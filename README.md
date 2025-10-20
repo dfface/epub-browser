@@ -7,7 +7,8 @@ Read epub file in the browser(Chrome/Edge/Safari...).
 Type the command in the terminal:
 
 ```bash
-python3 epub-browser.py xxx.epub
+pip install epub-browser
+epub-browser path/to/xxx.epub
 ```
 
 Then a browser will be opened to view the epub file.
