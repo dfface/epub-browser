@@ -35,17 +35,17 @@ class EPUBProcessor:
         try:
             with zipfile.ZipFile(self.epub_path, 'r') as zip_ref:
                 zip_ref.extractall(self.extract_dir)
-            print(f"已解压EPUB文件到: {self.extract_dir}")
+            print(f"EPUB file extracted to: {self.extract_dir}")
             return True
         except Exception as e:
-            print(f"解压EPUB文件失败: {e}")
+            print(f"Failed to extract EPUB file: {e}")
             return False
     
     def parse_container(self):
         """解析container.xml获取内容文件路径"""
         container_path = os.path.join(self.extract_dir, 'META-INF', 'container.xml')
         if not os.path.exists(container_path):
-            print("未找到container.xml文件")
+            print("container.xml file not found")
             return None
             
         try:
@@ -57,7 +57,7 @@ class EPUBProcessor:
             if rootfile is not None:
                 return rootfile.get('full-path')
         except Exception as e:
-            print(f"解析container.xml失败: {e}")
+            print(f"Failed to parse container.xml: {e}")
             
         return None
     
@@ -79,7 +79,7 @@ class EPUBProcessor:
                     if os.path.exists(os.path.join(self.extract_dir, ncx_path)):
                         return ncx_path
         except Exception as e:
-            print(f"查找toc属性失败: {e}")
+            print(f"Failed to find toc attribute: {e}")
         
         # 如果没有明确指定，查找media-type为application/x-dtbncx+xml的文件
         for item_id, item in manifest.items():
@@ -101,7 +101,7 @@ class EPUBProcessor:
         """解析NCX文件获取目录结构"""
         ncx_full_path = os.path.join(self.extract_dir, ncx_path)
         if not os.path.exists(ncx_full_path):
-            print(f"未找到NCX文件: {ncx_full_path}")
+            print(f"NCX file not found: {ncx_full_path}")
             return []
             
         try:
@@ -162,11 +162,11 @@ class EPUBProcessor:
             for navpoint in top_navpoints:
                 process_navpoint(navpoint, 0)
             
-            print(f"解析NCX得到目录项: {[(t['title'], t['src']) for t in toc]}")
+            print(f"Parsed NCX table of contents items: {[(t['title'], t['src']) for t in toc]}")
             return toc
             
         except Exception as e:
-            print(f"解析NCX文件失败: {e}")
+            print(f"Failed to parse NCX file: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -175,7 +175,7 @@ class EPUBProcessor:
         """解析OPF文件获取书籍信息和章节列表"""
         opf_full_path = os.path.join(self.extract_dir, opf_path)
         if not os.path.exists(opf_full_path):
-            print(f"未找到OPF文件: {opf_full_path}")
+            print(f"OPF file not found: {opf_full_path}")
             return False
             
         try:
@@ -210,7 +210,7 @@ class EPUBProcessor:
             ncx_path = self.find_ncx_file(opf_path, manifest)
             if ncx_path:
                 self.toc = self.parse_ncx(ncx_path)
-                print(f"从NCX文件中找到 {len(self.toc)} 个目录项")
+                print(f"Found {len(self.toc)} table of contents items from NCX file")
             
             # 获取spine（阅读顺序）
             spine = root.find('.//opf:spine', ns)
@@ -230,12 +230,12 @@ class EPUBProcessor:
                                 'title': title or f"Chapter {len(self.chapters) + 1}"
                             })
             
-            print(f"找到 {len(self.chapters)} 个章节")
-            print(f"章节列表: {[(c['title'], c['path']) for c in self.chapters]}")
+            print(f"Found {len(self.chapters)} chapters")
+            print(f"Chapter list: {[(c['title'], c['path']) for c in self.chapters]}")
             return True
             
         except Exception as e:
-            print(f"解析OPF文件失败: {e}")
+            print(f"Failed to parse OPF file: {e}")
             return False
     
     def find_chapter_title(self, chapter_path):
@@ -259,7 +259,7 @@ class EPUBProcessor:
             if normalized_toc_path == normalized_chapter_path:
                 return toc_item['title']
         
-        print(f"未找到章节标题: {chapter_path}")
+        print(f"Chapter title not found: {chapter_path}")
         return None
     
     def create_web_interface(self):
@@ -275,12 +275,12 @@ class EPUBProcessor:
         # 复制资源文件（CSS、图片、字体等）
         self.copy_resources()
         
-        print(f"网页界面已创建在: {self.web_dir}")
+        print(f"Web interface created at: {self.web_dir}")
     
     def create_index_page(self):
         """创建索引页面"""
         index_html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -330,7 +330,7 @@ class EPUBProcessor:
         <p>EPUB to Web Converter</p>
     </div>
     
-    <h2>目录</h2>
+    <h2>Table of Contents</h2>
     <ul class="chapter-list">
 """
         
@@ -341,7 +341,7 @@ class EPUBProcessor:
             for i, chapter in enumerate(self.chapters):
                 chapter_index_map[chapter['path']] = i
             
-            print(f"章节索引映射: {chapter_index_map}")
+            print(f"Chapter index mapping: {chapter_index_map}")
             
             # 根据toc生成目录
             for toc_item in self.toc:
@@ -351,7 +351,7 @@ class EPUBProcessor:
                 if chapter_index is not None:
                     index_html += f'        <li class="{level_class}"><a href="chapter_{chapter_index}.html">{toc_item["title"]}</a></li>\n'
                 else:
-                    print(f"未找到章节索引: {toc_item['src']}")
+                    print(f"Chapter index not found: {toc_item['src']}")
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
@@ -385,7 +385,7 @@ class EPUBProcessor:
                         f.write(chapter_html)
                         
                 except Exception as e:
-                    print(f"处理章节 {chapter['path']} 失败: {e}")
+                    print(f"Failed to process chapter {chapter['path']}: {e}")
     
     def process_html_content(self, content, chapter_path):
         """处理HTML内容，修复资源链接并提取样式"""
@@ -507,11 +507,11 @@ class EPUBProcessor:
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_link = f'<a href="chapter_{chapter_index-1}.html">上一章</a>' if chapter_index > 0 else ''
-        next_link = f'<a href="chapter_{chapter_index+1}.html">下一章</a>' if chapter_index < len(self.chapters) - 1 else ''
+        prev_link = f'<a href="chapter_{chapter_index-1}.html">Previous Chapter</a>' if chapter_index > 0 else ''
+        next_link = f'<a href="chapter_{chapter_index+1}.html">Next Chapter</a>' if chapter_index < len(self.chapters) - 1 else ''
         
         return f"""<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -574,7 +574,7 @@ class EPUBProcessor:
 <body>
     <div class="navigation">
         <div>{prev_link}</div>
-        <div><a href="index.html">目录</a></div>
+        <div><a href="index.html">Table of Contents</a></div>
         <div>{next_link}</div>
     </div>
     
@@ -584,7 +584,7 @@ class EPUBProcessor:
     
     <div class="navigation">
         <div>{prev_link}</div>
-        <div><a href="index.html">目录</a></div>
+        <div><a href="index.html">Table of Contents</a></div>
         <div>{next_link}</div>
     </div>
 </body>
@@ -608,13 +608,13 @@ class EPUBProcessor:
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                 shutil.copy2(src_path, dst_path)
         
-        print(f"资源文件已复制到: {resources_dir}")
+        print(f"Resource files copied to: {resources_dir}")
     
     def cleanup(self):
         """清理临时文件"""
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
-            print("临时文件已清理")
+            print("Temporary files cleaned up")
 
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     """自定义HTTP请求处理器"""
@@ -629,21 +629,21 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description='EPUB to Web Converter')
-    parser.add_argument('filename', help='EPUB文件路径')
-    parser.add_argument('--port', '-p', type=int, default=8000, help='Web服务器端口 (默认: 8000)')
-    parser.add_argument('--no-browser', action='store_true', help='不自动打开浏览器')
+    parser.add_argument('filename', help='EPUB file path')
+    parser.add_argument('--port', '-p', type=int, default=8000, help='Web server port (default: 8000)')
+    parser.add_argument('--no-browser', action='store_true', help='Do not automatically open browser')
     
     args = parser.parse_args()
     
     if not os.path.exists(args.filename):
-        print(f"错误: 文件 '{args.filename}' 不存在")
+        print(f"Error: File '{args.filename}' does not exist")
         sys.exit(1)
     
     # 处理EPUB文件
     processor = EPUBProcessor(args.filename)
     
     try:
-        print(f"正在处理EPUB文件: {args.filename}")
+        print(f"Processing EPUB file: {args.filename}")
         
         # 解压EPUB
         if not processor.extract_epub():
@@ -652,7 +652,7 @@ def main():
         # 解析容器文件
         opf_path = processor.parse_container()
         if not opf_path:
-            print("无法解析EPUB容器文件")
+            print("Unable to parse EPUB container file")
             sys.exit(1)
         
         # 解析OPF文件
@@ -668,9 +668,9 @@ def main():
         httpd = HTTPServer(server_address, 
                           lambda *x, **y: EPUBHTTPRequestHandler(*x, web_dir=processor.web_dir, **y))
         
-        print(f"Web服务器已启动: http://localhost:{args.port}")
-        print(f"书籍标题: {processor.book_title}")
-        print("按 Ctrl+C 停止服务器")
+        print(f"Web server started: http://localhost:{args.port}")
+        print(f"Book title: {processor.book_title}")
+        print("Press Ctrl+C to stop the server")
         
         # 自动打开浏览器
         if not args.no_browser:
@@ -680,9 +680,9 @@ def main():
         httpd.serve_forever()
         
     except KeyboardInterrupt:
-        print("\n正在关闭服务器...")
+        print("\nShutting down server...")
     except Exception as e:
-        print(f"发生错误: {e}")
+        print(f"Error occurred: {e}")
     finally:
         processor.cleanup()
 
