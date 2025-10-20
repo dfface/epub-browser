@@ -2,6 +2,7 @@
 """
 EPUB to Web Converter
 将EPUB文件转换为可在浏览器中阅读的网页格式
+支持多本书籍同时转换
 """
 
 import os
@@ -12,17 +13,28 @@ import tempfile
 import shutil
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 import xml.etree.ElementTree as ET
 import json
 import re
+import hashlib
+from pathlib import Path
 
 class EPUBProcessor:
     """处理EPUB文件的类"""
     
-    def __init__(self, epub_path):
+    def __init__(self, epub_path, output_dir=None):
         self.epub_path = epub_path
-        self.temp_dir = tempfile.mkdtemp(prefix='epub_')
+        self.book_name = Path(epub_path).stem  # 获取文件名（不含扩展名）
+        self.book_hash = hashlib.md5(epub_path.encode()).hexdigest()[:8]  # 使用哈希值作为标识
+        
+        if output_dir:
+            # 使用用户指定的输出目录
+            self.temp_dir = tempfile.mkdtemp(prefix='epub_', dir=output_dir)
+        else:
+            # 使用系统临时目录
+            self.temp_dir = tempfile.mkdtemp(prefix='epub_')
+            
         self.extract_dir = os.path.join(self.temp_dir, 'extracted')
         self.web_dir = os.path.join(self.temp_dir, 'web')
         self.book_title = "EPUB Book"
@@ -276,6 +288,7 @@ class EPUBProcessor:
         self.copy_resources()
         
         print(f"Web interface created at: {self.web_dir}")
+        return self.web_dir
     
     def create_index_page(self):
         """创建索引页面"""
@@ -322,9 +335,22 @@ class EPUBProcessor:
         .toc-level-1 {{ margin-left: 20px; font-size: 0.95em; }}
         .toc-level-2 {{ margin-left: 40px; font-size: 0.9em; }}
         .toc-level-3 {{ margin-left: 60px; font-size: 0.85em; }}
+        .back-link {{
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+            text-decoration: none;
+            color: #333;
+        }}
+        .back-link:hover {{
+            background-color: #e0e0e0;
+        }}
     </style>
 </head>
 <body>
+    <a href="/" class="back-link">← Back to Library</a>
     <div class="header">
         <h1>{self.book_title}</h1>
         <p>EPUB to Web Converter</p>
@@ -553,25 +579,22 @@ class EPUBProcessor:
             max-width: 100%;
             height: auto;
         }}
+        .back-link {{
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+            text-decoration: none;
+            color: #333;
+        }}
+        .back-link:hover {{
+            background-color: #e0e0e0;
+        }}
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/styles/default.min.css">
-    <!-- and it's easy to individually load additional languages -->
-    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/go.min.js"></script>
-    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/python.min.js"></script>
-    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/bash.min.js"></script>
-    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/java.min.js"></script>
-    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/c++.min.js"></script>
-    <script src="https://unpkg.com/@highlightjs/cdn-assets@11.9.0/languages/c.min.js"></script>
-    <script>hljs.highlightAll();</script>
-    <script>
-    document.addEventListener('DOMContentLoaded', (event) => {{
-        document.querySelectorAll('pre').forEach((el) => {{
-            hljs.highlightElement(el);
-        }});
-    }});
-    </script>
 </head>
 <body>
+    <a href="index.html" class="back-link">← Back to Table of Contents</a>
     <div class="navigation">
         <div>{prev_link}</div>
         <div><a href="index.html">Table of Contents</a></div>
@@ -610,81 +633,347 @@ class EPUBProcessor:
         
         print(f"Resource files copied to: {resources_dir}")
     
+    def get_book_info(self):
+        """获取书籍信息"""
+        return {
+            'title': self.book_title,
+            'path': self.web_dir,
+            'name': self.book_name,
+            'hash': self.book_hash
+        }
+    
     def cleanup(self):
         """清理临时文件"""
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
-            print("Temporary files cleaned up")
+            print(f"Temporary files cleaned up for: {self.book_title}")
 
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     """自定义HTTP请求处理器"""
     
-    def __init__(self, *args, web_dir=None, **kwargs):
-        self.web_dir = web_dir
-        super().__init__(*args, directory=web_dir, **kwargs)
+    def __init__(self, *args, library=None, **kwargs):
+        self.library = library
+        # 设置服务器根目录为临时目录
+        self.base_directory = self.library.base_directory
+        super().__init__(*args, directory=self.base_directory, **kwargs)
+    
+    def do_GET(self):
+        """处理GET请求"""
+        # 解析请求路径
+        parsed_path = urlparse(self.path)
+        path = parsed_path.path
+        
+        # 处理根路径 - 显示图书馆首页
+        if path == '/' or path == '/index.html':
+            self.send_library_index()
+            return
+        
+        # 处理书籍路径 - 使用哈希值
+        if path.startswith('/book/'):
+            self.serve_book_content(path)
+            return
+        
+        # 其他请求使用默认处理
+        super().do_GET()
+    
+    def send_library_index(self):
+        """发送图书馆首页"""
+        library_html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB Library</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .book-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .book-list li {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .book-list a {
+            text-decoration: none;
+            color: #333;
+            display: block;
+        }
+        .book-list a:hover {
+            background-color: #f0f0f0;
+        }
+        .book-title {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .book-file {
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>EPUB Library</h1>
+        <p>All converted EPUB books</p>
+    </div>
+    
+    <h2>Available Books</h2>
+    <ul class="book-list">
+"""
+        
+        for book_hash, book_info in self.library.books.items():
+            library_html += f"""
+        <li>
+            <a href="/book/{book_hash}/">
+                <div class="book-title">{book_info['title']}</div>
+                <div class="book-file">File: {book_info['web_dir']}</div>
+            </a>
+        </li>"""
+        
+        library_html += """
+    </ul>
+</body>
+</html>"""
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.send_header('Content-Length', str(len(library_html.encode('utf-8'))))
+        self.end_headers()
+        self.wfile.write(library_html.encode('utf-8'))
+    
+    def serve_book_content(self, path):
+        """服务书籍内容"""
+        # 提取书籍哈希值和请求的文件路径
+        path_parts = path.split('/')
+        if len(path_parts) < 3:
+            self.send_error(404, "Book not found")
+            return
+        
+        book_hash = path_parts[2]
+        
+        # 检查书籍是否存在
+        if book_hash not in self.library.books:
+            self.send_error(404, f"Book with hash '{book_hash}' not found")
+            return
+        
+        book_info = self.library.books[book_hash]
+        book_web_dir = book_info['web_dir']
+        
+        # 确定请求的文件
+        if len(path_parts) == 3 or path_parts[3] == '':
+            # 请求书籍根目录，返回index.html
+            file_path = os.path.join(book_web_dir, 'index.html')
+        else:
+            # 请求特定文件
+            relative_path = '/'.join(path_parts[3:])
+            file_path = os.path.join(book_web_dir, relative_path)
+        
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            self.send_error(404, f"File not found: {relative_path}")
+            return
+        
+        # 发送文件
+        try:
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
+            # 确定MIME类型
+            if file_path.endswith('.html'):
+                content_type = 'text/html'
+            elif file_path.endswith('.css'):
+                content_type = 'text/css'
+            elif file_path.endswith('.js'):
+                content_type = 'application/javascript'
+            elif file_path.endswith('.png'):
+                content_type = 'image/png'
+            elif file_path.endswith('.jpg') or file_path.endswith('.jpeg'):
+                content_type = 'image/jpeg'
+            elif file_path.endswith('.gif'):
+                content_type = 'image/gif'
+            elif file_path.endswith('.svg'):
+                content_type = 'image/svg+xml'
+            else:
+                content_type = 'application/octet-stream'
+            
+            self.send_response(200)
+            self.send_header('Content-type', content_type)
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+            
+        except Exception as e:
+            self.send_error(500, f"Error reading file: {str(e)}")
     
     def log_message(self, format, *args):
         """自定义日志格式"""
         print(f"[{self.log_date_time_string()}] {format % args}")
 
+class EPUBLibrary:
+    """EPUB图书馆类，管理多本书籍"""
+    
+    def __init__(self, output_dir=None):
+        self.output_dir = output_dir
+        self.books = {}  # 存储所有书籍信息，使用哈希作为键
+        self.server = None
+        
+        # 创建基础目录用于服务器
+        self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
+        print(f"Library base directory: {self.base_directory}")
+    
+    def add_book(self, epub_path):
+        """添加一本书籍到图书馆"""
+        try:
+            print(f"Adding book: {epub_path}")
+            processor = EPUBProcessor(epub_path, self.output_dir)
+            
+            # 解压EPUB
+            if not processor.extract_epub():
+                return False
+            
+            # 解析容器文件
+            opf_path = processor.parse_container()
+            if not opf_path:
+                print(f"Unable to parse EPUB container file: {epub_path}")
+                return False
+            
+            # 解析OPF文件
+            if not processor.parse_opf(opf_path):
+                return False
+            
+            # 创建网页界面
+            web_dir = processor.create_web_interface()
+            
+            # 存储书籍信息
+            book_info = processor.get_book_info()
+            self.books[book_info['hash']] = {
+                'title': book_info['title'],
+                'web_dir': web_dir,
+                'name': book_info['name'],
+                'processor': processor
+            }
+            
+            print(f"Successfully added book: {book_info['title']} (Hash: {book_info['hash']})")
+            return True
+            
+        except Exception as e:
+            print(f"Failed to add book {epub_path}: {e}")
+            return False
+    
+    def start_server(self, port=8000, no_browser=False):
+        """启动Web服务器"""
+        if not self.books:
+            print("No books available to serve")
+            return False
+        
+        try:
+            # 创建自定义请求处理器
+            handler = lambda *args, **kwargs: EPUBHTTPRequestHandler(
+                *args, library=self, **kwargs
+            )
+            
+            # 启动服务器
+            server_address = ('', port)
+            self.server = HTTPServer(server_address, handler)
+            
+            print(f"Web server started: http://localhost:{port}")
+            print("Available books:")
+            for book_hash, book_info in self.books.items():
+                print(f"  - {book_info['title']}: http://localhost:{port}/book/{book_hash}/")
+            print("Press Ctrl+C to stop the server")
+            
+            # 自动打开浏览器
+            if not no_browser:
+                webbrowser.open(f'http://localhost:{port}')
+            
+            # 启动服务器
+            self.server.serve_forever()
+            return True
+            
+        except Exception as e:
+            print(f"Failed to start server: {e}")
+            return False
+    
+    def stop_server(self):
+        """停止Web服务器"""
+        if self.server:
+            self.server.shutdown()
+            print("Server stopped")
+    
+    def cleanup(self):
+        """清理所有临时文件"""
+        # 清理基础目录
+        if os.path.exists(self.base_directory):
+            shutil.rmtree(self.base_directory)
+            print(f"Cleaned up library base directory: {self.base_directory}")
+        
+        # 清理各本书籍的临时文件
+        for book_hash, book_info in self.books.items():
+            try:
+                book_info['processor'].cleanup()
+                print(f"Cleaned up temporary files for: {book_info['title']}")
+            except Exception as e:
+                print(f"Failed to clean up {book_info['title']}: {e}")
+
 def main():
-    parser = argparse.ArgumentParser(description='EPUB to Web Converter')
-    parser.add_argument('filename', help='EPUB file path')
+    parser = argparse.ArgumentParser(description='EPUB to Web Converter - Multi-book Support')
+    parser.add_argument('filename', nargs='+', help='EPUB file path(s)')
     parser.add_argument('--port', '-p', type=int, default=8000, help='Web server port (default: 8000)')
     parser.add_argument('--no-browser', action='store_true', help='Do not automatically open browser')
+    parser.add_argument('--output-dir', '-o', help='Output directory for converted books')
+    parser.add_argument('--keep-files', action='store_true', help='Keep converted files after server stops')
     
     args = parser.parse_args()
     
-    if not os.path.exists(args.filename):
-        print(f"Error: File '{args.filename}' does not exist")
-        sys.exit(1)
+    # 检查文件是否存在
+    for filename in args.filename:
+        if not os.path.exists(filename):
+            print(f"Error: File '{filename}' does not exist")
+            sys.exit(1)
     
-    # 处理EPUB文件
-    processor = EPUBProcessor(args.filename)
+    # 创建图书馆
+    library = EPUBLibrary(args.output_dir)
     
     try:
-        print(f"Processing EPUB file: {args.filename}")
+        # 添加所有书籍
+        success_count = 0
+        for filename in args.filename:
+            if library.add_book(filename):
+                success_count += 1
         
-        # 解压EPUB
-        if not processor.extract_epub():
+        if success_count == 0:
+            print("No books were successfully processed")
             sys.exit(1)
         
-        # 解析容器文件
-        opf_path = processor.parse_container()
-        if not opf_path:
-            print("Unable to parse EPUB container file")
-            sys.exit(1)
-        
-        # 解析OPF文件
-        if not processor.parse_opf(opf_path):
-            sys.exit(1)
-        
-        # 创建网页界面
-        processor.create_web_interface()
-        
-        # 启动Web服务器
-        os.chdir(processor.web_dir)
-        server_address = ('', args.port)
-        httpd = HTTPServer(server_address, 
-                          lambda *x, **y: EPUBHTTPRequestHandler(*x, web_dir=processor.web_dir, **y))
-        
-        print(f"Web server started: http://localhost:{args.port}")
-        print(f"Book title: {processor.book_title}")
-        print("Press Ctrl+C to stop the server")
-        
-        # 自动打开浏览器
-        if not args.no_browser:
-            webbrowser.open(f'http://localhost:{args.port}')
+        print(f"Successfully processed {success_count} out of {len(args.filename)} books")
         
         # 启动服务器
-        httpd.serve_forever()
+        library.start_server(args.port, args.no_browser)
         
     except KeyboardInterrupt:
         print("\nShutting down server...")
     except Exception as e:
         print(f"Error occurred: {e}")
     finally:
-        processor.cleanup()
+        library.stop_server()
+        if not args.keep_files:
+            library.cleanup()
 
 if __name__ == '__main__':
     main()

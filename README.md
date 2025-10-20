@@ -8,7 +8,27 @@ Type the command in the terminal:
 
 ```bash
 pip install epub-browser
-epub-browser path/to/xxx.epub
+
+# Open single book
+epub-browser path/to/book1.epub
+
+# Open multiple books
+epub-browser book1.epub book2.epub book3.epub
+
+# Open multiple books under the path
+epub-browser *.epub
+
+# Specify the output directory of html files, or use tmp directory by default
+epub-browser book1.epub book2.epub --output-dir /path/to/output
+
+# Save the converted html files, will not clean the target tmp directory
+epub-browser book1.epub --keep-files
+
+# Do not open the browser automatically
+epub-browser book1.epub book2.epub --no-browser
+
+# Specify the server port
+epub-browser book1.epub --port 8080
 ```
 
 Then a browser will be opened to view the epub file.
