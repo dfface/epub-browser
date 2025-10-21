@@ -127,10 +127,10 @@ class EPUBProcessor:
             tree = ET.parse(ncx_full_path)
             root = tree.getroot()
             
-            # 获取书籍标题
-            doc_title = root.find('.//{http://www.daisy.org/z3986/2005/ncx/}docTitle/{http://www.daisy.org/z3986/2005/ncx/}text')
-            if doc_title is not None and doc_title.text:
-                self.book_title = doc_title.text
+            # 获取书籍标题（这一步应该在 opf 文件解析那里做）
+            # doc_title = root.find('.//{http://www.daisy.org/z3986/2005/ncx/}docTitle/{http://www.daisy.org/z3986/2005/ncx/}text')
+            # if doc_title is not None and doc_title.text:
+            #     self.book_title = doc_title.text
             
             # 解析目录
             nav_map = root.find('.//{http://www.daisy.org/z3986/2005/ncx/}navMap')
