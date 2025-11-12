@@ -837,6 +837,23 @@ class EPUBLibrary:
         self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
         print(f"Library base directory: {self.base_directory}")
     
+    def is_epub_file(self, filename):
+        suffix = filename[-5:]
+        return suffix == '.epub'
+    
+    def epub_file_discover(self, filename) -> list:
+        filenames = []
+        if self.is_epub_file(filename):
+            filenames.append(filename)
+            return filenames
+        if os.path.isdir(filename):
+            cur_files = os.listdir(filename)
+            for new_filename in cur_files:
+                new_path = os.path.join(filename, new_filename)
+                cur_names = self.epub_file_discover(new_path)
+                filenames.extend(cur_names)
+        return filenames   
+    
     def add_book(self, epub_path):
         """添加一本书籍到图书馆"""
         try:
@@ -953,7 +970,12 @@ def main():
     try:
         # 添加所有书籍
         success_count = 0
+        # 收集真实的 epub file
+        real_epub_files = []
         for filename in args.filename:
+            files = library.epub_file_discover(filename)
+            real_epub_files.extend(files)
+        for filename in real_epub_files:
             if library.add_book(filename):
                 success_count += 1
         
