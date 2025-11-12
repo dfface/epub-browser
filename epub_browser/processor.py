@@ -266,7 +266,7 @@ class EPUBProcessor:
 
             # 获取语言
             lang = root.find('.//dc:language', ns)
-            self.lang = lang.text if lang else 'en'
+            self.lang = lang.text if lang is not None and lang.text else 'en'
 
             # 获取封面
             cover_info = self.find_cover_info(tree, ns)
