@@ -1964,7 +1964,7 @@ class EPUBProcessor:
 
             
             let lastScrollTop = 0; // 移动端滚动时显示/隐藏底部控件
-            const scrollThreshold = 10; // 滚动阈值，避免轻微滚动触
+            const scrollThreshold = 1; // 滚动阈值，避免轻微滚动触
             const mobileControls = document.querySelector('.mobile-controls');
             window.addEventListener('scroll', function() {
                 const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
