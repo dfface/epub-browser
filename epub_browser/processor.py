@@ -802,7 +802,7 @@ class EPUBProcessor:
                 chapter_index = chapter_index_map.get(toc_item['src'])
                 
                 if chapter_index is not None:
-                    index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html">{toc_item["title"]}</a></li>\n'
+                    index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                 else:
                     print(f"Chapter index not found: {toc_item['src']}")
         else:
