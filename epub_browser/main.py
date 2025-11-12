@@ -354,7 +354,6 @@ class EPUBProcessor:
     <a href="/" class="back-link">← Back to Library</a>
     <div class="header">
         <h1>{self.book_title}</h1>
-        <p>EPUB to Web Converter</p>
     </div>
     
     <h2>Table of Contents</h2>
@@ -731,7 +730,6 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
 <body>
     <div class="header">
         <h1>EPUB Library</h1>
-        <p>All converted EPUB books</p>
     </div>
     
     <h2>Available Books</h2>
