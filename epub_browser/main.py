@@ -14,6 +14,7 @@ import shutil
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import unquote, urlparse
+from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import json
 import re
@@ -47,7 +48,7 @@ class EPUBProcessor:
         try:
             with zipfile.ZipFile(self.epub_path, 'r') as zip_ref:
                 zip_ref.extractall(self.extract_dir)
-            print(f"EPUB file extracted to: {self.extract_dir}")
+            # print(f"EPUB file extracted to: {self.extract_dir}")
             return True
         except Exception as e:
             print(f"Failed to extract EPUB file: {e}")
@@ -174,7 +175,7 @@ class EPUBProcessor:
             for navpoint in top_navpoints:
                 process_navpoint(navpoint, 0)
             
-            print(f"Parsed NCX table of contents items: {[(t['title'], t['src']) for t in toc]}")
+            # print(f"Parsed NCX table of contents items: {[(t['title'], t['src']) for t in toc]}")
             return toc
             
         except Exception as e:
@@ -222,7 +223,7 @@ class EPUBProcessor:
             ncx_path = self.find_ncx_file(opf_path, manifest)
             if ncx_path:
                 self.toc = self.parse_ncx(ncx_path)
-                print(f"Found {len(self.toc)} table of contents items from NCX file")
+                # print(f"Found {len(self.toc)} table of contents items from NCX file")
             
             # 获取spine（阅读顺序）
             spine = root.find('.//opf:spine', ns)
@@ -242,8 +243,8 @@ class EPUBProcessor:
                                 'title': title or f"Chapter {len(self.chapters) + 1}"
                             })
             
-            print(f"Found {len(self.chapters)} chapters")
-            print(f"Chapter list: {[(c['title'], c['path']) for c in self.chapters]}")
+            # print(f"Found {len(self.chapters)} chapters")
+            # print(f"Chapter list: {[(c['title'], c['path']) for c in self.chapters]}")
             return True
             
         except Exception as e:
@@ -271,7 +272,7 @@ class EPUBProcessor:
             if normalized_toc_path == normalized_chapter_path:
                 return toc_item['title']
         
-        print(f"Chapter title not found: {chapter_path}")
+        # print(f"Chapter title not found: {chapter_path}")
         return None
     
     def create_web_interface(self):
@@ -287,7 +288,7 @@ class EPUBProcessor:
         # 复制资源文件（CSS、图片、字体等）
         self.copy_resources()
         
-        print(f"Web interface created at: {self.web_dir}")
+        # print(f"Web interface created at: {self.web_dir}")
         return self.web_dir
     
     def create_index_page(self):
@@ -367,7 +368,7 @@ class EPUBProcessor:
             for i, chapter in enumerate(self.chapters):
                 chapter_index_map[chapter['path']] = i
             
-            print(f"Chapter index mapping: {chapter_index_map}")
+            # print(f"Chapter index mapping: {chapter_index_map}")
             
             # 根据toc生成目录
             for toc_item in self.toc:
@@ -631,7 +632,7 @@ class EPUBProcessor:
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                 shutil.copy2(src_path, dst_path)
         
-        print(f"Resource files copied to: {resources_dir}")
+        # print(f"Resource files copied to: {resources_dir}")
     
     def get_book_info(self):
         """获取书籍信息"""
@@ -646,7 +647,7 @@ class EPUBProcessor:
         """清理临时文件"""
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
-            print(f"Temporary files cleaned up for: {self.book_title}")
+            # print(f"Temporary files cleaned up for: {self.book_title}")
 
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     """自定义HTTP请求处理器"""
@@ -857,7 +858,7 @@ class EPUBLibrary:
     def add_book(self, epub_path):
         """添加一本书籍到图书馆"""
         try:
-            print(f"Adding book: {epub_path}")
+            # print(f"Adding book: {epub_path}")
             processor = EPUBProcessor(epub_path, self.output_dir)
             
             # 解压EPUB
@@ -886,7 +887,7 @@ class EPUBLibrary:
                 'processor': processor
             }
             
-            print(f"Successfully added book: {book_info['title']} (Hash: {book_info['hash']})")
+            # print(f"Successfully added book: {book_info['title']} (Hash: {book_info['hash']})")
             return True
             
         except Exception as e:
@@ -913,7 +914,7 @@ class EPUBLibrary:
             print("Available books:")
             for book_hash, book_info in self.books.items():
                 print(f"  - {book_info['title']}: http://localhost:{port}/book/{book_hash}/")
-            print("Press Ctrl+C to stop the server")
+            print("Press Ctrl+C to stop the server\n")
             
             # 自动打开浏览器
             if not no_browser:
@@ -938,7 +939,7 @@ class EPUBLibrary:
         # 清理基础目录
         if os.path.exists(self.base_directory):
             shutil.rmtree(self.base_directory)
-            print(f"Cleaned up library base directory: {self.base_directory}")
+            # print(f"Cleaned up library base directory: {self.base_directory}")
         
         # 清理各本书籍的临时文件
         for book_hash, book_info in self.books.items():
@@ -975,7 +976,7 @@ def main():
         for filename in args.filename:
             files = library.epub_file_discover(filename)
             real_epub_files.extend(files)
-        for filename in real_epub_files:
+        for filename in tqdm(real_epub_files):
             if library.add_book(filename):
                 success_count += 1
         
@@ -983,13 +984,13 @@ def main():
             print("No books were successfully processed")
             sys.exit(1)
         
-        print(f"Successfully processed {success_count} out of {len(args.filename)} books")
+        # print(f"Successfully processed {success_count} out of {len(args.filename)} books")
         
         # 启动服务器
         library.start_server(args.port, args.no_browser)
         
     except KeyboardInterrupt:
-        print("\nShutting down server...")
+        print("\n\nShutting down server...")
     except Exception as e:
         print(f"Error occurred: {e}")
     finally:

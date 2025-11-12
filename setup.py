@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
-    version="0.6.2",      # 初始版本号
+    version="0.6.3",      # 初始版本号
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     description="A tool to open epub files and serve them via a local web server for reading in a browser.",  # 简短描述
@@ -22,6 +22,7 @@ setup(
     python_requires='>=3.6',  # 指定Python版本要求
     install_requires=[  # 项目依赖的第三方包
         # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []
+        "tqdm"
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
         'console_scripts': [
