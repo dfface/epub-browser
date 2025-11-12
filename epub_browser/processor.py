@@ -1715,7 +1715,7 @@ class EPUBProcessor:
         {next_link_mobile}
         <div class="control-btn" id="mobileFontBtn">
             <i class="fas fa-font"></i>
-            <span>Font Size</span>
+            <span>Font</span>
         </div>
         <div class="control-btn" id="mobileTopBtn">
             <i class="fas fa-arrow-up"></i>
