@@ -610,8 +610,18 @@ class EPUBLibrary:
 </footer>
 """
         library_html += """<script>
-        // 主题切换功能
         document.addEventListener('DOMContentLoaded', function() {
+            // 书籍目录锚点
+            const allBookLinks = document.querySelectorAll('.book-card .book-link');
+            allBookLinks.forEach(item => {
+                let pathParts = item.href.split('/');
+                pathParts = pathParts.filter(item => item !== "");
+                let book_hash = pathParts[pathParts.length - 1];
+                let book_anchor = localStorage.getItem(book_hash) || '';
+                item.href += book_anchor;
+            });
+
+            // 主题切换
             const themeToggle = document.getElementById('themeToggle');
             const themeIcon = themeToggle.querySelector('i');
             

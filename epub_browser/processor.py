@@ -1749,6 +1749,7 @@ class EPUBProcessor:
             const path = window.location.pathname;  // 获取当前URL路径
             const pathParts = path.split('/');
             const lastPart = pathParts[pathParts.length - 1];
+            const book_hash = pathParts[pathParts.length - 2];
             let anchor = '';
             if (lastPart.startsWith('chapter_') && lastPart.endsWith('.html')) {
                 anchor = "#" + lastPart.replace('.html', '');
@@ -1758,6 +1759,9 @@ class EPUBProcessor:
                 bookHomes.forEach(item => {
                     item.href += anchor;
                 });
+                localStorage.setItem(book_hash, anchor);
+            } else {
+                localStorage.removeItem(book_hash);
             }
 
             // 主题切换功能
