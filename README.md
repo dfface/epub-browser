@@ -18,6 +18,9 @@ epub-browser book1.epub book2.epub book3.epub
 # Open multiple books under the path
 epub-browser *.epub
 
+# Open multiple books under the path
+epub-browser /path/to/epub
+
 # Specify the output directory of html files, or use tmp directory by default
 epub-browser book1.epub book2.epub --output-dir /path/to/output
 
