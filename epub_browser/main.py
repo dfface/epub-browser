@@ -20,6 +20,7 @@ import json
 import re
 import hashlib
 from pathlib import Path
+from datetime import datetime
 
 class EPUBProcessor:
     """处理EPUB文件的类"""
@@ -39,6 +40,9 @@ class EPUBProcessor:
         self.extract_dir = os.path.join(self.temp_dir, 'extracted')
         self.web_dir = os.path.join(self.temp_dir, 'web')
         self.book_title = "EPUB Book"
+        self.authors = None
+        self.tags = None
+        self.cover_info = None
         self.chapters = []
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
@@ -74,6 +78,59 @@ class EPUBProcessor:
             
         return None
     
+    def find_cover_info(self, opf_tree, namespaces):
+        """
+        在 OPF 文件中查找封面信息
+        """
+        # 方法1: 查找 meta 标签中声明的封面
+        cover_id = None
+        meta_elements = opf_tree.findall('.//opf:metadata/opf:meta', namespaces)
+        for meta in meta_elements:
+            if meta.get('name') in ['cover', 'cover-image']:
+                cover_id = meta.get('content')
+                break
+        
+        # 方法2: 查找 manifest 中的封面项
+        manifest_items = opf_tree.findall('.//opf:manifest/opf:item', namespaces)
+        
+        # 优先使用 meta 标签中指定的封面
+        if cover_id:
+            for item in manifest_items:
+                if item.get('id') == cover_id:
+                    return {
+                        'href': item.get('href'),
+                        'media-type': item.get('media-type'),
+                        'id': item.get('id')
+                    }
+        
+        # 方法3: 通过文件名模式查找
+        cover_patterns = ['cover', 'Cover', 'COVER', 'titlepage', 'TitlePage']
+        for item in manifest_items:
+            media_type = item.get('media-type', '')
+            href = item.get('href', '')
+            
+            # 检查是否是图片文件
+            if media_type.startswith('image/'):
+                # 检查文件名是否匹配封面模式
+                if any(pattern in href for pattern in cover_patterns):
+                    return {
+                        'href': href,
+                        'media-type': media_type,
+                        'id': item.get('id')
+                    }
+        
+        # 方法4: 查找第一个图片作为备选
+        for item in manifest_items:
+            media_type = item.get('media-type', '')
+            if media_type.startswith('image/'):
+                return {
+                    'href': item.get('href'),
+                    'media-type': media_type,
+                    'id': item.get('id')
+                }
+        
+        return None
+
     def find_ncx_file(self, opf_path, manifest):
         """查找NCX文件路径"""
         opf_dir = os.path.dirname(opf_path)
@@ -203,6 +260,18 @@ class EPUBProcessor:
             title_elem = root.find('.//dc:title', ns)
             if title_elem is not None and title_elem.text:
                 self.book_title = title_elem.text
+            
+            # 获取作者名
+            authors = tree.findall('.//dc:creator', ns)
+            self.authors = [author.text for author in authors] if authors else None
+
+            # 获取标签
+            tags = tree.findall('.//dc:subject', ns)
+            self.tags = [tag.text for tag in tags] if tags else None
+
+            # 获取封面
+            cover_info = self.find_cover_info(tree, ns)
+            self.cover_info = cover_info
                 
             # 获取manifest（所有资源）
             manifest = {}
@@ -635,11 +704,17 @@ class EPUBProcessor:
     
     def get_book_info(self):
         """获取书籍信息"""
+        cover = ""
+        if self.cover_info:
+            cover = os.path.normpath(os.path.join(self.resources_base, self.cover_info["href"]))
         return {
             'title': self.book_title,
             'path': self.web_dir,
             'name': self.book_name,
-            'hash': self.book_hash
+            'hash': self.book_hash,
+            'cover': cover,
+            'authors': self.authors,
+            'tags': self.tags
         }
     
     def cleanup(self):
@@ -677,77 +752,623 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
     
     def send_library_index(self):
-        """发送图书馆首页"""
+        """图书馆首页"""
         library_html = """<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPUB Library</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
+<head><meta charset="UTF-8"><meta name="viewport"content="width=device-width, initial-scale=1.0"><title>EPUB Library</title><link rel="stylesheet"href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+        :root {
+            --primary: #4361ee;
+            --primary-light: #4895ef;
+            --secondary: #3f37c9;
+            --dark: #1d3557;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --success: #4cc9f0;
+            --warning: #f8961e;
+            --danger: #e63946;
+            --border-radius: 12px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+            
+            /* 浅色主题变量 */
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #1d3557;
+            --text-secondary: #6c757d;
+            --border-color: #e9ecef;
+            --header-bg: #ffffff;
         }
+
+        .dark-mode {
+            /* 深色主题变量 */
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e9ecef;
+            --text-secondary: #a0a0a0;
+            --border-color: #2d2d2d;
+            --header-bg: #1e1e1e;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: var(--bg-color);
+            min-height: 100vh;
+            padding: 20px;
+            transition: var(--transition);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
         .header {
             text-align: center;
             margin-bottom: 40px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
+            padding: 40px 20px;
+            background: var(--header-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            transition: var(--transition);
         }
-        .book-list {
-            list-style-type: none;
-            padding: 0;
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to right, var(--primary), var(--success));
         }
-        .book-list li {
-            margin: 10px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--text-color);
+            font-weight: 700;
+            transition: var(--transition);
         }
-        .book-list a {
-            text-decoration: none;
-            color: #333;
+
+        .header p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            transition: var(--transition);
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+        }
+
+        .theme-toggle:hover {
+            transform: rotate(15deg);
+        }
+
+        .theme-toggle i {
+            font-size: 1.3rem;
+            color: var(--text-color);
+            transition: var(--transition);
+        }
+
+        .controls {
+            display: block;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .search-container {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 15px 50px 15px 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            font-size: 1rem;
+            transition: var(--transition);
+            background: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            transition: var(--transition);
+        }
+
+        .filter-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-color);
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 15px 25px;
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: var(--transition);
+        }
+
+        .stat-card i {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .book-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .book-cover {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
             display: block;
         }
-        .book-list a:hover {
-            background-color: #f0f0f0;
+
+        .book-card-content {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
         }
+
         .book-title {
-            font-size: 1.2em;
-            font-weight: bold;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-color);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            transition: var(--transition);
         }
-        .book-file {
-            font-size: 0.9em;
-            color: #666;
+
+        .book-author {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            transition: var(--transition);
+        }
+
+        .book-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .book-tag {
+            background: var(--border-color);
+            color: var(--text-color);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .book-tag:hover {
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+        }
+
+        .book-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .book-format {
+            background: var(--primary-light);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .book-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 40px;
+            transition: var(--transition);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: var(--border-color);
+        }
+
+        .book-icon {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.5rem;
+        }
+
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        .tag-cloud-item {
+            background: var(--card-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            color: var(--text-color);
+        }
+
+        .tag-cloud-item:hover, .tag-cloud-item.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .book-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stats {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-container {
+                min-width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .book-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                padding: 30px 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>EPUB Library</h1>
-    </div>
-    
-    <h2>Available Books</h2>
-    <ul class="book-list">
 """
-        
+        all_tags = []
+        for book_hash, book_info in self.library.books.items():
+            cur_tags = book_info['tags']
+            if cur_tags:
+                all_tags.extend(cur_tags)
+
+        library_html += f"""
+    <div class="container">
+        <header class="header">
+            <div class="theme-toggle" id="themeToggle">
+                <i class="fas fa-moon"></i>
+            </div>
+            <h1><i class="fas fa-book-open"></i> EPUB Library</h1>
+            <div class="stats">
+                <div class="stat-card">
+                    <i class="fas fa-book"></i>
+                    <div>
+                        <div class="stat-value">{len(self.library.books)}</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-tags"></i>
+                    <div>
+                        <div class="stat-value">{len(all_tags)}</div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </header>
+        <div class="controls">
+            <div class="search-container">
+                <input type="text" class="search-box" placeholder="Search by book title, author, or tag...">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            <br/>
+            <div class="tag-cloud">
+                <div class="tag-cloud-item active">All</div>
+"""
+        for tag in all_tags:
+            library_html += f"""<div class="tag-cloud-item">{tag}</div>"""
+        library_html += """
+            </div>
+        </div>"""
+
+        library_html += """
+        <div class="book-grid">
+"""
         for book_hash, book_info in self.library.books.items():
             library_html += f"""
-        <li>
-            <a href="/book/{book_hash}/">
-                <div class="book-title">{book_info['title']}</div>
-                <div class="book-file">File: {book_info['web_dir']}</div>
+        <div class="book-card">
+            <a href="/book/{book_hash}/" class="book-link">
+                <img src="/book/{book_hash}/{book_info['cover']}" alt="cover" class="book-cover"/>
+                <div class="book-card-content">
+                    <h3 class="book-title">{book_info['title']}</h3>
+                    <div class="book-author">{" & ".join(book_info['authors']) if book_info['authors'] else ""}</div>
+                    <div class="book-tags">
+            """
+            for tag in book_info['tags']:
+                library_html += f"""
+                        <span class="book-tag">{tag}</span>
+"""
+            library_html += """
+                    </div>
+                </div>
             </a>
-        </li>"""
-        
-        library_html += """
-    </ul>
-</body>
+        </div>
+"""      
+        library_html += f"""
+    </div>
+    <footer class="footer">
+        <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+"""
+        library_html += """<script>
+        // 主题切换功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('themeToggle');
+            const themeIcon = themeToggle.querySelector('i');
+            
+            // 检查本地存储中的主题设置
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            
+            // 应用保存的主题
+            if (currentTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            }
+            
+            // 切换主题
+            themeToggle.addEventListener('click', function() {
+                document.body.classList.toggle('dark-mode');
+                
+                if (document.body.classList.contains('dark-mode')) {
+                    themeIcon.classList.remove('fa-moon');
+                    themeIcon.classList.add('fa-sun');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    themeIcon.classList.remove('fa-sun');
+                    themeIcon.classList.add('fa-moon');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+            
+            // 搜索功能
+            const searchBox = document.querySelector('.search-box');
+            const bookCards = document.querySelectorAll('.book-card');
+            const filterBtns = document.querySelectorAll('.filter-btn');
+            const tagCloudItems = document.querySelectorAll('.tag-cloud-item');
+            
+            // 搜索功能
+            searchBox.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                
+                bookCards.forEach(card => {
+                    const title = card.querySelector('.book-title').textContent.toLowerCase();
+                    const author = card.querySelector('.book-author').textContent.toLowerCase();
+                    
+                    if (title.includes(searchTerm) || author.includes(searchTerm)) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+            
+            // 标签云筛选功能
+            tagCloudItems.forEach(tag => {
+                tag.addEventListener('click', function() {
+                    // 移除所有标签的active类
+                    tagCloudItems.forEach(t => t.classList.remove('active'));
+                    // 为当前点击的标签添加active类
+                    this.classList.add('active');
+                    
+                    const tagText = this.textContent.trim();
+                    
+                    if (tagText === 'All') {
+                        bookCards.forEach(card => {
+                            card.style.display = 'block';
+                        });
+                    } else {
+                        bookCards.forEach(card => {
+                            const tags = card.querySelectorAll('.book-tag');
+                            let hasTag = false;
+                            
+                            tags.forEach(t => {
+                                if (t.textContent === tagText) {
+                                    hasTag = true;
+                                }
+                            });
+                            
+                            if (hasTag) {
+                                card.style.display = 'block';
+                            } else {
+                                card.style.display = 'none';
+                            }
+                        });
+                    }
+                });
+            });
+            
+            // 书籍标签点击筛选功能
+            const bookTags = document.querySelectorAll('.book-tag');
+            bookTags.forEach(tag => {
+                tag.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const tagText = this.textContent;
+                    
+                    // 移除所有标签云的active类
+                    tagCloudItems.forEach(t => t.classList.remove('active'));
+                    
+                    // 激活对应的标签云项
+                    tagCloudItems.forEach(t => {
+                        if (t.textContent === tagText) {
+                            t.classList.add('active');
+                        }
+                    });
+                    
+                    // 筛选书籍
+                    bookCards.forEach(card => {
+                        const tags = card.querySelectorAll('.book-tag');
+                        let hasTag = false;
+                        
+                        tags.forEach(t => {
+                            if (t.textContent === tagText) {
+                                hasTag = true;
+                            }
+                        });
+                        
+                        if (hasTag) {
+                            card.style.display = 'block';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+    </body>
 </html>"""
         
         self.send_response(200)
@@ -828,12 +1449,15 @@ class EPUBLibrary:
     """EPUB图书馆类，管理多本书籍"""
     
     def __init__(self, output_dir=None):
-        self.output_dir = output_dir
         self.books = {}  # 存储所有书籍信息，使用哈希作为键
         self.server = None
         
         # 创建基础目录用于服务器
-        self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
+        if output_dir is not None and os.path.exists(output_dir):
+            self.base_directory = output_dir
+        else:
+            self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
+
         print(f"Library base directory: {self.base_directory}")
     
     def is_epub_file(self, filename):
@@ -857,7 +1481,7 @@ class EPUBLibrary:
         """添加一本书籍到图书馆"""
         try:
             # print(f"Adding book: {epub_path}")
-            processor = EPUBProcessor(epub_path, self.output_dir)
+            processor = EPUBProcessor(epub_path, self.base_directory)
             
             # 解压EPUB
             if not processor.extract_epub():
@@ -882,6 +1506,9 @@ class EPUBLibrary:
                 'title': book_info['title'],
                 'web_dir': web_dir,
                 'name': book_info['name'],
+                'cover': book_info['cover'],
+                'authors': book_info['authors'],
+                'tags': book_info['tags'],
                 'processor': processor
             }
             
