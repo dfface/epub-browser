@@ -5,6 +5,7 @@ import shutil
 import xml.etree.ElementTree as ET
 import re
 import hashlib
+import json
 from datetime import datetime
 
 class EPUBProcessor:
@@ -12,7 +13,7 @@ class EPUBProcessor:
     
     def __init__(self, epub_path, output_dir=None):
         self.epub_path = epub_path
-        self.book_hash = hashlib.md5(epub_path.encode()).hexdigest()[:8]  # 使用哈希值作为标识
+        self.book_hash = hashlib.md5(epub_path.encode()).hexdigest()[:8]  # 使用哈希值作为标识，后续可能会根据 ncx 更新
         
         if output_dir:
             # 使用用户指定的输出目录
@@ -30,6 +31,15 @@ class EPUBProcessor:
         self.chapters = []
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
+        
+    def generate_hash(self):
+        """生成书籍 Hash
+        一般来说，用路径受到用户传参影响，每次都是绝对路径则都是一样；
+        content.opf 可能因修改元数据如标签而更改；
+        toc.ncx 一般不会变化，用这个来 Hash 比较合适，而这个解析出来的是 toc 变量；
+        """
+        if self.toc:
+            self.book_hash = hashlib.md5(json.dumps(self.toc).encode()).hexdigest()[:8]
         
     def extract_epub(self):
         """解压EPUB文件"""
@@ -1576,6 +1586,8 @@ class EPUBProcessor:
                 right: 5%;
                 left: 5%;
                 top: 20px;
+                bottom: 90px;
+                max-height: 100vh;
             }
 
             .mobile-controls {

@@ -139,7 +139,7 @@ class EPUBServer():
             self.server = HTTPServer(server_address, handler)
             
             print(f"Web server started: http://localhost:{port}")
-            print("Available books:")
+            print(f"Available books({len(self.library.books.items())}):")
             for book_hash, book_info in self.library.books.items():
                 print(f"  - {book_info['title']}: http://localhost:{port}/book/{book_hash}/")
             print("Press Ctrl+C to stop the server\n")

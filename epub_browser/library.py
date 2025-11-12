@@ -55,6 +55,9 @@ class EPUBLibrary:
             if not processor.parse_opf(opf_path):
                 return False
             
+            # 重新生成 hash
+            processor.generate_hash()
+            
             # 创建网页界面
             web_dir = processor.create_web_interface()
             
