@@ -25,7 +25,7 @@ setup(
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
         'console_scripts': [
-            'epub-browser=epub_browser.main:main',  # 格式：'命令名=模块路径:函数名'
+            'epub_browser=epub_browser.main:main',  # 格式：'命令名=模块路径:函数名'
         ],
     },
 )
