@@ -1985,6 +1985,9 @@ class EPUBProcessor:
                     } else if (size === 'large') {
                         content.classList.add('font-large');
                     }
+
+                    // 关闭窗口
+                    fontControls.classList.toggle('show');
                 });
             });
             
