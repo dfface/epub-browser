@@ -706,6 +706,11 @@ class EPUBProcessor:
             background: var(--border-color);
         }
 
+        .chapter-list a:target {
+            background: linear-gradient(to right, var(--primary), var(--success));
+            color: #e9ecef;
+        }
+
         .chapter-icon {
             margin-right: 12px;
             color: var(--text-secondary);
@@ -839,8 +844,18 @@ class EPUBProcessor:
 </footer>
 """
         index_html += """<script>
-    // 主题切换功能
     document.addEventListener('DOMContentLoaded', function() {
+        // 书籍目录锚点更新
+        const path = window.location.pathname;  // 获取当前URL路径
+        let pathParts = path.split('/');
+        pathParts = pathParts.filter(item => item !== "");
+        const book_hash = pathParts[pathParts.length - 1];
+        const anchor = window.location.hash;
+        if (anchor === '' || !anchor.startsWith('#chapter_')) {
+            localStorage.removeItem(book_hash);  // 此时 lastPart 就是 book_hash
+        }
+        
+        // 主题切换功能
         const themeToggle = document.getElementById('themeToggle');
         const themeIcon = themeToggle.querySelector('i');
         
@@ -1641,7 +1656,7 @@ class EPUBProcessor:
             <i class="fas fa-moon"></i>
         </div>
 
-        <a href="/book/{self.book_hash}" alt="bookHome" class="a-book-home">
+        <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">
             <div class="control-btn">
                 <i class="fas fa-book"></i>
             </div>
@@ -1668,7 +1683,7 @@ class EPUBProcessor:
         <div class="breadcrumb header">
             <a href="/" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>
-            <a href="/book/{self.book_hash}" alt="bookHome" class="a-book-home">{self.book_title}</a>
+            <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-current">{chapter_title}</span>
         </div>
@@ -1721,7 +1736,7 @@ class EPUBProcessor:
             <span>Theme</span>
         </div>
         {prev_link_mobile}
-        <a href="/book/{self.book_hash}" alt="bookHome" class="a-book-home">
+        <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">
             <div class="control-btn">
                 <i class="fas fa-book"></i>
                 <span>Book</span>
@@ -1760,8 +1775,6 @@ class EPUBProcessor:
                     item.href += anchor;
                 });
                 localStorage.setItem(book_hash, anchor);
-            } else {
-                localStorage.removeItem(book_hash);
             }
 
             // 主题切换功能
