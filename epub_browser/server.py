@@ -3,6 +3,7 @@ import shutil
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
+
 from .library import EPUBLibrary
 
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):

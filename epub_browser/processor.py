@@ -1158,24 +1158,26 @@ class EPUBProcessor:
             top: 150px;
             right: 30px;
             width: 280px;
+
             background: var(--card-bg);
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
             transition: var(--transition);
             max-height: 70vh;
-            overflow-y: auto;
             display: none;
+            flex-direction: column;  /* 垂直方向排列 */
             z-index: 88;
         }
 
         .toc-floating.active {
-            display: block;
+            display: flex;
         }
 
         .toc-header {
             padding: 15px 20px;
             border-bottom: 1px solid var(--border-color);
             display: flex;
+            flex-shrink: 0; /* 头部不收缩 */ 
             justify-content: space-between;
             align-items: center;
         }
@@ -1200,6 +1202,8 @@ class EPUBProcessor:
         }
 
         .toc-list {
+            flex: 1; /* 内容区域占据剩余空间 */
+            overflow-y: auto;
             list-style-type: none;
             padding: 10px 0;
         }
