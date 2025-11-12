@@ -3,7 +3,7 @@ import shutil
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
-from library import EPUBLibrary
+from .library import EPUBLibrary
 
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     """自定义HTTP请求处理器"""

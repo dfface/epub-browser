@@ -8,10 +8,10 @@ EPUB to Web Converter
 import os
 import sys
 import argparse
-
 from tqdm import tqdm
-from server import EPUBServer
-from library import EPUBLibrary
+
+from .server import EPUBServer
+from .library import EPUBLibrary
 
 def main():
     parser = argparse.ArgumentParser(description='EPUB to Web Converter - Multi-book Support')
