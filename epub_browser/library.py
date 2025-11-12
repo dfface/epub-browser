@@ -443,7 +443,6 @@ class EPUBLibrary:
             color: var(--text-secondary);
             font-size: 0.9rem;
             border-top: 1px solid var(--border-color);
-            margin-top: 20px;
             transition: var(--transition);
         }
 
@@ -548,13 +547,13 @@ class EPUBLibrary:
                 <div class="stat-card">
                     <i class="fas fa-book"></i>
                     <div>
-                        <div class="stat-value">{len(self.books)}</div>
+                        <div class="stat-value">{len(self.books)} book(s)</div>
                     </div>
                 </div>
                 <div class="stat-card">
                     <i class="fas fa-tags"></i>
                     <div>
-                        <div class="stat-value">{len(all_tags)}</div>
+                        <div class="stat-value">{len(all_tags)} tag(s)</div>
                     </div>
                 </div>
             </div>

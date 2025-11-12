@@ -465,9 +465,6 @@ class EPUBProcessor:
         }
 
         .theme-toggle {
-            position: absolute;
-            top: 30px;
-            right: 30px;
             background: var(--card-bg);
             border: none;
 
@@ -490,6 +487,16 @@ class EPUBProcessor:
             font-size: 1.3rem;
             color: var(--text-color);
             transition: var(--transition);
+        }
+
+        .top-controls {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 22;
         }
 
         .reading-controls {
@@ -731,7 +738,6 @@ class EPUBProcessor:
             color: var(--text-secondary);
             font-size: 0.9rem;
             border-top: 1px solid var(--border-color);
-            margin-top: 20px;
             transition: var(--transition);
         }
 
@@ -775,13 +781,18 @@ class EPUBProcessor:
     </style>
 </head>
 <body>
+<div class="top-controls">
+    <div class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i>
+    </div>
+</div>
 """
         index_html += f"""
 <div class="container">
     <div class="breadcrumb header">
         <a href="/"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
         <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current">{self.book_title}</span>
+        <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
     </div>
     
     <div class="toc-container">
@@ -807,7 +818,7 @@ class EPUBProcessor:
                 chapter_index = chapter_index_map.get(toc_item['src'])
                 
                 if chapter_index is not None:
-                    index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                    index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                 else:
                     print(f"Chapter index not found: {toc_item['src']}")
         else:
@@ -818,8 +829,10 @@ class EPUBProcessor:
         index_html += f"""    </ul>
     </div>
 </div>
-<div class="theme-toggle" id="themeToggle">
-    <i class="fas fa-moon"></i>
+<div class="reading-controls">
+    <div class="control-btn" id="scrollToTopBtn">
+        <i class="fas fa-arrow-up"></i>
+    </div>
 </div>
 <footer class="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
@@ -1417,7 +1430,6 @@ class EPUBProcessor:
             padding: 10px 0;
             color: var(--text-secondary);
             font-size: 0.9rem;
-            margin-top: 20px;
             background: var(--header-bg);
             transition: var(--transition);
         }
@@ -1533,9 +1545,7 @@ class EPUBProcessor:
             color: var(--text-secondary);
             cursor: pointer;
             transition: var(--transition);
-            padding: 8px 12px;
             border-radius: 8px;
-            min-width: 60px;
         }
 
         .mobile-controls .control-btn:hover,
@@ -1631,7 +1641,7 @@ class EPUBProcessor:
             <i class="fas fa-moon"></i>
         </div>
 
-        <a href="/book/{self.book_hash}" alt="bookHome">
+        <a href="/book/{self.book_hash}" alt="bookHome" class="a-book-home">
             <div class="control-btn">
                 <i class="fas fa-book"></i>
             </div>
@@ -1658,7 +1668,7 @@ class EPUBProcessor:
         <div class="breadcrumb header">
             <a href="/" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>
-            <a href="/book/{self.book_hash}" alt="bookHome">{self.book_title}</a>
+            <a href="/book/{self.book_hash}" alt="bookHome" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-current">{chapter_title}</span>
         </div>
@@ -1711,10 +1721,10 @@ class EPUBProcessor:
             <span>Theme</span>
         </div>
         {prev_link_mobile}
-        <a href="/" alt="home">
+        <a href="/book/{self.book_hash}" alt="bookHome" class="a-book-home">
             <div class="control-btn">
-                <i class="fas fa-home"></i>
-                <span>Home</span>
+                <i class="fas fa-book"></i>
+                <span>Book</span>
             </div>
         </a>
         {next_link_mobile}
@@ -1734,8 +1744,23 @@ class EPUBProcessor:
 """
         chapter_html += """
 <script>
-        // 主题切换功能
         document.addEventListener('DOMContentLoaded', function() {
+            // 书籍目录锚点更新
+            const path = window.location.pathname;  // 获取当前URL路径
+            const pathParts = path.split('/');
+            const lastPart = pathParts[pathParts.length - 1];
+            let anchor = '';
+            if (lastPart.startsWith('chapter_') && lastPart.endsWith('.html')) {
+                anchor = "#" + lastPart.replace('.html', '');
+            }
+            if (anchor !== '') {
+                let bookHomes = document.querySelectorAll('.a-book-home');
+                bookHomes.forEach(item => {
+                    item.href += anchor;
+                });
+            }
+
+            // 主题切换功能
             const themeToggle = document.getElementById('themeToggle');
             const mobileThemeBtn = document.getElementById('mobileThemeBtn');
             const themeIcon = themeToggle.querySelector('i');
