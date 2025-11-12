@@ -28,6 +28,7 @@ class EPUBProcessor:
         self.authors = None
         self.tags = None
         self.cover_info = None
+        self.lang = 'en'
         self.chapters = []
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
@@ -263,6 +264,10 @@ class EPUBProcessor:
             tags = tree.findall('.//dc:subject', ns)
             self.tags = [tag.text for tag in tags] if tags else None
 
+            # 获取语言
+            lang = root.find('.//dc:language', ns)
+            self.lang = lang.text if lang else 'en'
+
             # 获取封面
             cover_info = self.find_cover_info(tree, ns)
             self.cover_info = cover_info
@@ -357,7 +362,7 @@ class EPUBProcessor:
     def create_index_page(self):
         """创建章节索引页面"""
         index_html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{self.lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1017,7 +1022,7 @@ class EPUBProcessor:
         next_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
         
         chapter_html =  f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{self.lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
