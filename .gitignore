@@ -1,2 +1,5 @@
 .DS_Store
 .venv
+build
+dist
+epub_browser.egg-info
