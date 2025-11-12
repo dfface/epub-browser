@@ -3,3 +3,4 @@
 build
 dist
 epub_browser.egg-info
+epub_browser/__pycache__/

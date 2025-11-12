@@ -6,9 +6,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
-    version="0.6.3",      # 初始版本号
+    version="1.0.0",      # 初始版本号
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
+    keywords="epub reader html export browser convert calibre-web calibre",
     description="A tool to open epub files and serve them via a local web server for reading in a browser.",  # 简短描述
     long_description=long_description,  # 详细描述，从README.md读取
     long_description_content_type="text/markdown",  # 详细描述格式
