@@ -658,6 +658,9 @@ class EPUBLibrary:
             // 检查当前的基路径
             base_path = window.location.pathname;
             if (base_path !== "/") {
+                if (base_path.endsWith("index.html")) {
+                    base_path = base_path.replace(/index.html$/, '');
+                }
                 // 处理所有资源，都要加上基路径
                 addBasePath(base_path);
             } else {

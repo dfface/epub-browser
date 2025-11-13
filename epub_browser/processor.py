@@ -976,7 +976,8 @@ class EPUBProcessor:
         // 检查当前的基路径
         if (!path.startsWith("/book/")) {
             // 获取基路径
-            let basePath = "/" + pathParts[0] + "/";
+            let basePath = path.split('/book/');
+            basePath = basePath[0] + "/";
             // 处理所有资源，都要加上基路径
             addBasePath(basePath);
         }
@@ -2271,7 +2272,8 @@ class EPUBProcessor:
             // 检查当前的基路径
             if (!path.startsWith("/book/")) {
                 // 获取基路径
-                let basePath = "/" + pathParts[0] + "/"
+                let basePath = path.split('/book/');
+                basePath = basePath[0] + "/";
                 // 处理所有资源，都要加上基路径
                 addBasePath(basePath);
             }
