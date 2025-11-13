@@ -551,11 +551,12 @@ class EPUBLibrary:
 </head>
 <body>
 """
-        all_tags = []
+        all_tags = set()
         for book_hash, book_info in self.books.items():
             cur_tags = book_info['tags']
             if cur_tags:
-                all_tags.extend(cur_tags)
+                for cur_tag in cur_tags:
+                    all_tags.add(cur_tag)
 
         library_html += f"""
     <div class="container">

@@ -67,7 +67,7 @@ Then a browser will be opened to view the epub file.
 
 If there are errors or some mistakes in epub files, then you can use [calibre](https://calibre-ebook.com/) to convert to epub again.
 
-Tags can be managed by [calibre](https://calibre-ebook.com/).
+Tags can be managed by [calibre](https://calibre-ebook.com/). After adding tags, **you should click "Edit book" and just close the window to update the epub file** or the tags will not change in the browser.
 
 Just find calibre library and run `epub-browser .`, it will collect all books that managed by calibre.
 
