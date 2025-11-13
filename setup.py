@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
-    version="1.2.9",      # 初始版本号
+    version="1.2.10",      # 初始版本号
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     keywords="epub reader html export browser convert calibre-web calibre kindle web server local",

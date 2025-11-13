@@ -950,7 +950,7 @@ class EPUBProcessor:
     </div>
 </div>
 <div class="reading-controls">
-    <a href="/#{self.book_hash}" alt="Home">
+    <a href="/index.html#{self.book_hash}" alt="Home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
             <span class="control-name">Home</span>
@@ -2118,7 +2118,7 @@ class EPUBProcessor:
             </button>
         </div>
         <div class="iframe-container">
-            <iframe id="bookHomeIframe" src="/book/{self.book_hash}/" title="BookHome" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
+            <iframe id="bookHomeIframe" src="/book/{self.book_hash}/index.html" title="BookHome" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
         </div>
     </div>
 
@@ -2138,7 +2138,7 @@ class EPUBProcessor:
         <div class="breadcrumb header">
             <a href="/#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>
-            <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">{self.book_title}</a>
+            <a href="/book/{self.book_hash}/index.html" alt="bookHome" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-current">{chapter_title}</span>
         </div> 
@@ -2207,7 +2207,7 @@ class EPUBProcessor:
     </div>
 
     <div class="reading-controls">
-        <a href="/#{self.book_hash}" alt="Home">
+        <a href="/index.html#{self.book_hash}" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
                 <span class="control-name">Home</span>
@@ -2234,7 +2234,7 @@ class EPUBProcessor:
             <span>Theme</span>
         </div>
         {prev_link_mobile}
-        <a href="/#{self.book_hash}" alt="Home">
+        <a href="/index.html#{self.book_hash}" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
                 <span>Home</span>
