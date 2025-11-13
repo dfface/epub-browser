@@ -874,8 +874,8 @@ class EPUBProcessor:
                 <img src="{self.get_book_info()['cover']}" alt="cover">
             </div>
             <div class="book-info-content">
-                <h2 class="book-info-title">Title: {self.book_title}</h2>
-                <p class="book-info-author">Author(s): {" & ".join(self.authors) if self.authors else "Unknown"}</p>
+                <h2 class="book-info-title">{self.book_title}</h2>
+                <p class="book-info-author">{" & ".join(self.authors) if self.authors else "Unknown"}</p>
                     <div class="book-info-tags">"""
         if self.tags:
             for tag in self.tags:
