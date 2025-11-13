@@ -1045,7 +1045,8 @@ class EPUBProcessor:
 </script>
 </body>
 </html>"""
-        index_html = minify_html.minify(index_html, minify_css=True, minify_js=True)
+        # kindle 支持，不能压缩 css 和 js
+        index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
         with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(index_html)
     
@@ -2864,7 +2865,8 @@ class EPUBProcessor:
 </body>
 </html>
 """
-        chapter_html = minify_html.minify(chapter_html, minify_css=True, minify_js=True)
+        # kindle 支持，不能压缩 css 和 js
+        chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)
         return chapter_html
     
     def copy_resources(self):
