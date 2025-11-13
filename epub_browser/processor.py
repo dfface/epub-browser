@@ -894,7 +894,7 @@ class EPUBProcessor:
         index_html += f"""
 <div class="container">
     <div class="breadcrumb header">
-        <a href="/#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
+        <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
     </div>
@@ -2136,7 +2136,7 @@ class EPUBProcessor:
 
     <div class="container">
         <div class="breadcrumb header">
-            <a href="/#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <a href="/index.html#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" alt="bookHome" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
@@ -2185,7 +2185,7 @@ class EPUBProcessor:
 
         <div class="navigation">
             {prev_link}
-            <a href="/#{self.book_hash}" alt="home">
+            <a href="/index.html#{self.book_hash}" alt="home">
                 <div class="control-btn">
                     <i class="fas fa-home"></i>
                     <span class="control-name">Home</span>
