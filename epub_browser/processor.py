@@ -2342,6 +2342,10 @@ class EPUBProcessor:
             // iframe 处理
             let iframe = document.getElementById('bookHomeIframe');
             iframe.addEventListener('load', function() {
+                loadBookHomeToc();
+                iframeAddEvent();
+            });
+            function loadBookHomeToc() {
                 let iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
                 let bookHomeToc = iframeDoc.querySelector('.chapter-list');
                 let iframeBody = iframeDoc.querySelector('body');
@@ -2352,7 +2356,6 @@ class EPUBProcessor:
                 let breadcrumb = iframeDoc.querySelector('.breadcrumb');
                 let bookInfoCard = iframeDoc.querySelector('.book-info-card');
                 let tocHeader = iframeDoc.querySelector('.toc-header'); 
-                let allLinks = iframeDoc.querySelectorAll('a');
 
                 topControls.style.display = 'none';
                 breadcrumb.style.display = 'none';
@@ -2364,8 +2367,12 @@ class EPUBProcessor:
                 bookHomeToc.style.maxHeight = "100%";
                 iframeBody.style.padding = 0;
                 iframeContainer.style.padding = 0;
-                iframeContainer.style.margin = 0;
+                iframeContainer.style.margin = 0; 
+            }
 
+            function iframeAddEvent() {
+                let iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                let allLinks = iframeDoc.querySelectorAll('a');
                 allLinks.forEach( link => {
                     link.addEventListener('click', function(event) {
                       // 阻止默认行为（在iframe中打开） 
@@ -2399,8 +2406,7 @@ class EPUBProcessor:
                         }
                     }
                 }
-                
-            });
+            }
             
             // 代码高亮
             hljs.highlightAll();
@@ -2551,6 +2557,7 @@ class EPUBProcessor:
             });
             bookHomeToggle.addEventListener('click', function() {
                 bookHomeFloating.classList.toggle('active');
+                loadBookHomeToc();
             });
             
             // 切换目录显示 - 移动端
