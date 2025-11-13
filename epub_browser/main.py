@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--output-dir', '-o', help='Output directory for converted books')
     parser.add_argument('--keep-files', action='store_true', help='Keep converted files after server stops')
     parser.add_argument('--log', action='store_true', help='Enable log messages')
+    parser.add_argument('--no-server', action='store_true', help='Do not start a server, just generate files')
     
     args = parser.parse_args()
     
@@ -32,15 +33,14 @@ def main():
     
     # 创建图书馆
     library = EPUBLibrary(args.output_dir)
-    server_instance = EPUBServer(library, args.log)
 
     # 添加所有书籍
     success_count = 0
-    # 收集真实的 epub file
+    # 收集所有的 epub file，可能传递了路径需要下钻
     real_epub_files = []
     for filename in args.filename:
-        files = library.epub_file_discover(filename)
-        real_epub_files.extend(files)
+        cur_files = library.epub_file_discover(filename)
+        real_epub_files.extend(cur_files)
     # 构建图书馆
     for filename in tqdm(real_epub_files):
         if library.add_book(filename):
@@ -50,7 +50,12 @@ def main():
         sys.exit(1)
 
     library.create_library_home()
-    
+
+    # 创建服务器
+    if args.no_server:
+        print(f"Files generated in: {library.base_directory}")
+        return
+    server_instance = EPUBServer(library, args.log)
     try:
         server_instance.start_server(
             port=args.port, 
@@ -63,7 +68,7 @@ def main():
     finally:
         server_instance.stop_server()
         if not args.keep_files:
-            server_instance.cleanup()
+            library.cleanup()
 
 
 if __name__ == '__main__':

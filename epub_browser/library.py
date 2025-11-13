@@ -13,7 +13,7 @@ class EPUBLibrary:
         self.books = {}  # 存储所有书籍信息，使用哈希作为键
         self.output_dir = output_dir
         
-        # 创建基础目录用于服务器
+        # 创建基础目录
         if output_dir is not None:
             if os.path.exists(output_dir):
                 try:
@@ -811,3 +811,20 @@ class EPUBLibrary:
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
         with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(library_html)
+    
+    def cleanup(self):
+        """清理所有文件"""
+        if self.output_dir is not None:
+            # 用户自己的目录，不要一个全删
+            for book_hash, book_info in self.books.items():
+                temp_dir = book_info['temp_dir']
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+                    print(f"Cleaned up book: {book_info['title']}, path: {temp_dir}")
+            os.remove(os.path.join(self.output_dir, "index.html"))
+            return
+        else:
+            # 清理基础目录
+            if os.path.exists(self.base_directory):
+                shutil.rmtree(self.base_directory)
+                print(f"Cleaned up library base directory: {self.base_directory}")

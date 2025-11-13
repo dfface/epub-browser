@@ -315,23 +315,3 @@ class EPUBServer:
     def is_running(self):
         """检查服务器是否正在运行"""
         return self._is_running
-    
-    def cleanup(self):
-        """清理所有临时文件"""
-        # 先停止服务器
-        if self.is_running():
-            self.stop_server()
-        if self.library.output_dir is not None:
-            # 用户自己的目录，不要一个全删
-            for book_hash, book_info in self.library.books.items():
-                temp_dir = book_info['temp_dir']
-                if os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir)
-                    print(f"Cleaned up book: {book_info['title']}, path: {temp_dir}")
-            os.remove(os.path.join(self.library.output_dir, "index.html"))
-            return
-        else:
-            # 清理基础目录
-            if os.path.exists(self.library.base_directory):
-                shutil.rmtree(self.library.base_directory)
-                print(f"Cleaned up library base directory: {self.library.base_directory}")
