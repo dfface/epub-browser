@@ -197,6 +197,7 @@ class EPUBLibrary:
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            flex-direction: column;
 
             transition: var(--transition);
             box-shadow: var(--shadow);
@@ -439,6 +440,10 @@ class EPUBLibrary:
             z-index: 99;
         }
 
+        .control-name {
+            font-size: 0.5rem;
+        }
+
         .control-btn {
             width: 50px;
             height: 50px;
@@ -452,6 +457,7 @@ class EPUBLibrary:
             transition: var(--transition);
             box-shadow: var(--shadow);
             border: none;
+            flex-direction: column;
         }
 
         .control-btn:hover {
@@ -564,6 +570,7 @@ class EPUBLibrary:
         <header class="header">
             <div class="theme-toggle" id="themeToggle">
                 <i class="fas fa-moon"></i>
+                <span class="control-name">Theme</span>
             </div>
             <h1><i class="fas fa-book-open"></i> EPUB Library</h1>
             <div class="stats">
@@ -625,6 +632,7 @@ class EPUBLibrary:
     <div class="reading-controls">
         <button class="control-btn" id="scrollToTopBtn">
             <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
         </button>
     </div>
 </div>

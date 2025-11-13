@@ -475,6 +475,8 @@ class EPUBProcessor:
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-direction: column;
+
             cursor: pointer;
             transition: var(--transition);
             box-shadow: var(--shadow);
@@ -523,6 +525,7 @@ class EPUBProcessor:
             transition: var(--transition);
             box-shadow: var(--shadow);
             border: none;
+            flex-direction: column;
         }
 
         .reading-controls .control-btn:hover, .top-controls .control-btn:hover {
@@ -820,6 +823,10 @@ class EPUBProcessor:
             cursor: pointer;
         }
 
+        .control-name {
+            font-size: 0.5rem;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.8rem;
@@ -863,6 +870,7 @@ class EPUBProcessor:
 <div class="top-controls">
     <div class="theme-toggle" id="themeToggle">
         <i class="fas fa-moon"></i>
+        <span class="control-name">Theme</span>
     </div>
 </div>
 """
@@ -928,10 +936,12 @@ class EPUBProcessor:
     <a href="/#{self.book_hash}" alt="Home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
+            <span class="control-name">Home</span>
         </div>
     </a>
     <div class="control-btn" id="scrollToTopBtn">
         <i class="fas fa-arrow-up"></i>
+        <span class="control-name">Top</span>
     </div>
 </div>
 <footer class="footer">
@@ -1140,8 +1150,8 @@ class EPUBProcessor:
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i></div></a>' if chapter_index > 0 else ''
-        next_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i></div></a>' if chapter_index < len(self.chapters) - 1 else ''
+        prev_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Previous</span></div></a>' if chapter_index > 0 else ''
+        next_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
         prev_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Previous</span></div></a>' if chapter_index > 0 else ''
         next_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
         
@@ -1263,6 +1273,7 @@ class EPUBProcessor:
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            flex-direction: column;
 
             transition: var(--transition);
             box-shadow: var(--shadow);
@@ -1615,6 +1626,7 @@ class EPUBProcessor:
             transition: var(--transition);
             border: none;
             cursor: pointer;
+            flex-direction: column;
         }
 
         .nav-btn:hover {
@@ -1670,6 +1682,7 @@ class EPUBProcessor:
             transition: var(--transition);
             box-shadow: var(--shadow);
             border: none;
+            flex-direction: column;
         }
 
         .reading-controls .control-btn:hover, .top-controls .control-btn:hover {
@@ -1938,6 +1951,10 @@ class EPUBProcessor:
             color: var(--primary);
         }
 
+        .control-name {
+            font-size: 0.5rem;
+        }
+
         /* 响应式设计 */
 
         @media (max-width: 768px) {
@@ -1950,8 +1967,7 @@ class EPUBProcessor:
             }
             
             .navigation {
-                flex-direction: column;
-                gap: 15px;
+                gap: 10px;
             }
             
             .nav-btn {
@@ -2038,14 +2054,17 @@ class EPUBProcessor:
     <div class="top-controls">
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
         </div>
 
         <div class="control-btn" id="bookHomeToggle">
             <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
         </div>
 
         <div class="control-btn" id="tocToggle">
             <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
         </div>
     </div>
 
@@ -2127,6 +2146,7 @@ class EPUBProcessor:
             <a href="/#{self.book_hash}" alt="home">
                 <div class="control-btn">
                     <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
                 </div>
             </a>
             {next_link}
@@ -2148,13 +2168,16 @@ class EPUBProcessor:
         <a href="/#{self.book_hash}" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
             </div>
         </a>
         <div class="control-btn" id="fontControlBtn">
             <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
         </div>
         <div class="control-btn" id="scrollToTopBtn">
             <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Up</span>
         </div>
     </div>
 
