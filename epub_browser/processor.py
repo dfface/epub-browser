@@ -940,11 +940,12 @@ class EPUBProcessor:
 """
         index_html += """<script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 书籍目录锚点删除
         const path = window.location.pathname;  // 获取当前URL路径
         let pathParts = path.split('/');
         pathParts = pathParts.filter(item => item !== "");
         const book_hash = pathParts[pathParts.length - 1];
+
+        // 书籍目录锚点删除
         const anchor = window.location.hash;
         if (anchor === '' || !anchor.startsWith('#chapter_')) {
             localStorage.removeItem(book_hash);  // 此时 lastPart 就是 book_hash
@@ -1151,7 +1152,8 @@ class EPUBProcessor:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{chapter_title} - {self.book_title}</title>
     {style_links}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
+    <link id="code-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIHY3LjEuMCBieSBAZm9udGF3ZXNvbWUgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbSBMaWNlbnNlIC0gaHR0cHM6Ly9mb250YXdlc29tZS5jb20vbGljZW5zZS9mcmVlIENvcHlyaWdodCAyMDI1IEZvbnRpY29ucywgSW5jLi0tPjxwYXRoIGQ9Ik0zMjAgMjA1LjNMMzIwIDUxNC42TDMyMC41IDUxNC40QzM3NS4xIDQ5MS43IDQzMy43IDQ4MCA0OTIuOCA0ODBMNTEyIDQ4MEw1MTIgMTYwTDQ5Mi44IDE2MEM0NTAuNiAxNjAgNDA4LjcgMTY4LjQgMzY5LjcgMTg0LjZDMzUyLjkgMTkxLjYgMzM2LjMgMTk4LjUgMzIwIDIwNS4zek0yOTQuOSAxMjUuNUwzMjAgMTM2TDM0NS4xIDEyNS41QzM5MS45IDEwNiA0NDIuMSA5NiA0OTIuOCA5Nkw1MjggOTZDNTU0LjUgOTYgNTc2IDExNy41IDU3NiAxNDRMNTc2IDQ5NkM1NzYgNTIyLjUgNTU0LjUgNTQ0IDUyOCA1NDRMNDkyLjggNTQ0QzQ0Mi4xIDU0NCAzOTEuOSA1NTQgMzQ1LjEgNTczLjVMMzMyLjMgNTc4LjhDMzI0LjQgNTgyLjEgMzE1LjYgNTgyLjEgMzA3LjcgNTc4LjhMMjk0LjkgNTczLjVDMjQ4LjEgNTU0IDE5Ny45IDU0NCAxNDcuMiA1NDRMMTEyIDU0NEM4NS41IDU0NCA2NCA1MjIuNSA2NCA0OTZMNjQgMTQ0QzY0IDExNy41IDg1LjUgOTYgMTEyIDk2TDE0Ny4yIDk2QzE5Ny45IDk2IDI0OC4xIDEwNiAyOTQuOSAxMjUuNXoiLz48L3N2Zz4=">
 """
@@ -1482,13 +1484,13 @@ class EPUBProcessor:
 
         .content h3 {
             font-size: 1.3rem;
-            border-left: 4px solid var(--success);
+            border-left: 4px solid var(--primary);
             padding-left: 1rem;
         }
 
         .content h4 {
             font-size: 1.1rem;
-            border-left: 2px solid var(--warning);
+            border-left: 2px solid var(--primary);
             padding-left: 1rem;
         }
 
@@ -1513,22 +1515,76 @@ class EPUBProcessor:
 
         .content table {
             margin: 0px;
+            border-color: var(--text-color);
         }
 
-        .content code {
-            background: var(--border-color);
-            padding: 2px 6px;
+        .content table tr, .content table td, .content table th {
+            border-color: var(--text-color);
+        }
+
+        .content table tr {
+            margin: 0px;
+            color: inherit;
+            background-color: inherit;
+        }
+
+        .content table th {
+            background-color: inherit;
+            font-weight: 600;
+            color: inherit;
+        }
+        
+        .content table td {
+            color: inherit;
+        }
+        
+        .content table tr:hover {
+            background-color: var(--bg-color);
+        }
+
+        .content pre code {
+            padding: 10px 10px;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
             font-size: 0.9rem;
+            height: auto;
+            width: 100%;
         }
 
         .content pre {
             background: var(--border-color);
-            padding: 1.5rem;
             border-radius: 8px;
             overflow-x: auto;
-            margin: 1.5rem 0;
+            margin: 0px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            display: flex;
+            white-space: pre;
+        }
+
+        .content blockquote {
+            color: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .content ul, .content ol {
+            padding: 0;
+        }
+        
+        .content ul li, .content ol li {
+            border-radius: inherit;
+            box-shadow: none;
+            transition: all 0.3s ease;
+        }
+
+        .content ul li:before {
+            margin-right: 0.5rem;
+        }
+
+        .content ol li:before {
+            margin-right: 0.5rem;
         }
 
         .navigation {
@@ -1710,6 +1766,178 @@ class EPUBProcessor:
             text-decoration: none;
         }
 
+
+        .custom-css-panel {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+        }
+
+        .panel-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-toggle {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: var(--transition);
+            padding: 5px;
+        }
+
+        .panel-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .panel-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .panel-content.expanded {
+            max-height: 500px;
+            padding: 20px;
+        }
+
+        .css-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #customCssInput {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            background: var(--bg-color);
+            color: var(--text-color);
+            transition: var(--transition);
+        }
+
+        #customCssInput:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+        }
+
+        .css-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .css-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            font-size: 0.9rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .css-btn.primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .css-btn.primary:hover {
+            background: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .css-btn.secondary {
+            background: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .css-btn.secondary:hover {
+            background: var(--border-color);
+            transform: translateY(-2px);
+        }
+
+        /* 通知样式 */
+        .custom-css-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        .custom-css-notification.success {
+            background: var(--success);
+        }
+
+        .custom-css-notification.info {
+            background: var(--primary);
+        }
+
+        .custom-css-notification.warning {
+            background: #f8961e;
+        }
+
+        .custom-css-notification.fade-out {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        .css-info {
+            padding: 10px 15px;
+            background: var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .css-info p {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .css-info i {
+            color: var(--primary);
+        }
+
         /* 响应式设计 */
 
         @media (max-width: 768px) {
@@ -1768,6 +1996,14 @@ class EPUBProcessor:
             .font-controls {
                 bottom: 80px;
             }
+
+            .css-controls {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .css-btn {
+                justify-content: center;
+            }
         }
 
         @media (max-width: 480px) {
@@ -1785,6 +2021,10 @@ class EPUBProcessor:
             
             .content {
                 padding: 20px;
+            }
+
+            .css-controls {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -1842,6 +2082,40 @@ class EPUBProcessor:
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-current">{chapter_title}</span>
         </div> 
+
+        <div class="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code..."></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="content-container">
             <article class="content" id="content">
@@ -1921,9 +2195,150 @@ class EPUBProcessor:
         <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
     </footer>
 """
-        chapter_html += """
+        chapter_html += f"""
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {{
+        const book_hash = "{self.book_hash}";
+"""
+        chapter_html += """
+            // 自定义CSS功能
+            const cssPanelToggle = document.getElementById('cssPanelToggle');
+            const cssPanelContent = document.getElementById('cssPanelContent');
+            const customCssInput = document.getElementById('customCssInput');
+            const saveCssBtn = document.getElementById('saveCssBtn');
+            const saveAsDefaultBtn = document.getElementById('saveAsDefaultBtn');
+            const resetCssBtn = document.getElementById('resetCssBtn');
+            const previewCssBtn = document.getElementById('previewCssBtn');
+            const loadDefaultBtn = document.getElementById('loadDefaultBtn');
+            const storageKey = `custom_css_${book_hash}`;
+            const defaultStorageKey = `custom_css_default`;
+            // 切换面板展开/收起
+            cssPanelToggle.addEventListener('click', function() {
+                cssPanelContent.classList.toggle('expanded');
+                const icon = cssPanelToggle.querySelector('i');
+                if (cssPanelContent.classList.contains('expanded')) {
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                } else {
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+            });
+            // 加载保存的自定义CSS
+            function loadCustomCss() {
+                // 首先尝试加载特定书籍的CSS
+                const savedCss = localStorage.getItem(storageKey);
+                if (savedCss) {
+                    customCssInput.value = savedCss;
+                    applyCustomCss(savedCss);
+                    return;
+                }
+                
+                // 如果没有特定书籍的CSS，尝试加载默认CSS
+                const defaultCss = localStorage.getItem(defaultStorageKey);
+                if (defaultCss) {
+                    customCssInput.value = defaultCss;
+                    applyCustomCss(defaultCss);
+                }
+            }
+            // 应用自定义CSS到页面
+            function applyCustomCss(css) {
+                // 移除之前添加的自定义样式
+                const existingStyle = document.getElementById('custom-user-css');
+                if (existingStyle) {
+                    existingStyle.remove();
+                }
+                
+                if (css.trim()) {
+                    // 创建新的style元素并添加到head
+                    const styleElement = document.createElement('style');
+                    styleElement.id = 'custom-user-css';
+                    styleElement.textContent = css;
+                    document.head.appendChild(styleElement);
+                }
+            }
+            // 保存自定义CSS
+            saveCssBtn.addEventListener('click', function() {
+                const css = customCssInput.value;
+                localStorage.setItem(storageKey, css);
+                applyCustomCss(css);
+                
+                // 显示保存成功提示
+                showNotification('Saved for current book!', 'success');
+            });
+            // 保存为默认样式
+            saveAsDefaultBtn.addEventListener('click', function() {
+                const css = customCssInput.value;
+                if (confirm('Are you sure to save as the default style? This will affect all books that do not have a custom style.')) {
+                    localStorage.setItem(defaultStorageKey, css);
+                    showNotification('Saved as a default style!', 'success');
+                }
+            });
+            // 加载默认样式
+            loadDefaultBtn.addEventListener('click', function() {
+                const defaultCss = localStorage.getItem(defaultStorageKey);
+                if (!defaultCss) {
+                    showNotification('Default style not found!', 'warning');
+                    return;
+                }
+                
+                if (confirm('Are you sure to load the default style? This will replace the current CSS code.')) {
+                    customCssInput.value = defaultCss;
+                    applyCustomCss(defaultCss);
+                    showNotification('The default style has been loaded!', 'success');
+                }
+            });
+            // 重置自定义CSS
+            resetCssBtn.addEventListener('click', function() {
+                if (confirm('Are you sure to reset? This will clear the custom CSS code for this book.')) {
+                    customCssInput.value = '';
+                    localStorage.removeItem(storageKey);
+                    applyCustomCss('');
+                    
+                    // 重置后尝试加载默认样式
+                    const defaultCss = localStorage.getItem(defaultStorageKey);
+                    if (defaultCss) {
+                        customCssInput.value = defaultCss;
+                        applyCustomCss(defaultCss);
+                    }
+                    
+                    showNotification('The custom style for this book has been reset!', 'info');
+                }
+            });
+            // 预览自定义CSS
+            previewCssBtn.addEventListener('click', function() {
+                const css = customCssInput.value;
+                applyCustomCss(css);
+                showNotification('Applied!', 'info');
+            });
+            // 显示通知
+            function showNotification(message, type) {
+                // 移除现有通知
+                const existingNotification = document.querySelector('.custom-css-notification');
+                if (existingNotification) {
+                    existingNotification.remove();
+                }
+                // 创建新通知
+                const notification = document.createElement('div');
+                notification.className = `custom-css-notification ${type}`;
+                notification.textContent = message;
+                
+                // 添加到页面
+                document.body.appendChild(notification);
+                
+                // 自动移除
+                setTimeout(() => {
+                    notification.classList.add('fade-out');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+            // 初始化 - 加载保存的CSS
+            loadCustomCss();
+            
             // iframe 处理
             let iframe = document.getElementById('bookHomeIframe');
             iframe.addEventListener('load', function() {
@@ -1989,6 +2404,21 @@ class EPUBProcessor:
             
             // 代码高亮
             hljs.highlightAll();
+            function switchCodeTheme(isDark) {
+                const lightTheme = document.querySelector('link[href*="highlight.js"][id*="light"]');
+                const darkTheme = document.querySelector('link[href*="highlight.js"][id*="dark"]');
+                
+                if (lightTheme && darkTheme) {
+                    if (isDark) {
+                    lightTheme.disabled = true;
+                    darkTheme.disabled = false;
+                    } else {
+                    lightTheme.disabled = false;
+                    darkTheme.disabled = true;
+                    }
+                }
+            }
+            
 
             // 包裹所有表格
             function wrapAllTables() {
@@ -2022,7 +2452,6 @@ class EPUBProcessor:
             const path = window.location.pathname;  // 获取当前URL路径
             const pathParts = path.split('/');
             const lastPart = pathParts[pathParts.length - 1];
-            const book_hash = pathParts[pathParts.length - 2];
             var anchor = '';
             if (lastPart.startsWith('chapter_') && lastPart.endsWith('.html')) {
                 anchor = "#" + lastPart.replace('.html', '');
@@ -2053,6 +2482,7 @@ class EPUBProcessor:
                 themeIcon.classList.add('fa-sun');
                 mobileThemeBtn.querySelector('i').classList.remove('fa-moon');
                 mobileThemeBtn.querySelector('i').classList.add('fa-sun');
+                switchCodeTheme(true);
             }
             
             // 切换主题
@@ -2065,12 +2495,14 @@ class EPUBProcessor:
                     mobileThemeBtn.querySelector('i').classList.remove('fa-moon');
                     mobileThemeBtn.querySelector('i').classList.add('fa-sun');
                     localStorage.setItem('theme', 'dark');
+                    switchCodeTheme(true);
                 } else {
                     themeIcon.classList.remove('fa-sun');
                     themeIcon.classList.add('fa-moon');
                     mobileThemeBtn.querySelector('i').classList.remove('fa-sun');
                     mobileThemeBtn.querySelector('i').classList.add('fa-moon');
                     localStorage.setItem('theme', 'light');
+                    switchCodeTheme(false);
                 }
             }
 

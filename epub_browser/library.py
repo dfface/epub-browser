@@ -2,7 +2,7 @@ import os
 import tempfile
 from datetime import datetime
 
-from .processor import EPUBProcessor
+from .rocessor import EPUBProcessor
 
 class EPUBLibrary:
     """EPUB图书馆类，管理多本书籍"""
