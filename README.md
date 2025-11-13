@@ -20,6 +20,7 @@ It now supports:
 * Mobile devices.
 * Code highlight.
 * Remember your last reading chapter.
+* Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
 
 ## Usage
 
@@ -59,7 +60,9 @@ Then a browser will be opened to view the epub file.
 
 ![epub book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-DMXr4g-DG7fei.png)
 
-![epub chapter](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-Fj7aTM-v2Li0z.png)
+![epub chapter example1](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-oQzhk1-Z8g6hg.png)
+
+![epub chapter example2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-B3rpC0-BSaN6R.png)
 
 ![mobile support](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-tFUcoE-CKAxJE.png)
 
