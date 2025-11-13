@@ -17,7 +17,7 @@ It now supports:
 * Table of contents in each chapter.
 * Font size adjustment.
 * Image zoom.
-* Mobile devices.
+* Mobile devices: especially kindle.
 * Code highlight.
 * Remember your last reading chapter.
 * Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
@@ -56,6 +56,8 @@ epub-browser book1.epub --port 8080
 
 Then a browser will be opened to view the epub file.
 
+### Desktop
+
 ![epub library home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-7Zojnb-JH0qhY.png)
 
 ![epub book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-DMXr4g-DG7fei.png)
@@ -64,19 +66,24 @@ Then a browser will be opened to view the epub file.
 
 ![epub chapter example2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-B3rpC0-BSaN6R.png)
 
+### Mobile
+
 ![mobile support](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-tFUcoE-CKAxJE.png)
+
+### Kindle
+
+![kindle support1](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-wXATw7-screenshot_2025_11_14T00_05_50+0800.png)
+
+![kindle support2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-JsykYo-screenshot_2025_11_14T00_06_18+0800.png)
+
+![kindle support3](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-S3hqb9-screenshot_2025_11_14T00_06_51+0800.png)
+
+![kindle support4](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-l0maxe-screenshot_2025_11_14T00_07_11+0800.png)
 
 ## Tips
 
-If there are errors or some mistakes in epub files, then you can use [calibre](https://calibre-ebook.com/) to convert to epub again.
-
-Tags can be managed by [calibre](https://calibre-ebook.com/). After adding tags, **you should click "Edit book" and just close the window to update the epub file** or the tags will not change in the browser.
-
-Just find calibre library and run `epub-browser .`, it will collect all books that managed by calibre.
-
-You can combine web reading with the web extension called [Circle Reader](https://circlereader.com/) to gain more elegant experience.
-
-Other extensions that are recommended are:
-
-1. [Diigo](https://www.diigo.com/): Read more effectively with annotation tools.
-2. ...
+* If there are errors or some mistakes in epub files, then you can use [calibre](https://calibre-ebook.com/) to convert to epub again.
+* Tags can be managed by [calibre](https://calibre-ebook.com/). After adding tags, **you should click "Edit book" and just close the window to update the epub file** or the tags will not change in the browser.
+* By default, the program listens on the address `0.0.0.0`. This means you can access the service via any of your local machine's addresses (such as a local area network (LAN) address like `192.168.1.233`), not just `localhost`.
+* Just find calibre library and run `epub-browser .`, it will collect all books that managed by calibre.
+* You can combine web reading with the web extension called [Circle Reader](https://circlereader.com/) to gain more elegant experience.Other extensions that are recommended are: [Diigo](https://www.diigo.com/): Read more effectively with annotation tools ...
