@@ -21,7 +21,8 @@ class EPUBProcessor:
             # 使用用户指定的输出目录
             # 这里一般会始终使用 base_directory，也就是上层已经处理了，可能是 temp dir
             self.temp_dir = os.path.join(output_dir, f'epub_{self.book_hash}')
-            os.mkdir(self.temp_dir)
+            if not os.path.exists(self.temp_dir):
+                os.mkdir(self.temp_dir)
         else:
             # 使用系统临时目录
             # 本程序永远走不到这里来的，除非作为库被别人调用
