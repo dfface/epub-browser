@@ -2439,65 +2439,75 @@ class EPUBProcessor:
                 iframeAddEvent();
             });
             function loadBookHomeToc() {
-                let iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                let bookHomeToc = iframeDoc.querySelector('.chapter-list');
-                let iframeBody = iframeDoc.querySelector('body');
-                let iframeFooter = iframeDoc.querySelector('footer');
-                let iframeContainer = iframeDoc.querySelector('.container');
-                let topControls = iframeDoc.querySelector('.top-controls');
-                let readingControls = iframeDoc.querySelector('.reading-controls');
-                let breadcrumb = iframeDoc.querySelector('.breadcrumb');
-                let bookInfoCard = iframeDoc.querySelector('.book-info-card');
-                let tocHeader = iframeDoc.querySelector('.toc-header'); 
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    // 使用 iframeDoc 进行操作
+                    let bookHomeToc = iframeDoc.querySelector('.chapter-list');
+                    let iframeBody = iframeDoc.querySelector('body');
+                    let iframeFooter = iframeDoc.querySelector('footer');
+                    let iframeContainer = iframeDoc.querySelector('.container');
+                    let topControls = iframeDoc.querySelector('.top-controls');
+                    let readingControls = iframeDoc.querySelector('.reading-controls');
+                    let breadcrumb = iframeDoc.querySelector('.breadcrumb');
+                    let bookInfoCard = iframeDoc.querySelector('.book-info-card');
+                    let tocHeader = iframeDoc.querySelector('.toc-header'); 
 
-                topControls.style.display = 'none';
-                breadcrumb.style.display = 'none';
-                bookInfoCard.style.display = 'none';
-                iframeFooter.style.display = 'none';
-                tocHeader.style.display = 'none';
-                readingControls.style.display = 'none';
-                bookHomeToc.style.width = "100%";
-                bookHomeToc.style.maxHeight = "100%";
-                iframeBody.style.padding = 0;
-                iframeContainer.style.padding = 0;
-                iframeContainer.style.margin = 0; 
+                    topControls.style.display = 'none';
+                    breadcrumb.style.display = 'none';
+                    bookInfoCard.style.display = 'none';
+                    iframeFooter.style.display = 'none';
+                    tocHeader.style.display = 'none';
+                    readingControls.style.display = 'none';
+                    bookHomeToc.style.width = "100%";
+                    bookHomeToc.style.maxHeight = "100%";
+                    iframeBody.style.padding = 0;
+                    iframeContainer.style.padding = 0;
+                    iframeContainer.style.margin = 0; 
+                } catch (e) {
+                    console.log('Can not reach iframe:', e.message);
+                }
             }
 
             function iframeAddEvent() {
-                let iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                let allLinks = iframeDoc.querySelectorAll('a');
-                allLinks.forEach( link => {
-                    link.addEventListener('click', function(event) {
-                      // 阻止默认行为（在iframe中打开） 
-                      event.preventDefault(); 
-                      // 获取链接URL 
-                      var href = this.getAttribute('href'); 
-                      // 在父页面中打开链接 
-                      window.location.href = href; 
-                      return false; 
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    // 使用 iframeDoc 进行操作
+                    let allLinks = iframeDoc.querySelectorAll('a');
+                    allLinks.forEach( link => {
+                        link.addEventListener('click', function(event) {
+                        // 阻止默认行为（在iframe中打开） 
+                        event.preventDefault(); 
+                        // 获取链接URL 
+                        var href = this.getAttribute('href'); 
+                        // 在父页面中打开链接 
+                        window.location.href = href; 
+                        return false; 
+                        });
                     });
-                });
 
-                // 书籍目录锚点滚动
-                mobileBookHomeBtn.addEventListener('click', function(){
-                    scrollBookHomeToc();
-                });
-                bookHomeToggle.addEventListener('click', function(){
-                    scrollBookHomeToc();
-                });
+                    // 书籍目录锚点滚动
+                    mobileBookHomeBtn.addEventListener('click', function(){
+                        scrollBookHomeToc();
+                    });
+                    bookHomeToggle.addEventListener('click', function(){
+                        scrollBookHomeToc();
+                    });
 
-                function scrollBookHomeToc() {
-                    if (anchor != '') { // 后面有 var anchor 的声明和取值
-                        targetEl =  iframeDoc.getElementById(anchor.substr(1));
-                        if (targetEl) {
-                            var rect = targetEl.getBoundingClientRect();
-                            // 滚动到元素位置
-                            iframe.contentWindow.scrollTo({
-                                top: rect.top + iframe.contentWindow.pageYOffset,
-                                behavior: 'smooth'
-                            });
+                    function scrollBookHomeToc() {
+                        if (anchor != '') { // 后面有 var anchor 的声明和取值
+                            targetEl =  iframeDoc.getElementById(anchor.substr(1));
+                            if (targetEl) {
+                                var rect = targetEl.getBoundingClientRect();
+                                // 滚动到元素位置
+                                iframe.contentWindow.scrollTo({
+                                    top: rect.top + iframe.contentWindow.pageYOffset,
+                                    behavior: 'smooth'
+                                });
+                            }
                         }
                     }
+                } catch (e) {
+                    console.log('Can not reach iframe:', e.message);
                 }
             }
             
