@@ -746,6 +746,75 @@ class EPUBProcessor:
             transition: var(--transition);
         }
 
+        .book-info-card {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px;
+            margin-bottom: 30px;
+            gap: 25px;
+            transition: var(--transition);
+        }
+
+        .book-info-cover {
+            flex: 0 0 150px;
+            height: 200px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .book-info-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .book-info-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .book-info-title {
+            font-size: 1.5rem;
+            color: var(--text-color);
+            margin-bottom: 10px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .book-info-author {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .book-info-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .book-tag {
+            background: var(--primary-light);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .book-tag:hover {
+            background: var(--primary);
+            transform: translateY(-2px);
+            cursor: pointer;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.8rem;
@@ -799,6 +868,22 @@ class EPUBProcessor:
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
     </div>
+
+    <div class="book-info-card">
+            <div class="book-info-cover">
+                <img src="{self.get_book_info()['cover']}" alt="cover">
+            </div>
+            <div class="book-info-content">
+                <h2 class="book-info-title">Title: {self.book_title}</h2>
+                <p class="book-info-author">Author(s): {" & ".join(self.authors) if self.authors else "Unknown"}</p>
+                    <div class="book-info-tags">"""
+        if self.tags:
+            for tag in self.tags:
+                index_html += f"""<span class="book-tag">{tag}</span>"""        
+        index_html += f"""
+                </div>
+            </div>
+        </div>
     
     <div class="toc-container">
         <div class="toc-header">
@@ -1056,6 +1141,7 @@ class EPUBProcessor:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{chapter_title} - {self.book_title}</title>
     {style_links}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 """
         chapter_html += """
@@ -1347,6 +1433,7 @@ class EPUBProcessor:
             padding: 40px;
             color: var(--content-text);
             transition: var(--transition);
+            text-indent: 0px;
         }
 
         .content h2, .content h3, .content h4 {
@@ -1375,7 +1462,7 @@ class EPUBProcessor:
         }
 
         .content p {
-            margin-bottom: 1.2rem;
+            margin-bottom: 0.8rem;
             line-height: 1.7;
         }
 
@@ -1384,7 +1471,17 @@ class EPUBProcessor:
             height: auto;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            margin: 1.5rem 0;
+            margin: 0;
+            object-fit: contain;
+        }
+
+        .content .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .content table {
+            margin: 0px;
         }
 
         .content code {
@@ -1585,6 +1682,10 @@ class EPUBProcessor:
         /* 响应式设计 */
 
         @media (max-width: 768px) {
+            .container {
+                max-width: 100%;
+            }
+
             .chapter-title {
                 font-size: 1.5rem;
             }
@@ -1630,6 +1731,10 @@ class EPUBProcessor:
         }
 
         @media (max-width: 480px) {
+            .container {
+                max-width: 100%;
+            }
+
             .breadcrumb {
                 flex-wrap: wrap;
             }
@@ -1686,7 +1791,7 @@ class EPUBProcessor:
             <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-current">{chapter_title}</span>
-        </div>
+        </div> 
 
         <div class="content-container">
             <article class="content" id="content">
@@ -1758,8 +1863,39 @@ class EPUBProcessor:
     </footer>
 """
         chapter_html += """
-<script>
+    <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // 代码高亮
+            hljs.highlightAll();
+
+            // 包裹所有表格
+            function wrapAllTables() {
+                // 获取页面中所有table元素
+                const tables = document.querySelectorAll('table');
+                let wrappedCount = 0;
+                
+                // 遍历每个表格
+                tables.forEach((table, index) => {
+                    // 如果表格已经被包裹，跳过
+                    if (table.parentElement && table.parentElement.classList.contains('table-wrapper')) {
+                        return;
+                    }
+                    
+                    // 创建包裹div
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-wrapper';
+                    
+                    // 将表格插入到包裹div中
+                    table.parentNode.insertBefore(wrapper, table);
+                    wrapper.appendChild(table);
+                    
+                    wrappedCount++;
+                });
+                
+                return wrappedCount;
+            }
+            wrapAllTables();
+
             // 书籍目录锚点更新
             const path = window.location.pathname;  // 获取当前URL路径
             const pathParts = path.split('/');
@@ -2054,6 +2190,7 @@ class EPUBProcessor:
             document.head.appendChild(style);
         });
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 </body>
 </html>
 """

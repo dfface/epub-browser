@@ -304,7 +304,7 @@ class EPUBLibrary:
 
         .book-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 25px;
             margin-bottom: 40px;
         }
@@ -330,10 +330,13 @@ class EPUBLibrary:
             height: 200px;
             object-fit: contain;
             display: block;
+            border-bottom: 1px solid transparent;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding-bottom: 8px;
         }
 
         .book-card-content {
-            padding: 20px;
+            padding: 5px 20px;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
@@ -342,28 +345,46 @@ class EPUBLibrary:
         .book-title {
             font-size: 1.2rem;
             font-weight: 600;
-            margin-bottom: 8px;
             color: var(--text-color);
             line-height: 1.4;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-            overflow: hidden;
             transition: var(--transition);
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .book-author {
             font-size: 0.9rem;
             color: var(--text-secondary);
-            margin-bottom: 15px;
             transition: var(--transition);
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .book-tags {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            padding: 20px 15px 10px;
+            transform: translateY(100%);
+            opacity: 0;
+            transition: all 0.3s ease;
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            margin-bottom: 15px;
+        }
+
+        .book-card:hover .book-tags {
+            transform: translateY(0);
+            opacity: 1;
         }
 
         .book-tag {
@@ -495,7 +516,7 @@ class EPUBLibrary:
 
         @media (max-width: 768px) {
             .book-grid {
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             }
             
             .header h1 {
@@ -519,7 +540,7 @@ class EPUBLibrary:
 
         @media (max-width: 480px) {
             .book-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
             }
             
             .header {
@@ -584,15 +605,15 @@ class EPUBLibrary:
                 <div class="book-card-content">
                     <h3 class="book-title">{book_info['title']}</h3>
                     <div class="book-author">{" & ".join(book_info['authors']) if book_info['authors'] else ""}</div>
-                    <div class="book-tags">
             """
             if book_info['tags']:
+                library_html += """<div class="book-tags">"""
                 for tag in book_info['tags']:
                     library_html += f"""
                         <span class="book-tag">{tag}</span>
 """
+                library_html += """</div>"""
             library_html += """
-                    </div>
                 </div>
             </a>
         </div>

@@ -18,6 +18,8 @@ It now supports:
 * Font size adjustment.
 * Image zoom.
 * Mobile devices.
+* Code highlight.
+* Remember your last reading chapter.
 
 ## Usage
 
@@ -53,9 +55,9 @@ epub-browser book1.epub --port 8080
 
 Then a browser will be opened to view the epub file.
 
-![epub library home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-GEpNPv-8bIkJB.png)
+![epub library home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-7Zojnb-JH0qhY.png)
 
-![epub book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-zayg9n-moqApI.png)
+![epub book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-DMXr4g-DG7fei.png)
 
 ![epub chapter](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-Fj7aTM-v2Li0z.png)
 
