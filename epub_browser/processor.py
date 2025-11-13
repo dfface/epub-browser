@@ -1952,7 +1952,6 @@ class EPUBProcessor:
             .navigation {
                 flex-direction: column;
                 gap: 15px;
-                display: none;
             }
             
             .nav-btn {
