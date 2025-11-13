@@ -602,7 +602,7 @@ class EPUBLibrary:
         for book_hash, book_info in self.books.items():
             library_html += f"""
         <div class="book-card">
-            <a href="/book/{book_hash}/" class="book-link">
+            <a href="/book/{book_hash}/" class="book-link" id="{book_hash}">
                 <img src="/book/{book_hash}/{book_info['cover']}" alt="cover" class="book-cover"/>
                 <div class="book-card-content">
                     <h3 class="book-title">{book_info['title']}</h3>
