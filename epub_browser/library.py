@@ -16,12 +16,7 @@ class EPUBLibrary:
         # 创建基础目录
         if output_dir is not None:
             if os.path.exists(output_dir):
-                try:
-                    # 如果存在则尝试删了再建
-                    shutil.rmtree(output_dir)
-                    os.mkdir(output_dir)
-                except Exception:
-                    print(f"output_dir {output_dir} exists, try to recreate failed, please check.")
+                # 如果存在 那就存在
                 self.base_directory = output_dir
             else:
                 try:
