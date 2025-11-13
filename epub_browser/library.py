@@ -1,5 +1,6 @@
 import os
 import tempfile
+import minify_html
 from datetime import datetime
 
 from .processor import EPUBProcessor
@@ -9,10 +10,19 @@ class EPUBLibrary:
     
     def __init__(self, output_dir=None):
         self.books = {}  # 存储所有书籍信息，使用哈希作为键
+        self.output_dir = output_dir
         
         # 创建基础目录用于服务器
-        if output_dir is not None and os.path.exists(output_dir):
-            self.base_directory = output_dir
+        if output_dir is not None:
+            if os.path.exists(output_dir):
+                self.base_directory = output_dir
+            else:
+                try:
+                    os.mkdir(output_dir)
+                    self.base_directory = output_dir
+                except Exception:
+                    print(f"output_dir {output_dir} not exists, try to create failed, please check.")
+                    return
         else:
             self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
 
@@ -54,7 +64,7 @@ class EPUBLibrary:
             # 解析OPF文件
             if not processor.parse_opf(opf_path):
                 return False
-            
+
             # 重新生成 hash
             processor.generate_hash()
             
@@ -64,6 +74,7 @@ class EPUBLibrary:
             # 存储书籍信息
             book_info = processor.get_book_info()
             self.books[book_info['hash']] = {
+                'temp_dir': book_info['temp_dir'],
                 'title': book_info['title'],
                 'web_dir': web_dir,
                 'cover': book_info['cover'],
@@ -790,5 +801,6 @@ class EPUBLibrary:
     </script>
     </body>
 </html>"""
+        library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
         with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(library_html)

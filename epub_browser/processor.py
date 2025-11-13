@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import re
 import hashlib
 import json
+import minify_html
 from datetime import datetime
 
 class EPUBProcessor:
@@ -13,13 +14,17 @@ class EPUBProcessor:
     
     def __init__(self, epub_path, output_dir=None):
         self.epub_path = epub_path
+        self.output_dir = output_dir
         self.book_hash = hashlib.md5(epub_path.encode()).hexdigest()[:8]  # 使用哈希值作为标识，后续可能会根据 ncx 更新
         
         if output_dir:
             # 使用用户指定的输出目录
-            self.temp_dir = tempfile.mkdtemp(prefix='epub_', dir=output_dir)
+            # 这里一般会始终使用 base_directory，也就是上层已经处理了，可能是 temp dir
+            self.temp_dir = os.path.join(output_dir, f'epub_{self.book_hash}')
+            os.mkdir(self.temp_dir)
         else:
             # 使用系统临时目录
+            # 本程序永远走不到这里来的，除非作为库被别人调用
             self.temp_dir = tempfile.mkdtemp(prefix='epub_')
             
         self.extract_dir = os.path.join(self.temp_dir, 'extracted')
@@ -41,6 +46,17 @@ class EPUBProcessor:
         """
         if self.toc:
             self.book_hash = hashlib.md5(json.dumps(self.toc).encode()).hexdigest()[:8]
+            # 如果重新生成 Hash，需要修改路径
+            if self.output_dir:
+                new_temp_dir = os.path.join(self.output_dir, f'epub_{self.book_hash}')
+                try:
+                    if not os.path.exists(new_temp_dir):
+                        os.rename(self.temp_dir, new_temp_dir)
+                    self.temp_dir = new_temp_dir
+                    self.web_dir = os.path.join(self.temp_dir, 'web')
+                    self.extract_dir = os.path.join(self.temp_dir, 'extracted')
+                except Exception as e:
+                    print(f"Modify directory name failed, old: {self.temp_dir}, new: {new_temp_dir}, err: {e}")
         
     def extract_epub(self):
         """解压EPUB文件"""
@@ -353,7 +369,7 @@ class EPUBProcessor:
         # 创建章节页面
         self.create_chapter_pages()
         
-        # 复制资源文件（CSS、图片、字体等）
+        # 复制资源文件（CSS、图片、字体等）并删除 extracted 文件夹
         self.copy_resources()
         
         # print(f"Web interface created at: {self.web_dir}")
@@ -1003,7 +1019,7 @@ class EPUBProcessor:
 </script>
 </body>
 </html>"""
-        
+        index_html = minify_html.minify(index_html, minify_css=True, minify_js=True)
         with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(index_html)
     
@@ -2796,6 +2812,7 @@ class EPUBProcessor:
 </body>
 </html>
 """
+        chapter_html = minify_html.minify(chapter_html, minify_css=True, minify_js=True)
         return chapter_html
     
     def copy_resources(self):
@@ -2816,6 +2833,13 @@ class EPUBProcessor:
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                 shutil.copy2(src_path, dst_path)
         
+        # 删除原来的 extracted，以后都不用了
+        if os.path.exists(self.extract_dir):
+            try:
+                shutil.rmtree(self.extract_dir)
+            except Exception:
+                pass
+
         # print(f"Resource files copied to: {resources_dir}")
     
     def get_book_info(self):
@@ -2825,6 +2849,7 @@ class EPUBProcessor:
             cover = os.path.normpath(os.path.join(self.resources_base, self.cover_info["href"]))
         return {
             'title': self.book_title,
+            'temp_dir': self.temp_dir,
             'path': self.web_dir,
             'hash': self.book_hash,
             'cover': cover,
