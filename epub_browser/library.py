@@ -590,7 +590,7 @@ class EPUBLibrary:
             <div class="tag-cloud">
                 <div class="tag-cloud-item active">All</div>
 """
-        for tag in all_tags:
+        for tag in sorted(all_tags):
             library_html += f"""<div class="tag-cloud-item">{tag}</div>"""
         library_html += """
             </div>
