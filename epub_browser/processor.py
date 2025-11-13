@@ -367,7 +367,7 @@ class EPUBProcessor:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{self.book_title}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIHY3LjEuMCBieSBAZm9udGF3ZXNvbWUgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbSBMaWNlbnNlIC0gaHR0cHM6Ly9mb250YXdlc29tZS5jb20vbGljZW5zZS9mcmVlIENvcHlyaWdodCAyMDI1IEZvbnRpY29ucywgSW5jLi0tPjxwYXRoIGQ9Ik0zMjAgMjA1LjNMMzIwIDUxNC42TDMyMC41IDUxNC40QzM3NS4xIDQ5MS43IDQzMy43IDQ4MCA0OTIuOCA0ODBMNTEyIDQ4MEw1MTIgMTYwTDQ5Mi44IDE2MEM0NTAuNiAxNjAgNDA4LjcgMTY4LjQgMzY5LjcgMTg0LjZDMzUyLjkgMTkxLjYgMzM2LjMgMTk4LjUgMzIwIDIwNS4zek0yOTQuOSAxMjUuNUwzMjAgMTM2TDM0NS4xIDEyNS41QzM5MS45IDEwNiA0NDIuMSA5NiA0OTIuOCA5Nkw1MjggOTZDNTU0LjUgOTYgNTc2IDExNy41IDU3NiAxNDRMNTc2IDQ5NkM1NzYgNTIyLjUgNTU0LjUgNTQ0IDUyOCA1NDRMNDkyLjggNTQ0QzQ0Mi4xIDU0NCAzOTEuOSA1NTQgMzQ1LjEgNTczLjVMMzMyLjMgNTc4LjhDMzI0LjQgNTgyLjEgMzE1LjYgNTgyLjEgMzA3LjcgNTc4LjhMMjk0LjkgNTczLjVDMjQ4LjEgNTU0IDE5Ny45IDU0NCAxNDcuMiA1NDRMMTEyIDU0NEM4NS41IDU0NCA2NCA1MjIuNSA2NCA0OTZMNjQgMTQ0QzY0IDExNy41IDg1LjUgOTYgMTEyIDk2TDE0Ny4yIDk2QzE5Ny45IDk2IDI0OC4xIDEwNiAyOTQuOSAxMjUuNXoiLz48L3N2Zz4=">
 """
         index_html += """
@@ -712,6 +712,10 @@ class EPUBProcessor:
             color: #e9ecef;
         }
 
+        .chapter-list a:target .chapter-page {
+            color: #e9ecef;
+        }
+
         .chapter-icon {
             margin-right: 12px;
             color: var(--text-secondary);
@@ -931,7 +935,7 @@ class EPUBProcessor:
 """
         index_html += """<script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 书籍目录锚点更新
+        // 书籍目录锚点删除
         const path = window.location.pathname;  // 获取当前URL路径
         let pathParts = path.split('/');
         pathParts = pathParts.filter(item => item !== "");
@@ -1143,7 +1147,7 @@ class EPUBProcessor:
     <title>{chapter_title} - {self.book_title}</title>
     {style_links}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/default.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIHY3LjEuMCBieSBAZm9udGF3ZXNvbWUgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbSBMaWNlbnNlIC0gaHR0cHM6Ly9mb250YXdlc29tZS5jb20vbGljZW5zZS9mcmVlIENvcHlyaWdodCAyMDI1IEZvbnRpY29ucywgSW5jLi0tPjxwYXRoIGQ9Ik0zMjAgMjA1LjNMMzIwIDUxNC42TDMyMC41IDUxNC40QzM3NS4xIDQ5MS43IDQzMy43IDQ4MCA0OTIuOCA0ODBMNTEyIDQ4MEw1MTIgMTYwTDQ5Mi44IDE2MEM0NTAuNiAxNjAgNDA4LjcgMTY4LjQgMzY5LjcgMTg0LjZDMzUyLjkgMTkxLjYgMzM2LjMgMTk4LjUgMzIwIDIwNS4zek0yOTQuOSAxMjUuNUwzMjAgMTM2TDM0NS4xIDEyNS41QzM5MS45IDEwNiA0NDIuMSA5NiA0OTIuOCA5Nkw1MjggOTZDNTU0LjUgOTYgNTc2IDExNy41IDU3NiAxNDRMNTc2IDQ5NkM1NzYgNTIyLjUgNTU0LjUgNTQ0IDUyOCA1NDRMNDkyLjggNTQ0QzQ0Mi4xIDU0NCAzOTEuOSA1NTQgMzQ1LjEgNTczLjVMMzMyLjMgNTc4LjhDMzI0LjQgNTgyLjEgMzE1LjYgNTgyLjEgMzA3LjcgNTc4LjhMMjk0LjkgNTczLjVDMjQ4LjEgNTU0IDE5Ny45IDU0NCAxNDcuMiA1NDRMMTEyIDU0NEM4NS41IDU0NCA2NCA1MjIuNSA2NCA0OTZMNjQgMTQ0QzY0IDExNy41IDg1LjUgOTYgMTEyIDk2TDE0Ny4yIDk2QzE5Ny45IDk2IDI0OC4xIDEwNiAyOTQuOSAxMjUuNXoiLz48L3N2Zz4=">
 """
         chapter_html += """
@@ -1282,6 +1286,26 @@ class EPUBProcessor:
             background: linear-gradient(to right, var(--primary), var(--success));
             width: 0%;
             transition: width 0.3s ease;
+        }
+
+        #bookHomeFloating {
+            width: 30%;
+            height: 100%;
+            bottom: 80px;
+            top: 80px;
+            overflow: hidden;
+        }
+
+        #bookHomeIframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: flex;
+        }
+
+        .iframe-container {
+            width: 100%;
+            height: 100%;
         }
 
         .toc-floating {
@@ -1723,6 +1747,15 @@ class EPUBProcessor:
                 max-height: 100vh;
             }
 
+            #bookHomeFloating {
+                right: 5%;
+                left: 5%;
+                top: 20px;
+                bottom: 90px;
+                width: auto;
+                height: auto;
+            }
+
             .mobile-controls {
                 display: flex;
             }
@@ -1763,14 +1796,24 @@ class EPUBProcessor:
             <i class="fas fa-moon"></i>
         </div>
 
-        <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">
-            <div class="control-btn">
-                <i class="fas fa-book"></i>
-            </div>
-        </a>
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+        </div>
 
         <div class="control-btn" id="tocToggle">
             <i class="fas fa-list"></i>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="iframe-container">
+            <iframe id="bookHomeIframe" src="/book/{self.book_hash}/" title="BookHome" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
         </div>
     </div>
 
@@ -1843,12 +1886,10 @@ class EPUBProcessor:
             <span>Theme</span>
         </div>
         {prev_link_mobile}
-        <a href="/book/{self.book_hash}/" alt="bookHome" class="a-book-home">
-            <div class="control-btn">
-                <i class="fas fa-book"></i>
-                <span>Book</span>
-            </div>
-        </a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
         {next_link_mobile}
         <div class="control-btn" id="mobileFontBtn">
             <i class="fas fa-font"></i>
@@ -1867,6 +1908,69 @@ class EPUBProcessor:
         chapter_html += """
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // iframe 处理
+            let iframe = document.getElementById('bookHomeIframe');
+            iframe.addEventListener('load', function() {
+                let iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                let bookHomeToc = iframeDoc.querySelector('.chapter-list');
+                let iframeBody = iframeDoc.querySelector('body');
+                let iframeFooter = iframeDoc.querySelector('footer');
+                let iframeContainer = iframeDoc.querySelector('.container');
+                let topControls = iframeDoc.querySelector('.top-controls');
+                let readingControls = iframeDoc.querySelector('.reading-controls');
+                let breadcrumb = iframeDoc.querySelector('.breadcrumb');
+                let bookInfoCard = iframeDoc.querySelector('.book-info-card');
+                let tocHeader = iframeDoc.querySelector('.toc-header'); 
+                let allLinks = iframeDoc.querySelectorAll('a');
+
+                topControls.style.display = 'none';
+                breadcrumb.style.display = 'none';
+                bookInfoCard.style.display = 'none';
+                iframeFooter.style.display = 'none';
+                tocHeader.style.display = 'none';
+                readingControls.style.display = 'none';
+                bookHomeToc.style.width = "100%";
+                bookHomeToc.style.maxHeight = "100%";
+                iframeBody.style.padding = 0;
+                iframeContainer.style.padding = 0;
+                iframeContainer.style.margin = 0;
+
+                allLinks.forEach( link => {
+                    link.addEventListener('click', function(event) {
+                      // 阻止默认行为（在iframe中打开） 
+                      event.preventDefault(); 
+                      // 获取链接URL 
+                      var href = this.getAttribute('href'); 
+                      // 在父页面中打开链接 
+                      window.location.href = href; 
+                      return false; 
+                    });
+                });
+
+                // 书籍目录锚点滚动
+                mobileBookHomeBtn.addEventListener('click', function(){
+                    scrollBookHomeToc();
+                });
+                bookHomeToggle.addEventListener('click', function(){
+                    scrollBookHomeToc();
+                });
+
+                function scrollBookHomeToc() {
+                    if (anchor != '') { // 后面有 var anchor 的声明和取值
+                        targetEl =  iframeDoc.getElementById(anchor.substr(1));
+                        if (targetEl) {
+                            var rect = targetEl.getBoundingClientRect();
+                            // 滚动到元素位置
+                            iframe.contentWindow.scrollTo({
+                                top: rect.top + iframe.contentWindow.pageYOffset,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                }
+                
+            });
+            
             // 代码高亮
             hljs.highlightAll();
 
@@ -1903,7 +2007,7 @@ class EPUBProcessor:
             const pathParts = path.split('/');
             const lastPart = pathParts[pathParts.length - 1];
             const book_hash = pathParts[pathParts.length - 2];
-            let anchor = '';
+            var anchor = '';
             if (lastPart.startsWith('chapter_') && lastPart.endsWith('.html')) {
                 anchor = "#" + lastPart.replace('.html', '');
             }
@@ -1913,6 +2017,9 @@ class EPUBProcessor:
                     item.href += anchor;
                 });
                 localStorage.setItem(book_hash, anchor);
+                
+                let bookHomeIframe = document.querySelector('#bookHomeIframe');
+                bookHomeIframe.src += anchor;
             }
 
             // 主题切换功能
@@ -1978,9 +2085,13 @@ class EPUBProcessor:
             
             // 目录功能
             const tocToggle = document.getElementById('tocToggle');
+            const bookHomeToggle = document.getElementById('bookHomeToggle');
             const tocFloating = document.getElementById('tocFloating');
+            const bookHomeFloating = document.getElementById('bookHomeFloating');
             const mobileTocBtn = document.getElementById('mobileTocBtn');
+            const mobileBookHomeBtn = document.getElementById('mobileBookHomeBtn');
             const tocClose = document.getElementById('tocClose');
+            const bookHomeClose = document.getElementById('bookHomeClose');
             const tocList = document.getElementById('tocList');
             
             // 生成目录
@@ -1990,6 +2101,9 @@ class EPUBProcessor:
             tocToggle.addEventListener('click', function() {
                 tocFloating.classList.toggle('active');
             });
+            bookHomeToggle.addEventListener('click', function() {
+                bookHomeFloating.classList.toggle('active');
+            });
             
             // 切换目录显示 - 移动端
             mobileTocBtn.addEventListener('click', function() {
@@ -1997,11 +2111,20 @@ class EPUBProcessor:
                 // 移动端点击后高亮按钮
                 mobileTocBtn.classList.toggle('active');
             });
+            mobileBookHomeBtn.addEventListener('click', function() {
+                bookHomeFloating.classList.toggle('active');
+                // 移动端点击后高亮按钮
+                mobileBookHomeBtn.classList.toggle('active');
+            });
             
             // 关闭目录
             tocClose.addEventListener('click', function() {
                 tocFloating.classList.remove('active');
                 mobileTocBtn.classList.remove('active');
+            });
+            bookHomeClose.addEventListener('click', function() {
+                bookHomeFloating.classList.remove('active');
+                mobileBookHomeBtn.classList.remove('active');
             });
             
             // 生成目录函数
