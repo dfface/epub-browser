@@ -965,12 +965,36 @@ class EPUBProcessor:
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """
-        index_html += """<script>
-    document.addEventListener('DOMContentLoaded', function() {
+        index_html += f"""<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        const book_hash = "{self.book_hash}";"""
+        index_html += """
         const path = window.location.pathname;  // 获取当前URL路径
         let pathParts = path.split('/');
         pathParts = pathParts.filter(item => item !== "");
-        const book_hash = pathParts[pathParts.length - 1];
+        
+        // 检查当前的基路径
+        if (!path.startsWith("/book/")) {
+            // 获取基路径
+            let basePath = "/" + pathParts[0] + "/";
+            // 处理所有资源，都要加上基路径
+            addBasePath(basePath);
+        }
+
+        function addBasePath(basePath) {
+            // 处理所有链接、图片、脚本和样式表
+            const resources = document.querySelectorAll('a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
+            resources.forEach(resource => {
+                const src = resource.getAttribute('src');
+                const href = resource.getAttribute('href');
+                if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                    resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+                }
+                if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                    resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+                }
+            });
+        }
 
         // 书籍目录锚点删除
         const anchor = window.location.hash;
@@ -2240,6 +2264,33 @@ class EPUBProcessor:
         const book_hash = "{self.book_hash}";
 """
         chapter_html += """
+            const path = window.location.pathname;  // 获取当前URL路径
+            let pathParts = path.split('/');
+            pathParts = pathParts.filter(item => item !== "");
+
+            // 检查当前的基路径
+            if (!path.startsWith("/book/")) {
+                // 获取基路径
+                let basePath = "/" + pathParts[0] + "/"
+                // 处理所有资源，都要加上基路径
+                addBasePath(basePath);
+            }
+
+            function addBasePath(basePath) {
+                // 处理所有链接、图片、脚本和样式表
+                const resources = document.querySelectorAll('iframe[src^="/"], a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
+                resources.forEach(resource => {
+                    const src = resource.getAttribute('src');
+                    const href = resource.getAttribute('href');
+                    if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                        resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+                    }
+                    if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                        resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+                    }
+                });
+            }
+
             // 自定义CSS功能
             const cssPanelToggle = document.getElementById('cssPanelToggle');
             const cssPanelContent = document.getElementById('cssPanelContent');
@@ -2494,8 +2545,6 @@ class EPUBProcessor:
             wrapAllTables();
 
             // 书籍目录锚点更新
-            const path = window.location.pathname;  // 获取当前URL路径
-            const pathParts = path.split('/');
             const lastPart = pathParts[pathParts.length - 1];
             var anchor = '';
             if (lastPart.startsWith('chapter_') && lastPart.endsWith('.html')) {

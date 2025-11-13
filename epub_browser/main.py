@@ -19,9 +19,9 @@ def main():
     parser.add_argument('--port', '-p', type=int, default=8000, help='Web server port (default: 8000)')
     parser.add_argument('--no-browser', action='store_true', help='Do not automatically open browser')
     parser.add_argument('--output-dir', '-o', help='Output directory for converted books')
-    parser.add_argument('--keep-files', action='store_true', help='Keep converted files after server stops')
+    parser.add_argument('--keep-files', action='store_true', help='Keep converted files after server stops. To enable direct deployment, please use the --no-server parameter.')
     parser.add_argument('--log', action='store_true', help='Enable log messages')
-    parser.add_argument('--no-server', action='store_true', help='Do not start a server, just generate files')
+    parser.add_argument('--no-server', action='store_true', help='Do not start a server, just generate files which can be directly deployed on any web server such as Apache.')
     
     args = parser.parse_args()
     
@@ -51,10 +51,14 @@ def main():
 
     library.create_library_home()
 
-    # 创建服务器
+    # 仅生成文件
     if args.no_server:
+        # 重新组织文件格式
+        library.reorganize_files()
         print(f"Files generated in: {library.base_directory}")
         return
+    
+    # 创建服务器
     server_instance = EPUBServer(library, args.log)
     try:
         server_instance.start_server(

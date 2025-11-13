@@ -251,7 +251,7 @@ class EPUBServer:
             print(f"Web server started: http://{actual_host}:{actual_port}")
             print(f"Available books ({len(self.library.books)}):")
             for book_hash, book_info in self.library.books.items():
-                print(f"  - {book_info['title']}: http://{actual_host}:{actual_port}/book/{book_hash}/")
+                print(f"  - {book_info['title']}: http://{actual_host}:{actual_port}book/{book_hash}/")
             print("Press Ctrl+C to stop the server\n")
             
             # 自动打开浏览器

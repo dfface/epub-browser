@@ -660,6 +660,30 @@ class EPUBLibrary:
 """
         library_html += """<script>
         document.addEventListener('DOMContentLoaded', function() {
+            // 检查当前的基路径
+            base_path = window.location.pathname;
+            if (base_path !== "/") {
+                // 处理所有资源，都要加上基路径
+                addBasePath(base_path);
+            } else {
+            }
+
+            function addBasePath(basePath) {
+                // 处理所有链接、图片、脚本和样式表
+                const resources = document.querySelectorAll('a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
+                resources.forEach(resource => {
+                    const src = resource.getAttribute('src');
+                    const href = resource.getAttribute('href');
+                    if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                        resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+                    }
+                    if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                        resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+                    }
+                });
+            }
+
+
             // 书籍目录锚点
             const allBookLinks = document.querySelectorAll('.book-card .book-link');
             allBookLinks.forEach(item => {
@@ -811,6 +835,30 @@ class EPUBLibrary:
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
         with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(library_html)
+    
+    def reorganize_files(self):
+        """按照 href 的格式组织目录"""
+        # 创建 book 目录
+        book_path = os.path.join(self.base_directory, "book")
+        if os.path.exists(book_path):
+            try:
+                shutil.rmtree(book_path)
+                os.mkdir(book_path)
+            except Exception as e:
+                print(f"book_path {book_path} exists, try to recreate failed, err: {e}")
+        else:
+            os.mkdir(book_path)
+        # 把所有书籍移动到对应目录
+        for book_hash, book_info in self.books.items():
+            old_path = book_info['web_dir']
+            old_temp_dir = book_info['temp_dir']
+            cur_path = os.path.join(book_path, book_hash)
+            try:
+                shutil.move(old_path, cur_path)
+                # 删除原来的 temp_dir 目录
+                shutil.rmtree(old_temp_dir)
+            except Exception as e:
+                print(f"move {old_path} to {cur_path} failed, err: {e}")
     
     def cleanup(self):
         """清理所有文件"""

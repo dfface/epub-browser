@@ -21,6 +21,7 @@ It now supports:
 * Code highlight.
 * Remember your last reading chapter.
 * Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
+* Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
 
 ## Usage
 
@@ -41,10 +42,14 @@ epub-browser *.epub
 # Open multiple books under the current path
 epub-browser .
 
+# Do not start the server; only generate static website files, which can be directly deployed on any web server such as Apache.
+epub-browser . --no-server
+
 # Specify the output directory of html files, or use tmp directory by default
 epub-browser book1.epub book2.epub --output-dir /path/to/output
 
-# Save the converted html files, will not clean the target tmp directory
+# Save the converted html files, will not clean the target tmp directory;
+# Note: These files are for inspection purposes only and cannot be directly deployed to a web server. To enable direct deployment, please use the --no-server parameter.
 epub-browser book1.epub --keep-files
 
 # Do not open the browser automatically
