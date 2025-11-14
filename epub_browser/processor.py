@@ -1355,7 +1355,6 @@ class EPUBProcessor:
             max-width: 1000px;
             min-width: 1000px;
             margin: 0 auto;
-            flex: 1;
         }
 
         .header {
@@ -1435,10 +1434,10 @@ class EPUBProcessor:
         }
 
         #bookHomeFloating {
-            width: 30%;
+            min-width: 30vw;
             height: 100%;
             bottom: 80px;
-            top: 80px;
+            top: 150px;
             overflow: hidden;
         }
 
@@ -1456,7 +1455,7 @@ class EPUBProcessor:
 
         .toc-floating {
             position: fixed;
-            top: 150px;
+            top: 208px;
             right: 30px;
             width: 280px;
 
@@ -1597,7 +1596,6 @@ class EPUBProcessor:
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
             overflow: hidden;
-            margin-bottom: 30px;
             transition: var(--transition);
         }
 
@@ -1606,6 +1604,7 @@ class EPUBProcessor:
             color: var(--content-text);
             transition: var(--transition);
             text-indent: 0px;
+            width: 100%;
         }
 
         .content h2, .content h3, .content h4 {
@@ -1641,10 +1640,13 @@ class EPUBProcessor:
         .content img {
             max-width: 100%;
             height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             margin: 0;
             object-fit: contain;
+        }
+
+        .content .img-wrapper{
+            max-height: 70vh;
+            display: inline;
         }
 
         .content .table-wrapper {
@@ -1653,7 +1655,7 @@ class EPUBProcessor:
         }
 
         .content table {
-            margin: 0px;
+            margin: 0 auto;
             border-color: var(--text-color);
         }
 
@@ -1729,7 +1731,7 @@ class EPUBProcessor:
         .navigation {
             display: flex;
             justify-content: space-between;
-            margin: 30px 0 0 0;
+            margin: 30px 0;
             padding: 20px;
             background: var(--card-bg);
             border-radius: var(--border-radius);
@@ -1758,11 +1760,8 @@ class EPUBProcessor:
             flex-direction: column;
         }
 
-        .nav-btn:hover {
-            background: var(--primary);
-            color: var(--card-bg);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(67, 97, 238, 0.4);
+        .navigation .control-btn:hover {
+            transform: translateY(-4px);
         }
 
         .footer {
@@ -1892,7 +1891,6 @@ class EPUBProcessor:
         .mobile-controls .control-btn:hover,
         .mobile-controls .control-btn.active {
             color: var(--primary);
-            background: var(--border-color);
         }
 
         .mobile-controls .control-btn i {
@@ -2034,7 +2032,8 @@ class EPUBProcessor:
         .custom-css-notification {
             position: fixed;
             top: 20px;
-            right: 20px;
+            left: 50%;
+            transform: translateX(-50%);        
             padding: 12px 20px;
             border-radius: 6px;
             color: white;
@@ -2085,52 +2084,15 @@ class EPUBProcessor:
         }
 
         /* 翻页控制面板 */
-        .pagination-controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 40px;
-            background: var(--card-bg);
-            border-radius: 50px;
-            box-shadow: var(--shadow);
-            padding: 10px 20px;
-            z-index: 77;
-            transition: var(--transition);
-        }
-
-        .pagination-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 600;
-        }
-
-        .pagination-btn:hover {
-            background: var(--secondary);
-            transform: translateY(-2px);
-        }
-
-        .pagination-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
         .page-indicator {
             font-weight: 600;
             color: var(--text-color);
             min-width: 60px;
             text-align: center;
+            display: flex;
+            justify-items: center;
+            line-height: 2rem;
+            margin: 0 2px;
         }
 
         .page-nav {
@@ -2195,10 +2157,23 @@ class EPUBProcessor:
         }
 
         /* 翻页模式样式 */
+        .pagination-mode .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
         .pagination-mode .content-container {
-            overflow: hidden;
-            height: calc(100vh - 60px);
-            position: relative;
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .pagination-mode .navigation {
+            padding: 20px;
+            min-height: 50px;
+            margin-top: 0;
+            margin-left: 0;
+            margin-right: 0;
         }
 
         .pagination-mode .content {
@@ -2206,6 +2181,21 @@ class EPUBProcessor:
             flex-direction: column;
             height: 100%;
             position: relative;
+            padding: 40px;
+            margin: 0;
+            width: 100%;
+        }
+
+        /* 隐藏滚动条 */
+        .pagination-mode ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .pagination-mode {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+            padding: 0;
+            background: var(--bg-color);
         }
 
         .pagination-page {
@@ -2231,16 +2221,6 @@ class EPUBProcessor:
             transform: translateX(-100%);
         }
 
-        /* 隐藏滚动条 */
-        .pagination-mode ::-webkit-scrollbar {
-            display: none;
-        }
-
-        .pagination-mode {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
         .kindle-mode .header, .kindle-mode .toc-container, 
         .kindle-mode .content-container, .kindle-mode .navigation,
         .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .pagination-controls {
@@ -2256,7 +2236,7 @@ class EPUBProcessor:
             display: none;
         }
 
-        .kindle-mode .breadcrumb {
+        .kindle-mode .breadcrumb,.kindle-mode .navigation {
             margin: 0;
         }
 
@@ -2266,6 +2246,14 @@ class EPUBProcessor:
 
         .kindle-mode .theme-toggle {
             border: 1px solid;
+        }
+
+        .kindle-mode .content-container {
+            margin-bottom: 0;
+        }
+
+        .kindle-mode {
+            background: var(--bg-color);
         }
 
         /* 响应式设计 */
@@ -2287,7 +2275,17 @@ class EPUBProcessor:
             }
             
             .navigation {
-                gap: 10px;
+                padding: 10px 0;
+                gap: 5px;
+            }
+
+            .pagination-mode .navigation{
+                padding: 10px 0;
+                gap: 5px;
+            }
+
+            .navigation .control-btn {
+                padding: 0 15px;
             }
             
             .nav-btn {
@@ -2479,29 +2477,6 @@ class EPUBProcessor:
         </div>
 
         <div class="content-container">
-            
-            <div class="pagination-info pagination-controls" id="paginationInfo" style="display: none;">
-                <span class="page-indicator">
-                    <span id="currentPage">1</span> / <span id="totalPages">1</span>
-                </span>
-                <div class="page-nav">
-                    <div class="page-jump">
-                        <input type="number" id="pageJumpInput" min="1" max="1" value="1">
-                        <div class="page-nav-btn" id="goToPage" title="Jump">
-                            <i class="fas fa-arrow-right-to-bracket"></i>
-                            <span class="control-name">Go to</span>
-                        </div>
-                    </div>
-                    <div class="page-nav-btn" id="prevPage">
-                        <i class="fas fa-chevron-left"></i>
-                        <span class="control-name">Prev page</span>
-                    </div>
-                    <div class="page-nav-btn" id="nextPage">
-                        <i class="fas fa-chevron-right"></i>
-                        <span class="control-name">Next page</span>
-                    </div>
-                </div>
-            </div>
             <article class="content" id="content">
             {content}
             </article>
@@ -2509,12 +2484,34 @@ class EPUBProcessor:
 
         <div class="navigation">
             {prev_link}
-            <a href="/index.html#{self.book_hash}" alt="home">
+            <a href="/index.html#{self.book_hash}" alt="home" id="navigationHomeBtn">
                 <div class="control-btn">
                     <i class="fas fa-home"></i>
                     <span class="control-name">Home</span>
                 </div>
             </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" style="padding: 0;">
+                    
+                </div>
+                <div class="control-btn" id="prevPage">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <span class="page-indicator">
+                    <span id="currentPage" style="display:none;"></span>
+                    <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                </span>
+                <div class="control-btn" id="goToPage" title="Jump">
+                    <i class="fas fa-arrow-right-to-bracket"></i>
+                    <span class="control-name">Jump</span>
+                </div>
+                <div class="control-btn" id="nextPage">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
             {next_link}
         </div>
     </div>
@@ -2600,6 +2597,7 @@ class EPUBProcessor:
             // 翻页功能
             const togglePaginationBtn = document.getElementById('togglePagination');
             const mobileTogglePaginationBtn  = document.getElementById('mobileTogglePagination');
+            const navigationHomeBtn = document.getElementById('navigationHomeBtn');
             const paginationInfo = document.getElementById('paginationInfo');
             const currentPageEl = document.getElementById('currentPage');
             const totalPagesEl = document.getElementById('totalPages');
@@ -2648,14 +2646,27 @@ class EPUBProcessor:
                 document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
             }
 
+            // 获取元素高度（包括外边距）
+            function getElementHeight(element) {
+                // 创建临时元素测量高度
+                const tempElement = element.cloneNode(true);
+                tempElement.style.visibility = 'hidden';
+                tempElement.style.position = 'absolute';
+                content.appendChild(tempElement);
+                
+                const height = tempElement.getBoundingClientRect().height;
+                const styles = window.getComputedStyle(element);
+                const marginTop = parseFloat(styles.marginTop) || 0;
+                const marginBottom = parseFloat(styles.marginBottom) || 0;
+                
+                content.removeChild(tempElement);
+                
+                return height + marginTop + marginBottom;
+            }
+
             function isKindleMode() {
                 let kindleMode = getCookie("kindle-mode") || "false";
                 return kindleMode == "true";
-            }
-
-            if (isKindleMode()) {
-                document.querySelector(".custom-css-panel").style.display = "none";
-                document.body.classList.add("kindle-mode");
             }
             
             // 翻页状态变量
@@ -2664,19 +2675,39 @@ class EPUBProcessor:
             let totalPages = 0;
             let pages = [];
 
+            let fontSize = "medium";
             // 检查本地存储中的主题设置
             if (!isKindleMode()) {
                 let currentPaginationMode = localStorage.getItem('turning') || "false";
                 isPaginationMode = currentPaginationMode == "true"
+                fontSize = localStorage.getItem('font_size') || "medium";
             } else {
                 let currentPaginationMode =  getCookie('turning') || "false";
-                isPaginationMode = currentPaginationMode == "true"
+                isPaginationMode = currentPaginationMode == "true";
+                fontSize = getCookie('font_size') || "medium";
+            }
+            if (fontSize != "medium") {
+                updateFontSize(fontSize);
+            }
+
+            if (isKindleMode() || isPaginationMode) {
+                document.querySelector(".custom-css-panel").style.display = "none";
+
+                // 获取目标元素
+                let mobileControls = document.querySelector('.mobile-controls');
+                let bottomNav = document.querySelector('.navigation');
+                bottomNav.style.marginBottom = `${getElementHeight(mobileControls)}px`;
+            }
+
+            if (isKindleMode()) {
+                document.body.classList.add("kindle-mode");
             }
 
             if (isPaginationMode) {
                 // 一开始就是翻页
                 enablePaginationMode();
                 togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
+                mobileTogglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
                 // 隐藏 tocFloatingBtn
                 let tocToggleBtn = document.getElementById('tocToggle');
                 if (tocToggleBtn) {
@@ -2687,42 +2718,33 @@ class EPUBProcessor:
                 if (mobileTocBtn) {
                     mobileTocBtn.style.display = 'none';
                 }
+            } else {
+                loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
             }
 
-            loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
-            
-            // 切换翻页模式
-            togglePaginationBtn.addEventListener('click', function() {
-                isPaginationMode = !isPaginationMode;
-                if (isPaginationMode) {
-                    enablePaginationMode();
-                    togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
-                    // 隐藏 tocFloatingBtn
-                    let tocToggleBtn = document.getElementById('tocToggle');
-                    if (tocToggleBtn) {
-                        tocToggleBtn.style.display = 'none';
-                    }
-                } else {
-                    disablePaginationMode();
-                    togglePaginationBtn.innerHTML = '<i class="fas fa-book-open"></i><span class="control-name">Turning</span>';
-                }
-            });
-            mobileTogglePaginationBtn.addEventListener('click', function() {
+            function savePaginationModeAndReload() {
                 isPaginationMode = !isPaginationMode;
                 
                 if (isPaginationMode) {
-                    enablePaginationMode();
-                    togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
-                    // 隐藏 mobileTocBtn
-                    let mobileTocBtn = document.getElementById('mobileTocBtn');
-                    if (mobileTocBtn) {
-                        mobileTocBtn.style.display = 'none';
+                    if (!isKindleMode()) {
+                        localStorage.setItem('turning', 'true');
+                    } else {
+                        setCookie('turning', 'true');
                     }
                 } else {
-                    disablePaginationMode();
-                    togglePaginationBtn.innerHTML = '<i class="fas fa-book-open"></i><span class="control-name">Turning</span>';
+                    if (!isKindleMode()) {
+                        localStorage.removeItem('turning');
+                    } else {
+                        deleteCookie('turning');
+                    }
                 }
-            });
+
+                location.reload();
+            }
+            
+            // 切换翻页模式
+            togglePaginationBtn.addEventListener('click', savePaginationModeAndReload);
+            mobileTogglePaginationBtn.addEventListener('click', savePaginationModeAndReload);
             
             // 启用翻页模式
             function enablePaginationMode() {
@@ -2734,13 +2756,19 @@ class EPUBProcessor:
                 
                 // 添加翻页模式类
                 document.body.classList.add('pagination-mode');
-                contentContainer.classList.add('pagination-mode');            
+                contentContainer.classList.add('pagination-mode');  
+
+                // 获取目标元素
+                let mobileControls = document.querySelector('.mobile-controls');
+                let bottomNav = document.querySelector('.navigation');
+                bottomNav.style.marginBottom = `${getElementHeight(mobileControls)}px`;
                 
                 // 关闭页面的不必要元素
                 toggleHideUnnecessary(true);
                 
                 // 显示翻页信息
                 paginationInfo.style.display = 'flex';
+                navigationHomeBtn.style.display = 'none';
                 
                 // 分割内容为页面
                 createPages();
@@ -2793,7 +2821,13 @@ class EPUBProcessor:
                 const originalContent = content.innerHTML;
                 
                 // 获取容器高度
-                const contentHeight = content.clientHeight - 150; // 减去内边距
+                const bottomNav = document.querySelector('.navigation');
+                const bottomNavHeight = getElementHeight(bottomNav);
+                const viewportHeight = window.innerHeight;
+
+                let contentHeight = viewportHeight - bottomNavHeight; // 减去边距
+                contentContainer.style.height = contentHeight;
+                contentHeight -= 90 // 减去大的内边距
                 
                 // 分割内容为页面
                 let currentPageContent = '';
@@ -2807,15 +2841,13 @@ class EPUBProcessor:
                 } else {
                     // 遍历所有子元素
                     elements.forEach(element => {
-                        const elementHeight = element.offsetHeight;
-                        
+                        let elementHeight = getElementHeight(element);
                         // 如果当前页面高度加上新元素高度超过容器高度，创建新页面
                         if (currentHeight + elementHeight > contentHeight && currentHeight > 0) {
                             pages.push(currentPageContent);
                             currentPageContent = '';
                             currentHeight = 0;
-                        }
-                        
+                        }        
                         // 添加元素到当前页面
                         currentPageContent += element.outerHTML;
                         currentHeight += elementHeight;
@@ -2941,12 +2973,14 @@ class EPUBProcessor:
                     let storageKey = getStorageKey("scroll");
                     let savedPos = localStorage.getItem(storageKey);
                     let windowHeight = window.innerHeight;
-                    window.scrollTo({
-                        top: parseInt(savedPos),
-                        behavior: 'smooth'
-                    });
-                    // 显示加载进度提示
-                    showNotification(`Reading progress loaded: Scroll position ${Math.round( savedPos / (document.documentElement.scrollHeight - windowHeight) * 100 )}%`, 'info');
+                    if (savedPos) {
+                            window.scrollTo({
+                            top: parseInt(savedPos),
+                            behavior: 'smooth'
+                        });
+                        // 显示加载进度提示
+                        showNotification(`Reading progress loaded: Scroll position ${Math.round( savedPos / (document.documentElement.scrollHeight - windowHeight) * 100 )}%`, 'info');
+                    }
                 }
             }
             
@@ -3278,32 +3312,34 @@ class EPUBProcessor:
             
 
             // 包裹所有表格
-            function wrapAllTables() {
-                // 获取页面中所有table元素
-                const tables = document.querySelectorAll('table');
+            function wrapAllElements(name) {
+                wrapperName = `${name}-wrapper`
+                // 获取页面中所有元素
+                const elements = document.querySelectorAll(name);
                 let wrappedCount = 0;
                 
                 // 遍历每个表格
-                tables.forEach((table, index) => {
+                elements.forEach((el, index) => {
                     // 如果表格已经被包裹，跳过
-                    if (table.parentElement && table.parentElement.classList.contains('table-wrapper')) {
+                    if (el.parentElement && el.parentElement.classList.contains(wrapperName)) {
                         return;
                     }
                     
                     // 创建包裹div
                     const wrapper = document.createElement('div');
-                    wrapper.className = 'table-wrapper';
+                    wrapper.className = wrapperName;
                     
                     // 将表格插入到包裹div中
-                    table.parentNode.insertBefore(wrapper, table);
-                    wrapper.appendChild(table);
+                    el.parentNode.insertBefore(wrapper, el);
+                    wrapper.appendChild(el);
                     
                     wrappedCount++;
                 });
                 
                 return wrappedCount;
             }
-            wrapAllTables();
+            wrapAllElements('table');
+            wrapAllElements('img');
 
             // 书籍目录锚点更新
             const lastPart = pathParts[pathParts.length - 1];
@@ -3436,7 +3472,7 @@ class EPUBProcessor:
                 if (activeLi) {
                     // 计算 activeLi 相对于 ul 的顶部偏移量
                     const offsetTop = activeLi.offsetTop;
-                    tocList.scrollTop = offsetTop - 20;  // 加点偏移
+                    tocList.scrollTop = offsetTop - 150;  // 加点偏移
                 }
             }
             tocToggle.addEventListener('click', function() {
@@ -3575,20 +3611,25 @@ class EPUBProcessor:
             let lastScrollTop = 0; // 移动端滚动时显示/隐藏底部控件
             const scrollThreshold = 1; // 滚动阈值，避免轻微滚动触
             const mobileControls = document.querySelector('.mobile-controls');
-            window.addEventListener('scroll', function() {
-                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            if(!isKindleMode() && !document.body.classList.contains('pagination-mode')) {
+                window.addEventListener('scroll', function() {
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-                if (scrollTop > lastScrollTop && scrollTop - lastScrollTop > scrollThreshold) {
-                    mobileControls.style.transform = 'translateY(100%)';
-                } 
-                // 向上滚动超过阈值时显示控件
-                else if (scrollTop < lastScrollTop && lastScrollTop - scrollTop > scrollThreshold) {
-                    mobileControls.style.transform = 'translateY(0)';
-                }
+                    if (scrollTop > lastScrollTop && scrollTop - lastScrollTop > scrollThreshold) {
+                        mobileControls.style.transform = 'translateY(100%)';
+                    } 
+                    // 向上滚动超过阈值时显示控件
+                    else if (scrollTop < lastScrollTop && lastScrollTop - scrollTop > scrollThreshold) {
+                        mobileControls.style.transform = 'translateY(0)';
+                    }
 
-                // 更新上一次滚动位置
-                lastScrollTop = scrollTop;
-            });
+                    // 更新上一次滚动位置
+                    lastScrollTop = scrollTop;
+                });
+            } else {
+                mobileControls.style.transform = 'translateY(0)';
+            }
+            
 
             // 图片点击放大功能
             const contentImages = document.querySelectorAll('img');
@@ -3619,30 +3660,47 @@ class EPUBProcessor:
             mobileFontBtn.addEventListener('click', function() {
                 fontControls.classList.toggle('show');
             });
+
+            function updateFontSize(size) {
+                // 移除所有按钮的active类
+                const fontSizeBtns = document.querySelectorAll('.font-size-btn');
+                fontSizeBtns.forEach(b => b.classList.remove('active'));
+                fontSizeBtns.forEach(btn => {
+                    // 点亮那个字体按钮
+                    let btnSize = btn.getAttribute('data-size');
+                    if (btnSize == size) {
+                        btn.classList.add('active');
+                    }
+                })
+
+                // 移除所有字体大小类
+                content.classList.remove('font-small', 'font-medium', 'font-large');
+                
+                // 添加选中的字体大小类
+                if (size === 'small') {
+                    content.classList.add('font-small');
+                } else if (size === 'medium') {
+                    content.classList.add('font-medium');
+                } else if (size === 'large') {
+                    content.classList.add('font-large');
+                }
+            }
             
             fontSizeBtns.forEach(btn => {
                 btn.addEventListener('click', function() {
-                    // 移除所有按钮的active类
-                    fontSizeBtns.forEach(b => b.classList.remove('active'));
-                    // 为当前点击的按钮添加active类
-                    this.classList.add('active');
-                    
-                    const size = this.getAttribute('data-size');
-                    
-                    // 移除所有字体大小类
-                    content.classList.remove('font-small', 'font-medium', 'font-large');
-                    
-                    // 添加选中的字体大小类
-                    if (size === 'small') {
-                        content.classList.add('font-small');
-                    } else if (size === 'medium') {
-                        content.classList.add('font-medium');
-                    } else if (size === 'large') {
-                        content.classList.add('font-large');
-                    }
+                    let size = this.getAttribute('data-size');
 
+                    updateFontSize(size);
+                    
                     // 关闭窗口
                     fontControls.classList.toggle('show');
+
+                    // 保存选项
+                    if (!isKindleMode()) {
+                        localStorage.setItem('font_size', size);
+                    } else {
+                        setCookie('font_size', size);
+                    }
                 });
             });
             

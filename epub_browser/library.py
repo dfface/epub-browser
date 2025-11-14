@@ -769,7 +769,7 @@ class EPUBLibrary:
             // 检查本地存储中的主题设置
             let currentTheme = 'light';
             if (!isKindleMode()) {
-                localStorage.getItem('theme');
+                currentTheme = localStorage.getItem('theme');
             } else {
                 currentTheme = getCookie('theme');
             }
