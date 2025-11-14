@@ -2845,6 +2845,12 @@ class EPUBProcessor:
                 } else if (fontSize == "small") {
                     contentHeight += 40;
                 }
+                if (!isKindleMode()) {
+                    let customContentHeight = localStorage.getItem("page_height");
+                    if (customContentHeight) {
+                        contentHeight = parseInt(customContentHeight);
+                    }
+                }
                 
                 // 分割内容为页面
                 let currentPageContent = '';
