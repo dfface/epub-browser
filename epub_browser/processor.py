@@ -3025,7 +3025,6 @@ class EPUBProcessor:
             // 键盘事件处理
             function handleKeyDown(e) {{
                 if (!isPaginationMode || isKindleMode()) return;
-                console.log(e.key);
                 switch(e.key) {{
                     case 'ArrowLeft':
                         if (currentPage > 0) {{
