@@ -141,13 +141,18 @@ class EPUBLibrary:
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
             line-height: 1.6;
             color: var(--text-color);
             background: var(--bg-color);
             min-height: 100vh;
             transition: var(--transition);
             padding: 0 20px;
+        }
+
+        /* 字体设置 */
+        .content h1, .content h2, .content h3, .content h4, .content h5, .content h6, .content p, .content span, .content a, .content div {
+            font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
         }
 
         .container {

@@ -429,13 +429,18 @@ class EPUBProcessor:
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
             line-height: 1.6;
             color: var(--text-color);
             background: var(--bg-color);
             min-height: 100vh;
             transition: var(--transition);
             padding: 0 20px;
+        }
+
+        /* 字体设置 */
+        .content h1, .content h2, .content h3, .content h4, .content h5, .content h6, .content p, .content span, .content a, .content div {
+            font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
         }
 
         .container {
@@ -1340,7 +1345,7 @@ class EPUBProcessor:
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
             line-height: 1.6;
             color: var(--text-color);
             background: var(--bg-color);
@@ -1349,6 +1354,11 @@ class EPUBProcessor:
             transition: var(--transition);
             display: flex;
             flex-direction: column;
+        }
+
+        /* 字体设置 */
+        .content h1, .content h2, .content h3, .content h4, .content h5, .content h6, .content p, .content span, .content a, .content div {
+            font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
         }
 
         .container {
@@ -2827,7 +2837,12 @@ class EPUBProcessor:
 
                 let contentHeight = viewportHeight - bottomNavHeight; // 减去边距
                 contentContainer.style.height = contentHeight;
-                contentHeight -= 90 // 减去大的内边距
+                contentHeight -= 60; // 减去大的内边距
+                if (fontSize == "large") {
+                    contentHeight -= 280;
+                } else if (fontSize == "small") {
+                    contentHeight += 40;
+                }
                 
                 // 分割内容为页面
                 let currentPageContent = '';
@@ -3690,26 +3705,23 @@ class EPUBProcessor:
                 btn.addEventListener('click', function() {
                     let size = this.getAttribute('data-size');
 
-                    updateFontSize(size);
-                    
-                    // 关闭窗口
-                    fontControls.classList.toggle('show');
-
                     // 保存选项
                     if (!isKindleMode()) {
                         localStorage.setItem('font_size', size);
                     } else {
                         setCookie('font_size', size);
                     }
+
+                    location.reload();
                 });
             });
             
             // 添加字体大小样式
             const style = document.createElement('style');
             style.textContent = `
-                .font-small { font-size: 0.9rem; }
-                .font-medium { font-size: 1rem; }
-                .font-large { font-size: 1.2rem; }
+                .font-small { font-size: 1rem; }
+                .font-medium { font-size: 1.2rem; }
+                .font-large { font-size: 1.5rem; }
 
                 img.zoomed {
                     width: 90vw; 
