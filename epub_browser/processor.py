@@ -1282,10 +1282,12 @@ class EPUBProcessor:
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Prev chapter</span></div></a>' if chapter_index > 0 else ''
-        next_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
-        prev_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Prev</span></div></a>' if chapter_index > 0 else ''
-        next_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
+        prev_href = f"/book/{self.book_hash}/chapter_{chapter_index-1}.html"
+        next_href = f"/book/{self.book_hash}/chapter_{chapter_index+1}.html"
+        prev_link = f'<a href="{prev_href}" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Prev chapter</span></div></a>' if chapter_index > 0 else ''
+        next_link = f'<a href="{next_href}" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
+        prev_link_mobile = f'<a href="{prev_href}" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Prev</span></div></a>' if chapter_index > 0 else ''
+        next_link_mobile = f'<a href="{next_href}" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="{self.lang}">
@@ -2998,24 +3000,6 @@ class EPUBProcessor:
                     }
                 }
             }
-            
-            // 键盘事件处理
-            function handleKeyDown(e) {
-                if (!isPaginationMode || isKindleMode()) return;
-                
-                switch(e.key) {
-                    case 'ArrowLeft':
-                        if (currentPage > 0) {
-                            showPage(currentPage - 1);
-                        }
-                        break;
-                    case 'ArrowRight':
-                        if (currentPage < totalPages - 1) {
-                            showPage(currentPage + 1);
-                        }
-                        break;
-                }
-            }
 
             // 跳转到指定页面
             goToPageBtn.addEventListener('click', function() {
@@ -3035,24 +3019,50 @@ class EPUBProcessor:
                 }
             });
 
+
+            """
+        chapter_html += f"""
+            // 键盘事件处理
+            function handleKeyDown(e) {{
+                if (!isPaginationMode || isKindleMode()) return;
+                
+                switch(e.key) {{
+                    case 'ArrowLeft':
+                        if (currentPage > 0) {{
+                            showPage(currentPage - 1);
+                        }} else {{
+                            location.href = "{prev_href}"
+                        }}
+                        break;
+                    case 'ArrowRight':
+                        if (currentPage < totalPages - 1) {{
+                            showPage(currentPage + 1);
+                        }} else {{
+                            location.href = "{next_href}"
+                        }}
+                        break;
+                }}
+            }}
+
             // 上一页按钮事件
-            prevPageBtn.addEventListener('click', function() {
-                if (currentPage > 0) {
+            prevPageBtn.addEventListener('click', function() {{
+                if (currentPage > 0) {{
                     showPage(currentPage - 1);
-                } else {
-                    showNotification(`Reached the start of this chapter.`, 'warning');
-                }
-            });
+                }} else {{
+                    location.href = "{prev_href}"
+                }}
+            }});
             
             // 下一页按钮事件
-            nextPageBtn.addEventListener('click', function() {
-                if (currentPage < totalPages - 1) {
+            nextPageBtn.addEventListener('click', function() {{
+                if (currentPage < totalPages - 1) {{
                     showPage(currentPage + 1);
-                } else {
-                    showNotification(`All pages of this chapter read. Click for the next chapter.`, 'warning');
-                }
-            });
-
+                }} else {{
+                    location.href = "{next_href}"
+                }}
+            }});"""
+        
+        chapter_html += """
             // 检查当前的基路径
             if (!path.startsWith("/book/")) {
                 // 获取基路径

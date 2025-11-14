@@ -1,5 +1,4 @@
 import os
-import shutil
 import webbrowser
 import threading
 import mimetypes
@@ -7,7 +6,6 @@ from socketserver import ThreadingMixIn
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import errno
-from socket import error as socket_error
 
 from .library import EPUBLibrary
 

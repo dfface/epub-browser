@@ -22,7 +22,7 @@ It now supports:
 * Remember position: remember your last reading chapter(support all devices including Kindle) and your last reading position(support all devices except Kindle).
 * Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
 * Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
-* Page turning mode.
+* Page turning mode: support keyboards(left arrow & right arrow).
 * Multi threads.
 
 ## Usage
