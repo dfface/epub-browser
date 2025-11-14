@@ -7,6 +7,8 @@ EPUB to Web Converter
 
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import argparse
 from tqdm import tqdm
 
@@ -34,17 +36,51 @@ def main():
     # 创建图书馆
     library = EPUBLibrary(args.output_dir)
 
-    # 添加所有书籍
-    success_count = 0
     # 收集所有的 epub file，可能传递了路径需要下钻
     real_epub_files = []
     for filename in args.filename:
         cur_files = library.epub_file_discover(filename)
         real_epub_files.extend(cur_files)
-    # 构建图书馆
-    for filename in tqdm(real_epub_files):
-        if library.add_book(filename):
-            success_count += 1
+
+    # 添加所有书籍
+    # 线程安全相关变量
+    success_count = 0
+    count_lock = threading.Lock()  # 保证计数器操作的原子性
+    progress_lock = threading.Lock()  # 保证 tqdm 进度条显示正常
+
+    # 创建进度条（总任务数为文件数量）
+    pbar = tqdm(total=len(real_epub_files), desc="Processing books")
+
+    # 多线程处理函数：添加单本书籍
+    def add_book_thread(filename, pbar):
+        nonlocal success_count
+        # 调用 add_book 添加书籍（假设该方法线程安全，若不安全需额外加锁）
+        result = library.add_book(filename)
+        # 线程安全地更新计数器和进度条
+        with count_lock:
+            if result:
+                success_count += 1
+        with progress_lock:
+            pbar.update(1)  # 每次处理完一本书，更新进度条
+
+    # 创建并启动线程
+    threads = []
+    with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程
+        for filename in real_epub_files:
+            thread = threading.Thread(
+                target=add_book_thread,
+                args=(filename, pbar)
+            )
+            threads.append(thread)
+            thread.start()
+
+    # 等待所有线程完成
+    for thread in threads:
+        thread.join()
+    
+    # 关闭进度条
+    pbar.close()
+
     if success_count == 0:
         print("No books were successfully processed")
         sys.exit(1)

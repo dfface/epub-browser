@@ -844,6 +844,33 @@ class EPUBProcessor:
             font-size: 0.5rem;
         }
 
+        .kindle-mode .header, .kindle-mode .toc-container, 
+        .kindle-mode .content-container, .kindle-mode .navigation,
+        .kindle-mode .theme-toggle, .kindle-mode .control-btn {
+            box-shadow: none;
+            border-radius: inherit;
+        }
+
+        .kindle-mode .book-info-card, .kindle-mode .footer{
+            display: none;
+        }
+
+        .kindle-mode .chapter-list {
+            max-height: none;
+        }
+
+        .kindle-mode .breadcrumb {
+            margin: 0;
+        }
+
+        .kindle-mode .container {
+            padding: 0;
+        }
+
+        .kindle-mode .theme-toggle {
+            border: 1px solid;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.8rem;
@@ -972,6 +999,44 @@ class EPUBProcessor:
         const path = window.location.pathname;  // 获取当前URL路径
         let pathParts = path.split('/');
         pathParts = pathParts.filter(item => item !== "");
+
+        // 设置 cookie
+        function setCookie(key, value) {
+            const date = new Date();
+            date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
+            const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
+            document.cookie = `${key}=${value}; ${expires}; path=/;`;
+        }
+
+        // 解析指定 key 的 Cookie
+        function getCookie(key) {
+            // 分割所有 Cookie 为数组
+            const cookies = document.cookie.split('; ');
+            for (const cookie of cookies) {
+                // 分割键和值
+                const [cookieKey, cookieValue] = cookie.split('=');
+                // 解码并返回匹配的值
+                if (cookieKey === key) {
+                return decodeURIComponent(cookieValue);
+                }
+            }
+            return null; // 未找到
+        }
+
+        function deleteCookie(name) {
+            // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+
+        let kindleMode = getCookie("kindle-mode") || "false";
+
+        function isKindleMode() {
+            return kindleMode == "true";
+        }
+
+        if (isKindleMode()) {
+            document.body.classList.add("kindle-mode");
+        }
         
         // 检查当前的基路径
         if (!path.startsWith("/book/")) {
@@ -999,8 +1064,14 @@ class EPUBProcessor:
 
         // 书籍目录锚点删除
         const anchor = window.location.hash;
-        if (anchor === '' || !anchor.startsWith('#chapter_')) {
-            localStorage.removeItem(book_hash);  // 此时 lastPart 就是 book_hash
+        if (!isKindleMode()) {
+            if (anchor === '' || !anchor.startsWith('#chapter_')) {
+                localStorage.removeItem(book_hash);  // 此时 lastPart 就是 book_hash
+            }
+        } else {
+            if (anchor === '' || !anchor.startsWith('#chapter_')) {
+                deleteCookie(book_hash);  // 此时 lastPart 就是 book_hash
+            }
         }
         
         // 主题切换功能
@@ -1008,7 +1079,12 @@ class EPUBProcessor:
         const themeIcon = themeToggle.querySelector('i');
         
         // 检查本地存储中的主题设置
-        const currentTheme = localStorage.getItem('theme') || 'light';
+        let currentTheme = 'light';
+        if (!isKindleMode()) {
+            currentTheme = localStorage.getItem('theme');
+        } else {
+            currentTheme = getCookie('theme');
+        }
         
         // 应用保存的主题
         if (currentTheme === 'dark') {
@@ -1024,11 +1100,19 @@ class EPUBProcessor:
             if (document.body.classList.contains('dark-mode')) {
                 themeIcon.classList.remove('fa-moon');
                 themeIcon.classList.add('fa-sun');
-                localStorage.setItem('theme', 'dark');
+                if (!isKindleMode()) {
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    setCookie('theme', 'dark');
+                }
             } else {
                 themeIcon.classList.remove('fa-sun');
                 themeIcon.classList.add('fa-moon');
-                localStorage.setItem('theme', 'light');
+                if (!isKindleMode()) {
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    setCookie('theme', 'light');
+                }
             }
         });
 
@@ -1193,9 +1277,9 @@ class EPUBProcessor:
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Previous</span></div></a>' if chapter_index > 0 else ''
-        next_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
-        prev_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Previous</span></div></a>' if chapter_index > 0 else ''
+        prev_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Prev chapter</span></div></a>' if chapter_index > 0 else ''
+        next_link = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
+        prev_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index-1}.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Prev</span></div></a>' if chapter_index > 0 else ''
         next_link_mobile = f'<a href="/book/{self.book_hash}/chapter_{chapter_index+1}.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
         
         chapter_html =  f"""<!DOCTYPE html>
@@ -1269,6 +1353,7 @@ class EPUBProcessor:
 
         .container {
             max-width: 1000px;
+            min-width: 1000px;
             margin: 0 auto;
             flex: 1;
         }
@@ -1644,7 +1729,7 @@ class EPUBProcessor:
         .navigation {
             display: flex;
             justify-content: space-between;
-            margin: 30px 0;
+            margin: 30px 0 0 0;
             padding: 20px;
             background: var(--card-bg);
             border-radius: var(--border-radius);
@@ -1654,13 +1739,14 @@ class EPUBProcessor:
 
         .navigation a {
             text-decoration: none;
+            line-height: 1;
         }
 
         .navigation .control-btn {
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 20px;
+            padding: 0 20px;
             background: var(--card-bg);
             color: var(--text-color);
             border-radius: 10px;
@@ -1998,11 +2084,202 @@ class EPUBProcessor:
             font-size: 0.5rem;
         }
 
+        /* 翻页控制面板 */
+        .pagination-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            background: var(--card-bg);
+            border-radius: 50px;
+            box-shadow: var(--shadow);
+            padding: 10px 20px;
+            z-index: 77;
+            transition: var(--transition);
+        }
+
+        .pagination-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 600;
+        }
+
+        .pagination-btn:hover {
+            background: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .pagination-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .page-indicator {
+            font-weight: 600;
+            color: var(--text-color);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .page-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .page-nav-btn {
+            height: 40px;
+            border-radius: 10%;
+            padding: 5px 10px;
+            background: var(--border-color);
+            color: var(--text-color);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            flex-direction: column;
+        }
+
+        .page-nav-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .page-nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .page-nav-btn:disabled:hover {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        /* 页面跳转输入框 */
+        .page-jump {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 0 5px;
+        }
+
+        #pageJumpInput {
+            width: 50px;
+            height: 36px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-weight: 600;
+        }
+
+        #pageJumpInput:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* 翻页模式样式 */
+        .pagination-mode .content-container {
+            overflow: hidden;
+            height: calc(100vh - 60px);
+            position: relative;
+        }
+
+        .pagination-mode .content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+        }
+
+        .pagination-page {
+            height: 100%;
+            width: 100%;
+            overflow-y: auto;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s ease, transform 0.4s ease;
+        }
+
+        .pagination-page.active {
+            opacity: 1;
+            transform: translateX(0);
+            position: relative;
+        }
+
+        .pagination-page.prev {
+            transform: translateX(-100%);
+        }
+
+        /* 隐藏滚动条 */
+        .pagination-mode ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .pagination-mode {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .kindle-mode .header, .kindle-mode .toc-container, 
+        .kindle-mode .content-container, .kindle-mode .navigation,
+        .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .pagination-controls {
+            box-shadow: none;
+            border-radius: inherit;
+        }
+
+        .kindle-mode .pagination-controls {
+            border: 1px solid;
+        }
+
+        .kindle-mode .footer {
+            display: none;
+        }
+
+        .kindle-mode .breadcrumb {
+            margin: 0;
+        }
+
+        .kindle-mode .pagination-page {
+            transition: none;
+        }
+
+        .kindle-mode .theme-toggle {
+            border: 1px solid;
+        }
+
         /* 响应式设计 */
+        @media (max-width: 1079px) {
+            .container {
+                max-width: 100%;
+                min-width: 70%;
+            }
+        }
 
         @media (max-width: 768px) {
             .container {
                 max-width: 100%;
+                min-width: 80%;
             }
 
             .chapter-title {
@@ -2062,11 +2339,29 @@ class EPUBProcessor:
             .css-btn {
                 justify-content: center;
             }
+
+            .pagination-controls {
+                bottom: 70px; /* 避免与移动端底部控件重叠 */
+                max-width: 80%;
+            }
+            
+            .pagination-info {
+                justify-content: space-between;
+            }
+
+            .page-nav-btn {
+                width: 65px;
+            }
+
+            .pagination-page {
+                transition: none;
+            }
         }
 
         @media (max-width: 480px) {
             .container {
                 max-width: 100%;
+                min-width: 80%;
             }
 
             .breadcrumb {
@@ -2098,6 +2393,11 @@ class EPUBProcessor:
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
             <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
         </div>
 
         <div class="control-btn" id="bookHomeToggle">
@@ -2179,6 +2479,29 @@ class EPUBProcessor:
         </div>
 
         <div class="content-container">
+            
+            <div class="pagination-info pagination-controls" id="paginationInfo" style="display: none;">
+                <span class="page-indicator">
+                    <span id="currentPage">1</span> / <span id="totalPages">1</span>
+                </span>
+                <div class="page-nav">
+                    <div class="page-jump">
+                        <input type="number" id="pageJumpInput" min="1" max="1" value="1">
+                        <div class="page-nav-btn" id="goToPage" title="Jump">
+                            <i class="fas fa-arrow-right-to-bracket"></i>
+                            <span class="control-name">Go to</span>
+                        </div>
+                    </div>
+                    <div class="page-nav-btn" id="prevPage">
+                        <i class="fas fa-chevron-left"></i>
+                        <span class="control-name">Prev page</span>
+                    </div>
+                    <div class="page-nav-btn" id="nextPage">
+                        <i class="fas fa-chevron-right"></i>
+                        <span class="control-name">Next page</span>
+                    </div>
+                </div>
+            </div>
             <article class="content" id="content">
             {content}
             </article>
@@ -2234,6 +2557,10 @@ class EPUBProcessor:
             <i class="fas fa-moon"></i>
             <span>Theme</span>
         </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
         {prev_link_mobile}
         <a href="/index.html#{self.book_hash}" alt="Home">
             <div class="control-btn">
@@ -2241,11 +2568,11 @@ class EPUBProcessor:
                 <span>Home</span>
             </div>
         </a>
+        {next_link_mobile}
         <div class="control-btn" id="mobileBookHomeBtn">
             <i class="fas fa-book"></i>
             <span>Book</span>
         </div>
-        {next_link_mobile}
         <div class="control-btn" id="mobileFontBtn">
             <i class="fas fa-font"></i>
             <span>Font</span>
@@ -2265,10 +2592,417 @@ class EPUBProcessor:
     document.addEventListener('DOMContentLoaded', function() {{
         const book_hash = "{self.book_hash}";
 """
-        chapter_html += """
+        chapter_html += f"""
             const path = window.location.pathname;  // 获取当前URL路径
             let pathParts = path.split('/');
             pathParts = pathParts.filter(item => item !== "");
+
+            // 翻页功能
+            const togglePaginationBtn = document.getElementById('togglePagination');
+            const mobileTogglePaginationBtn  = document.getElementById('mobileTogglePagination');
+            const paginationInfo = document.getElementById('paginationInfo');
+            const currentPageEl = document.getElementById('currentPage');
+            const totalPagesEl = document.getElementById('totalPages');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const contentContainer = document.querySelector('.content-container');
+            const content = document.getElementById('content');
+            const pageJumpInput = document.getElementById('pageJumpInput');
+            const goToPageBtn = document.getElementById('goToPage');
+            const progressFill = document.getElementById('progressBar');
+
+            // 生成存储键名
+            function getStorageKey(mode) {{
+                // 书籍ID和章节ID
+                const bookId = "{self.book_hash}";
+                const chapterId = {chapter_index}"""
+        chapter_html += """                                
+                return `book_${bookId}_chapter_${chapterId}_${mode}_position`;
+            }
+
+            // 设置 cookie
+            function setCookie(key, value) {
+                const date = new Date();
+                date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
+                const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
+                document.cookie = `${key}=${value}; ${expires}; path=/;`;
+            }
+
+            // 解析指定 key 的 Cookie
+            function getCookie(key) {
+                // 分割所有 Cookie 为数组
+                const cookies = document.cookie.split('; ');
+                for (const cookie of cookies) {
+                    // 分割键和值
+                    const [cookieKey, cookieValue] = cookie.split('=');
+                    // 解码并返回匹配的值
+                    if (cookieKey === key) {
+                    return decodeURIComponent(cookieValue);
+                    }
+                }
+                return null; // 未找到
+            }
+
+            function deleteCookie(name) {
+                // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+            }
+
+            function isKindleMode() {
+                let kindleMode = getCookie("kindle-mode") || "false";
+                return kindleMode == "true";
+            }
+
+            if (isKindleMode()) {
+                document.querySelector(".custom-css-panel").style.display = "none";
+                document.body.classList.add("kindle-mode");
+            }
+            
+            // 翻页状态变量
+            let isPaginationMode = false;
+            let currentPage = 0;
+            let totalPages = 0;
+            let pages = [];
+
+            // 检查本地存储中的主题设置
+            if (!isKindleMode()) {
+                let currentPaginationMode = localStorage.getItem('turning') || "false";
+                isPaginationMode = currentPaginationMode == "true"
+            } else {
+                let currentPaginationMode =  getCookie('turning') || "false";
+                isPaginationMode = currentPaginationMode == "true"
+            }
+
+            if (isPaginationMode) {
+                // 一开始就是翻页
+                enablePaginationMode();
+                togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
+                // 隐藏 tocFloatingBtn
+                let tocToggleBtn = document.getElementById('tocToggle');
+                if (tocToggleBtn) {
+                    tocToggleBtn.style.display = 'none';
+                }
+                // 隐藏 mobileTocBtn
+                let mobileTocBtn = document.getElementById('mobileTocBtn');
+                if (mobileTocBtn) {
+                    mobileTocBtn.style.display = 'none';
+                }
+            }
+
+            loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
+            
+            // 切换翻页模式
+            togglePaginationBtn.addEventListener('click', function() {
+                isPaginationMode = !isPaginationMode;
+                if (isPaginationMode) {
+                    enablePaginationMode();
+                    togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
+                    // 隐藏 tocFloatingBtn
+                    let tocToggleBtn = document.getElementById('tocToggle');
+                    if (tocToggleBtn) {
+                        tocToggleBtn.style.display = 'none';
+                    }
+                } else {
+                    disablePaginationMode();
+                    togglePaginationBtn.innerHTML = '<i class="fas fa-book-open"></i><span class="control-name">Turning</span>';
+                }
+            });
+            mobileTogglePaginationBtn.addEventListener('click', function() {
+                isPaginationMode = !isPaginationMode;
+                
+                if (isPaginationMode) {
+                    enablePaginationMode();
+                    togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
+                    // 隐藏 mobileTocBtn
+                    let mobileTocBtn = document.getElementById('mobileTocBtn');
+                    if (mobileTocBtn) {
+                        mobileTocBtn.style.display = 'none';
+                    }
+                } else {
+                    disablePaginationMode();
+                    togglePaginationBtn.innerHTML = '<i class="fas fa-book-open"></i><span class="control-name">Turning</span>';
+                }
+            });
+            
+            // 启用翻页模式
+            function enablePaginationMode() {
+                if (!isKindleMode()) {
+                    localStorage.setItem('turning', 'true');
+                } else {
+                    setCookie('turning', 'true');
+                }
+                
+                // 添加翻页模式类
+                document.body.classList.add('pagination-mode');
+                contentContainer.classList.add('pagination-mode');            
+                
+                // 关闭页面的不必要元素
+                toggleHideUnnecessary(true);
+                
+                // 显示翻页信息
+                paginationInfo.style.display = 'flex';
+                
+                // 分割内容为页面
+                createPages();
+
+                // 尝试加载保存的阅读进度
+                loadReadingProgress();
+                
+                // 更新导航按钮状态
+                updateNavButtons();
+                
+                // 添加键盘事件监听
+                document.addEventListener('keydown', handleKeyDown);
+
+                if (isKindleMode()) {
+                    showNotification(`Page turning mode enabled`, 'info');
+                }
+            }
+
+            // 关闭页面的不必要元素
+            function toggleHideUnnecessary(hide) {
+                let customCssPanel = document.querySelector(".custom-css-panel");
+                let breadcrumb = document.querySelector(".breadcrumb");
+                let footer = document.querySelector("footer");
+                if (hide) {
+                    customCssPanel.style.display = 'none';
+                    breadcrumb.style.display = 'none';
+                    footer.style.display = 'none';
+                } else {
+                    customCssPanel.style.display = 'inherit';
+                    breadcrumb.style.display = 'inherit';
+                    footer.style.display = 'inherit';
+                }
+            }
+            
+            // 禁用翻页模式
+            function disablePaginationMode() {
+                if (!isKindleMode()) {
+                    localStorage.removeItem('turning');
+                } else {
+                    deleteCookie('turning');
+                }
+                // 恢复原始内容
+                restoreOriginalContent();
+               
+            }
+            
+            // 创建页面
+            function createPages() {
+                // 保存原始内容
+                const originalContent = content.innerHTML;
+                
+                // 获取容器高度
+                const contentHeight = content.clientHeight - 150; // 减去内边距
+                
+                // 分割内容为页面
+                let currentPageContent = '';
+                let currentHeight = 0;
+                const elements = Array.from(content.children || []);
+                
+                // 如果没有子元素，直接使用文本内容
+                if (elements.length === 0) {
+                    pages = [originalContent];
+                    totalPages = 1;
+                } else {
+                    // 遍历所有子元素
+                    elements.forEach(element => {
+                        const elementHeight = element.offsetHeight;
+                        
+                        // 如果当前页面高度加上新元素高度超过容器高度，创建新页面
+                        if (currentHeight + elementHeight > contentHeight && currentHeight > 0) {
+                            pages.push(currentPageContent);
+                            currentPageContent = '';
+                            currentHeight = 0;
+                        }
+                        
+                        // 添加元素到当前页面
+                        currentPageContent += element.outerHTML;
+                        currentHeight += elementHeight;
+                    });
+                    
+                    // 添加最后一页
+                    if (currentPageContent) {
+                        pages.push(currentPageContent);
+                    }
+                    
+                    totalPages = pages.length;
+                }
+
+                pageJumpInput.setAttribute('max', totalPages);
+
+                // 清空内容容器
+                content.innerHTML = '';
+                
+                // 创建页面元素
+                pages.forEach((pageContent, index) => {
+                    const pageElement = document.createElement('div');
+                    pageElement.className = 'pagination-page';
+                    pageElement.innerHTML = pageContent;
+                    content.appendChild(pageElement);
+                });
+            }
+            
+            // 显示指定页面
+            function showPage(pageIndex) {
+                // 隐藏所有页面
+                document.querySelectorAll('.pagination-page').forEach(page => {
+                    page.classList.remove('active', 'prev');
+                });
+                
+                // 显示当前页面
+                const currentPageElement = document.querySelectorAll('.pagination-page')[pageIndex];
+                if (currentPageElement) {
+                    currentPageElement.classList.add('active');
+                }
+                
+                // 更新当前页面索引
+                currentPage = pageIndex;
+                currentPageEl.textContent = currentPage + 1;
+                totalPagesEl.textContent = totalPages;
+                
+                // 更新跳转输入框
+                pageJumpInput.value = currentPage + 1;
+                
+                // 更新进度指示器
+                updateProgressIndicator();
+
+                // 更新导航按钮状态
+                updateNavButtons();
+
+                // 保存阅读进度
+                saveReadingProgress();
+
+                // 更新目录锚点
+                updateTocHighlight();
+            }
+            
+            // 更新导航按钮状态
+            function updateNavButtons() {
+                prevPageBtn.disabled = currentPage === 0;
+                nextPageBtn.disabled = currentPage === totalPages - 1;
+            }
+
+            // 更新进度指示器
+            function updateProgressIndicator() {
+                const progress = ((currentPage + 1) / totalPages) * 100;
+                progressFill.style.width = `${progress}%`;
+            }
+            
+            // 恢复原始内容
+            function restoreOriginalContent() {
+                // 这里需要重新加载原始内容
+                // 在实际应用中，您可能需要保存原始内容或重新获取
+                // 这里我们简单重新加载页面
+                if (isKindleMode() || confirm('Are you sure you want to exit the page-turning mode?')) {
+                    location.reload();
+                } else {
+                    // 如果用户取消，重新启用翻页模式
+                    // 什么也不干
+                }
+            }
+
+            // 保存阅读进度
+            function saveReadingProgress() {
+                if (isPaginationMode && !isKindleMode()) {
+                    // 翻页模式
+                    let storageKey = getStorageKey("turning");
+                    localStorage.setItem(storageKey, currentPage.toString());
+                }
+            }
+
+            // 加载阅读进度
+            function loadReadingProgress() {
+                if (isKindleMode()) {
+                    if (isPaginationMode) {
+                        showPage(0);
+                    }
+                    return
+                }
+
+                if (isPaginationMode) {
+                    // 翻页模式
+                    let storageKey = getStorageKey("turning");
+                    let savedPage = localStorage.getItem(storageKey);
+                
+                    if (savedPage !== null) {
+                        const pageIndex = parseInt(savedPage, 10);
+                        if (pageIndex >= 0 && pageIndex < totalPages) {
+                            showPage(pageIndex);
+                            
+                            // 显示加载进度提示
+                            showNotification(`Reading progress loaded: Page ${pageIndex + 1}`, 'info');
+                        }
+                    } else {
+                        showPage(0);
+                    }
+                } else {
+                    // 滚动模式
+                    let storageKey = getStorageKey("scroll");
+                    let savedPos = localStorage.getItem(storageKey);
+                    let windowHeight = window.innerHeight;
+                    window.scrollTo({
+                        top: parseInt(savedPos),
+                        behavior: 'smooth'
+                    });
+                    // 显示加载进度提示
+                    showNotification(`Reading progress loaded: Scroll position ${Math.round( savedPos / (document.documentElement.scrollHeight - windowHeight) * 100 )}%`, 'info');
+                }
+            }
+            
+            // 键盘事件处理
+            function handleKeyDown(e) {
+                if (!isPaginationMode || isKindleMode()) return;
+                
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        if (currentPage > 0) {
+                            showPage(currentPage - 1);
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (currentPage < totalPages - 1) {
+                            showPage(currentPage + 1);
+                        }
+                        break;
+                }
+            }
+
+            // 跳转到指定页面
+            goToPageBtn.addEventListener('click', function() {
+                const pageNum = parseInt(pageJumpInput.value, 10);
+                if (pageNum >= 1 && pageNum <= totalPages) {
+                    showPage(pageNum - 1);
+                } else {
+                    showNotification(`Please enter a valid page number (1-${totalPages})`, 'warning');
+                    pageJumpInput.value = currentPage + 1;
+                }
+            });
+            
+            // 跳转输入框回车事件
+            pageJumpInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    goToPageBtn.click();
+                }
+            });
+
+            // 上一页按钮事件
+            prevPageBtn.addEventListener('click', function() {
+                if (currentPage > 0) {
+                    showPage(currentPage - 1);
+                } else {
+                    showNotification(`Reached the start of this chapter.`, 'warning');
+                }
+            });
+            
+            // 下一页按钮事件
+            nextPageBtn.addEventListener('click', function() {
+                if (currentPage < totalPages - 1) {
+                    showPage(currentPage + 1);
+                } else {
+                    showNotification(`All pages of this chapter read. Click for the next chapter.`, 'warning');
+                }
+            });
 
             // 检查当前的基路径
             if (!path.startsWith("/book/")) {
@@ -2294,116 +3028,128 @@ class EPUBProcessor:
                 });
             }
 
-            // 自定义CSS功能
-            const cssPanelToggle = document.getElementById('cssPanelToggle');
-            const cssPanelContent = document.getElementById('cssPanelContent');
-            const customCssInput = document.getElementById('customCssInput');
-            const saveCssBtn = document.getElementById('saveCssBtn');
-            const saveAsDefaultBtn = document.getElementById('saveAsDefaultBtn');
-            const resetCssBtn = document.getElementById('resetCssBtn');
-            const previewCssBtn = document.getElementById('previewCssBtn');
-            const loadDefaultBtn = document.getElementById('loadDefaultBtn');
-            const storageKey = `custom_css_${book_hash}`;
-            const defaultStorageKey = `custom_css_default`;
-            // 切换面板展开/收起
-            cssPanelToggle.addEventListener('click', function() {
-                cssPanelContent.classList.toggle('expanded');
-                const icon = cssPanelToggle.querySelector('i');
-                if (cssPanelContent.classList.contains('expanded')) {
-                    icon.classList.remove('fa-chevron-down');
-                    icon.classList.add('fa-chevron-up');
-                } else {
-                    icon.classList.remove('fa-chevron-up');
-                    icon.classList.add('fa-chevron-down');
-                }
-            });
-            // 加载保存的自定义CSS
-            function loadCustomCss() {
-                // 首先尝试加载特定书籍的CSS
-                const savedCss = localStorage.getItem(storageKey);
-                if (savedCss) {
-                    customCssInput.value = savedCss;
-                    applyCustomCss(savedCss);
+            // 自定义 css
+            customCssFunc();
+
+            function customCssFunc() {
+                if (isKindleMode()) {
                     return;
                 }
-                
-                // 如果没有特定书籍的CSS，尝试加载默认CSS
-                const defaultCss = localStorage.getItem(defaultStorageKey);
-                if (defaultCss) {
-                    customCssInput.value = defaultCss;
-                    applyCustomCss(defaultCss);
-                }
-            }
-            // 应用自定义CSS到页面
-            function applyCustomCss(css) {
-                // 移除之前添加的自定义样式
-                const existingStyle = document.getElementById('custom-user-css');
-                if (existingStyle) {
-                    existingStyle.remove();
-                }
-                
-                if (css.trim()) {
-                    // 创建新的style元素并添加到head
-                    const styleElement = document.createElement('style');
-                    styleElement.id = 'custom-user-css';
-                    styleElement.textContent = css;
-                    document.head.appendChild(styleElement);
-                }
-            }
-            // 保存自定义CSS
-            saveCssBtn.addEventListener('click', function() {
-                const css = customCssInput.value;
-                localStorage.setItem(storageKey, css);
-                applyCustomCss(css);
-                
-                // 显示保存成功提示
-                showNotification('Saved for current book!', 'success');
-            });
-            // 保存为默认样式
-            saveAsDefaultBtn.addEventListener('click', function() {
-                const css = customCssInput.value;
-                if (confirm('Are you sure to save as the default style? This will affect all books that do not have a custom style.')) {
-                    localStorage.setItem(defaultStorageKey, css);
-                    showNotification('Saved as a default style!', 'success');
-                }
-            });
-            // 加载默认样式
-            loadDefaultBtn.addEventListener('click', function() {
-                const defaultCss = localStorage.getItem(defaultStorageKey);
-                if (!defaultCss) {
-                    showNotification('Default style not found!', 'warning');
-                    return;
-                }
-                
-                if (confirm('Are you sure to load the default style? This will replace the current CSS code.')) {
-                    customCssInput.value = defaultCss;
-                    applyCustomCss(defaultCss);
-                    showNotification('The default style has been loaded!', 'success');
-                }
-            });
-            // 重置自定义CSS
-            resetCssBtn.addEventListener('click', function() {
-                if (confirm('Are you sure to reset? This will clear the custom CSS code for this book.')) {
-                    customCssInput.value = '';
-                    localStorage.removeItem(storageKey);
-                    applyCustomCss('');
+                // 自定义CSS功能
+                const cssPanelToggle = document.getElementById('cssPanelToggle');
+                const cssPanelContent = document.getElementById('cssPanelContent');
+                const customCssInput = document.getElementById('customCssInput');
+                const saveCssBtn = document.getElementById('saveCssBtn');
+                const saveAsDefaultBtn = document.getElementById('saveAsDefaultBtn');
+                const resetCssBtn = document.getElementById('resetCssBtn');
+                const previewCssBtn = document.getElementById('previewCssBtn');
+                const loadDefaultBtn = document.getElementById('loadDefaultBtn');
+                const storageKey = `custom_css_${book_hash}`;
+                const defaultStorageKey = `custom_css_default`;
+                // 切换面板展开/收起
+                cssPanelToggle.addEventListener('click', function() {
+                    cssPanelContent.classList.toggle('expanded');
+                    const icon = cssPanelToggle.querySelector('i');
+                    if (cssPanelContent.classList.contains('expanded')) {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    } else {
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    }
+                });
+                // 加载保存的自定义CSS
+                function loadCustomCss() {
+                    // 首先尝试加载特定书籍的CSS
+                    const savedCss = localStorage.getItem(storageKey);
+                    if (savedCss) {
+                        customCssInput.value = savedCss;
+                        applyCustomCss(savedCss);
+                        return;
+                    }
                     
-                    // 重置后尝试加载默认样式
+                    // 如果没有特定书籍的CSS，尝试加载默认CSS
                     const defaultCss = localStorage.getItem(defaultStorageKey);
                     if (defaultCss) {
                         customCssInput.value = defaultCss;
                         applyCustomCss(defaultCss);
                     }
-                    
-                    showNotification('The custom style for this book has been reset!', 'info');
                 }
-            });
-            // 预览自定义CSS
-            previewCssBtn.addEventListener('click', function() {
-                const css = customCssInput.value;
-                applyCustomCss(css);
-                showNotification('Applied!', 'info');
-            });
+                // 应用自定义CSS到页面
+                function applyCustomCss(css) {
+                    // 移除之前添加的自定义样式
+                    const existingStyle = document.getElementById('custom-user-css');
+                    if (existingStyle) {
+                        existingStyle.remove();
+                    }
+                    
+                    if (css.trim()) {
+                        // 创建新的style元素并添加到head
+                        const styleElement = document.createElement('style');
+                        styleElement.id = 'custom-user-css';
+                        styleElement.textContent = css;
+                        document.head.appendChild(styleElement);
+                    }
+                }
+                // 保存自定义CSS
+                saveCssBtn.addEventListener('click', function() {
+                    const css = customCssInput.value;
+                    localStorage.setItem(storageKey, css);
+                    applyCustomCss(css);
+                    
+                    // 显示保存成功提示
+                    showNotification('Saved for current book!', 'success');
+                });
+                // 保存为默认样式
+                saveAsDefaultBtn.addEventListener('click', function() {
+                    const css = customCssInput.value;
+                    if (confirm('Are you sure to save as the default style? This will affect all books that do not have a custom style.')) {
+                        localStorage.setItem(defaultStorageKey, css);
+                        showNotification('Saved as a default style!', 'success');
+                    }
+                });
+                // 加载默认样式
+                loadDefaultBtn.addEventListener('click', function() {
+                    const defaultCss = localStorage.getItem(defaultStorageKey);
+                    if (!defaultCss) {
+                        showNotification('Default style not found!', 'warning');
+                        return;
+                    }
+                    
+                    if (confirm('Are you sure to load the default style? This will replace the current CSS code.')) {
+                        customCssInput.value = defaultCss;
+                        applyCustomCss(defaultCss);
+                        showNotification('The default style has been loaded!', 'success');
+                    }
+                });
+                // 重置自定义CSS
+                resetCssBtn.addEventListener('click', function() {
+                    if (confirm('Are you sure to reset? This will clear the custom CSS code for this book.')) {
+                        customCssInput.value = '';
+                        localStorage.removeItem(storageKey);
+                        applyCustomCss('');
+                        
+                        // 重置后尝试加载默认样式
+                        const defaultCss = localStorage.getItem(defaultStorageKey);
+                        if (defaultCss) {
+                            customCssInput.value = defaultCss;
+                            applyCustomCss(defaultCss);
+                        }
+                        
+                        showNotification('The custom style for this book has been reset!', 'info');
+                    }
+                });
+                // 预览自定义CSS
+                previewCssBtn.addEventListener('click', function() {
+                    const css = customCssInput.value;
+                    applyCustomCss(css);
+                    showNotification('Applied!', 'info');
+                });
+
+                // 初始化 - 加载保存的CSS
+                loadCustomCss();
+            }
+            
             // 显示通知
             function showNotification(message, type) {
                 // 移除现有通知
@@ -2429,8 +3175,7 @@ class EPUBProcessor:
                     }, 300);
                 }, 3000);
             }
-            // 初始化 - 加载保存的CSS
-            loadCustomCss();
+            
             
             // iframe 处理
             let iframe = document.getElementById('bookHomeIframe');
@@ -2512,7 +3257,10 @@ class EPUBProcessor:
             }
             
             // 代码高亮
-            hljs.highlightAll();
+            if (!isKindleMode()) {
+                hljs.highlightAll();
+            }
+            
             function switchCodeTheme(isDark) {
                 const lightTheme = document.querySelector('link[href*="highlight.js"][id*="light"]');
                 const darkTheme = document.querySelector('link[href*="highlight.js"][id*="dark"]');
@@ -2568,7 +3316,11 @@ class EPUBProcessor:
                 bookHomes.forEach(item => {
                     item.href += anchor;
                 });
-                localStorage.setItem(book_hash, anchor);
+                if (!isKindleMode()) {
+                    localStorage.setItem(book_hash, anchor);
+                } else {
+                    setCookie(book_hash, anchor);
+                }   
                 
                 let bookHomeIframe = document.querySelector('#bookHomeIframe');
                 bookHomeIframe.src += anchor;
@@ -2580,7 +3332,12 @@ class EPUBProcessor:
             const themeIcon = themeToggle.querySelector('i');
             
             // 检查本地存储中的主题设置
-            const currentTheme = localStorage.getItem('theme') || 'light';
+            let currentTheme =  'light';
+            if (!isKindleMode()) {
+                currentTheme = localStorage.getItem('theme');
+            } else {
+                currentTheme = getCookie('theme');
+            }
             
             // 应用保存的主题
             if (currentTheme === 'dark') {
@@ -2601,14 +3358,22 @@ class EPUBProcessor:
                     themeIcon.classList.add('fa-sun');
                     mobileThemeBtn.querySelector('i').classList.remove('fa-moon');
                     mobileThemeBtn.querySelector('i').classList.add('fa-sun');
-                    localStorage.setItem('theme', 'dark');
+                    if (!isKindleMode()) {
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        setCookie('theme', 'dark');
+                    }
                     switchCodeTheme(true);
                 } else {
                     themeIcon.classList.remove('fa-sun');
                     themeIcon.classList.add('fa-moon');
                     mobileThemeBtn.querySelector('i').classList.remove('fa-sun');
                     mobileThemeBtn.querySelector('i').classList.add('fa-moon');
-                    localStorage.setItem('theme', 'light');
+                    if (!isKindleMode()) {
+                        localStorage.setItem('theme', 'light');
+                    } else {
+                        setCookie('theme', 'light');
+                    }
                     switchCodeTheme(false);
                 }
             }
@@ -2632,7 +3397,18 @@ class EPUBProcessor:
                 const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
                 const progress = (scrollTop / documentHeight) * 100;
                 
-                progressBar.style.width = progress + '%';
+                if (!document.body.classList.contains('pagination-mode')) {
+                    // 滚动模式进度条
+                    progressBar.style.width = progress + '%';
+                }
+
+                if (!isKindleMode()) {
+                    if (!document.body.classList.contains('pagination-mode')) {
+                        // 保存阅读进度
+                        let curStorageKey = getStorageKey("scroll");
+                        localStorage.setItem(curStorageKey, window.scrollY + 20);  // 加一点偏移
+                    }
+                }
                 
                 // 更新目录高亮
                 updateTocHighlight();
@@ -2653,8 +3429,19 @@ class EPUBProcessor:
             generateToc();
             
             // 切换目录显示 - 桌面端
+            function tocFloatingScrolling() {
+                // 滚动到正确的位置
+                const activeLi = document.querySelector('.toc-list li.active');
+                const tocList = document.getElementById('tocList');
+                if (activeLi) {
+                    // 计算 activeLi 相对于 ul 的顶部偏移量
+                    const offsetTop = activeLi.offsetTop;
+                    tocList.scrollTop = offsetTop - 20;  // 加点偏移
+                }
+            }
             tocToggle.addEventListener('click', function() {
                 tocFloating.classList.toggle('active');
+                tocFloatingScrolling();
             });
             bookHomeToggle.addEventListener('click', function() {
                 bookHomeFloating.classList.toggle('active');
@@ -2664,6 +3451,7 @@ class EPUBProcessor:
             // 切换目录显示 - 移动端
             mobileTocBtn.addEventListener('click', function() {
                 tocFloating.classList.toggle('active');
+                tocFloatingScrolling();
                 // 移动端点击后高亮按钮
                 mobileTocBtn.classList.toggle('active');
             });
@@ -2671,6 +3459,7 @@ class EPUBProcessor:
                 bookHomeFloating.classList.toggle('active');
                 // 移动端点击后高亮按钮
                 mobileBookHomeBtn.classList.toggle('active');
+                loadBookHomeToc();
             });
             
             // 关闭目录
@@ -2757,6 +3546,9 @@ class EPUBProcessor:
                         item.classList.add('active');
                     }
                 });
+
+                // 滚动到对应位置
+                tocFloatingScrolling();
             }
             
             // 滚动到顶部功能
@@ -2819,7 +3611,6 @@ class EPUBProcessor:
             const mobileFontBtn = document.getElementById('mobileFontBtn');
             const fontControls = document.getElementById('fontControls');
             const fontSizeBtns = document.querySelectorAll('.font-size-btn');
-            const content = document.getElementById('content');
             
             fontControlBtn.addEventListener('click', function() {
                 fontControls.classList.toggle('show');

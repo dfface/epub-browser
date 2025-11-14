@@ -248,16 +248,16 @@ class EPUBServer:
             actual_host = host if host else 'localhost'
             actual_port = self.server.server_address[1]
             
-            print(f"Web server started: http://{actual_host}:{actual_port}")
+            print(f"Web server started: http://{actual_host}:{actual_port}/")
             print(f"Available books ({len(self.library.books)}):")
             for book_hash, book_info in self.library.books.items():
-                print(f"  - {book_info['title']}: http://{actual_host}:{actual_port}book/{book_hash}/")
+                print(f"  - {book_info['title']}: http://{actual_host}:{actual_port}/book/{book_hash}/")
             print("Press Ctrl+C to stop the server\n")
             
             # 自动打开浏览器
             if not no_browser:
                 try:
-                    webbrowser.open(f'http://{actual_host}:{actual_port}')
+                    webbrowser.open(f'http://{actual_host}:{actual_port}/')
                 except Exception as e:
                     print(f"Failed to open browser: {e}")
             

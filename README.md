@@ -14,14 +14,16 @@ It now supports:
 * Simple library management: searching by title, author or tag.
 * Dark mode.
 * Reading progress bar.
-* Table of contents in each chapter.
+* Table of contents in each chapter(not active in `Page turning mode`).
 * Font size adjustment.
 * Image zoom.
-* Mobile devices: especially kindle.
-* Code highlight.
-* Remember your last reading chapter.
+* Mobile devices: especially for Kindle, remember to click `Not Kindle` in the header of home page to enable `Kindle Mode` to optimize experience.
+* Code highlight(not active in `Kindle Mode`).
+* Remember position: remember your last reading chapter(support all devices including Kindle) and your last reading position(support all devices except Kindle).
 * Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
 * Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
+* Page turning mode.
+* Multi threads.
 
 ## Usage
 

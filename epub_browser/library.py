@@ -296,7 +296,6 @@ class EPUBLibrary:
 
         .stats {
             display: flex;
-            gap: 20px;
             flex-wrap: wrap;
             flex-direction: row;
             justify-content: center;
@@ -304,11 +303,10 @@ class EPUBLibrary:
 
         .stat-card {
             background: var(--card-bg);
-            padding: 15px 25px;
+            padding: 5px;
             border-radius: var(--border-radius);
             display: flex;
             align-items: center;
-            gap: 10px;
             transition: var(--transition);
         }
 
@@ -558,6 +556,23 @@ class EPUBLibrary:
             }
         }
 
+        .kindle-mode header, .kindle-mode .tag-cloud-item, .kindle-mode .book-cover, .kindle-mode .book-card, .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .search-box {
+            box-shadow: none;
+            border-radius: inherit;
+        }
+
+        .kindle-mode .container {
+            padding: 0;
+        }
+
+        .kindle-mode .header {
+            margin-bottom: 0;
+        }
+
+        .kindle-mode .theme-toggle {
+            border: 1px solid;
+        }
+
         @media (max-width: 480px) {
             .book-grid {
                 grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -598,6 +613,15 @@ class EPUBLibrary:
                     <div>
                         <div class="stat-value">{len(all_tags)} tag(s)</div>
                     </div>
+                </div>
+                <div class="stat-card" id="kindleMode">
+                    <i class="fas fa-mobile"></i>
+                    <a id="kindleModeValueYes" style="text-decoration: none; color: var(--text-color);" href="javascript:deleteCookie('kindle-mode'); location.replace(location.pathname);">
+                        <div class="stat-value">Kindle Mode</div>
+                    </a>
+                    <a id="kindleModeValueNot" style="text-decoration: none; color: var(--text-color);" href="javascript:setCookie('kindle-mode', 'true'); location.replace(location.pathname);">
+                        <div class="stat-value">Not Kindle</div>
+                    </a>
                 </div>
             </div>
         </header>
@@ -650,10 +674,38 @@ class EPUBLibrary:
     </div>
 </div>
 <footer class="footer">
-    <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    <p>EPUB Library &copy; {datetime.now().year} | <a href="javascript:localStorage.clear(); alert('Done!');">clear localStorage</a> | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """
         library_html += """<script>
+        // 设置 cookie
+        function setCookie(key, value) {
+            const date = new Date();
+            date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
+            const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
+            document.cookie = `${key}=${value}; ${expires}; path=/;`;
+        }
+
+        // 解析指定 key 的 Cookie
+        function getCookie(key) {
+            // 分割所有 Cookie 为数组
+            const cookies = document.cookie.split('; ');
+            for (const cookie of cookies) {
+                // 分割键和值
+                const [cookieKey, cookieValue] = cookie.split('=');
+                // 解码并返回匹配的值
+                if (cookieKey === key) {
+                return decodeURIComponent(cookieValue);
+                }
+            }
+            return null; // 未找到
+        }
+
+        function deleteCookie(name) {
+            // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
             // 检查当前的基路径
             base_path = window.location.pathname;
@@ -681,15 +733,33 @@ class EPUBLibrary:
                 });
             }
 
+            let kindleMode = getCookie("kindle-mode") || "false";
+            function isKindleMode() {
+                return kindleMode == "true";
+            }
+
+            if (isKindleMode()) {
+                document.querySelector("#kindleModeValueNot").style.display = 'none';
+                document.querySelector("#kindleModeValueYes").style.display = 'inherit';
+                document.body.classList.add("kindle-mode");
+            } else {
+                document.querySelector("#kindleModeValueNot").style.display = 'inherit';
+                document.querySelector("#kindleModeValueYes").style.display = 'none';
+            }
 
             // 书籍目录锚点
             const allBookLinks = document.querySelectorAll('.book-card .book-link');
             allBookLinks.forEach(item => {
                 let pathParts = item.href.split('/');
                 pathParts = pathParts.filter(item => item !== "");
-                let book_hash = pathParts[pathParts.length - 1];
-                let book_anchor = localStorage.getItem(book_hash) || '';
-                item.href += book_anchor;
+                let book_hash = pathParts[pathParts.length - 2];  // 最后一个是 index.html
+                if (!isKindleMode()) {
+                    let book_anchor = localStorage.getItem(book_hash) || '';
+                    item.href += book_anchor;
+                } else {
+                    let book_anchor = getCookie(book_hash) || '';
+                    item.href += book_anchor;
+                }
             });
 
             // 主题切换
@@ -697,7 +767,12 @@ class EPUBLibrary:
             const themeIcon = themeToggle.querySelector('i');
             
             // 检查本地存储中的主题设置
-            const currentTheme = localStorage.getItem('theme') || 'light';
+            let currentTheme = 'light';
+            if (!isKindleMode()) {
+                localStorage.getItem('theme');
+            } else {
+                currentTheme = getCookie('theme');
+            }
             
             // 应用保存的主题
             if (currentTheme === 'dark') {
@@ -713,11 +788,19 @@ class EPUBLibrary:
                 if (document.body.classList.contains('dark-mode')) {
                     themeIcon.classList.remove('fa-moon');
                     themeIcon.classList.add('fa-sun');
-                    localStorage.setItem('theme', 'dark');
+                    if (!isKindleMode()) {
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        setCookie('theme', 'dark');
+                    }
                 } else {
                     themeIcon.classList.remove('fa-sun');
                     themeIcon.classList.add('fa-moon');
-                    localStorage.setItem('theme', 'light');
+                    if (!isKindleMode()) {
+                        localStorage.setItem('theme', 'light');
+                    } else {
+                        setCookie('theme', 'light');
+                    }
                 }
             });
             
