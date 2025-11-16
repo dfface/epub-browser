@@ -147,10 +147,10 @@ class EPUBLibrary:
                 </div>
                 <div class="stat-card" id="kindleMode">
                     <i class="fas fa-mobile"></i>
-                    <a id="kindleModeValueYes" style="text-decoration: none; color: var(--text-color);" href="javascript:deleteCookie('kindle-mode'); location.replace(location.pathname);">
+                    <a id="kindleModeValueYes" style="text-decoration: none; color: var(--text-color);" href="javascript:document.cookie=`kindle-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`; location.replace(location.pathname);">
                         <div class="stat-value">Kindle Mode</div>
                     </a>
-                    <a id="kindleModeValueNot" style="text-decoration: none; color: var(--text-color);" href="javascript:setCookie('kindle-mode', 'true'); location.replace(location.pathname);">
+                    <a id="kindleModeValueNot" style="text-decoration: none; color: var(--text-color);" href="javascript:document.cookie='kindle-mode=true; expires=Fri, 26 Jun 999999999999999 20:10:32 GMT; path=/;'`; location.replace(location.pathname);">
                         <div class="stat-value">Not Kindle</div>
                     </a>
                 </div>
