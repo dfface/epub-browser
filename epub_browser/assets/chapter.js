@@ -111,6 +111,23 @@ function isKindleMode() {
     return kindleMode == "true";
 }
 
+// 页面加载时恢复顺序
+function restoreOrder(storageKey, elementClass) {
+    var savedOrder = localStorage.getItem(storageKey);
+    if (savedOrder) {
+        var itemIds = JSON.parse(savedOrder);
+        var container = document.querySelector(`.${elementClass}`);
+        
+        // 按照保存的顺序重新排列元素
+        itemIds.forEach(function(id) {
+            var element = document.querySelector('[data-id="' + id + '"]');
+            if (element) {
+                container.appendChild(element);
+            }
+        });
+    }
+}
+
 
 function initScript() {
     const path = window.location.pathname;  // 获取当前URL路径
@@ -163,6 +180,9 @@ function initScript() {
         let fontFamilySelect = document.getElementById('fontFamilySelect');
         fontFamilySelect.appendChild(newOption);
     })
+
+    const storageKeySortableContainer = 'chapter-container-sortable-order';
+
     // 检查本地存储中的主题设置
     if (!isKindleMode()) {
         let currentPaginationMode = localStorage.getItem('turning') || "false";
@@ -170,6 +190,7 @@ function initScript() {
         fontSize = localStorage.getItem('font_size') || "medium";
         fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
         fontFamilyInput = localStorage.getItem('font_family_input');
+        restoreOrder(storageKeySortableContainer, 'container');
     } else {
         let currentPaginationMode =  getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
@@ -179,6 +200,22 @@ function initScript() {
     }
     updateFontSize(fontSize);
     updateFontFamily(fontFamily, fontFamilyInput);
+
+    // 拖拽
+    var el = document.querySelector('.container');
+    if (!isKindleMode()) {
+        var sortable = Sortable.create(el, {
+        onEnd: function(evt) {
+            // 获取所有项目的ID
+            var itemIds = Array.from(evt.from.children).map(function(child) {
+                console.log(child);
+                return child.dataset.id;
+            });
+            // 保存到 localStorage
+            localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
+        }
+        });
+    }   
 
     if (isKindleMode() || isPaginationMode) {
         document.querySelector(".custom-css-panel").style.display = "none";

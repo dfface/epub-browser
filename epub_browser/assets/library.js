@@ -27,6 +27,23 @@ function initScript() {
         document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
     }
 
+    // 页面加载时恢复顺序
+    function restoreOrder(storageKey, elementClass) {
+        var savedOrder = localStorage.getItem(storageKey);
+        if (savedOrder) {
+            var itemIds = JSON.parse(savedOrder);
+            var container = document.querySelector(`.${elementClass}`);
+            
+            // 按照保存的顺序重新排列元素
+            itemIds.forEach(function(id) {
+                var element = document.querySelector('[data-id="' + id + '"]');
+                if (element) {
+                    container.appendChild(element);
+                }
+            });
+        }
+    }
+
     function updateFontFamily(fontFamily, fontFamilyInput) {
         if (fontFamily == "custom") {
             document.body.style.fontFamily = fontFamilyInput;
@@ -40,6 +57,10 @@ function initScript() {
         return kindleMode == "true";
     }
 
+    const storageKeySortableBook = 'book-grid-sortable-order';
+    const storageKeySortableTag = 'tag-cloud-sortable-order';
+    const storageKeySortableContainer = 'library-container-sortable-order';
+
     if (isKindleMode()) {
         document.querySelector("#kindleModeValueNot").style.display = 'none';
         document.querySelector("#kindleModeValueYes").style.display = 'inherit';
@@ -47,6 +68,47 @@ function initScript() {
     } else {
         document.querySelector("#kindleModeValueNot").style.display = 'inherit';
         document.querySelector("#kindleModeValueYes").style.display = 'none';
+        restoreOrder(storageKeySortableBook, 'book-grid');
+        restoreOrder(storageKeySortableTag, 'tag-cloud');
+        restoreOrder(storageKeySortableContainer, 'container');
+    }
+
+    // 拖拽
+    var elBook = document.querySelector('.book-grid');
+    var elTag = document.querySelector('.tag-cloud');
+    var elContainer = document.querySelector('.container');
+    if (!isKindleMode()) {
+        var sortableBook = Sortable.create(elBook, {
+        onEnd: function(evt) {
+            // 获取所有项目的ID
+            var itemIds = Array.from(evt.from.children).map(function(child) {
+                console.log(child);
+                return child.dataset.id;
+            });
+            // 保存到 localStorage
+            localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
+        }
+        });
+        var sortableTag = Sortable.create(elTag, {
+        onEnd: function(evt) {
+            // 获取所有项目的ID
+            var itemIds = Array.from(evt.from.children).map(function(child) {
+                return child.dataset.id;
+            });
+            // 保存到 localStorage
+            localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
+        }
+        });
+        var sortableTag = Sortable.create(elContainer, {
+        onEnd: function(evt) {
+            // 获取所有项目的ID
+            var itemIds = Array.from(evt.from.children).map(function(child) {
+                return child.dataset.id;
+            });
+            // 保存到 localStorage
+            localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
+        }
+        });
     }
 
     // 书籍目录锚点

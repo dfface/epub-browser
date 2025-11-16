@@ -400,13 +400,13 @@ class EPUBProcessor:
 """
         index_html += f"""
 <div class="container">
-    <div class="breadcrumb header">
+    <div class="breadcrumb header" data-id="breadcrumb">
         <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
     </div>
 
-    <div class="book-info-card">
+    <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
                 <img src="{self.get_book_info()['cover']}" alt="cover">
             </div>
@@ -422,7 +422,7 @@ class EPUBProcessor:
             </div>
         </div>
     
-    <div class="toc-container">
+    <div class="toc-container" data-id="toc-container">
         <div class="toc-header">
             <h2>Table of contents</h2>
             <div class="chapter-count">total: {len(self.chapters)}</div>
@@ -456,7 +456,7 @@ class EPUBProcessor:
         index_html += f"""    </ul>
     </div>
 </div>
-<div class="reading-controls">
+<div class="reading-controls" data-id="reading-controls">
     <a href="/index.html#{self.book_hash}" alt="Home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
@@ -468,7 +468,7 @@ class EPUBProcessor:
         <span class="control-name">Top</span>
     </div>
 </div>
-<footer class="footer">
+<footer class="footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>"""
 
@@ -536,6 +536,7 @@ function addBasePath(basePath) {
 }
 });
 </script>
+<script src="/assets/sortable.min.js"></script>
 </body>
 </html>"""
         # kindle 支持，不能压缩 css 和 js
@@ -768,7 +769,7 @@ function addBasePath(basePath) {
     </div>
 
     <div class="container">
-        <div class="breadcrumb header">
+        <div class="breadcrumb header" data-id="breadcrumb">
             <a href="/index.html#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" alt="bookHome" class="a-book-home">{self.book_title}</a>
@@ -776,13 +777,7 @@ function addBasePath(basePath) {
             <span class="breadcrumb-current">{chapter_title}</span>
         </div> 
 
-        <div class="content-container">
-            <article class="content" id="content">
-            {content}
-            </article>
-        </div>
-
-        <div class="custom-css-panel">
+        <div class="custom-css-panel" data-id="custom-css-panel">
             <div class="panel-header" id="cssPanelToggle">
                 <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
                 <button class="panel-toggle">
@@ -816,7 +811,13 @@ function addBasePath(basePath) {
             </div>
         </div>
 
-        <div class="navigation">
+        <div class="content-container" data-id="content-container">
+            <article class="content" id="content">
+            {content}
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
             {prev_link}
             <a href="/index.html#{self.book_hash}" alt="home" id="navigationHomeBtn">
                 <div class="control-btn">
@@ -858,7 +859,7 @@ function addBasePath(basePath) {
         </div>
     </div>
 
-    <div class="font-controls" id="fontControls">
+    <div class="font-controls" id="fontControls" data-id="fontControls">
         <div class="font-family-control">
             <span>Font Family</span>
         </div>
@@ -886,7 +887,7 @@ function addBasePath(basePath) {
         </div>
     </div>
 
-    <div class="reading-controls">
+    <div class="reading-controls" data-id="reading-controls">
         <a href="/index.html#{self.book_hash}" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
@@ -904,7 +905,7 @@ function addBasePath(basePath) {
     </div>
 
     <!-- 移动端控件 -->
-    <div class="mobile-controls">
+    <div class="mobile-controls" data-id="mobile-controls">
         <div class="control-btn" id="mobileTocBtn">
             <i class="fas fa-list"></i>
             <span>Toc</span>
@@ -939,7 +940,7 @@ function addBasePath(basePath) {
         </div>
     </div>
 
-    <footer class="footer">
+    <footer class="footer" data-id="footer">
         <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
     </footer>
 """
@@ -1007,6 +1008,7 @@ function addBasePath(basePath) {
     });
     </script>
     <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 </body>
 </html>

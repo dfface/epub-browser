@@ -126,7 +126,7 @@ class EPUBLibrary:
 
         library_html += f"""
     <div class="container">
-        <header class="header">
+        <header class="header" data-id="header">
             <div class="theme-toggle" id="themeToggle">
                 <i class="fas fa-moon"></i>
                 <span class="control-name">Theme</span>
@@ -156,27 +156,27 @@ class EPUBLibrary:
                 </div>
             </div>
         </header>
-        <div class="controls">
+        <div class="controls" data-id="controls">
             <div class="search-container">
                 <input type="text" class="search-box" placeholder="Search by book title, author, or tag...">
                 <i class="fas fa-search search-icon"></i>
             </div>
             <br/>
             <div class="tag-cloud">
-                <div class="tag-cloud-item active">All</div>
+                <div class="tag-cloud-item active" data-id="All">All</div>
 """
         for tag in sorted(all_tags):
-            library_html += f"""<div class="tag-cloud-item">{tag}</div>"""
+            library_html += f"""<div class="tag-cloud-item" data-id="{tag}">{tag}</div>"""
         library_html += """
             </div>
         </div>"""
 
         library_html += """
-        <div class="book-grid">
+        <div class="book-grid" data-id="book-grid">
 """
         for book_hash, book_info in self.books.items():
             library_html += f"""
-        <div class="book-card">
+        <div class="book-card" data-id="{book_hash}">
             <a href="/book/{book_hash}/index.html" class="book-link" id="{book_hash}">
                 <img src="/book/{book_hash}/{book_info['cover']}" alt="cover" class="book-cover"/>
                 <div class="book-card-content">
@@ -197,14 +197,14 @@ class EPUBLibrary:
 """      
         library_html += f"""
     </div>
-    <div class="reading-controls">
+    <div class="reading-controls" data-id="reading-controls">
         <button class="control-btn" id="scrollToTopBtn">
             <i class="fas fa-arrow-up"></i>
             <span class="control-name">Top</span>
         </button>
     </div>
 </div>
-<footer class="footer">
+<footer class="footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """
@@ -273,6 +273,7 @@ class EPUBLibrary:
         }
         });
         </script>
+        <script src="/assets/sortable.min.js"></script>
     </body>
 </html>"""
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)

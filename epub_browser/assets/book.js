@@ -34,6 +34,23 @@ function updateFontFamily(fontFamily, fontFamilyInput) {
     }
 }
 
+// 页面加载时恢复顺序
+function restoreOrder(storageKey, elementClass) {
+    var savedOrder = localStorage.getItem(storageKey);
+    if (savedOrder) {
+        var itemIds = JSON.parse(savedOrder);
+        var container = document.querySelector(`.${elementClass}`);
+        
+        // 按照保存的顺序重新排列元素
+        itemIds.forEach(function(id) {
+            var element = document.querySelector('[data-id="' + id + '"]');
+            if (element) {
+                container.appendChild(element);
+            }
+        });
+    }
+}
+
 function initScript() {
     const path = window.location.pathname;  // 获取当前URL路径
     let pathParts = path.split('/');
@@ -46,10 +63,30 @@ function initScript() {
         return kindleMode == "true";
     }
 
+    const storageKeySortableContainer = 'book-container-sortable-order';
+
     if (isKindleMode()) {
         document.body.classList.add("kindle-mode");
+    } else {
+        restoreOrder(storageKeySortableContainer, 'container');
     }
 
+    // 拖拽
+    var el = document.querySelector('.container');
+    if (!isKindleMode()) {
+        var sortable = Sortable.create(el, {
+        onEnd: function(evt) {
+            // 获取所有项目的ID
+            var itemIds = Array.from(evt.from.children).map(function(child) {
+                console.log(child);
+                return child.dataset.id;
+            });
+            // 保存到 localStorage
+            localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
+        }
+        });
+    }
+    
     // 书籍目录锚点删除
     const anchor = window.location.hash;
     if (!isKindleMode()) {
