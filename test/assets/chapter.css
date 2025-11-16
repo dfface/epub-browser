@@ -614,6 +614,7 @@ body {
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
     margin-bottom: 30px;
+    margin-top: 20px;
     overflow: hidden;
     transition: var(--transition);
 }

@@ -49,7 +49,6 @@ body {
 .container {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 20px 0;
 }
 
 .header {
@@ -161,7 +160,7 @@ body {
 .breadcrumb {
     display: flex;
     align-items: center;
-    margin-bottom: 30px;
+    margin: 20px 0;
     padding: 15px 20px;
     background: var(--card-bg);
     border-radius: var(--border-radius);
@@ -276,6 +275,7 @@ body {
 }
 
 .toc-container {
+    margin: 20px 0;
     background: var(--card-bg);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
@@ -386,6 +386,7 @@ body {
     box-shadow: var(--shadow);
     padding: 25px;
     margin-bottom: 30px;
+    margin-top: 30px;
     gap: 25px;
     transition: var(--transition);
 }

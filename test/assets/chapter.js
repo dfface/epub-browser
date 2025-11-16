@@ -111,6 +111,23 @@ function isKindleMode() {
     return kindleMode == "true";
 }
 
+// 页面加载时恢复顺序
+function restoreOrder(storageKey, elementClass) {
+    var savedOrder = localStorage.getItem(storageKey);
+    if (savedOrder) {
+        var itemIds = JSON.parse(savedOrder);
+        var container = document.querySelector(`.${elementClass}`);
+        
+        // 按照保存的顺序重新排列元素
+        itemIds.forEach(function(id) {
+            var element = document.querySelector('[data-id="' + id + '"]');
+            if (element) {
+                container.appendChild(element);
+            }
+        });
+    }
+}
+
 
 function initScript() {
     const path = window.location.pathname;  // 获取当前URL路径
@@ -163,6 +180,9 @@ function initScript() {
         let fontFamilySelect = document.getElementById('fontFamilySelect');
         fontFamilySelect.appendChild(newOption);
     })
+
+    const storageKeySortableContainer = 'chapter-container-sortable-order';
+
     // 检查本地存储中的主题设置
     if (!isKindleMode()) {
         let currentPaginationMode = localStorage.getItem('turning') || "false";
@@ -170,6 +190,7 @@ function initScript() {
         fontSize = localStorage.getItem('font_size') || "medium";
         fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
         fontFamilyInput = localStorage.getItem('font_family_input');
+        restoreOrder(storageKeySortableContainer, 'container');
     } else {
         let currentPaginationMode =  getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
@@ -179,6 +200,22 @@ function initScript() {
     }
     updateFontSize(fontSize);
     updateFontFamily(fontFamily, fontFamilyInput);
+
+    // 拖拽
+    var el = document.querySelector('.container');
+    if (!isKindleMode()) {
+        var sortable = Sortable.create(el, {
+        onEnd: function(evt) {
+            // 获取所有项目的ID
+            var itemIds = Array.from(evt.from.children).map(function(child) {
+                console.log(child);
+                return child.dataset.id;
+            });
+            // 保存到 localStorage
+            localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
+        }
+        });
+    }   
 
     if (isKindleMode() || isPaginationMode) {
         document.querySelector(".custom-css-panel").style.display = "none";
@@ -532,8 +569,10 @@ function initScript() {
     });
     // 键盘事件处理
     function handleKeyDown(e) {
-        if (!isPaginationMode || isKindleMode()) return;
-        switch(e.key) {
+        if (isKindleMode()) return;
+        if (isPaginationMode) {
+            // 翻页模式
+            switch(e.key) {
             case 'ArrowLeft':
                 if (currentPage > 0) {
                     showPage(currentPage - 1);
@@ -552,7 +591,33 @@ function initScript() {
                     location.href = next_href;
                 }
                 break;
+            }
+        } else {
+            // 滚动模式
+            switch(e.key) {
+            case 'ArrowLeft':
+                let prev_href = document.querySelector(".prev-chapter").href;
+                location.href = prev_href;
+                break;
+            case ' ':
+            case 'Space':
+                // 获取页面总高度
+                const scrollHeight = document.documentElement.scrollHeight;
+                // 获取可视区域高度
+                const clientHeight = document.documentElement.clientHeight;
+                // 获取当前滚动位置
+                const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+                // 判断是否滚动到底部
+                if (scrollTop + clientHeight < scrollHeight) {
+                    break;
+                }
+            case 'ArrowRight':
+                let next_href = document.querySelector(".next-chapter").href;
+                location.href = next_href;
+                break;
+            }
         }
+        
     }
 
     // 上一页按钮事件
@@ -821,6 +886,18 @@ function initScript() {
     
     // 代码高亮
     if (!isKindleMode()) {
+        // highlight 之前的处理 pre 里面有无 code
+        let allPres = document.querySelectorAll("pre");
+        allPres.forEach(pre => {
+            if (pre.children.length == 0) {
+                // 需要用 code 包裹
+                oldValue = pre.innerHTML;
+                code = document.createElement('code');
+                code.innerHTML = oldValue;
+                pre.replaceChildren(code);
+            }
+        })
+        // 高亮
         hljs.highlightAll();
     }
     
@@ -841,7 +918,7 @@ function initScript() {
     
 
     // 包裹所有表格
-    function wrapAllElements(name) {
+    function wrapAllElements(name, wrapperElementName) {
         wrapperName = `${name}-wrapper`
         // 获取页面中所有元素
         const elements = document.querySelectorAll(name);
@@ -855,7 +932,7 @@ function initScript() {
             }
             
             // 创建包裹div
-            const wrapper = document.createElement('div');
+            const wrapper = document.createElement(wrapperElementName);
             wrapper.className = wrapperName;
             
             // 将表格插入到包裹div中
@@ -867,8 +944,8 @@ function initScript() {
         
         return wrappedCount;
     }
-    wrapAllElements('table');
-    wrapAllElements('img');
+    wrapAllElements('table', 'div');
+    wrapAllElements('img', 'div');
 
     // 书籍目录锚点更新
     const lastPart = pathParts[pathParts.length - 1];
