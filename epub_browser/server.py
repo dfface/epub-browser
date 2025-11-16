@@ -248,7 +248,7 @@ class EPUBServer:
             # 自动打开浏览器
             if not no_browser:
                 try:
-                    webbrowser.open(f'http://{actual_host}:{actual_port}/')
+                    webbrowser.open(f'http://{actual_host1}:{actual_port}/')
                 except Exception as e:
                     print(f"Failed to open browser: {e}")
             
