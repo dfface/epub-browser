@@ -955,7 +955,7 @@ body {
     margin-bottom: 0;
 }
 
-.kindle-mode .toc-container {
+.kindle-mode .toc-container, .iframe-container .toc-container  {
     margin: 0;
 }
 
