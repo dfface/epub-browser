@@ -510,6 +510,12 @@ function initScript() {
         }
     });
 
+    pageHeightInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            pageHeightSetBtn.click();
+        }
+    });
+
     // 设置页面高度
     pageHeightSetBtn.addEventListener('click', function(e) {
         const pageHeight = parseFloat(pageHeightInput.value);
