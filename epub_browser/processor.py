@@ -691,14 +691,14 @@ function addBasePath(basePath) {
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_href = f"/book/{self.book_hash}/chapter_{chapter_index-1}.html" if chapter_index > 0 else ''
-        next_href = f"/book/{self.book_hash}/chapter_{chapter_index+1}.html" if chapter_index < len(self.chapters) - 1 else ''
+        prev_href = f'href="/book/{self.book_hash}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
+        next_href = f'href="/book/{self.book_hash}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_chapter = f'Perv chapter' if chapter_index > 0 else 'First chapter'
         next_chapter = f'Next chapter' if chapter_index < len(self.chapters) - 1 else 'Last chapter'
-        prev_link = f'<a href="{prev_href}" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">{prev_chapter}</span></div></a>'
-        next_link = f'<a href="{next_href}" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">{next_chapter}</span></div></a>'
-        prev_link_mobile = f'<a href="{prev_href}" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(' chapter', '')}</span></div></a>'
-        next_link_mobile = f'<a href="{next_href}" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(' chapter', '')}</span></div></a>'
+        prev_link = f'<a {prev_href} alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">{prev_chapter}</span></div></a>'
+        next_link = f'<a {next_href} alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">{next_chapter}</span></div></a>'
+        prev_link_mobile = f'<a {prev_href} alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(' chapter', '')}</span></div></a>'
+        next_link_mobile = f'<a {next_href} alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(' chapter', '')}</span></div></a>'
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="{self.lang}">
