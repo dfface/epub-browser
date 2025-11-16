@@ -785,7 +785,7 @@ function addBasePath(basePath) {
             </div>
             <div class="panel-content" id="cssPanelContent">
                 <div class="css-editor">
-                    <textarea id="customCssInput" placeholder="Please input your CSS code..."></textarea>
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: .content{{margin: 50px}}"></textarea>
                     <div class="css-controls">
                         <button class="css-btn primary" id="saveCssBtn">
                             <i class="fas fa-save"></i> Save
