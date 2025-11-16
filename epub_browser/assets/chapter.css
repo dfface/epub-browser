@@ -947,7 +947,7 @@ body {
     transition: none;
 }
 
-.kindle-mode .toc-container, .iframe-container .toc-container {
+.kindle-mode .toc-container {
     margin: 0;
 }
 

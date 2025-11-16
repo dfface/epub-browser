@@ -843,6 +843,7 @@ function initScript() {
             let breadcrumb = iframeDoc.querySelector('.breadcrumb');
             let bookInfoCard = iframeDoc.querySelector('.book-info-card');
             let tocHeader = iframeDoc.querySelector('.toc-header'); 
+            let tocContainer = iframeDoc.querySelector('.toc-container');
 
             topControls.style.display = 'none';
             breadcrumb.style.display = 'none';
@@ -855,6 +856,7 @@ function initScript() {
             iframeBody.style.padding = 0;
             iframeContainer.style.padding = 0;
             iframeContainer.style.margin = 0; 
+            tocContainer.style.margin = 0;
         } catch (e) {
             console.log('Can not reach iframe:', e.message);
         }
