@@ -85,6 +85,7 @@ def main():
         print("No books were successfully processed")
         sys.exit(1)
 
+    library.add_assets()
     library.create_library_home()
 
     # 仅生成文件
