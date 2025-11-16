@@ -955,6 +955,10 @@ body {
     margin-bottom: 0;
 }
 
+.kindle-mode .toc-container {
+    margin: 0;
+}
+
 .kindle-mode {
     background: var(--bg-color);
 }

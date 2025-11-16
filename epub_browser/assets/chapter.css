@@ -947,6 +947,10 @@ body {
     transition: none;
 }
 
+.kindle-mode .toc-container {
+    margin: 0;
+}
+
 .kindle-mode .theme-toggle {
     border: 1px solid;
 }
