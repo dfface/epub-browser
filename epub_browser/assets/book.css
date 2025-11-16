@@ -468,7 +468,7 @@ body {
     max-height: none;
 }
 
-.kindle-mode .breadcrumb {
+.kindle-mode .breadcrumb, .kindle-mode .toc-container {
     margin: 0;
 }
 
