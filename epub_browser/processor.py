@@ -384,7 +384,7 @@ class EPUBProcessor:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{self.book_title}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/book.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
 """
@@ -707,9 +707,9 @@ function addBasePath(basePath) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{chapter_title} - {self.book_title}</title>
     {style_links}
-    <link id="code-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css">
-    <link id="code-dark" rel="stylesheet" disabled href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/chapter.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
 """
@@ -1009,7 +1009,7 @@ function addBasePath(basePath) {
     </script>
     <script src="/assets/chapter.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
 </body>
 </html>
 """

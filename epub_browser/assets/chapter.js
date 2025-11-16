@@ -886,6 +886,18 @@ function initScript() {
     
     // 代码高亮
     if (!isKindleMode()) {
+        // highlight 之前的处理 pre 里面有无 code
+        let allPres = document.querySelectorAll("pre");
+        allPres.forEach(pre => {
+            if (pre.children.length == 0) {
+                // 需要用 code 包裹
+                oldValue = pre.innerHTML;
+                code = document.createElement('code');
+                code.innerHTML = oldValue;
+                pre.replaceChildren(code);
+            }
+        })
+        // 高亮
         hljs.highlightAll();
     }
     
@@ -906,7 +918,7 @@ function initScript() {
     
 
     // 包裹所有表格
-    function wrapAllElements(name) {
+    function wrapAllElements(name, wrapperElementName) {
         wrapperName = `${name}-wrapper`
         // 获取页面中所有元素
         const elements = document.querySelectorAll(name);
@@ -920,7 +932,7 @@ function initScript() {
             }
             
             // 创建包裹div
-            const wrapper = document.createElement('div');
+            const wrapper = document.createElement(wrapperElementName);
             wrapper.className = wrapperName;
             
             // 将表格插入到包裹div中
@@ -932,8 +944,8 @@ function initScript() {
         
         return wrappedCount;
     }
-    wrapAllElements('table');
-    wrapAllElements('img');
+    wrapAllElements('table', 'div');
+    wrapAllElements('img', 'div');
 
     // 书籍目录锚点更新
     const lastPart = pathParts[pathParts.length - 1];
