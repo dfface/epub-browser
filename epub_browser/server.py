@@ -1,5 +1,6 @@
 import os
 import webbrowser
+import socket
 import threading
 import mimetypes
 from socketserver import ThreadingMixIn
@@ -224,6 +225,20 @@ class EPUBServer:
         self.server = None
         self._is_running = False
         self._server_thread = None
+    
+    def get_local_ip(self):
+        """获取本机局域网IP地址（最可靠的方法）"""
+        try:
+            # 创建一个UDP socket，连接到公共DNS服务器
+            # 这不会真正发送数据，只是用来确定路由路径
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))  # Google DNS
+            local_ip = s.getsockname()[0]
+            s.close()
+            return local_ip
+        except Exception as e:
+            print(f"Get local IP failed: {e}")
+            return ""
 
     def start_server(self, port=8000, no_browser=False, host=''):
         """启动Web服务器"""
@@ -243,13 +258,16 @@ class EPUBServer:
             self.server = StoppableThreadedHTTPServer(server_address, create_handler, self.library)
             
             # 获取实际绑定的地址和端口
-            actual_host = host if host else 'localhost'
+            actual_host1 = host if host else 'localhost'
+            actual_host2 = self.get_local_ip() if host == '' else ''
             actual_port = self.server.server_address[1]
             
-            print(f"Web server started: http://{actual_host}:{actual_port}/")
-            print(f"Available books ({len(self.library.books)}):")
-            for book_hash, book_info in self.library.books.items():
-                print(f"  - {book_info['title']}: http://{actual_host}:{actual_port}/book/{book_hash}/")
+            print(f"Available books count: {len(self.library.books)}")
+            print(f"Web server started: \n\thttp://{actual_host1}:{actual_port}/")
+            if actual_host2 != '':
+                print(f"\thttp://{actual_host2}:{actual_port}/")
+            # for book_hash, book_info in self.library.books.items():
+            #     print(f"  - {book_info['title']}: http://{actual_host}:{actual_port}/book/{book_hash}/")
             print("Press Ctrl+C to stop the server\n")
             
             # 自动打开浏览器
