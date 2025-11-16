@@ -9,6 +9,8 @@
 
 A simple and modern web E-book reader, which allows you to read e-books within a browser.
 
+Try it online: [https://epub-browser.vercel.app/index.html](https://epub-browser.vercel.app/index.html)
+
 It now supports:
 
 * Simple library management: searching by title, author or tag.
