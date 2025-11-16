@@ -10,7 +10,7 @@ setup(
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     keywords="epub reader html export browser convert calibre-web calibre kindle web server local",
-    description="A tool to open epub files and serve them via a local web server for reading in a browser.",  # 简短描述
+    description="A tool to open epub files and serve them via a local web server for reading in a browser on any device.",  # 简短描述
     long_description=long_description,  # 详细描述，从README.md读取
     long_description_content_type="text/markdown",  # 详细描述格式
     url="https://github.com/dfface/epub-browser",  # 项目主页，如GitHub仓库地址

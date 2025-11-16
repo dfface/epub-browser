@@ -384,7 +384,7 @@ class EPUBProcessor:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{self.book_title}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIHY3LjEuMCBieSBAZm9udGF3ZXNvbWUgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbSBMaWNlbnNlIC0gaHR0cHM6Ly9mb250YXdlc29tZS5jb20vbGljZW5zZS9mcmVlIENvcHlyaWdodCAyMDI1IEZvbnRpY29ucywgSW5jLi0tPjxwYXRoIGQ9Ik0zMjAgMjA1LjNMMzIwIDUxNC42TDMyMC41IDUxNC40QzM3NS4xIDQ5MS43IDQzMy43IDQ4MCA0OTIuOCA0ODBMNTEyIDQ4MEw1MTIgMTYwTDQ5Mi44IDE2MEM0NTAuNiAxNjAgNDA4LjcgMTY4LjQgMzY5LjcgMTg0LjZDMzUyLjkgMTkxLjYgMzM2LjMgMTk4LjUgMzIwIDIwNS4zek0yOTQuOSAxMjUuNUwzMjAgMTM2TDM0NS4xIDEyNS41QzM5MS45IDEwNiA0NDIuMSA5NiA0OTIuOCA5Nkw1MjggOTZDNTU0LjUgOTYgNTc2IDExNy41IDU3NiAxNDRMNTc2IDQ5NkM1NzYgNTIyLjUgNTU0LjUgNTQ0IDUyOCA1NDRMNDkyLjggNTQ0QzQ0Mi4xIDU0NCAzOTEuOSA1NTQgMzQ1LjEgNTczLjVMMzMyLjMgNTc4LjhDMzI0LjQgNTgyLjEgMzE1LjYgNTgyLjEgMzA3LjcgNTc4LjhMMjk0LjkgNTczLjVDMjQ4LjEgNTU0IDE5Ny45IDU0NCAxNDcuMiA1NDRMMTEyIDU0NEM4NS41IDU0NCA2NCA1MjIuNSA2NCA0OTZMNjQgMTQ0QzY0IDExNy41IDg1LjUgOTYgMTEyIDk2TDE0Ny4yIDk2QzE5Ny45IDk2IDI0OC4xIDEwNiAyOTQuOSAxMjUuNXoiLz48L3N2Zz4=">
 """
         index_html += """
@@ -1236,10 +1236,12 @@ class EPUBProcessor:
     def fix_image_links(self, content, chapter_path):
         """修复图片链接"""
         # 匹配img标签的src属性
-        img_pattern = r'<img[^>]+src="([^"]+)"[^>]*>'
+        img_pattern1 = r'<img[^>]+src="([^"]+)"[^>]*>'
+        img_pattern2 = r'<image[^>]+xlink:href="([^"]+)"[^>]*>'
         
         def replace_img_link(match):
             src = match.group(1)
+
             # 如果已经是绝对路径或数据URI，则不处理
             if src.startswith(('http://', 'https://', 'data:', '/')):
                 return match.group(0)
@@ -1250,9 +1252,11 @@ class EPUBProcessor:
             
             # 转换为web资源路径
             web_src = f"{self.resources_base}/{full_src}"
-            return match.group(0).replace(f'src="{src}"', f'src="{web_src}"')
-        
-        return re.sub(img_pattern, replace_img_link, content)
+            return match.group(0).replace(f'"{src}"', f'"{web_src}"')
+
+        replaced_content = re.sub(img_pattern1, replace_img_link, content)
+        replaced_content = re.sub(img_pattern2, replace_img_link, content)
+        return replaced_content
     
     def fix_other_links(self, content, chapter_path):
         """修复其他资源链接"""
@@ -1282,12 +1286,14 @@ class EPUBProcessor:
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_href = f"/book/{self.book_hash}/chapter_{chapter_index-1}.html"
-        next_href = f"/book/{self.book_hash}/chapter_{chapter_index+1}.html"
-        prev_link = f'<a href="{prev_href}" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Prev chapter</span></div></a>' if chapter_index > 0 else ''
-        next_link = f'<a href="{next_href}" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
-        prev_link_mobile = f'<a href="{prev_href}" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Prev</span></div></a>' if chapter_index > 0 else ''
-        next_link_mobile = f'<a href="{next_href}" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>' if chapter_index < len(self.chapters) - 1 else ''
+        prev_href = f"/book/{self.book_hash}/chapter_{chapter_index-1}.html" if chapter_index > 0 else ''
+        next_href = f"/book/{self.book_hash}/chapter_{chapter_index+1}.html" if chapter_index < len(self.chapters) - 1 else ''
+        prev_chapter = f'Perv chapter' if chapter_index > 0 else 'First chapter'
+        next_chapter = f'Next chapter' if chapter_index < len(self.chapters) - 1 else 'Last chapter'
+        prev_link = f'<a href="{prev_href}" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">{prev_chapter}</span></div></a>'
+        next_link = f'<a href="{next_href}" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">{next_chapter}</span></div></a>'
+        prev_link_mobile = f'<a href="{prev_href}" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(' chapter', '')}</span></div></a>'
+        next_link_mobile = f'<a href="{next_href}" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(' chapter', '')}</span></div></a>'
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="{self.lang}">
@@ -1298,7 +1304,7 @@ class EPUBProcessor:
     {style_links}
     <link id="code-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css">
     <link id="code-dark" rel="stylesheet" disabled href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIHY3LjEuMCBieSBAZm9udGF3ZXNvbWUgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbSBMaWNlbnNlIC0gaHR0cHM6Ly9mb250YXdlc29tZS5jb20vbGljZW5zZS9mcmVlIENvcHlyaWdodCAyMDI1IEZvbnRpY29ucywgSW5jLi0tPjxwYXRoIGQ9Ik0zMjAgMjA1LjNMMzIwIDUxNC42TDMyMC41IDUxNC40QzM3NS4xIDQ5MS43IDQzMy43IDQ4MCA0OTIuOCA0ODBMNTEyIDQ4MEw1MTIgMTYwTDQ5Mi44IDE2MEM0NTAuNiAxNjAgNDA4LjcgMTY4LjQgMzY5LjcgMTg0LjZDMzUyLjkgMTkxLjYgMzM2LjMgMTk4LjUgMzIwIDIwNS4zek0yOTQuOSAxMjUuNUwzMjAgMTM2TDM0NS4xIDEyNS41QzM5MS45IDEwNiA0NDIuMSA5NiA0OTIuOCA5Nkw1MjggOTZDNTU0LjUgOTYgNTc2IDExNy41IDU3NiAxNDRMNTc2IDQ5NkM1NzYgNTIyLjUgNTU0LjUgNTQ0IDUyOCA1NDRMNDkyLjggNTQ0QzQ0Mi4xIDU0NCAzOTEuOSA1NTQgMzQ1LjEgNTczLjVMMzMyLjMgNTc4LjhDMzI0LjQgNTgyLjEgMzE1LjYgNTgyLjEgMzA3LjcgNTc4LjhMMjk0LjkgNTczLjVDMjQ4LjEgNTU0IDE5Ny45IDU0NCAxNDcuMiA1NDRMMTEyIDU0NEM4NS41IDU0NCA2NCA1MjIuNSA2NCA0OTZMNjQgMTQ0QzY0IDExNy41IDg1LjUgOTYgMTEyIDk2TDE0Ny4yIDk2QzE5Ny45IDk2IDI0OC4xIDEwNiAyOTQuOSAxMjUuNXoiLz48L3N2Zz4=">
 """
         chapter_html += """
@@ -1365,7 +1371,7 @@ class EPUBProcessor:
 
         .container {
             max-width: 1000px;
-            min-width: 1000px;
+            width: 80%;
             margin: 0 auto;
         }
 
@@ -2152,7 +2158,7 @@ class EPUBProcessor:
             margin: 0 5px;
         }
 
-        #pageJumpInput {
+        #pageJumpInput, #pageHeightInput {
             width: 50px;
             height: 36px;
             text-align: center;
@@ -2163,7 +2169,7 @@ class EPUBProcessor:
             font-weight: 600;
         }
 
-        #pageJumpInput:focus {
+        #pageJumpInput:focus, #pageHeightInput:focus {
             outline: none;
             border-color: var(--primary);
         }
@@ -2278,8 +2284,7 @@ class EPUBProcessor:
 
         @media (max-width: 768px) {
             .container {
-                max-width: 100%;
-                min-width: 80%;
+                width: 100%;
             }
 
             .chapter-title {
@@ -2294,6 +2299,15 @@ class EPUBProcessor:
             .pagination-mode .navigation{
                 padding: 10px 0;
                 gap: 5px;
+            }
+
+            .pagination-mode .navigation .prev-chapter, .pagination-mode .navigation .next-chapter{
+                display: none;
+            }
+
+            .pagination-mode .navigation #paginationInfo{
+                width: 100%;
+                justify-content: space-between;
             }
 
             .navigation .control-btn {
@@ -2504,21 +2518,30 @@ class EPUBProcessor:
             </a>
 
             <div id="paginationInfo" style="display: none;">
-                <div class="control-btn" style="padding: 0;">
-                    
-                </div>
                 <div class="control-btn" id="prevPage">
                     <i class="fas fa-chevron-left"></i>
                     <span class="control-name">Prev page</span>
                 </div>
-                <span class="page-indicator">
-                    <span id="currentPage" style="display:none;"></span>
-                    <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
-                </span>
-                <div class="control-btn" id="goToPage" title="Jump">
-                    <i class="fas fa-arrow-right-to-bracket"></i>
-                    <span class="control-name">Jump</span>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
                 </div>
+                <div style="display: flex; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:2px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                
                 <div class="control-btn" id="nextPage">
                     <i class="fas fa-chevron-right"></i>
                     <span class="control-name">Next page</span>
@@ -2620,6 +2643,8 @@ class EPUBProcessor:
             const pageJumpInput = document.getElementById('pageJumpInput');
             const goToPageBtn = document.getElementById('goToPage');
             const progressFill = document.getElementById('progressBar');
+            const pageHeightSetBtn = document.querySelector("#setPageHeight");
+            const pageHeightInput = document.querySelector("#pageHeightInput");
 
             // 生成存储键名
             function getStorageKey(mode) {{
@@ -2848,9 +2873,16 @@ class EPUBProcessor:
                 if (!isKindleMode()) {
                     let customContentHeight = localStorage.getItem("page_height");
                     if (customContentHeight) {
-                        contentHeight = parseInt(customContentHeight);
+                        contentHeight = parseFloat(customContentHeight);
+                    }
+                } else {
+                    let customContentHeight = getCookie("page_height");
+                    if (customContentHeight) {
+                        contentHeight = parseFloat(customContentHeight);
                     }
                 }
+
+                pageHeightInput.value = contentHeight
                 
                 // 分割内容为页面
                 let currentPageContent = '';
@@ -3022,6 +3054,21 @@ class EPUBProcessor:
             pageJumpInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     goToPageBtn.click();
+                }
+            });
+
+            // 设置页面高度
+            pageHeightSetBtn.addEventListener('click', function(e) {
+                const pageHeight = parseFloat(pageHeightInput.value);
+                if (pageHeight > 0) {
+                    if (isKindleMode()) {
+                        setCookie('page_height', pageHeight);
+                    } else {
+                        localStorage.setItem('page_height', pageHeight);
+                    }
+                    location.reload();
+                } else {
+                    showNotification(`Please enter a valid page height`, 'warning');
                 }
             });
 
