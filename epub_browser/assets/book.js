@@ -78,7 +78,6 @@ function initScript() {
         onEnd: function(evt) {
             // 获取所有项目的ID
             var itemIds = Array.from(evt.from.children).map(function(child) {
-                console.log(child);
                 return child.dataset.id;
             });
             // 保存到 localStorage

@@ -201,21 +201,39 @@ function initScript() {
     updateFontSize(fontSize);
     updateFontFamily(fontFamily, fontFamilyInput);
 
-    // 拖拽
     var el = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortable = Sortable.create(el, {
+        delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
+        delayOnTouchOnly: false, // 在触摸设备上也应用延迟
+        filter: '.content', // 允许直接选择.content中的文字
+        preventOnFilter: false, // 过滤时不阻止默认行为
+        onStart: function(evt) {
+            // 拖拽开始时检查是否有文字被选中
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) {
+                // 如果有文字被选中，取消拖拽
+                evt.oldIndex; // 访问一下属性，确保事件被处理
+                return false;
+            }
+        },
         onEnd: function(evt) {
             // 获取所有项目的ID
             var itemIds = Array.from(evt.from.children).map(function(child) {
-                console.log(child);
                 return child.dataset.id;
             });
             // 保存到 localStorage
             localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
         }
         });
-    }   
+    } 
+    // 添加双击选择文字的功能
+    document.querySelectorAll('.content').forEach(item => {
+        item.addEventListener('dblclick', function(e) {
+            // 阻止双击触发拖拽
+            e.stopPropagation();
+        });
+    });
 
     if (isKindleMode() || isPaginationMode) {
         document.querySelector(".custom-css-panel").style.display = "none";
