@@ -472,6 +472,7 @@ class EPUBProcessor:
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 <script>
+let path = window.location.pathname;
 // 检查当前的基路径
 if (!path.startsWith("/book/")) {{
     // 获取基路径
@@ -907,6 +908,7 @@ function addBasePath(basePath) {{
         chapter_html += """
     <script>
     // 检查当前的基路径
+    let path = window.location.pathname;
     if (!path.startsWith("/book/")) {{
         // 获取基路径
         let basePath = path.split('/book/');
