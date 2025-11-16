@@ -596,6 +596,10 @@ function initScript() {
                     showPage(currentPage - 1);
                 } else {
                     let prev_href = document.querySelector(".prev-chapter").href;
+                    if (prev_href == location.href) {
+                        showNotification("It's already the first chapter!", 'warning')
+                        break;
+                    }
                     location.href = prev_href;
                 }
                 break;
@@ -606,6 +610,10 @@ function initScript() {
                     showPage(currentPage + 1);
                 } else {
                     let next_href = document.querySelector(".next-chapter").href;
+                    if (next_href == location.href) {
+                        showNotification("It's already the last chapter!", 'warning')
+                        break;
+                    }
                     location.href = next_href;
                 }
                 break;
@@ -615,6 +623,10 @@ function initScript() {
             switch(e.key) {
             case 'ArrowLeft':
                 let prev_href = document.querySelector(".prev-chapter").href;
+                if (prev_href == location.href) {
+                    showNotification("It's already the first chapter!", 'warning')
+                    break;
+                }
                 location.href = prev_href;
                 break;
             case ' ':
@@ -630,7 +642,11 @@ function initScript() {
                     break;
                 }
             case 'ArrowRight':
-                let next_href = document.querySelector(".next-chapter").href;
+                let  = document.querySelector(".next-chapter").href;
+                if (next_href == location.href) {
+                    showNotification("It's already the last chapter!", 'warning')
+                    break;
+                }
                 location.href = next_href;
                 break;
             }
@@ -644,7 +660,11 @@ function initScript() {
             showPage(currentPage - 1);
         } else {
             let prev_href = document.querySelector(".prev-chapter").href;
-            location.href = prev_href;
+            if (prev_href == location.href) {
+                showNotification("It's already the first chapter!", 'warning')
+            } else {
+                location.href = prev_href;
+            }
         }
     });
     
@@ -654,7 +674,11 @@ function initScript() {
             showPage(currentPage + 1);
         } else {
             let next_href = document.querySelector(".next-chapter").href;
-            location.href = next_href;
+            if (next_href == location.href) {
+                showNotification("It's already the last chapter!", 'warning')
+            } else {
+                location.href = next_href;
+            }
         }
     });
 
@@ -662,7 +686,7 @@ function initScript() {
     if (isKindleMode()) {
         content.addEventListener('click', function(e) {
             const screenWidth = window.innerWidth;
-            const targetArea = screenWidth * 0.3;
+            const targetArea = screenWidth * 0.2;
             
             // 左侧40px内点击
             if (e.clientX < targetArea) {
