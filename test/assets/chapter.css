@@ -1001,6 +1001,7 @@ body {
 .custom-font-input small {
     color: var(--text-secondary);
     font-size: 0.8rem;
+    text-align: left;
 }
 
 /* 响应式设计 */
