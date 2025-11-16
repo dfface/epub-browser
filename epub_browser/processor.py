@@ -2527,14 +2527,14 @@ class EPUBProcessor:
                         <span id="currentPage" style="display:none;"></span>
                         <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
                     </span>
-                    <div class="control-btn" id="goToPage" title="Jump">
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
                         <i class="fas fa-arrow-right-to-bracket"></i>
                         <span class="control-name">Jump</span>
                     </div>
                 </div>
                 <div style="display: flex; flex-direction: row;" class="page-height-adjustment">
                     <span>
-                        <input type="number" style="margin-right:2px;" id="pageHeightInput" value="1">
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
                     </span>
                     <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
                         <i class="fas fa-ruler-vertical"></i>
