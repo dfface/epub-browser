@@ -95,7 +95,7 @@ class EPUBLibrary:
     def add_assets(self):
         # 复制 assets
         assets_path = os.path.join(self.base_directory, "assets")
-        for root, dirs, files in os.walk(".assets"):
+        for root, dirs, files in os.walk("./assets"):
             for file in files:
                 src_path = os.path.join(root, file)
                 dst_path = os.path.join(assets_path, file)
@@ -203,11 +203,11 @@ class EPUBLibrary:
     </div>
 </div>
 <footer class="footer">
-    <p>EPUB Library &copy; {datetime.now().year} | <a href="javascript:localStorage.clear(); alert('Done!');">clear localStorage</a> | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """
         library_html += """
-        <script src="/assets/library.js" async></script>
+        <script src="/assets/library.js" defer></script>
     </body>
 </html>"""
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
@@ -248,7 +248,8 @@ class EPUBLibrary:
                     shutil.rmtree(temp_dir)
                     print(f"Cleaned up book: {book_info['title']}, path: {temp_dir}")
             os.remove(os.path.join(self.output_dir, "index.html"))
-            shutil.rmtree(os.path.join(self.output_dir, "assets"))
+            if os.path.exists(os.path.join(self.output_dir, "assets")):
+                shutil.rmtree(os.path.join(self.output_dir, "assets"))
             return
         else:
             # 清理基础目录
