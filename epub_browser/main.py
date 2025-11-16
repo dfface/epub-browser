@@ -84,14 +84,16 @@ def main():
     if success_count == 0:
         print("No books were successfully processed")
         sys.exit(1)
-
-    library.add_assets()
+    
+    # 创建 library home
     library.create_library_home()
+    # 添加静态资源
+    library.add_assets()
+    # 重新组织文件位置
+    library.reorganize_files()
 
     # 仅生成文件
     if args.no_server:
-        # 重新组织文件格式
-        library.reorganize_files()
         print(f"Files generated in: {library.base_directory}")
         return
     

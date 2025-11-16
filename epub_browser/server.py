@@ -67,13 +67,13 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 
             parsed_path = urlparse(self.path)
             path = parsed_path.path
-            
+
             if path == '/' or path == '/index.html':
                 self.send_library_index()
                 return
             
             if path.startswith('/book/'):
-                self.serve_book_content(path)
+                self.serve_book(path)
                 return
             
             super().do_GET()
@@ -112,44 +112,19 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.log_message(f"Error sending library index: {e}")
             self.send_error(500, f"Error reading index: {str(e)}")
     
-    def serve_book_content(self, path):
+    def serve_book(self, path):
         """服务书籍内容"""
         try:
-            if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
-                return
-                
-            path_parts = path.split('/')
-            if len(path_parts) < 3:
-                self.send_error(404, "Book not found")
-                return
-            
-            book_hash = path_parts[2]
-            
-            if book_hash not in self.library.books:
-                self.send_error(404, f"Book with hash '{book_hash}' not found")
-                return
-            
-            book_info = self.library.books[book_hash]
-            book_web_dir = book_info['web_dir']
-            
-            if len(path_parts) == 3 or path_parts[3] == '':
-                file_path = os.path.join(book_web_dir, 'index.html')
-            else:
-                relative_path = '/'.join(path_parts[3:])
-                file_path = os.path.join(book_web_dir, relative_path)
-            
-            file_path = os.path.normpath(file_path)
-            if not file_path.startswith(os.path.normpath(book_web_dir)):
-                self.send_error(403, "Access denied")
-                return
-            
+            if path[0] == "/":
+                path = path[1:]
+            file_path = os.path.join(self.base_directory, path)
+            file_path = os.path.normpath(file_path)            
+
             if not os.path.exists(file_path):
-                self.send_error(404, f"File not found: {relative_path}")
+                self.send_error(404, f"File not found: {file_path}")
                 return
             
             self.send_file_safely(file_path)
-            
         except Exception as e:
             self.log_message(f"Error serving book content: {e}")
             try:

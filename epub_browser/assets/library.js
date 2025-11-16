@@ -35,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // 处理所有资源，都要加上基路径
         addBasePath(base_path);
-    } else {
     }
 
     function addBasePath(basePath) {
