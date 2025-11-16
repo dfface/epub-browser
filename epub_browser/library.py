@@ -209,22 +209,59 @@ class EPUBLibrary:
 </footer>
 """
         library_html += """
+        <script src="/assets/library.js" defer></script>
         <script>
+        document.addEventListener('DOMContentLoaded', function() {
         // 检查当前的基路径
-        base_path = window.location.pathname;
+        let base_path = window.location.pathname;
+        if (base_path.endsWith("index.html")) {
+            base_path = base_path.replace(/index.html$/, '');
+        }
         if (base_path !== "/") {
-            if (base_path.endsWith("index.html")) {
-                base_path = base_path.replace(/index.html$/, '');
-            }
             // 处理所有资源，都要加上基路径
             addBasePath(base_path);
         }
+        // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+        js_resource = document.querySelector('script[src="/assets/library.js"]');
+        if (window.initScriptLibrary) {
+            window.initScriptLibrary();
+            console.log("init")
+            return;
+        } else {
+            const src = js_resource.getAttribute('src');
+            newScript = reloadScriptByReplacement(js_resource, base_path.substr(0, base_path.length - 1) + src);
+            newScript.onload = () => {
+                if (window.initScriptLibrary) {
+                    console.log("reinit")
+                    window.initScriptLibrary();
+                }
+            };
+        }
+        
+
+        function reloadScriptByReplacement(scriptElement, newSrc) {
+            const newScript = document.createElement('script');
+            newScript.src = newSrc;
+            
+            // 复制原script的所有属性（除了src）
+            Array.from(scriptElement.attributes).forEach(attr => {
+                if (attr.name !== 'src') {
+                    newScript.setAttribute(attr.name, attr.value);
+                }
+            });
+            scriptElement.parentNode.replaceChild(newScript, scriptElement);
+            return newScript;
+        }
 
         function addBasePath(basePath) {
-            // 处理所有链接、图片、脚本和样式表
-            const resources = document.querySelectorAll('a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
+            // 处理所有链接、图片和样式表
+            const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
             resources.forEach(resource => {
                 const src = resource.getAttribute('src');
+                if (src == "/assets/library.js") {
+                    console.log("jump");
+                    return
+                }
                 const href = resource.getAttribute('href');
                 if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
                     resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
@@ -234,8 +271,8 @@ class EPUBLibrary:
                 }
             });
         }
+        });
         </script>
-        <script src="/assets/library.js" defer></script>
     </body>
 </html>"""
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)

@@ -470,34 +470,72 @@ class EPUBProcessor:
 </div>
 <footer class="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
-</footer>
+</footer>"""
+
+        index_html += """
+<script src="/assets/book.js" defer></script>
 <script>
-let path = window.location.pathname;
+document.addEventListener('DOMContentLoaded', function() {
 // 检查当前的基路径
-if (!path.startsWith("/book/")) {{
-    // 获取基路径
-    let basePath = path.split('/book/');
-    basePath = basePath[0] + "/";
+let path = window.location.pathname;
+let basePath = path.split('/book/');
+// 获取基路径
+basePath = basePath[0] + "/";
+// 检查当前的基路径
+if (!path.startsWith("/book/")) {
     // 处理所有资源，都要加上基路径
     addBasePath(basePath);
-}}
+}
+// 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+const js_resource = document.querySelector('script[src="/assets/book.js"]');
+if (window.initScriptBook) {
+    console.log("init")
+    window.initScriptBook();
+} else {
+    const src = js_resource.getAttribute('src');
+    newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+    newScript.onload = () => {
+        if (window.initScriptBook) {
+            console.log("reinit")
+            window.initScriptBook();
+        }
+    };
+}
 
-function addBasePath(basePath) {{
-    // 处理所有链接、图片、脚本和样式表
-    const resources = document.querySelectorAll('a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
-    resources.forEach(resource => {{
+function reloadScriptByReplacement(scriptElement, newSrc) {
+    const newScript = document.createElement('script');
+    newScript.src = newSrc;
+    
+    // 复制原script的所有属性（除了src）
+    Array.from(scriptElement.attributes).forEach(attr => {
+        if (attr.name !== 'src') {
+            newScript.setAttribute(attr.name, attr.value);
+        }
+    });
+    scriptElement.parentNode.replaceChild(newScript, scriptElement);
+    return newScript;
+}
+
+function addBasePath(basePath) {
+    // 处理所有链接、图片和样式表
+    const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+    resources.forEach(resource => {
         const src = resource.getAttribute('src');
         const href = resource.getAttribute('href');
-        if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {{
+        if (src == "/assets/book.js") {
+            console.log("jump")
+            return
+        }
+        if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
             resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-        }}
-        if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {{
+        }
+        if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
             resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-        }}
-    }});
-}}
+        }
+    });
+}
+});
 </script>
-<script src="/assets/book.js" defer></script>
 </body>
 </html>"""
         # kindle 支持，不能压缩 css 和 js
@@ -907,30 +945,66 @@ function addBasePath(basePath) {{
 """
         chapter_html += """
     <script>
+    document.addEventListener('DOMContentLoaded', function() {
     // 检查当前的基路径
     let path = window.location.pathname;
-    if (!path.startsWith("/book/")) {{
-        // 获取基路径
-        let basePath = path.split('/book/');
-        basePath = basePath[0] + "/";
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
         // 处理所有资源，都要加上基路径
         addBasePath(basePath);
-    }}
+    }
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
 
-    function addBasePath(basePath) {{
-        // 处理所有链接、图片、脚本和样式表
-        const resources = document.querySelectorAll('a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
-        resources.forEach(resource => {{
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
             const src = resource.getAttribute('src');
             const href = resource.getAttribute('href');
-            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {{
+            if (src == "/assets/chapter.js") {
+                console.log("jump")
+                return
+            }
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
                 resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-            }}
-            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {{
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
                 resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-            }}
-        }});
-    }}
+            }
+        });
+    }
+    });
     </script>
     <script src="/assets/chapter.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
