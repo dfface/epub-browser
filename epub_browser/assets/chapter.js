@@ -532,8 +532,10 @@ function initScript() {
     });
     // 键盘事件处理
     function handleKeyDown(e) {
-        if (!isPaginationMode || isKindleMode()) return;
-        switch(e.key) {
+        if (isKindleMode()) return;
+        if (isPaginationMode) {
+            // 翻页模式
+            switch(e.key) {
             case 'ArrowLeft':
                 if (currentPage > 0) {
                     showPage(currentPage - 1);
@@ -552,7 +554,33 @@ function initScript() {
                     location.href = next_href;
                 }
                 break;
+            }
+        } else {
+            // 滚动模式
+            switch(e.key) {
+            case 'ArrowLeft':
+                let prev_href = document.querySelector(".prev-chapter").href;
+                location.href = prev_href;
+                break;
+            case ' ':
+            case 'Space':
+                // 获取页面总高度
+                const scrollHeight = document.documentElement.scrollHeight;
+                // 获取可视区域高度
+                const clientHeight = document.documentElement.clientHeight;
+                // 获取当前滚动位置
+                const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+                // 判断是否滚动到底部
+                if (scrollTop + clientHeight < scrollHeight) {
+                    break;
+                }
+            case 'ArrowRight':
+                let next_href = document.querySelector(".next-chapter").href;
+                location.href = next_href;
+                break;
+            }
         }
+        
     }
 
     // 上一页按钮事件
