@@ -26,6 +26,14 @@ function deleteCookie(name) {
     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 }
 
+function updateFontFamily(fontFamily, fontFamilyInput) {
+    if (fontFamily == "custom") {
+        document.body.style.fontFamily = fontFamilyInput;
+    } else {
+        document.body.style.fontFamily = fontFamily;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // 检查当前的基路径
     base_path = window.location.pathname;
@@ -84,14 +92,23 @@ document.addEventListener('DOMContentLoaded', function() {
     // 主题切换
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = themeToggle.querySelector('i');
+    let fontFamily = "system-ui, -apple-system, sans-serif";
+    let fontFamilyInput = null;
     
     // 检查本地存储中的主题设置
     let currentTheme = 'light';
     if (!isKindleMode()) {
         currentTheme = localStorage.getItem('theme');
+        fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = localStorage.getItem('font_family_input');
     } else {
         currentTheme = getCookie('theme');
+        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = getCookie('font_family_input');
     }
+    
+    // 更新字体
+    updateFontFamily(fontFamily, fontFamilyInput);
     
     // 应用保存的主题
     if (currentTheme === 'dark') {
@@ -126,7 +143,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 搜索功能
     const searchBox = document.querySelector('.search-box');
     const bookCards = document.querySelectorAll('.book-card');
-    const filterBtns = document.querySelectorAll('.filter-btn');
     const tagCloudItems = document.querySelectorAll('.tag-cloud-item');
     
     // 搜索功能

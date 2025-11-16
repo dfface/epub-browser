@@ -42,7 +42,6 @@
 }
 
 body {
-    font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
     line-height: 1.6;
     color: var(--text-color);
     background: var(--bg-color);
@@ -51,11 +50,6 @@ body {
     transition: var(--transition);
     display: flex;
     flex-direction: column;
-}
-
-/* 字体设置 */
-.content h1, .content h2, .content h3, .content h4, .content h5, .content h6, .content p, .content span, .content a, .content div {
-    font-family: "LXGW WenKai", "Helvetica Neue", "Heiti", "Songti", "Kaiti", "Fangsong", "Helvetica", "Arial", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Times New Roman", "Courier New", system-ui, -apple-system, sans-serif;
 }
 
 .container {
@@ -536,7 +530,7 @@ body {
     display: none;
     flex-direction: column;
     gap: 10px;
-    width: 150px;
+    width: 200px;
     z-index: 88;
 }
 
@@ -547,7 +541,7 @@ body {
 .font-size-control {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: space-around;
 }
 
 .font-size-btn {
@@ -961,6 +955,51 @@ body {
 
 .kindle-mode {
     background: var(--bg-color);
+}
+
+/* 字体家族选择器 */
+.font-family-selector select {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.font-family-selector select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+}
+
+.custom-font-input {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.custom-font-input input {
+    padding: 10px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.custom-font-input input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+}
+
+.custom-font-input small {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
 }
 
 /* 响应式设计 */

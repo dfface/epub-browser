@@ -15,7 +15,7 @@ It now supports:
 * Dark mode.
 * Reading progress bar.
 * Table of contents in each chapter(not active in `Page turning mode`).
-* Font size adjustment.
+* Font size/family adjustment.
 * Image zoom.
 * Mobile devices: especially for Kindle, remember to click `Not Kindle` in the header of home page to enable `Kindle Mode` to optimize experience.
 * Code highlight(not active in `Kindle Mode`).

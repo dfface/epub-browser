@@ -1,3 +1,117 @@
+function isFontAvailable(fontName) {
+    // 方法1：使用 canvas 测量文本宽度（推荐）
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    // 基准字体宽度
+    const baseText = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    context.font = '72px sans-serif';
+    const baselineWidth = context.measureText(baseText).width;
+    
+    // 测试字体宽度
+    context.font = `72px ${fontName}, sans-serif`;
+    const testWidth = context.measureText(baseText).width;
+    
+    return testWidth !== baselineWidth;
+}
+
+const commonFonts = [
+    'Arial', 'Helvetica', 'Times New Roman', 'Helvetica',
+    'Courier New','Trebuchet MS', 'Arial Black','Segoe UI', 'Microsoft YaHei', "微软雅黑", 'SimSun',
+    'SimHei',"Heiti", "Song Ti", "Kai Ti", 'KaiTi', 'FangSong', "Fang Song", "宋体", "仿宋", "黑体",
+    'STHeiti', 'STKaiti', 'STSong', 'STFangsong', 'PingFang SC', 'Heiti SC', 
+    'Noto Sans SC', 'WenQuanYi Micro Hei', 'MiSans', 'Alimama ShuHeiTi',
+    'LXGW WenKai', 'Amazon Ember',
+];
+
+// 获取支持的字体列表
+function getAvailableFonts() {
+    return commonFonts.filter(font => isFontAvailable(font));
+}
+
+function updateFontFamily(fontFamily, fontFamilyInput) {
+    let fontFamilySelect = document.getElementById('fontFamilySelect');
+    let customFontInput = document.getElementById('customFontInput');
+    let customFontFamily = document.getElementById('customFontFamily');
+    fontFamilySelect.value = fontFamily;
+    if (fontFamily == "custom") {
+        document.body.style.fontFamily = fontFamilyInput;
+        customFontInput.style.display = 'flex';
+        customFontFamily.value = fontFamilyInput;
+    } else {
+        document.body.style.fontFamily = fontFamily;
+        customFontInput.style.display = 'none';
+    }
+    // 保存选项
+    if (fontFamily == "custom") {
+        if (!isKindleMode()) {
+            localStorage.setItem('font_family_input', fontFamilyInput);
+            localStorage.setItem('font_family', "custom");
+        } else {
+            setCookie('font_family_input', fontFamilyInput);
+            setCookie('font_family', "custom");
+        }
+    } else {
+        if (!isKindleMode()) {
+            localStorage.setItem('font_family', fontFamily);
+        } else {
+            setCookie('font_family', fontFamily);
+        }
+    }
+}
+
+// 设置 cookie
+function setCookie(key, value) {
+    const date = new Date();
+    date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
+    const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
+    document.cookie = `${key}=${value}; ${expires}; path=/;`;
+}
+
+// 解析指定 key 的 Cookie
+function getCookie(key) {
+    // 分割所有 Cookie 为数组
+    const cookies = document.cookie.split('; ');
+    for (const cookie of cookies) {
+        // 分割键和值
+        const [cookieKey, cookieValue] = cookie.split('=');
+        // 解码并返回匹配的值
+        if (cookieKey === key) {
+        return decodeURIComponent(cookieValue);
+        }
+    }
+    return null; // 未找到
+}
+
+function deleteCookie(name) {
+    // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+}
+
+// 获取元素高度（包括外边距）
+function getElementHeight(element) {
+    // 创建临时元素测量高度
+    const tempElement = element.cloneNode(true);
+    tempElement.style.visibility = 'hidden';
+    tempElement.style.position = 'absolute';
+    content.appendChild(tempElement);
+    
+    const height = tempElement.getBoundingClientRect().height;
+    const styles = window.getComputedStyle(element);
+    const marginTop = parseFloat(styles.marginTop) || 0;
+    const marginBottom = parseFloat(styles.marginBottom) || 0;
+    
+    content.removeChild(tempElement);
+    
+    return height + marginTop + marginBottom;
+}
+
+function isKindleMode() {
+    let kindleMode = getCookie("kindle-mode") || "false";
+    return kindleMode == "true";
+}
+
+
 document.addEventListener('DOMContentLoaded', function() {
     const path = window.location.pathname;  // 获取当前URL路径
     let pathParts = path.split('/');
@@ -31,57 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const chapterId = chapter_index;
         return `book_${bookId}_chapter_${chapterId}_${mode}_position`;
     }
-
-    // 设置 cookie
-    function setCookie(key, value) {
-        const date = new Date();
-        date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
-        const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
-        document.cookie = `${key}=${value}; ${expires}; path=/;`;
-    }
-
-    // 解析指定 key 的 Cookie
-    function getCookie(key) {
-        // 分割所有 Cookie 为数组
-        const cookies = document.cookie.split('; ');
-        for (const cookie of cookies) {
-            // 分割键和值
-            const [cookieKey, cookieValue] = cookie.split('=');
-            // 解码并返回匹配的值
-            if (cookieKey === key) {
-            return decodeURIComponent(cookieValue);
-            }
-        }
-        return null; // 未找到
-    }
-
-    function deleteCookie(name) {
-        // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
-        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-    }
-
-    // 获取元素高度（包括外边距）
-    function getElementHeight(element) {
-        // 创建临时元素测量高度
-        const tempElement = element.cloneNode(true);
-        tempElement.style.visibility = 'hidden';
-        tempElement.style.position = 'absolute';
-        content.appendChild(tempElement);
-        
-        const height = tempElement.getBoundingClientRect().height;
-        const styles = window.getComputedStyle(element);
-        const marginTop = parseFloat(styles.marginTop) || 0;
-        const marginBottom = parseFloat(styles.marginBottom) || 0;
-        
-        content.removeChild(tempElement);
-        
-        return height + marginTop + marginBottom;
-    }
-
-    function isKindleMode() {
-        let kindleMode = getCookie("kindle-mode") || "false";
-        return kindleMode == "true";
-    }
     
     // 翻页状态变量
     let isPaginationMode = false;
@@ -90,19 +153,32 @@ document.addEventListener('DOMContentLoaded', function() {
     let pages = [];
 
     let fontSize = "medium";
+    let fontFamily = "system-ui, -apple-system, sans-serif";
+    let fontFamilyInput = null;
+    const supportedFonts = getAvailableFonts();
+    supportedFonts.forEach(item => {
+        let newOption = document.createElement('option');
+        newOption.value = item;
+        newOption.textContent = item;
+        let fontFamilySelect = document.getElementById('fontFamilySelect');
+        fontFamilySelect.appendChild(newOption);
+    })
     // 检查本地存储中的主题设置
     if (!isKindleMode()) {
         let currentPaginationMode = localStorage.getItem('turning') || "false";
         isPaginationMode = currentPaginationMode == "true"
         fontSize = localStorage.getItem('font_size') || "medium";
+        fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = localStorage.getItem('font_family_input');
     } else {
         let currentPaginationMode =  getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
         fontSize = getCookie('font_size') || "medium";
+        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = getCookie('font_family_input');
     }
-    if (fontSize != "medium") {
-        updateFontSize(fontSize);
-    }
+    updateFontSize(fontSize);
+    updateFontFamily(fontFamily, fontFamilyInput);
 
     if (isKindleMode() || isPaginationMode) {
         document.querySelector(".custom-css-panel").style.display = "none";
@@ -389,7 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let storageKey = getStorageKey("turning");
             let savedPage = localStorage.getItem(storageKey);
         
-            if (savedPage !== null) {
+            if (savedPage && savedPage > 0) {
                 const pageIndex = parseInt(savedPage, 10);
                 if (pageIndex >= 0 && pageIndex < totalPages) {
                     showPage(pageIndex);
@@ -405,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let storageKey = getStorageKey("scroll");
             let savedPos = localStorage.getItem(storageKey);
             let windowHeight = window.innerHeight;
-            if (savedPos) {
+            if (savedPos && savedPos > 0) {
                     window.scrollTo({
                     top: parseInt(savedPos),
                     behavior: 'smooth'
@@ -735,7 +811,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             // 滚动到元素位置
                             iframe.contentWindow.scrollTo({
                                 top: rect.top + iframe.contentWindow.pageYOffset,
-                                behavior: 'smooth'
                             });
                         }
                     }
@@ -1107,6 +1182,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const mobileFontBtn = document.getElementById('mobileFontBtn');
         const fontControls = document.getElementById('fontControls');
         const fontSizeBtns = document.querySelectorAll('.font-size-btn');
+        const fontFamilySelect = document.getElementById('fontFamilySelect');
+        const customFontInput = document.getElementById('customFontInput');
+        const applyFontSettings = document.getElementById('applyFontSettings');
+
+        fontFamilySelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customFontInput.style.display = 'flex';
+            } else {
+                customFontInput.style.display = 'none';
+                updateFontFamily(this.value, null);
+                location.reload();
+            }
+        });
+
+        applyFontSettings.addEventListener('click', function() {
+            let customFontFamily = document.getElementById('customFontFamily');
+            currentFont = customFontFamily.value ? `'${customFontFamily.value}', sans-serif` : 'system-ui, -apple-system, sans-serif';
+            if (currentFont == "system-ui, -apple-system, sans-serif") {
+                updateFontFamily(currentFont, null);
+            } else {
+                updateFontFamily("custom", currentFont);
+            }
+            location.reload();
+        });
+
         
         fontControlBtn.addEventListener('click', function() {
             fontControls.classList.toggle('show');
@@ -1160,8 +1260,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const style = document.createElement('style');
         style.textContent = `
             .font-small { font-size: 1rem; }
-            .font-medium { font-size: 1.2rem; }
-            .font-large { font-size: 1.5rem; }
+            .font-medium { font-size: 1.5rem; }
+            .font-large { font-size: 2rem; }
 
             img.zoomed {
                 width: 90vw; 
