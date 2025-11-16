@@ -776,6 +776,12 @@ function addBasePath(basePath) {
             <span class="breadcrumb-current">{chapter_title}</span>
         </div> 
 
+        <div class="content-container">
+            <article class="content" id="content">
+            {content}
+            </article>
+        </div>
+
         <div class="custom-css-panel">
             <div class="panel-header" id="cssPanelToggle">
                 <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
@@ -808,12 +814,6 @@ function addBasePath(basePath) {
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="content-container">
-            <article class="content" id="content">
-            {content}
-            </article>
         </div>
 
         <div class="navigation">
