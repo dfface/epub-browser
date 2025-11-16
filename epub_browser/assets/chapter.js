@@ -585,30 +585,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-        
-        // 检查当前的基路径
-        if (!path.startsWith("/book/")) {
-            // 获取基路径
-            let basePath = path.split('/book/');
-            basePath = basePath[0] + "/";
-            // 处理所有资源，都要加上基路径
-            addBasePath(basePath);
-        }
-
-        function addBasePath(basePath) {
-            // 处理所有链接、图片、脚本和样式表
-            const resources = document.querySelectorAll('iframe[src^="/"], a[href^="/"], img[src^="/"], script[src^="/"], link[rel="stylesheet"][href^="/"]');
-            resources.forEach(resource => {
-                const src = resource.getAttribute('src');
-                const href = resource.getAttribute('href');
-                if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
-                    resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-                }
-                if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
-                    resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-                }
-            });
-        }
 
         // 自定义 css
         customCssFunc();
