@@ -13,6 +13,8 @@ It now supports:
 
 * Simple library management: searching by title, author or tag.
 * Dark mode.
+* Page turning/scrolling: support keyboards(left arrow & right arrow & space).
+* Kindle mode: more style optimizations; Clicking on both sides of the screen is allowed to turn pages.
 * Reading progress bar.
 * Table of contents in each chapter(not active in `Page turning mode`).
 * Font size/family adjustment.
@@ -22,7 +24,6 @@ It now supports:
 * Remember position: remember your last reading chapter(support all devices including Kindle) and your last reading position(support all devices except Kindle).
 * Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
 * Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
-* Page turning mode: support keyboards(left arrow & right arrow & space).
 * Multi threads.
 
 ## Usage
@@ -65,27 +66,60 @@ Then a browser will be opened to view the epub file.
 
 ### Desktop
 
-![epub library home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-7Zojnb-JH0qhY.png)
+#### library home
 
-![epub book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-DMXr4g-DG7fei.png)
+![home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-HWZoEf-3pN2vj.png)
 
-![epub chapter example1](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-oQzhk1-Z8g6hg.png)
+* View All Books
+* Switch Kindle Mode
+* Search for Books
+* Toggle Dark Mode
 
-![epub chapter example2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-B3rpC0-BSaN6R.png)
+#### Page-turning mode
+
+![page turning](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-VvMhcs-Y6EeNs.png)
+
+* Previous Chapter
+* Next Chapter
+* Previous Page: Keyboard Left Arrow
+* Next Page: Keyboard Right Arrow, Spacebar
+* Jump to a Specific Page
+* Set Pagination Page Height to Customize Content Display per Page
+
+#### Book home
+
+![book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-IFvr9L-oZR6vO.png)
+
+* View Book Table of Contents
+
+#### Reader
+
+![reader](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-yWbMdb-NPTPJq.png)
+
+* Breadcrumb
+* Custom CSS
+* Scroll Reading
+* Page-Turning Reading
+* View Book Table of Contents
+* View Chapter Table of Contents
+* Return to Library Homepage
+* Font Adjustment
 
 ### Mobile
 
-![mobile support](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-13-tFUcoE-CKAxJE.png)
+![mobile support](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-eQFGMw-4ONeC0.png)
 
 ### Kindle
 
-![kindle support1](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-wXATw7-screenshot_2025_11_14T00_05_50+0800.png)
+![kindle support1](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-BpV0De-screenshot_2025_11_16T20_34_57+0800.png)
 
-![kindle support2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-JsykYo-screenshot_2025_11_14T00_06_18+0800.png)
+![kindle support2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-wmsmxP-screenshot_2025_11_16T20_36_01+0800.png)
 
-![kindle support3](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-S3hqb9-screenshot_2025_11_14T00_06_51+0800.png)
+![kindle support3](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-VZqKQ4-screenshot_2025_11_16T23_26_59+0800.png)
 
-![kindle support4](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-14-l0maxe-screenshot_2025_11_14T00_07_11+0800.png)
+![kindle support4](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-Ib1pM1-screenshot_2025_11_16T23_28_27+0800.png)
+
+![kindle support5](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-Fta2oI-screenshot_2025_11_16T23_28_58+0800.png)
 
 ## Tips
 

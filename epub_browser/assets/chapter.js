@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
     }
-
+    
     function savePaginationModeAndReload() {
         isPaginationMode = !isPaginationMode;
         
@@ -568,6 +568,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 location.href = next_href;
             }
         });
+
+        // 监听点击事件
+        if (isKindleMode()) {
+            content.addEventListener('click', function(e) {
+                const screenWidth = window.innerWidth;
+                const targetArea = screenWidth * 0.3;
+                
+                // 左侧40px内点击
+                if (e.clientX < targetArea) {
+                    prevPageBtn.click();
+                }
+                // 右侧40px内点击
+                else if (e.clientX > screenWidth - targetArea) {
+                    nextPageBtn.click();
+                }
+            });
+        }
         
         // 检查当前的基路径
         if (!path.startsWith("/book/")) {

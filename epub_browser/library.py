@@ -94,8 +94,10 @@ class EPUBLibrary:
     
     def add_assets(self):
         # 复制 assets
+        BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+        ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
         assets_path = os.path.join(self.base_directory, "assets")
-        for root, dirs, files in os.walk("./assets"):
+        for root, dirs, files in os.walk(ASSETS_DIR):
             for file in files:
                 src_path = os.path.join(root, file)
                 dst_path = os.path.join(assets_path, file)

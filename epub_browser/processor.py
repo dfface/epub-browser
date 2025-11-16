@@ -762,7 +762,7 @@ class EPUBProcessor:
             </a>
 
             <div id="paginationInfo" style="display: none;">
-                <div class="control-btn" id="prevPage">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
                     <i class="fas fa-chevron-left"></i>
                     <span class="control-name">Prev page</span>
                 </div>
@@ -785,8 +785,7 @@ class EPUBProcessor:
                         <span class="control-name">Set page height</span>
                     </div>
                 </div>
-                
-                <div class="control-btn" id="nextPage">
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
                     <i class="fas fa-chevron-right"></i>
                     <span class="control-name">Next page</span>
                 </div>
