@@ -176,6 +176,7 @@ body {
 
 .toc-header {
     padding: 15px 20px;
+    height: 60px;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     flex-shrink: 0; /* 头部不收缩 */ 
