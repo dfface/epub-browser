@@ -206,7 +206,7 @@ function initScript() {
         var sortable = Sortable.create(el, {
         delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
         delayOnTouchOnly: false, // 在触摸设备上也应用延迟
-        filter: '.content', // 允许直接选择.content中的文字
+        filter: '.content, #pageJumpInput, .page-height-adjustment', // 允许直接选择.content中的文字
         preventOnFilter: false, // 过滤时不阻止默认行为
         onStart: function(evt) {
             // 拖拽开始时检查是否有文字被选中
@@ -251,6 +251,10 @@ function initScript() {
     if (isPaginationMode) {
         // 一开始就是翻页
         enablePaginationMode();
+        // 禁止翻页模式 点击页面链接
+        document.querySelectorAll('.content a').forEach(item => {
+            item.removeAttribute('href');
+        });
         togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
         mobileTogglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
         // 隐藏 tocFloatingBtn
@@ -359,11 +363,23 @@ function initScript() {
         restoreOriginalContent();
         
     }
+
+    function preprocessContent(content) {
+        if (content.children && Array.from(content.children).length == 1) {
+            if (content.children[0].tagName == "DIV") {
+                return preprocessContent(content.children[0]);
+            }
+        }
+        return content.innerHTML;
+    }
     
     // 创建页面
     function createPages() {
         // 保存原始内容
-        const originalContent = content.innerHTML;
+        // 预处理
+        const originalContent = preprocessContent(content);
+        let newContent = document.createElement("article");
+        newContent.innerHTML = originalContent;
         
         // 获取容器高度
         const bottomNav = document.querySelector('.navigation');
@@ -395,7 +411,7 @@ function initScript() {
         // 分割内容为页面
         let currentPageContent = '';
         let currentHeight = 0;
-        const elements = Array.from(content.children || []);
+        const elements = Array.from(newContent.children || []);
         
         // 如果没有子元素，直接使用文本内容
         if (elements.length === 0) {
