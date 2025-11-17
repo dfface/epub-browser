@@ -492,7 +492,21 @@ class EPUBProcessor:
         index_html += """
 <script src="/assets/book.js" defer></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+function addBasePath(basePath) {
+    // 处理所有链接、图片和样式表
+    const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+    resources.forEach(resource => {
+        const src = resource.getAttribute('src');
+        const href = resource.getAttribute('href');
+        if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+            resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+        }
+        if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+            resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+        }
+    });
+}
+
 // 检查当前的基路径
 let path = window.location.pathname;
 let basePath = path.split('/book/');
@@ -503,6 +517,14 @@ if (!path.startsWith("/book/")) {
     // 处理所有资源，都要加上基路径
     addBasePath(basePath);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+// 检查当前的基路径
+let path = window.location.pathname;
+let basePath = path.split('/book/');
+// 获取基路径
+basePath = basePath[0] + "/";
+
 // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
 const js_resource = document.querySelector('script[src="/assets/book.js"]');
 if (window.initScriptBook) {
@@ -531,25 +553,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     });
     scriptElement.parentNode.replaceChild(newScript, scriptElement);
     return newScript;
-}
-
-function addBasePath(basePath) {
-    // 处理所有链接、图片和样式表
-    const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
-    resources.forEach(resource => {
-        const src = resource.getAttribute('src');
-        const href = resource.getAttribute('href');
-        if (src == "/assets/book.js") {
-            console.log("jump")
-            return
-        }
-        if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
-            resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-        }
-        if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
-            resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-        }
-    });
 }
 });
 </script>
@@ -963,7 +966,6 @@ function addBasePath(basePath) {
 """
         chapter_html += """
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
     // 检查当前的基路径
     let path = window.location.pathname;
     let basePath = path.split('/book/');
@@ -974,6 +976,28 @@ function addBasePath(basePath) {
         // 处理所有资源，都要加上基路径
         addBasePath(basePath);
     }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
     // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
     const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
     if (window.initScriptChapter) {
@@ -1002,25 +1026,6 @@ function addBasePath(basePath) {
         });
         scriptElement.parentNode.replaceChild(newScript, scriptElement);
         return newScript;
-    }
-
-    function addBasePath(basePath) {
-        // 处理所有链接、图片和样式表
-        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
-        resources.forEach(resource => {
-            const src = resource.getAttribute('src');
-            const href = resource.getAttribute('href');
-            if (src == "/assets/chapter.js") {
-                console.log("jump")
-                return
-            }
-            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
-                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-            }
-            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
-                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-            }
-        });
     }
     });
     </script>
