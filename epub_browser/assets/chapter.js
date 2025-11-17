@@ -201,6 +201,9 @@ function initScript() {
     updateFontSize(fontSize);
     updateFontFamily(fontFamily, fontFamilyInput);
 
+    // 添加键盘事件监听
+    document.addEventListener('keydown', handleKeyDown);
+
     var el = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortable = Sortable.create(el, {
@@ -327,9 +330,6 @@ function initScript() {
         
         // 更新导航按钮状态
         updateNavButtons();
-        
-        // 添加键盘事件监听
-        document.addEventListener('keydown', handleKeyDown);
 
         if (isKindleMode()) {
             showNotification(`Page turning mode enabled`, 'info');
@@ -646,6 +646,7 @@ function initScript() {
                 location.href = prev_href;
                 break;
             case ' ':
+            case 'ArrowDown':
             case 'Space':
                 // 获取页面总高度
                 const scrollHeight = document.documentElement.scrollHeight;
@@ -658,7 +659,7 @@ function initScript() {
                     break;
                 }
             case 'ArrowRight':
-                let  = document.querySelector(".next-chapter").href;
+                let next_href = document.querySelector(".next-chapter").href;
                 if (next_href == location.href) {
                     showNotification("It's already the last chapter!", 'warning')
                     break;
@@ -1406,6 +1407,9 @@ function initScript() {
         }
     `;
     document.head.appendChild(style);
+
+    // 聚焦
+    content.focus();
 };
 
 window.initScriptChapter = initScript;
