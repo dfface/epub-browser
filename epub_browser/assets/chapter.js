@@ -160,7 +160,7 @@ function initScript() {
         // 书籍ID和章节ID
         const bookId = book_hash;
         const chapterId = chapter_index;
-        return `book_${bookId}_chapter_${chapterId}_${mode}_position`;
+        return `${mode}_${bookId}_${chapterId}`;
     }
     
     // 翻页状态变量
@@ -169,7 +169,7 @@ function initScript() {
     let totalPages = 0;
     let pages = [];
 
-    let fontSize = "medium";
+    let fontSize = "small";
     let fontFamily = "system-ui, -apple-system, sans-serif";
     let fontFamilyInput = null;
     const supportedFonts = getAvailableFonts();
@@ -187,14 +187,14 @@ function initScript() {
     if (!isKindleMode()) {
         let currentPaginationMode = localStorage.getItem('turning') || "false";
         isPaginationMode = currentPaginationMode == "true"
-        fontSize = localStorage.getItem('font_size') || "medium";
+        fontSize = localStorage.getItem('font_size') || "small";
         fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
         fontFamilyInput = localStorage.getItem('font_family_input');
         restoreOrder(storageKeySortableContainer, 'container');
     } else {
         let currentPaginationMode =  getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
-        fontSize = getCookie('font_size') || "medium";
+        fontSize = getCookie('font_size') || "small";
         fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
         fontFamilyInput = getCookie('font_family_input');
     }

@@ -33,6 +33,7 @@ class EPUBProcessor:
         self.book_title = "EPUB Book"
         self.authors = None
         self.tags = None
+        self.description = None
         self.cover_info = None
         self.lang = 'en'
         self.chapters = []
@@ -281,17 +282,24 @@ class EPUBProcessor:
             tags = tree.findall('.//dc:subject', ns)
             self.tags = [tag.text for tag in tags] if tags else None
 
+            # 获取描述
+            description = tree.find('.//dc:description', ns)
+            self.description = description.text if description is not None and description.text else None
+
             # 获取语言
             lang = root.find('.//dc:language', ns)
             self.lang = lang.text if lang is not None and lang.text else 'en'
-
-            # 获取封面
-            cover_info = self.find_cover_info(tree, ns)
-            self.cover_info = cover_info
                 
             # 获取manifest（所有资源）
             manifest = {}
             opf_dir = os.path.dirname(opf_path)
+            # 获取封面
+            cover_info = self.find_cover_info(tree, ns)
+            if cover_info:
+                href = cover_info["href"]
+                cover_info["full_path"] = os.path.normpath(os.path.join(opf_dir, href)) if href else None
+            self.cover_info = cover_info
+            # 获取其他资源 xhtml、font、css 等
             for item in root.findall('.//opf:item', ns):
                 item_id = item.get('id')
                 href = item.get('href')
@@ -412,12 +420,21 @@ class EPUBProcessor:
             </div>
             <div class="book-info-content">
                 <h2 class="book-info-title">{self.book_title}</h2>
-                <p class="book-info-author">{" & ".join(self.authors) if self.authors else "Unknown"}</p>
-                    <div class="book-info-tags">"""
+                <p class="book-info-author">{" & ".join(self.authors) if self.authors else "Unknown"}</p>"""
+        if self.description:
+            index_html += f""" 
+                <div class="book-info-desc">
+                    {self.description}
+                </div>"""
+        index_html += """
+                <div class="book-info-tags">"""
         if self.tags:
             for tag in self.tags:
                 index_html += f"""<span class="book-tag">{tag}</span>"""        
         index_html += f"""
+                </div>
+                <div class="css-controls clearReadingProgress">
+                    <button class="css-btn primary" id="clearReadingProgressBtn"><i class="fas fa-eraser"></i>Clear reading progress</button>
                 </div>
             </div>
         </div>
@@ -1051,15 +1068,15 @@ function addBasePath(basePath) {
     
     def get_book_info(self):
         """获取书籍信息"""
-        cover = ""
-        if self.cover_info:
-            cover = os.path.normpath(os.path.join(self.resources_base, self.cover_info["href"]))
+        cover_path = ""
+        if self.cover_info and self.cover_info['full_path']:
+            cover_path = os.path.normpath(os.path.join(self.resources_base, self.cover_info["full_path"]))
         return {
             'title': self.book_title,
             'temp_dir': self.temp_dir,
             'path': self.web_dir,
             'hash': self.book_hash,
-            'cover': cover,
+            'cover': cover_path,
             'authors': self.authors,
             'tags': self.tags
         }

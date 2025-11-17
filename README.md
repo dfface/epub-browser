@@ -28,6 +28,7 @@ It now supports:
 * Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
 * Multi threads.
 * Sortable: main elements can be dragged.
+* Calibre metadata reading: supports the display of tags (dc:subject) and comments (dc:description) edited in [Calibre](https://calibre-ebook.com/) (remember to "Edit book" after "Edit metadata" to save the changes).
 
 ## Usage
 

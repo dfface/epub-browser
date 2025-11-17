@@ -1,0 +1,346 @@
+@namespace h "http://www.w3.org/1999/xhtml";
+.body {
+    display: block;
+    font-size: 1.125em;
+    margin-bottom: 0;
+    margin-left: 5pt;
+    margin-right: 5pt;
+    margin-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+    page-break-before: always
+    }
+.bs {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 0.77778em;
+    font-weight: normal;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    text-align: left;
+    text-indent: 10pt
+    }
+.bs1 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 0.88889em;
+    font-weight: normal;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    text-align: left;
+    text-indent: 10pt
+    }
+.bs2 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 1.33333em;
+    font-weight: bold;
+    margin-bottom: 6.072289pt;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    text-align: center;
+    text-indent: 7.2pt
+    }
+.bs3 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 0.77778em;
+    font-weight: normal;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    text-align: right;
+    text-indent: 10pt
+    }
+.bs4 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 0.77778em;
+    font-weight: normal;
+    margin-bottom: 0;
+    margin-left: 36pt;
+    margin-right: 36pt;
+    margin-top: 6.072289pt;
+    text-align: left;
+    text-indent: 10pt
+    }
+.bs5 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 0.77778em;
+    font-weight: normal;
+    margin-bottom: 0;
+    margin-left: 9.975904pt;
+    margin-right: 9.975904pt;
+    margin-top: 0;
+    text-align: left;
+    text-indent: 10pt
+    }
+.bs6 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 1em;
+    font-weight: bold;
+    margin-bottom: 3.036145pt;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 12.144578pt;
+    text-align: center;
+    text-indent: 10pt
+    }
+.bs7 {
+    border-color: rgb(0, 0, 0);
+    border-style: solid;
+    border-width: 0;
+    color: rgb(0, 0, 0);
+    display: block;
+    font-size: 0.77778em;
+    font-weight: normal;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    text-align: center;
+    text-indent: 10pt
+    }
+.calibre {
+    height: 775px;
+    width: 504px
+    }
+.calibre1 {
+    display: block;
+    margin-bottom: 1em;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 1em
+    }
+.calibre10 {
+    height: 112px;
+    width: 119px
+    }
+.calibre11 {
+    height: 103px;
+    width: 118px
+    }
+.calibre12 {
+    height: 81px;
+    width: 159px
+    }
+.calibre13 {
+    height: 159px;
+    width: 116px
+    }
+.calibre14 {
+    height: 159px;
+    width: 144px
+    }
+.calibre15 {
+    height: 120px;
+    width: 159px
+    }
+.calibre16 {
+    height: 111px;
+    width: 159px
+    }
+.calibre17 {
+    height: 159px;
+    width: 156px
+    }
+.calibre18 {
+    height: 130px;
+    width: 159px
+    }
+.calibre19 {
+    height: 160px;
+    width: 127px
+    }
+.calibre2 {
+    font-style: italic
+    }
+.calibre20 {
+    height: 86px;
+    width: 159px
+    }
+.calibre21 {
+    height: 159px;
+    width: 107px
+    }
+.calibre22 {
+    height: 159px;
+    width: 127px
+    }
+.calibre23 {
+    height: 160px;
+    width: 143px
+    }
+.calibre24 {
+    height: 119px;
+    width: 106px
+    }
+.calibre25 {
+    height: 147px;
+    width: 159px
+    }
+.calibre26 {
+    height: 159px;
+    width: 123px
+    }
+.calibre27 {
+    height: 159px;
+    width: 117px
+    }
+.calibre28 {
+    height: 143px;
+    width: 106px
+    }
+.calibre29 {
+    height: 159px;
+    width: 124px
+    }
+.calibre3 {
+    display: block
+    }
+.calibre30 {
+    height: 184px;
+    width: 89px
+    }
+.calibre31 {
+    height: 127px;
+    width: 159px
+    }
+.calibre32 {
+    height: 159px;
+    width: 138px
+    }
+.calibre33 {
+    height: 112px;
+    width: 159px
+    }
+.calibre34 {
+    height: 131px;
+    width: 159px
+    }
+.calibre35 {
+    height: 159px;
+    width: 115px
+    }
+.calibre36 {
+    height: 175px;
+    width: 123px
+    }
+.calibre37 {
+    height: 95px;
+    width: 159px
+    }
+.calibre38 {
+    height: 94px;
+    width: 159px
+    }
+.calibre39 {
+    height: 160px;
+    width: 153px
+    }
+.calibre4 {
+    color: blue;
+    cursor: pointer;
+    text-decoration: underline
+    }
+.calibre40 {
+    height: 83px;
+    width: 159px
+    }
+.calibre41 {
+    height: 146px;
+    width: 159px
+    }
+.calibre42 {
+    height: 159px;
+    width: 155px
+    }
+.calibre43 {
+    height: 159px;
+    width: 136px
+    }
+.calibre44 {
+    height: 154px;
+    width: 159px
+    }
+.calibre45 {
+    height: 155px;
+    width: 159px
+    }
+.calibre5 {
+    height: 96px;
+    width: 159px
+    }
+.calibre6 {
+    height: 52px;
+    width: 158px
+    }
+.calibre7 {
+    height: 59px;
+    width: 159px
+    }
+.calibre8 {
+    height: 159px;
+    width: 150px
+    }
+.calibre9 {
+    height: 104px;
+    width: 119px
+    }
+.imagepage {
+    display: block;
+    text-align: center
+    }
+.ts {
+    font-size: 1.71429em;
+    font-weight: bold
+    }
+.ts1 {
+    font-size: 0.91667em
+    }
+.ts2 {
+    font-size: 1.28571em;
+    font-weight: bold
+    }
+.ts3 {
+    font-size: 1.14286em
+    }
+.ts4 {
+    font-size: 1em
+    }
+.ts5 {
+    color: rgb(255, 0, 0)
+    }
+.ts6 {
+    font-size: 1.42857em;
+    font-weight: bold
+    }

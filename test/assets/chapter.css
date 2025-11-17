@@ -747,7 +747,7 @@ body {
 }
 
 .custom-css-notification.success {
-    background: var(--success);
+    background: #4CAF50;
 }
 
 .custom-css-notification.info {
@@ -947,16 +947,16 @@ body {
     transition: none;
 }
 
+.kindle-mode .toc-container {
+    margin: 0;
+}
+
 .kindle-mode .theme-toggle {
     border: 1px solid;
 }
 
 .kindle-mode .content-container {
     margin-bottom: 0;
-}
-
-.kindle-mode .toc-container, .iframe-container .toc-container  {
-    margin: 0;
 }
 
 .kindle-mode {

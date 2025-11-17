@@ -157,6 +157,64 @@ body {
     transform: scale(1.1);
 }
 
+.css-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    font-size: 0.9rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.css-btn.primary {
+    background: var(--primary);
+    color: white;
+}
+
+.css-btn.primary:hover {
+    background: var(--secondary);
+    transform: translateY(-2px);
+}
+
+/* 通知样式 */
+.custom-css-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);        
+    padding: 12px 20px;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.custom-css-notification.success {
+    background: #4CAF50;
+}
+
+.custom-css-notification.info {
+    background: var(--primary);
+}
+
+.custom-css-notification.warning {
+    background: #f8961e;
+}
+
+.custom-css-notification.fade-out {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
 .breadcrumb {
     display: flex;
     align-items: center;
@@ -423,6 +481,12 @@ body {
 .book-info-author {
     font-size: 1rem;
     color: var(--text-secondary);
+    margin-bottom: 15px;
+}
+
+.book-info-desc {
+    font-size: 1rem;
+    color: var(--text-color);
     margin-bottom: 15px;
 }
 
