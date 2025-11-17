@@ -70,7 +70,7 @@ Then a browser will be opened to view the epub file.
 
 ### Desktop
 
-#### library home
+#### Library home
 
 ![home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-HWZoEf-3pN2vj.png)
 
@@ -100,6 +100,8 @@ Then a browser will be opened to view the epub file.
 
 ![reader](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-yWbMdb-NPTPJq.png)
 
+![reader](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-17-w5l7ns-XvggSO.png)
+
 * Breadcrumb
 * Custom CSS
 * Scroll Reading
@@ -108,6 +110,7 @@ Then a browser will be opened to view the epub file.
 * View Chapter Table of Contents
 * Return to Library Homepage
 * Font Adjustment
+* Drag Elements
 
 ### Mobile
 
