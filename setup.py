@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
-    version="1.5.0",      # 初始版本号
+    version="1.5.1",      # 初始版本号
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     keywords="epub reader html export browser convert calibre-web calibre kindle web server local",
@@ -25,7 +25,8 @@ setup(
     install_requires=[  # 项目依赖的第三方包
         # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []
         "tqdm",
-        "minify-html"
+        "minify-html",
+        "watchdog"
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
         'console_scripts': [
