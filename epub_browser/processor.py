@@ -8,7 +8,6 @@ import hashlib
 import json
 import minify_html
 import threading
-
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -42,7 +41,15 @@ class EPUBProcessor:
         self.chapters = []
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
-        
+    
+    def cleanup(self):
+        # 诸如 extract 失败
+        try:
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
     def generate_hash(self):
         """生成书籍 Hash
         一般来说，用路径受到用户传参影响，每次都是绝对路径则都是一样；

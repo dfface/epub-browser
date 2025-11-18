@@ -8,6 +8,7 @@ EPUB to Web Converter
 import os
 import sys
 import threading
+import signal
 from concurrent.futures import ThreadPoolExecutor
 import argparse
 from tqdm import tqdm
@@ -132,6 +133,17 @@ def main():
     server_thread.daemon = True
     server_thread.start()
 
+    def signal_handler(sig, frame):
+        print("\nShutting down...")
+        # 设置停止标志或执行清理操作
+        if not args.keep_files:
+            library.cleanup()
+        # 然后退出程序
+        exit(0)
+
+    # 在主线程中注册信号处理
+    signal.signal(signal.SIGINT, signal_handler)
+
     try:
         # 主线程等待所有子线程完成
         while True:
@@ -144,12 +156,9 @@ def main():
                     print("Watchdog down")
                     break
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down。。。")
     except Exception as e:
         print(f"Error occurred: {e}")
-    finally:
-        if not args.keep_files:
-            library.cleanup()
 
 
 if __name__ == '__main__':

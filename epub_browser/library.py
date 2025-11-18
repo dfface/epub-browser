@@ -69,16 +69,19 @@ class EPUBLibrary:
             
             # 解压EPUB
             if not processor.extract_epub():
+                processor.cleanup()
                 return False, None
             
             # 解析容器文件
             opf_path = processor.parse_container()
             if not opf_path:
                 print(f"Unable to parse EPUB container file: {epub_path}")
+                processor.cleanup()
                 return False, None
             
             # 解析OPF文件
             if not processor.parse_opf(opf_path):
+                processor.cleanup()
                 return False, None
 
             # 重新生成 hash
@@ -362,21 +365,22 @@ class EPUBLibrary:
             for book_hash, book_info in self.books.items():
                 temp_dir = book_info['temp_dir']
                 if os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
                     print(f"Cleaned up book: {book_info['title']}, path: {temp_dir}")
                 middle_dir = os.path.join(self.output_dir,f"epub_{book_hash}") # 可能存在的中间文件
                 if os.path.exists(middle_dir):
-                    shutil.rmtree(middle_dir)
+                    shutil.rmtree(middle_dir, ignore_errors=True)
                     print(f"Cleaned up book: {book_info['title']}, path: {middle_dir}")
-            os.remove(os.path.join(self.output_dir, "index.html"))
+            if os.path.exists(os.path.join(self.output_dir, "index.html")):
+                os.remove(os.path.join(self.output_dir, "index.html"))
             if os.path.exists(os.path.join(self.output_dir, "assets")):
-                shutil.rmtree(os.path.join(self.output_dir, "assets"))
+                shutil.rmtree(os.path.join(self.output_dir, "assets"), ignore_errors=True)
             if os.path.exists(os.path.join(self.output_dir, "book")):
-                shutil.rmtree(os.path.join(self.output_dir, "book"))
+                shutil.rmtree(os.path.join(self.output_dir, "book"), ignore_errors=True)
             print(f"Cleaned up files inside library base directory: {self.base_directory}")
             return
         else:
             # 清理基础目录
             if os.path.exists(self.base_directory):
-                shutil.rmtree(self.base_directory)
+                shutil.rmtree(self.base_directory, ignore_errors=True)
                 print(f"Cleaned up library base directory: {self.base_directory}")
