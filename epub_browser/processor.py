@@ -1083,7 +1083,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             'hash': self.book_hash,
             'cover': cover_path,
             'authors': self.authors,
-            'tags': self.tags
+            'tags': self.tags,
+            'origin_file_path': self.epub_path,
         }
     
     def cleanup(self):

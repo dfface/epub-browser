@@ -11,9 +11,11 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 import argparse
 from tqdm import tqdm
+from watchdog.observers import Observer
 
 from .server import EPUBServer
 from .library import EPUBLibrary
+from .watch import EPUBWatcher
 
 def main():
     parser = argparse.ArgumentParser(description='EPUB to Web Converter - Multi-book Support')
@@ -24,6 +26,7 @@ def main():
     parser.add_argument('--keep-files', action='store_true', help='Keep converted files after server stops. To enable direct deployment, please use the --no-server parameter.')
     parser.add_argument('--log', action='store_true', help='Enable log messages')
     parser.add_argument('--no-server', action='store_true', help='Do not start a server, just generate files which can be directly deployed on any web server such as Apache.')
+    parser.add_argument('--watch', '-w', action='store_true', help="Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.")
     
     args = parser.parse_args()
     
@@ -55,7 +58,7 @@ def main():
     def add_book_thread(filename, pbar):
         nonlocal success_count
         # 调用 add_book 添加书籍（假设该方法线程安全，若不安全需额外加锁）
-        result = library.add_book(filename)
+        result, book_info = library.add_book(filename)
         # 线程安全地更新计数器和进度条
         with count_lock:
             if result:
@@ -96,22 +99,54 @@ def main():
     if args.no_server:
         print(f"Files generated in: {library.base_directory}")
         return
+
+    # 是否需要监控
+    def watch_changes():
+        watcher = EPUBWatcher(args.filename, library)
+        watcher.watch()
+   
+    if args.watch:
+        watchdog_thread = threading.Thread(
+            target=watch_changes, name="WatchdogThread"
+        )
+        watchdog_thread.daemon = True # 设置为守护线程（可选，这样主程序退出时线程会自动结束）
+        watchdog_thread.start()
     
     # 创建服务器
-    server_instance = EPUBServer(library, args.log)
+    def start_serve():
+        server_instance = EPUBServer(library, args.log)
+        try:
+            server_instance.start_server(
+                port=args.port, 
+                no_browser=args.no_browser,
+            )
+        except KeyboardInterrupt:
+            print("\n\nShutting down server...")
+        except Exception as e:
+            print(f"Error occurred: {e}")
+        finally:
+            server_instance.stop_server()
+            if not args.keep_files:
+                library.cleanup()
+    
+    server_thread = threading.Thread(
+        target=start_serve, name="ServerThread"
+    )
+    server_thread.daemon = True
+    server_thread.start()
+
     try:
-        server_instance.start_server(
-            port=args.port, 
-            no_browser=args.no_browser,
-        )
+        # 主线程等待所有子线程完成
+        while True:
+            # 检查线程是否存活
+            if not server_thread.is_alive():
+                print("Server down")
+                break
+            if not watchdog_thread.is_alive():
+                print("Watchdog down")
+                break
     except KeyboardInterrupt:
-        print("\n\nShutting down server...")
-    except Exception as e:
-        print(f"Error occurred: {e}")
-    finally:
-        server_instance.stop_server()
-        if not args.keep_files:
-            library.cleanup()
+        print("\nShutting down...")
 
 
 if __name__ == '__main__':

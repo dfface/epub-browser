@@ -2,6 +2,7 @@ import os
 import tempfile
 import minify_html
 import shutil
+from pathlib import Path
 from datetime import datetime
 
 from .processor import EPUBProcessor
@@ -11,6 +12,7 @@ class EPUBLibrary:
     
     def __init__(self, output_dir=None):
         self.books = {}  # 存储所有书籍信息，使用哈希作为键
+        self.file2hash = {} # 原书籍epub的 path -> book_hash
         self.output_dir = output_dir
         
         # 创建基础目录
@@ -34,12 +36,24 @@ class EPUBLibrary:
         suffix = filename[-5:]
         return suffix == '.epub'
     
+    def has_hidden_component(self, path_str):
+        """检查路径中间是否有以.开头的隐藏组件"""
+        path = Path(path_str).resolve()  # 转换为绝对路径并解析符号链接
+        parts = path.parts
+        
+        # 跳过根目录（如果是绝对路径）和最后一个组件（如果是文件）
+        # 只检查路径中间的目录组件
+        for part in parts[1:]:  # parts[0] 通常是根目录如 '/' 或 'C:\\'
+            if part.startswith('.'):
+                return True
+        return False
+    
     def epub_file_discover(self, filename) -> list:
         filenames = []
         if self.is_epub_file(filename):
             filenames.append(filename)
             return filenames
-        if os.path.isdir(filename):
+        if os.path.isdir(filename) and (not self.has_hidden_component(filename)):
             cur_files = os.listdir(filename)
             for new_filename in cur_files:
                 new_path = os.path.join(filename, new_filename)
@@ -55,17 +69,17 @@ class EPUBLibrary:
             
             # 解压EPUB
             if not processor.extract_epub():
-                return False
+                return False, None
             
             # 解析容器文件
             opf_path = processor.parse_container()
             if not opf_path:
                 print(f"Unable to parse EPUB container file: {epub_path}")
-                return False
+                return False, None
             
             # 解析OPF文件
             if not processor.parse_opf(opf_path):
-                return False
+                return False, None
 
             # 重新生成 hash
             processor.generate_hash()
@@ -82,15 +96,17 @@ class EPUBLibrary:
                 'cover': book_info['cover'],
                 'authors': book_info['authors'],
                 'tags': book_info['tags'],
-                'processor': processor
+                'processor': processor,
+                'origin_file_path': book_info['origin_file_path']
             }
+            self.file2hash[book_info['origin_file_path']] = book_info['hash']
             
             # print(f"Successfully added book: {book_info['title']} (Hash: {book_info['hash']})")
-            return True
+            return True, book_info
             
         except Exception as e:
             print(f"Failed to add book {epub_path}: {e}")
-            return False
+            return False, None
     
     def add_assets(self):
         # 复制 assets
@@ -282,6 +298,39 @@ class EPUBLibrary:
         with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(library_html)
     
+    def move_book(self, book_hash):
+        """按 href 的格式组织目录"""
+        book_path = os.path.join(self.base_directory, "book")
+        book_info = self.books[book_hash]
+        if not book_info:
+            print(f"move {book_hash} failed, err: not exists such book info")
+        old_path = book_info['web_dir']
+        old_temp_dir = book_info['temp_dir']
+        cur_path = os.path.join(book_path, book_hash)
+        try:
+            shutil.rmtree(cur_path, ignore_errors=True) # 删掉原来的文件，避免进入子目录
+        except Exception as e:
+            pass
+        try:
+            shutil.move(old_path, cur_path)
+        except Exception as e:
+            print(f"move {old_path} to {cur_path} failed, err: {e}")
+        try:
+            # 删除原来的 temp_dir 目录
+            shutil.rmtree(old_temp_dir)
+        except Exception as e:
+            pass
+
+    def remove_book(self, book_hash):
+        book_path = os.path.join(self.base_directory, "book")
+        cur_path = os.path.join(book_path, book_hash)
+        if os.path.exists(cur_path):
+            try:
+                shutil.rmtree(cur_path)
+                self.books.pop(book_hash)
+            except Exception as e:
+                print(f"remove {cur_path} failed, err: {e}")
+
     def reorganize_files(self):
         """按照 href 的格式组织目录"""
         # 创建 book 目录

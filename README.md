@@ -29,6 +29,7 @@ It now supports:
 * Multi threads.
 * Sortable: main elements can be dragged.
 * Calibre metadata reading: supports the display of tags (dc:subject) and comments (dc:description) edited in [Calibre](https://calibre-ebook.com/) (remember to "Edit book" after "Edit metadata" to save the changes).
+* Watchdog: Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.
 
 ## Usage
 
@@ -51,6 +52,10 @@ epub-browser .
 
 # Do not start the server; only generate static website files, which can be directly deployed on any web server such as Apache.
 epub-browser . --no-server
+
+# Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.
+
+epub-browser . --watch
 
 # Specify the output directory of html files, or use tmp directory by default
 epub-browser book1.epub book2.epub --output-dir /path/to/output
