@@ -595,21 +595,14 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                 print(f"Failed to process chapter {chapter['path']}: {e}")
         
         # 创建并启动线程
-        threads = []
         with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程
+            futures = []
             for i, chapter in enumerate(self.chapters):
                 chapter_path = os.path.join(self.extract_dir, chapter['path'])
                 if os.path.exists(chapter_path):
-                    thread = threading.Thread(
-                        target=create_chapter_page,
-                        args=(chapter_path, chapter, i)
-                    )
-                    threads.append(thread)
-                    thread.start()
-
-            # 等待所有线程完成
-            for thread in threads:
-                thread.join()
+                    # 使用线程池提交任务
+                    future = executor.submit(create_chapter_page, chapter_path, chapter, i)
+                    futures.append(future)
                 
     
     def process_html_content(self, content, chapter_path):

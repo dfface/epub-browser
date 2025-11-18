@@ -68,19 +68,12 @@ def main():
             pbar.update(1)  # 每次处理完一本书，更新进度条
 
     # 创建并启动线程
-    threads = []
     with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程
+        futures = []
         for filename in real_epub_files:
-            thread = threading.Thread(
-                target=add_book_thread,
-                args=(filename, pbar)
-            )
-            threads.append(thread)
-            thread.start()
-
-    # 等待所有线程完成
-    for thread in threads:
-        thread.join()
+            # 使用线程池提交任务
+            future = executor.submit(add_book_thread, filename, pbar)
+            futures.append(future)
     
     # 关闭进度条
     pbar.close()
