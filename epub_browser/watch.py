@@ -38,7 +38,7 @@ class EpubFileHandler(FileSystemEventHandler):
                 book_hash = book_info['hash']
                 self.library.move_book(book_hash)
                 self.library.create_library_home()
-                print(f"[Added] book: {book_info['title']}")
+                print(f"Added book: {book_info['title']}")
     
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
@@ -55,7 +55,7 @@ class EpubFileHandler(FileSystemEventHandler):
                 book_hash = book_info['hash']
                 self.library.move_book(book_hash)
                 self.library.create_library_home()
-                print(f"[Updated] book: {book_info['title']}")
+                print(f"Updated book: {book_info['title']}")
     
     def on_deleted(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
@@ -72,11 +72,11 @@ class EpubFileHandler(FileSystemEventHandler):
                 book_info = self.library.books[book_hash]
                 self.library.remove_book(book_hash)
                 self.library.create_library_home()
-                print(f"[Deleted] book: {book_info['title']}")
+                print(f"Deleted book: {book_info['title']}")
 
     def on_moved(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
-            title = event.src_path
+            title = os.path.basename(event.src_path)
             if event.src_path in self.library.file2hash:
                 book_hash = self.library.file2hash[event.src_path]
                 book_info = self.library.books[book_hash]
@@ -87,15 +87,16 @@ class EpubFileHandler(FileSystemEventHandler):
                 book_info = self.library.books[book_hash]
                 self.library.remove_book(book_hash)
                 self.library.create_library_home()
-                print(f"[Deleted] book: {book_info['title']}")
+                print(f"Deleted book: {book_info['title']}")
         if event.dest_path.endswith('.epub'):
+            print(f"Waiting to add book...")
             if (not os.path.basename(event.dest_path).startswith(".")) and (not self.has_hidden_component(event.dest_path)):
                 ok, book_info = self.library.add_book(event.dest_path)
                 if ok:
                     book_hash = book_info['hash']
                     self.library.move_book(book_hash)
                     self.library.create_library_home()
-                    print(f"[Added] book: {book_info['title']}")
+                    print(f"Added book: {book_info['title']}")
 
 class EPUBWatcher:
     def __init__(self, paths, library):

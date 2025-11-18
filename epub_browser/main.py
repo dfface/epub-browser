@@ -101,33 +101,30 @@ def main():
         return
 
     # 是否需要监控
+    watcher = EPUBWatcher(args.filename, library)
     def watch_changes():
-        watcher = EPUBWatcher(args.filename, library)
-        watcher.watch()
-   
+        try:
+            watcher.watch()
+        except Exception as e:
+            print(f"Error occurred: {e}")  
+
     if args.watch:
         watchdog_thread = threading.Thread(
             target=watch_changes, name="WatchdogThread"
         )
         watchdog_thread.daemon = True # 设置为守护线程（可选，这样主程序退出时线程会自动结束）
         watchdog_thread.start()
-    
+         
     # 创建服务器
+    server_instance = EPUBServer(library, args.log)
     def start_serve():
-        server_instance = EPUBServer(library, args.log)
         try:
             server_instance.start_server(
                 port=args.port, 
                 no_browser=args.no_browser,
             )
-        except KeyboardInterrupt:
-            print("\n\nShutting down server...")
         except Exception as e:
-            print(f"Error occurred: {e}")
-        finally:
-            server_instance.stop_server()
-            if not args.keep_files:
-                library.cleanup()
+            print(f"Error occurred: {e}")   
     
     server_thread = threading.Thread(
         target=start_serve, name="ServerThread"
@@ -142,11 +139,17 @@ def main():
             if not server_thread.is_alive():
                 print("Server down")
                 break
-            if not watchdog_thread.is_alive():
-                print("Watchdog down")
-                break
+            if args.watch and watchdog_thread:
+                if not watchdog_thread.is_alive():
+                    print("Watchdog down")
+                    break
     except KeyboardInterrupt:
         print("\nShutting down...")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+    finally:
+        if not args.keep_files:
+            library.cleanup()
 
 
 if __name__ == '__main__':

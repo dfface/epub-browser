@@ -7,6 +7,9 @@ import re
 import hashlib
 import json
 import minify_html
+import threading
+
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 class EPUBProcessor:
@@ -566,26 +569,41 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     
     def create_chapter_pages(self):
         """创建章节页面"""
-        for i, chapter in enumerate(self.chapters):
-            chapter_path = os.path.join(self.extract_dir, chapter['path'])
-            
-            if os.path.exists(chapter_path):
-                try:
-                    # 读取章节内容
-                    with open(chapter_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
+        def create_chapter_page(chapter_path, chapter, i):
+            try:
+                # 读取章节内容
+                with open(chapter_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # 处理HTML内容，修复资源链接并提取样式
+                body_content, style_links = self.process_html_content(content, chapter['path'])
+                
+                # 创建章节页面
+                chapter_html = self.create_chapter_template(body_content, style_links, i, chapter['title'])
+                
+                with open(os.path.join(self.web_dir, f'chapter_{i}.html'), 'w', encoding='utf-8') as f:
+                    f.write(chapter_html)
                     
-                    # 处理HTML内容，修复资源链接并提取样式
-                    body_content, style_links = self.process_html_content(content, chapter['path'])
-                    
-                    # 创建章节页面
-                    chapter_html = self.create_chapter_template(body_content, style_links, i, chapter['title'])
-                    
-                    with open(os.path.join(self.web_dir, f'chapter_{i}.html'), 'w', encoding='utf-8') as f:
-                        f.write(chapter_html)
-                        
-                except Exception as e:
-                    print(f"Failed to process chapter {chapter['path']}: {e}")
+            except Exception as e:
+                print(f"Failed to process chapter {chapter['path']}: {e}")
+        
+        # 创建并启动线程
+        threads = []
+        with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程
+            for i, chapter in enumerate(self.chapters):
+                chapter_path = os.path.join(self.extract_dir, chapter['path'])
+                if os.path.exists(chapter_path):
+                    thread = threading.Thread(
+                        target=create_chapter_page,
+                        args=(chapter_path, chapter, i)
+                    )
+                    threads.append(thread)
+                    thread.start()
+
+            # 等待所有线程完成
+            for thread in threads:
+                thread.join()
+                
     
     def process_html_content(self, content, chapter_path):
         """处理HTML内容，修复资源链接并提取样式"""
