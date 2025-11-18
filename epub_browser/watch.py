@@ -30,8 +30,9 @@ class EpubFileHandler(FileSystemEventHandler):
             title = event.src_path
             if event.src_path in self.library.file2hash:
                 book_hash = self.library.file2hash[event.src_path]
-                book_info = self.library.books[book_hash]
-                title = book_info['title']
+                if book_hash in self.library.books:
+                    book_info = self.library.books[book_hash]
+                    title = book_info['title']
             print(f"[Create] EPUB file: {title}")
             ok, book_info = self.library.add_book(event.src_path)
             if ok:
@@ -47,8 +48,9 @@ class EpubFileHandler(FileSystemEventHandler):
             title = event.src_path
             if event.src_path in self.library.file2hash:
                 book_hash = self.library.file2hash[event.src_path]
-                book_info = self.library.books[book_hash]
-                title = book_info['title']
+                if book_hash in self.library.books:
+                    book_info = self.library.books[book_hash]
+                    title = book_info['title']
             print(f"[Modify] EPUB file: {title}")
             ok, book_info = self.library.add_book(event.src_path)
             if ok:
@@ -64,8 +66,9 @@ class EpubFileHandler(FileSystemEventHandler):
             title = event.src_path
             if event.src_path in self.library.file2hash:
                 book_hash = self.library.file2hash[event.src_path]
-                book_info = self.library.books[book_hash]
-                title = book_info['title']
+                if book_hash in self.library.books:
+                    book_info = self.library.books[book_hash]
+                    title = book_info['title']
             print(f"[Delete] EPUB file: {title}")
             if event.src_path in self.library.file2hash:
                 book_hash = self.library.file2hash[event.src_path]
@@ -79,8 +82,9 @@ class EpubFileHandler(FileSystemEventHandler):
             title = os.path.basename(event.src_path)
             if event.src_path in self.library.file2hash:
                 book_hash = self.library.file2hash[event.src_path]
-                book_info = self.library.books[book_hash]
-                title = book_info['title']
+                if book_hash in self.library.books:
+                    book_info = self.library.books[book_hash]
+                    title = book_info['title']
             print(f"[Move] EPUB file({title}): from {event.src_path} to {event.dest_path}")
             if (not os.path.basename(event.src_path).startswith(".")) and (not self.has_hidden_component(event.src_path)) and (event.src_path in self.library.file2hash):
                 book_hash = self.library.file2hash[event.src_path]
