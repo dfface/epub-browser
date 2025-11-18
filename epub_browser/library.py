@@ -364,6 +364,10 @@ class EPUBLibrary:
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
                     print(f"Cleaned up book: {book_info['title']}, path: {temp_dir}")
+                middle_dir = os.path.join(self.output_dir,f"epub_{book_hash}") # 可能存在的中间文件
+                if os.path.exists(middle_dir):
+                    shutil.rmtree(middle_dir)
+                    print(f"Cleaned up book: {book_info['title']}, path: {middle_dir}")
             os.remove(os.path.join(self.output_dir, "index.html"))
             if os.path.exists(os.path.join(self.output_dir, "assets")):
                 shutil.rmtree(os.path.join(self.output_dir, "assets"))
