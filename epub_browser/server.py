@@ -260,7 +260,15 @@ class EPUBServer:
             self._is_running = True
             
             # 启动服务器
-            self.server.serve_forever()
+            while not self.server._is_shutting_down:
+                if stop_event is not None and stop_event.is_set():
+                    break
+                try:
+                    self.server.handle_request()
+                except Exception as e:
+                    if not self.server._is_shutting_down:
+                        print(f"Server error: {e}")
+            self.server.server_close()
             return True
         except KeyboardInterrupt:
             pass
