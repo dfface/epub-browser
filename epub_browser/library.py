@@ -146,10 +146,6 @@ class EPUBLibrary:
         library_html += f"""
     <div class="container">
         <header class="header" data-id="header">
-            <div class="theme-toggle" id="themeToggle">
-                <i class="fas fa-moon"></i>
-                <span class="control-name">Theme</span>
-            </div>
             <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favion.svg" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">
                 <div class="stat-card">
@@ -215,6 +211,10 @@ class EPUBLibrary:
         </div>
 """      
         library_html += f"""
+    </div>
+    <div class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i>
+        <span class="control-name">Theme</span>
     </div>
     <div class="reading-controls" data-id="reading-controls">
         <button class="control-btn" id="scrollToTopBtn">

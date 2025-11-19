@@ -580,4 +580,8 @@ body {
         gap: 10px;
         align-items: flex-start;
     }
+
+    #clearReadingProgressBtn {
+        font-size: 0.5rem;
+    }
 }
