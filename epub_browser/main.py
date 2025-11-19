@@ -8,6 +8,7 @@ EPUB to Web Converter
 import os
 import sys
 import threading
+import multiprocessing
 import signal
 from concurrent.futures import ThreadPoolExecutor
 import argparse
@@ -17,6 +18,26 @@ from watchdog.observers import Observer
 from .server import EPUBServer
 from .library import EPUBLibrary
 from .watch import EPUBWatcher
+
+def start_watcher_process(filenames, library, stop_event):
+    """启动文件监控进程"""
+    try:
+        watcher = EPUBWatcher(filenames, library)
+        watcher.watch(stop_event)
+    except Exception as e:
+        print(f"Watcher process error: {e}")
+
+def start_server_process(base_dir, book_count, port, no_browser, log_enabled, stop_event):
+    """启动服务器进程"""
+    try:
+        server_instance = EPUBServer(base_dir, book_count, log_enabled)
+        server_instance.start_server(
+            port=port, 
+            no_browser=no_browser,
+            stop_event=stop_event
+        )
+    except Exception as e:
+        print(f"Server process error: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description='EPUB to Web Converter - Multi-book Support')
@@ -94,65 +115,86 @@ def main():
         print(f"Files generated in: {library.base_directory}")
         return
 
-    # 是否需要监控
-    watcher = EPUBWatcher(args.filename, library)
-    def watch_changes():
-        try:
-            watcher.watch()
-        except Exception as e:
-            print(f"Error occurred: {e}")  
+    # 创建进程停止事件
+    stop_event = multiprocessing.Event()
 
-    if args.watch:
-        watchdog_thread = threading.Thread(
-            target=watch_changes, name="WatchdogThread"
-        )
-        watchdog_thread.daemon = True # 设置为守护线程（可选，这样主程序退出时线程会自动结束）
-        watchdog_thread.start()
-         
-    # 创建服务器
-    server_instance = EPUBServer(library, args.log)
-    def start_serve():
-        try:
-            server_instance.start_server(
-                port=args.port, 
-                no_browser=args.no_browser,
-            )
-        except Exception as e:
-            print(f"Error occurred: {e}")   
-    
-    server_thread = threading.Thread(
-        target=start_serve, name="ServerThread"
-    )
-    server_thread.daemon = True
-    server_thread.start()
-
+    # 信号处理函数
     def signal_handler(sig, frame):
         print("\nShutting down...")
-        # 设置停止标志或执行清理操作
+        stop_event.set()
+        # 等待进程结束
+        if 'server_process' in locals() and server_process.is_alive():
+            server_process.join(timeout=5)
+        if args.watch and 'watcher_process' in locals() and watcher_process.is_alive():
+            watcher_process.join(timeout=5)
+        
         if not args.keep_files:
             library.cleanup()
-        # 然后退出程序
-        exit(0)
+        sys.exit(0)
 
-    # 在主线程中注册信号处理
+    # 注册信号处理
     signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    # 启动服务器进程
+    server_process = multiprocessing.Process(
+        target=start_server_process,
+        args=(library.base_directory, len(library.books), args.port, args.no_browser, args.log, stop_event),
+        name="ServerProcess"
+    )
+    server_process.daemon = True
+    server_process.start()
+
+    # 启动监控进程（如果需要）
+    watcher_process = None
+    if args.watch:
+        watcher_process = multiprocessing.Process(
+            target=start_watcher_process,
+            args=(args.filename, library, stop_event),
+            name="WatcherProcess"
+        )
+        watcher_process.daemon = True
+        watcher_process.start()
 
     try:
-        # 主线程等待所有子线程完成
+        # 主进程等待子进程
+        processes = [server_process]
+        if watcher_process:
+            processes.append(watcher_process)
+
         while True:
-            # 检查线程是否存活
-            if not server_thread.is_alive():
-                print("Server down")
+            # 检查进程是否存活
+            alive_processes = [p for p in processes if p.is_alive()]
+            if not alive_processes:
+                print("All processes have terminated")
                 break
-            if args.watch and watchdog_thread:
-                if not watchdog_thread.is_alive():
-                    print("Watchdog down")
-                    break
+                
+            # 检查停止事件
+            if stop_event.is_set():
+                break
+                
+            # 短暂休眠避免过度占用CPU
+            import time
+            time.sleep(0.1)
+                
     except KeyboardInterrupt:
-        print("\nShutting down。。。")
+        print("\nShutting down...")
+        stop_event.set()
     except Exception as e:
         print(f"Error occurred: {e}")
+        stop_event.set()
+    finally:
+        # 等待进程结束
+        for process in processes:
+            if process.is_alive():
+                process.join(timeout=5)
+                if process.is_alive():
+                    print(f"Force terminating {process.name}")
+                    process.terminate()
 
 
 if __name__ == '__main__':
+    # 确保在Windows上正确运行多进程
+    if sys.platform.startswith('win'):
+        multiprocessing.freeze_support()
     main()

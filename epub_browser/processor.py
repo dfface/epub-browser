@@ -7,7 +7,6 @@ import re
 import hashlib
 import json
 import minify_html
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 

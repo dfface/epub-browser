@@ -8,17 +8,13 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import errno
 
-from .library import EPUBLibrary
-
-
 class StoppableThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """可停止的多线程HTTP服务器"""
     daemon_threads = True
     thread_name_prefix = "epub_server_"
     
-    def __init__(self, server_address, RequestHandlerClass, library):
+    def __init__(self, server_address, RequestHandlerClass):
         super().__init__(server_address, RequestHandlerClass)
-        self.library = library
         self._is_shutting_down = False
     
     def shutdown(self):
@@ -40,10 +36,9 @@ class StoppableThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     """自定义HTTP请求处理器"""
     
-    def __init__(self, *args, library=None, enableLog, **kwargs):
-        self.library = library
+    def __init__(self, *args, base_directory, enableLog, **kwargs):
         self.enableLog = enableLog
-        self.base_directory = self.library.base_directory
+        self.base_directory = base_directory
         super().__init__(*args, directory=self.base_directory, **kwargs)
     
     def handle_one_request(self):
@@ -194,8 +189,9 @@ class EPUBServer:
     增强的EPUB服务器
     """
 
-    def __init__(self, library: EPUBLibrary, enableLog: bool):
-        self.library = library
+    def __init__(self, base_directory, book_count, enableLog: bool):
+        self.base_directory = base_directory
+        self.book_count = book_count
         self.enableLog = enableLog
         self.server = None
         self._is_running = False
@@ -215,9 +211,9 @@ class EPUBServer:
             print(f"Get local IP failed: {e}")
             return ""
 
-    def start_server(self, port=8000, no_browser=False, host=''):
+    def start_server(self, port=8000, no_browser=False,stop_event=None, host=''):
         """启动Web服务器"""
-        if not self.library.books:
+        if self.book_count <= 0:
             print("No books available to serve")
             return False
         
@@ -225,19 +221,19 @@ class EPUBServer:
             # 创建自定义请求处理器 - 修复lambda作用域问题
             def create_handler(*args, **kwargs):
                 return EPUBHTTPRequestHandler(
-                    *args, library=self.library, enableLog=self.enableLog, **kwargs
+                    *args, base_directory=self.base_directory, enableLog=self.enableLog, **kwargs
                 )
             
             # 启动可停止的服务器
             server_address = (host, port)
-            self.server = StoppableThreadedHTTPServer(server_address, create_handler, self.library)
+            self.server = StoppableThreadedHTTPServer(server_address, create_handler)
             
             # 获取实际绑定的地址和端口
             actual_host1 = host if host else 'localhost'
             actual_host2 = self.get_local_ip() if host == '' else ''
             actual_port = self.server.server_address[1]
             
-            print(f"Available books count: {len(self.library.books)}")
+            print(f"Available books count: {self.book_count}")
             print(f"Web server started: \n\thttp://{actual_host1}:{actual_port}/")
             if actual_host2 != '':
                 print(f"\thttp://{actual_host2}:{actual_port}/")
@@ -252,12 +248,22 @@ class EPUBServer:
                 except Exception as e:
                     print(f"Failed to open browser: {e}")
             
+            # 如果提供了stop_event，则启动一个线程来监视这个事件
+            # if stop_event is not None:
+            #     def watch_stop_event():
+            #         stop_event.wait()
+            #         # 简化
+            #         self._is_running = False
+            #     stop_monitor_thread = threading.Thread(target=watch_stop_event, daemon=True)
+            #     stop_monitor_thread.start()
+            
             self._is_running = True
             
             # 启动服务器
             self.server.serve_forever()
             return True
-            
+        except KeyboardInterrupt:
+            pass
         except PermissionError:
             print(f"Permission denied: cannot start server on port {port}")
             print("Try using a different port (e.g., 8080, 9000)")
@@ -280,8 +286,6 @@ class EPUBServer:
         if not self.is_running():
             print("Server is not running")
             return
-        
-        print("Shutting down server...")
         
         # 停止服务器
         if self.server:
