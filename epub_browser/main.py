@@ -142,7 +142,6 @@ def main():
         args=(library.base_directory, len(library.books), args.port, args.no_browser, args.log, stop_event),
         name="ServerProcess"
     )
-    server_process.daemon = True
     server_process.start()
 
     # 启动监控进程（如果需要）
@@ -153,7 +152,6 @@ def main():
             args=(args.filename, library, stop_event),
             name="WatcherProcess"
         )
-        watcher_process.daemon = True
         watcher_process.start()
 
     try:
