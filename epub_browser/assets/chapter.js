@@ -272,8 +272,7 @@ function initScript() {
         }
     } else {
         loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
-    }
-    
+    }    
     function savePaginationModeAndReload() {
         isPaginationMode = !isPaginationMode;
         

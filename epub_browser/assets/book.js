@@ -139,6 +139,8 @@ function initScript() {
         var sortable = Sortable.create(el, {
         delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
         delayOnTouchOnly: false, // 在触摸设备上也应用延迟
+        filter: '.toc-container', // 允许直接选择.content中的文字
+        preventOnFilter: false, // 过滤时不阻止默认行为
         onEnd: function(evt) {
             // 获取所有项目的ID
             var itemIds = Array.from(evt.from.children).map(function(child) {
