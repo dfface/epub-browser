@@ -78,26 +78,6 @@ function initScript() {
     var elTag = document.querySelector('.tag-cloud');
     var elContainer = document.querySelector('.container');
     if (!isKindleMode()) {
-        var sortableBook = Sortable.create(elBook, {
-        onEnd: function(evt) {
-            // 获取所有项目的ID
-            var itemIds = Array.from(evt.from.children).map(function(child) {
-                return child.dataset.id;
-            });
-            // 保存到 localStorage
-            localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
-        }
-        });
-        var sortableTag = Sortable.create(elTag, {
-        onEnd: function(evt) {
-            // 获取所有项目的ID
-            var itemIds = Array.from(evt.from.children).map(function(child) {
-                return child.dataset.id;
-            });
-            // 保存到 localStorage
-            localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
-        }
-        });
         var sortableTag = Sortable.create(elContainer, {
         delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
         delayOnTouchOnly: false, // 在触摸设备上也应用延迟
