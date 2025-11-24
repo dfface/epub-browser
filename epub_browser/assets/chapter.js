@@ -962,8 +962,8 @@ function initScript() {
     }
     
     function switchCodeTheme(isDark) {
-        const lightTheme = document.querySelector('link[href*="highlight.js"][id*="light"]');
-        const darkTheme = document.querySelector('link[href*="highlight.js"][id*="dark"]');
+        const lightTheme = document.querySelector('link[href*="github"][id*="light"]');
+        const darkTheme = document.querySelector('link[href*="github"][id*="dark"]');
         
         if (lightTheme && darkTheme) {
             if (isDark) {
