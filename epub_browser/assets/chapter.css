@@ -475,6 +475,14 @@ body {
     transition: var(--transition);
 }
 
+.footer p {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    background: var(--header-bg);
+    transition: var(--transition);
+}
+
 .top-controls {
     position: fixed;
     top: 30px;
