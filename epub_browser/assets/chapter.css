@@ -635,6 +635,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    color: white;
 }
 
 .panel-toggle {
