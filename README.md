@@ -54,7 +54,6 @@ epub-browser .
 epub-browser . --no-server
 
 # Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.
-
 epub-browser . --watch
 
 # Specify the output directory of html files, or use tmp directory by default
