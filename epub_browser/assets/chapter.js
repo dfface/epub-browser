@@ -551,14 +551,16 @@ function initScript() {
             let storageKey = getStorageKey("scroll");
             let savedPos = localStorage.getItem(storageKey);
             let windowHeight = window.innerHeight;
-            if (savedPos && savedPos > 0) {
+            setTimeout(function(){
+                if (savedPos && savedPos > 0) {
                     window.scrollTo({
                     top: parseInt(savedPos),
                     behavior: 'smooth'
-                });
+                    });
                 // 显示加载进度提示
                 showNotification(`Reading progress loaded: Scroll position ${Math.round( savedPos / (document.documentElement.scrollHeight - windowHeight) * 100 )}%`, 'info');
-            }
+                }
+            }, 1000);
         }
     }
 
