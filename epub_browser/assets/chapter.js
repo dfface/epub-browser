@@ -209,7 +209,7 @@ function initScript() {
         var sortable = Sortable.create(el, {
         delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
         delayOnTouchOnly: false, // 在触摸设备上也应用延迟
-        filter: '.content, #pageJumpInput, .page-height-adjustment', // 允许直接选择.content中的文字
+        filter: '.content, #pageJumpInput, .page-height-adjustment, #customCssInput', // 允许直接选择.content中的文字
         preventOnFilter: false, // 过滤时不阻止默认行为
         onStart: function(evt) {
             // 拖拽开始时检查是否有文字被选中
@@ -635,10 +635,16 @@ function initScript() {
             }
         } else {
             // 滚动模式
+            const customCssInput = document.getElementById('customCssInput');
+            const customFontFamilyInput = document.getElementById('customFontFamily');
+            if (customCssInput === document.activeElement || customFontFamilyInput === document.activeElement) {
+                // 正在进行输入，输入框被聚焦了
+                return
+            }
             switch(e.key) {
             case 'ArrowLeft':
                 let prev_href = document.querySelector(".prev-chapter").href;
-                if (prev_href == location.href) {
+                if (prev_href === location.href) {
                     showNotification("It's already the first chapter!", 'warning')
                     break;
                 }
