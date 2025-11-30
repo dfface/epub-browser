@@ -56,7 +56,15 @@ class EPUBProcessor:
         toc.ncx 一般不会变化，用这个来 Hash 比较合适，而这个解析出来的是 toc 变量；
         """
         if self.toc:
-            self.book_hash = hashlib.md5(json.dumps(self.toc).encode()).hexdigest()[:8]
+            # 预处理 self.toc，只取  'title', 'src', 'level'，不取 'anchor'
+            toc_to_hash = []
+            for toc_item in self.toc:
+                toc_to_hash.append({
+                    'title': toc_item.get('title'),
+                    'src': toc_item.get('src'),
+                    'level': toc_item.get('level'),
+                })
+            self.book_hash = hashlib.md5(json.dumps(toc_to_hash).encode()).hexdigest()[:8]
             # 如果重新生成 Hash，需要修改路径
             if self.output_dir:
                 new_temp_dir = os.path.join(self.output_dir, f'epub_{self.book_hash}')
@@ -197,10 +205,6 @@ class EPUBProcessor:
             return []
             
         try:
-            # 读取文件内容并注册命名空间
-            with open(ncx_full_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
             # 注册命名空间
             ET.register_namespace('', 'http://www.daisy.org/z3986/2005/ncx/')
             
@@ -228,21 +232,27 @@ class EPUBProcessor:
                 if nav_label is not None and content is not None:
                     title = nav_label.text
                     src = content.get('src')
+                    anchor = None
                     
                     # 处理可能的锚点
                     if '#' in src:
+                        anchor = src.split('#')[1]
                         src = src.split('#')[0]
                     
                     if title and src:
                         # 将src路径转换为相对于EPUB根目录的完整路径
                         ncx_dir = os.path.dirname(ncx_path)
                         full_src = os.path.normpath(os.path.join(ncx_dir, src))
-                        
-                        toc.append({
+                        toc_item = {
                             'title': title,
                             'src': full_src,
                             'level': level
-                        })
+                        }
+                        # 处理可能的锚点
+                        if anchor:
+                            toc_item['anchor'] = anchor
+                        
+                        toc.append(toc_item)
                 
                 # 处理子navPoint
                 child_navpoints = navpoint.findall('{http://www.daisy.org/z3986/2005/ncx/}navPoint')
@@ -468,10 +478,15 @@ class EPUBProcessor:
             # 根据toc生成目录
             for toc_item in self.toc:
                 level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
+                chapter_anchor = toc_item.get('anchor', None)
                 chapter_index = chapter_index_map.get(toc_item['src'])
                 
                 if chapter_index is not None:
-                    index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                    if chapter_anchor is not None:
+                        # 只加一个正向链接的 anchor 定位，反链接中的 id 不加 anchor 防止章节中锚点乱搞而回来时无法锚定
+                        index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                    else:
+                        index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                 else:
                     print(f"Chapter index not found: {toc_item['src']}")
         else:
@@ -1053,7 +1068,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 </html>
 """
         # kindle 支持，不能压缩 css 和 js
-        chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)
+        # 部分 xhtml 书籍压缩之后会丢失标签，说明压缩算法可能存在问题
+        # chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)
         return chapter_html
     
     def copy_resources(self):
