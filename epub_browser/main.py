@@ -153,6 +153,9 @@ def main():
             name="WatcherProcess"
         )
         watcher_process.start()
+    
+    sys.stdout.flush()
+    sys.stderr.flush()
 
     try:
         # 主进程等待子进程

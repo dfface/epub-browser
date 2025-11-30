@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -91,6 +92,9 @@ class EpubFileHandler(FileSystemEventHandler):
                     print(f"[{str(datetime.now())}][Create] Added book({book_hash}): {book_info['title']}")
             except Exception as e:
                 print(f"[{str(datetime.now())}][Create] Error processing {src_path}: {e}")
+            finally:
+                sys.stdout.flush()
+                sys.stderr.flush()
     
     def on_created(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
@@ -118,6 +122,9 @@ class EpubFileHandler(FileSystemEventHandler):
                     print(f"[{str(datetime.now())}][Modify] Updated book({book_hash}): {book_info['title']}")
             except Exception as e:
                 print(f"[{str(datetime.now())}][Modify] Error processing {src_path}: {e}")
+            finally:
+                sys.stdout.flush()
+                sys.stderr.flush()
     
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
@@ -142,6 +149,9 @@ class EpubFileHandler(FileSystemEventHandler):
                 print(f"[{str(datetime.now())}][Delete] Deleted book({book_hash}): {book_info['title']}")
             except Exception as e:
                 print(f"[{str(datetime.now())}][Delete] Error processing {src_path}: {e}")
+            finally:
+                sys.stdout.flush()
+                sys.stderr.flush()
     
     def on_deleted(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
@@ -166,6 +176,9 @@ class EpubFileHandler(FileSystemEventHandler):
                 print(f"[{str(datetime.now())}][Move] Deleted book({book_hash}): {book_info['title']}")
             except Exception as e:
                 print(f"[{str(datetime.now())}][Move] Error processing source {src_path}: {e}")
+            finally:
+                sys.stdout.flush()
+                sys.stderr.flush()
     
     def _handle_move_destination(self, dest_path):
         """处理移动操作目标文件的后台任务"""
@@ -182,6 +195,9 @@ class EpubFileHandler(FileSystemEventHandler):
                     print(f"[{str(datetime.now())}][Move] Added book({book_hash}): {book_info['title']}")
         except Exception as e:
             print(f"[{str(datetime.now())}][Move] Error processing destination {dest_path}: {e}")
+        finally:
+            sys.stdout.flush()
+            sys.stderr.flush()
     
     def on_moved(self, event):
         if not event.is_directory and event.src_path.endswith('.epub'):
@@ -210,6 +226,8 @@ class EpubFileHandler(FileSystemEventHandler):
         """关闭线程池"""
         if self._executor is not None:
             self._executor.shutdown(wait=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
 
 
 class EPUBWatcher:
