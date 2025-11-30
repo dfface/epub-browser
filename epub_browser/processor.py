@@ -724,8 +724,12 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         # 根据目录中的文件名做新旧的映射
         old_file2new_file = {}
         for toc_item in self.toc:
-            old_file2new_file[toc_item['old_file_name']] = toc_item['new_file_name']
+            if 'old_file_name' in toc_item and 'new_file_name' in toc_item:
+                old_file2new_file[toc_item['old_file_name']] = toc_item['new_file_name']
 
+        if not old_file2new_file:
+            return content
+        
         # 匹配a标签的href属性
         a_pattern = r'<a[^>]+href="([^"]+)"[^>]*>'
 
@@ -739,7 +743,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             # 如果有 old_file_name 则替换
             new_src = None
             for key, value in old_file2new_file.items():
-                if key in src:
+                if key in src and value is not None:
                     new_src = src.replace(key, value, 1)
                     break
             
