@@ -251,7 +251,7 @@ class EPUBProcessor:
                         # 处理可能的锚点
                         if anchor:
                             toc_item['anchor'] = anchor
-                        
+                        toc_item['old_file_name'] = src # 老旧的文件名
                         toc.append(toc_item)
                 
                 # 处理子navPoint
@@ -487,6 +487,7 @@ class EPUBProcessor:
                         index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
                         index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                    toc_item['new_file_name'] = f'chapter_{i}.html'
                 else:
                     print(f"Chapter index not found: {toc_item['src']}")
         else:
@@ -629,6 +630,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         
         # 修复body中的图片链接
         body_content = self.fix_image_links(body_content, chapter_path)
+
+        # 修复body 中可能的 html 文件链接，比如有些书有目录页面
+        body_content = self.fix_html_file_links(body_content, chapter_path)
         
         # 修复body中的其他资源链接
         body_content = self.fix_other_links(body_content, chapter_path)
@@ -713,6 +717,40 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
         replaced_content = re.sub(img_pattern1, replace_img_link, content)
         replaced_content = re.sub(img_pattern2, replace_img_link, replaced_content)
+        return replaced_content
+
+    def fix_html_file_links(self, content, chapter_path):
+        """修复html/xhtml文件链接"""
+        # 根据目录中的文件名做新旧的映射
+        old_file2new_file = {}
+        for toc_item in self.toc:
+            old_file2new_file[toc_item['old_file_name']] = toc_item['new_file_name']
+
+        # 匹配a标签的href属性
+        a_pattern = r'<a[^>]+href="([^"]+)"[^>]*>'
+
+        def replace_a_link(match):
+            src = match.group(1)
+
+            # 如果已经是绝对路径或数据URI，则不处理
+            if src.startswith(('http://', 'https://', 'data:', '/')):
+                return match.group(0)
+            
+            # 如果有 old_file_name 则替换
+            new_src = None
+            for key, value in old_file2new_file.items():
+                if key in src:
+                    new_src = src.replace(key, value, 1)
+                    break
+            
+            if not new_src:
+                return match.group(0)
+            
+            # 转换为web资源路径，这里的 html 资源不会在 resources 下，直接就在当前电子书下
+            web_src = f"{new_src}"
+            return match.group(0).replace(f'"{src}"', f'"{web_src}"')
+
+        replaced_content = re.sub(a_pattern, replace_a_link, content)
         return replaced_content
     
     def fix_other_links(self, content, chapter_path):

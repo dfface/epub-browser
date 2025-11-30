@@ -72,6 +72,59 @@ epub-browser book1.epub --port 8080
 
 Then a browser will be opened to view the epub file.
 
+## Startup
+
+How do I set it to start automatically on boot?
+
+### macOS
+
+1. add a file `epub-browser.plist` in `~/Library/LaunchAgents`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>Label</key>
+        <string>Epub-Browser</string>
+        <key>ProgramArguments</key>
+        <array>
+            <string>/path/to/.venv/bin/epub-browser</string>
+            <string>--output-dir</string>
+            <string>/path/to/workdir</string>
+            <string>--watch</string>
+            <string>--no-browser</string>
+            <string>--keep-files</string>
+            <string>/path/to/Calibre Library</string>
+        </array>
+        <key>RunAtLoad</key>
+        <true/>
+        <key>WorkingDirectory</key>
+        <string>/path/to/workdir</string>
+        <key>StandardOutPath</key>
+        <string>/path/to/workdir/run.log</string>
+        <key>StandardErrorPath</key>
+        <string>/path/to/workdir/err.log</string>
+    </dict>
+</plist>
+```
+
+> run `which epub-browser` to get the full path of `epub-browser`
+
+1. run the command to make effective:
+
+```bash
+launchctl load -w ~/Library/LaunchAgents/epub-browser.plist
+# launchctl unload -w ~/Library/LaunchAgents/epub-browser.plist
+launchctl start epub-browser
+```
+
+### Linux
+
+wait someone to add or ask ChatGPT.
+
+## Screenshots
+
 ### Desktop
 
 #### Library home
