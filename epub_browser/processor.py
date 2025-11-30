@@ -251,7 +251,7 @@ class EPUBProcessor:
                         # 处理可能的锚点
                         if anchor:
                             toc_item['anchor'] = anchor
-                        toc_item['old_file_name'] = src # 老旧的文件名
+                        toc_item['old_file_name'] = os.path.basename(src) # 老旧的文件名，只取名字
                         toc.append(toc_item)
                 
                 # 处理子navPoint

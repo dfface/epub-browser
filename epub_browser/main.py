@@ -153,9 +153,6 @@ def main():
             name="WatcherProcess"
         )
         watcher_process.start()
-    
-    sys.stdout.flush()
-    sys.stderr.flush()
 
     try:
         # 主进程等待子进程
@@ -186,6 +183,8 @@ def main():
         stop_event.set()
     finally:
         # 等待进程结束
+        sys.stdout.flush()
+        sys.stderr.flush()
         for process in processes:
             if process.is_alive():
                 process.join(timeout=5)
