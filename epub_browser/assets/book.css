@@ -46,7 +46,7 @@ body {
     padding: 0 20px;
 }
 
-.container {
+.epub-browser-container {
     max-width: 1000px;
     margin: 0 auto;
 }

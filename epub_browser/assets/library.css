@@ -48,7 +48,7 @@ body {
     padding: 0 20px;
 }
 
-.container {
+.epub-browser-container {
     max-width: 1000px;
     margin: 0 auto;
     padding: 20px 0;
@@ -466,7 +466,7 @@ body {
     border-radius: inherit;
 }
 
-.kindle-mode .container {
+.kindle-mode .epub-browser-container {
     padding: 0;
 }
 
