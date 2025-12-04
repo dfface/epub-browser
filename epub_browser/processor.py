@@ -744,7 +744,11 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             new_src = None
             for key, value in old_file2new_file.items():
                 if key in src and value is not None:
-                    new_src = src.replace(key, value, 1)
+                    # 直接新文件+旧 Hash，因为原来的地址可能类似 ../contents/chapterchapter_15.html#annot5
+                    new_src = value
+                    if '#' in src:
+                        anchor = src.split('#')[1]
+                        new_src += f'#{anchor}'
                     break
             
             if not new_src:
