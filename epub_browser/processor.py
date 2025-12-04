@@ -426,7 +426,7 @@ class EPUBProcessor:
 </div>
 """
         index_html += f"""
-<div class="epub-browser-container">
+<div class="container">
     <div class="breadcrumb header" data-id="breadcrumb">
         <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
         <span class="breadcrumb-separator">/</span>
@@ -866,7 +866,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </ul>
     </div>
 
-    <div class="epub-browser-container">
+    <div class="container">
         <div class="breadcrumb header" data-id="breadcrumb">
             <a href="/index.html#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>

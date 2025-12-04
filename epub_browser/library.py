@@ -144,7 +144,7 @@ class EPUBLibrary:
                     all_tags.add(cur_tag)
 
         library_html += f"""
-    <div class="epub-browser-container">
+    <div class="container">
         <header class="header" data-id="header">
             <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favion.svg" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">

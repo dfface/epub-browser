@@ -52,7 +52,7 @@ body {
     flex-direction: column;
 }
 
-.epub-browser-container {
+.container {
     max-width: 1000px;
     width: 80%;
     margin: 0 auto;
@@ -869,7 +869,7 @@ body {
 }
 
 /* 翻页模式样式 */
-.pagination-mode .epub-browser-container {
+.pagination-mode .container {
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -1020,14 +1020,14 @@ body {
 
 /* 响应式设计 */
 @media (max-width: 1079px) {
-    .epub-browser-container {
+    .container {
         max-width: 100%;
         min-width: 70%;
     }
 }
 
 @media (max-width: 768px) {
-    .epub-browser-container {
+    .container {
         width: 100%;
     }
 
@@ -1127,7 +1127,7 @@ body {
 }
 
 @media (max-width: 480px) {
-    .epub-browser-container {
+    .container {
         max-width: 100%;
         min-width: 80%;
     }
