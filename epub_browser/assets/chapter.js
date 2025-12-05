@@ -128,6 +128,38 @@ function restoreOrder(storageKey, elementClass) {
     }
 }
 
+// CSS 作用域化函数
+function scopeCSS(cssText, scopeSelector) {
+  // 使用正则表达式为每个规则添加作用域前缀
+  return cssText.replace(
+    /([\w\W]+?)\{([\w\W]+?)\}/g,
+    (match, selectors, rules) => {
+      // 处理每个选择器
+      const scopedSelectors = selectors.split(',')
+        .map(selector => {
+          const trimmed = selector.trim();
+          // 跳过已包含作用域的选择器
+          if (trimmed.includes(scopeSelector)) {
+            return trimmed;
+          }
+          // 处理伪类和伪元素
+          if (trimmed.includes(':') && !trimmed.includes('::')) {
+            const parts = trimmed.split(':');
+            return `${scopeSelector} ${parts[0]}:${parts[1]}`;
+          }
+          // 处理关键帧动画
+          if (trimmed.startsWith('@keyframes') || trimmed.startsWith('@media')) {
+            return trimmed;
+          }
+          return `${scopeSelector} ${trimmed}`;
+        })
+        .join(', ');
+      
+      return `${scopedSelectors} {${rules}}`;
+    }
+  );
+}
+
 function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
     // 动态重写 CSS 规则
 
@@ -138,16 +170,13 @@ function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
   ebLinks.forEach(link => {
     // 先移除
     link.parentNode.removeChild(link);
-    
+
     // 再改写
     fetch(link.href)
       .then(response => response.text())
       .then(cssText => {
         // 为所有 CSS 规则添加作用域前缀
-        const scopedCSS = cssText.replace(
-          /([\w\W]+?)\{([\w\W]+?)\}/g,
-          `${scopeSelector} $1 {$2}`
-        );
+        const scopedCSS = scopeCSS(cssText);
         
         // 创建新的 style 标签
         const style = document.createElement('style');
@@ -163,10 +192,7 @@ function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
 
     // 再添加
     const originalCSS = style.textContent;
-    const scopedCSS = originalCSS.replace(
-      /([\w\W]+?)\{([\w\W]+?)\}/g,
-      `${scopeSelector} $1 {$2}`
-    );
+    const scopedCSS = scopeCSS(originalCSS);
     
     // 创建作用域化的新样式
     const scopedStyle = document.createElement('style');
