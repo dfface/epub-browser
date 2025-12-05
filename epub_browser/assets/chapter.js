@@ -176,7 +176,7 @@ function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
       .then(response => response.text())
       .then(cssText => {
         // 为所有 CSS 规则添加作用域前缀
-        const scopedCSS = scopeCSS(cssText);
+        const scopedCSS = scopeCSS(cssText, scopeSelector);
         
         // 创建新的 style 标签
         const style = document.createElement('style');
@@ -192,7 +192,7 @@ function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
 
     // 再添加
     const originalCSS = style.textContent;
-    const scopedCSS = scopeCSS(originalCSS);
+    const scopedCSS = scopeCSS(originalCSS, scopeSelector);
     
     // 创建作用域化的新样式
     const scopedStyle = document.createElement('style');
