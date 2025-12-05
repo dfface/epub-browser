@@ -128,8 +128,58 @@ function restoreOrder(storageKey, elementClass) {
     }
 }
 
+function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
+    // 动态重写 CSS 规则
+
+  const ebLinks = document.querySelectorAll('link.eb');
+  const ebStyles = document.querySelectorAll('style.eb');
+  
+  // 处理外部样式表
+  ebLinks.forEach(link => {
+    // 先移除
+    link.parentNode.removeChild(link);
+    
+    // 再改写
+    fetch(link.href)
+      .then(response => response.text())
+      .then(cssText => {
+        // 为所有 CSS 规则添加作用域前缀
+        const scopedCSS = cssText.replace(
+          /([\w\W]+?)\{([\w\W]+?)\}/g,
+          `${scopeSelector} $1 {$2}`
+        );
+        
+        // 创建新的 style 标签
+        const style = document.createElement('style');
+        style.textContent = scopedCSS;
+        document.head.appendChild(style);
+      });
+  });
+  
+  // 处理内联样式
+  ebStyles.forEach(style => {
+    // 先移除
+    style.parentNode.removeChild(style);
+
+    // 再添加
+    const originalCSS = style.textContent;
+    const scopedCSS = originalCSS.replace(
+      /([\w\W]+?)\{([\w\W]+?)\}/g,
+      `${scopeSelector} $1 {$2}`
+    );
+    
+    // 创建作用域化的新样式
+    const scopedStyle = document.createElement('style');
+    scopedStyle.textContent = scopedCSS;
+    document.head.appendChild(scopedStyle);
+  });
+}
+
 
 function initScript() {
+    // 样式重写，增加区域限定
+    scopeEBStyles();
+
     const path = window.location.pathname;  // 获取当前URL路径
     let pathParts = path.split('/');
     pathParts = pathParts.filter(item => item !== "");
@@ -148,7 +198,7 @@ function initScript() {
     const prevPageBtn = document.getElementById('prevPage');
     const nextPageBtn = document.getElementById('nextPage');
     const contentContainer = document.querySelector('.content-container');
-    const content = document.getElementById('content');
+    const content = document.getElementById('eb-content');
     const pageJumpInput = document.getElementById('pageJumpInput');
     const goToPageBtn = document.getElementById('goToPage');
     const progressFill = document.getElementById('progressBar');
@@ -209,7 +259,7 @@ function initScript() {
         var sortable = Sortable.create(el, {
         delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
         delayOnTouchOnly: false, // 在触摸设备上也应用延迟
-        filter: '.content, #pageJumpInput, .page-height-adjustment, #customCssInput', // 允许直接选择.content中的文字
+        filter: '#eb-content, #pageJumpInput, .page-height-adjustment, #customCssInput', // 允许直接选择#eb-content中的文字
         preventOnFilter: false, // 过滤时不阻止默认行为
         onStart: function(evt) {
             // 拖拽开始时检查是否有文字被选中
@@ -231,7 +281,7 @@ function initScript() {
         });
     } 
     // 添加双击选择文字的功能
-    document.querySelectorAll('.content').forEach(item => {
+    document.querySelectorAll('.eb-content').forEach(item => {
         item.addEventListener('dblclick', function(e) {
             // 阻止双击触发拖拽
             e.stopPropagation();
@@ -255,7 +305,7 @@ function initScript() {
         // 一开始就是翻页
         enablePaginationMode();
         // 禁止翻页模式 点击页面链接
-        document.querySelectorAll('.content a').forEach(item => {
+        document.querySelectorAll('.eb-content a').forEach(item => {
             item.removeAttribute('href');
         });
         togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
@@ -1184,7 +1234,7 @@ function initScript() {
     
     // 生成目录函数
     function generateToc() {
-        const content = document.getElementById('content');
+        const content = document.getElementById('eb-content');
         const headings = content.querySelectorAll('h2, h3, h4');
         
         if (headings.length === 0) {
@@ -1232,7 +1282,7 @@ function initScript() {
     
     // 更新目录高亮
     function updateTocHighlight() {
-        const content = document.getElementById('content');
+        const content = document.getElementById('eb-content');
         const headings = content.querySelectorAll('h2, h3, h4');
         const tocItems = document.querySelectorAll('.toc-item');
         

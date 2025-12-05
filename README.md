@@ -24,7 +24,7 @@ It now supports:
 * Mobile devices: especially for Kindle, remember to click `Not Kindle` in the header of home page to enable `Kindle Mode` to optimize experience.
 * Code highlight(not active in `Kindle Mode`).
 * Remember position: remember your last reading chapter(support all devices including Kindle) and your last reading position(support all devices except Kindle).
-* Custom CSS: you can write your own CSS style to improve your reading experience, such as `.content{margin: 50px;}.content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
+* Custom CSS: you can write your own CSS style to improve your reading experience, such as `#eb-content{margin: 50px;} #eb-content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
 * Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
 * Multi threads.
 * Sortable: main elements can be dragged.

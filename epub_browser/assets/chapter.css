@@ -301,7 +301,7 @@ body {
     transition: var(--transition);
 }
 
-.content {
+#eb-content {
     padding: 40px;
     color: var(--content-text);
     transition: var(--transition);
@@ -309,83 +309,83 @@ body {
     width: 100%;
 }
 
-.content h2, .content h3, .content h4 {
+#eb-content h2, #eb-content h3, #eb-content h4 {
     margin-top: 2rem;
     margin-bottom: 1rem;
     color: var(--text-color);
     transition: var(--transition);
 }
 
-.content h2 {
+#eb-content h2 {
     font-size: 1.5rem;
     border-bottom: 2px solid var(--primary);
     padding-bottom: 0.5rem;
 }
 
-.content h3 {
+#eb-content h3 {
     font-size: 1.3rem;
     border-left: 4px solid var(--primary);
     padding-left: 1rem;
 }
 
-.content h4 {
+#eb-content h4 {
     font-size: 1.1rem;
     border-left: 2px solid var(--primary);
     padding-left: 1rem;
 }
 
-.content p {
+#eb-content p {
     margin-bottom: 0.8rem;
     line-height: 1.7;
 }
 
-.content img {
+#eb-content img {
     max-width: 100%;
     height: auto;
     margin: 0;
     object-fit: contain;
 }
 
-.content .img-wrapper{
+#eb-content .img-wrapper{
     max-height: 70vh;
     display: inline;
 }
 
-.content .table-wrapper {
+#eb-content .table-wrapper {
     width: 100%;
     overflow-x: auto;
 }
 
-.content table {
+#eb-content table {
     margin: 0 auto;
     border-color: var(--text-color);
 }
 
-.content table tr, .content table td, .content table th {
+#eb-content table tr, #eb-content table td, #eb-content table th {
     border-color: var(--text-color);
 }
 
-.content table tr {
+#eb-content table tr {
     margin: 0px;
     color: inherit;
     background-color: inherit;
 }
 
-.content table th {
+#eb-content table th {
     background-color: inherit;
     font-weight: 600;
     color: inherit;
 }
 
-.content table td {
+#eb-content table td {
     color: inherit;
 }
 
-.content table tr:hover {
+#eb-content table tr:hover {
     background-color: var(--bg-color);
 }
 
-.content pre code {
+#eb-content pre code {
     padding: 10px 10px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
@@ -394,7 +394,7 @@ body {
     width: 100%;
 }
 
-.content pre {
+#eb-content pre {
     background: var(--border-color);
     border-radius: 8px;
     overflow-x: auto;
@@ -406,27 +406,27 @@ body {
     white-space: pre;
 }
 
-.content blockquote {
+#eb-content blockquote {
     color: inherit;
     position: relative;
     overflow: hidden;
 }
 
-.content ul, .content ol {
+#eb-content ul, #eb-content ol {
     padding: 0;
 }
 
-.content ul li, .content ol li {
+#eb-content ul li, #eb-content ol li {
     border-radius: inherit;
     box-shadow: none;
     transition: all 0.3s ease;
 }
 
-.content ul li:before {
+#eb-content ul li:before {
     margin-right: 0.5rem;
 }
 
-.content ol li:before {
+#eb-content ol li:before {
     margin-right: 0.5rem;
 }
 
@@ -888,7 +888,7 @@ body {
     margin-right: 0;
 }
 
-.pagination-mode .content {
+.pagination-mode #eb-content {
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -1140,7 +1140,7 @@ body {
         margin: 0 5px;
     }
     
-    .content {
+    #eb-content {
         padding: 20px;
     }
 

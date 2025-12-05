@@ -641,7 +641,29 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     
     def extract_style_links(self, content, chapter_path):
         """从head中提取样式链接"""
+
+        def add_class_to_link(tag, class_name):
+            # 检查是否已有 class 属性
+            if 'class=' in tag:
+                # 在现有 class 后追加
+                return re.sub(r'class="([^"]*)"', 
+                            f'class="\\1 {class_name}"', 
+                            tag)
+            else:
+                # 插入 class 属性
+                return tag.replace('<link ', f'<link class="{class_name}" ', 1)
+        
+        def add_class_to_style(tag, class_name):
+            # 处理 style 元素
+            if 'class=' in tag:
+                return re.sub(r'class="([^"]*)"', 
+                            f'class="\\1 {class_name}"', 
+                            tag)
+            else:
+                return tag.replace('<style', f'<style class="{class_name}"', 1)
+            
         style_links = []
+        to_add_class = "eb"
         
         # 匹配head标签
         head_match = re.search(r'<head[^>]*>(.*?)</head>', content, re.DOTALL | re.IGNORECASE)
@@ -653,6 +675,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             links = re.findall(link_pattern, head_content, re.IGNORECASE)
             
             for link in links:
+                # 添加class属性
+                link = add_class_to_link(link, to_add_class)
                 # 提取href属性
                 href_match = re.search(r'href=["\']([^"\']+)["\']', link)
                 if href_match:
@@ -675,7 +699,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             # 匹配style标签
             style_pattern = r'<style[^>]*>.*?</style>'
             styles = re.findall(style_pattern, head_content, re.DOTALL)
-            style_links.extend(styles)
+            for style in styles:
+                style = add_class_to_style(style, to_add_class)
+                style_links.append(style)
         
         return '\n        '.join(style_links)
     
@@ -884,7 +910,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
             <div class="panel-content" id="cssPanelContent">
                 <div class="css-editor">
-                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: .content{{margin: 50px; width: auto}}"></textarea>
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{{margin: 50px; width: auto}}"></textarea>
                     <div class="css-controls">
                         <button class="css-btn primary" id="saveCssBtn">
                             <i class="fas fa-save"></i> Save
@@ -910,7 +936,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </div>
 
         <div class="content-container" data-id="content-container">
-            <article class="content" id="content">
+            <article class="eb-content" id="eb-content" data-eb-styles>
             {content}
             </article>
         </div>
