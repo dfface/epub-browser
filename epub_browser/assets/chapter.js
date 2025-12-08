@@ -90,6 +90,8 @@ function deleteCookie(name) {
 
 // 获取元素高度（包括外边距）
 function getElementHeight(element) {
+    const content = document.getElementById('eb-content');
+    
     // 创建临时元素测量高度
     const tempElement = element.cloneNode(true);
     tempElement.style.visibility = 'hidden';
