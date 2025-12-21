@@ -131,76 +131,181 @@ function restoreOrder(storageKey, elementClass) {
 }
 
 // CSS 作用域化函数
-function scopeCSS(cssText, scopeSelector) {
-  // 使用正则表达式为每个规则添加作用域前缀
-  return cssText.replace(
-    /([\w\W]+?)\{([\w\W]+?)\}/g,
-    (match, selectors, rules) => {
-      // 处理每个选择器
-      const scopedSelectors = selectors.split(',')
-        .map(selector => {
-          const trimmed = selector.trim();
-          // 跳过已包含作用域的选择器
-          if (trimmed.includes(scopeSelector)) {
-            return trimmed;
-          }
-          // 处理伪类和伪元素
-          if (trimmed.includes(':') && !trimmed.includes('::')) {
-            const parts = trimmed.split(':');
-            return `${scopeSelector} ${parts[0]}:${parts[1]}`;
-          }
-          // 处理关键帧动画
-          if (trimmed.startsWith('@keyframes') || trimmed.startsWith('@media')) {
-            return trimmed;
-          }
-          return `${scopeSelector} ${trimmed}`;
-        })
-        .join(', ');
-      
-      return `${scopedSelectors} {${rules}}`;
+/**
+ * 优化后的CSS作用域化函数
+ * 处理复杂的CSS选择器，包括嵌套规则和特殊选择器
+ */
+function scopeCSS(cssText, scopeSelector = '[data-eb-styles]') {
+  // 临时存储处理过的关键帧动画名称映射
+  const keyframesMap = new Map();
+  let keyframeCounter = 0;
+  
+  // 第一步：处理关键帧动画，避免它们被作用域化
+  const processedKeyframes = cssText.replace(
+    /(@keyframes\s+)([\w-]+)(\s*\{[\s\S]*?\})/g,
+    (match, prefix, name, content) => {
+      const scopedName = `eb-${keyframeCounter++}-${name}`;
+      keyframesMap.set(name, scopedName);
+      return `${prefix}${scopedName}${content}`;
     }
   );
+  
+  // 第二步：处理媒体查询和规则
+  const processRules = (css, inMediaQuery = false) => {
+    return css.replace(
+      /((?:@media[^{]+\{[^{]*)?)([^{]+)\{([^}]+)\}/g,
+      (match, mediaPart, selectors, rules) => {
+        if (mediaPart) {
+          // 这是媒体查询内的规则
+          const processedSelectors = selectors.split(',')
+            .map(selector => {
+              const trimmed = selector.trim();
+              if (trimmed === '' || 
+                  trimmed.startsWith('@') || 
+                  trimmed.includes(scopeSelector)) {
+                return trimmed;
+              }
+              
+              // 处理复杂选择器（伪类、伪元素、属性选择器等）
+              return scopeComplexSelector(trimmed, scopeSelector);
+            })
+            .filter(s => s !== '')
+            .join(', ');
+          
+          return `${mediaPart}${processedSelectors}{${rules}}`;
+        } else {
+          // 普通规则
+          const processedSelectors = selectors.split(',')
+            .map(selector => {
+              const trimmed = selector.trim();
+              if (trimmed === '' || trimmed.startsWith('@') || trimmed.includes(scopeSelector)) {
+                return trimmed;
+              }
+              
+              return scopeComplexSelector(trimmed, scopeSelector);
+            })
+            .filter(s => s !== '')
+            .join(', ');
+          
+          return `${processedSelectors}{${rules}}`;
+        }
+      }
+    );
+  };
+  
+  // 第三步：处理复杂选择器
+  const scopeComplexSelector = (selector, scope) => {
+    // 检查是否已经包含作用域
+    if (selector.includes(scope)) {
+      return selector;
+    }
+    
+    // 处理:root和:host选择器
+    if (selector === ':root' || selector === ':host') {
+      return `${scope}:root`;
+    }
+    
+    // 处理:not()、:is()、:where()等伪类函数
+    if (selector.includes(':not(') || selector.includes(':is(') || selector.includes(':where(')) {
+      // 这些伪类函数内部的选择器也需要作用域化
+      return selector.replace(/(:not\(|:is\(|:where\()([^)]+)\)/g, (match, pseudo, innerSelectors) => {
+        const scopedInner = innerSelectors.split(',')
+          .map(s => scopeComplexSelector(s.trim(), scope))
+          .join(', ');
+        return `${pseudo}${scopedInner})`;
+      });
+    }
+    
+    // 处理普通伪类和伪元素
+    const pseudoMatch = selector.match(/(.*?)(::?[a-zA-Z-]+(?:\([^)]+\))?)$/);
+    if (pseudoMatch) {
+      const [_, base, pseudo] = pseudoMatch;
+      if (base.trim() === '') {
+        return `${scope}${pseudo}`;
+      }
+      return `${scope} ${base.trim()}${pseudo}`;
+    }
+    
+    // 默认情况：在开头添加作用域
+    return `${scope} ${selector}`;
+  };
+  
+  // 第四步：应用关键帧名称的替换
+  let result = processRules(processedKeyframes);
+  keyframesMap.forEach((scopedName, originalName) => {
+    const regex = new RegExp(`\\b${originalName}\\b`, 'g');
+    result = result.replace(regex, scopedName);
+  });
+  
+  return result;
 }
 
-function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
-    // 动态重写 CSS 规则
-
-  const ebLinks = document.querySelectorAll('link.eb');
-  const ebStyles = document.querySelectorAll('style.eb');
+/**
+ * 优化后的作用域化主函数
+ * 支持并行加载和错误处理
+ */
+async function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
+  const ebLinks = Array.from(document.querySelectorAll('link.eb'));
+  const ebStyles = Array.from(document.querySelectorAll('style.eb'));
   
-  // 处理外部样式表
-  ebLinks.forEach(link => {
-    // 先移除
-    link.parentNode.removeChild(link);
-
-    // 再改写
-    fetch(link.href)
-      .then(response => response.text())
-      .then(cssText => {
-        // 为所有 CSS 规则添加作用域前缀
-        const scopedCSS = scopeCSS(cssText, scopeSelector);
-        
-        // 创建新的 style 标签
-        const style = document.createElement('style');
-        style.textContent = scopedCSS;
-        document.head.appendChild(style);
-      });
+  // 创建作用域属性
+  if (!document.documentElement.hasAttribute('data-eb-styles')) {
+    document.documentElement.setAttribute('data-eb-styles', '');
+  }
+  
+  // 处理外部样式表 - 并行加载
+  const linkPromises = ebLinks.map(async link => {
+    try {
+      const response = await fetch(link.href);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${link.href}: ${response.status}`);
+      }
+      const cssText = await response.text();
+      const scopedCSS = scopeCSS(cssText, scopeSelector);
+      
+      // 创建新的style标签
+      const style = document.createElement('style');
+      style.setAttribute('data-eb-scoped', 'true');
+      style.textContent = scopedCSS;
+      
+      // 移除原link
+      link.remove();
+      
+      return style;
+    } catch (error) {
+      console.error('Error loading external CSS:', error);
+      // 保持原link作为fallback
+      return null;
+    }
   });
   
   // 处理内联样式
-  ebStyles.forEach(style => {
-    // 先移除
-    style.parentNode.removeChild(style);
-
-    // 再添加
+  const inlinePromises = ebStyles.map(style => {
     const originalCSS = style.textContent;
     const scopedCSS = scopeCSS(originalCSS, scopeSelector);
     
-    // 创建作用域化的新样式
+    // 创建新的style标签
     const scopedStyle = document.createElement('style');
+    scopedStyle.setAttribute('data-eb-scoped', 'true');
     scopedStyle.textContent = scopedCSS;
-    document.head.appendChild(scopedStyle);
+    
+    // 移除原style
+    style.remove();
+    
+    return Promise.resolve(scopedStyle);
   });
+  
+  // 等待所有样式处理完成
+  const allPromises = [...linkPromises, ...inlinePromises];
+  const results = await Promise.allSettled(allPromises);
+  
+  // 将处理好的样式添加到head
+  results.forEach(result => {
+    if (result.status === 'fulfilled' && result.value) {
+      document.head.appendChild(result.value);
+    }
+  });
+  
 }
 
 
