@@ -11,25 +11,49 @@ A simple and modern web E-book reader, which allows you to read e-books within a
 
 Try it online: [https://epub-browser.vercel.app](https://epub-browser.vercel.app)
 
-It now supports:
+It now supports the following features:
 
-* Simple library management: searching by title, author or tag.
-* Dark mode.
-* Page turning/scrolling: support keyboards(left arrow & right arrow & space).
-* Kindle mode: more style optimizations; Clicking on both sides of the screen is allowed to turn pages.
-* Reading progress bar.
-* Table of contents in each chapter(not active in `Page turning mode`).
-* Font size/family adjustment.
-* Image zoom.
-* Mobile devices: especially for Kindle, remember to click `Not Kindle` in the header of home page to enable `Kindle Mode` to optimize experience.
-* Code highlight(not active in `Kindle Mode`).
-* Remember position: remember your last reading chapter(support all devices including Kindle) and your last reading position(support all devices except Kindle).
-* Custom CSS: you can write your own CSS style to improve your reading experience, such as `#eb-content{margin: 50px;} #eb-content p{ font-size: 2rem; }`(All the main content is under the element with the class `content`).
-* Can be directly deployed on any web server such as Apache: use `--no-server` parameter.
-* Multi threads.
-* Sortable: main elements can be dragged.
-* Calibre metadata reading: supports the display of tags (dc:subject) and comments (dc:description) edited in [Calibre](https://calibre-ebook.com/) (remember to "Edit book" after "Edit metadata" to save the changes).
-* Watchdog: Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.
+- **Basic library management**: Search by title, author or tag.
+
+- Dark mode
+
+- **Page navigation**: Keyboard controls supported (Left Arrow, Right Arrow and Spacebar for page turning/scrolling).
+
+- **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen.
+
+- Reading progress bar
+
+- **Chapter-wise table of contents** (disabled in Page Turning Mode).
+
+- Font size and font family adjustment
+
+- Image zoom functionality
+
+- **Mobile device compatibility**: Especially for Kindle users—remember to tap *Not Kindle* on the homepage header to enable Kindle Mode for an optimized experience.
+
+- **Code highlighting** (disabled in Kindle Mode).
+
+- **Reading position retention**: Restores your last-read chapter (supported on all devices including Kindle) and your last-read location (supported on all devices *except* Kindle).
+
+- **Custom CSS**: Tailor the reading experience with custom styles, e.g.
+
+    ```css
+    #eb-content { margin: 50px; }
+    #eb-content p { font-size: 2rem; }
+    ```
+
+  *Note: All core content is nested under the element with the `#eb-content` selector.*
+
+- **Direct deployment** on any web server (e.g. Apache): Use the `--no-server` parameter.
+
+- Multithreading support
+
+- **Drag-and-drop sorting**: Main interface elements are draggable.
+
+- **Calibre metadata integration**: Displays tags (`dc:subject`) and comments (`dc:description`) edited in Calibre. *Note: After editing metadata in Calibre, use the "Edit book" function to save your changes.*
+
+- **Watchdog utility**: Monitors the user-specified directory (or the directory containing EPUB files) with `--watch` parameter. Automatically adds newly added or updated EPUB files to the library.
+
 
 ## Usage
 
@@ -72,6 +96,30 @@ epub-browser book1.epub --port 8080
 
 Then a browser will be opened to view the epub file.
 
+For more usage information, please use the `--help` parameter.
+
+```bash
+➜ epub-browser --help                                                                                        
+usage: epub-browser [-h] [--port PORT] [--no-browser] [--output-dir OUTPUT_DIR] [--keep-files] [--log] [--no-server] [--watch]
+                    filename [filename ...]
+
+EPUB to Web Converter - Multi-book Support
+
+positional arguments:
+  filename              EPUB file path(s)
+
+options:
+  -h, --help            show this help message and exit
+  --port, -p PORT       Web server port (default: 8000)
+  --no-browser          Do not automatically open browser
+  --output-dir, -o OUTPUT_DIR
+                        Output directory for converted books
+  --keep-files          Keep converted files after server stops. To enable direct deployment, please use the --no-server parameter.
+  --log                 Enable log messages
+  --no-server           Do not start a server, just generate files which can be directly deployed on any web server such as Apache.
+  --watch, -w           Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides).
+                        When there are new additions or updates, automatically add them to the library.
+```
 ## Startup
 
 How do I set it to start automatically on boot?
