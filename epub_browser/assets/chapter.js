@@ -248,11 +248,6 @@ async function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
   const ebLinks = Array.from(document.querySelectorAll('link.eb'));
   const ebStyles = Array.from(document.querySelectorAll('style.eb'));
   
-  // 创建作用域属性
-  if (!document.documentElement.hasAttribute('data-eb-styles')) {
-    document.documentElement.setAttribute('data-eb-styles', '');
-  }
-  
   // 处理外部样式表 - 并行加载
   const linkPromises = ebLinks.map(async link => {
     try {
