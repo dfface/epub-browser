@@ -1398,7 +1398,7 @@ function initScript() {
                     });
                     
                     // 关闭目录浮窗
-                    tocFloating.classList.remove('active');
+                    // tocFloating.classList.remove('active');
                     mobileTocBtn.classList.remove('active');
                 }
             });
