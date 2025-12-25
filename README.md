@@ -165,6 +165,9 @@ How do I set it to start automatically on boot?
 launchctl load -w ~/Library/LaunchAgents/epub-browser.plist
 # launchctl unload -w ~/Library/LaunchAgents/epub-browser.plist
 launchctl start epub-browser
+# using kickstart to restart like this:
+# launchctl kickstart -k gui/501/Epub-Browser 
+
 ```
 
 ### Linux
