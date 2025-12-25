@@ -235,7 +235,9 @@ wait someone to add or ask ChatGPT.
 
 ## Tips
 
-* If there are errors or some mistakes in epub files, then you can use [calibre](https://calibre-ebook.com/) to convert to epub again.
+* If there are errors or some mistakes in epub files, then you can use [Calibre](https://calibre-ebook.com/) to convert to epub again.
+  * Issue: EPUB table of contents fails to display properly, usually due to missing `toc.ncx` file.
+  * Fix: Use Calibre to re-convert the original file to EPUB. This generates a specification-compliant EPUB with correct TOC display.
 * Tags can be managed by [calibre](https://calibre-ebook.com/). After adding tags, **you should click "Edit book" and just close the window to update the epub file** or the tags will not change in the browser.
 * By default, the program listens on the address `0.0.0.0`. This means you can access the service via any of your local machine's addresses (such as a local area network (LAN) address like `192.168.1.233`), not just `localhost`.
 * Just find calibre library and run `epub-browser .`, it will collect all books that managed by calibre.
