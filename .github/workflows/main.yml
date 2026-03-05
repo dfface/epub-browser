@@ -1,27 +1,22 @@
 name: Upload to PyPI and Docker
 
-# 触发条件保持不变
 on:
   release: 
     types: [created]
   workflow_dispatch:
 
 jobs:
-  # 第一个任务：上传到 PyPI
   upload-to-pypi:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.14  # 注意：3.14 是预览版，建议确认是否需要降级为 3.11/3.12
-
+          python-version: 3.11  # 建议用稳定版，3.14为预览版
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install setuptools wheel twine
-
       - name: Build and upload to PyPI
         run: |
           python3 setup.py sdist bdist_wheel
@@ -30,9 +25,8 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TWINE_TOKEN }}
 
-  # 第二个任务：上传到 Docker（依赖第一个任务成功）
   upload-to-docker:
-    needs: upload-to-pypi  # 核心：指定依赖的 job，只有前者成功才执行
+    needs: upload-to-pypi
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,9 +39,6 @@ jobs:
           images: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.APP_NAME }}
           tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
@@ -56,10 +47,13 @@ jobs:
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v2  # 必须：提供跨架构模拟支持
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        id: buildx
+        with:
+          install: true  # 确保安装最新版 Buildx
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -67,10 +61,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push multi-arch image  # 核心修改：多架构构建
         uses: docker/build-push-action@v4
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true  # 直接推送（已排除PR场景，无需判断）
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64  # 关键：指定amd64和arm64架构
+          builder: ${{ steps.buildx.outputs.name }}  # 使用Buildx构建器
+          cache-from: type=gha  # 缓存加速构建
+          cache-to: type=gha,mode=max
