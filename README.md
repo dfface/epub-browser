@@ -1,3 +1,8 @@
+---
+date: 2026-03-05 21:36:40
+lastmod: 2026-03-05 21:39:24
+---
+
 # epub-browser
 
 ![GitHub Repo stars](https://img.shields.io/github/stars/dfface/epub-browser)
@@ -120,6 +125,7 @@ options:
   --watch, -w           Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides).
                         When there are new additions or updates, automatically add them to the library.
 ```
+
 ## Startup
 
 How do I set it to start automatically on boot?
@@ -173,6 +179,24 @@ launchctl start epub-browser
 ### Linux
 
 wait someone to add or ask ChatGPT.
+
+### Docker
+
+Start the service using `docker-compose up -d`:
+
+```
+version: "3"
+services:
+  epub-browser:
+    image: dfface/epub-browser:latest
+    user: 1000:1000 # should be owner of volumes
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - "/Users/dfface/Calibre Library:/app/Library"
+      - "/Users/dfface/data/epub-browser:/app/EpubBrowserFiles"
+```
 
 ## Screenshots
 
