@@ -1,6 +1,6 @@
 ---
 date: 2026-03-05 21:36:40
-lastmod: 2026-03-05 21:39:24
+lastmod: 2026-03-05 22:03:40
 ---
 
 # epub-browser
@@ -196,6 +196,17 @@ services:
     volumes:
       - "/Users/dfface/Calibre Library:/app/Library"
       - "/Users/dfface/data/epub-browser:/app/EpubBrowserFiles"
+```
+
+or just with `docker`:
+
+```bash
+docker run -d \
+  --name epub-browser-service \
+  -p 8080:80 \
+  -v /path/to/YourEpubDir:/app/Library \
+  -v /path/to/EpubBrowserTmpFiles:/app/EpubBrowserFiles \
+  epub-browser:latest
 ```
 
 ## Screenshots
