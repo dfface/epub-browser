@@ -25,7 +25,7 @@ RUN cd /app/epub-browser \
     && python -m build --wheel \
     && pip3 install --no-cache-dir dist/*.whl \
     # 清理构建产物，减小镜像体积
-    && rm -rf /app/epub-browser/dist /app/epub-browser/build /app/epub-browser/*.egg-info
+    && rm -rf /app/epub-browser
 
 # =====================================================================
 
