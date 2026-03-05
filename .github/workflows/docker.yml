@@ -55,5 +55,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64  # 关键：指定amd64和arm64架构
           builder: ${{ steps.buildx.outputs.name }}  # 使用Buildx构建器
-          cache-from: type=gha  # 缓存加速构建
-          cache-to: type=gha,mode=max
