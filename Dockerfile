@@ -1,5 +1,5 @@
 # 选择轻量级的Python基础镜像（slim版本体积小，仅包含运行时依赖）
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # 设置环境变量，避免Python产生.pyc文件，减少磁盘占用
 ENV PYTHONDONTWRITEBYTECODE=1
