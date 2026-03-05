@@ -821,8 +821,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         next_chapter = f'Next chapter' if chapter_index < len(self.chapters) - 1 else 'Last chapter'
         prev_link = f'<a {prev_href} alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">{prev_chapter}</span></div></a>'
         next_link = f'<a {next_href} alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">{next_chapter}</span></div></a>'
-        prev_link_mobile = f'<a {prev_href} alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(' chapter', '')}</span></div></a>'
-        next_link_mobile = f'<a {next_href} alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(' chapter', '')}</span></div></a>'
+        prev_link_mobile = f'<a {prev_href} alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(" chapter", "")}</span></div></a>'
+        next_link_mobile = f'<a {next_href} alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(" chapter", "")}</span></div></a>'
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="{self.lang}">
