@@ -215,6 +215,16 @@ function initScript() {
                 bookCards.forEach(card => {
                     card.style.display = 'block';
                 });
+            } else if (tagText === 'NoTags') {
+                bookCards.forEach(card => {
+                    const tags = card.querySelectorAll('.book-tag');
+                    let hasTag = len(tags) > 0 ? true : false;
+                    if (!hasTag) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
             } else {
                 bookCards.forEach(card => {
                     const tags = card.querySelectorAll('.book-tag');
