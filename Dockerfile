@@ -19,4 +19,4 @@ RUN mkdir -p /app/Library /app/EpubBrowserFiles
 EXPOSE 80
 
 # 启动命令（严格按照要求执行，使用exec形式保证信号传递）
-CMD ["epub-browser", "/app/Library", "--watch", "--no-browser", "--output-dir", "/app/EpubBrowserFiles", "--port", "80"]
+CMD ["epub-browser", "/app/Library", "--watch", "--no-browser", "--output-dir=/app/EpubBrowserFiles",  "--port=80"]
