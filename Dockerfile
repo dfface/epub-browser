@@ -6,11 +6,28 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # 禁用Python缓冲，确保日志能实时输出
 ENV PYTHONUNBUFFERED=1
 
+# 安装构建依赖（容器内构建需要pip、build等工具）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir build setuptools wheel
+
 # 创建并设置工作目录（统一管理文件）
 WORKDIR /app
 
-# 安装epub-browser依赖（--no-cache-dir避免缓存，减小镜像体积）
-RUN pip3 install --no-cache-dir epub-browser
+# ===================== 核心修改：直接复制源码到容器 =====================
+# 复制本地epub-browser源码到容器内（需保证本地Dockerfile同级有源码目录）
+COPY . /app/epub-browser/
+
+# 进入源码目录，在容器内构建并安装epub-browser
+RUN cd /app/epub-browser \
+    && python -m build --wheel \
+    && pip3 install --no-cache-dir dist/*.whl \
+    # 清理构建产物，减小镜像体积
+    && rm -rf /app/epub-browser/dist /app/epub-browser/build /app/epub-browser/*.egg-info
+
+# =====================================================================
 
 # 创建必要的目录（Library用于存放epub文件，EpubBrowserFiles用于输出）
 RUN mkdir -p /app/Library /app/EpubBrowserFiles
