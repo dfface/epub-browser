@@ -32,7 +32,9 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
+            # 新增：release 触发时添加 latest 标签
             type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            # 可选：手动触发时也添加 latest 标签
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}            
       -
         name: Set up QEMU
