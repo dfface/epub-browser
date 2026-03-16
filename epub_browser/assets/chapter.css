@@ -879,6 +879,7 @@ body {
     flex: 1;
     margin-bottom: 0;
     overflow: hidden;
+    position: relative;
 }
 
 .pagination-mode .navigation {
@@ -889,21 +890,47 @@ body {
     margin-right: 0;
 }
 
+/* CSS Column 分页样式 - 使用 CSS Grid 实现分页 */
 .pagination-mode #eb-content {
     height: 100%;
-    padding: 40px;
+    padding: 0;
     margin: 0;
+    /* 使用 Grid 布局 */
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc(100% - 80px);
+    gap: 0;
+    /* 允许水平滚动 */
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* 使用 snap 实现整页滚动 */
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    /* 隐藏滚动条 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+/* 分页页面样式 */
+.pagination-page {
+    height: 100%;
     width: 100%;
-    column-width: 100%;
-    column-height: 100%;
-    column-fill: auto;
-    column-gap: 0;
-    overflow: hidden;
-    position: relative;
+    padding: 40px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+
+/* 确保内容块不会被分割到不同页面 */
+.pagination-page > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
 }
 
 /* 隐藏滚动条 */
-.pagination-mode ::-webkit-scrollbar {
+.pagination-mode #eb-content::-webkit-scrollbar {
     display: none;
 }
 
@@ -914,20 +941,13 @@ body {
     background: var(--bg-color);
 }
 
-/* CSS Column 分页样式 */
-.pagination-mode #eb-content {
-    height: 100%;
-    column-count: 1;
-    column-fill: auto;
-    column-gap: 0;
-    overflow: hidden;
-}
-
 /* 确保内容块不会被分割到不同页面 */
 .pagination-mode #eb-content > * {
     break-inside: avoid;
     page-break-inside: avoid;
     -webkit-column-break-inside: avoid;
+    /* 确保每个元素都有 snap 对齐 */
+    scroll-snap-align: start;
 }
 
 /* 调整图片在分页模式下的显示 */

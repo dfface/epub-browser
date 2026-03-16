@@ -455,9 +455,37 @@ function initScript() {
         }
         
         // 添加窗口大小改变事件监听
+        let resizeTimeout;
         window.addEventListener('resize', function() {
-            calculateTotalPages();
-            showPage(currentPage);
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                // 重新创建页面以适应新的窗口大小
+                const currentPageBeforeResize = currentPage;
+                createPages();
+                // 确保当前页面在有效范围内
+                if (currentPageBeforeResize >= totalPages) {
+                    currentPage = totalPages - 1;
+                } else {
+                    currentPage = currentPageBeforeResize;
+                }
+                showPage(currentPage);
+            }, 250);
+        });
+        
+        // 添加滚动事件监听，更新当前页码
+        content.addEventListener('scroll', function() {
+            const scrollLeft = content.scrollLeft;
+            const pageWidth = content.clientWidth;
+            const newPage = Math.round(scrollLeft / pageWidth);
+            
+            if (newPage !== currentPage && newPage >= 0 && newPage < totalPages) {
+                currentPage = newPage;
+                currentPageEl.textContent = currentPage + 1;
+                pageJumpInput.value = currentPage + 1;
+                updateNavButtons();
+                updateProgressIndicator();
+                saveReadingProgress();
+            }
         });
     } else {
         loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
@@ -570,10 +598,12 @@ function initScript() {
         return content.innerHTML;
     }
     
-    // 创建页面 - 使用 CSS Column 实现
+    // 创建页面 - 使用改进的算法
     function createPages() {
         // 保存原始内容
         const originalContent = preprocessContent(content);
+        let newContent = document.createElement("article");
+        newContent.innerHTML = originalContent;
         
         // 获取容器高度
         const bottomNav = document.querySelector('.navigation');
@@ -582,7 +612,7 @@ function initScript() {
 
         let contentHeight = viewportHeight - bottomNavHeight; // 减去边距
         contentContainer.style.height = contentHeight;
-        contentHeight -= 60; // 减去大的内边距
+        contentHeight -= 80; // 减去大的内边距 (40px * 2)
         if (fontSize == "large") {
             contentHeight -= 280;
         } else if (fontSize == "small") {
@@ -602,45 +632,84 @@ function initScript() {
 
         pageHeightInput.value = contentHeight
         
-        // 应用 CSS Column 样式
-        content.style.height = `${contentHeight}px`;
-        content.style.columnCount = '1';
-        content.style.columnFill = 'auto';
-        content.style.columnGap = '0';
+        // 创建临时容器来测量元素高度
+        const tempContainer = document.createElement('div');
+        tempContainer.style.cssText = `
+            position: absolute;
+            visibility: hidden;
+            width: ${content.clientWidth - 80}px;
+            height: ${contentHeight}px;
+            padding: 40px;
+            box-sizing: border-box;
+            overflow: hidden;
+        `;
+        document.body.appendChild(tempContainer);
         
-        // 恢复原始内容
-        content.innerHTML = originalContent;
+        // 分割内容为页面
+        const pages = [];
+        const elements = Array.from(newContent.children || []);
+        let currentPageContent = [];
+        let currentHeight = 0;
         
-        // 计算总页数
-        calculateTotalPages();
+        elements.forEach(element => {
+            // 克隆元素到临时容器测量高度
+            const clonedElement = element.cloneNode(true);
+            tempContainer.innerHTML = '';
+            tempContainer.appendChild(clonedElement);
+            const elementHeight = clonedElement.getBoundingClientRect().height;
+            
+            // 如果当前页面高度加上新元素高度超过容器高度，创建新页面
+            if (currentHeight + elementHeight > contentHeight && currentHeight > 0) {
+                pages.push(currentPageContent.join(''));
+                currentPageContent = [];
+                currentHeight = 0;
+            }
+            
+            // 添加元素到当前页面
+            currentPageContent.push(element.outerHTML);
+            currentHeight += elementHeight;
+        });
         
+        // 添加最后一页
+        if (currentPageContent.length > 0) {
+            pages.push(currentPageContent.join(''));
+        }
+        
+        // 清理临时容器
+        document.body.removeChild(tempContainer);
+        
+        totalPages = pages.length;
         pageJumpInput.setAttribute('max', totalPages);
+
+        // 清空内容容器
+        content.innerHTML = '';
+        
+        // 创建页面元素
+        pages.forEach((pageContent, index) => {
+            const pageElement = document.createElement('div');
+            pageElement.className = 'pagination-page';
+            pageElement.innerHTML = pageContent;
+            content.appendChild(pageElement);
+        });
+        
+        console.log(`Created ${totalPages} pages`);
     }
     
-    // 计算总页数
-    function calculateTotalPages() {
-        // 获取内容和容器宽度
-        pageWidth = content.clientWidth;
-        contentWidth = content.scrollWidth;
-        
-        // 计算总页数
-        totalPages = Math.ceil(contentWidth / pageWidth);
-        
-        // 更新总页数显示
-        totalPagesEl.textContent = totalPages;
-    }
-    
-    // 显示指定页面 - 使用 CSS Column 实现
+    // 显示指定页面
     function showPage(pageIndex) {
         // 确保页面索引在有效范围内
         if (pageIndex < 0) pageIndex = 0;
         if (pageIndex >= totalPages) pageIndex = totalPages - 1;
         
-        // 计算滚动位置
+        // 计算滚动位置 - 使用 clientWidth 作为每页的宽度
+        const pageWidth = content.clientWidth;
         const scrollPosition = pageIndex * pageWidth;
         
-        // 滚动到指定位置
-        content.scrollLeft = scrollPosition;
+        // 滚动到指定位置 - 使用 smooth 滚动
+        content.scrollTo({
+            left: scrollPosition,
+            behavior: 'smooth'
+        });
         
         // 更新当前页面索引
         currentPage = pageIndex;
