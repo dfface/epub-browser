@@ -1,8 +1,3 @@
----
-date: 2026-03-05 21:36:40
-lastmod: 2026-03-05 22:03:40
----
-
 # epub-browser
 
 ![GitHub Repo stars](https://img.shields.io/github/stars/dfface/epub-browser)
@@ -14,7 +9,7 @@ lastmod: 2026-03-05 22:03:40
 
 A simple and modern web E-book reader, which allows you to read e-books within a browser.
 
-Try it online: [https://epub-browser.vercel.app](https://epub-browser.vercel.app)
+Try it online: [https://epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech)
 
 It now supports the following features:
 
