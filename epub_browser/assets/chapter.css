@@ -876,6 +876,7 @@ body {
 }
 
 .pagination-mode .content-container {
+    box-shadow: unset !important;
     margin-bottom: 0;
     overflow: hidden;
     position: relative;

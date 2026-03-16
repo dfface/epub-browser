@@ -692,7 +692,7 @@ function initScript() {
         // 滚动到指定位置 - 使用 smooth 滚动
         content.scrollTo({
             left: scrollPosition,
-            behavior: 'smooth'
+            // behavior: 'smooth'
         });
         
         // 更新当前页面索引
