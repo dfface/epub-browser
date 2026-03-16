@@ -876,30 +876,28 @@ body {
 }
 
 .pagination-mode .content-container {
-    flex: 1;
     margin-bottom: 0;
     overflow: hidden;
     position: relative;
+    /* 宽度由 JavaScript 统一设置 */
 }
 
 .pagination-mode .navigation {
-    padding: 20px;
     min-height: 50px;
     margin-top: 0;
     margin-left: 0;
     margin-right: 0;
+    /* 宽度和 padding 由 JavaScript 统一设置 */
 }
 
-/* CSS Column 分页样式 - 使用 CSS Grid 实现分页 */
+/* CSS Column 分页样式 - 使用 CSS Column 实现分页 */
 .pagination-mode #eb-content {
     height: 100%;
-    padding: 0;
+    padding: 0px !important;
     margin: 0;
-    /* 使用 Grid 布局 */
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: calc(100% - 80px);
-    gap: 0;
+    /* 列宽和容器宽度由 JavaScript 统一设置 */
+    column-count: auto;
+    column-gap: 0px;
     /* 允许水平滚动 */
     overflow-x: auto;
     overflow-y: hidden;
@@ -909,24 +907,10 @@ body {
     /* 隐藏滚动条 */
     scrollbar-width: none;
     -ms-overflow-style: none;
-}
-
-/* 分页页面样式 */
-.pagination-page {
-    height: 100%;
-    width: 100%;
-    padding: 40px;
-    overflow-y: auto;
-    box-sizing: border-box;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-}
-
-/* 确保内容块不会被分割到不同页面 */
-.pagination-page > * {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    -webkit-column-break-inside: avoid;
+    /* 确保内容能够正确分割 */
+    break-inside: auto;
+    page-break-inside: auto;
+    -webkit-column-break-inside: auto;
 }
 
 /* 隐藏滚动条 */
@@ -941,29 +925,29 @@ body {
     background: var(--bg-color);
 }
 
-/* 确保内容块不会被分割到不同页面 */
+/* 确保内容能够正确分割到不同列中 */
 .pagination-mode #eb-content > * {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    -webkit-column-break-inside: avoid;
-    /* 确保每个元素都有 snap 对齐 */
-    scroll-snap-align: start;
+    break-inside: auto;
+    page-break-inside: auto;
+    -webkit-column-break-inside: auto;
+    orphans: 1;
+    widows: 1;
 }
 
 /* 调整图片在分页模式下的显示 */
 .pagination-mode #eb-content img {
     max-width: 100%;
     height: auto;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    -webkit-column-break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
+    -webkit-column-break-inside: auto;
 }
 
 /* 调整表格在分页模式下的显示 */
 .pagination-mode #eb-content table {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    -webkit-column-break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
+    -webkit-column-break-inside: auto;
     width: 100%;
 }
 

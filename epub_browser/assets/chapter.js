@@ -475,7 +475,6 @@ function initScript() {
         // 添加滚动事件监听，更新当前页码
         content.addEventListener('scroll', function() {
             const scrollLeft = content.scrollLeft;
-            const pageWidth = content.clientWidth;
             const newPage = Math.round(scrollLeft / pageWidth);
             
             if (newPage !== currentPage && newPage >= 0 && newPage < totalPages) {
@@ -598,101 +597,102 @@ function initScript() {
         return content.innerHTML;
     }
     
-    // 创建页面 - 使用改进的算法
+    // 创建页面 - 使用 CSS Column 实现
     function createPages() {
         // 保存原始内容
         const originalContent = preprocessContent(content);
-        let newContent = document.createElement("article");
-        newContent.innerHTML = originalContent;
         
         // 获取容器高度
         const bottomNav = document.querySelector('.navigation');
         const bottomNavHeight = getElementHeight(bottomNav);
         const viewportHeight = window.innerHeight;
 
-        let contentHeight = viewportHeight - bottomNavHeight; // 减去边距
-        contentContainer.style.height = contentHeight;
-        contentHeight -= 80; // 减去大的内边距 (40px * 2)
-        if (fontSize == "large") {
-            contentHeight -= 280;
-        } else if (fontSize == "small") {
-            contentHeight += 40;
-        }
-        if (!isKindleMode()) {
-            let customContentHeight = localStorage.getItem("page_height");
-            if (customContentHeight) {
-                contentHeight = parseFloat(customContentHeight);
-            }
-        } else {
-            let customContentHeight = getCookie("page_height");
-            if (customContentHeight) {
-                contentHeight = parseFloat(customContentHeight);
-            }
-        }
-
-        pageHeightInput.value = contentHeight
+        let contentHeight = viewportHeight - bottomNavHeight - 40; // 减去边距和安全余量
+        contentContainer.style.height = `${viewportHeight - bottomNavHeight}px`;
         
-        // 创建临时容器来测量元素高度
-        const tempContainer = document.createElement('div');
-        tempContainer.style.cssText = `
-            position: absolute;
-            visibility: hidden;
-            width: ${content.clientWidth - 80}px;
-            height: ${contentHeight}px;
-            padding: 40px;
-            box-sizing: border-box;
-            overflow: hidden;
-        `;
-        document.body.appendChild(tempContainer);
+        // 直接设置内容容器的高度
+        content.style.height = `${contentHeight}px`;
         
-        // 分割内容为页面
-        const pages = [];
-        const elements = Array.from(newContent.children || []);
-        let currentPageContent = [];
-        let currentHeight = 0;
+        // 先恢复原始内容，以便计算内容高度
+        content.innerHTML = originalContent;
         
-        elements.forEach(element => {
-            // 克隆元素到临时容器测量高度
-            const clonedElement = element.cloneNode(true);
-            tempContainer.innerHTML = '';
-            tempContainer.appendChild(clonedElement);
-            const elementHeight = clonedElement.getBoundingClientRect().height;
+        // 等待内容渲染完成后计算需要的列数
+        setTimeout(() => {
+            // 计算内容总高度
+            const contentScrollHeight = content.scrollHeight;
             
-            // 如果当前页面高度加上新元素高度超过容器高度，创建新页面
-            if (currentHeight + elementHeight > contentHeight && currentHeight > 0) {
-                pages.push(currentPageContent.join(''));
-                currentPageContent = [];
-                currentHeight = 0;
-            }
+            // 计算需要的列数
+            const columnCount = Math.ceil(contentScrollHeight / contentHeight);
             
-            // 添加元素到当前页面
-            currentPageContent.push(element.outerHTML);
-            currentHeight += elementHeight;
-        });
+            console.log(`Content scroll height: ${contentScrollHeight}, Content height: ${contentHeight}, Column count: ${columnCount}`);
+            
+            // 应用 CSS Column 样式
+            content.style.columnCount = columnCount;
+            content.style.columnWidth = 'auto';
+            content.style.columnFill = 'auto';
+            content.style.columnGap = '0';
+            content.style.overflowX = 'auto';
+            content.style.overflowY = 'hidden';
+            content.style.scrollSnapType = 'x mandatory';
+            content.style.scrollBehavior = 'smooth';
+            
+            // 确保内容能够正确分割
+            content.style.breakInside = 'auto';
+            content.style.pageBreakInside = 'auto';
+            content.style.orphans = 1;
+            content.style.widows = 1;
+            
+            // 等待内容重新渲染完成后计算总页数
+            setTimeout(() => {
+                calculateTotalPages();
+                pageJumpInput.setAttribute('max', totalPages);
+            }, 100);
+        }, 100);
+    }
+    
+    // 计算总页数
+    function calculateTotalPages() {
+        // 获取父容器宽度并计算统一的整数宽度
+        const parentContainer = document.querySelector('.container');
+        const parentWidth = parentContainer.clientWidth;
+        // 设置统一的整数宽度（父容器宽度取整）
+        const unifiedWidth = Math.floor(parentWidth);
         
-        // 添加最后一页
-        if (currentPageContent.length > 0) {
-            pages.push(currentPageContent.join(''));
+        // 设置 content-container 宽度和高度
+        const contentContainer = document.querySelector('.content-container');
+        contentContainer.style.width = `${unifiedWidth}px`;
+        // 高度由 flex 布局自动计算，确保填满剩余空间
+        contentContainer.style.flex = '1';
+        
+        // 设置 navigation 宽度
+        const navigation = document.querySelector('.pagination-mode .navigation');
+        if (navigation) {
+            navigation.style.width = `${unifiedWidth}px`;
+            navigation.style.padding = '20px';
+            navigation.style.boxSizing = 'border-box';
         }
         
-        // 清理临时容器
-        document.body.removeChild(tempContainer);
+        // 设置列宽为统一宽度（整数）
+        pageWidth = unifiedWidth;
+        content.style.columnWidth = `${pageWidth}px`;
+        content.style.boxSizing = 'border-box';
         
-        totalPages = pages.length;
-        pageJumpInput.setAttribute('max', totalPages);
-
-        // 清空内容容器
-        content.innerHTML = '';
+        // 获取内容总宽度
+        const scrollWidth = content.scrollWidth;
         
-        // 创建页面元素
-        pages.forEach((pageContent, index) => {
-            const pageElement = document.createElement('div');
-            pageElement.className = 'pagination-page';
-            pageElement.innerHTML = pageContent;
-            content.appendChild(pageElement);
-        });
+        // 计算总页数 - 如果最后一页的内容很少，可能需要减去一页
+        // 使用 Math.ceil 计算，但如果最后一页的内容少于一半，则减去一页
+        const rawTotalPages = scrollWidth / pageWidth;
+        totalPages = Math.max(1, Math.ceil(rawTotalPages - 0.1)); // 减去 0.1 避免浮点数精度问题导致的额外一页
         
-        console.log(`Created ${totalPages} pages`);
+        // 更新总页数显示
+        totalPagesEl.textContent = totalPages;
+        
+        // 确保当前页码显示正确
+        currentPageEl.textContent = currentPage + 1;
+        pageJumpInput.value = currentPage + 1;
+        
+        console.log(`Total pages: ${totalPages}, contentWidth: ${contentWidth}, unifiedWidth: ${unifiedWidth}, pageWidth: ${pageWidth}`);
     }
     
     // 显示指定页面
@@ -701,9 +701,8 @@ function initScript() {
         if (pageIndex < 0) pageIndex = 0;
         if (pageIndex >= totalPages) pageIndex = totalPages - 1;
         
-        // 计算滚动位置 - 使用 clientWidth 作为每页的宽度
-        const pageWidth = content.clientWidth;
-        const scrollPosition = pageIndex * pageWidth;
+        // 计算滚动位置 - 使用实际的列宽（页面宽度）作为偏移量，确保为整数
+        const scrollPosition = Math.floor(pageIndex * pageWidth);
         
         // 滚动到指定位置 - 使用 smooth 滚动
         content.scrollTo({

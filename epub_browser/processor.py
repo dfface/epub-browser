@@ -965,7 +965,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                         <span class="control-name">Jump</span>
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: row;" class="page-height-adjustment">
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
                     <span>
                         <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
                     </span>
