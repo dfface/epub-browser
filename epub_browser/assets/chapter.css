@@ -879,16 +879,7 @@ body {
     margin-bottom: 0;
     overflow: hidden;
     position: relative;
-    background: unset !important;
-    border-radius: unset !important;
-    box-shadow: unset !important;
     /* 宽度由 JavaScript 统一设置 */
-}
-
-.pagination-mode .navigation .control-btn {
-    background: unset !important;
-    color: unset !important;
-    border-radius: unset !important;
 }
 
 .pagination-mode .navigation {
@@ -902,7 +893,7 @@ body {
 /* CSS Column 分页样式 - 使用 CSS Column 实现分页 */
 .pagination-mode #eb-content {
     /* 上面不影响进度条 */
-    margin-top: 5px;
+    margin-top: 20px !important;
     height: 100%;
     padding: 0px !important;
     margin: 0;
