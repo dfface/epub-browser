@@ -204,68 +204,6 @@ docker run -d \
   epub-browser:latest
 ```
 
-## Screenshots
-
-### Desktop
-
-#### Library home
-
-![home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-HWZoEf-3pN2vj.png)
-
-* View All Books
-* Switch Kindle Mode
-* Search for Books
-* Toggle Dark Mode
-
-#### Page-turning mode
-
-![page turning](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-VvMhcs-Y6EeNs.png)
-
-* Previous Chapter
-* Next Chapter
-* Previous Page: Keyboard Left Arrow
-* Next Page: Keyboard Right Arrow, Spacebar
-* Jump to a Specific Page
-* Set Pagination Page Height to Customize Content Display per Page
-
-#### Book home
-
-![book home](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-IFvr9L-oZR6vO.png)
-
-* View Book Table of Contents
-
-#### Reader
-
-![reader](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-yWbMdb-NPTPJq.png)
-
-![reader](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-17-w5l7ns-XvggSO.png)
-
-* Breadcrumb
-* Custom CSS
-* Scroll Reading
-* Page-Turning Reading
-* View Book Table of Contents
-* View Chapter Table of Contents
-* Return to Library Homepage
-* Font Adjustment
-* Drag Elements
-
-### Mobile
-
-![mobile support](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-eQFGMw-4ONeC0.png)
-
-### Kindle
-
-![kindle support1](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-BpV0De-screenshot_2025_11_16T20_34_57+0800.png)
-
-![kindle support2](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-wmsmxP-screenshot_2025_11_16T20_36_01+0800.png)
-
-![kindle support3](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-VZqKQ4-screenshot_2025_11_16T23_26_59+0800.png)
-
-![kindle support4](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-Ib1pM1-screenshot_2025_11_16T23_28_27+0800.png)
-
-![kindle support5](https://fastly.jsdelivr.net/gh/dfface/img0@master/2025/11-16-Fta2oI-screenshot_2025_11_16T23_28_58+0800.png)
-
 ## Tips
 
 * If there are errors or some mistakes in epub files, then you can use [Calibre](https://calibre-ebook.com/) to convert to epub again.
