@@ -893,6 +893,8 @@ body {
 
 /* CSS Column 分页样式 - 使用 CSS Column 实现分页 */
 .pagination-mode #eb-content {
+    /* 上面不影响进度条 */
+    margin-top: 20px !important;
     height: 100%;
     padding: 0px !important;
     margin: 0;

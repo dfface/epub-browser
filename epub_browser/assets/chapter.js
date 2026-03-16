@@ -584,6 +584,20 @@ function initScript() {
         // 保存原始内容
         const originalContent = preprocessContent(content);
         
+        // 获取容器高度
+        const bottomNav = document.querySelector('.navigation');
+        const bottomNavMobile = document.querySelector('.mobile-controls');
+        const bottomNavHeight = getElementHeight(bottomNav);
+        const bottomNavMobileHeight = getElementHeight(bottomNavMobile);
+
+        const viewportHeight = window.innerHeight;
+
+        let contentHeight = viewportHeight - bottomNavHeight - bottomNavMobileHeight - 40; // 减去边距和安全余量，安全余量就是 margin-top: 20px，然后上下不就都是 20 了
+        contentContainer.style.height = `${viewportHeight - bottomNavHeight - bottomNavMobileHeight}px`;
+        
+        // 直接设置内容容器的高度
+        content.style.height = `${contentHeight}px`;
+        
         // 先恢复原始内容，以便计算内容高度
         content.innerHTML = originalContent;
         
@@ -617,8 +631,8 @@ function initScript() {
             setTimeout(() => {
                 calculateTotalPages();
                 pageJumpInput.setAttribute('max', totalPages);
-            }, 200);
-        }, 200);
+            }, 100);
+        }, 100);
     }
     
     // 计算总页数
