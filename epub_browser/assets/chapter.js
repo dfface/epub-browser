@@ -454,24 +454,6 @@ function initScript() {
             mobileTocBtn.style.display = 'none';
         }
         
-        // 添加窗口大小改变事件监听
-        let resizeTimeout;
-        window.addEventListener('resize', function() {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                // 重新创建页面以适应新的窗口大小
-                const currentPageBeforeResize = currentPage;
-                createPages();
-                // 确保当前页面在有效范围内
-                if (currentPageBeforeResize >= totalPages) {
-                    currentPage = totalPages - 1;
-                } else {
-                    currentPage = currentPageBeforeResize;
-                }
-                showPage(currentPage);
-            }, 250);
-        });
-        
         // 添加滚动事件监听，更新当前页码
         content.addEventListener('scroll', function() {
             const scrollLeft = content.scrollLeft;
@@ -604,10 +586,13 @@ function initScript() {
         
         // 获取容器高度
         const bottomNav = document.querySelector('.navigation');
+        const bottomNavMobile = document.querySelector('.mobile-controls');
         const bottomNavHeight = getElementHeight(bottomNav);
+        const bottomNavMobileHeight = getElementHeight(bottomNavMobile);
+
         const viewportHeight = window.innerHeight;
 
-        let contentHeight = viewportHeight - bottomNavHeight - 40; // 减去边距和安全余量
+        let contentHeight = viewportHeight - bottomNavHeight - bottomNavMobileHeight - 5; // 减去边距和安全余量
         contentContainer.style.height = `${viewportHeight - bottomNavHeight}px`;
         
         // 直接设置内容容器的高度
@@ -801,6 +786,12 @@ function initScript() {
 
     // 加载阅读进度
     function loadReadingProgress() {
+        if (totalPages === 0) {
+            setTimeout(() => {
+                loadReadingProgress();
+            }, 100);
+            return 
+        }
         if (isKindleMode()) {
             if (isPaginationMode) {
                 showPage(0);
