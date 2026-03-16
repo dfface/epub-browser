@@ -593,7 +593,7 @@ function initScript() {
         const viewportHeight = window.innerHeight;
 
         let contentHeight = viewportHeight - bottomNavHeight - bottomNavMobileHeight - 40; // 减去边距和安全余量，安全余量就是 margin-top: 20px，然后上下不就都是 20 了
-        contentContainer.style.height = `${viewportHeight - bottomNavHeight}px`;
+        contentContainer.style.height = `${viewportHeight - bottomNavHeight - bottomNavMobileHeight}px`;
         
         // 直接设置内容容器的高度
         content.style.height = `${contentHeight}px`;
