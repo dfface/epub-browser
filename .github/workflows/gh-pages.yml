@@ -1,0 +1,63 @@
+# GitHub workflow for generating test files and deploying to gh-pages
+
+name: Generate Test Files and Deploy to gh-pages
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push to main branch
+  push:
+    branches: [ main ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build-and-deploy"
+  build-and-deploy:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Sets up python
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.10
+
+      # Install dependencies
+      - name: "Installs dependencies"
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install setuptools wheel tqdm minify-html watchdog
+
+      # Build and install the project
+      - name: "Builds and installs the project"
+        run: |
+          python3 setup.py sdist bdist_wheel
+          python3 -m pip install -e . --break-system-packages
+
+      # Generate test files
+      - name: "Generates test files"
+        run: |
+          # Check if there are any EPUB files in examples directory
+          if [ -z "$(ls -A examples/*.epub 2>/dev/null)" ]; then
+            echo "No EPUB files found in examples directory"
+            exit 1
+          fi
+          # Generate test files
+          epub-browser ./examples --no-server --output-dir ./test --keep-files
+
+      # Deploy to gh-pages
+      - name: "Deploys to gh-pages"
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./test
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: "Update test files"
