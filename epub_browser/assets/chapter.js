@@ -345,7 +345,8 @@ function initScript() {
     let isPaginationMode = false;
     let currentPage = 0;
     let totalPages = 0;
-    let pages = [];
+    let contentWidth = 0;
+    let pageWidth = 0;
 
     let fontSize = "small";
     let fontFamily = "system-ui, -apple-system, sans-serif";
@@ -434,7 +435,11 @@ function initScript() {
         enablePaginationMode();
         // 禁止翻页模式 点击页面链接
         document.querySelectorAll('.eb-content a').forEach(item => {
-            item.removeAttribute('href');
+            const originalHref = item.getAttribute('href');
+            if (originalHref) {
+                item.setAttribute('data-original-href', originalHref);
+                item.removeAttribute('href');
+            }
         });
         togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
         mobileTogglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
@@ -448,6 +453,12 @@ function initScript() {
         if (mobileTocBtn) {
             mobileTocBtn.style.display = 'none';
         }
+        
+        // 添加窗口大小改变事件监听
+        window.addEventListener('resize', function() {
+            calculateTotalPages();
+            showPage(currentPage);
+        });
     } else {
         loadReadingProgress();  // 刚进去是 scroll，也需要恢复下进度
     }    
@@ -498,6 +509,15 @@ function initScript() {
         // 显示翻页信息
         paginationInfo.style.display = 'flex';
         navigationHomeBtn.style.display = 'none';
+        
+        // 保存链接的原始 href 属性，然后移除 href
+        document.querySelectorAll('.eb-content a').forEach(item => {
+            const originalHref = item.getAttribute('href');
+            if (originalHref) {
+                item.setAttribute('data-original-href', originalHref);
+                item.removeAttribute('href');
+            }
+        });
         
         // 分割内容为页面
         createPages();
@@ -550,13 +570,10 @@ function initScript() {
         return content.innerHTML;
     }
     
-    // 创建页面
+    // 创建页面 - 使用 CSS Column 实现
     function createPages() {
         // 保存原始内容
-        // 预处理
         const originalContent = preprocessContent(content);
-        let newContent = document.createElement("article");
-        newContent.innerHTML = originalContent;
         
         // 获取容器高度
         const bottomNav = document.querySelector('.navigation');
@@ -585,64 +602,45 @@ function initScript() {
 
         pageHeightInput.value = contentHeight
         
-        // 分割内容为页面
-        let currentPageContent = '';
-        let currentHeight = 0;
-        const elements = Array.from(newContent.children || []);
+        // 应用 CSS Column 样式
+        content.style.height = `${contentHeight}px`;
+        content.style.columnCount = '1';
+        content.style.columnFill = 'auto';
+        content.style.columnGap = '0';
         
-        // 如果没有子元素，直接使用文本内容
-        if (elements.length === 0) {
-            pages = [originalContent];
-            totalPages = 1;
-        } else {
-            // 遍历所有子元素
-            elements.forEach(element => {
-                let elementHeight = getElementHeight(element);
-                // 如果当前页面高度加上新元素高度超过容器高度，创建新页面
-                if (currentHeight + elementHeight > contentHeight && currentHeight > 0) {
-                    pages.push(currentPageContent);
-                    currentPageContent = '';
-                    currentHeight = 0;
-                }        
-                // 添加元素到当前页面
-                currentPageContent += element.outerHTML;
-                currentHeight += elementHeight;
-            });
-            
-            // 添加最后一页
-            if (currentPageContent) {
-                pages.push(currentPageContent);
-            }
-            
-            totalPages = pages.length;
-        }
-
+        // 恢复原始内容
+        content.innerHTML = originalContent;
+        
+        // 计算总页数
+        calculateTotalPages();
+        
         pageJumpInput.setAttribute('max', totalPages);
-
-        // 清空内容容器
-        content.innerHTML = '';
-        
-        // 创建页面元素
-        pages.forEach((pageContent, index) => {
-            const pageElement = document.createElement('div');
-            pageElement.className = 'pagination-page';
-            pageElement.innerHTML = pageContent;
-            content.appendChild(pageElement);
-        });
     }
     
-    // 显示指定页面
-    function showPage(pageIndex) {
-        // 隐藏所有页面
-        document.querySelectorAll('.pagination-page').forEach(page => {
-            page.classList.remove('active', 'prev');
-        });
+    // 计算总页数
+    function calculateTotalPages() {
+        // 获取内容和容器宽度
+        pageWidth = content.clientWidth;
+        contentWidth = content.scrollWidth;
         
-        // 显示当前页面
-        const currentPageElement = document.querySelectorAll('.pagination-page')[pageIndex];
-        if (currentPageElement) {
-            currentPageElement.classList.add('active');
-        }
+        // 计算总页数
+        totalPages = Math.ceil(contentWidth / pageWidth);
+        
+        // 更新总页数显示
+        totalPagesEl.textContent = totalPages;
+    }
+    
+    // 显示指定页面 - 使用 CSS Column 实现
+    function showPage(pageIndex) {
+        // 确保页面索引在有效范围内
+        if (pageIndex < 0) pageIndex = 0;
+        if (pageIndex >= totalPages) pageIndex = totalPages - 1;
+        
+        // 计算滚动位置
+        const scrollPosition = pageIndex * pageWidth;
+        
+        // 滚动到指定位置
+        content.scrollLeft = scrollPosition;
         
         // 更新当前页面索引
         currentPage = pageIndex;
@@ -679,14 +677,48 @@ function initScript() {
     
     // 恢复原始内容
     function restoreOriginalContent() {
-        // 这里需要重新加载原始内容
-        // 在实际应用中，您可能需要保存原始内容或重新获取
-        // 这里我们简单重新加载页面
+        // 移除分页模式类
+        document.body.classList.remove('pagination-mode');
+        contentContainer.classList.remove('pagination-mode');
+        
+        // 恢复内容样式
+        content.style.height = '';
+        content.style.columnCount = '';
+        content.style.columnFill = '';
+        content.style.columnGap = '';
+        
+        // 显示页面的必要元素
+        toggleHideUnnecessary(false);
+        
+        // 隐藏翻页信息
+        paginationInfo.style.display = 'none';
+        navigationHomeBtn.style.display = 'flex';
+        
+        // 重新启用链接
+        document.querySelectorAll('.eb-content a').forEach(item => {
+            const originalHref = item.getAttribute('data-original-href');
+            if (originalHref) {
+                item.setAttribute('href', originalHref);
+                item.removeAttribute('data-original-href');
+            }
+        });
+        
+        // 显示目录按钮
+        let tocToggleBtn = document.getElementById('tocToggle');
+        if (tocToggleBtn) {
+            tocToggleBtn.style.display = 'flex';
+        }
+        let mobileTocBtn = document.getElementById('mobileTocBtn');
+        if (mobileTocBtn) {
+            mobileTocBtn.style.display = 'flex';
+        }
+        
+        // 重新加载页面以确保所有样式和功能恢复正常
         if (isKindleMode() || confirm('Are you sure you want to exit the page-turning mode?')) {
             location.reload();
         } else {
             // 如果用户取消，重新启用翻页模式
-            // 什么也不干
+            enablePaginationMode();
         }
     }
 

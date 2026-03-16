@@ -878,6 +878,7 @@ body {
 .pagination-mode .content-container {
     flex: 1;
     margin-bottom: 0;
+    overflow: hidden;
 }
 
 .pagination-mode .navigation {
@@ -889,13 +890,16 @@ body {
 }
 
 .pagination-mode #eb-content {
-    display: flex;
-    flex-direction: column;
     height: 100%;
-    position: relative;
     padding: 40px;
     margin: 0;
     width: 100%;
+    column-width: 100%;
+    column-height: 100%;
+    column-fill: auto;
+    column-gap: 0;
+    overflow: hidden;
+    position: relative;
 }
 
 /* 隐藏滚动条 */
@@ -910,27 +914,37 @@ body {
     background: var(--bg-color);
 }
 
-.pagination-page {
+/* CSS Column 分页样式 */
+.pagination-mode #eb-content {
     height: 100%;
+    column-count: 1;
+    column-fill: auto;
+    column-gap: 0;
+    overflow: hidden;
+}
+
+/* 确保内容块不会被分割到不同页面 */
+.pagination-mode #eb-content > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+}
+
+/* 调整图片在分页模式下的显示 */
+.pagination-mode #eb-content img {
+    max-width: 100%;
+    height: auto;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+}
+
+/* 调整表格在分页模式下的显示 */
+.pagination-mode #eb-content table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
     width: 100%;
-    overflow-y: auto;
-    box-sizing: border-box;
-    position: absolute;
-    top: 0;
-    left: 0;
-    opacity: 0;
-    transform: translateX(100%);
-    transition: opacity 0.3s ease, transform 0.4s ease;
-}
-
-.pagination-page.active {
-    opacity: 1;
-    transform: translateX(0);
-    position: relative;
-}
-
-.pagination-page.prev {
-    transform: translateX(-100%);
 }
 
 .kindle-mode .header, .kindle-mode .toc-container, 
