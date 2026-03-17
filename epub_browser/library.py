@@ -129,10 +129,20 @@ class EPUBLibrary:
         """图书馆首页"""
         library_html = """<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport"content="width=device-width, initial-scale=1.0"><title>EPUB Library</title>
-<link rel="stylesheet"href="/assets/fa.all.min.css">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#4a90d9">
+<meta name="description" content="EPUB Library - A web-based EPUB reader">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EPUB Browser">
+<title>EPUB Library</title>
+<link rel="stylesheet" href="/assets/fa.all.min.css">
 <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
-<link rel="stylesheet"href="/assets/library.css">
+<link rel="apple-touch-icon" href="/assets/icon-192.png">
+<link rel="manifest" href="/assets/manifest.json">
+<link rel="stylesheet" href="/assets/library.css">
 </head>
 <body>
 """
