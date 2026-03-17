@@ -1056,13 +1056,24 @@ body {
     }
     
     .navigation {
-        padding: 10px 0;
-        gap: 5px;
+        padding: 10px 5px;
+        gap: 2px;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    
+    .navigation::-webkit-scrollbar {
+        display: none;
     }
 
     .pagination-mode .navigation{
-        padding: 10px 0;
-        gap: 5px;
+        padding: 10px 5px;
+        gap: 2px;
+        flex-wrap: nowrap;
+        justify-content: space-between;
     }
 
     .pagination-mode .navigation .prev-chapter, .pagination-mode .navigation .next-chapter{
@@ -1070,12 +1081,38 @@ body {
     }
 
     .pagination-mode .navigation #paginationInfo{
-        width: 100%;
-        justify-content: space-between;
+        width: auto;
+        justify-content: center;
+        flex-wrap: nowrap;
+        gap: 2px;
     }
 
     .navigation .control-btn {
-        padding: 0 15px;
+        padding: 0 8px;
+        font-size: 0.75rem;
+        min-width: 0;
+        flex-shrink: 0;
+    }
+    
+    .navigation .control-btn i {
+        font-size: 0.9rem;
+    }
+    
+    .navigation .control-name {
+        font-size: 0.65rem;
+        white-space: nowrap;
+    }
+    
+    .navigation .page-indicator {
+        font-size: 0.85rem;
+        padding: 0 5px;
+        white-space: nowrap;
+    }
+    
+    .navigation #pageJumpInput {
+        width: 40px;
+        font-size: 0.85rem;
+        padding: 2px;
     }
     
     .nav-btn {
