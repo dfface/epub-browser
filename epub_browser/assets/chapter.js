@@ -997,6 +997,7 @@ function initScript() {
             tagName === 'input' || 
             tagName === 'textarea' || 
             tagName === 'select' ||
+            tagName === 'img' ||
             target.closest('a') || 
             target.closest('button') || 
             target.closest('input') || 
@@ -1005,7 +1006,8 @@ function initScript() {
             target.closest('.navigation') ||
             target.closest('.font-controls') ||
             target.closest('.reading-controls') ||
-            target.closest('.toc-container');
+            target.closest('.toc-container') ||
+            target.closest('.medium-zoom-container');
         
         if (isInteractiveElement) return;
         
