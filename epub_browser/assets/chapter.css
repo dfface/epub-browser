@@ -344,11 +344,32 @@ body {
     height: auto;
     margin: 0;
     object-fit: contain;
+    cursor: zoom-in;
 }
 
 #eb-content .img-wrapper{
     max-height: 70vh;
     display: inline;
+}
+
+/* medium-zoom 样式 */
+.medium-zoom-container {
+    z-index: 9999;
+}
+
+.medium-zoom-overlay {
+    background: #000;
+    opacity: 0.9;
+}
+
+.medium-zoom-scaler {
+    transform-origin: center center;
+}
+
+.medium-zoom-scaler img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
 }
 
 #eb-content .table-wrapper {

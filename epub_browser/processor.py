@@ -1151,6 +1151,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     }
     });
     </script>
+    <script src="/assets/medium-zoom.min.js"></script>
     <script src="/assets/chapter.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>

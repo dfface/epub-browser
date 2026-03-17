@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
     '/assets/chapter.js',
     '/assets/fa.all.min.css',
     '/assets/sortable.min.js',
+    '/assets/medium-zoom.min.js',
     '/assets/manifest.json'
 ];
 

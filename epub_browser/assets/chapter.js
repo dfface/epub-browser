@@ -1665,21 +1665,12 @@ function initScript() {
     }
     
 
-    // 图片点击放大功能
-    const contentImages = document.querySelectorAll('img');
-
-    for (let i = 0; i < contentImages.length; i++) {
-        let contentImage = contentImages[i];
-        contentImage.addEventListener('click', function() {
-            if (this.classList.contains('zoomed')) {
-                this.classList.remove('zoomed');
-                this.style.cursor = 'zoom-in';
-            } else {
-                this.classList.add('zoomed');
-                this.style.cursor = 'zoom-out';
-            }
-        });
-    }
+    // 图片缩放功能 - 使用 medium-zoom
+    mediumZoom('#eb-content img', {
+        margin: 24,
+        background: '#000',
+        scrollOffset: 0
+    });
     
     // 字体控制功能
     const fontControlBtn = document.getElementById('fontControlBtn');
