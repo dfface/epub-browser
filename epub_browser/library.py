@@ -123,6 +123,12 @@ class EPUBLibrary:
                 # 确保目标目录存在
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                 shutil.copy2(src_path, dst_path)
+        
+        # 复制 sw.js 到根目录（PWA 需要 Service Worker 在根目录）
+        sw_src = os.path.join(ASSETS_DIR, 'sw.js')
+        sw_dst = os.path.join(self.base_directory, 'sw.js')
+        if os.path.exists(sw_src):
+            shutil.copy2(sw_src, sw_dst)
             
     
     def create_library_home(self):
@@ -384,6 +390,8 @@ class EPUBLibrary:
                     print(f"Cleaned up book: {book_info['title']}, path: {middle_dir}")
             if os.path.exists(os.path.join(self.output_dir, "index.html")):
                 os.remove(os.path.join(self.output_dir, "index.html"))
+            if os.path.exists(os.path.join(self.output_dir, "sw.js")):
+                os.remove(os.path.join(self.output_dir, "sw.js"))
             if os.path.exists(os.path.join(self.output_dir, "assets")):
                 shutil.rmtree(os.path.join(self.output_dir, "assets"), ignore_errors=True)
             if os.path.exists(os.path.join(self.output_dir, "book")):
