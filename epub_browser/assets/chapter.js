@@ -1691,8 +1691,11 @@ function initScript() {
     `;
     document.head.appendChild(style);
 
-    // 聚焦
-    content.focus();
+    // 页面加载完成后自动聚焦
+    window.addEventListener('load', () => {
+        document.body.focus(); // 主动让页面body获得焦点
+    });
+
 };
 
 window.initScriptChapter = initScript;
