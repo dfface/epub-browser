@@ -847,12 +847,14 @@ function initScript() {
     // 跳转输入框回车事件
     pageJumpInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
+            e.preventDefault(); // 禁用默认跳转列行为
             goToPageBtn.click();
         }
     });
 
     pageHeightInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
+            e.preventDefault(); // 禁用默认跳转列行为
             pageHeightSetBtn.click();
         }
     });
@@ -878,6 +880,7 @@ function initScript() {
             // 翻页模式
             switch(e.key) {
             case 'ArrowLeft':
+                e.preventDefault(); // 禁用默认跳转列行为
                 if (currentPage > 0) {
                     showPage(currentPage - 1);
                 } else {
@@ -892,6 +895,7 @@ function initScript() {
             case ' ':
             case 'Space':
             case 'ArrowRight':
+                e.preventDefault(); // 禁用默认跳转列行为
                 if (currentPage < totalPages - 1) {
                     showPage(currentPage + 1);
                 } else {
@@ -914,6 +918,7 @@ function initScript() {
             }
             switch(e.key) {
             case 'ArrowLeft':
+                e.preventDefault(); // 禁用默认跳转列行为
                 let prev_href = document.querySelector(".prev-chapter").href;
                 if (prev_href === location.href) {
                     showNotification("It's already the first chapter!", 'warning')
@@ -924,6 +929,7 @@ function initScript() {
             case ' ':
             case 'ArrowDown':
             case 'Space':
+                e.preventDefault(); // 禁用默认跳转列行为
                 // 获取页面总高度
                 const scrollHeight = document.documentElement.scrollHeight;
                 // 获取可视区域高度
@@ -935,6 +941,7 @@ function initScript() {
                     break;
                 }
             case 'ArrowRight':
+                e.preventDefault(); // 禁用默认跳转列行为
                 let next_href = document.querySelector(".next-chapter").href;
                 if (next_href == location.href) {
                     showNotification("It's already the last chapter!", 'warning')
