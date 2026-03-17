@@ -964,6 +964,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                         <i class="fas fa-arrow-right-to-bracket"></i>
                         <span class="control-name">Jump</span>
                     </div>
+                    <div class="control-btn" style="padding-left:10px;" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
                 </div>
                 <div style="display: none; flex-direction: row;" class="page-height-adjustment">
                     <span>

@@ -137,8 +137,8 @@ function initScript() {
     var el = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortable = Sortable.create(el, {
-        delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
-        delayOnTouchOnly: false, // 在触摸设备上也应用延迟
+        delay: 300, // 延迟300ms后才开始拖动，避免移动端滑动时误触发
+        delayOnTouchOnly: true, // 只在触摸设备上应用延迟
         filter: '.toc-container', // 允许直接选择文字
         preventOnFilter: false, // 过滤时不阻止默认行为
         onEnd: function(evt) {

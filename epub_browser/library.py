@@ -195,9 +195,10 @@ class EPUBLibrary:
         <div class="book-card" data-id="{book_hash}">
             <a href="/book/{book_hash}/index.html" class="book-link" id="{book_hash}">
                 <img src="/book/{book_hash}/{book_info['cover']}" alt="cover" class="book-cover"/>
-                <div class="book-card-content">
-                    <h3 class="book-title">{book_info['title']}</h3>
-                    <div class="book-author">{" & ".join(book_info['authors']) if book_info['authors'] else ""}</div>
+            </a>
+            <div class="book-card-content">
+                <h3 class="book-title">{book_info['title']}</h3>
+                <div class="book-author">{" & ".join(book_info['authors']) if book_info['authors'] else ""}</div>
             """
             if book_info['tags']:
                 library_html += """<div class="book-tags">"""
@@ -208,7 +209,6 @@ class EPUBLibrary:
                 library_html += """</div>"""
             library_html += """
                 </div>
-            </a>
         </div>
 """      
         library_html += f"""

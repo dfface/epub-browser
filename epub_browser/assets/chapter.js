@@ -332,6 +332,7 @@ function initScript() {
     const progressFill = document.getElementById('progressBar');
     const pageHeightSetBtn = document.querySelector("#setPageHeight");
     const pageHeightInput = document.querySelector("#pageHeightInput");
+    const toggleClickPageBtn = document.getElementById('toggleClickPage');
 
     // 生成存储键名
     function getStorageKey(mode) {
@@ -347,6 +348,7 @@ function initScript() {
     let totalPages = 0;
     let contentWidth = 0;
     let pageWidth = 0;
+    let isClickPageEnabled = false; // 点击翻页功能状态
 
     let fontSize = "small";
     let fontFamily = "system-ui, -apple-system, sans-serif";
@@ -386,8 +388,8 @@ function initScript() {
     var el = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortable = Sortable.create(el, {
-        delay: 10, // 延迟100ms后才开始拖动，给用户选择文字的时间
-        delayOnTouchOnly: false, // 在触摸设备上也应用延迟
+        delay: 300, // 延迟300ms后才开始拖动，避免移动端滑动时误触发
+        delayOnTouchOnly: true, // 只在触摸设备上应用延迟
         filter: '#eb-content, #pageJumpInput, .page-height-adjustment, #customCssInput', // 允许直接选择#eb-content中的文字
         preventOnFilter: false, // 过滤时不阻止默认行为
         onStart: function(evt) {
@@ -982,22 +984,79 @@ function initScript() {
         }
     });
 
-    // 监听点击事件
-    if (isKindleMode()) {
-        content.addEventListener('click', function(e) {
-            const screenWidth = window.innerWidth;
-            const targetArea = screenWidth * 0.2;
-            
-            // 左侧40px内点击
-            if (e.clientX < targetArea) {
-                prevPageBtn.click();
-            }
-            // 右侧40px内点击
-            else if (e.clientX > screenWidth - targetArea) {
-                nextPageBtn.click();
-            }
-        });
+    // 点击翻页功能
+    function handleClickPage(e) {
+        if (!isClickPageEnabled || !isPaginationMode) return;
+        
+        const screenWidth = window.innerWidth;
+        const targetArea = screenWidth * 0.2;
+        
+        // 左侧20%区域点击
+        if (e.clientX < targetArea) {
+            prevPageBtn.click();
+        }
+        // 右侧20%区域点击
+        else if (e.clientX > screenWidth - targetArea) {
+            nextPageBtn.click();
+        }
     }
+    
+    // 初始化点击翻页功能状态
+    function initClickPageState() {
+        if (!isKindleMode()) {
+            isClickPageEnabled = localStorage.getItem('clickPageEnabled') === 'true';
+        } else {
+            isClickPageEnabled = getCookie('clickPageEnabled') === 'true';
+        }
+        updateClickPageButton();
+        
+        // 如果是 Kindle 模式，默认开启点击翻页
+        if (isKindleMode() && localStorage.getItem('clickPageEnabled') === null && getCookie('clickPageEnabled') === null) {
+            isClickPageEnabled = true;
+            saveClickPageState();
+        }
+    }
+    
+    // 保存点击翻页功能状态
+    function saveClickPageState() {
+        if (!isKindleMode()) {
+            localStorage.setItem('clickPageEnabled', isClickPageEnabled.toString());
+        } else {
+            setCookie('clickPageEnabled', isClickPageEnabled.toString());
+        }
+    }
+    
+    // 更新点击翻页按钮状态
+    function updateClickPageButton() {
+        if (isClickPageEnabled) {
+            toggleClickPageBtn.classList.add('active');
+            toggleClickPageBtn.style.background = 'var(--primary)';
+            toggleClickPageBtn.style.color = 'white';
+        } else {
+            toggleClickPageBtn.classList.remove('active');
+            toggleClickPageBtn.style.background = '';
+            toggleClickPageBtn.style.color = '';
+        }
+    }
+    
+    // 初始化点击翻页功能状态
+    initClickPageState();
+    
+    // 监听点击事件
+    content.addEventListener('click', handleClickPage);
+    
+    // 点击翻页按钮点击事件
+    toggleClickPageBtn.addEventListener('click', function() {
+        isClickPageEnabled = !isClickPageEnabled;
+        saveClickPageState();
+        updateClickPageButton();
+        
+        if (isClickPageEnabled) {
+            showNotification('Click to turn page enabled', 'info');
+        } else {
+            showNotification('Click to turn page disabled', 'info');
+        }
+    });
 
     // 自定义 css
     customCssFunc();
