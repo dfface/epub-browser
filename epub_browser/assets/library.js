@@ -312,6 +312,41 @@ function initScript() {
         });
     }
 
+    // PWA 安装提示
+    let deferredPrompt;
+    const installBtn = document.createElement('button');
+    installBtn.id = 'pwa-install-btn';
+    installBtn.innerHTML = '<i class="fas fa-download"></i> Install App';
+    installBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:12px 20px;background:#4a90d9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.2);z-index:9999;display:none;';
+    document.body.appendChild(installBtn);
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.style.display = 'block';
+        console.log('PWA install prompt captured');
+    });
+
+    installBtn.addEventListener('click', function() {
+        if (deferredPrompt) {
+            installBtn.style.display = 'none';
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function(choiceResult) {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        }
+    });
+
+    window.addEventListener('appinstalled', function() {
+        installBtn.style.display = 'none';
+        console.log('PWA installed successfully');
+    });
+
 };
 
 // 如果DOM已经加载完成，立即初始化

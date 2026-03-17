@@ -1,4 +1,5 @@
-const CACHE_NAME = 'epub-browser-v3';
+const CACHE_NAME = 'epub-browser-v5';
+
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -11,10 +12,14 @@ const STATIC_ASSETS = [
     '/assets/fa.all.min.css',
     '/assets/sortable.min.js',
     '/assets/medium-zoom.min.js',
-    '/assets/manifest.json'
+    '/assets/manifest.json',
+    '/assets/icon-192.png',
+    '/assets/icon-512.png',
+    '/assets/screenshot-wide.png',
+    '/assets/screenshot-narrow.png'
 ];
 
-// 安装事件 - 只缓存静态资源
+// 安装事件 - 预缓存静态资源
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
@@ -46,22 +51,18 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// 判断是否应该缓存该请求
+// 判断是否应该缓存该请求（只缓存静态资源）
 function shouldCache(url) {
     const urlObj = new URL(url);
-    
-    // 缓存书籍页面
-    if (urlObj.pathname.startsWith('/book/')) {
-        return true;
-    }
+    const pathname = urlObj.pathname;
     
     // 缓存静态资源
-    if (urlObj.pathname.startsWith('/assets/')) {
+    if (pathname.startsWith('/assets/')) {
         return true;
     }
     
-    // 缓存根页面
-    if (urlObj.pathname === '/' || urlObj.pathname === '/index.html') {
+    // 只缓存根页面
+    if (pathname === '/' || pathname === '/index.html') {
         return true;
     }
     
@@ -80,29 +81,8 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 对于导航请求（页面跳转），使用网络优先策略
+    // 导航请求（页面跳转）- 直接从网络获取，不经过 Service Worker
     if (event.request.mode === 'navigate') {
-        event.respondWith(
-            fetch(event.request, { redirect: 'follow' })
-                .then((response) => {
-                    // 缓存响应（包括重定向后的最终响应）
-                    if (response) {
-                        const responseToCache = response.clone();
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    // 网络失败时，返回缓存
-                    return caches.match(event.request)
-                        .then((cachedResponse) => {
-                            return cachedResponse || caches.match('/index.html');
-                        });
-                })
-        );
         return;
     }
 
@@ -112,18 +92,19 @@ self.addEventListener('fetch', (event) => {
             .then((cachedResponse) => {
                 // 如果有缓存，返回缓存
                 if (cachedResponse) {
-                    // 同时在后台更新缓存
-                    if (shouldCache(event.request.url)) {
-                        fetchAndCache(event.request);
-                    }
                     return cachedResponse;
                 }
 
                 // 否则从网络获取
-                return fetch(event.request, { redirect: 'follow' })
+                return fetch(event.request)
                     .then((response) => {
-                        // 缓存响应
-                        if (response && shouldCache(event.request.url)) {
+                        // 检查是否是有效的响应
+                        if (!response || response.status !== 200) {
+                            return response;
+                        }
+
+                        // 如果应该缓存，则缓存响应
+                        if (shouldCache(event.request.url)) {
                             const responseToCache = response.clone();
                             caches.open(CACHE_NAME)
                                 .then((cache) => {
@@ -134,27 +115,11 @@ self.addEventListener('fetch', (event) => {
                         return response;
                     })
                     .catch(() => {
-                        // 如果网络请求失败，尝试返回缓存的首页
-                        if (event.request.destination === 'document') {
-                            return caches.match('/index.html');
+                        // 如果网络请求失败，返回备用响应
+                        if (event.request.destination === 'image') {
+                            return new Response('', { status: 404 });
                         }
                     });
             })
     );
 });
-
-// 后台更新缓存
-function fetchAndCache(request) {
-    fetch(request, { redirect: 'follow' })
-        .then((response) => {
-            if (response) {
-                caches.open(CACHE_NAME)
-                    .then((cache) => {
-                        cache.put(request, response);
-                    });
-            }
-        })
-        .catch(() => {
-            // 忽略错误
-        });
-}
