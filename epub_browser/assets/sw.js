@@ -1,4 +1,4 @@
-const CACHE_NAME = 'epub-browser-v1';
+const CACHE_NAME = 'epub-browser-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -80,6 +80,33 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // 对于导航请求（页面跳转），使用网络优先策略
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request, { redirect: 'follow' })
+                .then((response) => {
+                    // 缓存响应（包括重定向后的最终响应）
+                    if (response) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME)
+                            .then((cache) => {
+                                cache.put(event.request, responseToCache);
+                            });
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    // 网络失败时，返回缓存
+                    return caches.match(event.request)
+                        .then((cachedResponse) => {
+                            return cachedResponse || caches.match('/index.html');
+                        });
+                })
+        );
+        return;
+    }
+
+    // 其他请求使用缓存优先策略
     event.respondWith(
         caches.match(event.request)
             .then((cachedResponse) => {
@@ -93,15 +120,10 @@ self.addEventListener('fetch', (event) => {
                 }
 
                 // 否则从网络获取
-                return fetch(event.request)
+                return fetch(event.request, { redirect: 'follow' })
                     .then((response) => {
-                        // 检查是否是有效的响应
-                        if (!response || response.status !== 200 || response.type !== 'basic') {
-                            return response;
-                        }
-
-                        // 如果应该缓存，则缓存响应
-                        if (shouldCache(event.request.url)) {
+                        // 缓存响应
+                        if (response && shouldCache(event.request.url)) {
                             const responseToCache = response.clone();
                             caches.open(CACHE_NAME)
                                 .then((cache) => {
@@ -123,9 +145,9 @@ self.addEventListener('fetch', (event) => {
 
 // 后台更新缓存
 function fetchAndCache(request) {
-    fetch(request)
+    fetch(request, { redirect: 'follow' })
         .then((response) => {
-            if (response && response.status === 200 && response.type === 'basic') {
+            if (response) {
                 caches.open(CACHE_NAME)
                     .then((cache) => {
                         cache.put(request, response);
