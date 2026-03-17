@@ -988,17 +988,42 @@ function initScript() {
     function handleClickPage(e) {
         if (!isClickPageEnabled || !isPaginationMode) return;
         
-        const screenWidth = window.innerWidth;
-        const targetArea = screenWidth * 0.2;
+        // 排除一些特殊元素，避免误触发
+        const target = e.target;
+        const tagName = target.tagName.toLowerCase();
+        const isInteractiveElement = 
+            tagName === 'a' || 
+            tagName === 'button' || 
+            tagName === 'input' || 
+            tagName === 'textarea' || 
+            tagName === 'select' ||
+            target.closest('a') || 
+            target.closest('button') || 
+            target.closest('input') || 
+            target.closest('textarea') || 
+            target.closest('select') ||
+            target.closest('.navigation') ||
+            target.closest('.font-controls') ||
+            target.closest('.reading-controls') ||
+            target.closest('.toc-container');
         
-        // 左侧20%区域点击
-        if (e.clientX < targetArea) {
+        if (isInteractiveElement) return;
+        
+        const screenWidth = window.innerWidth;
+        const leftArea = screenWidth * 0.3;  // 左侧30%区域
+        const rightArea = screenWidth * 0.7; // 右侧30%区域（从70%开始）
+        
+        // 左侧30%区域点击 - 上一页
+        if (e.clientX < leftArea) {
+            e.preventDefault();
             prevPageBtn.click();
         }
-        // 右侧20%区域点击
-        else if (e.clientX > screenWidth - targetArea) {
+        // 右侧30%区域点击 - 下一页
+        else if (e.clientX > rightArea) {
+            e.preventDefault();
             nextPageBtn.click();
         }
+        // 中间40%区域不触发翻页
     }
     
     // 初始化点击翻页功能状态
@@ -1042,8 +1067,8 @@ function initScript() {
     // 初始化点击翻页功能状态
     initClickPageState();
     
-    // 监听点击事件
-    content.addEventListener('click', handleClickPage);
+    // 监听整个 body 的点击事件
+    document.body.addEventListener('click', handleClickPage);
     
     // 点击翻页按钮点击事件
     toggleClickPageBtn.addEventListener('click', function() {
@@ -1052,9 +1077,9 @@ function initScript() {
         updateClickPageButton();
         
         if (isClickPageEnabled) {
-            showNotification('Click to turn page enabled', 'info');
+            showNotification('Click edge to turn page enabled', 'info');
         } else {
-            showNotification('Click to turn page disabled', 'info');
+            showNotification('Click edge to turn page disabled', 'info');
         }
     });
 
