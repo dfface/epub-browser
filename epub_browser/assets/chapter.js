@@ -1085,11 +1085,33 @@ function initScript() {
         }
         updatePureModeButton();
         
+        const navigation = document.querySelector('.navigation');
+        const topControls = document.querySelector('.top-controls');
+        const readingControls = document.querySelector('.reading-controls');
+        const contentContainer = document.querySelector('.content-container');
+        const ebContent = document.getElementById('eb-content');
+        
         // 应用保存的状态
         if (isPureModeEnabled) {
-            document.querySelector('.navigation').style.display = 'none';
-            document.querySelector('.top-controls').style.display = 'none';
-            document.querySelector('.reading-controls').style.display = 'none';
+            // 隐藏工具栏
+            navigation.style.display = 'none';
+            topControls.style.display = 'none';
+            readingControls.style.display = 'none';
+            
+            // 调整内容容器高度，填充导航栏的空间
+            contentContainer.style.marginTop = '0';
+            contentContainer.style.marginBottom = '0';
+            ebContent.style.minHeight = 'calc(100vh - 80px)'; // 减去页面顶部和底部的 padding
+        } else {
+            // 显示工具栏
+            navigation.style.display = 'flex';
+            topControls.style.display = 'flex';
+            readingControls.style.display = 'flex';
+            
+            // 恢复默认高度
+            contentContainer.style.marginTop = '';
+            contentContainer.style.marginBottom = '';
+            ebContent.style.minHeight = '';
         }
     }
     
@@ -1108,17 +1130,35 @@ function initScript() {
         savePureModeState();
         updatePureModeButton();
         
+        const navigation = document.querySelector('.navigation');
+        const topControls = document.querySelector('.top-controls');
+        const readingControls = document.querySelector('.reading-controls');
+        const contentContainer = document.querySelector('.content-container');
+        const ebContent = document.getElementById('eb-content');
+        
         if (isPureModeEnabled) {
             // 隐藏工具栏
-            document.querySelector('.navigation').style.display = 'none';
-            document.querySelector('.top-controls').style.display = 'none';
-            document.querySelector('.reading-controls').style.display = 'none';
+            navigation.style.display = 'none';
+            topControls.style.display = 'none';
+            readingControls.style.display = 'none';
+            
+            // 调整内容容器高度，填充导航栏的空间
+            contentContainer.style.marginTop = '0';
+            contentContainer.style.marginBottom = '0';
+            ebContent.style.minHeight = 'calc(100vh - 80px)'; // 减去页面顶部和底部的 padding
+            
             showNotification('Pure reading mode enabled', 'info');
         } else {
             // 显示工具栏
-            document.querySelector('.navigation').style.display = 'flex';
-            document.querySelector('.top-controls').style.display = 'flex';
-            document.querySelector('.reading-controls').style.display = 'flex';
+            navigation.style.display = 'flex';
+            topControls.style.display = 'flex';
+            readingControls.style.display = 'flex';
+            
+            // 恢复默认高度
+            contentContainer.style.marginTop = '';
+            contentContainer.style.marginBottom = '';
+            ebContent.style.minHeight = '';
+            
             showNotification('Pure reading mode disabled', 'info');
         }
     }
