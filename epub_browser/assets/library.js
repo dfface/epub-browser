@@ -317,9 +317,8 @@ function initScript() {
     const readingControls = document.querySelector('.reading-controls');
     
     // 安装应用按钮
-    const installBtn = document.createElement('a');
+    const installBtn = document.createElement('button');
     installBtn.id = 'pwa-install-btn';
-    installBtn.href = '#';
     installBtn.className = 'control-btn';
     installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name">Install</div>';
     installBtn.style.display = 'none';
@@ -328,9 +327,8 @@ function initScript() {
     }
 
     // 更新缓存按钮
-    const updateCacheBtn = document.createElement('a');
+    const updateCacheBtn = document.createElement('button');
     updateCacheBtn.id = 'update-cache-btn';
-    updateCacheBtn.href = '#';
     updateCacheBtn.className = 'control-btn';
     updateCacheBtn.innerHTML = '<i class="fas fa-sync"></i><div class="control-name">Update</div>';
     if (readingControls) {
