@@ -778,6 +778,7 @@ function initBookshelf() {
         renderGroupContent(group, 'All');
         
         groupModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     }
     
     // 渲染分组内容
@@ -1127,11 +1128,13 @@ function initBookshelf() {
         currentTag = 'All';
         renderBookshelf('All');
         bookshelfModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     });
     
     // 关闭书架弹窗
     bookshelfCloseBtn.addEventListener('click', function() {
         bookshelfModal.classList.remove('active');
+        document.body.style.overflow = '';
     });
     
     // 关闭分组弹窗
@@ -1145,6 +1148,7 @@ function initBookshelf() {
     bookshelfModal.addEventListener('click', function(e) {
         if (e.target === bookshelfModal) {
             bookshelfModal.classList.remove('active');
+            document.body.style.overflow = '';
         }
     });
     
