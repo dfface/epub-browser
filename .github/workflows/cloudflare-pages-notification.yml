@@ -1,0 +1,50 @@
+# GitHub workflow for Cloudflare Pages build notifications
+
+name: Cloudflare Pages Deploy Notify
+
+# Controls when the action will run.
+on:
+  # Triggers on push to main branch
+  push:
+    branches: [ gh-pages ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "notify"
+  notify:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Get commit information
+      - name: Get commit details
+        id: commit
+        run: |
+          echo "::set-output name=message::$(git log -1 --pretty=%B)"
+          echo "::set-output name=author::$(git log -1 --pretty=%an)"
+
+      # Wait for Cloudflare Pages deployment and send notification
+      - name: Wait for Cloudflare Pages deployment
+        uses: arddluma/cloudflare-pages-slack-notification@v4
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          project: ${{ secrets.CF_PAGES_PROJECT }}
+          slackWebHook: ${{ secrets.FEISHU_WEBHOOK }}
+          # Comprehensive notification message
+          message: |
+            🚀 Cloudflare Pages 部署通知
+            - 项目: ${{ secrets.CF_PAGES_PROJECT }}
+            - 环境: production
+            - 提交信息: ${{ steps.commit.outputs.message }}
+            - 提交作者: ${{ steps.commit.outputs.author }}
+            - 提交: ${{ github.sha }}
+            - 分支: ${{ github.ref }}
+            - 仓库: ${{ github.repository }}
+            - 触发事件: ${{ github.event_name }}
