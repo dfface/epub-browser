@@ -57,3 +57,25 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64  # 关键：指定amd64和arm64架构
           builder: ${{ steps.buildx.outputs.name }}  # 使用Buildx构建器
+
+      # Send Feishu notification
+      - name: "Send Feishu notification"
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" == "success" ]; then
+            STATUS_TEXT="成功"
+          elif [ "$STATUS" == "failure" ]; then
+            STATUS_TEXT="失败"
+          else
+            STATUS_TEXT="取消"
+          fi
+          
+          curl -X POST "${{ secrets.FEISHU_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "msg_type": "text",
+              "content": {
+                "text": "GitHub workflow 通知：\n- 工作流：Upload to Docker\n- 状态：'"$STATUS_TEXT"'\n- 触发事件：'"${{ github.event_name }}"',\n- 提交：'"${{ github.sha }}"',\n- 分支：'"${{ github.ref }}"',\n- 仓库：'"${{ github.repository }}"''
+              }
+            }'
