@@ -1086,9 +1086,6 @@ function initScript() {
         updatePureModeButton();
         
         const navigation = document.querySelector('.navigation');
-        const mobileControls = document.querySelector('.mobile-controls');
-        const topControls = document.querySelector('.top-controls');
-        const readingControls = document.querySelector('.reading-controls');
         const contentContainer = document.querySelector('.content-container');
         const ebContent = document.getElementById('eb-content');
         
@@ -1100,11 +1097,20 @@ function initScript() {
             // 根据设备类型隐藏不同的控件
             if (isMobile()) {
                 // 移动端：隐藏 mobile-controls
-                mobileControls.style.display = 'none';
+                const mobileControls = document.querySelector('.mobile-controls');
+                if (mobileControls) {
+                    mobileControls.style.display = 'none';
+                }
             } else {
                 // 桌面端：隐藏 top-controls 和 reading-controls
-                topControls.style.display = 'none';
-                readingControls.style.display = 'none';
+                const topControls = document.querySelector('.top-controls');
+                const readingControls = document.querySelector('.reading-controls');
+                if (topControls) {
+                    topControls.style.display = 'none';
+                }
+                if (readingControls) {
+                    readingControls.style.display = 'none';
+                }
             }
             
             // 调整内容容器高度，填充导航栏的空间
@@ -1118,11 +1124,20 @@ function initScript() {
             // 根据设备类型显示不同的控件
             if (isMobile()) {
                 // 移动端：显示 mobile-controls
-                mobileControls.style.display = 'flex';
+                const mobileControls = document.querySelector('.mobile-controls');
+                if (mobileControls) {
+                    mobileControls.style.display = 'flex';
+                }
             } else {
                 // 桌面端：显示 top-controls 和 reading-controls
-                topControls.style.display = 'flex';
-                readingControls.style.display = 'flex';
+                const topControls = document.querySelector('.top-controls');
+                const readingControls = document.querySelector('.reading-controls');
+                if (topControls) {
+                    topControls.style.display = 'flex';
+                }
+                if (readingControls) {
+                    readingControls.style.display = 'flex';
+                }
             }
             
             // 恢复默认高度
@@ -1148,9 +1163,6 @@ function initScript() {
         updatePureModeButton();
         
         const navigation = document.querySelector('.navigation');
-        const mobileControls = document.querySelector('.mobile-controls');
-        const topControls = document.querySelector('.top-controls');
-        const readingControls = document.querySelector('.reading-controls');
         const contentContainer = document.querySelector('.content-container');
         const ebContent = document.getElementById('eb-content');
         
@@ -1161,11 +1173,20 @@ function initScript() {
             // 根据设备类型隐藏不同的控件
             if (isMobile()) {
                 // 移动端：隐藏 mobile-controls
-                mobileControls.style.display = 'none';
+                const mobileControls = document.querySelector('.mobile-controls');
+                if (mobileControls) {
+                    mobileControls.style.display = 'none';
+                }
             } else {
                 // 桌面端：隐藏 top-controls 和 reading-controls
-                topControls.style.display = 'none';
-                readingControls.style.display = 'none';
+                const topControls = document.querySelector('.top-controls');
+                const readingControls = document.querySelector('.reading-controls');
+                if (topControls) {
+                    topControls.style.display = 'none';
+                }
+                if (readingControls) {
+                    readingControls.style.display = 'none';
+                }
             }
             
             // 调整内容容器高度，填充导航栏的空间
@@ -1181,11 +1202,20 @@ function initScript() {
             // 根据设备类型显示不同的控件
             if (isMobile()) {
                 // 移动端：显示 mobile-controls
-                mobileControls.style.display = 'flex';
+                const mobileControls = document.querySelector('.mobile-controls');
+                if (mobileControls) {
+                    mobileControls.style.display = 'flex';
+                }
             } else {
                 // 桌面端：显示 top-controls 和 reading-controls
-                topControls.style.display = 'flex';
-                readingControls.style.display = 'flex';
+                const topControls = document.querySelector('.top-controls');
+                const readingControls = document.querySelector('.reading-controls');
+                if (topControls) {
+                    topControls.style.display = 'flex';
+                }
+                if (readingControls) {
+                    readingControls.style.display = 'flex';
+                }
             }
             
             // 恢复默认高度
