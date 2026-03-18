@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/github/license/dfface/epub-browser)](https://pypi.org/project/epub-browser/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/epub-browser)
 
-A simple and modern web E-book reader, which allows you to read e-books within a browser.
+A modern web-based EPUB reader with library management, dark mode, Kindle optimization, code highlighting, and PWA support for an enhanced reading experience across devices.
 
 Try it online: [https://epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech)
 
@@ -31,7 +31,7 @@ It now supports the following features:
 
 - **Mobile device compatibility**: Especially for Kindle users—remember to tap *Not Kindle* on the homepage header to enable Kindle Mode for an optimized experience.
 
-- **Code highlighting** (disabled in Kindle Mode).
+- **Code highlighting** (disabled in Kindle Mode) with theme synchronization.
 
 - **Reading position retention**: Restores your last-read chapter (supported on all devices including Kindle) and your last-read location (supported on all devices *except* Kindle).
 
@@ -53,6 +53,12 @@ It now supports the following features:
 - **Calibre metadata integration**: Displays tags (`dc:subject`) and comments (`dc:description`) edited in Calibre. *Note: After editing metadata in Calibre, use the "Edit book" function to save your changes.*
 
 - **Watchdog utility**: Monitors the user-specified directory (or the directory containing EPUB files) with `--watch` parameter. Automatically adds newly added or updated EPUB files to the library.
+
+- **Progressive Web App (PWA)**: Installable as a native app on supported devices for a more app-like experience.
+
+- **Pure Reading Mode**: Hides all toolbars for distraction-free reading, toggleable by clicking the center of the screen.
+
+- **Cache management**: Update button in library to clear Service Worker cache and refresh content.
 
 
 ## Usage

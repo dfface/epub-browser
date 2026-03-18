@@ -1072,6 +1072,96 @@ function initScript() {
     // 监听整个 body 的点击事件
     document.body.addEventListener('click', handleClickPage);
     
+    // 纯净阅读模式
+    let isPureModeEnabled = false;
+    const togglePureModeBtn = document.getElementById('togglePureMode');
+    
+    // 初始化纯净阅读模式状态
+    function initPureModeState() {
+        if (!isKindleMode()) {
+            isPureModeEnabled = localStorage.getItem('pureModeEnabled') === 'true';
+        } else {
+            isPureModeEnabled = getCookie('pureModeEnabled') === 'true';
+        }
+        updatePureModeButton();
+        
+        // 应用保存的状态
+        if (isPureModeEnabled) {
+            document.querySelector('.navigation').style.display = 'none';
+            document.querySelector('.top-controls').style.display = 'none';
+            document.querySelector('.reading-controls').style.display = 'none';
+        }
+    }
+    
+    // 保存纯净阅读模式状态
+    function savePureModeState() {
+        if (!isKindleMode()) {
+            localStorage.setItem('pureModeEnabled', isPureModeEnabled.toString());
+        } else {
+            setCookie('pureModeEnabled', isPureModeEnabled.toString());
+        }
+    }
+    
+    // 切换纯净阅读模式
+    function togglePureMode() {
+        isPureModeEnabled = !isPureModeEnabled;
+        savePureModeState();
+        updatePureModeButton();
+        
+        if (isPureModeEnabled) {
+            // 隐藏工具栏
+            document.querySelector('.navigation').style.display = 'none';
+            document.querySelector('.top-controls').style.display = 'none';
+            document.querySelector('.reading-controls').style.display = 'none';
+            showNotification('Pure reading mode enabled', 'info');
+        } else {
+            // 显示工具栏
+            document.querySelector('.navigation').style.display = 'flex';
+            document.querySelector('.top-controls').style.display = 'flex';
+            document.querySelector('.reading-controls').style.display = 'flex';
+            showNotification('Pure reading mode disabled', 'info');
+        }
+    }
+    
+    // 更新纯净模式按钮状态
+    function updatePureModeButton() {
+        if (isPureModeEnabled) {
+            togglePureModeBtn.classList.add('active');
+            togglePureModeBtn.style.background = 'var(--primary)';
+            togglePureModeBtn.style.color = 'white';
+        } else {
+            togglePureModeBtn.classList.remove('active');
+            togglePureModeBtn.style.background = '';
+            togglePureModeBtn.style.color = '';
+        }
+    }
+    
+    // 点击文档中心时显示工具栏
+    document.getElementById('eb-content').addEventListener('click', function(e) {
+        if (isPureModeEnabled) {
+            // 计算点击位置是否在文档中心
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            const centerX = screenWidth / 2;
+            const centerY = screenHeight / 2;
+            const centerArea = Math.min(screenWidth, screenHeight) * 0.3; // 中心30%区域
+            
+            if (Math.abs(e.clientX - centerX) < centerArea && Math.abs(e.clientY - centerY) < centerArea) {
+                togglePureMode();
+            }
+        }
+    });
+    
+    // 纯净模式按钮点击事件
+    if (togglePureModeBtn) {
+        togglePureModeBtn.addEventListener('click', function() {
+            togglePureMode();
+        });
+    }
+    
+    // 初始化纯净阅读模式状态
+    initPureModeState();
+    
     // 点击翻页按钮点击事件
     toggleClickPageBtn.addEventListener('click', function() {
         isClickPageEnabled = !isClickPageEnabled;

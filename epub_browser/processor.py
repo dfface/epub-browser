@@ -982,6 +982,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                         <i class="fas fa-hand-pointer"></i>
                         <span class="control-name">Click</span>
                     </div>
+                    <div class="control-btn" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
                 </div>
                 <div style="display: none; flex-direction: row;" class="page-height-adjustment">
                     <span>
