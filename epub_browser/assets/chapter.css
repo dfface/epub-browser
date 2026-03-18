@@ -1214,7 +1214,7 @@ body {
         padding: 10px 5px;
         gap: 2px;
         flex-wrap: nowrap;
-        justify-content: space-between;
+        justify-content: center;
         overflow-x: auto;
         scrollbar-width: none;
         -ms-overflow-style: none;
