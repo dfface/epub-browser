@@ -1027,6 +1027,101 @@ body {
 /* 代码块 */
 .dark-mode #eb-content pre code {
     background: var(--bg-color) !important;
+    color: var(--content-text) !important;
+}
+
+.dark-mode #eb-content pre {
+    background: var(--border-color) !important;
+}
+
+/* 代码高亮主题覆盖 */
+.dark-mode .hljs {
+    background: var(--bg-color) !important;
+    color: var(--content-text) !important;
+}
+
+.dark-mode .hljs-comment,
+.dark-mode .hljs-quote {
+    color: var(--text-secondary) !important;
+}
+
+.dark-mode .hljs-keyword,
+.dark-mode .hljs-selector-tag,
+.dark-mode .hljs-literal,
+.dark-mode .hljs-section,
+.dark-mode .hljs-link {
+    color: var(--primary) !important;
+}
+
+.dark-mode .hljs-string,
+.dark-mode .hljs-title,
+.dark-mode .hljs-name,
+.dark-mode .hljs-type,
+.dark-mode .hljs-attribute,
+.dark-mode .hljs-symbol,
+.dark-mode .hljs-bullet,
+.dark-mode .hljs-built_in,
+.dark-mode .hljs-addition,
+.dark-mode .hljs-variable,
+.dark-mode .hljs-template-tag,
+.dark-mode .hljs-template-variable {
+    color: var(--content-text) !important;
+}
+
+.dark-mode .hljs-number,
+.dark-mode .hljs-regexp,
+.dark-mode .hljs-literal {
+    color: var(--success) !important;
+}
+
+.dark-mode .hljs-deletion,
+.dark-mode .hljs-meta {
+    color: #ff6b6b !important;
+}
+
+/* 日间模式代码高亮覆盖 */
+:not(.dark-mode) .hljs {
+    background: var(--bg-color) !important;
+    color: var(--content-text) !important;
+}
+
+:not(.dark-mode) .hljs-comment,
+:not(.dark-mode) .hljs-quote {
+    color: var(--text-secondary) !important;
+}
+
+:not(.dark-mode) .hljs-keyword,
+:not(.dark-mode) .hljs-selector-tag,
+:not(.dark-mode) .hljs-literal,
+:not(.dark-mode) .hljs-section,
+:not(.dark-mode) .hljs-link {
+    color: var(--primary) !important;
+}
+
+:not(.dark-mode) .hljs-string,
+:not(.dark-mode) .hljs-title,
+:not(.dark-mode) .hljs-name,
+:not(.dark-mode) .hljs-type,
+:not(.dark-mode) .hljs-attribute,
+:not(.dark-mode) .hljs-symbol,
+:not(.dark-mode) .hljs-bullet,
+:not(.dark-mode) .hljs-built_in,
+:not(.dark-mode) .hljs-addition,
+:not(.dark-mode) .hljs-variable,
+:not(.dark-mode) .hljs-template-tag,
+:not(.dark-mode) .hljs-template-variable {
+    color: var(--content-text) !important;
+}
+
+:not(.dark-mode) .hljs-number,
+:not(.dark-mode) .hljs-regexp,
+:not(.dark-mode) .hljs-literal {
+    color: var(--success) !important;
+}
+
+:not(.dark-mode) .hljs-deletion,
+:not(.dark-mode) .hljs-meta {
+    color: #ff6b6b !important;
 }
 
 /* 表格 */
