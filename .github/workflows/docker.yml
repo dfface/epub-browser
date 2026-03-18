@@ -73,9 +73,9 @@ jobs:
           
           curl -X POST "${{ secrets.FEISHU_WEBHOOK }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "msg_type": "text",
-              "content": {
-                "text": "GitHub workflow 通知：\n- 工作流：Upload to Docker\n- 状态：'"$STATUS_TEXT"'\n- 触发事件：'"${{ github.event_name }}"',\n- 提交：'"${{ github.sha }}"',\n- 分支：'"${{ github.ref }}"',\n- 仓库：'"${{ github.repository }}"''
+            -d "{
+              \"msg_type\": \"text\",
+              \"content\": {
+                \"text\": \"GitHub workflow 通知：\\n- 工作流：Upload to Docker\\n- 状态：$STATUS_TEXT\\n- 触发事件：${{ github.event_name }}\\n- 提交：${{ github.sha }}\\n- 分支：${{ github.ref }}\\n- 仓库：${{ github.repository }}\"
               }
-            }'
+            }"
