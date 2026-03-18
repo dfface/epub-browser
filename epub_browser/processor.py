@@ -480,21 +480,7 @@ class EPUBProcessor:
         
         # 如果有详细的toc信息，使用toc生成目录
         if self.toc:
-            # 创建章节路径到索引的映射（支持多种路径格式）
-            chapter_index_map = {}
-            chapter_filename_map = {}  # 用于文件名匹配
-            for i, chapter in enumerate(self.chapters):
-                # 原始路径
-                chapter_index_map[chapter['path']] = i
-                # 规范化路径（去除 ./ 前缀）
-                normalized_path = chapter['path'].lstrip('./').lstrip('/')
-                chapter_index_map[normalized_path] = i
-                # 文件名匹配
-                chapter_filename = os.path.basename(chapter['path'])
-                chapter_filename_map[chapter_filename] = i
-            
-            # print(f"Chapter index mapping: {chapter_index_map}")
-            # print(f"Chapter filename mapping: {chapter_filename_map}")
+            chapter_index_map, chapter_filename_map = self._build_chapter_index_maps()
             
             # 根据toc生成目录
             for toc_item in self.toc:
@@ -502,18 +488,7 @@ class EPUBProcessor:
                 chapter_anchor = toc_item.get('anchor', None)
                 toc_src = toc_item['src']
                 
-                # 尝试多种方式匹配章节索引
-                chapter_index = None
-                
-                # 1. 直接匹配
-                if toc_src in chapter_index_map:
-                    chapter_index = chapter_index_map[toc_src]
-                # 2. 规范化路径匹配（去除 ./ 前缀）
-                elif toc_src.lstrip('./').lstrip('/') in chapter_index_map:
-                    chapter_index = chapter_index_map[toc_src.lstrip('./').lstrip('/')]
-                # 3. 文件名匹配
-                elif os.path.basename(toc_src) in chapter_filename_map:
-                    chapter_index = chapter_filename_map[os.path.basename(toc_src)]
+                chapter_index = self._find_chapter_index(toc_src, chapter_index_map, chapter_filename_map)
                 
                 if chapter_index is not None:
                     if chapter_anchor is not None:
@@ -622,6 +597,94 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
         with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(index_html)
+        
+        # 生成目录 JSON 文件
+        self.create_toc_json()
+    
+    def _build_chapter_index_maps(self):
+        """构建章节路径到索引的映射（支持多种路径格式）
+        
+        Returns:
+            tuple: (chapter_index_map, chapter_filename_map)
+        """
+        chapter_index_map = {}
+        chapter_filename_map = {}
+        for i, chapter in enumerate(self.chapters):
+            # 原始路径
+            chapter_index_map[chapter['path']] = i
+            # 规范化路径（去除 ./ 前缀）
+            normalized_path = chapter['path'].lstrip('./').lstrip('/')
+            chapter_index_map[normalized_path] = i
+            # 文件名匹配
+            chapter_filename = os.path.basename(chapter['path'])
+            chapter_filename_map[chapter_filename] = i
+        return chapter_index_map, chapter_filename_map
+    
+    def _find_chapter_index(self, toc_src, chapter_index_map, chapter_filename_map):
+        """根据toc_src查找章节索引
+        
+        Args:
+            toc_src: 目录项的src路径
+            chapter_index_map: 章节路径到索引的映射
+            chapter_filename_map: 章节文件名到索引的映射
+            
+        Returns:
+            int or None: 章节索引，未找到则返回None
+        """
+        # 1. 直接匹配
+        if toc_src in chapter_index_map:
+            return chapter_index_map[toc_src]
+        # 2. 规范化路径匹配（去除 ./ 前缀）
+        elif toc_src.lstrip('./').lstrip('/') in chapter_index_map:
+            return chapter_index_map[toc_src.lstrip('./').lstrip('/')]
+        # 3. 文件名匹配
+        elif os.path.basename(toc_src) in chapter_filename_map:
+            return chapter_filename_map[os.path.basename(toc_src)]
+        return None
+    
+    def create_toc_json(self):
+        """生成目录 JSON 文件到书籍自己的文件夹下"""
+        toc_data = []
+        
+        # 如果有详细的toc信息，使用toc生成目录
+        if self.toc:
+            chapter_index_map, chapter_filename_map = self._build_chapter_index_maps()
+            
+            # 根据toc生成目录
+            for toc_item in self.toc:
+                chapter_anchor = toc_item.get('anchor', None)
+                toc_src = toc_item['src']
+                
+                chapter_index = self._find_chapter_index(toc_src, chapter_index_map, chapter_filename_map)
+                
+                if chapter_index is not None:
+                    chapter_data = {
+                        'title': toc_item['title'],
+                        'level': toc_item.get('level', 0),
+                        'chapter_index': chapter_index,
+                        'chapter_file': f'chapter_{chapter_index}.html'
+                    }
+                    if chapter_anchor is not None:
+                        chapter_data['anchor'] = chapter_anchor
+                    toc_data.append(chapter_data)
+                else:
+                    print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
+        else:
+            # 回退到简单章节列表
+            for i, chapter in enumerate(self.chapters):
+                toc_data.append({
+                    'title': chapter['title'],
+                    'level': 0,
+                    'chapter_index': i,
+                    'chapter_file': f'chapter_{i}.html'
+                })
+        
+        # 保存为 JSON 文件到书籍自己的文件夹下
+        toc_json_path = os.path.join(self.web_dir, 'toc.json')
+        with open(toc_json_path, 'w', encoding='utf-8') as f:
+            json.dump(toc_data, f, ensure_ascii=False, indent=2)
+        
+        print(f"TOC JSON file created: {toc_json_path} with {len(toc_data)} items")
     
     def create_chapter_pages(self):
         """创建章节页面"""
