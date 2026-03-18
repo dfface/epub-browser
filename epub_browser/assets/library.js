@@ -312,6 +312,32 @@ function initScript() {
         });
     }
 
+    // 显示通知
+    function showNotification(message, type) {
+        // 移除现有通知
+        const existingNotification = document.querySelector('.custom-css-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        // 创建新通知
+        const notification = document.createElement('div');
+        notification.className = `custom-css-notification ${type}`;
+        notification.textContent = message;
+        
+        // 添加到页面
+        document.body.appendChild(notification);
+        
+        // 自动移除
+        setTimeout(() => {
+            notification.classList.add('fade-out');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+
     // PWA 安装提示和更新按钮
     let deferredPrompt;
     const readingControls = document.querySelector('.reading-controls');
@@ -348,12 +374,15 @@ function initScript() {
         installBtn.addEventListener('click', function(e) {
             e.preventDefault();
             if (deferredPrompt) {
+                showNotification('Installing app...', 'info');
                 installBtn.style.display = 'none';
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then(function(choiceResult) {
                     if (choiceResult.outcome === 'accepted') {
+                        showNotification('App installed successfully!', 'success');
                         console.log('User accepted the install prompt');
                     } else {
+                        showNotification('Install cancelled', 'info');
                         console.log('User dismissed the install prompt');
                     }
                     deferredPrompt = null;
@@ -365,6 +394,7 @@ function initScript() {
     if (updateCacheBtn) {
         updateCacheBtn.addEventListener('click', function(e) {
             e.preventDefault();
+            showNotification('Updating cache...', 'info');
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                 // 发送消息给 Service Worker 清除缓存
                 navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
@@ -373,7 +403,10 @@ function initScript() {
                     location.reload();
                 }, 1000);
             } else {
-                location.reload();
+                showNotification('Page will reload...', 'info');
+                setTimeout(function() {
+                    location.reload();
+                }, 500);
             }
         });
     }
