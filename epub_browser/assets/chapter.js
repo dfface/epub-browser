@@ -1557,8 +1557,8 @@ function initScript() {
                 event.preventDefault(); 
                 // 获取链接URL 
                 var href = this.getAttribute('href'); 
-                // 在父页面中打开链接 
-                window.location.href = href; 
+                // 在主窗口中打开链接 
+                window.parent.location.href = href; 
                 return false; 
                 });
             });
