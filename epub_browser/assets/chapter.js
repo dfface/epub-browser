@@ -305,6 +305,39 @@ async function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
 
 
 function initScript() {
+    // 创建加载动画元素
+    function createLoadingOverlay() {
+        const overlay = document.createElement('div');
+        overlay.className = 'loading-overlay';
+        overlay.id = 'loadingOverlay';
+        
+        const spinner = document.createElement('div');
+        spinner.className = 'loading-spinner';
+        
+        overlay.appendChild(spinner);
+        document.body.appendChild(overlay);
+    }
+    
+    // 显示加载动画
+    function showLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+    }
+    
+    // 隐藏加载动画
+    function hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+    
+    // 初始化加载动画
+    createLoadingOverlay();
+    showLoading();
+
     // 样式重写，增加区域限定
     scopeEBStyles();
 
@@ -583,6 +616,8 @@ function initScript() {
     
     // 创建页面 - 使用 CSS Column 实现
     function createPages() {
+        showLoading();
+        
         // 保存原始内容
         const originalContent = preprocessContent(content);
         
@@ -633,6 +668,10 @@ function initScript() {
             setTimeout(() => {
                 calculateTotalPages();
                 pageJumpInput.setAttribute('max', totalPages);
+                // 延迟隐藏加载动画，确保页面完全渲染
+                setTimeout(function() {
+                    hideLoading();
+                }, 500);
             }, 200);
         }, 200);
     }
@@ -1097,8 +1136,8 @@ function initScript() {
         const contentContainer = document.querySelector('.content-container');
         const ebContent = document.getElementById('eb-content');
         
-        // 应用保存的状态
-        if (isPureModeEnabled) {
+        // 应用保存的状态 - 只在翻页模式下生效
+        if (isPureModeEnabled && isPaginationMode) {
             // 隐藏工具栏
             navigation.style.display = 'none';
             
@@ -1166,6 +1205,12 @@ function initScript() {
     
     // 切换纯净阅读模式
     function togglePureMode() {
+        // 只在翻页模式下才能切换纯净阅读模式
+        if (!isPaginationMode) {
+            showNotification('Pure reading mode is only available in page-turning mode', 'info');
+            return;
+        }
+        
         isPureModeEnabled = !isPureModeEnabled;
         savePureModeState();
         updatePureModeButton();
@@ -1202,7 +1247,7 @@ function initScript() {
             contentContainer.style.marginBottom = '0';
             ebContent.style.minHeight = 'calc(100vh - 80px)'; // 减去页面顶部和底部的 padding
             
-            showNotification('Pure reading mode enabled', 'info');
+            showNotification('Pure reading mode enabled. You can click the "Click" button to enable edge-click page turning, or use Spacebar and arrow keys for page navigation.', 'info');
         } else {
             // 显示工具栏
             navigation.style.display = 'flex';
@@ -1276,8 +1321,19 @@ function initScript() {
         const centerAreaHeight = rect.height * 0.3;
         
         if (Math.abs(e.clientX - centerX) < centerAreaWidth && Math.abs(e.clientY - centerY) < centerAreaHeight) {
-            // 点击中间部分，无论设备类型，都切换纯净模式
-            togglePureMode();
+            // 点击中间部分，只有在翻页模式下才切换纯净模式
+            if (isPaginationMode) {
+                // 区分桌面端和移动端的行为
+                if (isMobile()) {
+                    // 移动端：点击中间部分切换纯净模式
+                    togglePureMode();
+                } else {
+                    // 桌面端：只有在纯净阅读模式已开启时，点击中间部分才关闭纯净模式
+                    if (isPureModeEnabled) {
+                        togglePureMode();
+                    }
+                }
+            }
         }
     });
     
@@ -1302,6 +1358,14 @@ function initScript() {
         } else {
             showNotification('Click edge to turn page disabled', 'info');
         }
+    });
+    
+    // 页面加载完成后隐藏加载动画
+    window.addEventListener('load', function() {
+        // 延迟隐藏加载动画，确保页面完全渲染
+        setTimeout(function() {
+            hideLoading();
+        }, 500);
     });
 
     // 自定义 css
