@@ -55,8 +55,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
     if (event.data && event.data.action === 'CLEAR_CACHE') {
         event.waitUntil(
-            caches.delete(CACHE_NAME).then(() => {
-                console.log('Cache cleared:', CACHE_NAME);
+            caches.keys().then((cacheNames) => {
+                return Promise.all(
+                    cacheNames.map((cacheName) => {
+                        console.log('Deleting cache:', cacheName);
+                        return caches.delete(cacheName);
+                    })
+                );
+            }).then(() => {
+                console.log('All caches cleared');
                 // 重新预缓存静态资源
                 return caches.open(CACHE_NAME).then((cache) => {
                     return cache.addAll(STATIC_ASSETS);

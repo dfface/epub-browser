@@ -395,6 +395,7 @@ function initScript() {
         updateCacheBtn.addEventListener('click', function(e) {
             e.preventDefault();
             showNotification('Updating cache...', 'info');
+            
             if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                 // 发送消息给 Service Worker 清除缓存
                 navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
