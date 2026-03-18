@@ -802,24 +802,47 @@ function initBookshelf() {
     // 打开分组
     function openGroup(groupId, path) {
         currentGroupId = groupId;
-        currentGroupPath = path;
+        currentGroupPath = path || [];
         
         const shelfData = getBookshelf();
         let group = shelfData.groups[groupId];
         let fullPath = [group.name];
+        let pathIds = [groupId];
         
         // 按路径找到嵌套分组并构建完整路径
         let currentParent = shelfData.groups[groupId];
-        for (const pathId of path) {
+        for (const pathId of currentGroupPath) {
             currentParent = currentParent.groups[pathId];
             fullPath.push(currentParent.name);
+            pathIds.push(pathId);
             group = currentParent;
         }
         
-        // 设置分组标题
+        // 设置分组标题（可点击的路径）
         const groupModalTitle = document.getElementById('groupModalTitle');
         if (groupModalTitle) {
-            groupModalTitle.innerHTML = `<i class="fas fa-folder"></i> ${fullPath.join(' → ')}`;
+            let pathHtml = '<i class="fas fa-folder"></i> ';
+            fullPath.forEach((name, index) => {
+                if (index > 0) {
+                    pathHtml += ' <span class="path-separator">→</span> ';
+                }
+                if (index < fullPath.length - 1) {
+                    pathHtml += `<span class="path-item clickable" data-group-id="${pathIds[0]}" data-path="${index === 0 ? '' : pathIds.slice(1, index + 1).join(',')}">${name}</span>`;
+                } else {
+                    pathHtml += `<span class="path-item">${name}</span>`;
+                }
+            });
+            groupModalTitle.innerHTML = pathHtml;
+            
+            // 添加点击事件
+            groupModalTitle.querySelectorAll('.path-item.clickable').forEach(item => {
+                item.addEventListener('click', function() {
+                    const groupId = this.dataset.groupId;
+                    const pathStr = this.dataset.path;
+                    const path = pathStr ? pathStr.split(',') : [];
+                    openGroup(groupId, path);
+                });
+            });
         }
         
         const groupTags = getGroupTags(group);
@@ -1227,6 +1250,18 @@ function initBookshelf() {
         currentGroupId = null;
         currentGroupPath = [];
     });
+    
+    // 关闭所有弹窗（分组和书架）
+    const groupCloseAllBtn = document.getElementById('groupCloseAllBtn');
+    if (groupCloseAllBtn) {
+        groupCloseAllBtn.addEventListener('click', function() {
+            groupModal.classList.remove('active');
+            bookshelfModal.classList.remove('active');
+            document.body.style.overflow = '';
+            currentGroupId = null;
+            currentGroupPath = [];
+        });
+    }
     
     // 点击弹窗外部关闭
     bookshelfModal.addEventListener('click', function(e) {

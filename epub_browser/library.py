@@ -306,6 +306,9 @@ class EPUBLibrary:
                 <button class="bookshelf-close-btn" id="groupCloseBtn">
                     <i class="fas fa-home"></i>
                 </button>
+                <button class="bookshelf-close-btn" id="groupCloseAllBtn">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
         </div>
         <div class="bookshelf-tag-filter" id="groupTagFilter">

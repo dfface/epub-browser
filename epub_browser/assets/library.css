@@ -713,6 +713,8 @@ body {
     justify-content: center;
     transition: var(--transition);
     color: var(--text-color);
+    margin-left: 4px;
+    margin-right: 4px;
 }
 
 .bookshelf-close-btn:hover {
@@ -888,6 +890,26 @@ body {
 
 .bookshelf-title i {
     margin-right: 8px;
+}
+
+.path-item {
+    color: var(--text-color);
+}
+
+.path-item.clickable {
+    cursor: pointer;
+    color: var(--primary);
+    transition: var(--transition);
+}
+
+.path-item.clickable:hover {
+    color: var(--primary-light);
+    text-decoration: underline;
+}
+
+.path-separator {
+    color: var(--text-secondary);
+    margin: 0 4px;
 }
 
 /* 分组封面拼接样式 */
