@@ -508,16 +508,16 @@ class EPUBProcessor:
     </div>
 </div>
 <div class="reading-controls" data-id="reading-controls">
+    <div class="control-btn" id="scrollToTopBtn">
+        <i class="fas fa-arrow-up"></i>
+        <span class="control-name">Top</span>
+    </div>
     <a href="/index.html#{self.book_hash}" alt="Home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
             <span class="control-name">Home</span>
         </div>
     </a>
-    <div class="control-btn" id="scrollToTopBtn">
-        <i class="fas fa-arrow-up"></i>
-        <span class="control-name">Top</span>
-    </div>
 </div>
 <footer class="footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
@@ -1130,20 +1130,20 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
 
     <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
         <a href="/index.html#{self.book_hash}" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
                 <span class="control-name">Home</span>
             </div>
         </a>
-        <div class="control-btn" id="fontControlBtn">
-            <i class="fas fa-font"></i>
-            <span class="control-name">Font</span>
-        </div>
-        <div class="control-btn" id="scrollToTopBtn">
-            <i class="fas fa-arrow-up"></i>
-            <span class="control-name">Up</span>
-        </div>
     </div>
 
     <!-- 移动端控件 -->
