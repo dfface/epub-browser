@@ -320,6 +320,13 @@ function initScript() {
     installBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:12px 20px;background:#4a90d9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.2);z-index:9999;display:none;';
     document.body.appendChild(installBtn);
 
+    // 更新缓存按钮
+    const updateCacheBtn = document.createElement('button');
+    updateCacheBtn.id = 'update-cache-btn';
+    updateCacheBtn.innerHTML = '<i class="fas fa-sync"></i> Update';
+    updateCacheBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;padding:12px 20px;background:#28a745;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.2);z-index:9999;';
+    document.body.appendChild(updateCacheBtn);
+
     window.addEventListener('beforeinstallprompt', function(e) {
         e.preventDefault();
         deferredPrompt = e;
@@ -339,6 +346,19 @@ function initScript() {
                 }
                 deferredPrompt = null;
             });
+        }
+    });
+
+    updateCacheBtn.addEventListener('click', function() {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            // 发送消息给 Service Worker 清除缓存
+            navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
+            showNotification('Cache cleared, page will reload...', 'info');
+            setTimeout(function() {
+                location.reload();
+            }, 1000);
+        } else {
+            location.reload();
         }
     });
 

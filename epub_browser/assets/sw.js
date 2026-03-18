@@ -1,4 +1,4 @@
-const CACHE_NAME = 'epub-browser-v5';
+const CACHE_NAME = 'epub-browser-v7';
 
 const STATIC_ASSETS = [
     '/',
@@ -51,7 +51,22 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// 判断是否应该缓存该请求（只缓存静态资源）
+// 监听消息（清除缓存）
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'CLEAR_CACHE') {
+        event.waitUntil(
+            caches.delete(CACHE_NAME).then(() => {
+                console.log('Cache cleared:', CACHE_NAME);
+                // 重新预缓存静态资源
+                return caches.open(CACHE_NAME).then((cache) => {
+                    return cache.addAll(STATIC_ASSETS);
+                });
+            })
+        );
+    }
+});
+
+// 判断是否应该缓存该请求
 function shouldCache(url) {
     const urlObj = new URL(url);
     const pathname = urlObj.pathname;
@@ -61,7 +76,12 @@ function shouldCache(url) {
         return true;
     }
     
-    // 只缓存根页面
+    // 缓存书籍页面
+    if (pathname.startsWith('/book/')) {
+        return true;
+    }
+    
+    // 缓存根页面
     if (pathname === '/' || pathname === '/index.html') {
         return true;
     }
@@ -81,8 +101,29 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 导航请求（页面跳转）- 直接从网络获取，不经过 Service Worker
+    // 对于导航请求（页面跳转），使用网络优先策略
     if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    // 缓存响应
+                    if (response && response.status === 200) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME)
+                            .then((cache) => {
+                                cache.put(event.request, responseToCache);
+                            });
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    // 网络失败时，返回缓存
+                    return caches.match(event.request)
+                        .then((cachedResponse) => {
+                            return cachedResponse || caches.match('/index.html');
+                        });
+                })
+        );
         return;
     }
 
@@ -115,9 +156,9 @@ self.addEventListener('fetch', (event) => {
                         return response;
                     })
                     .catch(() => {
-                        // 如果网络请求失败，返回备用响应
-                        if (event.request.destination === 'image') {
-                            return new Response('', { status: 404 });
+                        // 如果网络请求失败，尝试返回缓存的首页
+                        if (event.request.destination === 'document') {
+                            return caches.match('/index.html');
                         }
                     });
             })
