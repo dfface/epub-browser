@@ -685,7 +685,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         with open(toc_json_path, 'w', encoding='utf-8') as f:
             json.dump(toc_data, f, ensure_ascii=False, indent=2)
         
-        print(f"TOC JSON file created: {toc_json_path} with {len(toc_data)} items")
+        # print(f"TOC JSON file created: {toc_json_path} with {len(toc_data)} items")
     
     def create_chapter_pages(self):
         """创建章节页面"""

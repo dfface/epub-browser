@@ -294,6 +294,9 @@ class EPUBLibrary:
                 <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
                     <i class="fas fa-folder-plus"></i> Add Group
                 </button>
+                <button class="bookshelf-action-btn" id="renameGroupBtn">
+                    <i class="fas fa-edit"></i> Rename
+                </button>
                 <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
                     <i class="fas fa-trash"></i> Delete Group
                 </button>

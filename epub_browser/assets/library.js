@@ -480,6 +480,7 @@ function initBookshelf() {
     const groupLoading = document.getElementById('groupLoading');
     const addGroupSubGroupBtn = document.getElementById('addGroupSubGroupBtn');
     const deleteGroupBtn = document.getElementById('deleteGroupBtn');
+    const renameGroupBtn = document.getElementById('renameGroupBtn');
     
     let currentGroupId = null;
     let currentGroupPath = [];
@@ -629,7 +630,7 @@ function initBookshelf() {
                     </div>
                     <div class="bookshelf-item-info">
                         <div class="bookshelf-item-title">${group.name}</div>
-                        <div class="bookshelf-item-author">${countGroupItems(group)} items</div>
+                        <div class="bookshelf-item-author">${countGroupItems(group)}</div>
                     </div>
                 `;
                 groupEl.addEventListener('click', () => openGroup(id, []));
@@ -671,7 +672,8 @@ function initBookshelf() {
             `;
         }
         
-        bookshelfStats.textContent = `${bookCount} books, ${groupCount} groups`;
+        const total = countAllItems(shelfData);
+        bookshelfStats.textContent = `Current: ${bookCount} book(s), ${groupCount} group(s) | Total: ${total.books} book(s), ${total.groups} group(s)`;
         
         // 初始化拖拽排序
         initBookshelfSortable();
@@ -738,15 +740,63 @@ function initBookshelf() {
         return covers;
     }
     
-    // 统计分组内项目数量
+    // 统计分组内直接子项目数量（只统计下一层）
     function countGroupItems(group) {
-        let count = group.items.length;
-        if (group.groups) {
-            for (const subGroupId in group.groups) {
-                count += countGroupItems(group.groups[subGroupId]);
+        const bookCount = (group.items || []).length;
+        const groupCount = group.groups ? Object.keys(group.groups).length : 0;
+        
+        if (bookCount > 0 && groupCount > 0) {
+            return `${bookCount} books, ${groupCount} subgroups`;
+        } else if (bookCount > 0) {
+            return `${bookCount} books`;
+        } else if (groupCount > 0) {
+            return `${groupCount} subgroups`;
+        } else {
+            return 'Empty group';
+        }
+    }
+    
+    // 递归统计所有嵌套的书籍和分组数量
+    function countAllItems(shelfData) {
+        let totalBooks = 0;
+        let totalGroups = 0;
+        
+        function countGroup(group) {
+            totalBooks += (group.items || []).length;
+            if (group.groups) {
+                for (const groupId in group.groups) {
+                    totalGroups++;
+                    countGroup(group.groups[groupId]);
+                }
             }
         }
-        return count;
+        
+        totalBooks += (shelfData.items || []).length;
+        if (shelfData.groups) {
+            for (const groupId in shelfData.groups) {
+                totalGroups++;
+                countGroup(shelfData.groups[groupId]);
+            }
+        }
+        
+        return { books: totalBooks, groups: totalGroups };
+    }
+    
+    // 递归统计分组内所有嵌套的书籍和分组数量
+    function countAllGroupItems(group) {
+        let totalBooks = (group.items || []).length;
+        let totalGroups = 0;
+        
+        if (group.groups) {
+            for (const groupId in group.groups) {
+                totalGroups++;
+                const subResult = countAllGroupItems(group.groups[groupId]);
+                totalBooks += subResult.books;
+                totalGroups += subResult.groups;
+            }
+        }
+        
+        return { books: totalBooks, groups: totalGroups };
     }
     
     // 打开分组
@@ -813,7 +863,7 @@ function initBookshelf() {
                         </div>
                         <div class="bookshelf-item-info">
                             <div class="bookshelf-item-title">${subGroup.name}</div>
-                            <div class="bookshelf-item-author">${countGroupItems(subGroup)} items</div>
+                            <div class="bookshelf-item-author">${countGroupItems(subGroup)}</div>
                         </div>
                     `;
                     groupEl.addEventListener('click', () => openGroup(currentGroupId, [...currentGroupPath, id]));
@@ -855,7 +905,8 @@ function initBookshelf() {
             `;
         }
         
-        groupStats.textContent = `${bookCount} books, ${subGroupCount} groups`;
+        const total = countAllGroupItems(group);
+        groupStats.textContent = `Current: ${bookCount} book(s), ${subGroupCount} group(s) | Total: ${total.books} book(s), ${total.groups} group(s)`;
         
         // 初始化拖拽排序
         initGroupSortable();
@@ -1051,6 +1102,39 @@ function initBookshelf() {
             }
             
             groupModal.classList.remove('active');
+            renderBookshelf(currentTag);
+        }
+    });
+    
+    // 重命名分组
+    renameGroupBtn.addEventListener('click', function() {
+        const shelfData = getBookshelf();
+        let targetGroup = shelfData.groups[currentGroupId];
+        for (const pathId of currentGroupPath) {
+            targetGroup = targetGroup.groups[pathId];
+        }
+        
+        const newName = prompt('Enter new group name:', targetGroup.name);
+        if (newName && newName.trim() && newName.trim() !== targetGroup.name) {
+            targetGroup.name = newName.trim();
+            saveBookshelf(shelfData);
+            
+            const groupModalTitle = document.getElementById('groupModalTitle');
+            if (groupModalTitle) {
+                let fullPath = [shelfData.groups[currentGroupId].name];
+                let currentParent = shelfData.groups[currentGroupId];
+                for (const pathId of currentGroupPath) {
+                    currentParent = currentParent.groups[pathId];
+                    fullPath.push(currentParent.name);
+                }
+                groupModalTitle.innerHTML = `<i class="fas fa-folder"></i> ${fullPath.join(' → ')}`;
+            }
+            
+            let group = shelfData.groups[currentGroupId];
+            for (const pathId of currentGroupPath) {
+                group = group.groups[pathId];
+            }
+            renderGroupContent(group, currentTag);
             renderBookshelf(currentTag);
         }
     });
