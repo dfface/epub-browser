@@ -1031,7 +1031,9 @@ function initScript() {
             target.closest('.font-controls') ||
             target.closest('.reading-controls') ||
             target.closest('.toc-container') ||
-            target.closest('.medium-zoom-container');
+            target.closest('.medium-zoom-container') ||
+            target.closest('.top-controls') ||
+            target.closest('.mobile-controls');
         
         if (isInteractiveElement) return;
         

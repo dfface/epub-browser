@@ -480,18 +480,40 @@ class EPUBProcessor:
         
         # 如果有详细的toc信息，使用toc生成目录
         if self.toc:
-            # 创建章节路径到索引的映射
+            # 创建章节路径到索引的映射（支持多种路径格式）
             chapter_index_map = {}
+            chapter_filename_map = {}  # 用于文件名匹配
             for i, chapter in enumerate(self.chapters):
+                # 原始路径
                 chapter_index_map[chapter['path']] = i
+                # 规范化路径（去除 ./ 前缀）
+                normalized_path = chapter['path'].lstrip('./').lstrip('/')
+                chapter_index_map[normalized_path] = i
+                # 文件名匹配
+                chapter_filename = os.path.basename(chapter['path'])
+                chapter_filename_map[chapter_filename] = i
             
             # print(f"Chapter index mapping: {chapter_index_map}")
+            # print(f"Chapter filename mapping: {chapter_filename_map}")
             
             # 根据toc生成目录
             for toc_item in self.toc:
                 level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
                 chapter_anchor = toc_item.get('anchor', None)
-                chapter_index = chapter_index_map.get(toc_item['src'])
+                toc_src = toc_item['src']
+                
+                # 尝试多种方式匹配章节索引
+                chapter_index = None
+                
+                # 1. 直接匹配
+                if toc_src in chapter_index_map:
+                    chapter_index = chapter_index_map[toc_src]
+                # 2. 规范化路径匹配（去除 ./ 前缀）
+                elif toc_src.lstrip('./').lstrip('/') in chapter_index_map:
+                    chapter_index = chapter_index_map[toc_src.lstrip('./').lstrip('/')]
+                # 3. 文件名匹配
+                elif os.path.basename(toc_src) in chapter_filename_map:
+                    chapter_index = chapter_filename_map[os.path.basename(toc_src)]
                 
                 if chapter_index is not None:
                     if chapter_anchor is not None:
@@ -499,9 +521,9 @@ class EPUBProcessor:
                         index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
                         index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
-                    toc_item['new_file_name'] = f'chapter_{i}.html'
+                    toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
                 else:
-                    print(f"Chapter index not found: {toc_item['src']}")
+                    print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
