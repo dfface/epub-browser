@@ -93,5 +93,3 @@ jobs:
           project: ${{ secrets.CF_PAGES_PROJECT }}
           notificationType: feishu
           webhookUrl: ${{ secrets.FEISHU_WEBHOOK  }}
-          feishuMessage: "🚀 项目 {{project}} 的部署{{success ? '成功' : '失败'}}！\n环境: {{environment}}\n部署URL: {{deploymentUrl}}\n提交: {{commitUrl}}"
-          commitHash: ${{ steps.push-changes.outputs.commit-hash }}
