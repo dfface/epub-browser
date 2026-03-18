@@ -1123,7 +1123,7 @@ function initScript() {
             
             // 根据设备类型显示不同的控件
             if (isMobile()) {
-                // 移动端：显示 mobile-controls
+                // 移动端：只显示 mobile-controls，不操作 top-controls 和 reading-controls
                 const mobileControls = document.querySelector('.mobile-controls');
                 if (mobileControls) {
                     mobileControls.style.display = 'flex';
@@ -1201,7 +1201,7 @@ function initScript() {
             
             // 根据设备类型显示不同的控件
             if (isMobile()) {
-                // 移动端：显示 mobile-controls
+                // 移动端：只显示 mobile-controls，不操作 top-controls 和 reading-controls
                 const mobileControls = document.querySelector('.mobile-controls');
                 if (mobileControls) {
                     mobileControls.style.display = 'flex';
@@ -1244,8 +1244,8 @@ function initScript() {
     
     // 检查是否为移动端（通过 mobile-controls 是否显示）
     function isMobile() {
-        const mobileControls = document.querySelector('.mobile-controls');
-        return window.getComputedStyle(mobileControls).display !== 'none';
+        // 更可靠的移动端检测方法
+        return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
     
     // 点击屏幕中间部分切换纯净阅读模式
