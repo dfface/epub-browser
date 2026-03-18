@@ -312,58 +312,78 @@ function initScript() {
         });
     }
 
-    // PWA 安装提示
+    // PWA 安装提示和更新按钮
     let deferredPrompt;
-    const installBtn = document.createElement('button');
+    const readingControls = document.querySelector('.reading-controls');
+    
+    // 安装应用按钮
+    const installBtn = document.createElement('a');
     installBtn.id = 'pwa-install-btn';
-    installBtn.innerHTML = '<i class="fas fa-download"></i> Install App';
-    installBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:12px 20px;background:#4a90d9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.2);z-index:9999;display:none;';
-    document.body.appendChild(installBtn);
+    installBtn.href = '#';
+    installBtn.className = 'control-btn';
+    installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name">Install</div>';
+    installBtn.style.display = 'none';
+    if (readingControls) {
+        readingControls.appendChild(installBtn);
+    }
 
     // 更新缓存按钮
-    const updateCacheBtn = document.createElement('button');
+    const updateCacheBtn = document.createElement('a');
     updateCacheBtn.id = 'update-cache-btn';
-    updateCacheBtn.innerHTML = '<i class="fas fa-sync"></i> Update';
-    updateCacheBtn.style.cssText = 'position:fixed;bottom:80px;right:20px;padding:12px 20px;background:#28a745;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.2);z-index:9999;';
-    document.body.appendChild(updateCacheBtn);
+    updateCacheBtn.href = '#';
+    updateCacheBtn.className = 'control-btn';
+    updateCacheBtn.innerHTML = '<i class="fas fa-sync"></i><div class="control-name">Update</div>';
+    if (readingControls) {
+        readingControls.appendChild(updateCacheBtn);
+    }
 
     window.addEventListener('beforeinstallprompt', function(e) {
         e.preventDefault();
         deferredPrompt = e;
-        installBtn.style.display = 'block';
+        if (installBtn) {
+            installBtn.style.display = 'block';
+        }
         console.log('PWA install prompt captured');
     });
 
-    installBtn.addEventListener('click', function() {
-        if (deferredPrompt) {
-            installBtn.style.display = 'none';
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then(function(choiceResult) {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('User accepted the install prompt');
-                } else {
-                    console.log('User dismissed the install prompt');
-                }
-                deferredPrompt = null;
-            });
-        }
-    });
+    if (installBtn) {
+        installBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (deferredPrompt) {
+                installBtn.style.display = 'none';
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function(choiceResult) {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        });
+    }
 
-    updateCacheBtn.addEventListener('click', function() {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            // 发送消息给 Service Worker 清除缓存
-            navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
-            showNotification('Cache cleared, page will reload...', 'info');
-            setTimeout(function() {
+    if (updateCacheBtn) {
+        updateCacheBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                // 发送消息给 Service Worker 清除缓存
+                navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
+                showNotification('Cache cleared, page will reload...', 'info');
+                setTimeout(function() {
+                    location.reload();
+                }, 1000);
+            } else {
                 location.reload();
-            }, 1000);
-        } else {
-            location.reload();
-        }
-    });
+            }
+        });
+    }
 
     window.addEventListener('appinstalled', function() {
-        installBtn.style.display = 'none';
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
         console.log('PWA installed successfully');
     });
 
