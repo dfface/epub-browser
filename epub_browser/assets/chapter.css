@@ -1009,11 +1009,46 @@ body {
     margin-bottom: 0;
 }
 
-.kindle-mode {
-    background: var(--bg-color);
+/* 暗黑模式全局修复 */
+.dark-mode #eb-content * {
+    color: var(--content-text) !important;
 }
 
-/* 字体家族选择器 */
+/* 图片保持原样 */
+.dark-mode #eb-content img {
+    filter: none !important;
+}
+
+/* 链接颜色 */
+.dark-mode #eb-content a {
+    color: var(--primary) !important;
+}
+
+/* 代码块 */
+.dark-mode #eb-content pre code {
+    background: var(--bg-color) !important;
+}
+
+/* 表格 */
+.dark-mode #eb-content table tr:hover {
+    background-color: var(--bg-color) !important;
+}
+
+/* 引用 */
+.dark-mode #eb-content blockquote {
+    border-left: 4px solid var(--primary) !important;
+}
+
+/* 列表项 */
+.dark-mode #eb-content ul li:before,
+.dark-mode #eb-content ol li:before {
+    color: var(--primary) !important;
+}
+
+/* medium-zoom 覆盖层 */
+.dark-mode .medium-zoom-overlay {
+    background: rgba(0, 0, 0, 0.9) !important;
+}
 .font-family-selector select {
     width: 100%;
     padding: 10px 15px;
