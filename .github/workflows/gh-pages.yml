@@ -86,7 +86,7 @@ jobs:
             
       # Wait for Cloudflare Pages deployment and send notification
       - name: Wait for Cloudflare Pages deployment
-        uses: dfface/cloudflare-pages-slack-notification@v1
+        uses: dfface/cloudflare-pages-notification@v1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
