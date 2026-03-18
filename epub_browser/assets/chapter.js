@@ -1086,6 +1086,7 @@ function initScript() {
         updatePureModeButton();
         
         const navigation = document.querySelector('.navigation');
+        const mobileControls = document.querySelector('.mobile-controls');
         const topControls = document.querySelector('.top-controls');
         const readingControls = document.querySelector('.reading-controls');
         const contentContainer = document.querySelector('.content-container');
@@ -1095,8 +1096,16 @@ function initScript() {
         if (isPureModeEnabled) {
             // 隐藏工具栏
             navigation.style.display = 'none';
-            topControls.style.display = 'none';
-            readingControls.style.display = 'none';
+            
+            // 根据设备类型隐藏不同的控件
+            if (isMobile()) {
+                // 移动端：隐藏 mobile-controls
+                mobileControls.style.display = 'none';
+            } else {
+                // 桌面端：隐藏 top-controls 和 reading-controls
+                topControls.style.display = 'none';
+                readingControls.style.display = 'none';
+            }
             
             // 调整内容容器高度，填充导航栏的空间
             contentContainer.style.marginTop = '0';
@@ -1105,8 +1114,16 @@ function initScript() {
         } else {
             // 显示工具栏
             navigation.style.display = 'flex';
-            topControls.style.display = 'flex';
-            readingControls.style.display = 'flex';
+            
+            // 根据设备类型显示不同的控件
+            if (isMobile()) {
+                // 移动端：显示 mobile-controls
+                mobileControls.style.display = 'flex';
+            } else {
+                // 桌面端：显示 top-controls 和 reading-controls
+                topControls.style.display = 'flex';
+                readingControls.style.display = 'flex';
+            }
             
             // 恢复默认高度
             contentContainer.style.marginTop = '';
@@ -1131,6 +1148,7 @@ function initScript() {
         updatePureModeButton();
         
         const navigation = document.querySelector('.navigation');
+        const mobileControls = document.querySelector('.mobile-controls');
         const topControls = document.querySelector('.top-controls');
         const readingControls = document.querySelector('.reading-controls');
         const contentContainer = document.querySelector('.content-container');
@@ -1139,8 +1157,16 @@ function initScript() {
         if (isPureModeEnabled) {
             // 隐藏工具栏
             navigation.style.display = 'none';
-            topControls.style.display = 'none';
-            readingControls.style.display = 'none';
+            
+            // 根据设备类型隐藏不同的控件
+            if (isMobile()) {
+                // 移动端：隐藏 mobile-controls
+                mobileControls.style.display = 'none';
+            } else {
+                // 桌面端：隐藏 top-controls 和 reading-controls
+                topControls.style.display = 'none';
+                readingControls.style.display = 'none';
+            }
             
             // 调整内容容器高度，填充导航栏的空间
             contentContainer.style.marginTop = '0';
@@ -1151,8 +1177,16 @@ function initScript() {
         } else {
             // 显示工具栏
             navigation.style.display = 'flex';
-            topControls.style.display = 'flex';
-            readingControls.style.display = 'flex';
+            
+            // 根据设备类型显示不同的控件
+            if (isMobile()) {
+                // 移动端：显示 mobile-controls
+                mobileControls.style.display = 'flex';
+            } else {
+                // 桌面端：显示 top-controls 和 reading-controls
+                topControls.style.display = 'flex';
+                readingControls.style.display = 'flex';
+            }
             
             // 恢复默认高度
             contentContainer.style.marginTop = '';
@@ -1165,34 +1199,51 @@ function initScript() {
     
     // 更新纯净模式按钮状态
     function updatePureModeButton() {
-        if (isPureModeEnabled) {
-            togglePureModeBtn.classList.add('active');
-            togglePureModeBtn.style.background = 'var(--primary)';
-            togglePureModeBtn.style.color = 'white';
-        } else {
-            togglePureModeBtn.classList.remove('active');
-            togglePureModeBtn.style.background = '';
-            togglePureModeBtn.style.color = '';
+        if (togglePureModeBtn) {
+            if (isPureModeEnabled) {
+                togglePureModeBtn.classList.add('active');
+                togglePureModeBtn.style.background = 'var(--primary)';
+                togglePureModeBtn.style.color = 'white';
+            } else {
+                togglePureModeBtn.classList.remove('active');
+                togglePureModeBtn.style.background = '';
+                togglePureModeBtn.style.color = '';
+            }
         }
     }
     
-    // 点击文档中心时显示工具栏
+    // 检查是否为移动端（通过 mobile-controls 是否显示）
+    function isMobile() {
+        const mobileControls = document.querySelector('.mobile-controls');
+        return window.getComputedStyle(mobileControls).display !== 'none';
+    }
+    
+    // 点击屏幕中间部分切换纯净阅读模式
     document.getElementById('eb-content').addEventListener('click', function(e) {
-        if (isPureModeEnabled) {
-            // 计算点击位置是否在文档中心
-            const screenWidth = window.innerWidth;
-            const screenHeight = window.innerHeight;
-            const centerX = screenWidth / 2;
-            const centerY = screenHeight / 2;
-            const centerArea = Math.min(screenWidth, screenHeight) * 0.3; // 中心30%区域
-            
-            if (Math.abs(e.clientX - centerX) < centerArea && Math.abs(e.clientY - centerY) < centerArea) {
-                togglePureMode();
-            }
+        // 排除图片元素，避免影响图片缩放
+        const target = e.target;
+        const tagName = target.tagName.toLowerCase();
+        const isImageElement = 
+            tagName === 'img' ||
+            target.closest('img') ||
+            target.closest('.medium-zoom-container');
+        
+        if (isImageElement) return;
+        
+        // 计算点击位置是否在文档中心
+        const rect = e.currentTarget.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const centerAreaWidth = rect.width * 0.3; // 中心30%区域
+        const centerAreaHeight = rect.height * 0.3;
+        
+        if (Math.abs(e.clientX - centerX) < centerAreaWidth && Math.abs(e.clientY - centerY) < centerAreaHeight) {
+            // 点击中间部分，无论设备类型，都切换纯净模式
+            togglePureMode();
         }
     });
     
-    // 纯净模式按钮点击事件
+    // 纯净模式按钮点击事件（仅桌面端）
     if (togglePureModeBtn) {
         togglePureModeBtn.addEventListener('click', function() {
             togglePureMode();

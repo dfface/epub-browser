@@ -56,7 +56,7 @@ It now supports the following features:
 
 - **Progressive Web App (PWA)**: Installable as a native app on supported devices for a more app-like experience.
 
-- **Pure Reading Mode**: Hides all toolbars for distraction-free reading, toggleable by clicking the center of the screen.
+- **Pure Reading Mode**: Hides all toolbars for distraction-free reading. On desktop, toggle via the "Pure" button in the navigation bar or by clicking the center of the screen. On mobile, toggle by clicking the center of the screen.
 
 - **Cache management**: Update button in library to clear Service Worker cache and refresh content.
 

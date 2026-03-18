@@ -982,7 +982,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                         <i class="fas fa-hand-pointer"></i>
                         <span class="control-name">Click</span>
                     </div>
-                    <div class="control-btn" id="togglePureMode" title="Pure reading mode">
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
                         <i class="fas fa-book-open"></i>
                         <span class="control-name">Pure</span>
                     </div>

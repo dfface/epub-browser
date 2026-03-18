@@ -1198,6 +1198,10 @@ body {
 }
 
 @media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
+    }
+    
     body:not(.pagination-mode) .container {
         width: 100%;
     }
