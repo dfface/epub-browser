@@ -1038,9 +1038,17 @@ function initScript() {
         updateClickPageButton();
         
         // 如果是 Kindle 模式，默认开启点击翻页
-        if (isKindleMode() && localStorage.getItem('clickPageEnabled') === null && getCookie('clickPageEnabled') === null) {
+        if (isKindleMode() && getCookie('clickPageEnabled') === null) {
             isClickPageEnabled = true;
             saveClickPageState();
+            updateClickPageButton();
+        }
+        
+        // 如果是移动端，默认开启点击翻页
+        if (isMobile() && localStorage.getItem('clickPageEnabled') === null) {
+            isClickPageEnabled = true;
+            saveClickPageState();
+            updateClickPageButton();
         }
     }
     
