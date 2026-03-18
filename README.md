@@ -60,6 +60,14 @@ It now supports the following features:
 
 - **Cache management**: Update button in library to clear Service Worker cache and refresh content.
 
+- **Bookshelf**: Personal bookshelf with grouping support (non-Kindle mode only). Features include:
+  - Add/remove books to shelf from book detail page
+  - Create nested groups for organization
+  - Tag-based filtering within shelf and groups
+  - Drag-and-drop sorting for books and groups
+  - Export/import shelf data as JSON (supports both file upload and URL import)
+  - Statistics showing book and group counts
+
 
 ## Usage
 

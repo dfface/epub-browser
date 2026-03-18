@@ -766,7 +766,7 @@ body {
     border-radius: 6px;
     color: white;
     font-weight: 600;
-    z-index: 1000;
+    z-index: 10003;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: all 0.3s ease;
 }

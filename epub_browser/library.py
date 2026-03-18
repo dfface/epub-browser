@@ -242,8 +242,105 @@ class EPUBLibrary:
             <i class="fas fa-arrow-up"></i>
             <span class="control-name">Top</span>
         </button>
+        <button class="control-btn" id="bookshelfBtn">
+            <i class="fas fa-bookmark"></i>
+            <span class="control-name">Shelf</span>
+        </button>
     </div>
 </div>
+
+<!-- 书架弹窗 -->
+<div class="bookshelf-modal" id="bookshelfModal">
+    <div class="bookshelf-content">
+        <div class="bookshelf-header">
+            <div class="bookshelf-header-left">
+                <button class="bookshelf-action-btn" id="addShelfGroupBtn">
+                    <i class="fas fa-folder-plus"></i> Add Group
+                </button>
+                <button class="bookshelf-action-btn" id="exportShelfBtn">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button class="bookshelf-action-btn" id="importShelfBtn">
+                    <i class="fas fa-upload"></i> Import
+                </button>
+                <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+            </div>
+            <h2 class="bookshelf-title"><i class="fas fa-home"></i> Bookshelf</h2>
+            <div class="bookshelf-header-right">
+                <button class="bookshelf-close-btn" id="bookshelfCloseBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
+            <span class="bookshelf-tag active" data-tag="All">All</span>
+        </div>
+        <div class="bookshelf-body" id="bookshelfBody">
+            <div class="bookshelf-loading" id="bookshelfLoading">
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+        <div class="bookshelf-footer" id="bookshelfFooter">
+            <span id="bookshelfStats"></span>
+        </div>
+    </div>
+</div>
+
+<!-- 分组弹窗 -->
+<div class="bookshelf-modal" id="groupModal">
+    <div class="bookshelf-content">
+        <div class="bookshelf-header">
+            <div class="bookshelf-header-left">
+                <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
+                    <i class="fas fa-folder-plus"></i> Add Group
+                </button>
+                <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
+                    <i class="fas fa-trash"></i> Delete Group
+                </button>
+            </div>
+            <h2 class="bookshelf-title" id="groupModalTitle">Group</h2>
+            <div class="bookshelf-header-right">
+                <button class="bookshelf-close-btn" id="groupCloseBtn">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        </div>
+        <div class="bookshelf-tag-filter" id="groupTagFilter">
+            <span class="bookshelf-tag active" data-tag="All">All</span>
+        </div>
+        <div class="bookshelf-body" id="groupBody">
+            <div class="bookshelf-loading" id="groupLoading">
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+        <div class="bookshelf-footer" id="groupFooter">
+            <span id="groupStats"></span>
+        </div>
+    </div>
+</div>
+
+<!-- 选择分组弹窗 -->
+<div class="select-group-modal" id="selectGroupModal">
+    <div class="select-group-content">
+        <div class="select-group-header">
+            <h3>Add to Shelf</h3>
+            <button class="select-group-close-btn" id="selectGroupCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="select-group-body">
+            <div class="select-group-tree" id="selectGroupTree">
+                <!-- 树形分组结构 -->
+            </div>
+        </div>
+        <div class="select-group-footer">
+            <button class="select-group-confirm-btn" id="selectGroupConfirmBtn">
+                <i class="fas fa-check"></i> Confirm
+            </button>
+        </div>
+    </div>
+</div>
+
 <footer class="footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
