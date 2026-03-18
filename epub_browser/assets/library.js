@@ -584,6 +584,7 @@ function initBookshelf() {
     // 渲染标签过滤器
     function renderTagFilter(container, tags, activeTag) {
         container.innerHTML = '<span class="bookshelf-tag ' + (activeTag === 'All' ? 'active' : '') + '" data-tag="All">All</span>';
+        container.innerHTML += '<span class="bookshelf-tag ' + (activeTag === 'NoTag' ? 'active' : '') + '" data-tag="NoTag">NoTag</span>';
         tags.forEach(tag => {
             const tagEl = document.createElement('span');
             tagEl.className = 'bookshelf-tag' + (activeTag === tag ? ' active' : '');
@@ -616,7 +617,9 @@ function initBookshelf() {
                 // 检查是否是分组
                 if (shelfData.groups && shelfData.groups[id]) {
                     const group = shelfData.groups[id];
-                    if (tag !== 'All' && !groupHasTagInTree(group, tag)) continue;
+                    if (tag === 'NoTag') {
+                        if (!groupHasNoTagInTree(group)) continue;
+                    } else if (tag !== 'All' && !groupHasTagInTree(group, tag)) continue;
                 
                 const groupEl = document.createElement('div');
                 groupEl.className = 'bookshelf-item group';
@@ -641,7 +644,9 @@ function initBookshelf() {
             else if (shelfData.items && shelfData.items.includes(id)) {
                 const bookInfo = getBookInfo(id);
                 if (!bookInfo) continue;
-                if (tag !== 'All' && !bookInfo.tags.includes(tag)) continue;
+                if (tag === 'NoTag') {
+                    if (bookInfo.tags && bookInfo.tags.length > 0) continue;
+                } else if (tag !== 'All' && !bookInfo.tags.includes(tag)) continue;
                 
                 const bookEl = document.createElement('div');
                 bookEl.className = 'bookshelf-item book';
@@ -693,6 +698,20 @@ function initBookshelf() {
         if (group.groups) {
             for (const subGroupId in group.groups) {
                 if (groupHasTagInTree(group.groups[subGroupId], tag)) return true;
+            }
+        }
+        return false;
+    }
+    
+    // 检查分组是否包含无标签书籍
+    function groupHasNoTagInTree(group) {
+        for (const bookHash of group.items) {
+            const bookInfo = getBookInfo(bookHash);
+            if (bookInfo && (!bookInfo.tags || bookInfo.tags.length === 0)) return true;
+        }
+        if (group.groups) {
+            for (const subGroupId in group.groups) {
+                if (groupHasNoTagInTree(group.groups[subGroupId])) return true;
             }
         }
         return false;
@@ -872,7 +891,9 @@ function initBookshelf() {
                 // 检查是否是子分组
                 if (group.groups && group.groups[id]) {
                     const subGroup = group.groups[id];
-                    if (tag !== 'All' && !groupHasTagInTree(subGroup, tag)) continue;
+                    if (tag === 'NoTag') {
+                        if (!groupHasNoTagInTree(subGroup)) continue;
+                    } else if (tag !== 'All' && !groupHasTagInTree(subGroup, tag)) continue;
                     
                     const groupEl = document.createElement('div');
                     groupEl.className = 'bookshelf-item group';
@@ -897,7 +918,9 @@ function initBookshelf() {
                 else if (group.items && group.items.includes(id)) {
                     const bookInfo = getBookInfo(id);
                     if (!bookInfo) continue;
-                    if (tag !== 'All' && !bookInfo.tags.includes(tag)) continue;
+                    if (tag === 'NoTag') {
+                        if (bookInfo.tags && bookInfo.tags.length > 0) continue;
+                    } else if (tag !== 'All' && !bookInfo.tags.includes(tag)) continue;
                     
                     const bookEl = document.createElement('div');
                     bookEl.className = 'bookshelf-item book';
