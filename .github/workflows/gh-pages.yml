@@ -83,3 +83,23 @@ jobs:
                 \"text\": \"GitHub workflow 通知：\\n- 工作流：Generate Test Files and Deploy to gh-pages\\n- 状态：$STATUS_TEXT\\n- 触发事件：${{ github.event_name }}\\n- 提交：${{ github.sha }}\\n- 分支：${{ github.ref }}\\n- 仓库：${{ github.repository }}\"
               }
             }"
+            
+      # Wait for Cloudflare Pages deployment and send notification
+      - name: Wait for Cloudflare Pages deployment
+        uses: arddluma/cloudflare-pages-slack-notification@v4
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          project: ${{ secrets.CF_PAGES_PROJECT }}
+          slackWebHook: ${{ secrets.FEISHU_WEBHOOK }}
+          # Comprehensive notification message
+          message: |
+            🚀 Cloudflare Pages 部署通知
+            - 项目: ${{ secrets.CF_PAGES_PROJECT }}
+            - 环境: production
+            - 提交信息: ${{ steps.commit.outputs.message }}
+            - 提交作者: ${{ steps.commit.outputs.author }}
+            - 提交: ${{ github.sha }}
+            - 分支: ${{ github.ref }}
+            - 仓库: ${{ github.repository }}
+            - 触发事件: ${{ github.event_name }}
