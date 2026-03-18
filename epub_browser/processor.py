@@ -425,6 +425,11 @@ class EPUBProcessor:
         index_html += """
 </head>
 <body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
 <div class="top-controls">
     <div class="theme-toggle" id="themeToggle">
         <i class="fas fa-moon"></i>
@@ -856,6 +861,11 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 """
         chapter_html +=f"""
 <body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="reading-progress-container">
         <div class="progress-bar" id="progressBar"></div>
     </div>

@@ -305,19 +305,6 @@ async function scopeEBStyles(scopeSelector = '[data-eb-styles]') {
 
 
 function initScript() {
-    // 创建加载动画元素
-    function createLoadingOverlay() {
-        const overlay = document.createElement('div');
-        overlay.className = 'loading-overlay';
-        overlay.id = 'loadingOverlay';
-        
-        const spinner = document.createElement('div');
-        spinner.className = 'loading-spinner';
-        
-        overlay.appendChild(spinner);
-        document.body.appendChild(overlay);
-    }
-    
     // 显示加载动画
     function showLoading() {
         const overlay = document.getElementById('loadingOverlay');
@@ -333,10 +320,6 @@ function initScript() {
             overlay.style.display = 'none';
         }
     }
-    
-    // 初始化加载动画
-    createLoadingOverlay();
-    showLoading();
 
     // 样式重写，增加区域限定
     scopeEBStyles();
@@ -827,12 +810,6 @@ function initScript() {
 
     // 加载阅读进度
     function loadReadingProgress() {
-        if (totalPages === 0) {
-            setTimeout(() => {
-                loadReadingProgress();
-            }, 100);
-            return 
-        }
         if (isKindleMode()) {
             if (isPaginationMode) {
                 showPage(0);
@@ -841,6 +818,14 @@ function initScript() {
         }
 
         if (isPaginationMode) {
+            // 翻页模式需要等待 totalPages 计算完成
+            if (totalPages === 0) {
+                setTimeout(() => {
+                    loadReadingProgress();
+                }, 100);
+                return 
+            }
+            
             // 翻页模式
             let storageKey = getStorageKey("turning");
             let savedPage = localStorage.getItem(storageKey);
@@ -857,7 +842,7 @@ function initScript() {
                 showPage(0);
             }
         } else {
-            // 滚动模式
+            // 滚动模式不需要等待 totalPages
             let storageKey = getStorageKey("scroll");
             let savedPos = localStorage.getItem(storageKey);
             let windowHeight = window.innerHeight;
@@ -1360,16 +1345,20 @@ function initScript() {
         }
     });
     
-    // 页面加载完成后隐藏加载动画
-    window.addEventListener('load', function() {
+    // 自定义 css
+    customCssFunc();
+    
+    // 根据模式决定何时隐藏加载动画
+    if (isPaginationMode) {
+        // 翻页模式：在 createPages 完成后隐藏 loading
+        // createPages 内部已经处理了 hideLoading
+    } else {
+        // 滚动模式：在 loadReadingProgress 完成后隐藏 loading
         // 延迟隐藏加载动画，确保页面完全渲染
         setTimeout(function() {
             hideLoading();
-        }, 500);
-    });
-
-    // 自定义 css
-    customCssFunc();
+        }, 500); // 等待 loadReadingProgress 中的 setTimeout 完成
+    }
 
     function customCssFunc() {
         if (isKindleMode()) {

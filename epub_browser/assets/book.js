@@ -223,6 +223,19 @@ function initScript() {
             behavior: 'smooth'
         });
     });
+
+    // 隐藏加载动画
+    function hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+    
+    // 延迟隐藏加载动画，确保页面完全渲染
+    setTimeout(function() {
+        hideLoading();
+    }, 500);
 };
 
 window.initScriptBook = initScript;

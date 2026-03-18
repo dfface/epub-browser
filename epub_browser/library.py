@@ -151,6 +151,10 @@ class EPUBLibrary:
 <link rel="stylesheet" href="/assets/library.css">
 </head>
 <body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
 """
         all_tags = set()
         for book_hash, book_info in self.books.items():
