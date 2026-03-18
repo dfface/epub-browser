@@ -1508,83 +1508,60 @@ function initScript() {
     }
     
     
-    // iframe 处理
-    let iframe = document.getElementById('bookHomeIframe');
-    iframe.addEventListener('load', function() {
-        loadBookHomeToc();
-        iframeAddEvent();
-    });
-    function loadBookHomeToc() {
+    // 加载书籍目录
+    loadBookHomeToc();
+    
+    async function loadBookHomeToc() {
         try {
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            // 使用 iframeDoc 进行操作
-            let bookHomeToc = iframeDoc.querySelector('.chapter-list');
-            let iframeBody = iframeDoc.querySelector('body');
-            let iframeFooter = iframeDoc.querySelector('footer');
-            let iframeContainer = iframeDoc.querySelector('.container');
-            let topControls = iframeDoc.querySelector('.top-controls');
-            let readingControls = iframeDoc.querySelector('.reading-controls');
-            let breadcrumb = iframeDoc.querySelector('.breadcrumb');
-            let bookInfoCard = iframeDoc.querySelector('.book-info-card');
-            let tocHeader = iframeDoc.querySelector('.toc-header'); 
-            let tocContainer = iframeDoc.querySelector('.toc-container');
-
-            topControls.style.display = 'none';
-            breadcrumb.style.display = 'none';
-            bookInfoCard.style.display = 'none';
-            iframeFooter.style.display = 'none';
-            tocHeader.style.display = 'none';
-            readingControls.style.display = 'none';
-            bookHomeToc.style.width = "100%";
-            bookHomeToc.style.maxHeight = "100%";
-            iframeBody.style.padding = 0;
-            iframeContainer.style.padding = 0;
-            iframeContainer.style.margin = 0; 
-            tocContainer.style.margin = 0;
-        } catch (e) {
-            console.log('Can not reach iframe:', e.message);
-        }
-    }
-
-    function iframeAddEvent() {
-        try {
-            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-            // 使用 iframeDoc 进行操作
-            let allLinks = iframeDoc.querySelectorAll('a');
-            allLinks.forEach( link => {
-                link.addEventListener('click', function(event) {
-                // 阻止默认行为（在iframe中打开） 
-                event.preventDefault(); 
-                // 获取链接URL 
-                var href = this.getAttribute('href'); 
-                // 在主窗口中打开链接 
-                window.parent.location.href = href; 
-                return false; 
-                });
-            });
-
-            // 书籍目录锚点滚动
-            mobileBookHomeBtn.addEventListener('click', function(){
-                scrollBookHomeToc();
-            });
-            bookHomeToggle.addEventListener('click', function(){
-                scrollBookHomeToc();
-            });
-
-            function scrollBookHomeToc() {
-                if (anchor != '') { // 后面有 var anchor 的声明和取值
-                    targetEl =  iframeDoc.getElementById(anchor.substr(1));
-                    if (targetEl) {
-                        var rect = targetEl.getBoundingClientRect();
-                        // 滚动到元素位置
-                        iframe.contentWindow.scrollTo({
-                            top: rect.top + iframe.contentWindow.pageYOffset,
-                        });
-                    }
-                }
+            const bookHomeTocList = document.getElementById('bookHomeTocList');
+            const currentPath = window.location.pathname;
+            const bookHash = currentPath.split('/book/')[1].split('/')[0];
+            const tocJsonPath = `/book/${bookHash}/toc.json`;
+            
+            const response = await fetch(tocJsonPath);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            const tocData = await response.json();
+            
+            bookHomeTocList.innerHTML = '';
+            
+            tocData.forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.className = `toc-item toc-level-${Math.min(item.level, 3)}`;
+                
+                const link = document.createElement('a');
+                let href = `/book/${bookHash}/${item.chapter_file}`;
+                if (item.anchor) {
+                    href += `#${item.anchor}`;
+                }
+                link.href = href;
+                link.textContent = item.title;
+                
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.location.href = href;
+                });
+                
+                listItem.appendChild(link);
+                bookHomeTocList.appendChild(listItem);
+            });
+            
+            // 滚动到当前章节
+            const currentChapter = currentPath.split('/').pop();
+            const activeLi = bookHomeTocList.querySelector(`a[href*="${currentChapter}"]`);
+            if (activeLi) {
+                const listItem = activeLi.parentElement;
+                listItem.classList.add('active');
+                bookHomeTocList.scrollTop = listItem.offsetTop - 150;
+            }
+            
         } catch (e) {
-            console.log('Can not reach iframe:', e.message);
+            console.log('Failed to load book home toc:', e.message);
+            const bookHomeTocList = document.getElementById('bookHomeTocList');
+            if (bookHomeTocList) {
+                bookHomeTocList.innerHTML = '<li class="toc-item">Failed to load table of contents</li>';
+            }
         }
     }
     
@@ -1667,9 +1644,6 @@ function initScript() {
         } else {
             setCookie(book_hash, anchor);
         }   
-        
-        let bookHomeIframe = document.querySelector('#bookHomeIframe');
-        bookHomeIframe.src += anchor;
     }
 
     // 主题切换功能
@@ -1791,7 +1765,6 @@ function initScript() {
     });
     bookHomeToggle.addEventListener('click', function() {
         bookHomeFloating.classList.toggle('active');
-        loadBookHomeToc();
     });
     
     // 切换目录显示 - 移动端
@@ -1805,7 +1778,6 @@ function initScript() {
         bookHomeFloating.classList.toggle('active');
         // 移动端点击后高亮按钮
         mobileBookHomeBtn.classList.toggle('active');
-        loadBookHomeToc();
     });
     
     // 关闭目录

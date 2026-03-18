@@ -984,9 +984,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="iframe-container">
-            <iframe id="bookHomeIframe" src="/book/{self.book_hash}/index.html" title="BookHome" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
-        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
     </div>
 
     <div class="toc-floating" id="tocFloating">
