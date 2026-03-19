@@ -526,6 +526,7 @@ class EPUBProcessor:
 
         index_html += """
 <script src="/assets/book.js" defer></script>
+<script src="/assets/sortable.min.js" defer></script>
 <script>
 function addBasePath(basePath) {
     // 处理所有链接、图片和样式表
@@ -591,7 +592,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 }
 });
 </script>
-<script src="/assets/sortable.min.js"></script>
 </body>
 </html>"""
         # kindle 支持，不能压缩 css 和 js
@@ -1082,6 +1082,11 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                     <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
                         <i class="fas fa-book-open"></i>
                         <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
                     </div>
                 </div>
                 <div style="display: none; flex-direction: row;" class="page-height-adjustment">

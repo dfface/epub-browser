@@ -775,3 +775,18 @@ body {
     border: 5px solid #333;
     border-top: 5px solid var(--primary);
 }
+
+.kindle-mode .loading-spinner {
+    width: auto;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    animation: none;
+    font-size: 18px;
+    color: var(--text);
+    font-family: var(--font-family);
+}
+
+.kindle-mode .loading-spinner::after {
+    content: "Loading...";
+}

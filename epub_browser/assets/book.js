@@ -241,10 +241,10 @@ function initScript() {
     }, 500);
 };
 
-// 书架功能
-const BOOKSHELF_KEY = 'bookshelf';
-
 function initBookShelfButton(bookHash) {
+    // 书架功能
+    const BOOKSHELF_KEY = 'bookshelf';
+
     const toggleShelfBtn = document.getElementById('toggleShelfBtn');
     const toggleShelfBtnText = document.getElementById('toggleShelfBtnText');
     

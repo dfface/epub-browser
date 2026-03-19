@@ -151,6 +151,10 @@ class EPUBLibrary:
 <link rel="stylesheet" href="/assets/library.css">
 </head>
 <body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
 """
         all_tags = set()
         for book_hash, book_info in self.books.items():
@@ -181,7 +185,7 @@ class EPUBLibrary:
                     <a id="kindleModeValueYes" style="text-decoration: none; color: var(--text-color); cursor: pointer;" href="javascript:document.cookie='kindle-mode=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'; location.replace(location.pathname);">
                         <div class="stat-value">Kindle Mode</div>
                     </a>
-                    <a id="kindleModeValueNot" style="text-decoration: none; color: var(--text-color); cursor: pointer;" href="javascript:document.cookie='kindle-mode=true; expires=Fri, 26 Jun 999999999999999 20:10:32 GMT; path=/;''; location.replace(location.pathname);">
+                    <a id="kindleModeValueNot" style="text-decoration: none; color: var(--text-color); cursor: pointer;" href="javascript:document.cookie='kindle-mode=true; expires=Fri, 26 Jun 999999999999999 20:10:32 GMT; path=/;'; location.replace(location.pathname);">
                         <div class="stat-value">Not Kindle</div>
                     </a>
                 </div>
@@ -238,7 +242,7 @@ class EPUBLibrary:
             <i class="fas fa-arrow-up"></i>
             <span class="control-name">Top</span>
         </button>
-        <button class="control-btn" id="bookshelfBtn">
+        <button class="control-btn" id="bookshelfBtn" style="display: none;">
             <i class="fas fa-bookmark"></i>
             <span class="control-name">Shelf</span>
         </button>
@@ -320,35 +324,14 @@ class EPUBLibrary:
         </div>
     </div>
 </div>
-
-<!-- 选择分组弹窗 -->
-<div class="select-group-modal" id="selectGroupModal">
-    <div class="select-group-content">
-        <div class="select-group-header">
-            <h3>Add to Shelf</h3>
-            <button class="select-group-close-btn" id="selectGroupCloseBtn">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="select-group-body">
-            <div class="select-group-tree" id="selectGroupTree">
-                <!-- 树形分组结构 -->
-            </div>
-        </div>
-        <div class="select-group-footer">
-            <button class="select-group-confirm-btn" id="selectGroupConfirmBtn">
-                <i class="fas fa-check"></i> Confirm
-            </button>
-        </div>
-    </div>
-</div>
-
 <footer class="footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """
         library_html += """
         <script src="/assets/library.js" defer></script>
+        <script src="/assets/sortable.min.js" defer></script>
+        <script src="/assets/bookshelf.js" defer></script>
         <script>
         let base_path = window.location.pathname;
         if (base_path.endsWith("index.html")) {
@@ -414,7 +397,6 @@ class EPUBLibrary:
         }
         });
         </script>
-        <script src="/assets/sortable.min.js"></script>
     </body>
 </html>"""
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)

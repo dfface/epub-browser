@@ -612,7 +612,7 @@ function initScript() {
 
         const viewportHeight = window.innerHeight;
 
-        let contentHeight = viewportHeight - bottomNavHeight - bottomNavMobileHeight; // 减去边距和安全余量，安全余量就是 margin-top: 20px，然后上下不就都是 20 了
+        let contentHeight = viewportHeight - bottomNavHeight - bottomNavMobileHeight - 40; // 减去边距和安全余量，安全余量就是 margin-top: 20px，然后上下不就都是 20 了
         contentContainer.style.height = `${viewportHeight - bottomNavHeight - bottomNavMobileHeight}px`;
         
         // 直接设置内容容器的高度
@@ -801,40 +801,42 @@ function initScript() {
 
     // 保存阅读进度
     function saveReadingProgress() {
-        if (isPaginationMode && !isKindleMode()) {
+        if (isPaginationMode) {
             // 翻页模式
             let storageKey = getStorageKey("turning");
-            localStorage.setItem(storageKey, currentPage.toString());
+            if (isKindleMode()) {
+                setCookie(storageKey, currentPage.toString());
+            } else {
+                localStorage.setItem(storageKey, currentPage.toString());
+            }
         }
     }
 
     // 加载阅读进度
     function loadReadingProgress() {
-        if (isKindleMode()) {
-            if (isPaginationMode) {
-                showPage(0);
-            }
-            return
-        }
-
         if (isPaginationMode) {
             // 翻页模式需要等待 totalPages 计算完成
             if (totalPages === 0) {
                 setTimeout(() => {
                     loadReadingProgress();
                 }, 100);
-                return 
+                return
             }
-            
+
             // 翻页模式
             let storageKey = getStorageKey("turning");
-            let savedPage = localStorage.getItem(storageKey);
-        
+            let savedPage;
+            if (isKindleMode()) {
+                savedPage = getCookie(storageKey);
+            } else {
+                savedPage = localStorage.getItem(storageKey);
+            }
+
             if (savedPage && savedPage > 0) {
                 const pageIndex = parseInt(savedPage, 10);
                 if (pageIndex >= 0 && pageIndex < totalPages) {
                     showPage(pageIndex);
-                    
+
                     // 显示加载进度提示
                     showNotification(`Reading progress loaded: Page ${pageIndex + 1}`, 'info');
                 }
@@ -1330,7 +1332,31 @@ function initScript() {
             togglePureMode();
         });
     }
-    
+
+    // Reload按钮点击事件（仅桌面端翻页模式）
+    const reloadPagesBtn = document.getElementById('reloadPages');
+    if (reloadPagesBtn) {
+        reloadPagesBtn.addEventListener('click', function() {
+            if (isPaginationMode) {
+                showLoading();
+                // 保存当前页码
+                const savedPage = currentPage;
+                // 延迟执行createPages，确保loading动画显示
+                setTimeout(() => {
+                    createPages();
+                    // 恢复页码位置
+                    setTimeout(() => {
+                        showPage(savedPage);
+                        hideLoading();
+                        showNotification('Pages reloaded', 'info');
+                    }, 500);
+                }, 200);
+            } else {
+                showNotification('Reload is only available in page-turning mode', 'info');
+            }
+        });
+    }
+
     // 初始化纯净阅读模式状态
     initPureModeState();
     
