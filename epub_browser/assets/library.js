@@ -1104,15 +1104,17 @@ function initBookshelf() {
         let targetGroup = shelfData;
         let parentGroups = shelfData.groups;
         let targetId = currentGroupId;
+        let parentGroup = null;
         
         if (currentGroupPath.length > 0) {
             targetGroup = shelfData.groups[currentGroupId];
+            parentGroup = targetGroup;
             for (let i = 0; i < currentGroupPath.length - 1; i++) {
-                targetGroup = targetGroup.groups[currentGroupPath[i]];
+                parentGroup = parentGroup.groups[currentGroupPath[i]];
             }
             if (currentGroupPath.length > 0) {
                 targetId = currentGroupPath[currentGroupPath.length - 1];
-                parentGroups = targetGroup.groups;
+                parentGroups = parentGroup.groups;
                 targetGroup = targetGroup.groups[targetId];
             }
         } else {
@@ -1130,22 +1132,16 @@ function initBookshelf() {
             delete parentGroups[targetId];
             
             if (currentGroupPath.length > 0) {
-                const shelfData = getBookshelf();
-                let parentGroup = shelfData.groups[currentGroupId];
-                for (let i = 0; i < currentGroupPath.length - 1; i++) {
-                    parentGroup = parentGroup.groups[currentGroupPath[i]];
-                }
                 if (parentGroup.order) {
                     parentGroup.order = parentGroup.order.filter(id => id !== targetId);
                 }
-                saveBookshelf(shelfData);
             } else {
-                const shelfData = getBookshelf();
                 if (shelfData.order) {
                     shelfData.order = shelfData.order.filter(id => id !== targetId);
                 }
-                saveBookshelf(shelfData);
             }
+            
+            saveBookshelf(shelfData);
             
             groupModal.classList.remove('active');
             renderBookshelf(currentTag);
