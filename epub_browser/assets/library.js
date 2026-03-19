@@ -52,7 +52,10 @@ function initScript() {
         }
     }
 
-    let kindleMode = getCookie("kindle-mode") || "false";
+    let kindleMode = getCookie("kindle-mode") || "true";
+    if (window.location.hash == "#kindle") {
+        kindleMode = "true";
+    }
     function isKindleMode() {
         return kindleMode == "true";
     }
