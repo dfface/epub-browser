@@ -4,7 +4,7 @@ function initScript() {
         const date = new Date();
         date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
         const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
-        document.cookie = `${key}=${value}; ${expires}; path=/;`;
+        document.cookie = key + "=" + value + ";" + expires + "; path=/;";
     }
 
     // 解析指定 key 的 Cookie
@@ -24,7 +24,7 @@ function initScript() {
 
     function deleteCookie(name) {
         // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
-        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     }
 
     // 页面加载时恢复顺序
