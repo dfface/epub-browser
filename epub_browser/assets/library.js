@@ -2,9 +2,10 @@ function initScript() {
     // 设置 cookie
     function setCookie(key, value) {
         const date = new Date();
-        date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
-        const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
-        document.cookie = key + "=" + value + ";" + expires + "; path=/;";
+        date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
+        const expires = "expires=" + date.toUTCString();
+        // 重点：加上 SameSite=Lax，和你的按钮完全一致
+        document.cookie = key + "=" + value + ";" + expires + "; path=/; SameSite=Lax";
     }
 
     // 解析指定 key 的 Cookie
@@ -52,9 +53,11 @@ function initScript() {
         }
     }
 
-    let kindleMode = getCookie("kindle-mode") || "true";
-    if (window.location.hash == "#kindle") {
+    let kindleMode = getCookie("kindle-mode") || "false";  // 不能是 true，1 是默认就没设置 2 是点击后也是没设置
+    if (window.location.hash == "#kindle") {  // 保底方案
         kindleMode = "true";
+    } else if (window.location.hash == "#not-kindle") {
+        kindleMode = "false";
     }
     function isKindleMode() {
         return kindleMode == "true";

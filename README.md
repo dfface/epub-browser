@@ -19,7 +19,7 @@ It now supports the following features:
 
 - **Page navigation**: Keyboard controls supported (Left Arrow, Right Arrow and Spacebar for page turning/scrolling).
 
-- **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen. Default is enabled. Can also be enabled by the URL with `#kindle`.
+- **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen. Default is disabled. You can click the button to enable it or disable it. Can also be enabled by the URL with `#kindle` and be disabled by the URL with `#not-kindle`.
 
 - Reading progress bar
 

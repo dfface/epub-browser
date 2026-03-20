@@ -840,6 +840,4 @@ function initBookshelf() {
     });
 }
 
-if (!window.initBookShelf) {
-    window.initBookShelf = initBookshelf;
-}
+window.initBookShelf = initBookshelf;
