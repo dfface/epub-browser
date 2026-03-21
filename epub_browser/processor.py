@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import re
 import hashlib
 import json
+import urllib.parse
 import minify_html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -638,9 +639,17 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         # 2. 规范化路径匹配（去除 ./ 前缀）
         elif toc_src.lstrip('./').lstrip('/') in chapter_index_map:
             return chapter_index_map[toc_src.lstrip('./').lstrip('/')]
-        # 3. 文件名匹配
+        # 3. URL解码后匹配（处理%20等编码字符）
+        elif urllib.parse.unquote(toc_src) in chapter_index_map:
+            return chapter_index_map[urllib.parse.unquote(toc_src)]
+        elif urllib.parse.unquote(toc_src).lstrip('./').lstrip('/') in chapter_index_map:
+            return chapter_index_map[urllib.parse.unquote(toc_src).lstrip('./').lstrip('/')]
+        # 4. 文件名匹配
         elif os.path.basename(toc_src) in chapter_filename_map:
             return chapter_filename_map[os.path.basename(toc_src)]
+        # 5. URL解码后的文件名匹配
+        elif os.path.basename(urllib.parse.unquote(toc_src)) in chapter_filename_map:
+            return chapter_filename_map[os.path.basename(urllib.parse.unquote(toc_src))]
         return None
     
     def create_toc_json(self):
