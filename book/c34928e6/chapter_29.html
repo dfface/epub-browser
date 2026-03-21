@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="附录 大洋邦新语要义 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>附录 大洋邦新语要义 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">附录 大洋邦新语要义</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">附录　大洋邦新语要义</h2>
+
+  <p class="normal">“新语”是为了满足“英社”（Ingsoc）或旧称英国社会主义意识形态的需要而设计出来的官方语言。到了一九八四年，相信还没有人采用新语作为唯一的沟通工具，不论是说话也好，书写也好。不错，《泰晤士报》的社论是以新语撰写，但那是只有专家才写得出来的大手笔。估计到了二〇五〇年吧，新语终会取代旧语（或者我们该称为标准英语）。在这期间，新语发展稳健，各党员在日常的言谈中越来越倾向于使用新语的词汇和语法结构。一九八四年流通的新语版本（已收录在第九和第十版的新语辞典中），只是一个试用版，因为里面出现不少将来一定会禁止使用的冗词和过时的字眼。现在我们要讨论的，是已臻完美、收在第十一版新语辞典中的确定版本。</p>
+
+  <p class="normal">新语的目标，不单在为英社信徒提供一种适合他们表达自己的世界观和思想习惯的媒介，更因此令其他的思想方式根本无法运作。新语一旦全面采用后，旧语就彻底被遗忘。那时离经叛道的思想，即是说偏离英社原理的思想，根本是无法想象的事——因为思想还需要依赖文字来表达。新语的词汇结构准确，而且定义常见幽微精妙之处，各党员表达自己的思想时，也希望能如此得心应手。这些定义既排除所有为人误解的地方，因此亦不可能通过旁门左道取得其他的结论。确定版新语能取得这种成果，靠的是创造新词，但用得最多的法子是删词。除了不合时宜的全删外，剩下来的词汇，意义稍有偏离正统的都一一改正，杜绝任何产生歧义的可能。兹举一例。在新语中，“free”这个词未删，但用法只限于“This dog is free from lice”（这狗身上没有虱子）或“This field is free from weeds”（这块田没有杂草）这类表述句子中。在新语中，“free”再无旧语中自由的含义，如“politically free”（政治上的自由）或“intellectually free”（知识上的自由），因为政治上的自由和知识上的自由实际上不存在，观念上也不存在，因此无以名之。异端邪说的词语要禁用，但词汇的删减却是推广新语的分内事：只有删无可删的词才会保留下来。新语的宗旨不在扩大而是缩小思想的范围。把词语的选择<b class="calibre8">减到</b>最低限度，也间接地在这方面帮了大忙。</p>
+
+  <p class="normal">新语以目前我们所使用的英语为基础，虽然不少新语的句子，即使没有混合新创出来的词语，也不易为今天说英语的人看得懂。新语的词汇分成三个截然不同的组别：甲组、乙组（亦称复合词）和丙组。各组分别讨论较容易处理，但新语的语法特色将集中在甲组中讨论，因为乙组和丙组涉及的语法规则问题与在甲组讨论的相同。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal"><b class="calibre8">甲组词汇</b>。此组词汇以日常生活用词组成，诸如“吃”、“饮”、“工作”、“穿衣”、“上楼梯和下楼梯”、“乘车”、“养花”、“做饭”等等。新语的词汇几乎全是我们现有的词语，像“打”、“跑”、“狗”、“树”、“糖”、“房子”、“田野”等等。但相对于今天我们使用的英语词汇，新语词汇量一来少得可以，二来语义严格限定，难生岐义。语义上凡见模棱两可、含糊不清的地方都已一一清除。新语要尽可能做到的，是使用甲组中的词清清楚楚地表达大家习知的<b class="calibre8">单一</b>观念。看来用甲组词汇从事文艺创作是不大可能了，也难用来讨论政治的或哲学的问题。甲组词汇只用来表达简单的、目标明确的思想，通常与有形的实物或身体动作有关。</p>
+
+  <p class="normal">新语语法有两大特色。第一个特色是几乎所有词类（parts of speech）的功能都可以互相交换。新语中任何一个词（原则上甚至连抽象的词如“if”、“when”也算在内）都可作动词、名词、形容词或副词使用。在动词和名词的模式之间，如果词根相同，就绝不会起变化，这条规则有助于废除不少早已过时的形式。就拿“thought”（思想）这个词来说吧，在新语中是不存在的，代之而起的是“think”（思想），既是名词，也是动词。这跟词源学没有什么关系。有时保留下来的是名词原来的面貌，有时则是动词。即使一个名词和一个动词在意思上有相近之处，但如果在词源上实无关联，其中的一个——是名词也好、动词也好——就得消失。譬如说，“cut”（切割）这个词是不存在的，因为其意义已被“knife”（刀）这个名词和动词混合体所涵盖了。要作形容词使用，只消在混合体后加上后缀“-ful”不就成了？副词呢，后缀加上！“-wise”。例子如下：“speedful”就是“rapid”（快），“speedwise”等于“quickly”（快）。我们今天使用的一些形容词，像“good”（好）、“strong”（强）、“big”（大）、“black”（黑）、“soft”（软），会保留下来，但总数不多。实际上也用不着，因为几乎所有形容词都可以通过在名词和动词混合体后加个后缀就可变化出来。所有现存的副词都消失了，只有几个例外：那些本来就以“-wise”作词尾的。以“-wise”作后缀的副词改变不了。作为副词用的“well”（好），已由“goodwise”取代。</p>
+
+  <p class="normal">除此之外，任何词语——原则上任何出现在新语中的词类都不例外——只要在前面加上“un-”这个前缀都可变成否定意义。要加重词气，可加前缀“plus-”。或要再升一级，可用“doubleplus-”。譬如说，“uncold”（不冷）就是“暖”，那么“pluscold”和“doublepluscold”分别是“very cold”（很冷）和“superlatively cold”（极冷）。前置词缀（prepositional affixes）的使用，几乎可以修正我们日常英语中差不多每一个词的意思。这些词缀包括：“ante-”，“post-”、“up-”和“down-”等等。我们不难看出，这个前置词缀法一经使用，常用的词汇就大大减少。既然已经有“good”（好）这个词，“bad”（坏）这个词就用不着了；需要说出来的意思，用“ungood”来表达不是一样？不，应该说更好。面对两个意思完全相反的词，你只消决定删除哪一个就成。举例来说吧，“dark”（暗）这个词，就可由“unlight”（不亮）代替，而“light”（明亮）可以由“undark”（不暗）代替。这是自己可以作主的选择。</p>
+
+  <p class="normal">新语语法的第二个特色是规则固定不变。除了下面提到的几个例外，所有词形的变化都依随同样的规则。这就是说所有动词的过去式和过去分词并无区别，都是以“-ed”结尾。“Steal”的过去式是“stealed”，“think”的过去式是“thinked”。这规则在新语中实施后，旧语中的词汇如“swam”、“gave”、“brought”、“spoken”、“taken”等，都淘汰了，分别以“swimed”、“gived”、“bringed”、“speaked”、“taked”等的新面目出现。要把名词改为复数，在后面加上“s”，或看个别情形而定，加上“es”就成。“Man”、“ox”、“life”在新语中的复数是：“mans”、“oxes”、“lifes”。形容词的等级比较一律以“-er”、“-est”来表示，如“good”、“gooder”、“goodest”。旧制不规则的比较级形式如“more”和“most”全面废止。</p>
+
+  <p class="normal">词语类型中唯一可以不规则变化的是代名词、关系代词、指示形容词和助词。这些词类，除了“whom”一词因属多余已被删除外，其余的都可以保留原来的用法。“Shall”和“should”这两种时态亦已废除，因功用已在“will”和“would”的范围涵盖之内。由于要使演讲的人容易措辞和说话不拖泥带水，词的创造有时难免偏离常规。任何发音困难或听来易生误解的词，事实已证明是“坏”词，因此有时为了听来悦耳，就会加插一些多余的字母，或让过时的词形结构保留下来。这些问题将会在谈论乙组的词汇时引发出来。下文将会说明我们<b class="calibre8">为什么</b>这么重视发音的因素了。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal"><b class="calibre8">乙组词汇。</b>此组词汇的结构均有明显的政治目的。不但每个词都带有政治意识，词的本身更可以让使用者发音时感到无比舒畅。只有完全熟悉英社的政情党规的人才能正确使用这些词汇。在某些情形下，乙组的词语可以翻译成旧语，甚至可以译为以甲组词汇组成的文章，但免不了要加上长长的一段文字作解释，更不用说难以照顾到在原文中弦外之音的层面了。乙组的词语或可看作是一种文字速记，能用几个音节就把一篮子的主意紧紧包容起来。乙组的词汇，实在比一般语言更准确、更有活力。</p>
+
+  <p class="normal">乙组的词汇都是复合词，由两三个词或词的某一部分基于方便发音的原则组合起来。<sup class="calibre7"><a class="duokan-footnote" href="chapter_29.html#fn1" id="fnref1"><img alt="" class="exs" src="resources/OEBPS/Images/00003.jpeg" /></a></sup>这些结合起来的词总是名词、动词兼用，以现有的规则作词形变化。举例来说，“goodthink”这个词，粗浅的意思是“orthodoxy”（正统）。若有人把它看作动词的话，那就等于说“to think in an orthodox manner”（思想正统）。此词的形式变化如下：名词、动词：“goodthink”；过去式和过去分词：“goodthinked”；现在分词：“goodthinking”；形容词：“goodthinkful”；副词：“goodthinkwise”；动名词：“goodthinker”。</p>
+
+  <p class="normal">乙组词汇的结构并非根据任何词源学的原则。词语的组件可取自词类中任何一部分，既可随意安插，亦可为了方便发音而轻易移位，只消让人看得出这种组合的由来便成。且看“crimethink”（思想罪行）这个词，“think”是放在第二位的。但在“thinkpol”（思想警察）中，它在首位，而构成这个词的第二个单元“police”的第二个音节就省略了。由于谐音不易得，乙组词汇的“配件”组合不像甲组那么有规律。举例来说，“Minitrue”、“Minipax”和“Miniluv”这三个词的形容词格式原来是“Minitruthful”、“Minipeaceful”和“Minilovely”，但一来“-trueful”、“-paxful”和“-loveful”的形式怪怪的，二来读来有点聱牙。但原则上，所有乙组的词都可以“变形”，都可以按照既定的原则来变。</p>
+
+  <p class="normal">乙组中有些词极为玄妙，除非你对新语研究有素，否则难明所指。试看《泰晤士报》社论中一个典型的句子：“Oldthinkers unbellyfeel Ingsoc”。我们能想到以最短的旧语翻译过来的话是：“Those whose ideas were formed before the Revolution cannot have a full emotional understanding of the principles of English Socialism”（在革命前思想已定型的人无法对英国社会主义原理有全面的和感性的理解）。但这句译文显然有不足之处。首先，要透彻地理解上面这句新语的含义，你应对英社的本质有通盘的了解。还有一点，只有一个全面浸淫于英社思想的人才会感受到“bellyfeel”这个词震人心弦的威力。“Bellyfeel”意味着对一种思想盲目的、热烈的拥抱。这种境界，今天实难想象。“Oldthink”这个词也不能望文生义，因为词义本身跟“邪恶”与“堕落”的观念夹缠不清。但新语中有些词语的功能不是为了表达而是为了摧毁词的意义，“oldthink”正是其中的一个例子。这类词汇数目不多，它们的内涵不断膨胀，得用大量的词句来释义。等到一个可以涵盖全部语境的词出现时，这些曾经用作释义的词句就可以从人间蒸发了。新语辞典的编纂者面对的最大困难，不是创新词，而是创了新词后搞清楚它们究竟是什么意思。这也是说，搞清楚它们出现后可以删除的旧语的幅度多大。</p>
+
+  <p class="normal">我们在“free”的例子中看到，为了方便，一些曾经有异端指向的词经过修正后，还是保留下来。但不少其他词诸如“honor”（荣誉）、“justice”（正义）、“morality”（道德）、“internationalism”（国际主义）、“democracy”（民主）、“science”（科学）、“religion”（宗教）等，都一一清除了。这些词的意义都涵盖在几个容量无限的综合词汇中，也正因如此最后被除了名。譬如说，所有环绕着“自由”和“平等”这两个观念组成的词汇，都可以用一个词概括：“crimethink”（思想罪行）。所有因“客观”和“理性”这两个观念引发出来的词，都可以概括成一个词：“oldthink”（旧思）。定义越准确越易生枝节。一个党员只消像古代希伯来人那样看人生，就符合了标准。也不知是什么原因，那时的希伯来人相信，除了他们以外，其他人崇拜的都是“假神祇”。党员不必知道这些假神祇名叫“Baal”、“Osiris”、“Moloch”、“Ashtaroth”等等。也许他所知越少，越能保持自己思想的正统。他知道耶和华是谁，也知道什么是“十诫”。他因此知道，所有名称不同、特性有异的神祇都是冒牌的。党员跟希伯来人有点相似的是，他知道什么是正确的行为，而且在极其模糊和笼统的范围内，知道可以“越分”的程度有多大。举例说，他的性生活完全受制于两个新语的语境：“sexcrime”（不道德的性行为）和“goodsex”（贞洁）。“Sexcrime”概括所有不规矩的性行为，包括通奸、苟合、同性恋和其他性变态花样。还有一点，正常的为性交而性交也是一种“sexcrime”。我们不必在这里一一罗列，反正所有违规的都是罪行，原则上都犯了死罪。丙组词汇以科学和技术专门名词组成，理应因利乘便在这里给某些有偏差的性行为厘定专门术语，只是就平民百姓而言，实在无此需要。他们知道什么是“goodsex”，那就是夫妇间为生儿育女而性交，但女方不能感受肉体上的快乐，离此正道就是“sexcrime”。你很难依据新语来判断什么是离经叛道的思想，你只能靠直觉。在此范围外的语言表述根本不存在。</p>
+
+  <p class="normal">在乙组中出现的词汇，没有一个是意识形态暧昧不明的。不少名词用的都是委婉语。就拿“joycamp”和“Minipax”这两个词来说吧，字面意思跟实情差不多完全相反。“Joycamp”看来是“幸福营”，其实是“劳改营”。“Minipax”是旧语中的“和平部”，其实是“作战部”。另一方面，新语有些词汇公然而又轻蔑地道出对大洋邦真面目的认识。“Prolefeed”是其中一个例子，拆成“prole”和“feed”来看，可知此新语的意思是“无产阶级的养料”，实情是党给无产者大众提供的垃圾娱乐和虚假新闻。其余的词的意思也是模棱两可：用于党的时候含义是“好的”，说到党的敌人时是“坏的”。此外还有不少初看像是缩写的词，其意识形态的指向不是由内容来决定，而要看词的结构。</p>
+
+  <p class="normal">所有与政治有关或可能有关的词汇都尽量放在乙组。每一个机构、学说、国家、制度、公共大厦的名字，例必缩短到方便辨识的形式，也就是一个可以保留其原来意思，发音容易、音节最少的词。譬如说，温斯顿·史密斯在真理部工作的单位记录科称作“Recdep”，而子虚科名为“Ficdep”，电视科就是“Teledep”，依此类推。这种设计并非单单为了节省时间。早在二十世纪初期，缩略语的使用已成政治语言的一个特色。值得注意的是，最倾向于使用这类缩略语的是极权主义国家和极权主义组织。以下几个是显例：“Nazi”（纳粹分子），“Gestapo”（盖世太保），“Comintern”（第三国际），“Inprecorr”（国际新闻通讯），“Agitprop”（宣传鼓动）。起初人们使用这种缩略语好像是出于本能，但作为新语来使用时，这些词是有明确目的的。造词的党人认识到，你缩短一个名字，同时也会收窄和改变它的含义，削去原来依附着它的诸多联想。譬如说“Communist International”这个词，一提到它眼前就会出现一幅普世兄弟爱的复合图，就会想到红旗、路障、马克思和巴黎公社。相对来讲，“Comintern”这词只教人想到一个组织严密的政党和一套头头是道的教条。“Comintern”指涉的事情易于辨识，目的也有限，就像椅子或桌子那么容易辨识。你几乎可以不用思考地把“Comintern”这个词念出来，可是“Communist International”这名词，你总得稍为停顿一下才能念出来。基于相同的道理，一个像“Minitrue”这样的缩略语所引起的联想不但少于“Ministry of Truth”，而且还较易控制。这既解释了为什么缩略语这么流行，亦可因此明白为什么新语对每个词都要求可以轻易发音，严谨得近乎吹毛求疵。</p>
+
+  <p class="normal">新语对谐音的重视，仅次于词义是否正确。为了需要，语法的常规可以牺牲。这也是合理的事，因为政治目标至高无上，新语用的词除意义正确外，更应简短，可以快速背诵，使言说者发言时脑中的回响减至最低限度。乙组所收的词汇，正因互相看来极为相似反而更见威力。“Goodthink”、“Minipax”、“prolefeed”、“sexcrime”、“joycamp”、“Ingsoc”、“bellyfeel”、“thinkpol”——这些词，还有其他难以计算的，都有一个共同点：几乎都是双音节或三音节，重音不分彼此地落在第一节和最后一节上。这些词有利于形成含混不清、断断续续、单调乏味的说话风格。这正是新语的本意，目的是尽可能使言语跟个人的清醒意识相隔开来，特别是关乎意识形态取舍问题的那种言语。在日常生活中，一个人开口说话前总会稍顿一下，或者说需要沉思一下。但一个党员受命对一个政治的或伦理的问题下判断发言时，应有能量像机枪发射子弹那么自然地发射出正确的见解。他本来就训练有素，掌握着的新语可说是万无一失的工具。这些词语听来刺耳，形式看来有点刻意求丑，但这倒是跟英社精神非常协调。新语的结构让党员发言时有个依靠。</p>
+
+  <p class="normal">词汇少、用词没有什么选择倒是好事。跟我们今天运用的英语相比，新语的词汇本来就相当贫乏，更不断有删除原有词汇的方法出现。说来也有点奇怪，新语跟其他语言的不同之处是词汇不是随着岁月而增加，反而是逐年减少。但这实在不是坏事，因为选择的范围越少，引发遐思的诱惑也因应减少。希望达到的至善之境是这样的：言者的发言都用喉音传达，不需通过脑神经。新语名正言顺地把“duckspeak”这个词收了进去，意思是说话“quack like a duck”，嘎嘎不休地像只鸭子。像乙组中不少其他词一样，“duckspeak”的意义也是模棱两可的。如果“嘎嘎”出来的见解正确，那“duckspeak”的语义就是正面的，值得称赞的。如果《泰晤士报》提到党内某演说家时称他为“doubleplusgood duckspeaker”，那就表示对他的表现热烈的恭维。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal"><b class="calibre8">丙组词汇。</b>丙组全以科技专门术语组成，可视为甲组和乙组的增补篇。这些词语跟我们今天使用的科学名词相似，也以同样的词源拼合，但一如处理其他词汇的程序一样，词义必须严格限定，删去所有不当的联想。在语法规则方面，此组词语与前二组无异。没有几个丙组的词语会在日常用语或政治言论中出现。任何从事科学工作的专家或技术人员，都会在特别为他们行业制定的词汇表中找到自己要用的词，但没有几个人对列在别组的词汇有什么认识。只有极少的几个词会在甲、乙、丙三组词汇中同时出现。科学作为一种思想习惯或思想方法——这种任何科学派系都会拥有的基本功能，却不会在列出的三个词汇表中找到任何有关的解说。事实上根本没有“科学”这个词，因为所有可能想出来有关科学的含义都清清楚楚地包含在“英社”这个词里面。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">从上面的介绍可以看出，想以新语发表一些层次稍高的歪论，是几乎不可能的事。当然，你也许还可用新语来发表层次极低的异端邪说，亵渎神明。举例来说吧，你可用新语说“Big Brother is ungood”（老大哥不好），但在一个思想正统的人听来，这句话本身自相矛盾，也无法以理性文字解释，因为需要引用的词根本不存在。任何对英社有敌意的念头，因此只能是个没有文字描述的念头。既然无以名之，非要提及不可时也只能笼笼统统地一笔带过。这些异端邪说一起受到谴责，但为什么是异端邪说却没有明文交代。实情是，新语本身不能用来追求不正当的目标，除非不惜以身试法把其中一些字句翻译为旧语。举例来说，“All mans are equal”（人人生而平等）可以说是一个新语句子，但其有违常理之处一如旧语说“All men are redhaired”（人人生而红发）之难言之成理。用新语说“All mans are equal”并无语法上的错误，但有违常识之处显而易见：人的身形、体重和气力怎可能完全“平等”？既然政治平等的观念已不存在，“equal”这个词的次要定义亦因此删除。在一九八四年，旧语还是日常的沟通工具。理论上说，使用新语词汇的人说不定还会记得这些新语在旧语中的本来面目。但实际上，任何在“doublethink”（双重思想）方面有根底的人都可以避免这种错误。再说，两三代以后，连这种失误的可能性也没有了。一个使用新语作为唯一语言而长大的人，绝不可能知道“equal”这个词的第二义曾经是政治平等，或“free”的旧义是“intellectually free”（知识上的自由）。这正如不知国际象棋为何物的人不会知道“queen”（后）和“rook”（车）分别扮演的是什么角色的道理一样。使用新语长大的人说不定都失去了犯罪和犯过错的能力，因为这些罪恶都无以名之，因此无法识认，也因此无法想象。可以预见的是，随着时间的流逝，新语最为显著的特色会越来越显彰：词汇越来越少、词义越来越死板、利用它作不轨用途的机会也越小。</p>
+
+  <p class="normal">旧语彻头彻尾为新语取代后，通往从前的环节也切断了。历史早已改写，但旧时的文学作品片段犹在，散置四方，虽经审查，但不彻底，可供旧语能力未失的人阅读。但在未来的日子中，这些文学片段即使幸存，已变得不知所云，因此译无可译了。任何旧语文字要翻译成新语都难实现，除非要翻译的段落是技术性的操作说明，或日常生活状况的叙述，或显露了正统思想（在新语词汇中叫“goodthinkful”）痕迹的描述。事实上这等于说没有任何约于一九六〇年前成书的作品可以全数翻译过来。革命前的文学作品只能作意识形态的翻译——这是说在文字上和意义上作改动。就拿知名的《独立宣言》来说吧：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">吾人坚信下列真理不证自明：人人生而平等，具有造物主所赐予某些无可剥夺之权利，其中包括生命、自由和追求幸福之权利。为了取得这些权利，人民于是成立了政府。政府的权力来自人民的认可。本此，任何政体一旦对这些目标造成损害，人民自有权利改变之或罢免之，再而成立新政府……</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">要把这段文字译成新语而又要保存其原有的意思，是近乎不可能的事。最接近的做法是用“crimethink”（思想罪行）这个词把这段文字概括起来。要全文译出，只有采取意识形态翻译法，到时杰斐逊的话都变为对独裁政府的歌颂了。</p>
+
+  <p class="normal">实在已有不少旧文学作品经过这样的处理了。某些历史人物的作品因为名气大而留存下来，但他们的成就已跟英社的思想体系混为一谈。这些人物中有莎士比亚、弥尔顿、斯威夫特、拜伦、狄更斯和其他一些作家。他们的作品正在翻译中。一待工作完成后，他们文字的原来面目以及所有旧文学遗存下来的痕迹都会灰飞烟灭。翻译这些作品的工作艰巨而缓慢，因此不能期望能在二十一世纪的第一个或第二个十年完成。此外还有不少实用性文字——诸如不可或缺的工艺手册等——需要以同样的方针去处理。正是为了给翻译工作充裕的准备时间，才会把落实新语使用的时间定为二〇五〇年那么晚。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <div class="calibre1">
+    <hr class="xian" />
+  </div>
+
+  <ol class="duokan-footnote-content">
+    <li class="duokan-footnote-item" id="fn1" value="1">
+      <p class="fn"><a class="calibre9" href="chapter_29.html#fnref1">◎</a>&nbsp;像speakwrite这类复合词，甲组词汇中当然有载，但这只能算是缩写，本身没有特殊意识形态色彩。——作者注</p>
+    </li>
+  </ol>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_28.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a  alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Last chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_28.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a  alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Last</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="五 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>五 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">五</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">五</h2>
+
+  <p class="normal">深处在地下的食堂，天花板很低。排队吃午餐的人慢慢移动上前。厅内已塞得满满的，嘈杂不堪。柜台后面的炉子传来饭菜的气味，酸酸的而带铁腥，难以掩盖胜利杜松子酒发出的酒精气味。厅内远远的一角有个小酒吧，其实只是墙上挖空的一个小洞，一毛钱可买一小杯酒。</p>
+
+  <p class="normal">“呀，正是我要找的人哪！”温斯顿背后有声音说。</p>
+
+  <p class="normal">他转头，原来是他的朋友赛姆，在研究科工作。也许“朋友”两字用得不妥。今天朋友已不存在，只有同志。但有些同志比别的同志让你比较乐于接近。赛姆是语言学家，长于新语。他现在正和一大群语言学家忙于编辑第十一版新语辞典。他个子比温斯顿瘦小，黑头发，大而鼓突的眼睛有时看来神伤得很，但有时却满带嘲弄意味，特别是他跟你说话，要研究你面部表情的时候。</p>
+
+  <p class="normal">“我只想问你有没有多余的刀片。”赛姆说。</p>
+
+  <p class="normal">“没有，”温斯顿以微带负疚的心情急急地说，“我什么地方都找过了，好像这东西已不存在。”</p>
+
+  <p class="normal">几乎每个人都问你要刀片。实际上他还有两片备而不用的。过去几个月闹刀片荒。官家的店子随时随地缺少某项必需品的供应，有时缺的是纽扣，有时是毛线或鞋带。现在是刀片。如果这些东西还存在的话，那你真要踏破铁鞋，往“自由市场”去找。</p>
+
+  <p class="normal">“我那片刀片用了一个半月。”他口是心非地补充说。</p>
+
+  <p class="normal">队伍又向前移动了几英寸。停下来时他转身又面对赛姆。他们分别从柜台末端那堆金属托盘中取下一个来，摸着还有点油腻腻的。</p>
+
+  <p class="normal">“昨天你去看战俘处绞刑了没有？”赛姆问道。</p>
+
+  <p class="normal">“没有，我那时正忙，”温斯顿淡然地说，“也许看纪录片时会看到吧。”</p>
+
+  <p class="normal">“那根本不是同一回事了。”赛姆说。</p>
+
+  <p class="normal">他用嘲弄的眼神看了温斯顿一眼。“我了解你，”他的眼睛好像在说，“你的心事我怎会看不穿？我当然明白你为什么不去看那些家伙吊死。”在政治认同方面，赛姆正统得近乎恶毒残忍。他跟你讲大洋邦飞机空袭敌人村落、公审思想犯和他们招供的细节，或在仁爱部执行的死刑，口气和神色总显得那么悠然自得，令人无法忍受。如果你不想听这种话，只有把话题岔到新语，尤其是比较专门的问题上去。在这方面他是权威，说得头头是道。温斯顿微微别过头去，躲开他黑色大眼审视的目光。</p>
+
+  <p class="normal">“昨天的绞刑还算可以，”赛姆带着回想的口吻说，“可惜的是死人的脚缚起来了。我要看的就是他们摇身踢脚的时候。当然，还有在他们断气前把舌头——很蓝很蓝的舌头——吐出来的刹那。我最欣赏的就是这些细节。”</p>
+
+  <p class="normal">“下一位！”穿着白围裙、手执长柄勺子的同志嚷道。</p>
+
+  <p class="normal">温斯顿和赛姆把托盘推前，那同志就动作快捷地把午餐定食倒下来：一小碟煮得稀烂呈淡红淡灰的碎肉瓜菜、一块面包、一片奶酪、一杯无牛乳拌调的胜利咖啡和一粒糖精。</p>
+
+  <p class="normal">“在电幕前那边有空台子，”赛姆说，“我们先买些杜松子酒吧。”</p>
+
+  <p class="normal">酒吧的同志给他们用无耳的瓷器杯子盛酒。他们小心翼翼地穿过拥挤的厅堂，把托盘在金属面的台子上放下。台子的一角有好像是前一位食客吐出来没擦去的残羹。温斯顿举起杯子，顿了顿做心理准备，然后一口把那杯油腻腻的液体灌下。眼泪从眼睛渗出来后，他突然觉得饿了。他一调羹一调羹地把那类似糨糊的东西往嘴巴送。里面那些软得像海绵一样的粉红小方块准是肉类的一种了，他想。两人在吃完小碟子所盛的东西前，一直没有再说过话。温斯顿左边后面有人喋喋不休地说话，声音沙哑，像鸭叫。大概正因此音与众不同，厅堂内虽然嘈杂，还是一样清晰刺耳。</p>
+
+  <p class="normal">“辞典编得怎么样了？”温斯顿提高声音问。</p>
+
+  <p class="normal">“慢得很，”赛姆说，“我负责的是形容词部分。这东西够迷人。”</p>
+
+  <p class="normal">一提到新语，赛姆马上神采飞扬起来。他把小碟子推到一旁，纤细的手一只拿起面包，一只执着奶酪，弯着身子靠近台面说话。为了不想叫喊，只好这样跟温斯顿交谈了。</p>
+
+  <p class="normal">“第十一版是确定本了。”他说，“我们的目的是把新语修到化境，到时每人除新语外再不会说别的了。工作完成时，像你这类人就得从头学起。我敢打赌，你一定以为我们主要的任务是创新词。那就大错特错了。我们在消灭词汇，每天毁掉的数以百计。我们要把语言的渣滓除去，务使第十一版所收的词，没有一个会在二〇五〇年以前过时的。”</p>
+
+  <p class="normal">他像饿坏了似的啃着面包，吞了两口后，继续以一种学究式的热情说下去。瘦黑的脸骤然充满生气，连嘲弄的眼光也收敛起来，他现在的神情真是如醉如痴。</p>
+
+  <p class="normal">“把多余的词删掉，呀，这感受美得可以。文字中最大的浪费自然要算动词和形容词，但名词中也有不少可以省掉的。同义词可省，反义词也何尝不可以省？任何一个形容词本身就可以变换为反义，何必节外生枝地另外用一个词？就拿‘好’来说吧，既有‘好’这么一个词，‘坏’就用不着了，是不是？说‘非好’不就成了吗？不但成，而且比‘坏’还要准确，因为‘非好’才是‘好’的反义。或者，你要表达‘好’的各种不同程度，那也易办，绝对用不上‘优秀’或‘精彩’诸如此类多余的词。‘加好’就包含了这一类形容词的意思。如果你再要强调多‘好’，那也成，说‘双倍加好’就是。不错，我们目前偶尔也采用这种形式，但到确定本完成时，这就是唯一的形式了。那个时候，全部有关好坏的观念都用六个词来表达：‘好’，‘加好’，‘双倍加好’；‘非好’，‘加非好’，‘双倍加非好’。但实际上，你知道，只有一个词。你说吧，这是不是一种美得可以的感受？对了，这主意原来是老大哥的。”他好像一时想到才加了这么一句话。</p>
+
+  <p class="normal">温斯顿一听到赛姆提到老大哥时，脸上马上露出一种热切的神情。可是赛姆也马上察觉出温斯顿并不热心。</p>
+
+  <p class="normal">“你对新语并不真心赏识，”赛姆用近乎忧伤的口吻说，“即使你写的是新语，心中想的还是旧语。你在《泰晤士报》发表的文章，有些我拜读过，实在不错，可惜在我看来这不过是翻译。新旧比对之下，看来你还是爱用含义模糊、语言繁冗的旧语。难怪，你不懂得消灭多余的文字是多美的一回事。你知不知道新语是世上唯一词汇每年减少的语言？”</p>
+
+  <p class="normal">温斯顿当然知道。但他没有搭腔，恐怕说溜了嘴，只淡淡地笑了笑，希望对方看来这是深有同感的表示才好。赛姆又啃了那块灰黑的面包一口，嚼了嚼，然后继续说：</p>
+
+  <p class="normal">“你没想到吗，新语的最后目标是把思想的范围缩小。到时要犯思想罪也不可能，因为根本没有语言构成异端邪说。每一个需要表达的观念都可以由<b class="calibre8">一个</b>词正确地表达出来。对了，一个词——言简意赅，绝无任何附会可能的一个词。什么草蛇灰线、雾里看花的旧把戏，忘的忘了，删的删了。这个境界，十一版已快达到了，但这种毁词的工作，你我死后还会继续下去。词汇每年减少，而我们意识的活动范围也相应缩小。当然，即使在目前，我们也没有理由或借口犯思想罪。这是个人的约束和现实控制，不过到那时候，连这个也用不着了。语言改革臻至善境时，革命也就完成了。新语是英社而英社就是新语。”说到这里他顿了顿，然后露出近乎神秘的满足感，补充说，“老兄，你有没有想过，到二〇五〇年，不会再晚了，世界上再没有一个活着的家伙听得懂我们今天的谈话了！”</p>
+
+  <p class="normal">“除了……”温斯顿用怀疑的口吻说了一半就顿住了。</p>
+
+  <p class="normal">他本想说“除了无产者”，只是他不敢肯定这句话是否不存异端成分，因此住了口。赛姆可猜出了他滑到嘴边的话。</p>
+
+  <p class="normal">“无产者不是人。”赛姆毫无顾忌地说，“到二〇五〇年，可能要更早些，我们所有有关旧语的知识不复存在。旧文学那时已烟消灰灭。乔叟、莎士比亚、弥尔顿、拜伦，这些人的东西只在新语版出现了，不但改了，而且改得跟他们原来说的意思相反。改的不限于旧文学，党的文字也得改，包括口号与标语。自由的观念已经废除了，你还说‘自由是奴役’，谁懂？整个思想的习惯会完全不同。其实，以我们今天所下的定义看，到时没有思想。思想正确就是没有思想，不必思想。正统思想是无意识。”</p>
+
+  <p class="normal">总有一天，温斯顿突然想道——而且深信这想法错不了，赛姆会被蒸发掉的。他太聪明了，看得太清楚，说话又没遮拦。党不喜欢这种人。有一天他会失踪，他的命运已刻在脸上。</p>
+
+  <p class="normal">温斯顿已把面包奶酪吃完。他在椅子中略微移动身子去喝咖啡。左边台子那个声音沙哑的汉子，仍喋喋不休地聒聒叫着。背对着温斯顿的是个年轻的女人，大概是他的秘书吧。那汉子说一句，她恭听一句，而且看来无事不表衷心赞同的样子。温斯顿不时听到她说“你讲得<b class="calibre8">对极了</b>，我<b class="calibre8">完全</b>同意你的意见”，声音听来青春活泼，虽然柔美得近乎傻兮兮的。但不管她在讲什么，那汉子还是滔滔不绝地聒聒下去。温斯顿认出来了，他在子虚部工作，地位颇高，但所知也仅此而已。他看来约摸三十岁，喉头大，嘴巴部分的表情特别灵活。他微扬着头。由于他所坐的位子的关系，他那双埋在眼镜片后面的眼睛反射着灯光，在温斯顿看来像两个空白的小圆盘。更可怕的是，他虽然像连珠炮似的叫个不停，你连一个字也难听得清楚。就这么一次温斯顿听到半句话：“……最后完全消灭戈斯坦。”这半句话说得又急又快，像一行新铸出来的完全没有标点符号的铅字。其余温斯顿能听到的，就是聒聒、嘎嘎、聒——嘎。那汉子实际说了些什么你虽然听不清楚，但谈的内容，你用不着猜也知一二。他要不是痛斥戈斯坦，就是在说思想犯和阴谋破坏分子这类人应用更严厉的手段对付，再不然就是力数欧亚国军队暴行之不是，也可能在称赞老大哥的为人，或者是在马拉巴前线服务的英雄。不过，他在说什么都没有分别，因为你可以肯定他用的每一个词都是思想正确的，非常“英社的”。温斯顿看着那张无眼的脸的嘴巴上下移动时，忽然产生异样的感觉：眼前说话的不是一个人，而是一个可以发出声音的木偶之类的东西。声音不受大脑操纵，仅是声带的振动。振动出来的东西虽用文字组成，但不能说是语言，只是无意识状态下发出来的声音，犹如鸭叫。</p>
+
+  <p class="normal">赛姆久久没有说话，正用调羹柄在台角那摊菜汁上无聊地画花纹。隔台那个鸭叫声还是聒聒不休。</p>
+
+  <p class="normal">“在新语中有一个词，”赛姆说话了，“我不知道你听说过没有，那就是‘鸭语’，其话如鸭叫的意思。这个词有两种完全矛盾的意义。如果敌人鸭语，就是废话；如果与你见解相同的人鸭语，那是称赞。”</p>
+
+  <p class="normal">毫无疑问，赛姆早晚要被蒸发掉的，温斯顿不禁又想道。他觉得有点黯然，虽然他明知赛姆瞧不起自己，甚至不太喜欢自己。如果找到什么证据或理由，赛姆绝不会犹疑指控他为思想犯。可是这个人不知怎的就是有点问题：他粗心大意，不懂得“若即若离”和“大智若愚”这两句话所包含的处世之道。你可不能说他思想有问题；他奉信英社的训条，崇拜老大哥。打胜仗了，他欣喜若狂。他仇视异端分子，态度热情而诚恳，对他们的一切了如指掌，这就非一般党员能及了。虽然如此，他还是予人一种不太守本分的感觉。不该说的话他说了，书看得太多。这还不算，他居然常去泡栗树咖啡馆，那个画家和音乐家最爱去鬼混的地方。没什么法律——明的没有，暗的也没有——规定你不能到那儿去，只不过那地方实在有点儿邪门而已。不少如今名誉扫地的党的领袖，在未受清算前就是那咖啡馆的常客。据说戈斯坦几十年前也光顾过呢。赛姆的命运如何也就不问可知了。但如果他此刻捉摸到温斯顿的心事，他会马上转身，向思想警察告发。其实别人也不例外，只是赛姆比别人行动更快而已。空怀对党一腔热诚还不够。赛姆自己不是说过吗，最正确的思想就是无思想、无意识。他早晚要出问题的。</p>
+
+  <p class="normal">赛姆抬起头来，看了一眼，接着说：“柏森斯来了！”</p>
+
+  <p class="normal">听他的口吻，几乎恨不得加一句：“那大笨蛋来了！”柏森斯就是温斯顿在胜利大楼的邻居。现在果见那金发、青蛙脸、中等身材的邻居摇着水桶似的身子越过拥挤的厅堂前来。才三十五岁的年纪，肚皮和脖子已长了一层层肥肉，只是动作还算敏捷就是。他整个外貌就像一个发育过早的大孩子，因此他穿的虽是套头制服，你无法不联想到他穿的实际是探子装：蓝短裤、灰衬衣、红领巾。你闭起眼睛也可以看到他这个形象：胖乎乎的膝盖与卷起袖子露出来的浑圆胳膊。此形象并非虚构，因为每逢公社旅行或任何能找到借口参与的运动场合，他都一定穿短裤。柏森斯兴冲冲地跟温斯顿和赛姆打过招呼，就一屁股坐下来。怕人的汗臭已开始散发，粉红的脸冒着汗珠。他的汗腺一定特别发达。在公社中心的运动室里，你只要看看乒乓球拍子的把手是否湿润，就可知他有没有来过了。赛姆掏出了一张印满了字句的条子，捏着墨水笔，一本正经地研究起来。</p>
+
+  <p class="normal">“你瞧嘛，吃午餐不忘工作。”柏森斯用肘子推了推温斯顿说，“喂，老学究，你看的是什么东西，这么着迷？准是我看也看不懂的。哦，对了，史密斯，你知道我为什么找你？你忘了捐款！”</p>
+
+  <p class="normal">“捐哪种款？”温斯顿边问边本能地摸口袋掏钱。每个人的薪水约有四分之一是要拿出来做自愿捐款用的，但名堂这么多，温斯顿一时不记得他答应了捐什么。</p>
+
+  <p class="normal">“每家每户要负责的仇恨周基金呀！本人就是我们区的财务员，我们决定要轰轰烈烈搞一搞。让我告诉你，胜利大楼到时一片旗海，全区无处可比！你说过捐两块。”</p>
+
+  <p class="normal">温斯顿找到了两张又脏又皱的纸币，交了过去。柏森斯慎重其事地用文盲字体一笔一画地在记事本上记下来。</p>
+
+  <p class="normal">“对了，听说我家那个小流氓用弹弓打了你。我修理了他一顿，告诉他下次再犯，就把弹弓没收。”</p>
+
+  <p class="normal">“我想是因为没看到绞刑，他才这么不高兴吧。”温斯顿说。</p>
+
+  <p class="normal">“呀，说的是，说的是，这正是他爱国精神的体现，对不对？实话说，我那两个小家伙顽皮是顽皮极了，但一谈到对党的热忱，那是另外一回事。他们一天念念不忘的，就是探子团的活动和斗争。你知不知道我那宝贝女儿上星期六到伯哈斯德郊游时做了什么好事？这是探子团的集体行动，对不对？她居然找到了两个女团员跟她一起溜队，跟踪一个陌生人两小时。穿过树林到达阿米萨姆时，她们就把他交给了巡逻警察。”</p>
+
+  <p class="normal">“她们干吗跟踪他？”温斯顿有点吃惊地问。</p>
+
+  <p class="normal">“我那孩子肯定他是敌人的探子，”柏森斯得意地说，“就譬如说他是跳降落伞下来的吧。但最要紧的一点是，你知道她怎么想到要跟踪他的？她说他穿的鞋子怪得很，她从来没见过。她由此推论他是外国人！才七岁的小鬼，脑筋满灵的呢，是不是？”</p>
+
+  <p class="normal">“那人后来又怎样了？”温斯顿问。</p>
+
+  <p class="normal">“这个我就不知道了，可是如果他被这个的话，我一点也不会觉得奇怪。”柏森斯边说边做了一个瞄准步枪的姿势，然后舌头发出咔嗒一声。</p>
+
+  <p class="normal">“好极了。”赛姆心不在焉地说，眼睛一直没离开那张字条。</p>
+
+  <p class="normal">“实话说，这种事我们真的不能疏忽。”温斯顿也只好附和着说。</p>
+
+  <p class="normal">“我要说的，就是这意思，现在是战时哪！”柏森斯说。</p>
+
+  <p class="normal">好像是要证明柏森斯说的不是废话，他们头上的电幕喇叭声大作。但这次奏的不是军事捷报的音乐，仅是迷裕部公告的前奏曲。</p>
+
+  <p class="normal">“同志们！”一个充满青春活力的声音喊道，“同志们请注意，我们有天大的好消息宣布。我们在生产的战线又打了一次胜仗。我们各种消费品生产的任务已经完成，证明了我们今年的生活水准比去年提高了百分之二十以上。今天早上大洋邦各地均有自动自发的庆祝游行，工人同志们离开工厂和办公室，到街上去高举大旗，欢呼感谢老大哥的口号，感谢他的英明领导给我们带来新而幸福的生活。以下是我们生产的数字：粮食类……”</p>
+
+  <p class="normal">“新而幸福的生活”这句话一再出现，这是迷裕部最近的口头禅。柏森斯的注意力受喇叭声所吸引，这时半张着嘴巴，煞有介事地全神倾听着。迷裕部的数字他是没法听懂的，只是下意识地知道，这一定又是值得庆祝的成就。他掏出一个又大又脏的烟斗来，里面半斗烟丝虽已烧得差不多了，却没有挖出来。烟草的配给额是一星期一百克，你又怎能常常把烟斗塞满？温斯顿小心翼翼地平拿着纸烟，稍微斜一下烟丝就会倒出来。新配给明天才开始，而他只剩下四根了。此刻他倾听着电幕泻出来的新闻和数字，离他较远的人声和鸭语就听不到了。看来好像还有人游行喊口号，感谢老大哥把巧克力的每周配给额提高到二十克呢。可是昨天不是才宣布过，配额<b class="calibre8">减</b>为每周二十克吗，这怎么可能？迷裕部的报告硬把“减”说成“增”，老百姓又怎会轻易相信？不错，他们相信了。柏森斯就像痴呆的动物一样，毫无困难地相信了。左边台子那无眼珠的木偶，更会热烈地、毫无异议地相信。不但如此，他还会不遗余力地去追查任何一个露口风说过上周的配额是三十克的人，查到了就检举，直到看到他被蒸发为止。赛姆呢，也相信了，虽然心态比较复杂，可能牵涉到双重思想。是不是只有我<b class="calibre8">一个人</b>还没有失去记忆的能力？温斯顿问自己。</p>
+
+  <p class="normal">电幕继续传来迷裕部公布的神话数字。与去年比较，今年我们有更多的食物、衣服、房子、家具、烧饭锅、汽油燃料、船只、飞机、书籍、孩子。总之，除了疾病、犯罪案件和疯狂病症没有增加外，其他什么东西都增产。每年每月每日每分每秒，每人每事都随着一片景气嗖嗖上升。温斯顿也学着赛姆刚才的样子，拿起调羹在台面那摊已蔓延四周的菜汁上长长地画了一条痕。他一肚子怨气地沉思着。他们现在过的物质生活，过去也是这个样子吗？吃的东西，是不是一向都味同嚼蜡？他的目光在饭厅浏览了一周。天花板低低的，人又拥挤，墙壁经过多少人在上面揩拭过，摸着黏黏腻腻的。金属做的台子椅子，残破不堪，排得密密的，你坐下来吃饭，无法不碰到旁人的肘子。调羹弯折，托盘缺口，杯子质料粗糙笨拙。杯盘外面油污未净，裂缝藏污纳垢。饭厅浮荡的气味集各种酸臭之大成：劣质杜松子酒和咖啡的气味、瓜菜肉汁的铁腥味和食客穿的衣服的脏味。你的肚子和皮肤每时每刻都向你抗议，使你觉得像被剥夺了一些本来属于你的东西。不过，说起来在他的记忆中，过去的日子跟现在也没有什么显著的分别。自他能够清楚地记事开始，好像从来没有过足够吃的一天。袜子和内衣裤总是那么百孔千疮，家具摇摇欲坠，房子暖气不足，地铁拥挤，楼房尽见断瓦残垣，面包灰黑，茶叶难得一见，咖啡味如洗碗水，香烟供量不足——而除了用化学原料制成的杜松子酒大量廉价供应外，其他不是缺货就是价格惊人。自然，这种情形到你年岁增长、体力日衰时，滋味会分外不好受，但这不正也表示了这种生活一点也<b class="calibre8">不</b>正常吗？脏乱不堪的环境、物质的匮乏、无休无止的冬天、湿黏黏的袜子、难得运转正常的电梯、洗澡无热水、岩石一样的肥皂、卷得松兮兮的纸烟和食而无味的饭菜——你一想起，心就下沉。这是正常现象吗？我们一定有某种隔代遗传的记忆，晓得从前的东西不是这样的。否则我们为什么一想到现状，就觉得事事难以忍受？</p>
+
+  <p class="normal">温斯顿又在饭厅四周看了一次。几乎每个人都丑得可以，即使不穿套头蓝制服而改穿其他衣服，还是一样的丑。饭厅远远的一角，一个身材瘦小、相貌极似甲虫的男子独据一桌，默默地饮着咖啡，小眼睛不时疑神疑鬼地溜来溜去。如果你不好好地看看，你真会相信党为大洋邦男女立的典型——身材高大、孔武有力的少年男子，胸脯健美的女子，个个金发，皮肤晒得红润，充满青春活力，无忧无虑——不但存在，而且普遍得随处可见。这真是神话，温斯顿想。其实以他的眼光看来，大部分居住在一号航道的居民，都是矮小、黝黑和其貌不扬的。怪的是政府各部门多的是甲虫类型的男人。他们个子矮小，未到中年就发起福来，两条短短的腿行动还算灵活，嵌着两粒小眼珠的厚肉脸上却毫无表情。只有这类人在党的统治下还是活得好好的。</p>
+
+  <p class="normal">电幕响了一阵喇叭声，原来迷裕部的公告已毕。接下来是轻音乐。柏森斯显然是被刚才报出的数字迷住了，从嘴里拿开烟斗。</p>
+
+  <p class="normal">“迷裕部今年的成就可不赖呵。”他善颂善祷地摇着脑袋瓜，“对了，史密斯，你有没有多余的刀片借我？”</p>
+
+  <p class="normal">“抱歉，”温斯顿说，“我自己那片已用了六个星期。”</p>
+
+  <p class="normal">“唔，我也只不过问问而已。”</p>
+
+  <p class="normal">“真抱歉。”温斯顿又说了一遍。</p>
+
+  <p class="normal">邻座的鸭语刚才停了一阵，此刻卷土重来，音色胜前。不知怎的，温斯顿突然想起了头发疏落、尘埃满面的柏森斯太太。不消两年，她的孩子就会向思想警察检举她，她会被蒸发掉。赛姆会被蒸发掉。温斯顿自己会被蒸发掉。奥布赖恩会被蒸发掉。柏森斯呢，他不会的。那个无眼说鸭语的木偶也不会。那些行动敏捷，在政府机构走廊内进进出出的甲虫人永远不会被蒸发。而那个在子虚部工作的黑发女人，她永远也不会被蒸发。温斯顿好像有第六感似的，知道谁可以保住性命，谁难逃大限。可是究竟怎样才可以保住性命，却又不易说出来。</p>
+
+  <p class="normal">这时他突然从沉思中惊醒。左边台子的女郎半转过了身，睨着他。原来她正是黑发女郎！她虽然只是侧脸看他，目光一样炽炽迫人。一见温斯顿也打量着她时，就别过脸去了。</p>
+
+  <p class="normal">温斯顿脊背冒着冷汗，吓得浑身发抖。虽然一下子就镇静下来，但心中还是惴惴不安。她觑着他干吗？为什么她老是跟踪他？可是他记不起她是比他先来的，还是他坐下来后她才出现的。但昨天“两分钟仇恨”节目时，她不是就坐在他后面吗，这又为什么呢？她的真正目标，可能就是要听听他宣仇泄恨时的声音够不够洪亮。</p>
+
+  <p class="normal">他早些时候的想法又重现了：她也许不是正规的思想警察，而糟糕的正是这个，因为业余探子更为危险。他不知道她盯了他多久，大约五分钟的样子吧，而在这五分钟内，说不定他面部的表情不很“正确”。在公共场合或电幕视线之下胡思乱想，是最危险不过的事了。一个小小的动作有什么不对，人家就把你看穿了。譬如说你面部抽搐一下、无意露出来的焦虑之情、喃喃自语的习惯——总之，任何显出反常迹象或意图隐瞒的动作，都可看作包藏祸心的证据。表情不当——譬如说电幕传来前方捷报时你却露出一脸不肯置信的神情——是刑罪之一种，新语叫“脸罪”。</p>
+
+  <p class="normal">黑发女郎又背对着他坐了。也许她并不是真的要跟踪他，一连两天跟他这么接近，说不定只是巧合而已。纸烟已熄，他小心地把未燃烧的一截搁在台边。如果烟丝不掉出来的话，下班后再抽。左边台子前的那个木偶可能是思想警察派来的探子，因此说不定三天内他就会在仁爱部的牢房受刑，但尚未抽完的纸烟绝不能浪费！赛姆把字条折好，塞进口袋。柏森斯又开腔了。</p>
+
+  <p class="normal">“我跟你说过了没有，史密斯，”柏森斯咬着烟斗吃吃笑问道，“我是说那两个小鬼把在市场内一个卖东西的老太婆的裙子烧了。为什么？因为他们瞧见她用一张印有老大哥照片的招贴纸包香肠！他们偷偷走到她背后，烧了一盒火柴！我想伤势一定不轻呢。真是小流氓作风，是不是？可是他们的热忱真感人。今天探子团给他们的训练确是一流，比我们那个时候还要好。你猜他们给小鬼的最新配备是什么？钥匙孔窃听筒！前天晚上我那小丫头带了一个回来，就在我们客厅做实验，过后说她用这筒子来听，比平常清楚一倍。当然，这不过是一种玩具，但主意实在正确不过，对不对？”</p>
+
+  <p class="normal">这时电幕发出刺耳的哨子声，是回到工作岗位的时候了。三个人连忙站起来，跟着人潮拥到电梯旁边去。温斯顿剩下那截纸烟的烟丝已全部抖了出来。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_6.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_8.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_6.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_8.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="Essay - TheEconomist.2026.02.14 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>Essay - TheEconomist.2026.02.14</title>
+    <link class="eb" href="resources/EPUB/static_styles/default_styles.css" rel="stylesheet" type="text/css"/>
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#9b397f57" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/9b397f57/index.html" alt="bookHome" class="a-book-home">TheEconomist.2026.02.14</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">Essay</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            <p><span class="te_section_title">Essay</span><span class="te_fly_span"> | Enlightenment ideals meet reality</span></p><p/><h1 class="te_article_title">America at 250</h1><h3 class="te_article_rubric">A brief history of the world’s oldest democracy</h3><h3 class="te_article_datePublished">February 12th 2026</h3><br/><div class="head_image_div"><img src="resources/EPUB/static_images/437edc3e5cea44bafbfc8c383587848a.jpg" alt="" class="te_head_image"/></div><p>Why anyone would want to leave Britain is beyond us. But in 1776 the 13 colonies declared their own version of Brexit, with muskets but notably with the pen, besmirching our king. Out of this act of youthful defiance came a great liberal experiment. Ideas taken from the Enlightenment—natural rights, the rule of law, government by consent—became the scaffolding for a new country.</p><p>To mark the 250th anniversary of the Declaration of Independence, The Economist offers not fireworks but something far more British—a review. An arch, authoritative, occasionally patronising review.</p><p>Every few weeks until July 4th we will pass judgment on America’s triumphs and hypocrisies, booms and busts, from the founders to Donald Trump. Some judgments will be contemporaneous, from after we began publishing in 1843. (Our first American correspondent was ejected from a hotel in the 1840s for preaching free trade. We hated tariffs then as now.) And we asked historians, even Americans like J<a href="9ae981b9-b295-42b0-9234-e7cddaa24676.html">on Meacham</a>, to weigh in. He says the Declaration was written for America’s most challenging moments. Never a better time, then, to assess the great liberal experiment.</p><p>1776 The break-up</p><p>Twelve score and ten years ago—on July 4th 1776—the Second Continental Congress in Philadelphia approved the Declaration of Independence (signing would take weeks: this was before email). The United States of America, as the troublemakers styled their new creation, had already been at war with Britain for more than a year. Good King George III was not the tyrant of American legend, but we grudgingly admit that his insistence on asserting authority and raising revenue in the colonies helped turn protest into revolution.</p><p>The Declaration became America’s first great statement of liberal principle, espousing those Enlightenment ideals of natural rights and government by consent. It proclaimed that “all men are created equal”—though many of its signatories owned slaves. With rare exceptions, white women and black people were excluded from voting, as were many poor white men. Indigenous nations were ignored or exploited. The world’s first liberal republic was, in practice, a narrow aristocracy (without the noble titles). But, as George Washington said, the government’s true character would emerge only with time.</p><p>1787 Revolution accomplished, now what?</p><p>Having won their little war, the founders convened a constitutional convention in Philadelphia to take on a new challenge: turning Enlightenment principles into an enduring political structure. Using a blueprint from James Madison (pictured), they eventually settled on a republican system with three branches of government each checking and balancing the power of the others. The constitution’s framers also wrote in protections for slavery. Some northern delegates who opposed the institution on principle nonetheless yielded to their southern, slaveholding colleagues for the sake of unity. In doing so they ensured that slavery would endure for generations.</p><p>An ideal that the constitution’s northern and southern framers could agree on was a national executive strong enough to be effective but not so strong as to become tyrannical. This was the original No Kings movement (though the French revolution would soon go a little harder on that point).</p><p>1789 So you’re holding elections now?</p><p>The first ballot for president was, like in modern elections, conducted via the odd institution of the electoral college, rather than by a direct popular vote. In virtually all other ways it was unrecognisable to anyone following American politics today: very few people could vote, and there was no public campaign, not even a Swift Boat advertisement painting Washington’s crossing of the Delaware in a nefarious light.</p><p>There was no sweating the count on election night either. Having led the Continental Army to victory, Washington was a shoo-in for the presidency (even as he claimed not to want the job). He was selected on all 69 electoral-college ballots; John Adams, marked on 34 ballots (each elector could list two names), became vice-president. Only one presidential election has been decided unanimously since: Washington’s own re-election.</p><p>1791 Ten things they left out</p><p>The Bill of Rights, ratified in 1791, transformed the constitution from a merely republican charter into a liberal one, enshrining freedoms of speech, religion and due process, to name but a few.</p><p>The authors’ vague language ensured that Americans, among them Supreme Court justices, would still be arguing about it 250 years later. Even the use of punctuation is the subject of intense legal debate. In the 21st century the Supreme Court’s interpretation of the Second Amendment, reached in part on its placement of commas, ensures that individual Americans, and not just militias, have a constitutional right to own guns. The founders could scarcely have imagined AR-15s.</p><p>1790s Clash of the founders</p><p>By 1790 the founders were still arguing over how much power the central government should have. The Broadway musical “Hamilton” told the story through epic rap battles between Alexander Hamilton and Thomas Jefferson. (The actual debates were not conducted in verse.)</p><p>Hamilton was a New Yorker, the first treasury secretary—and our kind of guy. He wanted a strong federal government that paid its debts (also very much our thing). Jefferson was a Virginian farmer, a slaveholder and the first secretary of state. He argued for states’ rights, fearing that centralisation would bring tyranny. Hamilton won, and thankfully that was the last time there was any disagreement about federal power in American history.</p><p>1798 How to save a republic: jail your critics</p><p>An early reactionary moment in America arrived in 1798. Those excitable French were in the midst of revolution. Tensions between France and America were high. President John Adams’s Federalist Party viewed its critics at home—namely pro-French Jeffersonians—as potential traitors. With Adams’s support Congress (pictured below in its natural state) passed the Alien and Sedition Acts, four laws giving the president power to deport “dangerous” foreigners and making it a crime to publish “false, scandalous and malicious writing” about the government.</p><p>The laws were used to silence opposition journalists and pamphleteers. One tell that they were undemocratic and illiberal was that Congress set two of the laws to expire on Adams’s last day as president in March 1801. The controversy helped Jefferson win the race to succeed Adams as president, and hastened the decline of the Federalist Party.</p><p>1803 The original dealmaker-in-chief</p><p>Donald Trump could learn a thing or two from Jefferson. Today’s president muses about acquiring Greenland; Jefferson doubled the size of America in a single transaction. In 1803, after negotiations with Napoleon Bonaparte, he purchased the vast Louisiana Territory from France for $15m ($314m in today’s dollars). The tract of land stretched from the Mississippi river to the Rocky Mountains and encompassed 828,000 square miles, or more than 20% of modern America.</p><p>The Louisiana Purchase secured land for the yeoman farmers whom Jefferson considered the backbone of the country. But he also worried that the deal might be unconstitutional. Jefferson himself had long argued that the federal government had no power not explicitly granted by the constitution, and the charter was silent about the notion of buying half a continent. The deal was made using executive power—on Hamiltonian terms.</p><p>1812-15 That time we burned down your White House</p><p>Talk about Trumpian. Having declared war on Britain in 1812, America dispatched troops to invade Canada, expecting that they would be greeted as liberators from British oppression. (They were not.) The war itself had been triggered by Britain’s repeated interference in American affairs: on the western front, aiding Native Americans’ resistance to US territorial expansion; on the eastern front, interdicting American ships and pressing sailors into the Royal Navy to fight in the Napoleonic wars.</p><p>Britain notoriously set fire to the White House, but America in many respects “won” the War of 1812, as the British thereafter left the North American mainland largely to American ambitions. Native Americans were doomed to military subjugation. The war also made a national hero and future presidential contender of Andrew Jackson, who won the Battle of New Orleans in 1815.</p><p>1619-1865The stain of slavery</p><p>At the time of America’s founding, an estimated 500,000 of the roughly 2.5m people living in the 13 colonies were enslaved—about one in five Americans. By 1800 that number had risen to nearly 900,000. In the South, just before the civil war, enslaved people made up more than one-third of the population. Slavery, as much as freedom, would shape America’s first century.</p><p>How did the country’s founders, so enamoured of “liberty”, justify it? By applying self-serving logic to liberal principles. Some invoked the idea that property rights were essential to freedom—that is, the freedom to keep slaves as property. Others argued that slavery was a temporary evil worth tolerating for the sake of keeping a young country together. Still others said slavery was an economic engine that the country could not do without. Many simply believed all men were not created equal, despite their soaring revolutionary rhetoric to the contrary.</p><p>1820 Secrets of the ex-president group chat revealed</p><p>Jefferson’s record on slavery was particularly troubling. Though he professed opposition in principle, he fathered several children with one of his own slaves, Sally Hemings. He also favoured extending slavery into new western states, arguing—under his peculiar theory of “diffusion”—that dispersing slaves would reduce their concentration and make emancipation less frightening to slaveholders.</p><p>Jefferson summed up these anxieties in a letter to his frequent late-in-life pen pal, John Adams, asking rhetorically: “Are our slaves to be presented with freedom and a dagger?” Adams replied that slavery had been a “black cloud” hanging over the country for half a century. In 1820 the Missouri Compromise drew a line across the map, with slavery permitted below and banned above. The compromise postponed the reckoning. Slavery would endure for nearly another half-century. <span class="span_ufinish">■</span></p><p class="link_navbar">This article was downloaded by <a href="https://z-lib.io" class="producer_link">zlibrary</a> from <a href="https://www.economist.com//essay/2026/02/12/america-at-250" class="origin_link">https://www.economist.com//essay/2026/02/12/america-at-250</a> </p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/9b397f57/chapter_62.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#9b397f57" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/9b397f57/chapter_64.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#9b397f57" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/9b397f57/chapter_62.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#9b397f57" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/9b397f57/chapter_64.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

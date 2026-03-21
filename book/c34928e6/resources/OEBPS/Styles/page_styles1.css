@@ -1,0 +1,8 @@
+@page {
+    margin-bottom: 5pt;
+    margin-top: 5pt
+    }
+@font-face {
+    font-family: "kt";
+    src: local("楷体"), local("楷体_GB2312"), local("Kaiti"), local("Kaiti SC"), local("Kaiti TC"), local("MKai PRC"), local("MKaiGB18030C-Medium"), local("MKaiGB18030C-Bold"), local("DK-KAITI"), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX), url(styles/XXXXXXXXXXXXXXXX)
+    }

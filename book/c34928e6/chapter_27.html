@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="五 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>五 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">五</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">五</h2>
+
+  <p class="normal">在温斯顿被关禁的各阶段中，大概由于气压不同的关系，他差不多可以猜测到身在仁爱部哪一个地方。老粗拳打脚踢的牢室，应该在地下；奥布赖恩审问他的地方，则高高在上，靠近屋顶；现在的位置，深埋地下。</p>
+
+  <p class="normal">房间好像比以前的都大，虽然他对周围的一切并没有怎样留意。他只看到自己前面有两张小桌子，铺上绿台布，一张离他只有一两米，另外一张则较远，靠近门口。他被缚在一张椅子上，动弹不得。脑袋后面好像托了一个垫，也是缚得紧紧的，迫得他只能向前看。</p>
+
+  <p class="normal">他一个人坐了一会儿，奥布赖恩就推门进来了。</p>
+
+  <p class="normal">“你曾经问过我一〇一室里面是什么东西，”奥布赖恩说，“我告诉过你答案你是知道的，而且每个人都知道。一〇一室里面是世界上最可怕的东西。”</p>
+
+  <p class="normal">门又开了，狱卒走进来，手上拎着一个用铁线织成好像是个笼子之类的东西。他把这东西放在靠门的桌子上，就离开了。奥布赖恩站的地方刚好挡着他的视线，温斯顿不知道里面究竟是什么。</p>
+
+  <p class="normal">“世界上最可怕的东西，”奥布赖恩说，“是因人而异的。这可能是活埋、火烧、淹死、钉在柱上……总之是各式各样的死法。可是有时候最可怕的事却是微不足道的，而且不一定会致命。”</p>
+
+  <p class="normal">他的身子移动了一下，让温斯顿看到桌上摆着的是什么东西。这是一个椭圆形的铁笼子，上面有个携带用的把手。笼子的前面有个像练习击剑的人戴的面罩，中间凹了进去。这笼子离他虽有三四米，但他看得清楚里面分了两个格子，每一格都有动物在内。原来是老鼠。</p>
+
+  <p class="normal">“就你来讲，”奥布赖恩说，“世界上最可怕的东西就是老鼠。”</p>
+
+  <p class="normal">温斯顿初见笼子时，心中就有恐怖的预感，全身一阵震颤。这一刻看到笼子前面的面罩，他清楚地知道奥布赖恩的意思了。他浑身冷得发抖。</p>
+
+  <p class="normal">“你不能这样做，”他用沙哑的声音嚷道，“你不能！你不能！这是不可能的。”</p>
+
+  <p class="normal">“你还记得吗，”奥布赖恩说，“你还记得你梦中常常出现的痛苦时分吗？你前面是一道黑墙，耳边听到吼声。墙后面是世界上最可怕的东西，你一直知道那是什么，可就是没有勇气拉它出来。墙后面的东西就是老鼠。”</p>
+
+  <p class="normal">“奥布赖恩！”温斯顿尽力压抑自己的声音说，“你实在不必用这种手段。你要我做些什么事？”</p>
+
+  <p class="normal">奥布赖恩没有直接答他的话。他再说话时，态度与口吻又像个课堂上的老师。他眼睛向前望，好像听众都挤在温斯顿身后似的。</p>
+
+  <p class="normal">“痛苦不一定能够使每一个人就范，”他说，“有些人忍受痛苦的能力极强，至死不改。可是每个人总有一些他不能忍受的事情，连想象也不敢想象。这与勇气不勇气毫无关系。你自高处跌下时，有绳子可以救命，自然该抓住这根绳子。这种行为不算懦弱，这和快淹死的人冒出头来拼命呼吸的道理一样。这不过是不可违背的本能反应而已。对你来说，老鼠是无可忍受的东西、一种你无法抵抗的压力。我们要你做什么，你就做什么。”</p>
+
+  <p class="normal">“你要我做什么？你不告诉我，我又能做什么？”</p>
+
+  <p class="normal">奥布赖恩拎起了笼子，小心翼翼地放在温斯顿面前的桌子上。温斯顿听到自己的血液在体内奔流。他感觉到自己一个人孤独地坐在旷野上，阳光耀眼，远处传来各种声音。但鼠笼跟他的距离还不到两米。笼中的老鼠硕大无比，毛色深褐而非灰白，正处于牙齿最锐利、性格最凶悍的阶段。</p>
+
+  <p class="normal">“你知道，”奥布赖恩继续面对那群不存在的听众说，“老鼠是食肉动物，虽然它属啮齿类。你亦听说过本市贫民区中发生过的事，譬如说在某些街道上，做妈妈的不敢把孩子放下来五分钟，怕的就是老鼠。她们的顾虑是有理由的，因为老鼠准会偷袭，在短短一段时间内就把孩子吃光，剩下一把骨头。其实老鼠不单危害婴儿，也袭击病人和快要死的人。它们真机灵，分得出哪种人是孤弱无助的。”</p>
+
+  <p class="normal">笼子内吱吱之声大作，但听来好像是远处传来的。老鼠在里面打架，要冲过笼内的格子拼个你死我活。温斯顿听到一声痛苦的呻吟，但好像不是发自自己的口中，而是由远处传来的。</p>
+
+  <p class="normal">奥布赖恩拿起笼子，在什么部位按了一按，马上发出咔嗒一声。温斯顿拼了气力想从椅子上站起来，但一分一毫也动不了，他身体每个部位都缚得紧紧的。奥布赖恩把笼子移近了一点，现在距离温斯顿的脸不到一米了。</p>
+
+  <p class="normal">“我已经按下了第一个键，”他说，“你是知道这笼子的结构的。笼子前面的面罩刚好套住你的头部，盖得密不通风。我按第二个键时，笼子的门就会升起，里面饿坏了的东西就会跳出来。你有没有看过老鼠跳高？它们一跳就跳到你脸上，有时先吃眼睛，有时先咬破脸颊，再吃舌头。”</p>
+
+  <p class="normal">鼠笼已贴近面部，温斯顿听到头上有一阵吱吱声。他极力保持镇静。快想，赶快想办法啊。突然老鼠身上的腥臭味扑鼻而来，他五脏翻腾，恶心得要吐，几乎失去了知觉。眼前一片漆黑，他像疯子一般叫着。就在这一瞬间，他想到了一个唯一自救的主意。他非得找另外一个人的<b class="calibre8">身体</b>介入他和老鼠之间不可。</p>
+
+  <p class="normal">面罩的圈围很大，挡住了他面前的其他一切。这时笼门离他的脸只有一两个巴掌远。这些阴沟里的老祖宗知道开怀大嚼的时间到了，其中一只爬上爬下，另外一只则站起来，手攀铁线，鼻子四面嗅着。温斯顿已看到它们嘴上的须和牙齿，刚才那种黑色的恐怖又袭上心头。他看不见东西，脑子一片空白，完全不知所措。</p>
+
+  <p class="normal">“这是中国封建时代一种很普通的刑罚。”奥布赖恩轻描淡写地说。</p>
+
+  <p class="normal">面罩已套上，铁丝擦到颊上——可能还有半分希望吧，但也许太迟了。这个时候他突然了解到，在这世界上他能把自己的苦难转移过去的，只有<b class="calibre8">一个</b>人——只有<b class="calibre8">一个</b>身体可以介入他和老鼠之间。他疯狂地叫着，一次又一次：</p>
+
+  <p class="normal">“让老鼠去咬朱丽亚！不要咬我！咬朱丽亚！我不管你把她怎样折磨，让老鼠吃掉她的脸，我不会哼一声，但不要咬我！不要咬我！”</p>
+
+  <p class="normal">他倒向后面，倒向深渊，远离老鼠。他还是被缚在椅子上，但自己已掉下楼板，穿过仁爱部大楼的墙，穿过地心、海洋、大气、太空，浮游于星际之间——远离老鼠的腥臭味。他已远离不知多少光年，但奥布赖恩一直站在他旁边。贴在他颊上的铁丝还是凉凉的，但在黑暗中他听到咔嗒一声。他知道笼门是关上了。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_26.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_28.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_26.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_28.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

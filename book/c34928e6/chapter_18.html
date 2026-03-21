@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="七 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>七 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">七</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">七</h2>
+
+  <p class="normal">温斯顿醒来，满眼都是泪水。朱丽亚睡眼惺忪地倚着他睡，喃喃地问他：“什么事？”</p>
+
+  <p class="normal">“我梦到——”他没说完就停下来。要告诉她的事复杂得语言难以表达。除了梦本身外，还有醒后几秒钟之间涌现的回忆。</p>
+
+  <p class="normal">他闭上眼睛再躺下来，梦境依稀还在。他梦到的东西非常清晰，历时也长。他的一生犹如一幅雨后仲夏黄昏的景色在他面前展开，玲珑剔透。所有事情都是在水晶玻璃里面发生的。水晶的外层是苍穹，里面的世界光线柔和，可以极目远处。他在梦中看到很多东西，其中包括他母亲手臂挥动的姿势，和三十年后在新闻纪录片中出现的犹太母亲在直升机炸死他们前用身体掩护孩子的姿态。</p>
+
+  <p class="normal">“你知道吗，我一直以为我母亲是被我害死的。”他说。</p>
+
+  <p class="normal">“你为什么要杀她？”朱丽亚说，几乎睡着了。</p>
+
+  <p class="normal">“我的意思是害死，不是杀死。”</p>
+
+  <p class="normal">在梦中他记得最后一次看见母亲的情形。醒后几分钟，前尘旧事都到眼前来了，这是他多年来一直要尽量忘记的事。究竟是哪一年的事，他记不清楚了，但事情发生时他最少也有十岁，可能是十二岁了。</p>
+
+  <p class="normal">那时他父亲已经失踪了，但究竟失踪了多久，他也忘记了。他只记得那个时候什么都是乱糟糟的，情况很不安定。空袭是常有的事。警报一来，大家都到地铁站去躲。市面郊区，一片疮痍。街头巷尾满贴告示，只是他那时不知道上面说些什么。青年人成群结队流荡街头，穿的都是同一颜色的衬衫。他还记得面包店前面长长的队伍和远处的机枪声。但印象最深的，还是从来不够东西吃。他跟其他男孩子常常花整整一个下午，徘徊于垃圾箱与废物堆之间，为的就是要捡人家丢了的卷心菜根茎或马铃薯皮。有时他连发了霉的面包皮也不放弃，把煤渣抖出就放到嘴里。除了捡垃圾箱的东西外，他们也站在运牲口饲料的货车必经之道，等货车经过。车子经过路面不平的地段时，一颠一簸的，有时会掉下一些油渣饼的碎片来。</p>
+
+  <p class="normal">他父亲失踪时，母亲既没有表示惊奇，也没有大哭大叫，但人显然转变了，整天都是无精打采的样子。温斯顿看得出来，她在等待着无可逃避的命运降临。要做的事情她都做了，烧饭、洗衣、缝补、整理床铺、打扫房间、拭擦壁炉架子，但手脚奇慢，好像一个走动的人体模型。她高大的身躯显得毫无活力。她可以抱着他妹妹，在床上一坐就坐上几个钟头，动也不动。妹妹那时大概两三岁，体弱多病，不爱说话，脸瘦得像猴子。有时母亲也会紧紧地搂着温斯顿不放，一句话也没说。虽然他年纪小，虽然他事事只想到自己，虽然他母亲从没提过，但他已意识到这一定与快要发生的事情有关。</p>
+
+  <p class="normal">他们住的房子阴暗而空气混浊，床上铺了白床罩，而房子的一半空间也就给这张床占去了。房内还有一个煤气灶，一个放食物的壁橱。楼梯附近有一个棕色的陶器洗涤槽，几家共享。他还记得母亲站在煤气灶边用平底锅烧东西时的情形，大概因为他老吃不饱的缘故吧。饭桌真像战场，他老是缠着他的母亲，问她为什么东西总不够吃。他要么是又喊又叫，要么是哭哭啼啼，装出可怜巴巴的样子。目的都是一样：要多拿些吃的。（他还记得喊叫时的声调，先是咽呜，然后有时突然哇哇大吵大嚷一番。）他母亲总是多分他一点，因为她认为男孩子得多吃些。但不管她给他多少，他还是嚷着说不够。每次吃饭时，母亲总提醒他不要太自私，他妹妹生病，也得吃东西。但也没用，一看到她分饭菜的勺子在他盘子上停下来，他就野性突发，要把她手上的锅子抢过来，或把妹妹的饭菜倒在自己的盘子上。他知道这样做会把他母亲和妹妹饿死，但他还是做了，甚至相信这是应该的。他腹中的饿火让他觉得抢吃有理。在早晚两顿饭之间，如果他母亲没看到，他就到壁橱偷东西吃。</p>
+
+  <p class="normal">一天家里拿到了巧克力配给，这是几个月来的第一次。他还记得那是两盎司的一小片（那时还用旧制），理应分成三份的。突然他脑中好像有人告诉他：你应该全部拿过来！接着他就大嚷大叫了。母亲对他说不能这么不知足。于是母子两人一个哄骗说理、一个又哭又啼地吵个不休。他妹妹双手搂着母亲，就像小猴子抱着母猴一样，转过头来用她大而悒郁的眼睛望着他。母亲最后把四分之三的巧克力分给温斯顿，四分之一给妹妹。妹妹接过后，傻傻地瞪着它，大概不知道这是好吃的东西。温斯顿看在眼内，突然一跃而起把她手上的巧克力抢过来夺门而逃。</p>
+
+  <p class="normal">“温斯顿！”他母亲在后面喊着，“快回来，把巧克力还给你妹妹！”</p>
+
+  <p class="normal">他停了步，但没有走回去。他母亲焦灼的眼睛一直凝视着他的脸。即使在这一分钟，她心中想着的还是那快要发生的事，但那时他不知道究竟是什么事。这时他妹妹知道东西被抢了，低声抽泣起来。他母亲搂着她，把她的脸紧贴自己胸前。他从这举动猜到，他妹妹快死了。他转身疾步下楼，手上的巧克力开始融化了，变得黏糊糊。</p>
+
+  <p class="normal">这是他最后一次看到母亲了。他吞下了那片巧克力后，觉得有点惭愧，在街上荡了几个钟头，直到肚子饿得不能再忍受了才回家。想不到他母亲已失踪了。当时“失踪”已渐渐普遍。除了母亲和妹妹不见外，房内什么东西都一样。她们没拿任何衣服，母亲那件大衣还在。到今天他还不知道母亲是死是活。说不定她下放到劳改营了。妹妹呢，可能跟他一样，送到孤儿营（他们称为感化中心）。这是内战后才建立起来的机构。但她也可能跟母亲一道去了劳改营，再不然就被丢在什么角落自生自灭。</p>
+
+  <p class="normal">这梦境到现在还异常鲜明，尤其难忘的是母亲环抱着孩子、呵护孩子的手势，似乎包含了这个梦的全部意义。他又想到了两个月前做的梦。坐的姿势相同，怀中也抱着妹妹，不同的是在那个梦中母亲不是坐在套上床罩的床上，而是在一条下沉的船上。他在陆上，而母亲逐渐下沉，一直抬起头来望着他。</p>
+
+  <p class="normal">他把母亲失踪的故事告诉了朱丽亚。她眼睛也没有张开，改换了一个睡姿，睡得更舒服一些。</p>
+
+  <p class="normal">“我想你小时候一定是个王八蛋，”她言语不清地说，“所有小孩都是王八蛋。”</p>
+
+  <p class="normal">“不错，但问题在——”</p>
+
+  <p class="normal">听她的呼吸声就知道她又睡着了。他真希望她能醒着听他讲有关他母亲的故事。在他的记忆中，她并不是什么特殊的女人，也不算聪明。可是她有一种纯洁而高贵的气质，这因为她奉信的做人标准都是发自内心的，外在的影响改变不了她。对她来讲，一个不实际的行动不一定是无意义的行动。你爱一个人的话，就认真地去爱他。到你一无所有，你还可以一样爱他。温斯顿把巧克力抢去后，她就紧紧抱着他妹妹。这没有什么用处，改变不了什么事实，也不能把巧克力讨回来，更不能逃过自己的或他妹妹的死亡命运，但她还是拥抱着他妹妹，好像这是天经地义的事。纪录片中那个乘小艇逃命的妈妈，也用自己的身体掩护孩子，虽然在机枪扫射下，她身体的掩护作用也强不过一张薄纸。党所干的事所以可怕，因为一方面它要让你看到天性与感情驱使的行动改变不了事实，另一方面，它剥夺了你对物质世界的任何权利。你一旦落在党的掌握之中，你的感觉如何，你有没有采取行动，事实上毫无分别。不管发生了什么事，你最后还逃不过烟消尘灭的命运。你的名字和你的行为，从此绝迹人世，在历史上一笔勾销。可是对上两辈的人来说，这实在有点不可思议，因为他们还没有修改历史的习惯。他们对个人奉信的道德价值从不怀疑。他们重视人与人之间的关系，因此一个苍凉无效的姿势、一搂一抱、一滴眼泪，或对一个临终的人说的安慰的话，都有其一定的意义。温斯顿这时突然想到，今天还抱着这种信念的，只有无产者。他们效忠的对象，不是党、不是国家，更不是一个抽象的观念。他们积极维持的，只是私人关系。有生以来温斯顿第一次觉得以往瞧不起无产者的态度是不对的。他们不但有突然一天觉醒起来改变世界的潜在力量，最要紧的是他们保全了人性。他们没变得铁石心肠。无产者还留存了人类原始的情感——温斯顿得重新用心学习的情感。想到这里，他记起了一件事：几个星期前空袭时，他在行人道上不是看到一只断了的手吗？他不是像踢卷心菜一样，一踢就踢到沟里去了吗？</p>
+
+  <p class="normal">“无产者才是人，”他大声说，“我们不是！”</p>
+
+  <p class="normal">“我们为什么不是人？”朱丽亚醒来了，反问他说。</p>
+
+  <p class="normal">他想了想，改换了话题答道：“你有没有想过，对你和我来说，最聪明的事莫如现在就离开这里，今后再不见面？”</p>
+
+  <p class="normal">“当然想过，而且还不止一次。但我不打算离开。”</p>
+
+  <p class="normal">“我们运气不错，但不可能永远靠运气。你年轻，看来又正常得很，纯洁得很。如果你不和我这类人来往，说不定还可再活五十年。”</p>
+
+  <p class="normal">“谢了，我想通了。你怎么做，我也怎么做。你也不必太泄气，我懂得怎样照顾自己。”</p>
+
+  <p class="normal">“我们也许再可以相处半年，甚至一年，反正谁晓得。最后总要分手的。你有没有想过到时我们多孤独？我们一被捕后，谁也帮不了谁。我招供了，他们固然枪毙你，但即使我不招供，他们也一样地枪毙你。不管我说什么、做什么，或者不管我怎样守口如瓶，也拖延不了你的死刑。到时我们谁也不知谁的死活。我们什么力量都没有。最要紧的是，我们不能互相出卖，虽然我也晓得到后来结果都一样。”</p>
+
+  <p class="normal">“你是说招供？”她问，“我们当然招供，谁被抓进去都招供不误。有什么办法，他们用刑折磨你。”</p>
+
+  <p class="normal">“我不是说招供。招供不等于出卖。你说什么做什么都没关系，感情才是重要的。如果他们能迫使我不再爱你，这才是出卖。”</p>
+
+  <p class="normal">她想了一会儿，然后肯定地说：“这个他们做不到。他们可以迫你招认<b class="calibre8">任何事情</b>，但却不能迫你相信你讲的话是真的或假的。他们不能跑到你脑子里去。”</p>
+
+  <p class="normal">“这倒是真的，”他心中也因此燃起了一丝希望，“他们还不能够钻入我们的脑袋。如果你<b class="calibre8">觉得</b>保全人性是值得的，即使最后也发生不了什么效果，但在精神上来说，你已经把他们打败了。”</p>
+
+  <p class="normal">他想到了那不眠不休的电幕。虽然它二十四小时都监视着你，但如果你头脑能保持清醒，它还是闹不过你的。党的手段是厉害不过了，但还没有发明出可以测量你内心感受的仪器。要是真正落在他们的手上，事情就难说了。没有人晓得迷仁部里面的实际情形，但也不难想象：酷刑、药物、测探你神经反应的精密器具，然后关禁、夜以继日地审讯、不让你睡觉——直到你完全崩溃为止。如果他们要从你嘴里探听的是事实，那你无法隐瞒，因为他们总会不择手段要你供出来。但如果你认为人生的意义不是苟全性命，而是活得像个人，那么他们怎样对付你也没有什么分别了。你对某人某事的情感怎样，这是他们改变不了的，你自己想改变也不容易。他们可以把你说过、想过和做过的事的每一细节探究出来，但譬如说你为什么爱一个人，这种连你自己也会觉得玄妙的情感，那是没有任何力量可以攻得破的。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_17.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_19.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_17.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_19.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

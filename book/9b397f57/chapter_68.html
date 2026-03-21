@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="Business - TheEconomist.2026.02.14 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>Business - TheEconomist.2026.02.14</title>
+    <link class="eb" href="resources/EPUB/static_styles/default_styles.css" rel="stylesheet" type="text/css"/>
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#9b397f57" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/9b397f57/index.html" alt="bookHome" class="a-book-home">TheEconomist.2026.02.14</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">Business</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            <p><span class="te_section_title">Business</span><span class="te_fly_span"> | Shaking up the boardroom</span></p><p/><h1 class="te_article_title">Asia’s capitalists will need to fight for their revolution</h1><h3 class="te_article_rubric">They cannot rely on politicians alone to fix the region’s abysmal corporate governance</h3><h3 class="te_article_datePublished">February 12th 2026</h3><br/><div class="head_image_div"><img src="resources/EPUB/static_images/1248a2e2d803c259a023d6ff5ad3c959.jpg" alt="" class="te_head_image"/></div><p>When Abe Shinzo set out to revive Japan’s economy as prime minister in the 2010s, he couldn’t ignore the torpor of its companies. Profits were meagre. Enormous cash piles sat idle on balance-sheets. Cross-holdings between businesses kept activist investors at bay.</p><p>The reforms he pursued breathed fresh life into Japan Inc. In the ten years prior to the introduction of a new corporate-governance code in 2015, Japanese companies delivered a return for shareholders, including dividends, of roughly zero. Since then they have returned around 170%, comfortably outperforming their European peers. Activists have flocked to Tokyo and shaken management teams into selling off underperforming businesses and handing cash to shareholders through buy-backs. Last year listed Japanese firms generated a return on equity of 8.6%—not spectacular, but up from an average of 6.3% between 2010 and 2015. In the past five years they have paid out dividends and buy-backs equivalent to a respectable 33% of operating cashflow.</p><img src="resources/EPUB/static_images/91bab20c251c666a461f8351f20cdebe.png" alt="None" class="te_img"/><p>Yet Japan’s still unfinished <a href="https://www.economist.com/business/2024/09/09/japans-sleepy-companies-still-need-more-reform">corporate-governance revolution</a> may now be under threat. On February 8th Takaichi Sanae, prime minister since October, won a decisive victory in a snap election. Equity investors, cheered by her promises of fiscal stimulus, sent stocks up by 3% the next day. Ms Takaichi, however, is hardly a champion of their interests. “I think there has been a trend of too much focus on shareholders,” she said in November, imploring firms to consider “their contribution to the broader society”. Ms Takaichi has promised changes to the corporate-governance code that would steer money towards employees.</p><p>A reversal in Japan would reverberate across Asia. Inspired by the country’s success, others in the region have started making similar efforts. They are sorely needed. Profits and the portion of them paid to shareholders are underwhelming in many countries (see chart 1). Insufficient disclosure, insider dealing and deferential boards are common. Families or the state often hold majority stakes in big companies, and pay little heed to the interests of minority shareholders. The portion of shares that can be bought, known as the “free float”, averages 63% across the region, compared with 77% in Europe and 94% in America (see chart 2). Many countries’ politicians know change is required. But as America’s shareholder revolution a half-century ago shows, lasting change cannot simply be mandated.</p><p>Asia’s demography makes corporate reform an urgent task. Japan, South Korea and Taiwan are already grappling with the burden of ageing populations. China is not far behind. Even poorer countries such as Thailand are quickly getting old. Without rising equity markets, supporting Asia’s growing number of retirees will become ever harder. Pensions are already stingy in much of the region.</p><img src="resources/EPUB/static_images/9f612e8dbf8d1901ec8270b340d8a7cc.png" alt="None" class="te_img"/><p>Many countries have thus closely watched Japan’s reforms. Overseas capital has flooded into its market: since 2023 foreigners have bought ¥8.7trn ($55bn) more of shares listed on the Tokyo Stock Exchange than they have sold, helping to lift valuations. Other Asian countries want in on the action.</p><p>Closest behind is South Korea. Since 2024 it has introduced various changes including a new fiduciary obligation for company managers and a tax perk for businesses that pay significant dividends. Last year its companies bought back a record $14bn-worth of shares. Some hold on to them, making it easier to fend off pesky activists. But a law currently under debate in the national assembly would require repurchased shares to be torched. Although foreign investors were put off by the declaration of martial law in late 2024, they have begun wading back in since the election in June of Lee Jae-myung, a shareholder-friendly president, notes Peter Kim of KB Securities, a broker in Seoul.</p><p>China has also begun pursuing reform. Its companies are <a href="https://www.economist.com/business/2026/01/13/a-new-generation-of-chinese-companies-is-expanding-around-the-world">beating foreign rivals</a> at home and abroad. Yet over the past decade they have, as a whole, generated next to no return for shareholders. Profits remain elusive and are rarely distributed. Ferocious domestic competition is part of the explanation. But so is poor corporate governance. Officials have published a flurry of new rules over the past two years in an effort to improve the situation. The focus has been to tighten constraints on corporate insiders collectively known as guanjian shaoshu (“the crucial few”).</p><p>Controlling owners, which the vast majority of listed Chinese companies have, are now vested with a fiduciary duty to all shareholders. Independent audit committees—the standard in the West—are being introduced. As in Japan, China’s securities regulator now requires companies whose shares are trading below the book value of assets to disclose plans to boost their price and report on progress. Over 200 have done so. In addition, Chinese officials have shown interest in reforming the governance of state-owned enterprises (SOEs), which make up about a quarter of listed firms. They have added “market-value management” as a criterion on which SOE bosses are evaluated.</p><p>Progress elsewhere in Asia, however, has been slower. In some countries, favourable winds have cooled interest in reform. Many of Taiwan’s biggest companies have benefited from roaring demand for data centres needed for artificial intelligence. India’s stockmarket has been propelled by a <a href="https://www.economist.com/finance-and-economics/2024/11/07/india-is-undergoing-an-astonishing-stockmarket-revolution">surge in interest from retail traders</a>.</p><p>Then there is South-East Asia. Last year Thailand established a programme aimed at small listed firms. It offers sweeteners such as tax perks and publicity roadshows in exchange for releasing plans to boost valuations. It is, however, voluntary. In December Malaysia concluded its own three-year programme in which participating businesses attended gabfests and received best-practice guidebooks. In its review, the government boasted of widespread uptake—but did not find a clear trend of companies improving their profitability or valuations.</p><p>The softly-softly approach of South-East Asia’s governments may reflect reluctance to upset their countries’ <a href="https://www.economist.com/business/2024/10/24/south-east-asias-stodgy-conglomerates-are-holding-it-back">politically connected tycoons</a>. But some investors are losing patience. In January MSCI, an index provider, said it was concerned about the “fundamental investibility” of Indonesia amid concerns that majority owners had used opaque holding structures to exaggerate their free float, get their companies included in share indices and, as a result, boost their market value. That was followed by a fire sale, after which Indonesia’s securities regulator said it would double the minimum free float to 15%.</p><p>Progress on corporate governance in Asia has been uneven in part because it has relied on the zeal of politicians and regulators. Whereas the shareholder-primacy revolution that began in America in the 1970s was led from the bottom up by swashbuckling corporate raiders, in Asia it has been led top-down by the state.</p><p>Wider and deeper reform may require a shift in approach. “Ultimately, corporate governance is a cultural issue,” says Christopher Leahy of the Asian Corporate Governance Association, an advocacy group. On this it is South Korea, more than Japan, that may offer inspiration. In recent years its many retail investors have become increasingly vocal, co-ordinating grassroots activist campaigns and pushing politicians such as Mr Lee to pursue reforms. If Asia’s capitalists want their revolution, they will need to fight for it. <span class="span_ufinish">■</span></p><p>To track the trends shaping commerce, industry and technology, sign up to “<a href="https://www.economist.com/newsletters/the-bottom-line">The Bottom Line</a>”, our weekly subscriber-only newsletter on global business.</p><p class="link_navbar">This article was downloaded by <a href="https://z-lib.io" class="producer_link">zlibrary</a> from <a href="https://www.economist.com//business/2026/02/11/asias-capitalists-will-need-to-fight-for-their-revolution" class="origin_link">https://www.economist.com//business/2026/02/11/asias-capitalists-will-need-to-fight-for-their-revolution</a> </p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/9b397f57/chapter_67.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#9b397f57" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/9b397f57/chapter_69.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#9b397f57" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/9b397f57/chapter_67.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#9b397f57" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/9b397f57/chapter_69.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

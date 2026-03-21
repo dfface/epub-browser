@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="七 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>七 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">七</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">七</h2>
+
+  <p class="normal">（温斯顿写道）<span class="kt2">如果还有希望，只有寄托在无产者身上。</span></p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">为什么希望<b class="calibre8">只在</b>无产者身上？因为大洋邦百分之八十五以上的人口是无产者，老大哥平日对他们疏于管教。摧毁党的原动力，理应由这里出来。党从里面是推翻不了的。党的敌人无法聚合，甚至互相辨识身份都无机会。传说中的那个兄弟会，果有其事的话，会员集合在一起的人数，极其量也不会超过两三个。对这种人来说，造反不过是交换一个眼色或改变一下说话的声调，最了不起也不过偶尔匆匆地低声说一两句话。无产者不同，只要他们了解到自己力量多大，行事就不必偷偷摸摸。他们只要集体站起来，像马一样把身上的苍蝇抖去就成了。他们了解到自己的力量而又决定行事的话，明天早上就可以把整个党瓦解。他们早晚应该会想到的。可是——</p>
+
+  <p class="normal">他记得有一次在一条拥挤不堪的街上走着，前面巷子突然传来千百个女人呼叫的声音。那是交杂着愤怒和失望的声音，“噢——呀——呀——噢”地像钟声的嗡嗡回声不绝。他的心怦然一跳。来了！他想。这是暴动！无产者终于觉醒！他走到闹事地点时，只见两三百个女人围绕着露天市场的摊子争吵。她们脸上露出哀戚之情，直像一条沉船的乘客。可是这一刻她们普遍失望的情绪已化为零星的争执。事情起因于这里一个摊子在卖锡制的平底锅。这东西质量低劣而不牢，但烧饭菜的工具一直就不容易买到。现在居然意外地有供应，难怪拿到锅子在手的几个女人拼命地要杀出一条血路来！其余买不到的，就缠着摊主不放，不是骂他对顾客不公平，就说他一定在什么地方有存货未拿出来。又听到尖声嘶叫了。两个面目肿胀的女人，其中一个头发吊在眼前，各不相让地为同一个锅争吵，你一拉我一扯，最后锅柄也脱下来了。温斯顿看在眼里，觉得恶心极了。可是他注意到，几百个喉咙同声发出的怒吼，真怕人呵。这些喉咙如果能为比这更重要的事怒吼一次就好了。他又写道：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">如果他们一直不知不觉，不会造反。只有造了反以后才会知觉。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">这两句话真像从党的册子搬过来的，他想。他们自然一直宣称把无产者从各种桎梏解放出来的，就是党。在解放前，无产者受尽资本主义者的折磨。他们挨饥抵饿之余，还受皮肉之苦。女人被迫下煤矿坑工作（现在也是），小孩不到六岁就卖到工厂去做苦工。可是在同时，党又教导党员说，无产者是天生的低等动物，得要实施若干简单的法例，以便控制他们。这说法并不矛盾，不过是双重思想原理的运用而已。事实上党对无产者所知甚少——也不必知道得太多。只要他们工作不懈，继续生孩子，他们的其他活动也就不必多管了。你让他们自生自灭的话，他们就会像阿根廷平原的牛群一样，回复到一种他们认为是原始自然的生活方式，类似先民过的日子。他们出生后，在贫民窟长大，十二岁开始工作，度过短短一段青春发育期后在二十岁结婚，三十岁就踏入中年，而大半死于六十岁。他们一天烦恼或记挂着的事，不外是消耗体力极多的工作、养儿育女、整理家务、为芝麻绿豆的事跟邻居吵架、看电影、足球和喝啤酒，而兴趣最浓的是赌博。管理这类人并不困难，在他们的圈子中埋伏几个思想警察就成。他们的任务是散布谣言，把有问题的危险分子暗记下来，机会一到就把他们蒸发掉。但党可从没有给他们灌输英社的意识形态。无产者实在并不需要强烈的政治意识。如果他们能保持原始的爱国思想，在必要时可借报国之名，要他们加长工作时间或接受更少的配给，那已经够了。即使他们有时不满现状，也不会带来什么麻烦，因为他们本来就没有什么概括性的思想，他们不满的事实因此也有一定的范围。真正值得他们大鸣大叫的罪恶，他们倒没有注意到。大部分的无产者家中，连电幕也没有。无产者的日常生活，民防警察也很少管。伦敦的犯罪案件相当多，黑吃黑的小偷和强盗以外，还有娼妓、毒贩和各式各样敲诈勒索的骗子。但只要犯罪案件在无产者阶层中发生，就没有什么值得大惊小怪的了。凡是与道德问题有关的事件，无产者均可依照自己祖先遗留下来的律法去裁夺。不但如此，党员所过的清教徒般的性生活，也没有强迫他们接受。他们即使乱搞男女关系，也不会受到惩戒。他们要离婚也可以。从上面的事实看，如果无产者表示了意见，觉得需要宗教生活，那么他们一样会享受到信仰自由的。你实在不必猜疑他们有什么越轨行动。正如党的一句口号所说：“无产者和动物都可以为所欲为。”</p>
+
+  <p class="normal">温斯顿俯下身去抓静脉曲张患处。又痒起来了。说来说去，还是无法知道解放前的生活是个什么样子。他从抽屉取出一本跟柏森斯太太借来的儿童历史书，在日记上抄下这一段：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">在从前，在光辉灿烂的革命还没有完成以前，伦敦不是我们今天所看到那么漂亮的。那时候的伦敦，黑暗、肮脏、可怜透了。住在那儿的人，没有几个吃得饱。许许多多的人没有鞋子穿、没有房子住。比你还要小的孩子，每天要工作十二小时。主人家凶透了。工作稍微慢一点，就要挨皮鞭抽打。吃的东西呢，只是发了霉的面包和清水。在这贫穷肮脏的环境中，却有一些富贵人家住的豪华房子，每家都有三十来个人侍候。这些有钱人就叫资本家。他们又肥又丑，脸生横肉，就像下一页插图所描绘的样子。你看到了吗，他穿的那件长长的黑衣服就叫礼服，戴的那个状如烟囱的东西就叫礼帽。这就是资本家的制服，除了他们外别人是不许穿的。全世界每一样东西都归资本家所有，而每一个人都是他们的奴隶。他们拥有所有的房子、所有的土地、所有的工厂和所有的钱。谁不听他们的话，谁就得坐牢，要不然就是丢了工作，活活饿死。普通人要跟资本家说话，得打躬作揖，脱去帽子，恭恭敬敬地称呼他“大人”。这些资本家的头子就叫皇帝——</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">这故事下面要说的话都是温斯顿熟悉的。譬如说拖着细麻布长袖子的主教，穿着貂皮袍子的法官，折磨犯人的颈手枷、脚枷、皮鞭和各式各样的其他刑具，以及市长大人的宴会、跪吻教皇脚丫子的规矩。还有一样大概在小孩的书中不会讲出来的事：初夜权。资本家老爷欢喜，就可以跟任何一个在他工厂内工作的女工睡觉。</p>
+
+  <p class="normal">但你又怎知道上面所记的事，有多少是事实，有多少是谎言？如果说普通人的生活比革命前有改善，那<b class="calibre8">也许</b>还有几分道理。可是你骨子里的感觉，却告诉你这不是事实。你凭本能就知道目前的生活无法忍受，而从前跟现在一定有点不同。现代生活的特色，令你感受最深的，倒不是它的残忍面与朝不保夕的恐惧，而是生活本身成了荒凉、灰暗和落寞的代名词。只要你四周打量一下，就知道大家过的生活，跟电幕播出来的谎言固然风马牛不相及，跟党将来要实现的理想参照，也是遥遥不可指望。即使就党员的生活而言，大部分的时间都是在与政治毫无关联的琐事上浪费掉了。刻板的党事做完后，就到地铁上挤位子、缝补破袜、向别的同志乞讨一片糖精，再不然就是抢救有剩余价值的烟屁股。党所树立的未来远景巨大辉煌，到处都是钢筋水泥建筑物，机器庞大，武器杀伤力怕人。那时全国皆兵，个个思想极端、行动一致、口号相同。他们不断工作、打仗、取胜、迫害别人。三亿人口，但只有一张面孔。现实生活中所见的却不是这样。他们住的城市脏乱颓落，营养不良的市民穿着有破洞的鞋子走路，住的是失修已久的十九世纪房子，远远就闻到卷心菜的气味和破旧厕所传出的恶臭。温斯顿眼前的伦敦，是个大废墟，摆着上百万个垃圾箱，其中有尘埃满面、头发稀疏的柏森斯太太，一筹莫展地看着那堵塞了的洗涤槽干焦急。</p>
+
+  <p class="normal">他伸手到足踝去抓痒。电幕夜以继日地向你的耳膜轰炸，举出数字证明今天的日子好过多了。食物和衣服的数量增加，居住的环境改善，娱乐节目也比以前精彩。总之，大家比五十年前的人活得长久些、工作时间少些、个子大些、健康些、强健些、快乐些、聪明些、受的教育也多些。党一说：今天成年无产者中，有百分之四十认得字；解放前，只有百分之十五而已。党又说：今天婴儿的死亡率，一千人中只有一百六十个；解放前，则有三百个。这等于一个方程式上的两个未知数。谁知道？说不定那些历史书上的记载，包括大众认为天经地义的事，真的是满纸荒唐言。他自己也不敢肯定究竟有没有涉及初夜权的这种法律，或者资本家这类人究竟存不存在，究竟有没有礼帽这种东西。</p>
+
+  <p class="normal">什么事都在烟雾中散去。历史已一笔勾销，不留痕迹，谎言变为真理。他生命中只有一次抓到足以证明党改史的确实证据。那是<b class="calibre8">事发后</b>才弄到手的，这才宝贵。他把那文件捏在手上捏了半分钟。那该是一九七三年吧，总之约摸是他跟凯瑟琳分手后不久的事。但真正与这事情有关的日期，应推回七八年前去。</p>
+
+  <p class="normal">这故事应从六十年代中说起，那时大清算运动进行得如火如荼，许多原来的革命领袖都在那时期清除了。到了一九七〇年，除了老大哥外，其余一个也没留下来。各领袖不是被判叛国罪名，就是反革命罪。戈斯坦逃了，躲在什么地方谁都不知道。有些人失踪了。但大部分人被抓了去公审，认了罪后就蒸发掉。保留了性命的有三人：琼斯、阿诺逊和卢瑟福。他们被捕时，一定是在一九六五年。正如以前发生过的案子一样，他们失踪了一年多，死活不知，突然又出现公开自己的罪行，包括通敌（那时的敌人也是欧亚国）、盗用公款、谋杀党的亲信同志、阴谋倾覆老大哥早在革命前就已被肯定的领导权、捣乱破坏导致千千万万的人无辜牺牲。他们招认了以后，党不但颁了特赦令，而且还恢复了他们党员的身份，安排了听来冠冕堂皇但实际上是虚衔的工作。三个人都在《泰晤士报》上发表了声泪俱下的悔过书，分析自己离经叛道的原因和经过，最后答应一定要将功赎罪。</p>
+
+  <p class="normal">这三个人被释放了以后，温斯顿在栗树咖啡馆也见过他们。这三个人物实在太有传奇性了，但他虽然好奇，却只敢用眼角瞧他们。他们比他年纪大多了，可说是古老世界的遗物，党英雄史迹最后的样本。在他们的身上，你还可以看到当年党打游击和干地下活动时光辉记录的余绪。虽然有关他们生平的记载在那时候已经模糊，在温斯顿的印象中，这三个人成名要比老大哥早。事实是否如此，现在倒无关紧要了。他们是罪犯、敌人和贱民，一两年内准会在这世界上消失。没有一个落在思想警察手里的人逃得了大限的。他们实在是等着人家送回坟墓的尸体。</p>
+
+  <p class="normal">他们坐的台子附近没有别的酒客。大家都避免靠近他们，免受怀疑。三人默默坐着，面前摆着三杯掺了丁香叶的杜松子酒，这是栗树咖啡馆的出名饮料。三人中卢瑟福的外貌予温斯顿的印象最深。他原是极有名气的讽刺漫画家，线条锋利如匕首，在革命前和革命时期的作品极能煽动民众情绪。现在他的东西偶然也在《泰晤士报》出现，只是不但题材炒冷饭，手法也了无生气，一点也不动人。在他漫画里出现的，还是贫民窟的生活形象：挨饿的小孩、街头的打斗、戴着礼帽的资本家——虽然生命的安全也得靠面前架起的铁丝路障维护，他们还是戴着礼帽。总之，他在革命后所发表的漫画，还是不断有气无力地拽着过去的包袱不放。他块头大，长着一头油腻腻的浓密灰发，脸皮打褶，嘴唇隆起。他以前准是个体格魁梧的汉子，只是现在除了肚皮鼓起外，身体各部分都显得下垂了，像一座山在你面前崩溃的模样。</p>
+
+  <p class="normal">温斯顿在咖啡馆看到他们时是十五点，冷清清的。他也记不起为什么会在这个时间跑到这儿来。电幕传出细碎的音乐。他们纹丝不动在角落的台子前坐着，闷不吭声。侍者也不等他们招呼，自动给他们添酒。他们旁边的台子上有棋盘，棋子已经摆好，但一着也没动过。突然，电幕节目换了，调子和音色也变了，代之而起的是一种难以描述的声音，既像嘶鸣，也像调侃，沙哑得近乎阴阳怪气。温斯顿暗称它为“黄腔”。接着有声音歌唱了：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">栗树荫下</p>
+
+  <p class="kt1">我出卖你，你出卖我。</p>
+
+  <p class="kt1">他们躺在那边，我们躺在这边</p>
+
+  <p class="kt1">栗树荫下。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">那三人动也不动。但当温斯顿偷偷地瞧了卢瑟福一眼时，大块头的眼睛已噙着泪水。而也在这个时候他才注意到，阿诺逊和卢瑟福二人的鼻子原来已经断了。他心中战栗了一下，虽然他自己也说不清楚究竟是被断鼻子吓坏了，还是联想到后面的故事而害怕了。</p>
+
+  <p class="normal">不久他们三人又被捕了，据说是上次他们获释后，马上又搞阴谋倾覆的勾当。第二次公审时，他们除了把前科罪行再说一遍外，又供认了一大堆新的罪名。接着他们就被蒸发了。他们的命运入了党史，以儆效尤。事隔五年后——这次他记得清楚是在一九七三年——温斯顿拿起气筒喷到他桌上来的一卷文件，翻到一张别人夹在其中而最后忘记捡回来的剪报。那是十年前《泰晤士报》的上半版，因此上面印有年份和日期。除文字外，还有一张党的代表团在纽约开会的照片，中立者赫然是琼斯、阿诺逊和卢瑟福三人。错不了的，因为照片下的文字说明中就有这三人的名字。</p>
+
+  <p class="normal">可是这三人在两次公审时都招认就在纽约开会这一天，他们都身在欧亚国本土。供词说他们在加拿大某秘密机场起飞，到西伯利亚某一地点与欧亚国指挥部将领会面，出卖重要军事情报给他们。这日子温斯顿记得清楚，因为正是六月二十四日，圣约翰施洗者的节日。这个纽约大会，别的国家一定也有详细的记录。那么只有一个解释了：三人的供词，全是假话。</p>
+
+  <p class="normal">自然，这事情本身并不算得是什么发现。十年前的温斯顿，也不会相信在清算中犯死罪的人，实际干了他们在供词中招认的各种罪行。这次不同的地方，无非是他手上握有具体的证据。这是历史被颠倒的一个证据，犹如地质学家在意想不到的地层捡到一块化石，把已建立的理论推翻了。如果能够把这事公诸世人，并说明党这种措施所代表的是什么心态，已足以使党的名誉万劫不复了。</p>
+
+  <p class="normal">他继续埋头工作。刚才他一看清楚这照片是怎么回事时，就用另外一张纸盖着它。真是有运气，他翻开这半版报纸时，电幕看来是上下颠倒的。</p>
+
+  <p class="normal">他把拍纸簿摆在腿上，椅子推到后面。能够离电幕越远越好。要脸上喜怒不形于色不难，而且，只要你用些气力，呼吸的轻重也可以调节。但心脏跳动的快慢可不容易控制了。电幕的收听效果奇佳，听得到的。他耐心静坐让情绪平伏，一直害怕这期间会有什么意外事件出现，让他原形毕露。譬如说，室内突然吹来一阵风，把桌上的文件吹散。这就完蛋了。大概过了十分钟后，他也没有揭起盖在上面的那张纸，就把照片连同其他废纸一起丢进思旧穴去。一分钟内，历史化为灰烬。</p>
+
+  <p class="normal">那是十年——十一年前的事了。要是今天发生，说不定他会把照片留下来。奇怪的是，虽然那张照片和那半版文字今天已不存在，但他的手指捏过照片的经历，居然影响他一生。是不是因为一份如今已成灰烬的文件<b class="calibre8">曾经</b>存在过，他就觉得党对历史的控制，最少就他而言，不像以前想象的那么万无一失？</p>
+
+  <p class="normal">但今天即使你有魔力能把照片的灰烬重组起来，也不能用作改史的证据了。事实上，温斯顿发现此照片时，大洋邦与欧亚国的战事已经停息，因此卢瑟福三人通的敌一定是东亚国的情报人员。再说，他们死后的历史还有其他订正——两次或三次，他记不起来了。最大的可能是党把他们的供词改了又改，改得面目全非，使得原来的事实和日期一点也没有关联。历史不但改变，而且不断改变。最令他感到像做噩梦一样难受的，是他从来不明白<b class="calibre8">为什么</b>要花这么大的功夫去做瞒天过海的事。他了解伪造历史的显明功用，但最终的目的究竟是什么，他就有点不懂了。他拿起笔来，在日记簿上写下：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">我知道<b class="calibre8">怎样</b>去做，却不明白<b class="calibre8">为什么</b>要做。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">他怀疑自己究竟是不是疯了。他以前也多次这样问自己。也许疯子的定义不过是持异议的少数个人。从前若你相信地球绕着太阳运转，这就是发疯的证据。今天相信历史不可抹杀的人也是如此。抱着这种信念的人，可能只有<b class="calibre8">他一个</b>。那么他就是疯子了。自己疯了并不怎样可怕，最可怕的是，你这种想法可能是错的。</p>
+
+  <p class="normal">他拿起了那本借来的儿童历史书，看了印在封面上的老大哥照片一眼。老大哥催眠的眼睛也瞪了他一眼，他马上感到一股慑人的力量向他袭来，钻入他的脑袋，扰乱他的神经，窒息他的信仰。我们几乎可以说，这股力量根本否定温斯顿独立知觉的存在。总有一天党会宣布二加二等于五，你也得相信。二加二得五这新发现党迟早会发表的，这符合他们的逻辑。虽然没有明言出来，但他们的哲学本质上是排斥经验的可靠性和否定外界现实的存在。异端邪说，反成为常识。你独持异见，他们杀了你，这固然可怕，但更可怕的是他们的话可能是对的。你怎敢肯定二加二真的等于四、地心真的有吸力、历史真的不可涂改？如果过去的经验和外在的世界只存在于我们的观念中，而观念可受控制——那么该怎样？</p>
+
+  <p class="normal">不，不成！他的勇气突然涌现。也没有故意地去联想到他，奥布赖恩的脸却在他脑海中浮现出来。他比以前更肯定地相信，奥布赖恩是站在他这一边的。这日记是为他写的——写给他的。这日记像一封无休无止的信，虽没有人会看到，但正因为落了上款，语气和内容也因此有了准则。</p>
+
+  <p class="normal">党要你排斥看到的和听到的证据，这是他们最基本的命令。他一想到要面对冲着他来的庞大反对力量，就泄了气。在辩论时，党的理论家可以不费吹灰之力就把他击倒。他们的辩论方法，玄得他连听都听不懂，遑论反驳了。可是，他是对的。他们错了，他才是对的。明显的、简单的和不作伪的事实，一定要维护。真理就是真理，这一点不能放弃。地球是圆的，宇宙的轨迹不变。石头是硬的，水是液体，地心有吸力。抱着面对奥布赖恩讲话的心情，同时也为了给后世留下两句重要的格言，他在日记中写下：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">自由就是可以说二加二等于四。此理既立，余者亦然。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_8.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_10.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_8.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_10.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

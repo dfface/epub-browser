@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="二 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>二 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">二</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">二</h2>
+
+  <p class="normal">他躺着的地方好像是一张行军床，只是离地面颇高，而他手脚被缚，不能动弹。强烈的灯光照在脸上。奥布赖恩站在他旁边，密切注视着他的反应。站在另外一边的是个穿着白外衣的男子，手执皮下注射器。</p>
+
+  <p class="normal">他现在眼睛虽然张开，却没有马上打量四周的环境。他觉得自己好像是从另外一个世界游到这房间来的，那是一个深埋水下的海底世界。自己在那世界待了多久，他就不清楚了。自被捕以来，既没见过阳光，也没见过黑夜。再说他的记忆也是无连贯性的，有时他的意识完全空白，连做梦时那种残存的意识也没有；空白过后，意识又恢复过来。但这片空白的时间究竟是一周、一日或仅仅几秒钟，他就无法知晓了。</p>
+
+  <p class="normal">打在手肘上的那一棍，是噩梦的序幕。他后来才了解到，提堂审讯不外是种形式，每个犯人都得经过。罪名多得很：为敌国搜集情报、从事破坏活动等，这是每个犯人都循例招认的罪名。虽然招供是种例行手续，但皮肉之苦却是真的。温斯顿一共被打过多少次，每次打多久，已记不起来了。但他记得每次都有五六个穿黑制服的人一同出现施刑，有时用拳头，有时用木棍、铁杆或皮靴。他像一只不知廉耻的野兽在地上打滚，本能地要躲过皮靴的踏踢。这一来对方踢得更多更狠，踢在肋骨、肚皮、手肘、小腿、腹股沟、阴囊和背后的尾龙骨上。他就是这样接二连三地抵受皮肉之苦。到了最后，他觉得最残忍和最不可原谅的事情，倒不是这些汉子心狠手辣，而是自己怎么不会昏死过去。有时他的神经完全失去控制，拳头未下，他已开始求饶，把已犯过的和想象出来的种种罪行一一招供。但有时正好相反，他下定决心拒绝招供，如非痛楚难忍，一字不吐。有时他预先准备了要让步，对自己说：“招供是逃不了的，但慢慢来，能多忍受一分钟就多忍受一分钟。他们再踢两三下，那个时候我才招认。”有时他被揍得再站不起来，那些汉子就像摔一袋马铃薯的样子把他丢在牢房的石板地上，让他休息几个钟头然后从头再来。有时他们让他恢复体力的时间会长一些，虽然实在有多久他自己也不清楚，因为他要不是昏迷不醒就是睡着了。他记得自己被关在一个小室内，有木板床，墙上有个突出来的架子，有锡脸盆。吃的有热汤和面包，有时还有咖啡。期间，有一个脾气暴躁的理发匠进来给他剪过发、刮过胡子。穿着白制服的人也进来过，职业性地按了按他的脉搏，测量了他的神经反应，翻了翻他的眼皮，探手摸他的身体看看骨头有没有被打断，检查了以后就在他手臂上打一针让他睡觉。</p>
+
+  <p class="normal">毒打的次数减少了，但威胁性仍然存在，温斯顿怕的就是自己说的口供万一不令人满意，又落在那几个汉子手上。问他话的人，不再是穿黑制服的老粗，而是戴着眼镜的党的知识分子，长得矮矮胖胖，行动却异常敏捷。他们轮班来折磨他，每次总有十或十二小时吧，他想。这些戴眼镜的讯问人，虽然照样要他受皮肉之苦，但他们真正的用心显然不单是要在肉体上折磨他。他们掴他耳光、扭他的耳朵、扯他的头发、命他单腿站着、不准他小解、用最强烈的灯光照他的脸使他眼泪直流，但这仅是一种手段，目的在于奚落他和摧毁他思考与争辩的能力。他们最厉害的武器倒是疲劳审讯，一个钟头接一个钟头地问下去，一方面要他自露破绽，另一方面又把他说的话扭曲一番，让他把谎言看成真理。到最后，他竟放声哭出来。精神疲劳固然是个原因，但对自己感到惭愧也是原因之一。有时审讯一次，他会哭上六七次。大部分的时间他们用污言污语侮辱他；他回答时略一迟疑，他们就恐吓说要把他送回老粗的地方去“修理”。可是有时候他们的腔调一变，称他“同志”，以英社和老大哥的名义去感化他，问他现在对党的忠诚如何，希不希望有机会洗去以往的罪行等等。经过连续几小时的疲劳审讯，神经已临崩溃，所以即使这种温言温语也一样引出他的眼泪来。疲劳审讯的方式果然比黑衣汉子的拳脚有效。他的意志力全部垮了，他们要他说什么他就说什么，要他签什么他就签什么。他目前最关心的是他们要他招认什么罪行，一猜到就在他们发问前先供出来。因此，他的罪名包括：暗杀党内显要党员，散发煽动性传单，盗用公款，出卖军事情报给敌国，还有各式各样的阴谋颠覆行动。他招认了自一九六八年以来就做了东亚国的奸细；招认了自己奉信宗教，崇拜资本主义，是个在性行为上有堕落嗜好的人。此外，他还招认了自己是个杀妻罪犯，虽然他和审问他的人都知道凯瑟琳还好好地活着。在口供上，多年来他跟戈斯坦过从甚密，是个地下组织的会员，会员包括了所有他认识的人。招认所有想象得出来的罪名、拖每个认识的人下水，实在是轻而易举的事。再说，这也没有冤枉自己，他不一直就是党的敌人吗？在党的眼中，思想与行动是不能分开的。</p>
+
+  <p class="normal">在他模糊的记忆中还有其他断断续续的片段，连贯不起来。</p>
+
+  <p class="normal">他在一个小室里，是暗是亮已记不起来了，因为他除了一双眼睛外什么也看不见。附近有一个仪器，规律性地滴答滴答响个不停。那双眼睛越来越大，发着亮光。突然他自椅子上浮起，滑入那双眼睛内，被吞没了。</p>
+
+  <p class="normal">他被缚在一张椅子上，灯光刺眼，四面是钟面形状的控制盘，有一个穿白衣服的男子在看管。门外有沉重的皮靴声，门开处，那冷漠的警官带着两个狱卒进来了。</p>
+
+  <p class="normal">“一〇一室。”警官说。</p>
+
+  <p class="normal">那看守着控制盘的男子没有转身，也没有看温斯顿一眼。他只看着控制盘。</p>
+
+  <p class="normal">温斯顿在一个金光耀眼、一公里宽的特大走廊里滚下来，疯狂地笑着，大声地把自己的罪名叫出来。他什么都招了，连苦刑也迫不出来的话也说了。他对着已熟悉他一生的听众复述自己的身世。在走廊上滚下来的，还有狱卒、讯问者、奥布赖恩、朱丽亚和查林顿先生。他们也像他一样，疯狂地大笑着。有些预料到将要发生的恐怖事情，不知为了什么原因，最后竟然没有发生。他已无问题了，不会再受折磨。他一生中的每一细节已经公开，也获得谅解和宽恕。</p>
+
+  <p class="normal">他好像听到了奥布赖恩的声音，拼命要从板床上挣扎起来。自受刑以来，温斯顿总觉得奥布赖恩就在他身边，只是自己看不到他而已。奥布赖恩犹如一部电影的导演。指挥黑衣老粗去毒打他的是奥布赖恩，及时制止他们不要下手太重的又是他。决定温斯顿该受多少折磨、哪时可以喘一口气、哪时吃饭睡觉、哪时接受皮下注射——都是他一个人发的命令。问题是由他出的，答案也是他提供的。总之，奥布赖恩是他的折磨者、保护人、审判官、朋友。有一次他听到一个声音在耳边说话，虽然他不知道自己是打了针后昏睡时听到的、正常睡眠状态中听到的还是清醒时听到的。这声音对他说：“温斯顿，别担心，你在我手上。我监视你七年了。现在已到了转折点，我会救你的，会把你变成完人。”他不敢断定这就是奥布赖恩的声音，但可以肯定的是，这声音与七年前在梦中对他说“我们将来会在没有黑暗的地方见面”的声音完全一样。</p>
+
+  <p class="normal">盘问怎样结束的，他记不起来了。在黑暗的地方待了一阵子后，他就被移到现在这小室来。他平卧着，身体每一重要部分，包括脑后，都像被什么东西缚着，动弹不得。奥布赖恩带着一种既严肃又忧伤的神色俯视着他。从下面往上看，奥布赖恩的脸显得粗糙而憔悴，眼皮打褶，从鼻子到下巴尽是皱纹。他看来比温斯顿想象的老，大概是四十八至五十岁的样子吧。他的手下面是一个有把手的钟面控制盘，上面是数字。</p>
+
+  <p class="normal">“我对你说过，如果我们还会见面的话，地方就在这里。”奥布赖恩说。</p>
+
+  <p class="normal">“我知道。”温斯顿答道。</p>
+
+  <p class="normal">奥布赖恩也没有给他什么警告，手略一转动，温斯顿浑身刺痛。这种痛苦可怕极了，因为他看不到是怎么一回事，只觉得身体已受到严重的伤害。他不知道这种痛苦是真的，还是电波制造出来的。但不管真的假的，他觉得身体各关节慢慢脱位就是。额前一直冒着冷汗，但令他最觉得恐惧的却是脊骨会不会因此折断。他咬着牙，用鼻子深呼吸，决定能多挨一分钟就沉默一分钟。</p>
+
+  <p class="normal">奥布赖恩细看着他面部的表情，说：“现在你害怕的是下一秒钟身体某一部分会折断，是不是？你最担心的是脊骨，你在脑中几乎可以清清楚楚地看到脊骨一节一节折断的情形，脊髓液跟着流光。你想着的就是这个，对不对？”</p>
+
+  <p class="normal">温斯顿没有搭腔。奥布赖恩扭动了转盘，痛楚马上消失了。</p>
+
+  <p class="normal">“刚才你受的痛苦是四十度，”奥布赖恩又说，“你可以看得出来，这转盘最高的数字是一百。好，你记着，等会儿我问你话时，你知道我可以随时有使你受苦的能力，而你痛苦的轻重也完全由我控制。如果你跟我说谎，或答话时支吾以对，或装糊涂——因为我知道你的知识水平如何——你马上就要吃苦的。这一点你明白了？”</p>
+
+  <p class="normal">“明白了。”</p>
+
+  <p class="normal">奥布赖恩听后，态度柔和多了。他推了推眼镜，踱了几下方步，说话声音温和，也显得非常有耐心，态度和口吻像个医生、教师或牧师，旨在劝导，不在惩罚。</p>
+
+  <p class="normal">“温斯顿，”他说，“我愿意在你身上花心血和时间，因为你值得我这么做。你自己也知道问题出在哪里。多年来，你对自己的情况自然了解，只是一直不肯承认而已。你的问题就是神经不正常，记忆力衰退，该记得清楚的事你记不起来，而从来没发生的事你却自以为是，挂在心上。幸好这种病是可以治疗的，你没有及早治好，只不过是你不愿意而已。其实，只需稍微调整一下你的意志力就成，可惜连这一点你都不肯做。我可以看得出来，即使在这一分钟，你还是不肯放弃你的病态思想，因为你以为那是一种了不起的德行。好吧，我们举一个实例。目前大洋邦跟谁作战？”</p>
+
+  <p class="normal">“我被捕时，是东亚国。”</p>
+
+  <p class="normal">“东亚国，对。大洋邦的敌国一直就是东亚国，对不对？”</p>
+
+  <p class="normal">温斯顿深深吸了一口气。他张开嘴巴要说话，但说不出来。他的眼睛一直看着控制盘上面的数字。</p>
+
+  <p class="normal">“温斯顿，说实话，说<b class="calibre8">你</b>知道的实话。”</p>
+
+  <p class="normal">“我记得的就是在我被捕前的一个星期，东亚国还是我们的盟友。我们的敌人是欧亚国，打了四年。在此以前——”</p>
+
+  <p class="normal">奥布赖恩举手制止他。</p>
+
+  <p class="normal">“我们举别的例子。多年以前，你产生的许多幻觉中，最严重的莫如你相信因叛国与叛乱罪名而被正法的党员琼斯、阿诺逊与卢瑟福死得冤枉。你认为你看过证据充足的文件，可以证明他们的供词全是伪造的。你看到了一张使你产生幻觉的照片，认为物证既在自己手上，假不了的。那张照片就像这个样子。”</p>
+
+  <p class="normal">奥布赖恩的手指捏着一张报纸的剪报。大约有五秒钟吧，温斯顿看得清清楚楚，对了，就是<b class="calibre8">那张</b>照片，不会错的——琼斯、阿诺逊和卢瑟福因党务到纽约开会的照片，十一年前他把玩了一下就马上销毁的照片。它在他眼前只出现短短的几秒钟，又消失了。可是要紧的是，他看到了，真正地看到了。他挣扎着要坐起来，可是丝毫也动不了。这一刻他连控制盘的恐怖也忘了，只希望能再捏着那照片半分钟，或者最少再看一眼。</p>
+
+  <p class="normal">“这证据是存在的。”他喊了出来。</p>
+
+  <p class="normal">“谁说？”奥布赖恩反问道。</p>
+
+  <p class="normal">他走到房子的对面。墙上有思旧穴，他拉开盖子，一声不响地把那张剪报投进去。纸片随着热流而下，顷刻化成灰烬。奥布赖恩转过身来。</p>
+
+  <p class="normal">“烟消灰灭，”他说，“这照片从来没存在过。”</p>
+
+  <p class="normal">“它存在过！现在也存在于我们的记忆中。你记得，我记得！”</p>
+
+  <p class="normal">“我不记得。”奥布赖恩说。</p>
+
+  <p class="normal">温斯顿的心不觉一沉。这是双重思想。这真令他陷于困境了。如果他知道奥布赖恩在撒谎，那还可解释。但要命的是，奥布赖恩真的可能完全忘记这张照片存在过啊！如果这假定不错，那么他已经忘记否认过照片存在这回事。当然，也忘记曾经忘记否认……你又怎能肯定这是欺诈的伎俩呢？也许人类的思想真的可以随时调整。他觉得已败下阵来。</p>
+
+  <p class="normal">奥布赖恩若有所思地望着他。他的神色越来越像一个善心诱导入迷途但素质极佳孩子的老师。</p>
+
+  <p class="normal">“党有一句有关控制过去的口号，”他说，“请你念出来吧。”</p>
+
+  <p class="normal">“‘谁控制过去，就控制未来；谁控制现在，就控制过去。’”温斯顿应命念道。</p>
+
+  <p class="normal">“‘谁控制现在，就控制过去。’”奥布赖恩认可地慢慢点头说，“那么，温斯顿，依你看来，过去有没有真正存在的证据呢？”</p>
+
+  <p class="normal">温斯顿又一次陷于困境了。他向控制盘瞄了一眼。他不但不知道为了减轻痛苦，究竟该说“有”呢还是“没有”，最苦恼的是：他连自己也不知道哪一个才是真正诚实的答案。</p>
+
+  <p class="normal">奥布赖恩淡淡地笑道：“温斯顿，看来你也不是什么玄学家。我不问你，大概你也没有想过‘存在’究竟是怎么一回事吧？好，我说得更具体点。过去会不会在空间里存在？过去会不会在某一个地方、某一个实际的世界继续发展下去？”</p>
+
+  <p class="normal">“不会。”</p>
+
+  <p class="normal">“那么过去如果存在的话，到哪里去找？”</p>
+
+  <p class="normal">“文字的记录，所有书写下来的有关记载。”</p>
+
+  <p class="normal">“好，还有呢？”</p>
+
+  <p class="normal">“在我们的脑中、人类的记忆中。”</p>
+
+  <p class="normal">“这说得有理。好吧，我问你，如果我们党控制所有记录、控制人类的记忆，那么算不算也控制了过去呢？”</p>
+
+  <p class="normal">“但党又怎能消灭人类记忆的习惯？”温斯顿嚷着说，又一次忘记控制盘的存在了，“记忆的习惯是与生俱来的，不由自主的，你们怎能控制别人的记忆？不说别人，我的记忆你们就控制不了！”</p>
+
+  <p class="normal">奥布赖恩脸色变得沉重起来，他的手按在控制盘的把手上。</p>
+
+  <p class="normal">“正好相反，控制不了记忆的是<b class="calibre8">你自己</b>。你被捕到这里来，就是为了这个原因。你既不谦虚，也不知自律。你不肯抛弃私见，服从大我，因此你选择的是疯子的道路，是少数中的少数。温斯顿，我告诉你，只有受过训练的头脑才看到现实。你相信现实是客观的、外在的、不求外证的、自成天地的。因此，你如果从幻觉中看到一样东西，就会假定在现实中也会看到同样的东西。可是，温斯顿，我要告诉你的是现实不是外在的。现实只存在于人的脑中——但这‘脑中’不是指个人的头脑，因为个人会犯错误，而且早晚要灭亡。党的头脑不同，它是集体的，因此也是不朽的。党认为是真理，那就是真理。除了用党的观点去看的现实是现实，此外再无其他现实。温斯顿，这就是你得从头学起的地方了。这牵涉到意志力的运用，因为你需要消灭自我。在你的头脑变得清醒前，你得否定自己。”</p>
+
+  <p class="normal">奥布赖恩说到这里顿了顿，好像要给温斯顿足够的时间去消化的样子。</p>
+
+  <p class="normal">“你还记得你在日记上写过的话吗？”他接着说，“‘自由就是可以说二加二等于四’？”</p>
+
+  <p class="normal">“记得。”</p>
+
+  <p class="normal">奥布赖恩举起左手，伸出四个手指，大拇指屈起来，不让温斯顿看见。</p>
+
+  <p class="normal">“我竖起来的手指有多少？”</p>
+
+  <p class="normal">“四个。”</p>
+
+  <p class="normal">“如果党说不是四个，是五个——那你说有多少？”</p>
+
+  <p class="normal">“四个。”</p>
+
+  <p class="normal">话未说完，温斯顿已痛得喘着气。控制盘的指针指着五十五。他浑身冒着冷汗，吸进肺里的空气化作痛苦的呻吟声吐出来。他咬着牙，但一点也减不了身上的痛楚。奥布赖恩目不转睛地望着他，还是竖着四个手指。他按了按把手，温斯顿的痛苦稍微减轻了点。</p>
+
+  <p class="normal">“多少个？”</p>
+
+  <p class="normal">“四个。”</p>
+
+  <p class="normal">指针跳到六十。</p>
+
+  <p class="normal">“多少个？”</p>
+
+  <p class="normal">“四个！四个！你要我怎么说？四个！”</p>
+
+  <p class="normal">指针一定又跳高了，但这次他没有看。他看到的只是奥布赖恩严肃的面孔和他竖起的四个手指，手指像擎天的巨柱一样挺立在他眼前，有时朦胧且摇摆不定，但数目错不了的：四个。</p>
+
+  <p class="normal">“温斯顿，多少个手指？”</p>
+
+  <p class="normal">“四个！别再用那东西折磨我了！四个！四个！”</p>
+
+  <p class="normal">“温斯顿，多少个？”</p>
+
+  <p class="normal">“五个！五个！五个！”</p>
+
+  <p class="normal">“那没用，温斯顿，你在撒谎，你还是相信看到四个。好，再来一次，多少个手指？”</p>
+
+  <p class="normal">“四个！五个！四个！你要我说多少就多少吧，只要不让我受苦就是。”</p>
+
+  <p class="normal">他醒来时突然发觉奥布赖恩用手臂环抱着他坐着！缠绕着他身体的电线之类的东西已经松开了。他大概是昏过去几秒钟吧。冷极了，他身上一直发抖，牙齿咯咯作响，泪流满面。他像孩子依偎母亲一般靠在奥布赖恩粗大的臂弯里，出奇地感到舒服。奥布赖恩是他的保护人，痛苦从别的地方来，只有奥布赖恩才会及时制止他的痛苦。</p>
+
+  <p class="normal">“你学东西学得很慢，温斯顿。”奥布赖恩温和地说。</p>
+
+  <p class="normal">“我有什么办法？”他哭泣着说，“我的眼睛是看东西的，看到了四怎能说五？”</p>
+
+  <p class="normal">“有时二加二等于四，温斯顿，但有时是三，有时是五，有时同时是三、四、五。你还得努力学习，要清醒不容易。”</p>
+
+  <p class="normal">奥布赖恩又扶他躺下，他的身体又被缚得紧紧的。痛苦已略微减轻，也不再颤抖了，只感到虚弱和寒冷而已。</p>
+
+  <p class="normal">奥布赖恩用头向穿着白制服的人示意。这家伙一直站在旁边，没有哼过声，现在低下头翻了翻温斯顿的眼皮，按了按他的脉搏，听了听他的胸口，敲敲这里，摸摸那里，然后向奥布赖恩点了点头。</p>
+
+  <p class="normal">“好，再来一次。”奥布赖恩说。</p>
+
+  <p class="normal">温斯顿马上又全身陷于痛苦中。控制盘上的指针，大概指着七十或七十五的数字吧。他闭上眼睛。他知道奥布赖恩的手指还是竖着，还是四个手指。现在最要紧的事是忍着痛苦，等痉挛过去。他已懒得理会自己有没有叫出来。阵痛逐渐退去，他张开眼睛，看到奥布赖恩把转盘数字减低。</p>
+
+  <p class="normal">“多少个手指，温斯顿？”</p>
+
+  <p class="normal">“四个，我想是四个。如果可以的话，我希望看到五个，我现在正努力。”</p>
+
+  <p class="normal">“那你选择哪条路：教我相信你看到五个，还是真的看到五个？”</p>
+
+  <p class="normal">“真的看到五个。”</p>
+
+  <p class="normal">“再来一次。”奥布赖恩下令说。</p>
+
+  <p class="normal">指针上的数字是八十或九十吧，温斯顿一定昏过去醒过来多次，因为他只能断断续续地记起为什么身上受着痛苦。眼睑下好像出现了一个手指丛林，徐徐舞动，时而消失，转瞬复现。他试着数过这些手指，虽然自己也不明白动机何在。这些手指是数不清的，他自己也知道，因为这牵涉到四与五之间神秘的观念问题。痛苦又减轻了。他张开眼时，所见的还是刚才的印象：数不清的手指，如会走路的树在自己左右两边交错移动。他又闭上眼睛。</p>
+
+  <p class="normal">“我现在竖着多少个手指？”</p>
+
+  <p class="normal">“我不知道，真的不知道，只知道你再来一次的话，我就会死。四个、五个、六个——最老实的答案就是不知道。”</p>
+
+  <p class="normal">“有进步了。”奥布赖恩说。</p>
+
+  <p class="normal">白衣人在他的臂上注射了一针，温斯顿马上觉得有一股暖流透过全身，舒服极了，使他几乎忘记刚才的痛苦。他张开眼睛，感谢地望着奥布赖恩。看到他那张既丑陋又聪明的粗线条的脸，温斯顿禁不住对他产生敬爱之心。如果他能动的话，一定会伸出手搭在奥布赖恩的臂上表达这个意思。他对奥布赖恩的敬爱之情，从没像这时这么强烈过。这不单为了他制止了他的痛苦，他对这人原先的感情又回来了，那就是奥布赖恩究竟是敌是友都无所谓，要紧的是这人谈得来。也许一个人对知己的渴求，比爱情尤甚。奥布赖恩把他折磨得近乎疯狂状态，而他也知道，等一会儿自己就要受死，可是这都没关系。在某种意识来讲，他们的关系超越一般友情：他们的确是推心置腹之交。虽然谁都没有提到这点，但他相信他们将来总会在什么地方再见，然后好好地聊一番。温斯顿注意到奥布赖恩俯视着自己时，脸上有一种特有的表情，好像在说：你的心事我完全了解，因为我也这么想。奥布赖恩再开口说话时，神态悠闲得像在聊天。</p>
+
+  <p class="normal">“你知道身在何处吗？”他问。</p>
+
+  <p class="normal">“不知道，但我猜是仁爱部吧。”</p>
+
+  <p class="normal">“那你知不知道在这里待了多久了？”</p>
+
+  <p class="normal">“不知道。几天、几个星期、几个月——我想是几个月吧。”</p>
+
+  <p class="normal">“你知道我们为什么把犯人带到这儿来吗？”</p>
+
+  <p class="normal">“迫供。”</p>
+
+  <p class="normal">“不对，这不是理由。再试试看。”</p>
+
+  <p class="normal">“惩罪。”</p>
+
+  <p class="normal">“不对！”奥布赖恩叫道。他的腔调变了，面色虽然凝重，但掩盖不了兴致勃勃的神情。“我们带你来这里，既不为了迫你招供，也不是要惩罚你。要不要我说出来？你在这里，因为我们要治疗你，不让你发疯！你得明白，温斯顿，到这里来接受我们治疗的人没有一个没治愈。你所犯的各种愚笨的罪行，我们一点也没有兴趣。党注意的不是表面的行为，只关心行为后面的思想。我们不但消灭敌人，我们还要改造敌人。你懂吗？”</p>
+
+  <p class="normal">奥布赖恩弯下腰去看温斯顿。从温斯顿的角度看去，他的脸奇大奇丑，也许是距离太近的缘故吧。除了大与丑外，温斯顿还注意到他脸上的另一特征：一种你常在疯人眼睛里看到的亢奋。温斯顿的心不禁又下沉了。如果可以的话，他真想钻到床底。说不定他一时兴起，又转动控制盘了，温斯顿想。但奥布赖恩在这个时候却走开，踱着方步。接着他激动地说：</p>
+
+  <p class="normal">“你首先要了解，在这个地方是没有烈士和殉道者的。你一定读过历史上有关宗教迫害异端分子的记载吧，譬如说天主教在中世纪的大审判。那种行动注定要失败。目的在于铲除异端，结果正好相反，异端不但没有消灭，反因此连绵不绝。他们在刑架上烧死一个异教徒，成千成万的同类继之而起。为什么？因为宗教法庭公开杀害它的敌人，在他们没有悔过前就烧死。正确地说，正因为他们不肯悔过，不肯放弃他们真正的信仰，才会被烧死。自然，所有荣耀属于牺牲者，而恶名则由施刑者担当。二十世纪则有所谓极权主义者的例子，如德国的纳粹党和俄国的共产党。俄国人对付异端分子的手段，比天主教宗教法庭残忍得多。他们以为从历史上得了教训。平心而论，他们至少学会了这一点：不能制造殉道者。在提犯人公审前，他们用尽心机，摧毁了犯人最后一点尊严。他们施酷刑之余，还把犯人隔离关闭，直弄到每个落在他们手上的人都变得摇尾乞怜、面目可憎，要他们供什么就供什么。他们除了指控别人，也会辱骂自己。可是，过了几年后，结果又与宗教迫害异端分子一样。死去的人成了烈士、殉道者。他们当时受凌辱的过程，已为人淡忘。我们不禁又要问：为什么？首先，谁也看得出来，他们的供词是屈打成招的结果，因此不是真的。我们这里不犯那种错误。在这里吐出的供词，都属实情，因为我们要它变成实情。但最重要的一点是：我们不让死者有起来反抗我们的机会。因此，温斯顿，你不要做白日梦，以为后世会为你平反。后世永远不会知道你是谁。你在历史上的痕迹将会被刮得一干二净。我们把你炼成气体，让你消失于太空中。你毫无痕迹留下：名册上没有你的名字，没有一个活着的人会记得你。过去没有你，将来也没有你，你从来没存在过。”</p>
+
+  <p class="normal">那为什么又要折磨我呢？温斯顿禁不住怨恨地想。奥布赖恩好像听到了他的心事似的，突然停了步。他的丑脸靠近，眼睛半眯着。</p>
+
+  <p class="normal">“你在想，既然我们打算把你毁灭得不留痕迹，既然你说的做的最后毫无分别，那么我们又何必花这么大的工夫盘问你？你心里想的就是这疑问，是不是？”</p>
+
+  <p class="normal">“是的。”温斯顿说。</p>
+
+  <p class="normal">奥布赖恩微笑着答道：“温斯顿，你是我们模式中的一个缺陷，一个必须擦去的污点。我不是才跟你讲过我们跟过去的迫害者不同吗？我们对口是心非的顺从和可怜兮兮的驯服不会满意。到你最后向我们投降时，得正心诚意。我们不会毁灭一个抗拒我们的异端分子。他抗拒一天，我们就让他活一天。我们要转变他的信仰，控制他的思想，改造他。我们把他心中的毒素和幻想洗涤干净，把他诱导到我们这边来：不但表面属于我们，整个心灵也得认同我们。在我们杀他前，先把他变为我们自己的人。我们不能忍受世上任何一个角落有错误的思想存在，即使它是隐秘的、不会惹起问题的。即使在犯人就刑时，我们也不容许他犯错误。中世纪的异教徒踏上刑架时还是异教徒，大声说邪话，一副求仁得仁的嘴脸。俄国整肃知识分子时，也一样。犯人步上法场吃子弹时，满脑子都是反抗思想。我们不同，我们在犯人的脑袋开花前，先把他的思想洗得干干净净。古代专制政权的戒条是：‘勿以身试法。’极权主义者叫的口号则是：‘你应为我们的信仰牺牲。’我们比较干脆，我们会说：‘你是我们的人！’不是吗？我们带进来的人，从没有一个抵抗过我们的。每个人都变得思想纯正。琼斯、阿诺逊和卢瑟福这三个可怜虫，你不是曾经相信过他们是无辜的吗？我告诉你，他们一一垮下去了。我审问过他们，因此亲眼看到他们的意志力怎样逐渐消失——他们匍匐在地，哭着，呜咽着。到最后，他们的表情再不是痛苦和恐惧，而是后悔。我们审问完毕时，他们只剩下了躯壳，除了悔意和对老大哥的爱心外再无其他感情。他们对老大哥的爱意，看了令人感动。他们最后要求尽早行刑，这样可以保证他们死时还是思想正确的人。”</p>
+
+  <p class="normal">奥布赖恩的声音变得有点如醉如痴，脸上露出的狂热仍然不减。他不是在演戏，温斯顿想。他相信自己说的每句话，因此不是个说谎的人。最令温斯顿受不了的，是相形之下觉得自己的智力渺小。他看着这个块头虽大，但姿态异常优雅的人在自己的视野内走来走去。奥布赖恩无论在哪方面都比自己强大，他想。没有一种他想过的或可能想到的观念不为奥布赖恩洞悉先机，不为他排斥。他的思想<b class="calibre8">涵盖</b>了温斯顿的思想。但如果这是真的话，奥布赖恩又怎会是疯子呢？一定是自己疯了，温斯顿想。奥布赖恩停下步来，俯视着他，声音又变得冷峻起来。</p>
+
+  <p class="normal">“温斯顿，你千万别做白日梦，以为你向我们无条件投降就可以挽救你自己。我们从来不放过走入歧途的人。即使我们让你度过余生，你也逃不过我们的掌握。你在这里经历的事，因此也一辈子摆脱不了。这一点，你得先弄清楚。我们将把你压得扁扁的，你永不能翻身。即使你活上一千年，也无法抚平烙在你身上的伤痕。你将永远不会体验到人类普通的情感。你的感情将如槁木，失去了对爱情友情的本能反应，失去了求知欲和道德勇气，因此也谈不到什么人格的完整了。总之，到时你连欢笑的能力也没有，因此也无法享受什么生命的乐趣。你将是个空洞的人，我们将你挤得空空的，然后把我们的成分将你填满。”</p>
+
+  <p class="normal">奥布赖恩说到这里顿了顿，向白衣人举手示意。温斯顿感觉到有什么仪器塞到他脑后来。奥布赖恩坐在他的床边，因此他的脸几乎与温斯顿的处于同一高度。</p>
+
+  <p class="normal">“三千。”他吩咐白衣人说。</p>
+
+  <p class="normal">两块微湿的垫子贴在温斯顿两边的太阳穴上，他吓得缩了缩身子。将要尝到另一种花样的痛苦了。奥布赖恩用一只手按着他，似乎要他不要担心，几乎很和善。</p>
+
+  <p class="normal">“这一次不会有什么痛苦，”他说，“你看着我的眼睛吧。”</p>
+
+  <p class="normal">温斯顿听到一阵轰天动地的爆炸声，或者可以说像是爆炸声，因为他不知道是否真的有声音发出来。但他看到刺眼的强光，这倒是假不了的。他没有受伤，只觉得好像被什么东西推倒了，虽然他本来就躺着的。他的脑袋亦受到影响。他的视力恢复过来时，他记得他是谁、身在哪里、面前凝视着自己的是谁，但在感觉上好像有一大片空白，恰似脑髓给人挖了一块一样。</p>
+
+  <p class="normal">“等会儿就好了，”奥布赖恩说，“望着我的眼睛。大洋邦跟哪一国打仗？”</p>
+
+  <p class="normal">温斯顿想了想。他知道大洋邦是什么意思，也知道自己是大洋邦的国民。他还记得有东亚国和欧亚国这两个国家，但谁跟谁打仗就搞不清了。事实上，他根本不知道有过战争。</p>
+
+  <p class="normal">“我不记得了。”</p>
+
+  <p class="normal">“大洋邦现在跟东亚国交战。你记起来了？”</p>
+
+  <p class="normal">“是的。”</p>
+
+  <p class="normal">“大洋邦一直跟东亚国交战。自你出生以来、自党存在以来、自有历史以来，我们一直与东亚国交战，战争从未停过。你记起来了？”</p>
+
+  <p class="normal">“是的。”</p>
+
+  <p class="normal">“十一年前，你创造了有关三个因叛国罪被判死刑囚犯的神话。你以为看到了一份可以证明他们无辜的文件。这份文件从来没存在过，是你杜撰出来的，后来连你自己也相信是真的。你还记得你最初伪造这份文件的情形，是不是？”</p>
+
+  <p class="normal">“是的。”</p>
+
+  <p class="normal">“刚才我举起手给你看手指。你看到五个，记得吗？”</p>
+
+  <p class="normal">“记得。”</p>
+
+  <p class="normal">奥布赖恩举起了左掌，大拇指屈在掌心。</p>
+
+  <p class="normal">“这里有五个手指，看到了没有？”</p>
+
+  <p class="normal">“看到了。”</p>
+
+  <p class="normal">他真的看到了，虽然时间不长，在他脑海中的景象还没改变之前。他看到五个手指，奥布赖恩的左掌一个手指也不短少。可是一下子眼前的景物变了，他只看到四个手指。正常的感情——恐惧、仇恨与迷茫，复现心头。但刚才奥布赖恩问他话时，确有一段时间（半分钟吧，他无法肯定），他对二加二等于五这类逻辑深信不疑。奥布赖恩的每一个提议，把他脑中的空白填满，变成绝对真理。二加二等于五不成问题，等于三也一样不成问题。虽然这种望四成五的能力转瞬即逝，虽然他无法再回到这种境界去，但这经历他记得很清楚，犹如一个人到了晚年忆起童年一些印象深刻的事情一样。</p>
+
+  <p class="normal">“现在你看清楚了，”奥布赖恩说，“二加二等于五是可能的。”</p>
+
+  <p class="normal">“是的。”温斯顿说。</p>
+
+  <p class="normal">奥布赖恩满意地站起来。温斯顿看到他左边的白衣人打破了一个注射剂瓶子，把针管插进去。奥布赖恩转过身，推了推眼镜，面带笑容地对温斯顿说：“你还记得你在日记上说，不论我是你的敌人或朋友都无所谓，因为最少我懂得你，可以谈得来？你说对了，我爱跟你谈话，因为我对你的思想有兴趣。你的思想与我的相近，只是你疯了。你愿意的话，在这一节结束前，你可以提出几个问题。”</p>
+
+  <p class="normal">“任何问题？”</p>
+
+  <p class="normal">“对的。”奥布赖恩看到他的眼睛一直注视着控制盘，乃补充说，“已经关了。你的第一个问题是什么？”</p>
+
+  <p class="normal">“你把朱丽亚怎么处置了？”</p>
+
+  <p class="normal">奥布赖恩的脸上又露出笑容了。“温斯顿，她出卖了你，毫无保留、不经考虑就出卖了你。我没见过这么容易就范的人。你如果有机会再看到她，不会认得她了。她的叛逆性、狡猾性格、愚昧和脏思想，全被我们洗擦得干干净净。她的改变，完美得像是教科书上的例子。”</p>
+
+  <p class="normal">“因为你用刑迫她。”</p>
+
+  <p class="normal">奥布赖恩没有理会他。“下一个问题。”他说。</p>
+
+  <p class="normal">“老大哥存在吗？”</p>
+
+  <p class="normal">“当然存在。党存在，而老大哥就是党的化身。”</p>
+
+  <p class="normal">“他存在的方式，是不是跟我一样？”</p>
+
+  <p class="normal">“你不存在。”奥布赖恩说。</p>
+
+  <p class="normal">温斯顿又一次陷于苦恼中。他固然知道或最少可以想象出来证明他不存在的逻辑，但那不过是语言上或文字上的游戏，荒谬之至。奥布赖恩明明看到他，却说“你不存在”，这种话不就是逻辑谬误吗？但说出来又有什么用？一想到奥布赖恩会用一种无可反驳的疯狂辩证法把他击倒，他已经泄了气。</p>
+
+  <p class="normal">“我想我存在的，”他疲累地说，“最少我体认到我的存在。我坐下来，将要死去。我有手有脚，在宇宙间占据了一个独特的地方。没有别的东西可以同时占据这个地方。老大哥是否在这个意义上存在？”</p>
+
+  <p class="normal">“那无关宏旨，他存在就是。”</p>
+
+  <p class="normal">“老大哥会不会死？”</p>
+
+  <p class="normal">“当然不会。他怎会死？下一个问题。”</p>
+
+  <p class="normal">“那么兄弟会呢？存不存在？”</p>
+
+  <p class="normal">“温斯顿，这个你就永远不会知道了。如果我们把你的事办完后，决定放你走，即使你活到九十岁，你这问题永远不会有答案。你活一天，这就成为你脑中无法解答的谜。”</p>
+
+  <p class="normal">温斯顿无言地躺着，胸口起伏急速了一点。他还没问一开始就想问的问题。这非问不可，但话一到嘴边就胶着。奥布赖恩的脸上显现出一种近乎观看他表演的神色，连他的眼镜也露出嘲弄的光芒。他已经知道我要问的是什么了，温斯顿突然想。这么一想，话就漏了出来：“什么是一〇一室？”</p>
+
+  <p class="normal">奥布赖恩脸上的表情没有变，冷冰冰地说：“温斯顿，你知道一〇一室是什么。每个人都知道一〇一室是什么。”</p>
+
+  <p class="normal">他说完后就对着白衣人摆摆手，看来这一节完了。针头插在温斯顿的臂上，他几乎马上就睡着了。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_23.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_25.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_23.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_25.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

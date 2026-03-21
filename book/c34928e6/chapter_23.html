@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="一 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>一 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">一</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">一</h2>
+
+  <p class="normal">温斯顿不知身在哪个部门。可能在迷仁部吧，但也难说。</p>
+
+  <p class="normal">狱室的天花板很高，没有窗户，四边的墙壁是闪亮的白瓷砖。灯光从哪里来虽然看不到，但映在瓷壁上寒气侵人。室内不时传来阵阵嗡嗡声，想是与调节空气的机器有关。除了进门的地方，墙壁四周是刚够屁股坐下来的板凳，或者说是木架。门的对面是个没有坐板的马桶。每一面墙都设有电幕。</p>
+
+  <p class="normal">他腹中隐隐作痛，自他们把他捆起用小型货车送到这里来后就一直没停止过。除了痛楚外，他也饿坏了。想来整整二十四小时没吃过东西。说不定还不止。三十六小时吧。他现在还搞不清楚（也许永远都不会搞清楚），他们逮捕他时究竟是白天还是晚上。总之自那个时候开始一点东西也没下过肚就是。</p>
+
+  <p class="normal">他双手搭在膝盖上，静静地坐在板凳上。如果你稍微移动一下，他们就在电幕上呵斥你。他只得乖乖地规规矩矩地坐着。饥饿越来越难忍，他多希望吃到一块面包呵！他忽然想到制服的口袋里可能还有些面包屑。腿部不时有些什么东西摩擦着皮肤，想来是一块不小的面包皮呢。最后他受不住诱惑，冒险伸手到口袋去。</p>
+
+  <p class="normal">“史密斯！”果然电幕上有人大叫说，“六〇七九号史密斯！手不准插在口袋里！”</p>
+
+  <p class="normal">他只得把手拉出来，搭在膝上。他们押他到这个地方前，先把他关禁在一处看来是普通牢房或巡逻警察的临时羁留所的地方。他不知道在那里究竟待了多久，但最少也有几个钟头吧。既无时钟，也不见天日，也就没有时间观念了。那地方不但嘈杂，而且气味难闻。他关禁的牢房跟现在的差不多，但肮脏多了，而且十多个人挤一个房子。这些人大部分是普通罪犯，但其中也有几个是政治犯。跟现在一样，他在那牢房中也是动也不动地坐着，背靠着墙。新押进来犯人肮脏的身体在他面前荡来荡去。虽然他心中恐惧，肚子又痛，再难有兴趣注意周围发生的事了，但党员罪犯和普通罪犯的举止分别实在太大了，他不用特别注意也看得出来。党员怕得不敢做声，无产者却是一无所畏。他们有胆量对狱卒破口大骂，自己随身的东西被扣押时吵得几乎要动起粗来，地上随处可以看到他们写下来的泄愤脏话。电幕上的指导员要他们遵守秩序时，反被他们奚落一番。他们还有其他的惊人之举：在衣服里偷运食物进来大饱口福。但并不是所有的犯人都对狱卒无礼。有些人实在跟他们亲热得很，交谈起来时直呼他们的诨名。有些人则跟他们说尽好话，无非希望获赏一两根香烟。狱卒对这些普通犯人可说是百般容忍，虽然职责所在有时难免下手重一点。温斯顿在这牢房内常常听到他们提到劳改营，大概是他们最后会被送到那里去吧。劳改营也没有什么可怕的，他想，只要你懂得门路，了解规矩。走后门、拉关系、偷鸡摸狗、男的断袖分桃、女的出卖色相，总之各式各样的勾当都在劳改营发生。你甚至可以买到用马铃薯酿造的私酒。在那儿掌权的，都是普通罪犯，特别是流氓和杀人凶手这类人物，他们可说是劳改营的贵族阶级。所有吃力的活儿都交给政治犯去做。</p>
+
+  <p class="normal">牢房诸色人等不断进进出出：毒贩、小偷、土匪、奸商、酒鬼和娼妓等。有时闯进来的酒鬼凶悍不堪，得由几个人联手才能制伏。温斯顿看见四个警卫扛着一个年约六十岁的老妇人进来。她两个下垂的乳房大得像葫芦，踢着喊着，一头白发因激烈的挣扎披到前面来。四个警卫扭下了拼命踢着他们的靴子后，就顺势把她丢在温斯顿膝上，几乎把他的股骨摔断。那妇人撑起上半身在他们后面破口大骂“操你们这些野种”。警卫离开后她才发觉自己坐的地方有些不平，连忙挪开屁股，坐到板凳上去。</p>
+
+  <p class="normal">“真抱歉呵，小心肝，”她说，“不是我坐在你身上的，你是看到那些野种把我摔下来的，是不是？他们真会欺负女人，对不对？”说到这里她顿了顿，拍拍胸脯，打了个嗝，接着又说，“抱歉，真失礼。”</p>
+
+  <p class="normal">她弯下腰往地上吐个不停。</p>
+
+  <p class="normal">“呀，舒服多了，”她闭着眼睛靠着墙壁说，“我说呀，别忍在肚子里，想吐就吐出来。”</p>
+
+  <p class="normal">她精神恢复过来后就打量了温斯顿一眼，马上对他产生了好感。她伸出粗大的手臂搂着他的肩膀，把他拉近身前，啤酒和呕吐的气味直喷他脸上。</p>
+
+  <p class="normal">“小心肝，你叫什么名字？”她问道。</p>
+
+  <p class="normal">“史密斯。”</p>
+
+  <p class="normal">“史密斯？怪了，我也姓史密斯。谁晓得，”她用慈祥的声音补充说，“我可能是你的母亲。”</p>
+
+  <p class="normal">可能的，温斯顿想。年纪差不多，身形也差不多，再说，劳改二十年以后的人的样子也会改变的。</p>
+
+  <p class="normal">除了这老妇人外，再没有人跟他说过一句话。令他奇怪的是无产者囚犯对同室的党员竟然不理不睬。无产者对温斯顿这类人不但没兴趣，而且还有点藐视，称他们为“吃党饭的”。党员自己害怕得不敢跟人说话，更怕跟另一个党员说话。只有一个小例外：有一次，两个女党员挤坐在板凳上，温斯顿在人声嘈杂中听到她们交头接耳匆匆低声地说了一两句话，说的是什么他听不清楚，但好像特别提到“一〇一室”。但一〇一室究竟代表什么，他也毫无头绪。</p>
+
+  <p class="normal">他们把他转移到这狱室来，想是两三个钟头以前的事吧。腹中的隐痛一直没停过，时好时坏，他的思绪也随着这肉体感受的变化而一收一敛。痛得厉害时，他忘记了一切，只想到食物；痛苦减轻时，心中就充满了恐惧。有时他预想将要发生的事，情况逼真得令他呼吸停顿。他几乎听到了警棍击打他肘子的声音，或镶了铁片的皮鞋踩踏他小腿的噼啪声。他痛得咬着打碎了的牙齿，跪在地上尖声求饶。他很少想到朱丽亚，因为他的思绪无法集中在她身上。他爱她，不会出卖她，但这仅是一个事实，一如他所知道的算数法则是个事实一样，没有感情的存在。他也很少关心过朱丽亚现在怎么样了。他倒常常怀着一丝希望地想到奥布赖恩。他一定知道自己被捕吧？对的，他早就说过兄弟会从来不搭救落难会员的，但如果可能的话就会送刀片进来。如果他要自尽，他大概有五秒钟的时间，因为狱卒一看到就会冲进来。刀片割血管时，将会给他一种又灼热又冰冷的感觉。拿刀片的手指，说不定也会受伤，刀锋直割到骨节。他原是个不能忍受任何肉体痛苦的人，一想到这里，浑身已觉得正受酷刑煎熬。即使刀片送到手里，他也不知道有没有勇气自杀。虽然明知最后难逃毒打，还是有一分钟就活一分钟吧。</p>
+
+  <p class="normal">为了打发时间，他试着数过墙上的瓷砖，可是每次数不到一半就把数字弄混了。他经常想着的是自己置身何处，或现在是什么时间了。一会儿他认定了外面准是大白天，可是转瞬间他又相信天已黑了。他的直觉告诉他，这地方的灯火是永远不会关闭的。这是个没有黑暗的地方。现在他明白为什么奥布赖恩这么快就听出他话中的暗示来。仁爱部整栋大楼是没有窗户的，他的牢房可能就在这建筑物的中心，但也可能靠着墙边。它可能处于地下十层，也可能在地面第三十层。他的思绪在这大楼内到处漫游，靠身体的感受去推测自己究竟是浮于空中呢，还是深埋于地底。</p>
+
+  <p class="normal">外面是皮靴操步走过的声音，接着钢门咔嚓一声打开了。一个年轻的警官步伐轻快地踏了进来，接着向几个狱卒打了手势，要他们把押来的犯人引进来。这警官一身剪裁适中的黑制服，皮靴擦得亮亮的，映在灯下，使人看来他整个人也沐浴于光辉中。他轮廓刚硬的脸，苍白得有如戴上了蜡制的面具。进来的犯人是诗人阿普福思。门砰地又关上了。</p>
+
+  <p class="normal">诗人怯怯地在房内来回踱了一下方步，然后停下来，好像猜想到这房子另有出口似的。不久他又开始踱步了。他没注意到房内还有别人，因为他的眼睛凝视着离温斯顿头顶约一米的墙壁。他没穿鞋子，又脏又大的脚趾从破袜子的洞口钻了出来。看来几天没刮胡子了，从脸部到颧骨长了密密麻麻的短髭。这种粗豪的流氓形象，与他神经兮兮的举动和瘦弱的大个子身材很不对称。</p>
+
+  <p class="normal">温斯顿勉强振作起来。他得冒着电幕喝止的危险跟阿普福思说一两句话，说不定兄弟会的人就是托他带刀片来的。</p>
+
+  <p class="normal">“阿普福思。”他招呼着说。</p>
+
+  <p class="normal">电幕居然没有干涉。诗人愣了一下，有点吃惊，目光慢慢转移到温斯顿身上。</p>
+
+  <p class="normal">“呵，史密斯！想不到你也来了！”</p>
+
+  <p class="normal">“你犯了什么罪？”</p>
+
+  <p class="normal">“不妨跟你说实话——”他笨拙地在温斯顿前面的板凳上坐下来，“罪名只有一种，对不对？”</p>
+
+  <p class="normal">“你犯了？”</p>
+
+  <p class="normal">“显然我犯了。”</p>
+
+  <p class="normal">他伸手揉了揉太阳穴，好像要回忆一些什么事情似的。</p>
+
+  <p class="normal">“这种事情很难避免，”他淡淡地说，“我想起了一个例子——一个可能当作例子的例子。我们正准备出版吉卜林诗集的确定本，而我在一行原诗的韵脚保留了‘上帝’一词。这实在没办法呵！”他几乎有点气愤不平地补充说，抬头看着史密斯，“这一行不能改的，因为原韵是‘棍棒’。你知道，我们的语言中只有十二个词可以压这个韵。我搜索枯肠多天，仍然没办法。”</p>
+
+  <p class="normal">说完后，诗人脸上的表情也转变了，先前烦躁不安的神色已逝，代之而起的是一种沾沾自喜的光彩。学究发现了一些毫无实际价值的证据时，露出的就是这种洋洋自得的满足神色。温斯顿感觉到阿普福思知识分子的热情，透过密密麻麻的胡子和污垢发射出来。</p>
+
+  <p class="normal">“你知不知道，”诗人又开腔了，“整个英诗的发展都受到英语缺少韵脚的限制？”</p>
+
+  <p class="normal">温斯顿没有直接回答他。他确实不知道，而他对这问题也一直没有注意。此时此地，像韵脚不韵脚这种问题，不但索然无味，而且无关紧要。</p>
+
+  <p class="normal">“你知不知道现在是什么时间？”他问道。</p>
+
+  <p class="normal">阿普福思显得有点吃惊，随后答说：“哎呀，我想也没有想过。他们是两天前，也许是三天前，把我抓来的。”说着他的目光在四面墙壁上浏览了一会儿，好像要找窗户的样子，“白天也好，黑夜也好，有什么分别？我们在这里还能算什么时间？”</p>
+
+  <p class="normal">他们随便聊了几分钟，突然听到电幕喝令他们住口的声音。温斯顿马上静下来，交叉着手坐着。阿普福思块头大，在狭小的板凳上坐得老不舒服，因此老是改变坐姿，双手一时搂着这边膝盖，一时又转到另一边去。电幕里有人喊话，命令他坐得规矩些。时间静悄悄地过去——二十分钟、一小时，但谁算得清楚？皮靴踏步的声音又响起了，温斯顿的心脏几乎停顿。快了，快了，再过五分钟吧，这些皮靴声说不定就是冲着他而来的。</p>
+
+  <p class="normal">门开了，那冷面的年轻警官踏进来，向阿普福思招招手。</p>
+
+  <p class="normal">“一〇一室。”他说。</p>
+
+  <p class="normal">诗人笨拙地跟着几个狱卒茫然地走出去。</p>
+
+  <p class="normal">又过了一段漫长的时间。温斯顿腹中的痛楚又变本加厉了。他的思绪老是绕着这六个方向兜圈子：肚子的疼痛、面包、鲜血和呼喊声、奥布赖恩、朱丽亚、刀片。皮靴声又来了，他的肚皮又抽搐了一下。门开处，随着空气飘来一阵强烈的汗臭。柏森斯荡了进来，身上穿着卡其布短裤和运动衫。</p>
+
+  <p class="normal">这可令温斯顿惊异得张大了嘴巴。</p>
+
+  <p class="normal">“怎么<b class="calibre8">你</b>也来了？”他说。</p>
+
+  <p class="normal">柏森斯看了温斯顿一眼，既不觉得惊奇，也不显得有兴趣。他目光流露的，只是自己受苦受难的神情。一进来后他就没有安静过，还是那副跳跳蹦蹦的样子，但每次他把那圆胖胖的膝盖伸直时，你可以看出他实际在发抖。他眼睛张得大大的，好像无法压制随时随地要审视周围一切的冲动。</p>
+
+  <p class="normal">“你犯了什么罪？”温斯顿问。</p>
+
+  <p class="normal">“思想罪！”柏森斯几乎呜咽着回答说。他声音的腔调意味着两种截然不同的心态：一方面是承认自己的罪行，另一方面似乎连自己也不敢相信自己竟会犯思想罪！他站在温斯顿面前，恳切地向他陈情：“照你看，他们不至于要枪毙我吧？对，他们不会杀只有思想有毛病，但无实际犯罪行为的人。你说对不对？思想嘛，有时自己也控制不了。我相信他们会给我公平的审判，这一点我有信心。他们有我过去行为的记录，对不对？<b class="calibre8">你</b>也知道我是哪类人，头脑可能简单一些，但办事热心呵！我为党服务，竭尽所能，对不对？照你看，劳改五年就成了，是不是？再不然就是十年。像我这种人劳改营也用得着的。生平的差错就是这么一次，他们是不会杀我的，对不对？”</p>
+
+  <p class="normal">“你有罪吗？”温斯顿问。</p>
+
+  <p class="normal">“当然有罪！”柏森斯面对电幕，装出一副卑屈的样子，故意大声呜咽道，“党怎会冤枉好人？”他的青蛙脸较前平静多了，现在用近乎虔诚的声音说，“思想罪可怕，防不胜防。你知道我怎样受害的？在我睡觉的时候！对啦，这是事实。我十年如一日地做着我分内的事，鬼才知道坏主意怎样钻到脑袋来。哎，我睡觉时竟说梦话！你知道他们听到我说了些什么？”</p>
+
+  <p class="normal">他压低了嗓子，表情就像一个病人为了健康的理由，不得不听医生的吩咐破口说脏话一样。</p>
+
+  <p class="normal">“我说了‘打倒老大哥’。对了，一点不错，而且可能不止说了一次！我不妨告诉你，我真感激他们，因为他们及时救了我。你想想看，这心中的魔鬼不及早铲除，还得了？你知道我在法庭时要跟他们讲些什么话？我会说：‘谢谢你们呵，你们及时救了我！’”</p>
+
+  <p class="normal">“谁检举你的？”</p>
+
+  <p class="normal">“我的小娃娃，”柏森斯伤感的声调糅合了骄傲的成分，“她通过钥匙孔听到了我说梦话，第二天就向巡逻警察告发。才七岁的小鬼，挺伶俐的，对不对？我对她不但不怨恨，反而以她为荣，这证明我给她的教育完全正确。”</p>
+
+  <p class="normal">说完后，他又恢复了先前坐立不安的动作，好几次把目光投在马桶上，然后把裤子拉下。</p>
+
+  <p class="normal">“别见怪，实在忍不住。”他说。</p>
+
+  <p class="normal">说时迟那时快，他肥大的屁股已盖在马桶上。温斯顿连忙以手掩面。</p>
+
+  <p class="normal">“史密斯！”电幕叫了，“六〇七九号史密斯！把手放下来！在牢房不准掩着面孔。”</p>
+
+  <p class="normal">温斯顿把手放了下来。柏森斯开始方便，哗啦哗啦地响个不停。碰巧马桶排水的设备坏了，室内臭得昏天黑地，历久不散。</p>
+
+  <p class="normal">柏森斯被移走了，新的犯人又来，不久又被移走。一个女犯人被押到一〇一室受审，温斯顿注意到她一听到“一〇一”的数字时，浑身发抖，脸色也变了。他不知道自己是什么时候押到这儿来的，如果是上午，那么现在该是下午了；如果是下午，那么这时是深夜。现在连他一起一共有男女犯人六名，都静静地坐着。温斯顿对面是个看来没有下巴的男人，因此牙齿特别突出，整个人就像一头柔顺的啮齿动物。他肥厚的双颊满是斑点，呈袋形垂了下来。里面准藏了吃的东西，温斯顿想。他浅灰的眼睛在各人脸上溜了一下，一看到别人对他注意时就连忙别过头去。</p>
+
+  <p class="normal">门开了，又有新犯人进来，温斯顿一看这男子的面貌，心里不禁打了个寒战。这人看来有点阴险，样子却是普普通通的，可能是个工程师或是个技工，但最令人胆寒的是他的脸瘦削得不见肌肉，简直就像一个骷髅头。正因为脸上无肉，嘴巴和眼睛大得怕人。他目露凶光，好像对某人某事怀着无可化解的仇恨似的。</p>
+
+  <p class="normal">那汉子在离温斯顿不远的板凳上坐下。温斯顿不再看他了，但那人瘦削痛苦的脸孔仿佛一直就在他眼前晃荡。突然他明白过来了：那人快要饿死了。除了温斯顿以外，其余的人似乎也同时认识到这一点，因为他看到各人的身子都不安地移动了一下。那没下巴的人的目光不断往骷髅头似的脸孔打量，看了一眼又别过头去，然后好像受到强烈引诱似的又看一眼。他在板凳上一直坐立不安。最后他忍不住站起来了，颤巍巍地走到骷髅头面前，探手到制服的口袋去，腼腆地掏出一片脏乎乎的面包来。</p>
+
+  <p class="normal">马上就听到电幕怒吼的声音。没下巴的人立即跳回原位。骷髅头也慌忙把手伸到背后，以证明自己的清白，并没有拿那片面包。</p>
+
+  <p class="normal">“巴姆斯特德，”电幕的声音喝道，“二七一三号巴姆斯特德，把面包放下来。”</p>
+
+  <p class="normal">没下巴的人就把面包丢在地上。</p>
+
+  <p class="normal">“就站在那里，对着门口，别动。”电幕的声音说。</p>
+
+  <p class="normal">没下巴的人应命站着，他那袋形的脸颊不由自主地颤动着。门开了，年轻的警官闪身进来后，接着就有一个虎背熊腰的狱卒出现，站在没下巴的人面前。警官以手示意后，就见狱卒使尽浑身气力，重重地朝没下巴的人的口鼻擂了一记。这一下打得好狠，没下巴的人身子倒地后，滑过半个房间，停在马桶的前面。他好像昏迷过去了，血自他的口鼻渗出来，嘴巴发着呜呜咽咽的声音。好一会儿他才摇摇摆摆地爬起来，口里冒着鲜血，两块假牙托子也掉在地上了。</p>
+
+  <p class="normal">其余的犯人静悄悄地坐着，手搭在膝盖上。没下巴的人爬回他原来坐着的板凳，一边脸孔已呈淤黑。他的嘴巴已肿胀成猩红的一块，中间是个黑洞，血水不时滴到制服的胸口来。他的眼睛还是溜来溜去，只是现在的犯罪感更显明了，好像要看看别人是否因他所受的侮辱而更瞧不起他。</p>
+
+  <p class="normal">门又开了。年轻的警官向骷髅头略一抬手。</p>
+
+  <p class="normal">“一〇一室。”他说。</p>
+
+  <p class="normal">温斯顿身边的人“呃”地喊了一声，倒跪在地上，双手合抱求饶。</p>
+
+  <p class="normal">“同志！长官！你用不着送我到那房间呵！我不是什么都告诉了你吗？你还要知道什么？我知无不言，言无不尽。你问我好了，我原原本本地告诉你。你准备什么供词，我都签名，但请不要送我到一〇一室。”</p>
+
+  <p class="normal">“一〇一室。”长官说。</p>
+
+  <p class="normal">骷髅头本来脸白如纸，现在竟变成了绿色，使温斯顿难以置信。</p>
+
+  <p class="normal">“你要怎么处置我，就请便吧！”他嚷道，“你们已饿了我几个星期，干脆就让我饿死算了！再不然，一枪把我毙了，或者把我绞死，或者判我二十五年徒刑！你要我检举什么人？你说名字吧，我什么都告诉你。我不管这人是谁，也不在乎你怎样折磨他。我除太太外还有三个儿女，最大的一个还不到六岁。你高兴的话，把他们全部带来，在我面前割断他们的喉咙，我不会哼一声。但请不要送我到一〇一室！”</p>
+
+  <p class="normal">“一〇一室。”警官说。</p>
+
+  <p class="normal">骷髅头发了狂一样环视室内各犯人一周，好像要找替身似的。最后他的目光落在刚才给他面包吃的没下巴的人身上，伸出瘦削的手臂指着他。</p>
+
+  <p class="normal">“这个才是你要的人，不是我！他挨打后背后说的话你们没听到，只要给我一个机会，我会一字不漏地告诉你。<b class="calibre8">他才是</b>反党的人，不是我！”狱卒上前，骷髅头又惨叫道，“他说的话你们没听到，电幕出了故障。我不是你们要的人，<b class="calibre8">是他</b>！”</p>
+
+  <p class="normal">两个彪形大汉低下身子挽他的手臂，可是他突如其来一个箭步走到板凳前面，躺在地上，紧握着一条板凳的铁脚不放。他像野兽一样喘气吼着。狱卒上前要把他扭开，可是他紧握着铁柱的手力气奇大。三个人纠缠了约摸二十秒钟。其余犯人手搭膝盖静静坐着，直视前方。吼声停了，那人除了紧握铁柱外，连叫的气力也没有了。不久突闻凄厉的呼声，原来其中一个狱卒用皮靴一脚踢断了他一只手的手指，接着就把他拖起来。</p>
+
+  <p class="normal">“一〇一室。”警官说。</p>
+
+  <p class="normal">骷髅头踉跄地跟着出去了，低着头看着踢伤了的手，再无任何抗拒的气力了。</p>
+
+  <p class="normal">又过了一段很长的时间。如果骷髅头离开时是午夜，现在该天亮了；如果是早上，现在是下午。室内只剩下温斯顿一人，已经好几个钟头了。在窄板凳上坐了这么久，痛苦不堪，他只得站起来走动。幸好电幕没有喝止。那片没下巴的人丢下来的面包仍在地上，开始时他忍不住频频往地上看，后来觉得口渴更要难受。嘴巴胶着，气味难闻。空气调节机的嗡嗡声和室内一直未转换过的光源，使他有点晕眩，脑袋空空的。骨痛难忍时他站起来，但马上又坐下，因为晕眩得实在无法站定身子。肉体的痛苦稍微减轻时，恐惧马上又占据他心中。他寄予奥布赖恩的一丝希望还没有死去，尤其是他说过的那块刀片。如果他还有东西吃的话，刀片可能就藏在食物内。有时他也会模模糊糊地想起朱丽亚来。她一定在什么地方受折磨吧，而且可能比他还要痛苦，这一分钟说不定就是她大声嘶喊的时候。如果我增加我的痛苦可以救朱丽亚一命的话，我愿不愿意做？会的，我愿意——他想。但这仅是一个理智上的决定，他愿意为她多受苦难，因为他知道应该这么做。可是他心中并没有这种感觉。在这里除了痛苦和预知痛苦快来，你什么感觉也没有。还有一个问题：正当你受苦时，你可不可能为了某种原因希望增加自己的痛苦呢？这问题目前还没有答案。</p>
+
+  <p class="normal">皮靴的声音又起了，门开处，奥布赖恩走进来。</p>
+
+  <p class="normal">温斯顿吃惊地站起来。奥布赖恩出现得太突然了，使自己完全失去警戒之心。这是多年来他第一次完全忘记电幕的存在。</p>
+
+  <p class="normal">“他们把你也弄到手了！”温斯顿惊呼。</p>
+
+  <p class="normal">“他们老早就把我弄到手了。”奥布赖恩用一种近乎歉意的嘲弄口吻说。他说完后站在一旁。后面是个裸着上身的警卫，手执一根长长的黑棍子。</p>
+
+  <p class="normal">“温斯顿，别骗自己，你老早就知道有今天的结果的。”奥布赖恩说。</p>
+
+  <p class="normal">对的，他现在明白过来，他老早就知道有今天的，只是现在没时间想了，注意力全集中在那根黑棍子上。这东西随时会击到天灵盖、耳边、肩膀、手肘——</p>
+
+  <p class="normal">手肘！他颓然倒下，跪在地上，用另一只手握着受伤的肘子，几乎全身瘫软，眼前的东西都冒着黄光。真是不可想象呵，一棍下来竟教人这么痛苦。黄光渐散，他看到奥布赖恩和那警卫俯视着他。警卫看到他因痛若而扭弯的身体狞笑起来。这一闷棍最少解答了一个问题：不管为了什么理由，你绝不能希望增加自己的痛苦。受折磨时你只期望一件事情：停止痛苦。世界上没有比肉体痛苦更难受的事情了。“在痛苦面前是没有英雄的。”他抱着受伤了的左手在地上痛苦地打滚，心中还想着这句话。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_22.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_24.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_22.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_24.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

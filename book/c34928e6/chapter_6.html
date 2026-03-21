@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="四 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>四 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">四</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">四</h2>
+
+  <p class="normal">温斯顿不自觉地深深叹了一口气，把面前的录音书写器拉近自己一点，把话筒上的尘埃吹去，然后戴上眼镜准备工作。他每天开始工作时都这样，即使明知可能有电幕在监视着他，他也忍不住要叹那口气。在他桌子右边的“气筒”里，已有四小卷资料“喷”了出来等待他处理。他翻开来，夹在一起。</p>
+
+  <div class="duokan-image-single"><img alt="" class="calibre6" src="resources/OEBPS/Images/00005.jpeg" /></div>
+
+  <p class="normal">他办公的小房间一共有三个气筒喷口。录音书写器右边是个小口，专门为传送备忘录之类文件用的。左边的孔穴较大，是送报纸的。最大的一个设在边墙，长方形，四边围着铁丝格栅，专为处理废纸用的，这也是温斯顿伸手就够得到的地方。类似的洞穴在真理部大厦数以千计，不但办公室有，走廊上每隔几英尺的距离也有同样的设备。不知是谁想出来的主意，把这些长方形的孔道雅称为思旧穴。谁知道哪一份文件行将作废，或者谁看到一张废纸随处飘荡，都会习惯性地把身边的思旧穴盖子揭开，随手一丢。这份文件或废纸就会沿着穴道传来的一股暖流，奔腾到设在真理部大厦某些隐蔽角落的大熔炉去。</p>
+
+  <p class="normal">温斯顿把刚才解下来的四张字条打开来看。每一张字条只有三言两语，而且用的是一种糅合了新语和真理部内部通用术语的缩写，非专家实难明究竟。这四项分别是：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">泰晤士报一九八四·三·十七老大演讲误报非洲订正</p>
+
+  <p class="kt1">泰晤士报一九八三·十二·十九预测三年计划八三年度末季错误数据现报校正</p>
+
+  <p class="kt1">泰晤士报一九八四·二·十四迷裕部误报巧克力订正</p>
+
+  <p class="kt1">泰晤士报一九八三·十二·三老大授勋双倍加非好涉及非人全改呈上层待存</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">看到第四项时，温斯顿微微产生了一种工作上的成就感。他先把这一项搁在一边，因为有关问题比较复杂，需要慎重处理。其余三项只是例行公事，虽然第二项比较烦琐，得翻阅许多旧资料和数字。</p>
+
+  <p class="normal">温斯顿在电幕的“资料”栏中拨了一个号码，要找《泰晤士报》某月某日的旧件。不消两三分钟，他要的资料就从气筒钻出来了。他刚收到的四项指示，就是因为《泰晤士报》上登的文章或报道，其中有的地方为了某些理由需要改写——或用官方口吻说，“订正”。譬如说第一项的实际情形是这样的。三月十七日《泰晤士报》报道老大哥在十六日发表的训令中曾预言南印度阵线会继续宁静，但欧亚国将会短期内在北非发动攻势。后来局势发展正好相反：欧亚统帅在南印发动攻势，对北非却丝毫未动。这就是需要改写的理由了。老大哥预言的事都得一一实现。第二项。十二月十九日《泰晤士报》刊载了官方预测一九八三年度末季各种消费品的生产数字。这一季刚巧又是第九个三年计划的第六季。今天的报纸公布了实际的数字，与预测的数字大有出入。温斯顿的差事就是根据新数字去订正预测的数字。第三项最不花工夫。原来在二月间迷裕部对大家许下诺言（官方用语是“绝对保证”），说在一九八四年内不会减少巧克力的配给额。可是温斯顿心里明白，这个星期结束后，配额将由三十克减至二十克。他要改的地方不多，把“保证”订正为“提醒”就是——说如果情势需要，政府可能于四月间减少巧克力的配额。</p>
+
+  <p class="normal">温斯顿把三项指示办理后，就把录音书写器打出来的订正稿夹在原版《泰晤士报》上，然后投入气筒。接着他以近乎毫不自觉的动作，把三张字条连同他拟的草稿一并投入思旧穴去，顷刻化为灰烬。</p>
+
+  <p class="normal">那么，那些订正稿投进气筒后命运又如何呢？详情他不太清楚，但大概情形总知道一些。据他所知，哪一天的《泰晤士报》需要订正的稿件收齐了以后，就会把哪一天的报纸重印一次。不用说，原来的“正本”就得毁掉，档案存的就是修订本。这种不断修“史”的程序，不但报纸如此——书、期刊、手册、标语、传单、影片、录音带、漫画和照片也不例外。总之，任何一种带有政治性或含有意识形态色彩的文件都属订正范围之内。如此一来，过去发生的一分一秒的事情都跟得上时代。这也不过是说，党所作的各种预测，不但准确得料事如神，而且还有证据可循。为了这个缘故，任何与目前需要发生冲突的意见与新闻，都不容许存在。历史不是一面镜子，而是黑板上的记号，可以随时擦去，随时填补。更为可怕的是，一旦涂改了，你找不到证据去证明这是篡改历史的行为。记录科内员工最多的一个部门（比温斯顿的部门庞大多了），主要的任务就是把所有过时的书籍、报纸和诸如此类的文件找出来送到思旧穴。档案中还有不少《泰晤士报》的原件，要么是因为政治上的结盟中途起了变化，要么是老大哥的预言没有兑现，一直就搁在那儿，等候指示。老大哥刊在《泰晤士报》上的各种说法，也许需要订正多次，但目前尚未收到跟与已公布的说法互相矛盾的记录。已出版了的书籍，亦常收回来，但尽管修订本一出再出，你绝不会找到任何说明指出修订本与原本的异同在哪里。就拿温斯顿所收到的指示来做例子好了。那些他一处理后就毁掉的字条，从来不会留下一点痕迹，使人怀疑是伪造文件。字条上的指示，只不过是要你做编辑和校对的工作而已。坚决指出鲁鱼亥豕，誓死不让张冠李戴，这都是为了维护新闻正确报道的大原则呵！</p>
+
+  <p class="normal">严格地说，这不能称作伪造文书，他一边把迷裕部的数字调整一边想道。因为实际的情形是把乌有的数字化为子虚的产额而已。你要处理的数据，大部分跟现实的世界无任何关系。你做的工作，并非替一些瞪着眼说出来的谎话补过。他们原先发表的统计数字就是天方夜谭，这还有什么“正”需要“订”的？从头到尾都是玄虚的数字游戏而已。大部分的时间，这种玄虚的加减工作得由你自己负责。譬如说，迷裕部估计本季生产鞋子一亿四千五百万双，实际造出来的据说有六千两百万双，温斯顿在订正原来预测的数字时，改为五千七百万双，让大家看来又有超额完成的感觉。其实，你说六千两百万也好，五千七百万也好，其与现实数字的距离跟一亿四千五百万也差不多，因为可能一双鞋子都没有造出来。更可能的是究竟生产了多少，或实际有没有生产，大家根本不知道，也不感兴趣。大家知道的只有一点：每一季总有天文数字的鞋子在报纸上生产出来，而大洋邦约摸有半数居民光着脚。其余各种事实的记录，不论大小多寡，均可类推。反正结果总是一样，大事小事沉落于迷离世界，最后连年份日期也搞不清了。</p>
+
+  <p class="normal">温斯顿朝走廊对面的小室看了一眼。一个下巴黑黑、身材瘦小但样子看来一丝不苟的男子正在埋头工作。他叫蒂洛森，膝上放着一份折叠的报纸，嘴巴贴近录音书写器的话筒。他的神情好像要让人知道，他现在说的话，内容除他自己外只有电幕晓得。这时他抬起头来，透过眼镜带着敌意瞪了温斯顿一眼。</p>
+
+  <p class="normal">温斯顿跟他毫无交情，也不知道他负责的是哪一类工作。在记录科上班的人，很不愿谈到自己的工作。长长的走廊开列着两排不设窗户的小室，除了沙沙发响的纸声，就是对着录音书写器话筒的呢喃声。在这些小室工作的同事，温斯顿连名字也叫不出来的，少说也有十来个，虽然每天都看到他们在走廊上匆忙得像煞有介事，或者在“两分钟仇恨”节目中看到他们举手作态。在他隔壁那位沙色头发的瘦小女人干的是什么工作，他倒知道。她每天忙来忙去，就是要从报纸或其他刊物上找出已被蒸发掉的人的名字，把他们删掉，因为他们从来没有在这世界上生存过。她自己的丈夫两年前被蒸发掉，现在由她来做这种除名工作，也可以说得上是人选适中。离他几个小室的地方，有个叫阿普福思的家伙，温温憨憨，糊里糊涂，一派不食人间烟火的模样。他耳毛特别长。由于他精于英诗的韵律和格式，他在真理部的工作就是把若干诗作创新，也就是他们所谓提供最后修订本。这些诗的意识形态本来很有问题，却不知为了哪种原因而决定在诗选内保留下来。温斯顿工作的这个楼厅，全部约摸有员工五十人，仅是记录科的一个分组而已。换句话说，仅是记录科这个庞大而复杂组织中一个小小的单位。离此楼厅以外，以上和以下不知还有多少职员干着千万种难以想象的事。规模宏伟的印刷厂中，有的是编辑人才和技术专家，随时可以在设备齐全的摄影室伪造照片。电艺组更是人才济济，制作人和工程师外，还有一群特经挑选的演员，最精于模仿别人的声音。此外还有难以胜数的资料人员，负责登记行将没收的书报杂志的名字。这金字塔式的大厦还腾出了不少地方做贮藏室，存放订正了的文件，而另外一些不易为人看见的角落，可能就是思旧穴所在，焚毁原件。最后是丝毫不露眉目的某些要地，首脑级人物坐镇之所。整个记录科的操作由他们牵引，政策路线由他们执行。不消说，哪一部分历史该保留，哪一部分该订正，哪一部分该付之一炬，都是由他们决定的。</p>
+
+  <p class="normal">我们不该忘记的是，记录科不过是真理部许多单位中的一个。真理部的主要任务，不是重组历史，而是给大洋邦国民供应报纸、电影、教科书、电幕节目、戏剧和小说等。总之，此部门提供所有有关新闻、教育或娱乐的数据和需要。从给某某立雕像到决定一句口号的内容，从抒情诗到生物学专题论文，从幼童启蒙书籍到新语辞典的编订，都是真理部管辖的范围。真理部要管的事情还不止这些。它一方面照顾党的各种需要，另一方面做便民功夫：把给党看的一套水平降低，让普通大众易于接受。部里因此设有不少单位，分别负责大众文学、音乐、戏剧和一般娱乐性的需要的供应问题。你看到的那种除了体育新闻、犯罪案件和医卜星相外几无任何消息的小报，就是这些单位的杰作。此外还制作五分钱一本的奇情刺激小说和桃色电影。最可圈可点的想是他们炮制出来的靡靡之音，歌词乐谱全由一种叫万花筒的谱乐器机械化生产出来。这儿还有一个新语叫“黄社”的分组，专门制作超低级色情电影，用密封包裹寄出。除了直接负责制片的工作人员，其余党员一律不得观赏。</p>
+
+  <p class="normal">温斯顿埋头处理文件时，又有三张字条由气筒钻出，但性质简单，他在“两分钟仇恨”节目开始前就办好了。“仇恨”完毕后他回到小室，从架子上取下新语辞典，把录音书写器推在一旁，擦擦眼镜，然后静下心来开始今天早上最重大的任务。</p>
+
+  <p class="normal">他一生最大的乐趣也就是工作了。虽然大部分的差事都属烦琐的例行公事，但其中也有非常伤脑筋的复杂文件，令你一开始思考就不自觉地像坠入一个数学问题那样废寝忘食。伪造或篡改性质微妙的文件就属于这种例子。磨人的地方就是上方毫无指示。你唯一可以依靠的法宝就是你对英社的理论和党规的认识，以及你对党在此情形下会要你怎么说的判断。温斯顿老于此道。有时他甚至受重托，订正《泰晤士报》全用新语写成的特稿。他把早些时间搁在一边的字条翻开来看。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">泰晤士报一九八三·十二·三老大授勋双倍加非好涉及非人全改呈上层待存</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">上面这个指示，可用旧语（即标准英语）这样翻译出来：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">《泰晤士报》一九八三年十二月三日有关老大哥授勋章的报道极为不妥，提及的人有些根本不存在。此文应全部改写，在归档前将草稿送上层请示。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">温斯顿把这篇问题文章细心看了一遍。原来老大哥授勋那天的训令，主要是颂扬一个叫浮堡后勤会的组织所做的工作：供应香烟和其他物品给浮游堡垒的海军将士享用。老大哥特别点名提到的，是一位显要的内党党员，叫威瑟斯。那天拿到特殊成就二等勋章的就是这位同志。三个月以后，浮堡后勤会不知何故解散了。你也许会猜想威瑟斯及其同僚失宠了，可是报纸和电幕只字没提过。其实这也是正常的事，政治犯很少被公审或在公开批斗的场合露面。牵连千万人的大清算则是例外，但这是两年不超过一次的示范场面。在这种大公审出现的人，不是叛国者就是思想犯，你会在那个时候听到他们可怜兮兮地招认所犯的各种罪。过后，他们就蒸发掉了。在普通情形下，谁犯了党的清规戒律，从此在世界上失踪了就是。他们的命运究竟如何，你想找一些线索也找不到。有时失踪并不就等于死亡，虽然我们不知道实际情形。温斯顿认识的人中，不包括他父母在内，失踪了的就大概有三十个。</p>
+
+  <p class="normal">温斯顿用文具纸夹子轻轻地揉着鼻子。对面小室的蒂洛森还是老样子，嘴巴贴着录音书写器的话筒。偶尔抬头跟温斯顿对视，目光一样充满了敌意。温斯顿猜想蒂洛森现在埋头苦干的工作，说不定跟他的一样。这是极有可能的事，因为这么棘手的一份文件，绝不会交给一个人。但如果成立一个委员会专门办理此事，那无疑是不打自招，公开承认党在改史了。很可能现在有十一二个人各出计谋，给老大哥那篇演说词作定案，给他决定他实际说了什么话。这十一二个版本呈上后，内党中自有首脑人物从中挑选一份，然后再予修订。修订后，其他先前出现于各说法中的矛盾，就依此版本作必要的统一。此一经过加工的谎话就入了永久档案，成为事实了。</p>
+
+  <p class="normal">温斯顿不知道威瑟斯的问题出在什么地方。可能是贪污或无能。可能是老大哥要除去一个功高震主的部属。可能是威瑟斯的亲信中有异端思想分子，已被发现。但最可能的是，清算与蒸发乃大洋邦政府维护其政权不可或缺的一种手段。威瑟斯出了问题，说来也就这么简单了。那字条的指示中最关键的字眼就是“涉及非人”，这也就是说威瑟斯已经死了。如果一个人只是逮捕了，不会用“非人”的字眼。这些人会释放出来，自由自在地活一两年后再被蒸发。有时一些你认为已经死去的人，会像鬼影一样突然在公审场合出现，指控上千上万的人——然后就永远消失了。这时候他们才算“非人”。威瑟斯不同。他是“非人”，不存在，而且从来也没有存在过。温斯顿因此明白单是改变老大哥的口风是不成的，最好还是让他讲一些与威瑟斯和浮游堡垒工作风马牛不相及的事。</p>
+
+  <p class="normal">他可以让老大哥循例谴责叛徒与思想犯一番，但那样改史的痕迹太明显了。如果伪造前线一次辉煌战果或第九个三年计划超额增产的事，则要牵扯到一大串订正的手续。突然他脑中灵光一闪，一个好像事先已绘制好的形象浮现出来——在最近的战役中光荣牺牲的奥兹维同志。老大哥有时会在训令的场合中举一些身世寒微、地位不高的党员来做例子，勉励别人以他们的一生或死来做榜样。今天就让老大哥纪念奥兹维同志吧。不错，大洋邦本无奥兹维其人，但只消由技工组合出一张照片，加上两三行说明，不就可以把他带到世上来吗？</p>
+
+  <p class="normal">温斯顿沉思一会儿后就把录音书写器拉到面前来，开始用老大哥惯用的文体口述一番。这文体既富军人本色，也带学究气味。而且由于他说话有自问自答的习惯，他的演说词不难模仿。举个例子，他会这么自说自道：“同志们，我们由此得到什么教训？那教训——也同时是英社基本信条之一——就是……”</p>
+
+  <p class="normal">奥兹维同志三岁时，除了一面鼓、一支冲锋枪和一架模型直升机外，对其余玩具一律不感兴趣。六岁时，由于特别放松了标准的关系，他提早了一年加入探子团。九岁时选为队长。十一岁时他向思想警察告发叔父，因为他窃听到叔父的谈话，觉得他有犯罪倾向。十七岁时他是青年反性联盟的地区组织人。十九岁时他设计了一种手榴弹，旋为和平部采用，并于第一次试用时一举杀了三十一个欧亚国敌人。二十三岁时殉国。他在印度洋上空执行任务时，为敌机穷追猛打，迫得把机枪绑在身上以增加下沉重量，连同携带的重要文件一同跳出直升机葬身海底。这种光荣牺牲的方式，教人想来羡慕，老大哥说。最后老大哥还补充说了几句有关奥兹维同志思想纯洁与一心一意忠党爱国的精神。他一生烟酒不沾，除每天一小时在体育馆健身外，并无其他消遣。此外他还立誓独身一辈子，因为他深信婚姻生活和家庭负担与一天二十四小时献身工作岗位的志气难免有冲突。他谈话主题不离英社信条，而人生除了消灭欧亚国敌人，清除在大洋邦活动的间谍、倾覆分子与思想犯外，别无其他目标。</p>
+
+  <p class="normal">温斯顿口述到这里，盘算了一下究竟要不要授予奥兹维同志特殊成就勋章。最后想到这一来必增加许多文件上必须统一的矛盾，乃决定免了。</p>
+
+  <p class="normal">他又一次举头看了对面小室的对手一眼。他有一种感觉，蒂洛森正在忙的，也是同样的文件。虽然最后哪个人的版本会被上层接受无法逆料，但他深信自己的创作一定会被采用。一小时以前，奥兹维同志还未诞生，现在已成事实。这真是怪诞的事，他想，“无中生有”可以随心所欲，活人活事却不能造次。实际不存在的奥兹维同志，现在已名留青史。一旦“造史”这经过被后人忘记，奥兹维同志在历史上的地位，就会跟查理曼大帝或恺撒大帝的一样信实可靠了。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_5.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_7.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_5.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_7.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

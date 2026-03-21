@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="Letters - TheEconomist.2026.02.14 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>Letters - TheEconomist.2026.02.14</title>
+    <link class="eb" href="resources/EPUB/static_styles/default_styles.css" rel="stylesheet" type="text/css"/>
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#9b397f57" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/9b397f57/index.html" alt="bookHome" class="a-book-home">TheEconomist.2026.02.14</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">Letters</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            <p><span class="te_section_title">Letters</span><span class="te_fly_span"> | A selection of correspondence</span></p><p/><h1 class="te_article_title">Is education technology mostly useless?</h1><h3 class="te_article_rubric">Also this week, refreezing the Arctic, overseas colonial empires, child prodigies, relationships, song titles</h3><h3 class="te_article_datePublished">February 12th 2026</h3><br/><div class="head_image_div"><img src="resources/EPUB/static_images/fa45a222d6ab14ea3fef887814e00d6d.jpg" alt="" class="te_head_image"/></div><p>Letters are welcome via email to letters@economist.com<a href="https://www.economist.com/letters/2025/03/26/a-note-for-readers">Find out more</a> about how we process your letter</p><p><a href="https://www.economist.com/united-states/2026/01/22/ed-tech-is-profitable-it-is-also-mostly-useless">Education technology is profitable but mostly useless</a>, you argue (“Failing the screen test”, January 24th). It is right to question the return on investment, but blaming the technology for poor outcomes is like blaming running shoes that are still in the box after a New Year’s resolution.</p><p>Our data show that the problem isn’t the tools. It’s the implementation. School districts that buy literacy platforms without committing to its systematic usage see no gains. But districts that ensure just one hour a week of consistent use (40 hours out of 800 total instructional hours) typically see significant reading gains. The difference isn’t the platform. It is whether schools maintain disciplined implementation with teacher training and accountability.</p><p>You note that some schools are returning to pencil and paper. Fair enough. But whether digital or analogue, learning requires consistent practice. Ed-tech vendors, as a class, oversell, but districts buying tools without the discipline or capacity to use them shouldn’t be surprised when outcomes don’t improve.</p><p>Sean RyanPresidentK-12 DivisionMcGraw HillColumbus, Ohio</p><p>I found your analysis to be empirically sound, but it would be sharpened by two refinements. First, ed tech is treated primarily as instructional software, but much of the industry’s scale and profitability comes from platforms and hardware (such as Chromebooks, iPads, and operating systems) that erode attention and degrade classroom behaviour even when no instructional software is running.</p><p>Second, educational apps may disappoint when they digitise tasks that are better done off-screen, especially for young children. By contrast, there are domains where computers are not optional but necessary, such as coding and data science. Separating infrastructure from instructional software, and distinguishing among different kinds of instructional goals, would clarify the economics of ed tech and the learning-science evidence.</p><p>Ji SonProfessor of psychologyCalifornia State University Los Angeles</p><p>The problem is not technology itself, but how ed tech is financed, and therefore what kinds of evidence it is able to produce. High-quality impact research is expensive. Rigorous evaluations require access to classrooms, ethical oversight, independent researchers and long-time horizons, often costing six figures. These costs introduce uncertainty that private investors, understandably, avoid.</p><p>As a result, ed-tech markets reward what is easiest to measure and monetise: user growth, licences and subscriptions. When firms must choose between funding the next feature that attracts customers and funding an independent evaluation where the results may be slow, uncertain or inconvenient, evidence of learning predictably loses out.</p><p>Markets deliver what they are paid to deliver. Ed tech should be treated like public infrastructure, not a consumer app. Governments underwrite roads and medical research. They should similarly fund independent research and outcomes-based contracting that ties payment to learning impact. Britain’s £23m ($31m) investment to expand the government’s research and development in ed tech is a way forward. Until evidence is financed as a public good, markets will continue to optimise for the wrong signals and learners will bear the cost.</p><p>Professor Natalia KucirkovaProfessor of early childhood and developmentOpen UniversityMilton Keynes</p><p>Recent research from the Nord Anglia Education Metacognition Project, conducted in partnership with Boston College and spanning 27 schools worldwide, offers a more nuanced perspective. Over two years and with more than 12,000 students and 5,000 teachers participating, our study found that technology’s educational impact depends less on its novelty and more on its ability to support proven learning strategies; specifically, metacognitive approaches that foster self-awareness, reflection and skill transfer.</p><p>Our results show that when digital tools are used to support meaningful reflection and embed “thinking routines” in everyday learning, students demonstrate significant gains in curiosity, creativity, collaboration and critical thinking. Students who used these approaches in lessons, and then reflected on their experiences, reported up to 21% growth in critical thinking and 20% in curiosity. Teachers observed marked improvements not only in academic outcomes but also in motivation, independence and communication.</p><p>Crucially, our study found that the quality of reflection matters far more than quantity. Technology that simply automates drill-and-practise or digitises worksheets, like the example highlighted in your article, rarely moves the needle. In contrast, platforms that enable students to capture and reflect on specific learning moments drive measurable progress in skills and mindsets.</p><p>We agree that technology cannot replace human connection, but when integrated as part of a broader pedagogical strategy, where teachers have time and training to embed metacognitive routines, technology becomes a powerful lever for change, not a distraction.</p><p>Dr Kate ErrickerGroup headEducation research and global partnershipsNord Anglia EducationLondon</p><p>Regarding your article on “<a href="https://www.economist.com/science-and-technology/2026/01/29/should-the-arctic-be-refrozen">Refreezing the Arctic</a>” (January 31st), the idea has never been to start with a large-scale freezing exercise but rather a reduction in the melting rate brought about by a gradual increase of aerosol levels in summer while controlling for side-effects. This is a true low-cost programme that avoids horrendous expense and disasters in the future as ice lost is gone for ever.</p><p>This is not a question of air-pollution treaties from times long past or minuscule reductions in the ozone layer or a moving intertropical convergence zone, which will shift anyway in a warming climate. It is a question of stopping the Arctic from warming three-times faster than the rest of the planet as is the case today, which would prevent  irreversible melting processes that set the world onto a track of ever-faster sea-level rises. The case for cooling is clear. The case for refreezing will be decided once we have more insight into the science behind cooling, which needs real-world tests and not just models that could be outdated within a few years.</p><p>Eduard SpielbauerBad Reichenhall, Germany</p><p>Charlemagne (January 31st) did an excellent job highlighting how <a href="https://www.economist.com/europe/2026/01/29/how-its-long-lost-empires-still-shape-europe">the overseas colonial empires that European countries lost after the second world war have left a lasting impact on Europe</a>. Readers may be intrigued to learn that much more ancient, truly “long lost” empires also still shape Europe in detectable ways.</p><p>Recent research has found that the parts of western Germany incorporated into the Roman Empire have higher patent rates and more startups per person than those areas of western Germany that were never conquered by Rome. Their current inhabitants also exhibit better health and psychological well-being. These contemporary inequalities may be the result of ancient investments in institutions and infrastructure, in particular roads, markets and mines.</p><p>Similar modern-day economic disparities have been found between German cities that gained free or imperial status under the Holy Roman Empire, and those which did not. The lasting economic advantage of these free and empirical cities may be due to the increased local reinvestment brought about by self-governance.</p><p>Liam McClainResearch affiliateBoston UniversityAsunción, Paraguay</p><p>Despite Donald Trump’s suggestion it was Norse explorers from Norway that settled in Greenland, not Danish ones. Norse colonists on the island were entirely descended from Norwegians and Icelanders, like Erik the Red.</p><p>Denmark’s connection to Greenland began when the Norwegian and Danish crowns unified in 1380. Nevertheless, this was merely a personal union, and Greenland was considered part of the kingdom of Norway throughout.</p><p>The first time Greenland ever became a formal Danish territory was in 1814 at the Treaty of Kiel. The Norwegian crown was given to Sweden, but the British were unwilling to grant control of major North Atlantic islands to a strengthened Sweden.</p><p>As with most European territories, the history of Greenland’s ownership is complex and convoluted.</p><p>Will LawsonOxford</p><p>You wrote about why <a href="https://www.economist.com/science-and-technology/2026/01/14/why-child-prodigies-rarely-become-elite-performers">child prodigies rarely become elite performers</a> and observed that many adults who reach the very top were not the most outstanding performers in their youth (“Fanfare for the uncommon man”, January 17th). That observation may hold within elite groups. But the causal interpretation suggested by the article risks a statistical problem of collider bias.</p><p>Adult elite status depends on both early performance and later development, along with many other factors such as opportunity, health and support. In short, selecting only those who make it can distort what appears to predict why they made it. This does not invalidate the broader message about the value of exploration and flexibility. But it does suggest that evidence drawn solely from elite samples cannot support strong claims about the drawbacks of early excellence or specialisation.</p><p>Christian ZellerMunich</p><p>From my experience as the principal of an independent prep school I believe that highly able children at school often do not learn to fail and how to deal with this type of challenge. Life is too easy for them. To thrive and succeed in adulthood and the wider world everyone has to learn that you can’t win every battle. Less-able children will have learned this lesson over time at school, and are better mentally prepared to go on and succeed after such a failure. This can apply to any situation whether sport, music or career.</p><p>Christopher LinfordLeatherhead, Surrey</p><img src="resources/EPUB/static_images/a84e60025db24a3e1ba17c56a2b48fd8.jpg" alt="None" class="te_img"/><p>“Untying the knot” (January 17th) reviewed “Strangers” by Belle Burden on marriage infidelity. “<a href="https://www.economist.com/culture/2026/01/13/how-well-do-you-know-the-person-lying-next-to-you-in-bed">Even the most intimate and long marriages can yield nasty surprises</a>”, you concluded “How well do you really know the person who lies next to you in bed every night?”, you asked. This line of reasoning assumes that any person can ever truly know the full depths of another. And that such complete knowledge is even desirable in the first place. Esther Perel, a psychotherapist, views excessive closeness as a romantic death knell.</p><p>The ideal of total transparency in romantic relationships is largely a Western concept. In some cultures a degree of secrecy is seen as more respectful and helps preserve collective family harmony, a concept Ms Perel calls the secret garden. In the end, is extensive knowledge of any situation truly a safeguard against misfortune?</p><p>BEATRICE LANGFORD-BRIDGEFounex, Switzerland</p><p>As you point out in “The hole story” (January 17th), <a href="https://www.economist.com/culture/2026/01/14/how-bagels-conquered-the-world">bagels come in many delicious varieties</a> (plain, poppy, sesame, everything) and a good bagel emporium will offer a choice of toppings (cream cheese, lox, onions, and so on). I was at such an emporium in New York not long ago when a customer ordered “a plain with everything and an everything with nothing.”</p><p>ERIC EVANSBrookline, Massachusetts</p><p>Your department tasked with creating tabloid-style, eye-catching headlines that reference pop music knows no bounds. I spotted several song titles or plays on song titles in <a href="https://www.economist.com/weeklyedition/2026-01-10">the January 10th issue</a>. These included “All Along the Watchtower” by Jimi Hendrix (an article on Ukraine’s fortification system), “Breakin’ Up is Hard to Do” by Neil Sedaka (Germany’s industrial conglomerates), “Blood on the Tracks” by Bob Dylan (a train project) and “Video Killed the Radio Star” by the Buggles (the vodcasting trend). Maybe start a competition?</p><p>Mike NicholsonFour Marks, Hampshire</p><p class="link_navbar">This article was downloaded by <a href="https://z-lib.io" class="producer_link">zlibrary</a> from <a href="https://www.economist.com//letters/2026/02/12/is-education-technology-mostly-useless" class="origin_link">https://www.economist.com//letters/2026/02/12/is-education-technology-mostly-useless</a> </p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/9b397f57/chapter_13.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#9b397f57" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/9b397f57/chapter_15.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#9b397f57" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/9b397f57/chapter_13.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#9b397f57" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/9b397f57/chapter_15.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

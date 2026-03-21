@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="一 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>一 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">一</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">一</h2>
+
+  <p class="normal">一天早上，上班的时间大概过了一半，温斯顿离开办公室到厕所去。</p>
+
+  <p class="normal">灯光明亮的长走廊里只有他一人。突然走廊的另一端有人出来，朝他这边走。黑发女郎！自那天晚上在旧货店门口遇见她后，已有四天没碰面了。她走近他身前时他才注意到她的右手悬着一条纱带，颜色与制服一样，因此刚才看不出来。准是她操作制造小说情节的万花筒机器时受伤了。在子虚科内，这种事常会发生。</p>
+
+  <p class="normal">离温斯顿差不多四米时，黑发女郎迎头摔了一跤，痛得尖声大叫。她一定撞到右手的伤口了。温斯顿停了步，她也半跪着站起来，脸色惨白，两片嘴唇看来更红润了。她乞援地一直望着温斯顿，但看来惶恐的神色比痛苦的表情还要明显。</p>
+
+  <p class="normal">温斯顿的心情一时难以分析。站在他面前的不正是要置自己于死地的敌人吗？另一方面，她也是人哪，受着痛楚的折磨，说不定骨头已经断了。他已本能地上前要扶她了，刚才看着她吊着纱带的手坠地时，好像自己的身体也感到疼痛似的。</p>
+
+  <p class="normal">“有没有摔伤？”他问。</p>
+
+  <p class="normal">“没关系。我的手臂……一会儿就没事了。”</p>
+
+  <p class="normal">她说话的声音有点颤抖，好像心脏跳个不停。脸色实在苍白得很。</p>
+
+  <p class="normal">“你没摔断骨头吧？”</p>
+
+  <p class="normal">“没有，真的没事，只痛了一阵。”</p>
+
+  <p class="normal">她伸出左手给他，脸色已开始恢复，看来好多了。</p>
+
+  <p class="normal">“没关系，”她又说一遍，“只是肘子震荡了一下。同志，谢谢呵。”</p>
+
+  <p class="normal">说完她就继续朝她原来的方向走，脚步轻快，好像什么事也没有发生过一样。此事从头到尾，也不过短短半分钟。面部不露任何表情，已成了大家本能的习惯。再说，他们刚才站的地方，正好是电幕前面。话虽如此，刚才温斯顿说不定露出一两秒钟惊奇的神色，因为他伸手扶那女郎时，她塞了一点什么东西给他。这准是她有意塞给他的。那东西很小，平平扁扁。他走进厕所时，就把那东西塞进口袋，用手指捏捏，原来是一张折成方块的纸！</p>
+
+  <p class="normal">站在尿池前面时，他设法把这方块在口袋里打开。一定是字条之类的东西。他几乎忍不住要进抽水马桶间打开来看，但最后还是忍住了，因为他知道这是愚蠢不过的事。如果你要指出一个电幕眼在二十四小时内都看着你的地方，那就是抽水马桶间。</p>
+
+  <p class="normal">他回到小室坐下，把那纸片随便地丢在桌上的一大堆文件上，然后戴上眼镜，把录音书写器拉到面前。等五分钟，他心里说，最少五分钟！他的心忍不住怦怦地跳动着，幸好他正在处理的文件是例行公事，订正长长一串数字，并不费神。</p>
+
+  <p class="normal">不管纸上说的是什么，总与政治有关就是。他能猜到的只有两个可能。一个可能是他一直担心的事：女的是思想警察。他想不通思想警察为什么要用这种方式去传达命令。看来一定是有什么特别理由吧。如果这猜想是对的，那字条说不定是恐吓信、面谈的通知、要他自杀的指令，再不然就是要诱他进去的一种圈套了。想到第二个可能时，他激动得难以自制。那就是：这字条不是思想警察交给他的，而是一个地下组织的密件。这么说，兄弟会真的存在了！而那黑发女郎就是会员。当然，这想法荒谬绝伦，但他手上捏着字条的刹那，想着的正是这个。他开始推想其他的解释和可能性，还是两分钟以后的事。即使现在他的理智告诉他这字条不是什么地下组织的密件，而是思想警察的处决令，他还是不肯相信的。他不断盼望的还是那个悖乎常理的可能性最后变成事实。他的心怦怦跳着，费了一番气力才不让声音发抖，把订正的数字对着录音书写器念出来。</p>
+
+  <p class="normal">他把处理好的文件卷起，投入气筒。从厕所回来到现在，已过了八分钟了。他调整了眼镜，轻轻地叹了口气，又把另一堆文件拉近。那女郎塞给他的字条，就在这堆文件上面。他把它摊平，上面是三个不太工整的大字：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="center">我爱你</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">他吓得瞠目结舌，竟忘了把这犯罪的证据随手丢在思旧穴。到他清醒后快要投进去时，还忍不住要再看一下，虽然明知这举动会让人怀疑他为什么对这字条发生这么大的兴趣。他要弄清楚究竟有没有看错。</p>
+
+  <p class="normal">那个上午剩下来的时间再难做什么事情了。要在电幕前面隐瞒你兴奋的心情，比集中精神去做无聊的差事还要困难。他觉得腹中好像有火球在滚动。到闷热、拥挤而又嘈吵的食堂吃午饭更是活受罪。他本来希望独个儿吃完就走，谁料偏遇到柏森斯这大笨蛋，一屁股就坐在他旁边，他的汗臭几乎掩盖了碎肉汁的气味。话匣子一开就说个没完，说的都是有关仇恨周筹备的事。他讲得特别热心的，是他女儿所属那个探子团为这活动特制的老大哥面具，据说有两米宽。更要命的是在喧哗的人声中，温斯顿没全听懂这家伙在说什么，因此得三番五次地要他把无聊透顶的话重述一遍。这其间他只匆匆地看过黑发女郎一次。她在食堂远远一角的一张台子前，旁边还有两个女孩子。她好像没有注意到他，而他再也没有往那边瞧了。</p>
+
+  <p class="normal">下午的一段时间就比较好过了。午餐回来后气筒马上就传来一份得费相当心机处理的文件。即使把别的东西搁在一边先办这事，也得花好几个钟头。温斯顿的任务：一个显要的内党党员有问题了，他得伪造一连串两年前的生产报告，使这内党头子名誉扫地。这正是温斯顿的看家本领，因此两个钟头内他埋首工作，居然没想起黑发女郎来。但工作完成后，她的面孔又在他脑海出现了。他多希望能够有一个独自沉思的机会，好好地把这事情的发展想一番。今天晚上他得去公社中心，因此在食堂又一次胡乱把肚子塞饱后，就到那边报到去了。他参加了形式庄严无比但内容愚不可及的所谓“小组讨论”，打了两局乒乓球，灌下几杯杜松子酒，听了半小时的演讲。演讲题目是“英社与棋戏的关系”。连他的灵魂也闷得要出窍。可是今天晚上是他平生第一次没想到要开小差。自看到“我爱你”三字后，他求生的意志突然加强，冒小小的风险他也认为太不值得了。一直等到二十三点钟他回家睡在床上后，他才真正找到沉思的机会。在黑暗中，只要你不做声，电幕也看不到你，你就安全了。</p>
+
+  <p class="normal">要解决的是个实际问题：怎样才能与那女郎联络和安排约会？现在他不再怀疑她是引诱他入圈套了，因为她塞字条给他时，情绪激动，这不是装得出来的。显然她怕极了。谁不怕呢？要不要拒绝她的追求？他想也没有想过，虽然五天以前他才动过要用石块砸破她脑袋的念头。这些都无关紧要了，他想着的是她赤裸青春的胴体，一如在梦中所见。他曾经把她看作和其他的人一样，一脑袋谎言与仇恨——一肚子冰块！一想到自己说不定会失去她，失去那洁白的少女胴体，心头急得发热。他最担心的倒是如果他不能马上跟她联络上，她就会改变主意了。但要跟她接触，谈何容易呵。这等于在棋盘上给人将死后还想再跳一步。你走到哪里，电幕眼跟到哪里。事实上，看了字条后的五分钟，什么可能跟她联系的方法都一下子掠过脑际，只是这个时候他才有时间逐一检视一番，犹如审视楼上摆着的一堆工具，看看哪件合用。</p>
+
+  <p class="normal">不用说，今天早上那种“邂逅”的方式不能重演了。如果她在记录科上班，那比较容易办。子虚科在这栋大楼的位置，他实在模糊，再说他也没有借口到那儿去。如果他知道她住在哪里，知道她的下班时间，也许可以想办法在她回家的路上“巧遇”一次。但如果要在真理部门口等她出来再跟她回家，那就危险了，因为在门口闲荡会引人注意。通过邮局写信给她呢？那更不用考虑了，因为所有信件都经检查，这已成公开秘密。事实上今天的人已很少写信了。有什么消息要转达的话，那你去买一张上面早已印好各种日常用语的明信片，把合用的句子勾出来就是。即使要写信给她也办不到，因为他不知道她叫什么名字。最后他决定还是在食堂跟她联络最安全。如果能有机会碰到她一个人吃饭，只要台子在食堂中央（也因此离电幕远一点），只要四周的人谈话的声音不断，只要上述这三种条件能够持续半分钟，那么，他就有把握跟她交换三言两语。</p>
+
+  <p class="normal">此事发生后的一个星期内，他简直坐立不安。第二天午餐时间，她一直到温斯顿听到上班信号响起要离开时才出现，看来她掉换了晚一班的班次。他们碰面时眼色也不交换一下就各走各路。第三天，她在平常的午饭时间出现了，但一来她坐的台子靠近电幕，二来她还跟三个女孩子在一起。这以后她整整三天没有出现，害得他好像患了一种特殊的敏感性，浑身脆弱紧张，不但一举一动觉得痛苦，就是跟人说话或听任何声音都变成难以忍受的折磨。梦中他也无法忘记她。那几天的日记一片空白。如果还有些微安慰的话，那只有在工作时间碰到需要他特别花脑筋的任务，使他暂时忘记这黑发女郎。究竟发生了什么事呢？他毫无头绪，又不能向人打听。她可能蒸发掉了，可能自杀，可能调到大洋邦另一边去。但更可能是她改变了主意，决定躲避他。</p>
+
+  <p class="normal">第二天她出现了，臂上的纱带已除，只是手腕上裹了一条胶布。他兴奋之余，忍不住正眼看了她好几秒钟。接着的一天午饭时，如果不是一个不速之客突然出现，他差点就有跟她说话的机会。他到食堂时，她一个人坐着，台子也不靠近墙壁。时间尚早，食堂里还没有几个人。排队吃饭的行列节节上前，可是温斯顿快到柜台时停住了，因为前面有人抱怨说还没有拿到糖精。到他拿到盘子，移步到她的方向时，她还是一个人坐着。他一边漫不经心地走着，一边打量着她附近有无空台子。她与他的距离只有三米了——还差两秒钟就大功告成。一个声音在后面招呼他，他装着没听见。“史密斯——”声音喊得更响亮了。躲不过了，他只得向后转。原来是一个叫威尔舍的傻头傻脑的年轻人，笑着请他到旁边的空位子坐。他跟这金发青年并不熟，可是他不能拒绝。人家既跟你打了招呼，你怎可以弃他不顾走去跟旁边无伴的女人坐？那太显明了。他只好笑着坐下。威尔舍对着他傻笑。温斯顿突生幻觉，看到自己用鹤嘴锄朝他的傻样子锄去！黑发女郎的台子一下就坐满了人。</p>
+
+  <p class="normal">但她一定注意到他的举动了，说不定已了解他的用意。第二天他提早来，果然，她已在那儿，在昨天附近的台子前一个人坐着。排队时站在他面前的是个甲虫类的小块头，手脚灵活，两粒多疑的小眼睛在坦平的脸上滚来滚去。温斯顿在餐盘盛了食物转身要走时，看到甲虫人一直往女郎的方向走，自觉希望又落空了。前面不远的地方就有一个空位，但温斯顿从他的外貌可以看出，这甲虫人顶会照顾自己的利益，因此准会选最空的台子坐下。温斯顿跟在后面走，心头重得像铅块。除非他能单独面对她，否则什么计划也没法实现。前面突然轰的一响，只见甲虫人四脚朝天，餐盘舞汤如飞碟，咖啡和肉汤在地板上汇成两道小川。甲虫人挣扎起来后狠狠地瞪了温斯顿一眼，他心中一定以为这是后面跟上来的人的恶作剧。幸好他瞪瞪眼就算了。五秒钟后，温斯顿终于坐到女郎的台子来，心还扑通跳个不停。</p>
+
+  <p class="normal">他并没有正面看她，只默默地把餐盘上的饭菜放到台上来，马上就开始吃饭。当务之急就是马上跟她说话，否则别人就坐到旁边了。可是他实在担心得很。从她塞条子给他到现在，已有一个星期了，她可能已经改变主意。不，她一定已经改变主意。这种事不可能成功的。在现实的人生中，这种事根本不可能发生。如果不是这时看到耳朵长着长毛的诗人阿普福思，一瘸一拐地托着餐盘踱来踱去找空位子坐，他说不定一句话也不敢开口。阿普福思对温斯顿满有好感，如果看到他旁边有空位子，准会坐下来。能够采取行动的时间，大概只有一分钟。温斯顿和那女郎默默地低头喝着扁豆汤。温斯顿开始喃喃说话。两个人仍然是低着头忙着吃东西，就靠着一呼一喘的空当儿，面无表情地交换了下面几句话：</p>
+
+  <p class="normal">“什么时候下班？”温斯顿问。</p>
+
+  <p class="normal">“十八点三十分。”</p>
+
+  <p class="normal">“在哪儿见面？”</p>
+
+  <p class="normal">“胜利广场，靠近纪念碑。”</p>
+
+  <p class="normal">“到处都有电幕。”</p>
+
+  <p class="normal">“只要有一大堆人，就没有关系。”</p>
+
+  <p class="normal">“用什么暗号？”</p>
+
+  <p class="normal">“不用。除非你看到我四边都围着人，否则别接近我。别盯着我。只要站在我附近就行。”</p>
+
+  <p class="normal">“什么时间？”</p>
+
+  <p class="normal">“十九点。”</p>
+
+  <p class="normal">“好吧。”</p>
+
+  <p class="normal">阿普福思没看到温斯顿，他在别的台子坐下来了。黑发女郎匆匆吃罢，就走了。温斯顿燃了一根香烟。他们没再说一句话，而两人虽面对面地坐在同一张台子前吃饭，居然瞧也不瞧对方一眼。</p>
+
+  <p class="normal">温斯顿十九点前就到了胜利广场。他在老大哥铜像的支柱附近走着。老大哥的目光瞧着南边的天空凝望，因为在“一号航道战役”中击败欧亚敌机进犯，就在那方向（前几年，进犯的敌机是东亚国的）。老大哥铜像对面的一条街上也有一个骑着马的雕像，大概是英国名将奥利弗·克伦威尔吧。十九点零五分，她还没出现。温斯顿不觉又担心起来。她不来了，改变主意了。他信步走到广场的北面去。呀，这是圣马丁教堂，就是当年钟声吟咏“你欠我三法新”的地方！他因自己有这种识别能力而微感得意。就在这时，他看见她了，在纪念碑下念着（或假装念着）一份贴在柱子上的招贴。他不能走近她那边，人潮还未出现呢。这儿四边的墙壁都装有电幕。幸好不久就听到了左边传来一阵吆喝声和隆隆的汽车声。女郎迅速地绕过纪念碑下的狮子铜像，跑向涌来的人潮。温斯顿也跟着跑。他一边跑，一边听着旁人喊着叫着的话，才弄清楚原来有一批欧亚国的俘虏要在这里经过。</p>
+
+  <p class="normal">一下子广场的南边已挤满了人。温斯顿平日虽然看到人潮就朝相反方向走的，此刻一反常态，拼了命地向人头挤拥的地方钻。几乎伸手就够得上那女郎站的地方了！只可惜前面有一对看似夫妇模样的无产者，两人块头大得如日本的相扑勇士，严严实实地堵住他的过路。温斯顿只得侧着身子，光着肩膀，拼了九牛二虎之力穿过这道人肉屏障。他的内脏快要被两个肌肉结实的屁股压得粉碎了，幸好挤了没多久，出了一身汗，终于杀出重围。黑发女郎就在他旁边，两人紧贴着肩膀，两眼直视前面。</p>
+
+  <p class="normal">一队大卡车在前面经过，车上四个角落都有手执冲锋枪、面无表情的卫兵站着。卡车内就是个子矮小的黄种人俘虏，穿着褴褛的绿色军装，挤在一起蹲坐着。他们忧郁的蒙古人种的脸朝向车外，但一点也没有显得好奇的样子。车子偶然颠簸一下，你就听到当啷当啷的响声，因为俘虏都戴着脚镣。一卡车一卡车忧悒的眼睛从温斯顿前面经过。女郎的肩膀和胳膊紧贴着他的，面颊也靠近得几乎可以让他嗅到她的气息。一如她在食堂时所表现的当机立断能力一样，此刻她马上把握形势，用同样毫无感情的声音，嘴唇动也没动似的呢喃着。卡车声和人声一下子就可以把她的声音掩盖。</p>
+
+  <p class="normal">“你听不听得到我说话？”</p>
+
+  <p class="normal">“听得到。”</p>
+
+  <p class="normal">“星期天下午走得开吗？”</p>
+
+  <p class="normal">“可以。”</p>
+
+  <p class="normal">“那小心听着，别忘了。你去帕丁顿车站——”</p>
+
+  <p class="normal">接着她就告诉他要走的路线和方向，周密得如军队部署一样，令他吃了一惊。坐半小时的火车；出车站后左转；走两公里；到了上面缺了横梁的大门，进去；越过田野小径；穿过杂草丛生的巷子；走过矮树中的小道；看到长着苔藓的一株倒在地上的枯树……仿佛她的脑袋里面是张地图！最后她问：“都记得吗？”</p>
+
+  <p class="normal">“记得。”</p>
+
+  <p class="normal">“你先左转，再右转，然后再左转。那道门上面缺了一道横梁。”</p>
+
+  <p class="normal">“记住了。什么时间？”</p>
+
+  <p class="normal">“十五点吧。可能你要等我一下，因为我从另外一个方向来。真的记清楚了？”</p>
+
+  <p class="normal">“不错。”</p>
+
+  <p class="normal">“那马上离开我。”</p>
+
+  <p class="normal">其实不用她说他也知道，只是目前实在无法抽身。卡车还没过完，观众还是百看不厌的样子。刚开始时有人“呸”声不绝，但这仅是几个党员的行为，而没多久他们也自动停止了。现在大家只是好奇。外国人，不论是从欧亚国来的或从东亚国来的，都是新奇的动物。除了以囚犯的面目与人相见外，他们根本不会在大洋邦出现。即使这样，你能够看到他们的机会也不多，总是短短的一瞥一瞬而已。他们的命运也没人知道，其中一些以战犯的罪名处了绞刑，其余的就失踪了，大概是下放劳改营吧。蒙古人脸形的俘虏已陆续过去，接着出现的看似欧洲人，脏脏的，满面胡子，显得筋疲力尽。他们的目光从长满短须的面颊上方向温斯顿这边投来，有时给人一种奇异的炽热感觉，但一下子又消逝了。俘虏卡车快过尽了，在最后一辆卡车上，温斯顿看到一个脸上须发斑白的老人站着，双手交叉在胸前，好像早已习惯了这种束缚似的。该是他和女郎分手的时候了。在最后的一刹那，趁着人潮还在围着他们的时候，她摸到了他的手掌，迅速地捏了捏。</p>
+
+  <p class="normal">他们手捏着手的时间，顶多不过十秒钟，感觉却似永恒。就在这短短的时间内，他已熟悉了她手掌的细节——修长的手指，整齐的指甲，因干粗活而磨出来的掌心硬皮，还有手腕部位的细嫩皮肤。他虽然没看到，但这么抚摸了一下，已感觉到好像亲眼看到过一样。就在这时他想起了一件事：他不知道她的眼睛是什么颜色。褐色吧？但黑发的人的眼睛通常是蓝色的。他不敢转头去望她，太危险了。在人肉屏障内，他们紧握着手，直视前方。他看到的不是女郎的眼睛，而是须发斑白的那个老俘虏神伤的眼睛。</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_11.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_13.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_11.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_13.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>

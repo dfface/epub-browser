@@ -1,0 +1,584 @@
+[
+  {
+    "title": "The world this week",
+    "level": 0,
+    "chapter_index": 3,
+    "chapter_file": "chapter_3.html"
+  },
+  {
+    "title": "Politics",
+    "level": 1,
+    "chapter_index": 3,
+    "chapter_file": "chapter_3.html"
+  },
+  {
+    "title": "Business",
+    "level": 1,
+    "chapter_index": 4,
+    "chapter_file": "chapter_4.html"
+  },
+  {
+    "title": "The weekly cartoon",
+    "level": 1,
+    "chapter_index": 5,
+    "chapter_file": "chapter_5.html"
+  },
+  {
+    "title": "Leaders",
+    "level": 0,
+    "chapter_index": 7,
+    "chapter_file": "chapter_7.html"
+  },
+  {
+    "title": "Don’t ban teenagers from social media",
+    "level": 1,
+    "chapter_index": 7,
+    "chapter_file": "chapter_7.html"
+  },
+  {
+    "title": "The world’s most powerful woman",
+    "level": 1,
+    "chapter_index": 8,
+    "chapter_file": "chapter_8.html"
+  },
+  {
+    "title": "The Epstein files tell a story of justice denied",
+    "level": 1,
+    "chapter_index": 9,
+    "chapter_file": "chapter_9.html"
+  },
+  {
+    "title": "The rich world should beware Brazilification",
+    "level": 1,
+    "chapter_index": 10,
+    "chapter_file": "chapter_10.html"
+  },
+  {
+    "title": "How to solve the tenor shortage",
+    "level": 1,
+    "chapter_index": 11,
+    "chapter_file": "chapter_11.html"
+  },
+  {
+    "title": "Britain’s predicament will get worse before it gets better",
+    "level": 1,
+    "chapter_index": 12,
+    "chapter_file": "chapter_12.html"
+  },
+  {
+    "title": "Letters",
+    "level": 0,
+    "chapter_index": 14,
+    "chapter_file": "chapter_14.html"
+  },
+  {
+    "title": "Is education technology mostly useless?",
+    "level": 1,
+    "chapter_index": 14,
+    "chapter_file": "chapter_14.html"
+  },
+  {
+    "title": "Briefing",
+    "level": 0,
+    "chapter_index": 16,
+    "chapter_file": "chapter_16.html"
+  },
+  {
+    "title": "More and more countries are banning kids from social media",
+    "level": 1,
+    "chapter_index": 16,
+    "chapter_file": "chapter_16.html"
+  },
+  {
+    "title": "United States",
+    "level": 0,
+    "chapter_index": 18,
+    "chapter_file": "chapter_18.html"
+  },
+  {
+    "title": "How Democrats aim to curb ICE without losing votes",
+    "level": 1,
+    "chapter_index": 18,
+    "chapter_file": "chapter_18.html"
+  },
+  {
+    "title": "America may be reaching peak Spanish",
+    "level": 1,
+    "chapter_index": 19,
+    "chapter_file": "chapter_19.html"
+  },
+  {
+    "title": "Lawsuits over transgender medicine for minors could be huge",
+    "level": 1,
+    "chapter_index": 20,
+    "chapter_file": "chapter_20.html"
+  },
+  {
+    "title": "The decline of single-earner housebuyers in America",
+    "level": 1,
+    "chapter_index": 21,
+    "chapter_file": "chapter_21.html"
+  },
+  {
+    "title": "Alabama offers three tricks to fix poor urban schools ",
+    "level": 1,
+    "chapter_index": 22,
+    "chapter_file": "chapter_22.html"
+  },
+  {
+    "title": "RFK’s idea of making America healthy starts with making it politically sicker",
+    "level": 1,
+    "chapter_index": 23,
+    "chapter_file": "chapter_23.html"
+  },
+  {
+    "title": "The Americas",
+    "level": 0,
+    "chapter_index": 25,
+    "chapter_file": "chapter_25.html"
+  },
+  {
+    "title": "Brazil’s economy is being throttled by entrenched interests",
+    "level": 1,
+    "chapter_index": 25,
+    "chapter_file": "chapter_25.html"
+  },
+  {
+    "title": "Cuba’s fate may be in Marco Rubio’s hands",
+    "level": 1,
+    "chapter_index": 26,
+    "chapter_file": "chapter_26.html"
+  },
+  {
+    "title": "Central America’s biggest city is eternally snarled with traffic",
+    "level": 1,
+    "chapter_index": 27,
+    "chapter_file": "chapter_27.html"
+  },
+  {
+    "title": "Asia",
+    "level": 0,
+    "chapter_index": 29,
+    "chapter_file": "chapter_29.html"
+  },
+  {
+    "title": "How Japan’s prime minister will use her massive new mandate",
+    "level": 1,
+    "chapter_index": 29,
+    "chapter_file": "chapter_29.html"
+  },
+  {
+    "title": "Led by a Marxist, battered by a storm, Sri Lanka is doing better",
+    "level": 1,
+    "chapter_index": 30,
+    "chapter_file": "chapter_30.html"
+  },
+  {
+    "title": "Asia is turning stablecoins into banking infrastructure",
+    "level": 1,
+    "chapter_index": 31,
+    "chapter_file": "chapter_31.html"
+  },
+  {
+    "title": "Thailand’s conservatives win a shock big victory",
+    "level": 1,
+    "chapter_index": 32,
+    "chapter_file": "chapter_32.html"
+  },
+  {
+    "title": "India, Pakistan and Bangladesh are weaponising cricket ",
+    "level": 1,
+    "chapter_index": 33,
+    "chapter_file": "chapter_33.html"
+  },
+  {
+    "title": "China",
+    "level": 0,
+    "chapter_index": 35,
+    "chapter_file": "chapter_35.html"
+  },
+  {
+    "title": "What China is really up to in the Arctic",
+    "level": 1,
+    "chapter_index": 35,
+    "chapter_file": "chapter_35.html"
+  },
+  {
+    "title": "What’s the point of AI in acupuncture?",
+    "level": 1,
+    "chapter_index": 36,
+    "chapter_file": "chapter_36.html"
+  },
+  {
+    "title": "Why China’s concert scene has boomed since the pandemic",
+    "level": 1,
+    "chapter_index": 37,
+    "chapter_file": "chapter_37.html"
+  },
+  {
+    "title": "Middle East & Africa",
+    "level": 0,
+    "chapter_index": 39,
+    "chapter_file": "chapter_39.html"
+  },
+  {
+    "title": "Don’t welcome Africa’s newest despot",
+    "level": 1,
+    "chapter_index": 39,
+    "chapter_file": "chapter_39.html"
+  },
+  {
+    "title": "A deadly attack shows Nigeria’s security crisis is worsening",
+    "level": 1,
+    "chapter_index": 40,
+    "chapter_file": "chapter_40.html"
+  },
+  {
+    "title": "How Africa’s hottest new museum unravelled",
+    "level": 1,
+    "chapter_index": 41,
+    "chapter_file": "chapter_41.html"
+  },
+  {
+    "title": "Why Syria and Iraq cannot reconcile",
+    "level": 1,
+    "chapter_index": 42,
+    "chapter_file": "chapter_42.html"
+  },
+  {
+    "title": "Why Saudis feel squeezed even as the economy booms",
+    "level": 1,
+    "chapter_index": 43,
+    "chapter_file": "chapter_43.html"
+  },
+  {
+    "title": "Europe",
+    "level": 0,
+    "chapter_index": 45,
+    "chapter_file": "chapter_45.html"
+  },
+  {
+    "title": "A European fighter-jet partnership is verging on a break-up",
+    "level": 1,
+    "chapter_index": 45,
+    "chapter_file": "chapter_45.html"
+  },
+  {
+    "title": "Emmanuel Macron declares a European state of emergency",
+    "level": 1,
+    "chapter_index": 46,
+    "chapter_file": "chapter_46.html"
+  },
+  {
+    "title": "Can Germany rearm its way to growth?",
+    "level": 1,
+    "chapter_index": 47,
+    "chapter_file": "chapter_47.html"
+  },
+  {
+    "title": "The Epstein files are sullying Norway’s squeaky-clean image",
+    "level": 1,
+    "chapter_index": 48,
+    "chapter_file": "chapter_48.html"
+  },
+  {
+    "title": "At the last open crossing, Ukrainians flee Russia’s annexation",
+    "level": 1,
+    "chapter_index": 49,
+    "chapter_file": "chapter_49.html"
+  },
+  {
+    "title": "The European Onion is a joke whose time has come",
+    "level": 1,
+    "chapter_index": 50,
+    "chapter_file": "chapter_50.html"
+  },
+  {
+    "title": "Britain",
+    "level": 0,
+    "chapter_index": 52,
+    "chapter_file": "chapter_52.html"
+  },
+  {
+    "title": "Sir Keir Starmer clings to office—but not power",
+    "level": 1,
+    "chapter_index": 52,
+    "chapter_file": "chapter_52.html"
+  },
+  {
+    "title": "King Charles tries to limit the fallout from Andrew’s Epstein mess",
+    "level": 1,
+    "chapter_index": 53,
+    "chapter_file": "chapter_53.html"
+  },
+  {
+    "title": "Britain’s shifting GDP numbers",
+    "level": 1,
+    "chapter_index": 54,
+    "chapter_file": "chapter_54.html"
+  },
+  {
+    "title": "Tin mining is making a surprise return to Cornwall",
+    "level": 1,
+    "chapter_index": 55,
+    "chapter_file": "chapter_55.html"
+  },
+  {
+    "title": "Alpha offers a starter course in salvation",
+    "level": 1,
+    "chapter_index": 56,
+    "chapter_file": "chapter_56.html"
+  },
+  {
+    "title": "Britain’s “Hillsborough law”, pledging candour, is avoiding it ",
+    "level": 1,
+    "chapter_index": 57,
+    "chapter_file": "chapter_57.html"
+  },
+  {
+    "title": "The alternatives to Sir Keir",
+    "level": 1,
+    "chapter_index": 58,
+    "chapter_file": "chapter_58.html"
+  },
+  {
+    "title": "International",
+    "level": 0,
+    "chapter_index": 60,
+    "chapter_file": "chapter_60.html"
+  },
+  {
+    "title": "Inside Jeffrey Epstein’s network",
+    "level": 1,
+    "chapter_index": 60,
+    "chapter_file": "chapter_60.html"
+  },
+  {
+    "title": "Are liberal values a luxury the West cannot afford?",
+    "level": 1,
+    "chapter_index": 61,
+    "chapter_file": "chapter_61.html"
+  },
+  {
+    "title": "Essay",
+    "level": 0,
+    "chapter_index": 63,
+    "chapter_file": "chapter_63.html"
+  },
+  {
+    "title": "America at 250",
+    "level": 1,
+    "chapter_index": 63,
+    "chapter_file": "chapter_63.html"
+  },
+  {
+    "title": "The Declaration of Independence still defines America’s purpose, writes Jon Meacham",
+    "level": 1,
+    "chapter_index": 64,
+    "chapter_file": "chapter_64.html"
+  },
+  {
+    "title": "Political parties are a feature, not a bug, of American democracy, writes H.W. Brands",
+    "level": 1,
+    "chapter_index": 65,
+    "chapter_file": "chapter_65.html"
+  },
+  {
+    "title": "Six books to understand the Founding Fathers",
+    "level": 1,
+    "chapter_index": 66,
+    "chapter_file": "chapter_66.html"
+  },
+  {
+    "title": "Business",
+    "level": 0,
+    "chapter_index": 68,
+    "chapter_file": "chapter_68.html"
+  },
+  {
+    "title": "Asia’s capitalists will need to fight for their revolution",
+    "level": 1,
+    "chapter_index": 68,
+    "chapter_file": "chapter_68.html"
+  },
+  {
+    "title": "Arm wants a bigger slice of the chip business",
+    "level": 1,
+    "chapter_index": 69,
+    "chapter_file": "chapter_69.html"
+  },
+  {
+    "title": "China once stole foreign ideas. Now it wants to protect its own",
+    "level": 1,
+    "chapter_index": 70,
+    "chapter_file": "chapter_70.html"
+  },
+  {
+    "title": "America’s hottest grocery store is also its priciest",
+    "level": 1,
+    "chapter_index": 71,
+    "chapter_file": "chapter_71.html"
+  },
+  {
+    "title": "The excruciating quest for a meeting room",
+    "level": 1,
+    "chapter_index": 72,
+    "chapter_file": "chapter_72.html"
+  },
+  {
+    "title": "Private-equity barons have a giant AI problem",
+    "level": 1,
+    "chapter_index": 73,
+    "chapter_file": "chapter_73.html"
+  },
+  {
+    "title": "Finance & economics",
+    "level": 0,
+    "chapter_index": 75,
+    "chapter_file": "chapter_75.html"
+  },
+  {
+    "title": "How to hedge a bubble, AI edition",
+    "level": 1,
+    "chapter_index": 75,
+    "chapter_file": "chapter_75.html"
+  },
+  {
+    "title": "Who wrangled the best trade deal from Donald Trump?",
+    "level": 1,
+    "chapter_index": 76,
+    "chapter_file": "chapter_76.html"
+  },
+  {
+    "title": "Ethnic minorities are driving America’s startup boom",
+    "level": 1,
+    "chapter_index": 77,
+    "chapter_file": "chapter_77.html"
+  },
+  {
+    "title": "What drives the wage gap between men and women?",
+    "level": 1,
+    "chapter_index": 78,
+    "chapter_file": "chapter_78.html"
+  },
+  {
+    "title": "Chinese homebuyers are enraged by shoddy building standards",
+    "level": 1,
+    "chapter_index": 79,
+    "chapter_file": "chapter_79.html"
+  },
+  {
+    "title": "Why China’s central bank won’t save the country from deflation",
+    "level": 1,
+    "chapter_index": 80,
+    "chapter_file": "chapter_80.html"
+  },
+  {
+    "title": "The coldest crypto winter yet",
+    "level": 1,
+    "chapter_index": 81,
+    "chapter_file": "chapter_81.html"
+  },
+  {
+    "title": "How to put a price on a human life",
+    "level": 1,
+    "chapter_index": 82,
+    "chapter_file": "chapter_82.html"
+  },
+  {
+    "title": "Science & technology",
+    "level": 0,
+    "chapter_index": 84,
+    "chapter_file": "chapter_84.html"
+  },
+  {
+    "title": "“Flying” electric boats could remake urban transport",
+    "level": 1,
+    "chapter_index": 84,
+    "chapter_file": "chapter_84.html"
+  },
+  {
+    "title": "Humans are not the only animals that treat each other’s injuries ",
+    "level": 1,
+    "chapter_index": 85,
+    "chapter_file": "chapter_85.html"
+  },
+  {
+    "title": "Robots with human-inspired eyes have better vision",
+    "level": 1,
+    "chapter_index": 86,
+    "chapter_file": "chapter_86.html"
+  },
+  {
+    "title": "Does being induced lead to a medicalised birth?",
+    "level": 1,
+    "chapter_index": 87,
+    "chapter_file": "chapter_87.html"
+  },
+  {
+    "title": "Culture",
+    "level": 0,
+    "chapter_index": 89,
+    "chapter_file": "chapter_89.html"
+  },
+  {
+    "title": "Need a bit of dating help? The caveman’s guide to romance",
+    "level": 1,
+    "chapter_index": 89,
+    "chapter_file": "chapter_89.html"
+  },
+  {
+    "title": "The world is suffering from a shortage of tenors",
+    "level": 1,
+    "chapter_index": 90,
+    "chapter_file": "chapter_90.html"
+  },
+  {
+    "title": "Sex, sex and more sex: Emerald Fennell’s “Wuthering Heights”",
+    "level": 1,
+    "chapter_index": 91,
+    "chapter_file": "chapter_91.html"
+  },
+  {
+    "title": "Africa needs to follow Asia’s path to grow",
+    "level": 1,
+    "chapter_index": 92,
+    "chapter_file": "chapter_92.html"
+  },
+  {
+    "title": "The rise of the 9-to-5 influencer",
+    "level": 1,
+    "chapter_index": 93,
+    "chapter_file": "chapter_93.html"
+  },
+  {
+    "title": "Real-life “Succession”: Media’s most dysfunctional family",
+    "level": 1,
+    "chapter_index": 94,
+    "chapter_file": "chapter_94.html"
+  },
+  {
+    "title": "Economic & financial indicators",
+    "level": 0,
+    "chapter_index": 96,
+    "chapter_file": "chapter_96.html"
+  },
+  {
+    "title": "Economic data, commodities and markets",
+    "level": 1,
+    "chapter_index": 96,
+    "chapter_file": "chapter_96.html"
+  },
+  {
+    "title": "Obituary",
+    "level": 0,
+    "chapter_index": 98,
+    "chapter_file": "chapter_98.html"
+  },
+  {
+    "title": "Virginia Oliver worked Maine’s waters for nearly a century",
+    "level": 1,
+    "chapter_index": 98,
+    "chapter_file": "chapter_98.html"
+  }
+]

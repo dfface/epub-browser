@@ -1,0 +1,2462 @@
+[
+  {
+    "title": "第一卷",
+    "level": 0,
+    "chapter_index": 4,
+    "chapter_file": "chapter_4.html"
+  },
+  {
+    "title": "第二版出版说明",
+    "level": 1,
+    "chapter_index": 5,
+    "chapter_file": "chapter_5.html"
+  },
+  {
+    "title": "本书出版的说明",
+    "level": 1,
+    "chapter_index": 6,
+    "chapter_file": "chapter_6.html"
+  },
+  {
+    "title": "第一次国内革命战争时期",
+    "level": 1,
+    "chapter_index": 7,
+    "chapter_file": "chapter_7.html"
+  },
+  {
+    "title": "中国社会各阶级的分析",
+    "level": 2,
+    "chapter_index": 8,
+    "chapter_file": "chapter_8.html"
+  },
+  {
+    "title": "湖南农民运动考察报告",
+    "level": 2,
+    "chapter_index": 9,
+    "chapter_file": "chapter_9.html"
+  },
+  {
+    "title": "第二次国内革命战争时期",
+    "level": 1,
+    "chapter_index": 10,
+    "chapter_file": "chapter_10.html"
+  },
+  {
+    "title": "中国的红色政权为什么能够存在？",
+    "level": 2,
+    "chapter_index": 11,
+    "chapter_file": "chapter_11.html"
+  },
+  {
+    "title": "井冈山的斗争",
+    "level": 2,
+    "chapter_index": 12,
+    "chapter_file": "chapter_12.html"
+  },
+  {
+    "title": "关于纠正党内的错误思想",
+    "level": 2,
+    "chapter_index": 13,
+    "chapter_file": "chapter_13.html"
+  },
+  {
+    "title": "星星之火，可以燎原",
+    "level": 2,
+    "chapter_index": 14,
+    "chapter_file": "chapter_14.html"
+  },
+  {
+    "title": "反对本本主义",
+    "level": 2,
+    "chapter_index": 15,
+    "chapter_file": "chapter_15.html"
+  },
+  {
+    "title": "必须注意经济工作",
+    "level": 2,
+    "chapter_index": 16,
+    "chapter_file": "chapter_16.html"
+  },
+  {
+    "title": "怎样分析农村阶级",
+    "level": 2,
+    "chapter_index": 17,
+    "chapter_file": "chapter_17.html"
+  },
+  {
+    "title": "我们的经济政策",
+    "level": 2,
+    "chapter_index": 18,
+    "chapter_file": "chapter_18.html"
+  },
+  {
+    "title": "关心群众生活，注意工作方法",
+    "level": 2,
+    "chapter_index": 19,
+    "chapter_file": "chapter_19.html"
+  },
+  {
+    "title": "论反对日本帝国主义的策略",
+    "level": 2,
+    "chapter_index": 20,
+    "chapter_file": "chapter_20.html"
+  },
+  {
+    "title": "中国革命战争的战略问题",
+    "level": 2,
+    "chapter_index": 21,
+    "chapter_file": "chapter_21.html"
+  },
+  {
+    "title": "关于蒋介石声明的声明",
+    "level": 2,
+    "chapter_index": 22,
+    "chapter_file": "chapter_22.html"
+  },
+  {
+    "title": "中国共产党在抗日时期的任务",
+    "level": 2,
+    "chapter_index": 23,
+    "chapter_file": "chapter_23.html"
+  },
+  {
+    "title": "为争取千百万群众进入抗日民族统一战线而斗争",
+    "level": 2,
+    "chapter_index": 24,
+    "chapter_file": "chapter_24.html"
+  },
+  {
+    "title": "实践论",
+    "level": 2,
+    "chapter_index": 25,
+    "chapter_file": "chapter_25.html"
+  },
+  {
+    "title": "矛盾论",
+    "level": 2,
+    "chapter_index": 26,
+    "chapter_file": "chapter_26.html"
+  },
+  {
+    "title": "第二卷",
+    "level": 0,
+    "chapter_index": 27,
+    "chapter_file": "chapter_27.html"
+  },
+  {
+    "title": "抗日战争时期（上）",
+    "level": 1,
+    "chapter_index": 28,
+    "chapter_file": "chapter_28.html"
+  },
+  {
+    "title": "反对日本进攻的方针、办法和前途",
+    "level": 2,
+    "chapter_index": 29,
+    "chapter_file": "chapter_29.html"
+  },
+  {
+    "title": "为动员一切力量争取抗战胜利而斗争",
+    "level": 2,
+    "chapter_index": 30,
+    "chapter_file": "chapter_30.html"
+  },
+  {
+    "title": "反对自由主义",
+    "level": 2,
+    "chapter_index": 31,
+    "chapter_file": "chapter_31.html"
+  },
+  {
+    "title": "国共合作成立后的迫切任务",
+    "level": 2,
+    "chapter_index": 32,
+    "chapter_file": "chapter_32.html"
+  },
+  {
+    "title": "和英国记者贝特兰的谈话",
+    "level": 2,
+    "chapter_index": 33,
+    "chapter_file": "chapter_33.html"
+  },
+  {
+    "title": "上海太原失陷以后抗日战争的形势和任务",
+    "level": 2,
+    "chapter_index": 34,
+    "chapter_file": "chapter_34.html"
+  },
+  {
+    "title": "陕甘宁边区政府、第八路军后方留守处布告",
+    "level": 2,
+    "chapter_index": 35,
+    "chapter_file": "chapter_35.html"
+  },
+  {
+    "title": "抗日游击战争的战略问题",
+    "level": 2,
+    "chapter_index": 36,
+    "chapter_file": "chapter_36.html"
+  },
+  {
+    "title": "论持久战",
+    "level": 2,
+    "chapter_index": 37,
+    "chapter_file": "chapter_37.html"
+  },
+  {
+    "title": "中国共产党在民族战争中的地位",
+    "level": 2,
+    "chapter_index": 38,
+    "chapter_file": "chapter_38.html"
+  },
+  {
+    "title": "统一战线中的独立自主问题",
+    "level": 2,
+    "chapter_index": 39,
+    "chapter_file": "chapter_39.html"
+  },
+  {
+    "title": "战争和战略问题",
+    "level": 2,
+    "chapter_index": 40,
+    "chapter_file": "chapter_40.html"
+  },
+  {
+    "title": "五四运动",
+    "level": 2,
+    "chapter_index": 41,
+    "chapter_file": "chapter_41.html"
+  },
+  {
+    "title": "青年运动的方向",
+    "level": 2,
+    "chapter_index": 42,
+    "chapter_file": "chapter_42.html"
+  },
+  {
+    "title": "反对投降活动",
+    "level": 2,
+    "chapter_index": 43,
+    "chapter_file": "chapter_43.html"
+  },
+  {
+    "title": "必须制裁反动派",
+    "level": 2,
+    "chapter_index": 44,
+    "chapter_file": "chapter_44.html"
+  },
+  {
+    "title": "关于国际新形势对新华日报记者的谈话",
+    "level": 2,
+    "chapter_index": 45,
+    "chapter_file": "chapter_45.html"
+  },
+  {
+    "title": "和中央社、扫荡报、新民报三记者的谈话",
+    "level": 2,
+    "chapter_index": 46,
+    "chapter_file": "chapter_46.html"
+  },
+  {
+    "title": "苏联利益和人类利益的一致",
+    "level": 2,
+    "chapter_index": 47,
+    "chapter_file": "chapter_47.html"
+  },
+  {
+    "title": "《共产党人》发刊词",
+    "level": 2,
+    "chapter_index": 48,
+    "chapter_file": "chapter_48.html"
+  },
+  {
+    "title": "目前形势和党的任务",
+    "level": 2,
+    "chapter_index": 49,
+    "chapter_file": "chapter_49.html"
+  },
+  {
+    "title": "大量吸收知识分子",
+    "level": 2,
+    "chapter_index": 50,
+    "chapter_file": "chapter_50.html"
+  },
+  {
+    "title": "中国革命和中国共产党",
+    "level": 2,
+    "chapter_index": 51,
+    "chapter_file": "chapter_51.html"
+  },
+  {
+    "title": "斯大林是中国人民的朋友",
+    "level": 2,
+    "chapter_index": 52,
+    "chapter_file": "chapter_52.html"
+  },
+  {
+    "title": "纪念白求恩",
+    "level": 2,
+    "chapter_index": 53,
+    "chapter_file": "chapter_53.html"
+  },
+  {
+    "title": "新民主主义论",
+    "level": 2,
+    "chapter_index": 54,
+    "chapter_file": "chapter_54.html"
+  },
+  {
+    "title": "克服投降危险，力争时局好转",
+    "level": 2,
+    "chapter_index": 55,
+    "chapter_file": "chapter_55.html"
+  },
+  {
+    "title": "团结一切抗日力量，反对反共顽固派",
+    "level": 2,
+    "chapter_index": 56,
+    "chapter_file": "chapter_56.html"
+  },
+  {
+    "title": "向国民党的十点要求",
+    "level": 2,
+    "chapter_index": 57,
+    "chapter_file": "chapter_57.html"
+  },
+  {
+    "title": "《中国工人》发刊词",
+    "level": 2,
+    "chapter_index": 58,
+    "chapter_file": "chapter_58.html"
+  },
+  {
+    "title": "必须强调团结和进步",
+    "level": 2,
+    "chapter_index": 59,
+    "chapter_file": "chapter_59.html"
+  },
+  {
+    "title": "新民主主义的宪政",
+    "level": 2,
+    "chapter_index": 60,
+    "chapter_file": "chapter_60.html"
+  },
+  {
+    "title": "抗日根据地的政权问题",
+    "level": 2,
+    "chapter_index": 61,
+    "chapter_file": "chapter_61.html"
+  },
+  {
+    "title": "目前抗日统一战线中的策略问题",
+    "level": 2,
+    "chapter_index": 62,
+    "chapter_file": "chapter_62.html"
+  },
+  {
+    "title": "放手发展抗日力量，抵抗反共顽固派的进攻",
+    "level": 2,
+    "chapter_index": 63,
+    "chapter_file": "chapter_63.html"
+  },
+  {
+    "title": "团结到底",
+    "level": 2,
+    "chapter_index": 64,
+    "chapter_file": "chapter_64.html"
+  },
+  {
+    "title": "论政策",
+    "level": 2,
+    "chapter_index": 65,
+    "chapter_file": "chapter_65.html"
+  },
+  {
+    "title": "为皖南事变发表的命令和谈话",
+    "level": 2,
+    "chapter_index": 66,
+    "chapter_file": "chapter_66.html"
+  },
+  {
+    "title": "打退第二次反共高潮后的时局",
+    "level": 2,
+    "chapter_index": 67,
+    "chapter_file": "chapter_67.html"
+  },
+  {
+    "title": "关于打退第二次反共高潮的总结",
+    "level": 2,
+    "chapter_index": 68,
+    "chapter_file": "chapter_68.html"
+  },
+  {
+    "title": "第三卷",
+    "level": 0,
+    "chapter_index": 69,
+    "chapter_file": "chapter_69.html"
+  },
+  {
+    "title": "抗日战争时期（下）",
+    "level": 1,
+    "chapter_index": 70,
+    "chapter_file": "chapter_70.html"
+  },
+  {
+    "title": "《农村调查》的序言和跋",
+    "level": 2,
+    "chapter_index": 71,
+    "chapter_file": "chapter_71.html"
+  },
+  {
+    "title": "改造我们的学习",
+    "level": 2,
+    "chapter_index": 72,
+    "chapter_file": "chapter_72.html"
+  },
+  {
+    "title": "揭破远东慕尼黑的阴谋",
+    "level": 2,
+    "chapter_index": 73,
+    "chapter_file": "chapter_73.html"
+  },
+  {
+    "title": "关于反法西斯的国际统一战线",
+    "level": 2,
+    "chapter_index": 74,
+    "chapter_file": "chapter_74.html"
+  },
+  {
+    "title": "在陕甘宁边区参议会的演说",
+    "level": 2,
+    "chapter_index": 75,
+    "chapter_file": "chapter_75.html"
+  },
+  {
+    "title": "整顿党的作风",
+    "level": 2,
+    "chapter_index": 76,
+    "chapter_file": "chapter_76.html"
+  },
+  {
+    "title": "反对党八股",
+    "level": 2,
+    "chapter_index": 77,
+    "chapter_file": "chapter_77.html"
+  },
+  {
+    "title": "在延安文艺座谈会上的讲话",
+    "level": 2,
+    "chapter_index": 78,
+    "chapter_file": "chapter_78.html"
+  },
+  {
+    "title": "一个极其重要的政策",
+    "level": 2,
+    "chapter_index": 79,
+    "chapter_file": "chapter_79.html"
+  },
+  {
+    "title": "第二次世界大战的转折点",
+    "level": 2,
+    "chapter_index": 80,
+    "chapter_file": "chapter_80.html"
+  },
+  {
+    "title": "祝十月革命二十五周年",
+    "level": 2,
+    "chapter_index": 81,
+    "chapter_file": "chapter_81.html"
+  },
+  {
+    "title": "抗日时期的经济问题和财政问题",
+    "level": 2,
+    "chapter_index": 82,
+    "chapter_file": "chapter_82.html"
+  },
+  {
+    "title": "关于领导方法的若干问题",
+    "level": 2,
+    "chapter_index": 83,
+    "chapter_file": "chapter_83.html"
+  },
+  {
+    "title": "质问国民党",
+    "level": 2,
+    "chapter_index": 84,
+    "chapter_file": "chapter_84.html"
+  },
+  {
+    "title": "开展根据地的减租、生产和拥政爱民运动",
+    "level": 2,
+    "chapter_index": 85,
+    "chapter_file": "chapter_85.html"
+  },
+  {
+    "title": "评国民党十一中全会和三届二次国民参政会",
+    "level": 2,
+    "chapter_index": 86,
+    "chapter_file": "chapter_86.html"
+  },
+  {
+    "title": "组织起来",
+    "level": 2,
+    "chapter_index": 87,
+    "chapter_file": "chapter_87.html"
+  },
+  {
+    "title": "学习和时局",
+    "level": 2,
+    "chapter_index": 88,
+    "chapter_file": "chapter_88.html"
+  },
+  {
+    "title": "为人民服务",
+    "level": 2,
+    "chapter_index": 90,
+    "chapter_file": "chapter_90.html"
+  },
+  {
+    "title": "评蒋介石在双十节的演说",
+    "level": 2,
+    "chapter_index": 91,
+    "chapter_file": "chapter_91.html"
+  },
+  {
+    "title": "文化工作中的统一战线",
+    "level": 2,
+    "chapter_index": 92,
+    "chapter_file": "chapter_92.html"
+  },
+  {
+    "title": "必须学会做经济工作",
+    "level": 2,
+    "chapter_index": 93,
+    "chapter_file": "chapter_93.html"
+  },
+  {
+    "title": "游击区也能够进行生产",
+    "level": 2,
+    "chapter_index": 94,
+    "chapter_file": "chapter_94.html"
+  },
+  {
+    "title": "两个中国之命运",
+    "level": 2,
+    "chapter_index": 95,
+    "chapter_file": "chapter_95.html"
+  },
+  {
+    "title": "论联合政府",
+    "level": 2,
+    "chapter_index": 96,
+    "chapter_file": "chapter_96.html"
+  },
+  {
+    "title": "愚公移山",
+    "level": 2,
+    "chapter_index": 97,
+    "chapter_file": "chapter_97.html"
+  },
+  {
+    "title": "论军队生产自给，兼论整风和生产两大运动的重要性",
+    "level": 2,
+    "chapter_index": 98,
+    "chapter_file": "chapter_98.html"
+  },
+  {
+    "title": "赫尔利和蒋介石的双簧已经破产",
+    "level": 2,
+    "chapter_index": 99,
+    "chapter_file": "chapter_99.html"
+  },
+  {
+    "title": "评赫尔利政策的危险",
+    "level": 2,
+    "chapter_index": 100,
+    "chapter_file": "chapter_100.html"
+  },
+  {
+    "title": "给福斯特同志的电报",
+    "level": 2,
+    "chapter_index": 101,
+    "chapter_file": "chapter_101.html"
+  },
+  {
+    "title": "对日寇的最后一战",
+    "level": 2,
+    "chapter_index": 102,
+    "chapter_file": "chapter_102.html"
+  },
+  {
+    "title": "第四卷",
+    "level": 0,
+    "chapter_index": 103,
+    "chapter_file": "chapter_103.html"
+  },
+  {
+    "title": "第三次国内革命战争时期",
+    "level": 1,
+    "chapter_index": 104,
+    "chapter_file": "chapter_104.html"
+  },
+  {
+    "title": "抗日战争胜利后的时局和我们的方针",
+    "level": 2,
+    "chapter_index": 105,
+    "chapter_file": "chapter_105.html"
+  },
+  {
+    "title": "蒋介石在挑动内战",
+    "level": 2,
+    "chapter_index": 106,
+    "chapter_file": "chapter_106.html"
+  },
+  {
+    "title": "第十八集团军总司令给蒋介石的两个电报",
+    "level": 2,
+    "chapter_index": 107,
+    "chapter_file": "chapter_107.html"
+  },
+  {
+    "title": "评蒋介石发言人谈话",
+    "level": 2,
+    "chapter_index": 108,
+    "chapter_file": "chapter_108.html"
+  },
+  {
+    "title": "中共中央关于同国民党进行和平谈判的通知",
+    "level": 2,
+    "chapter_index": 109,
+    "chapter_file": "chapter_109.html"
+  },
+  {
+    "title": "关于重庆谈判",
+    "level": 2,
+    "chapter_index": 110,
+    "chapter_file": "chapter_110.html"
+  },
+  {
+    "title": "国民党进攻的真相",
+    "level": 2,
+    "chapter_index": 111,
+    "chapter_file": "chapter_111.html"
+  },
+  {
+    "title": "减租和生产是保卫解放区的两件大事",
+    "level": 2,
+    "chapter_index": 112,
+    "chapter_file": "chapter_112.html"
+  },
+  {
+    "title": "一九四六年解放区工作的方针",
+    "level": 2,
+    "chapter_index": 113,
+    "chapter_file": "chapter_113.html"
+  },
+  {
+    "title": "建立巩固的东北根据地",
+    "level": 2,
+    "chapter_index": 114,
+    "chapter_file": "chapter_114.html"
+  },
+  {
+    "title": "关于目前国际形势的几点估计",
+    "level": 2,
+    "chapter_index": 115,
+    "chapter_file": "chapter_115.html"
+  },
+  {
+    "title": "以自卫战争粉碎蒋介石的进攻",
+    "level": 2,
+    "chapter_index": 116,
+    "chapter_file": "chapter_116.html"
+  },
+  {
+    "title": "和美国记者安娜·路易斯·斯特朗的谈话",
+    "level": 2,
+    "chapter_index": 117,
+    "chapter_file": "chapter_117.html"
+  },
+  {
+    "title": "集中优势兵力，各个歼灭敌人",
+    "level": 2,
+    "chapter_index": 118,
+    "chapter_file": "chapter_118.html"
+  },
+  {
+    "title": "美国“调解”真相和中国内战前途",
+    "level": 2,
+    "chapter_index": 119,
+    "chapter_file": "chapter_119.html"
+  },
+  {
+    "title": "三个月总结",
+    "level": 2,
+    "chapter_index": 120,
+    "chapter_file": "chapter_120.html"
+  },
+  {
+    "title": "迎接中国革命的新高潮",
+    "level": 2,
+    "chapter_index": 121,
+    "chapter_file": "chapter_121.html"
+  },
+  {
+    "title": "中共中央关于暂时放弃延安和保卫陕甘宁边区的两个文件",
+    "level": 2,
+    "chapter_index": 122,
+    "chapter_file": "chapter_122.html"
+  },
+  {
+    "title": "关于西北战场的作战方针",
+    "level": 2,
+    "chapter_index": 123,
+    "chapter_file": "chapter_123.html"
+  },
+  {
+    "title": "蒋介石政府已处在全民的包围中",
+    "level": 2,
+    "chapter_index": 124,
+    "chapter_file": "chapter_124.html"
+  },
+  {
+    "title": "解放战争第二年的战略方针",
+    "level": 2,
+    "chapter_index": 125,
+    "chapter_file": "chapter_125.html"
+  },
+  {
+    "title": "中国人民解放军宣言",
+    "level": 2,
+    "chapter_index": 126,
+    "chapter_file": "chapter_126.html"
+  },
+  {
+    "title": "中国人民解放军总部关于重行颁布三大纪律八项注意的训令",
+    "level": 2,
+    "chapter_index": 127,
+    "chapter_file": "chapter_127.html"
+  },
+  {
+    "title": "目前形势和我们的任务",
+    "level": 2,
+    "chapter_index": 128,
+    "chapter_file": "chapter_128.html"
+  },
+  {
+    "title": "关于建立报告制度",
+    "level": 2,
+    "chapter_index": 129,
+    "chapter_file": "chapter_129.html"
+  },
+  {
+    "title": "关于目前党的政策中的几个重要问题",
+    "level": 2,
+    "chapter_index": 130,
+    "chapter_file": "chapter_130.html"
+  },
+  {
+    "title": "军队内部的民主运动",
+    "level": 2,
+    "chapter_index": 131,
+    "chapter_file": "chapter_131.html"
+  },
+  {
+    "title": "在不同地区实施土地法的不同策略",
+    "level": 2,
+    "chapter_index": 132,
+    "chapter_file": "chapter_132.html"
+  },
+  {
+    "title": "纠正土地改革宣传中的“左”倾错误",
+    "level": 2,
+    "chapter_index": 133,
+    "chapter_file": "chapter_133.html"
+  },
+  {
+    "title": "新解放区土地改革要点",
+    "level": 2,
+    "chapter_index": 134,
+    "chapter_file": "chapter_134.html"
+  },
+  {
+    "title": "关于工商业政策",
+    "level": 2,
+    "chapter_index": 135,
+    "chapter_file": "chapter_135.html"
+  },
+  {
+    "title": "关于民族资产阶级和开明绅士问题",
+    "level": 2,
+    "chapter_index": 136,
+    "chapter_file": "chapter_136.html"
+  },
+  {
+    "title": "评西北大捷兼论解放军的新式整军运动",
+    "level": 2,
+    "chapter_index": 137,
+    "chapter_file": "chapter_137.html"
+  },
+  {
+    "title": "关于情况的通报",
+    "level": 2,
+    "chapter_index": 138,
+    "chapter_file": "chapter_138.html"
+  },
+  {
+    "title": "在晋绥干部会议上的讲话",
+    "level": 2,
+    "chapter_index": 139,
+    "chapter_file": "chapter_139.html"
+  },
+  {
+    "title": "对晋绥日报编辑人员的谈话",
+    "level": 2,
+    "chapter_index": 140,
+    "chapter_file": "chapter_140.html"
+  },
+  {
+    "title": "再克洛阳后给洛阳前线指挥部的电报",
+    "level": 2,
+    "chapter_index": 141,
+    "chapter_file": "chapter_141.html"
+  },
+  {
+    "title": "新解放区农村工作的策略问题",
+    "level": 2,
+    "chapter_index": 142,
+    "chapter_file": "chapter_142.html"
+  },
+  {
+    "title": "一九四八年的土地改革工作和整党工作",
+    "level": 2,
+    "chapter_index": 143,
+    "chapter_file": "chapter_143.html"
+  },
+  {
+    "title": "关于辽沈战役的作战方针",
+    "level": 2,
+    "chapter_index": 144,
+    "chapter_file": "chapter_144.html"
+  },
+  {
+    "title": "关于健全党委制",
+    "level": 2,
+    "chapter_index": 145,
+    "chapter_file": "chapter_145.html"
+  },
+  {
+    "title": "中共中央关于九月会议的通知",
+    "level": 2,
+    "chapter_index": 146,
+    "chapter_file": "chapter_146.html"
+  },
+  {
+    "title": "关于淮海战役的的作战方针",
+    "level": 2,
+    "chapter_index": 147,
+    "chapter_file": "chapter_147.html"
+  },
+  {
+    "title": "全世界革命力量团结起来，反对帝国主义的侵略",
+    "level": 2,
+    "chapter_index": 148,
+    "chapter_file": "chapter_148.html"
+  },
+  {
+    "title": "中国军事形势的重大变化",
+    "level": 2,
+    "chapter_index": 149,
+    "chapter_file": "chapter_149.html"
+  },
+  {
+    "title": "关于平津战役的作战方针",
+    "level": 2,
+    "chapter_index": 150,
+    "chapter_file": "chapter_150.html"
+  },
+  {
+    "title": "敦促杜聿明等投降书",
+    "level": 2,
+    "chapter_index": 151,
+    "chapter_file": "chapter_151.html"
+  },
+  {
+    "title": "将革命进行到底",
+    "level": 2,
+    "chapter_index": 152,
+    "chapter_file": "chapter_152.html"
+  },
+  {
+    "title": "评战犯求和",
+    "level": 2,
+    "chapter_index": 153,
+    "chapter_file": "chapter_153.html"
+  },
+  {
+    "title": "中共中央毛泽东主席关于时局的声明",
+    "level": 2,
+    "chapter_index": 154,
+    "chapter_file": "chapter_154.html"
+  },
+  {
+    "title": "中共发言人评南京行政院的决议",
+    "level": 2,
+    "chapter_index": 155,
+    "chapter_file": "chapter_155.html"
+  },
+  {
+    "title": "中共发言人关于命令国民党反动政府重新逮捕前日本侵华军总司令冈村宁次和逮捕国民党内战罪犯的谈话",
+    "level": 2,
+    "chapter_index": 156,
+    "chapter_file": "chapter_156.html"
+  },
+  {
+    "title": "中共发言人关于和平条件必须包括惩办日本战犯和国民党战犯的声明",
+    "level": 2,
+    "chapter_index": 157,
+    "chapter_file": "chapter_157.html"
+  },
+  {
+    "title": "把军队变为工作队",
+    "level": 2,
+    "chapter_index": 158,
+    "chapter_file": "chapter_158.html"
+  },
+  {
+    "title": "四分五裂的反动派为什么还要空喊“全面和平”？",
+    "level": 2,
+    "chapter_index": 159,
+    "chapter_file": "chapter_159.html"
+  },
+  {
+    "title": "国民党反动派由“呼吁和平”变为呼吁战争",
+    "level": 2,
+    "chapter_index": 160,
+    "chapter_file": "chapter_160.html"
+  },
+  {
+    "title": "评国民党对战争责任问题的几种答案",
+    "level": 2,
+    "chapter_index": 161,
+    "chapter_file": "chapter_161.html"
+  },
+  {
+    "title": "在中国共产党第七届中央委员会第二次全体会议上的报告",
+    "level": 2,
+    "chapter_index": 162,
+    "chapter_file": "chapter_162.html"
+  },
+  {
+    "title": "党委会的工作方法",
+    "level": 2,
+    "chapter_index": 163,
+    "chapter_file": "chapter_163.html"
+  },
+  {
+    "title": "南京政府向何处去？",
+    "level": 2,
+    "chapter_index": 164,
+    "chapter_file": "chapter_164.html"
+  },
+  {
+    "title": "向全国进军的命令",
+    "level": 2,
+    "chapter_index": 165,
+    "chapter_file": "chapter_165.html"
+  },
+  {
+    "title": "中国人民解放军布告",
+    "level": 2,
+    "chapter_index": 166,
+    "chapter_file": "chapter_166.html"
+  },
+  {
+    "title": "中国人民解放军总部发言人为英国军舰暴行发表的声明",
+    "level": 2,
+    "chapter_index": 167,
+    "chapter_file": "chapter_167.html"
+  },
+  {
+    "title": "在新政治协商会议筹备会上的讲话",
+    "level": 2,
+    "chapter_index": 168,
+    "chapter_file": "chapter_168.html"
+  },
+  {
+    "title": "论人民民主专政",
+    "level": 2,
+    "chapter_index": 169,
+    "chapter_file": "chapter_169.html"
+  },
+  {
+    "title": "丢掉幻想，准备斗争",
+    "level": 2,
+    "chapter_index": 170,
+    "chapter_file": "chapter_170.html"
+  },
+  {
+    "title": "别了，司徒雷登",
+    "level": 2,
+    "chapter_index": 171,
+    "chapter_file": "chapter_171.html"
+  },
+  {
+    "title": "为什么要讨论白皮书？",
+    "level": 2,
+    "chapter_index": 172,
+    "chapter_file": "chapter_172.html"
+  },
+  {
+    "title": "“友谊”，还是侵略？",
+    "level": 2,
+    "chapter_index": 173,
+    "chapter_file": "chapter_173.html"
+  },
+  {
+    "title": "唯心历史观的破产",
+    "level": 2,
+    "chapter_index": 174,
+    "chapter_file": "chapter_174.html"
+  },
+  {
+    "title": "第五卷",
+    "level": 0,
+    "chapter_index": 175,
+    "chapter_file": "chapter_175.html"
+  },
+  {
+    "title": "出版说明",
+    "level": 1,
+    "chapter_index": 177,
+    "chapter_file": "chapter_177.html"
+  },
+  {
+    "title": "社会主义革命和社会主义建设时期（一）",
+    "level": 1,
+    "chapter_index": 178,
+    "chapter_file": "chapter_178.html"
+  },
+  {
+    "title": "中国人民站起来了",
+    "level": 2,
+    "chapter_index": 179,
+    "chapter_file": "chapter_179.html"
+  },
+  {
+    "title": "中国人民大团结万岁",
+    "level": 2,
+    "chapter_index": 180,
+    "chapter_file": "chapter_180.html"
+  },
+  {
+    "title": "人民英雄们永垂不朽",
+    "level": 2,
+    "chapter_index": 181,
+    "chapter_file": "chapter_181.html"
+  },
+  {
+    "title": "永远保持艰苦奋斗的作风",
+    "level": 2,
+    "chapter_index": 182,
+    "chapter_file": "chapter_182.html"
+  },
+  {
+    "title": "征询对待富农策略问题的意见",
+    "level": 2,
+    "chapter_index": 183,
+    "chapter_file": "chapter_183.html"
+  },
+  {
+    "title": "为争取国家财政经济状况的基本好转而斗争",
+    "level": 2,
+    "chapter_index": 184,
+    "chapter_file": "chapter_184.html"
+  },
+  {
+    "title": "不要四面出击",
+    "level": 2,
+    "chapter_index": 185,
+    "chapter_file": "chapter_185.html"
+  },
+  {
+    "title": "做一个完全的革命派",
+    "level": 2,
+    "chapter_index": 186,
+    "chapter_file": "chapter_186.html"
+  },
+  {
+    "title": "你们是全民族的模范人物",
+    "level": 2,
+    "chapter_index": 187,
+    "chapter_file": "chapter_187.html"
+  },
+  {
+    "title": "给中国人民志愿军的命令",
+    "level": 2,
+    "chapter_index": 188,
+    "chapter_file": "chapter_188.html"
+  },
+  {
+    "title": "中国人民志愿军要爱护朝鲜的一山一水一草一木",
+    "level": 2,
+    "chapter_index": 189,
+    "chapter_file": "chapter_189.html"
+  },
+  {
+    "title": "中共中央政治局扩大会议决议要点",
+    "level": 2,
+    "chapter_index": 190,
+    "chapter_file": "chapter_190.html"
+  },
+  {
+    "title": "镇压反革命必须实行党的群众路线",
+    "level": 2,
+    "chapter_index": 191,
+    "chapter_file": "chapter_191.html"
+  },
+  {
+    "title": "镇压反革命必须打得稳，打得准，打得狠",
+    "level": 2,
+    "chapter_index": 192,
+    "chapter_file": "chapter_192.html"
+  },
+  {
+    "title": "应当重视电影《武训传》的讨论",
+    "level": 2,
+    "chapter_index": 193,
+    "chapter_file": "chapter_193.html"
+  },
+  {
+    "title": "三大运动的伟大胜利",
+    "level": 2,
+    "chapter_index": 194,
+    "chapter_file": "chapter_194.html"
+  },
+  {
+    "title": "关于“三反”“五反”的斗争",
+    "level": 2,
+    "chapter_index": 195,
+    "chapter_file": "chapter_195.html"
+  },
+  {
+    "title": "把农业互助合作当作一件大事去做",
+    "level": 2,
+    "chapter_index": 196,
+    "chapter_file": "chapter_196.html"
+  },
+  {
+    "title": "元旦祝词",
+    "level": 2,
+    "chapter_index": 197,
+    "chapter_file": "chapter_197.html"
+  },
+  {
+    "title": "中共中央关于西藏工作方针的指示",
+    "level": 2,
+    "chapter_index": 198,
+    "chapter_file": "chapter_198.html"
+  },
+  {
+    "title": "工人阶级与资产阶级的矛盾是国内的主要矛盾",
+    "level": 2,
+    "chapter_index": 199,
+    "chapter_file": "chapter_199.html"
+  },
+  {
+    "title": "团结起来，划清敌我界限",
+    "level": 2,
+    "chapter_index": 200,
+    "chapter_file": "chapter_200.html"
+  },
+  {
+    "title": "祝贺中国人民志愿军的重大胜利",
+    "level": 2,
+    "chapter_index": 201,
+    "chapter_file": "chapter_201.html"
+  },
+  {
+    "title": "反对官僚主义、命令主义和违法乱纪",
+    "level": 2,
+    "chapter_index": 202,
+    "chapter_file": "chapter_202.html"
+  },
+  {
+    "title": "批判大汉族主义",
+    "level": 2,
+    "chapter_index": 203,
+    "chapter_file": "chapter_203.html"
+  },
+  {
+    "title": "解决“五多”问题",
+    "level": 2,
+    "chapter_index": 204,
+    "chapter_file": "chapter_204.html"
+  },
+  {
+    "title": "对刘少奇、杨尚昆破坏纪律擅自以中央名义发出文件的批评",
+    "level": 2,
+    "chapter_index": 205,
+    "chapter_file": "chapter_205.html"
+  },
+  {
+    "title": "批判离开总路线的右倾观点",
+    "level": 2,
+    "chapter_index": 206,
+    "chapter_file": "chapter_206.html"
+  },
+  {
+    "title": "青年团的工作要照顾青年的特点",
+    "level": 2,
+    "chapter_index": 207,
+    "chapter_file": "chapter_207.html"
+  },
+  {
+    "title": "关于国家资本主义",
+    "level": 2,
+    "chapter_index": 208,
+    "chapter_file": "chapter_208.html"
+  },
+  {
+    "title": "党在过渡时期的总路线",
+    "level": 2,
+    "chapter_index": 209,
+    "chapter_file": "chapter_209.html"
+  },
+  {
+    "title": "反对党内的资产阶级思想",
+    "level": 2,
+    "chapter_index": 210,
+    "chapter_file": "chapter_210.html"
+  },
+  {
+    "title": "改造资本主义工商业的必经之路",
+    "level": 2,
+    "chapter_index": 211,
+    "chapter_file": "chapter_211.html"
+  },
+  {
+    "title": "抗美援朝的伟大胜利和今后的任务",
+    "level": 2,
+    "chapter_index": 212,
+    "chapter_file": "chapter_212.html"
+  },
+  {
+    "title": "批判梁漱溟的反动思想",
+    "level": 2,
+    "chapter_index": 213,
+    "chapter_file": "chapter_213.html"
+  },
+  {
+    "title": "关于农业互助合作的两次谈话",
+    "level": 2,
+    "chapter_index": 214,
+    "chapter_file": "chapter_214.html"
+  },
+  {
+    "title": "关于中华人民共和国宪法草案",
+    "level": 2,
+    "chapter_index": 215,
+    "chapter_file": "chapter_215.html"
+  },
+  {
+    "title": "为建设一个伟大的社会主义国家而奋斗",
+    "level": 2,
+    "chapter_index": 216,
+    "chapter_file": "chapter_216.html"
+  },
+  {
+    "title": "关于《红楼梦》研究问题的信",
+    "level": 2,
+    "chapter_index": 217,
+    "chapter_file": "chapter_217.html"
+  },
+  {
+    "title": "原子弹吓不倒中国人民",
+    "level": 2,
+    "chapter_index": 218,
+    "chapter_file": "chapter_218.html"
+  },
+  {
+    "title": "在中国共产党全国代表会议上的讲话",
+    "level": 2,
+    "chapter_index": 219,
+    "chapter_file": "chapter_219.html"
+  },
+  {
+    "title": "驳“舆论一律”",
+    "level": 2,
+    "chapter_index": 220,
+    "chapter_file": "chapter_220.html"
+  },
+  {
+    "title": "《关于胡风反革命集团的材料》的序言和按语",
+    "level": 2,
+    "chapter_index": 221,
+    "chapter_file": "chapter_221.html"
+  },
+  {
+    "title": "关于农业合作化问题",
+    "level": 2,
+    "chapter_index": 222,
+    "chapter_file": "chapter_222.html"
+  },
+  {
+    "title": "农业合作化必须依靠党团员和贫农下中农",
+    "level": 2,
+    "chapter_index": 223,
+    "chapter_file": "chapter_223.html"
+  },
+  {
+    "title": "农业合作化的一场辩论和当前的阶级斗争",
+    "level": 2,
+    "chapter_index": 224,
+    "chapter_file": "chapter_224.html"
+  },
+  {
+    "title": "《中国农村的社会主义高潮》的序言",
+    "level": 2,
+    "chapter_index": 225,
+    "chapter_file": "chapter_225.html"
+  },
+  {
+    "title": "《中国农村的社会主义高潮》的按语",
+    "level": 2,
+    "chapter_index": 226,
+    "chapter_file": "chapter_226.html"
+  },
+  {
+    "title": "征询对农业十七条的意见",
+    "level": 2,
+    "chapter_index": 227,
+    "chapter_file": "chapter_227.html"
+  },
+  {
+    "title": "加快手工业的社会主义改造",
+    "level": 2,
+    "chapter_index": 228,
+    "chapter_file": "chapter_228.html"
+  },
+  {
+    "title": "论十大关系",
+    "level": 2,
+    "chapter_index": 229,
+    "chapter_file": "chapter_229.html"
+  },
+  {
+    "title": "美帝国主义是纸老虎",
+    "level": 2,
+    "chapter_index": 230,
+    "chapter_file": "chapter_230.html"
+  },
+  {
+    "title": "增强党的团结，继承党的传统",
+    "level": 2,
+    "chapter_index": 231,
+    "chapter_file": "chapter_231.html"
+  },
+  {
+    "title": "我们党的—些历史经验",
+    "level": 2,
+    "chapter_index": 232,
+    "chapter_file": "chapter_232.html"
+  },
+  {
+    "title": "纪念孙中山先生",
+    "level": 2,
+    "chapter_index": 233,
+    "chapter_file": "chapter_233.html"
+  },
+  {
+    "title": "在中国共产党第八届中央委员会第二次全体会议上的讲话",
+    "level": 2,
+    "chapter_index": 234,
+    "chapter_file": "chapter_234.html"
+  },
+  {
+    "title": "在省市自治区党委书记会议上的讲话",
+    "level": 2,
+    "chapter_index": 235,
+    "chapter_file": "chapter_235.html"
+  },
+  {
+    "title": "关于正确处理人民内部矛盾的问题",
+    "level": 2,
+    "chapter_index": 236,
+    "chapter_file": "chapter_236.html"
+  },
+  {
+    "title": "在中国共产党全国宣传工作会议上的讲话",
+    "level": 2,
+    "chapter_index": 237,
+    "chapter_file": "chapter_237.html"
+  },
+  {
+    "title": "坚持艰苦奋斗，密切联系群众",
+    "level": 2,
+    "chapter_index": 238,
+    "chapter_file": "chapter_238.html"
+  },
+  {
+    "title": "事情正在起变化",
+    "level": 2,
+    "chapter_index": 239,
+    "chapter_file": "chapter_239.html"
+  },
+  {
+    "title": "中国共产党是全中国人民的领导核心",
+    "level": 2,
+    "chapter_index": 240,
+    "chapter_file": "chapter_240.html"
+  },
+  {
+    "title": "组织力量反击右派分子的猖狂进攻",
+    "level": 2,
+    "chapter_index": 241,
+    "chapter_file": "chapter_241.html"
+  },
+  {
+    "title": "文汇报的资产阶级方向应当批判",
+    "level": 2,
+    "chapter_index": 242,
+    "chapter_file": "chapter_242.html"
+  },
+  {
+    "title": "打退资产阶级右派的进攻",
+    "level": 2,
+    "chapter_index": 243,
+    "chapter_file": "chapter_243.html"
+  },
+  {
+    "title": "一九五七年夏季的形势",
+    "level": 2,
+    "chapter_index": 244,
+    "chapter_file": "chapter_244.html"
+  },
+  {
+    "title": "做革命的促进派",
+    "level": 2,
+    "chapter_index": 245,
+    "chapter_file": "chapter_245.html"
+  },
+  {
+    "title": "坚定地相信群众的大多数",
+    "level": 2,
+    "chapter_index": 246,
+    "chapter_file": "chapter_246.html"
+  },
+  {
+    "title": "党内团结的辩证方法",
+    "level": 2,
+    "chapter_index": 247,
+    "chapter_file": "chapter_247.html"
+  },
+  {
+    "title": "一切反动派都是纸老虎",
+    "level": 2,
+    "chapter_index": 248,
+    "chapter_file": "chapter_248.html"
+  },
+  {
+    "title": "第六卷（静火版）",
+    "level": 0,
+    "chapter_index": 249,
+    "chapter_file": "chapter_249.html"
+  },
+  {
+    "title": "出版说明",
+    "level": 1,
+    "chapter_index": 250,
+    "chapter_file": "chapter_250.html"
+  },
+  {
+    "title": "静火有言",
+    "level": 1,
+    "chapter_index": 251,
+    "chapter_file": "chapter_251.html"
+  },
+  {
+    "title": "社会主义革命和社会主义建设时期（二）",
+    "level": 1,
+    "chapter_index": 252,
+    "chapter_file": "chapter_252.html"
+  },
+  {
+    "title": "关于中国人民志愿军撤出朝鲜问题",
+    "level": 2,
+    "chapter_index": 253,
+    "chapter_file": "chapter_253.html"
+  },
+  {
+    "title": "工作方法六十条（草案）",
+    "level": 2,
+    "chapter_index": 254,
+    "chapter_file": "chapter_254.html"
+  },
+  {
+    "title": "在成都会议上的讲话",
+    "level": 2,
+    "chapter_index": 255,
+    "chapter_file": "chapter_255.html"
+  },
+  {
+    "title": "干部要以普通劳动者的姿态出现",
+    "level": 2,
+    "chapter_index": 256,
+    "chapter_file": "chapter_256.html"
+  },
+  {
+    "title": "要搞一点原子弹氢弹",
+    "level": 2,
+    "chapter_index": 257,
+    "chapter_file": "chapter_257.html"
+  },
+  {
+    "title": "西藏要准备对付那里的可能的全局叛乱",
+    "level": 2,
+    "chapter_index": 258,
+    "chapter_file": "chapter_258.html"
+  },
+  {
+    "title": "介绍一封信",
+    "level": 2,
+    "chapter_index": 259,
+    "chapter_file": "chapter_259.html"
+  },
+  {
+    "title": "同苏联驻华大使尤金的谈话",
+    "level": 2,
+    "chapter_index": 260,
+    "chapter_file": "chapter_260.html"
+  },
+  {
+    "title": "关于国际形势问题",
+    "level": 2,
+    "chapter_index": 261,
+    "chapter_file": "chapter_261.html"
+  },
+  {
+    "title": "中华人民共和国国防部告台湾同胞书",
+    "level": 2,
+    "chapter_index": 262,
+    "chapter_file": "chapter_262.html"
+  },
+  {
+    "title": "中华人民共和国国防部命令",
+    "level": 2,
+    "chapter_index": 263,
+    "chapter_file": "chapter_263.html"
+  },
+  {
+    "title": "中华人民共和国国防部再告台湾同胞书",
+    "level": 2,
+    "chapter_index": 264,
+    "chapter_file": "chapter_264.html"
+  },
+  {
+    "title": "关于社会主义商品生产问题",
+    "level": 2,
+    "chapter_index": 265,
+    "chapter_file": "chapter_265.html"
+  },
+  {
+    "title": "记者头脑要冷静",
+    "level": 2,
+    "chapter_index": 266,
+    "chapter_file": "chapter_266.html"
+  },
+  {
+    "title": "在武昌会议上的讲话",
+    "level": 2,
+    "chapter_index": 267,
+    "chapter_file": "chapter_267.html"
+  },
+  {
+    "title": "关于帝国主义和一切反动派是不是真老虎的问题",
+    "level": 2,
+    "chapter_index": 268,
+    "chapter_file": "chapter_268.html"
+  },
+  {
+    "title": "在八届六中全会上的讲话",
+    "level": 2,
+    "chapter_index": 269,
+    "chapter_file": "chapter_269.html"
+  },
+  {
+    "title": "马列主义基本原理至今未变，个别结论可以改变",
+    "level": 2,
+    "chapter_index": 270,
+    "chapter_file": "chapter_270.html"
+  },
+  {
+    "title": "在第二次郑州会议上的讲话",
+    "level": 2,
+    "chapter_index": 271,
+    "chapter_file": "chapter_271.html"
+  },
+  {
+    "title": "党内通信——建议召开县五级干部大会",
+    "level": 2,
+    "chapter_index": 272,
+    "chapter_file": "chapter_272.html"
+  },
+  {
+    "title": "关于西藏平叛",
+    "level": 2,
+    "chapter_index": 273,
+    "chapter_file": "chapter_273.html"
+  },
+  {
+    "title": "党内通信——致六级干部的公开信",
+    "level": 2,
+    "chapter_index": 274,
+    "chapter_file": "chapter_274.html"
+  },
+  {
+    "title": "关于西藏问题和台湾问题",
+    "level": 2,
+    "chapter_index": 275,
+    "chapter_file": "chapter_275.html"
+  },
+  {
+    "title": "经济建设是科学，要老老实实学习",
+    "level": 2,
+    "chapter_index": 276,
+    "chapter_file": "chapter_276.html"
+  },
+  {
+    "title": "要政治家办报",
+    "level": 2,
+    "chapter_index": 277,
+    "chapter_file": "chapter_277.html"
+  },
+  {
+    "title": "如实公开报道灾情",
+    "level": 2,
+    "chapter_index": 278,
+    "chapter_file": "chapter_278.html"
+  },
+  {
+    "title": "庐山会议讨论的十八个问题",
+    "level": 2,
+    "chapter_index": 279,
+    "chapter_file": "chapter_279.html"
+  },
+  {
+    "title": "在庐山会议上的多次讲话、批语",
+    "level": 2,
+    "chapter_index": 280,
+    "chapter_file": "chapter_280.html"
+  },
+  {
+    "title": "对彭德怀九月九日信的批示",
+    "level": 2,
+    "chapter_index": 281,
+    "chapter_file": "chapter_281.html"
+  },
+  {
+    "title": "争取比较长的和平时间是可能的",
+    "level": 2,
+    "chapter_index": 282,
+    "chapter_file": "chapter_282.html"
+  },
+  {
+    "title": "同澳共总书记夏基的谈话",
+    "level": 2,
+    "chapter_index": 283,
+    "chapter_file": "chapter_283.html"
+  },
+  {
+    "title": "读苏联《政治经济学教科书》的谈话",
+    "level": 2,
+    "chapter_index": 284,
+    "chapter_file": "chapter_284.html"
+  },
+  {
+    "title": "坚决制止重刮“共产风”等违法乱纪行为",
+    "level": 2,
+    "chapter_index": 285,
+    "chapter_file": "chapter_285.html"
+  },
+  {
+    "title": "同蒙哥马利的谈话",
+    "level": 2,
+    "chapter_index": 286,
+    "chapter_file": "chapter_286.html"
+  },
+  {
+    "title": "十年总结",
+    "level": 2,
+    "chapter_index": 287,
+    "chapter_file": "chapter_287.html"
+  },
+  {
+    "title": "同斯诺的谈话——中国人的精神面貌改变了",
+    "level": 2,
+    "chapter_index": 288,
+    "chapter_file": "chapter_288.html"
+  },
+  {
+    "title": "彻底纠正“五风”",
+    "level": 2,
+    "chapter_index": 289,
+    "chapter_file": "chapter_289.html"
+  },
+  {
+    "title": "永远不许一平二调",
+    "level": 2,
+    "chapter_index": 290,
+    "chapter_file": "chapter_290.html"
+  },
+  {
+    "title": "坚决退赔，刹住“共产风”",
+    "level": 2,
+    "chapter_index": 291,
+    "chapter_file": "chapter_291.html"
+  },
+  {
+    "title": "大兴调查研究之风",
+    "level": 2,
+    "chapter_index": 292,
+    "chapter_file": "chapter_292.html"
+  },
+  {
+    "title": "要做系统的由历史到现状的调查研究",
+    "level": 2,
+    "chapter_index": 293,
+    "chapter_file": "chapter_293.html"
+  },
+  {
+    "title": "总结经验，教育干部",
+    "level": 2,
+    "chapter_index": 294,
+    "chapter_file": "chapter_294.html"
+  },
+  {
+    "title": "中国在联合国只能有一个代表",
+    "level": 2,
+    "chapter_index": 295,
+    "chapter_file": "chapter_295.html"
+  },
+  {
+    "title": "在七千人大会上的讲话——关于党的民主集中制",
+    "level": 2,
+    "chapter_index": 296,
+    "chapter_file": "chapter_296.html"
+  },
+  {
+    "title": "在北戴河中央工作会议中心小组会上的讲话",
+    "level": 2,
+    "chapter_index": 297,
+    "chapter_file": "chapter_297.html"
+  },
+  {
+    "title": "在八届十中全会上的讲话",
+    "level": 2,
+    "chapter_index": 298,
+    "chapter_file": "chapter_298.html"
+  },
+  {
+    "title": "干部参加劳动的伟大意义",
+    "level": 2,
+    "chapter_index": 299,
+    "chapter_file": "chapter_299.html"
+  },
+  {
+    "title": "人的正确思想是从哪里来的？",
+    "level": 2,
+    "chapter_index": 300,
+    "chapter_file": "chapter_300.html"
+  },
+  {
+    "title": "论反对官僚主义",
+    "level": 2,
+    "chapter_index": 301,
+    "chapter_file": "chapter_301.html"
+  },
+  {
+    "title": "支持美国黑人反对种族歧视斗争的声明",
+    "level": 2,
+    "chapter_index": 302,
+    "chapter_file": "chapter_302.html"
+  },
+  {
+    "title": "受压迫的人民总是要起来的",
+    "level": 2,
+    "chapter_index": 303,
+    "chapter_file": "chapter_303.html"
+  },
+  {
+    "title": "革命和建设都要靠自己",
+    "level": 2,
+    "chapter_index": 304,
+    "chapter_file": "chapter_304.html"
+  },
+  {
+    "title": "关于文艺工作的批示",
+    "level": 2,
+    "chapter_index": 305,
+    "chapter_file": "chapter_305.html"
+  },
+  {
+    "title": "加强相互学习，克服固步自封、骄傲自满",
+    "level": 2,
+    "chapter_index": 306,
+    "chapter_file": "chapter_306.html"
+  },
+  {
+    "title": "不搞科学技术，生产力无法提高",
+    "level": 2,
+    "chapter_index": 307,
+    "chapter_file": "chapter_307.html"
+  },
+  {
+    "title": "我国还可能要走一段资本主义复辟的道路",
+    "level": 2,
+    "chapter_index": 308,
+    "chapter_file": "chapter_308.html"
+  },
+  {
+    "title": "中法之间有共同点",
+    "level": 2,
+    "chapter_index": 309,
+    "chapter_file": "chapter_309.html"
+  },
+  {
+    "title": "关于教育革命的谈话",
+    "level": 2,
+    "chapter_index": 310,
+    "chapter_file": "chapter_310.html"
+  },
+  {
+    "title": "以农业为基础，以工业为主导",
+    "level": 2,
+    "chapter_index": 311,
+    "chapter_file": "chapter_311.html"
+  },
+  {
+    "title": "支持被压迫人民反对帝国主义的战争",
+    "level": 2,
+    "chapter_index": 312,
+    "chapter_file": "chapter_312.html"
+  },
+  {
+    "title": "和王海蓉同志的谈话",
+    "level": 2,
+    "chapter_index": 313,
+    "chapter_file": "chapter_313.html"
+  },
+  {
+    "title": "哪里有压迫哪里就有反抗",
+    "level": 2,
+    "chapter_index": 314,
+    "chapter_file": "chapter_314.html"
+  },
+  {
+    "title": "接见日本社会党人士的谈话",
+    "level": 2,
+    "chapter_index": 315,
+    "chapter_file": "chapter_315.html"
+  },
+  {
+    "title": "关于九评苏共中央的公开信的节录",
+    "level": 2,
+    "chapter_index": 316,
+    "chapter_file": "chapter_316.html"
+  },
+  {
+    "title": "中华人民共和国政府声明",
+    "level": 2,
+    "chapter_index": 317,
+    "chapter_file": "chapter_317.html"
+  },
+  {
+    "title": "打破核垄断，消灭核武器",
+    "level": 2,
+    "chapter_index": 318,
+    "chapter_file": "chapter_318.html"
+  },
+  {
+    "title": "中国的大跃进",
+    "level": 2,
+    "chapter_index": 319,
+    "chapter_file": "chapter_319.html"
+  },
+  {
+    "title": "同斯诺的谈话——关于越南战争",
+    "level": 2,
+    "chapter_index": 320,
+    "chapter_file": "chapter_320.html"
+  },
+  {
+    "title": "官僚主义者阶级是革命对象",
+    "level": 2,
+    "chapter_index": 321,
+    "chapter_file": "chapter_321.html"
+  },
+  {
+    "title": "我们希望阿拉伯国家团结起来",
+    "level": 2,
+    "chapter_index": 322,
+    "chapter_file": "chapter_322.html"
+  },
+  {
+    "title": "把医疗卫生工作的重点放到农村去",
+    "level": 2,
+    "chapter_index": 323,
+    "chapter_file": "chapter_323.html"
+  },
+  {
+    "title": "人民给政府饭吃，吃了饭就要为人民服务",
+    "level": 2,
+    "chapter_index": 324,
+    "chapter_file": "chapter_324.html"
+  },
+  {
+    "title": "胜利的信念是从斗争中得来的",
+    "level": 2,
+    "chapter_index": 325,
+    "chapter_file": "chapter_325.html"
+  },
+  {
+    "title": "突出政治，反对折衷主义",
+    "level": 2,
+    "chapter_index": 326,
+    "chapter_file": "chapter_326.html"
+  },
+  {
+    "title": "上面要靠党的领导，下面要靠广大群众",
+    "level": 2,
+    "chapter_index": 327,
+    "chapter_file": "chapter_327.html"
+  },
+  {
+    "title": "第七卷（静火版）",
+    "level": 0,
+    "chapter_index": 328,
+    "chapter_file": "chapter_328.html"
+  },
+  {
+    "title": "出版说明",
+    "level": 1,
+    "chapter_index": 329,
+    "chapter_file": "chapter_329.html"
+  },
+  {
+    "title": "静火有言",
+    "level": 1,
+    "chapter_index": 330,
+    "chapter_file": "chapter_330.html"
+  },
+  {
+    "title": "文化大革命时期",
+    "level": 1,
+    "chapter_index": 331,
+    "chapter_file": "chapter_331.html"
+  },
+  {
+    "title": "关于农业机械化——备战备荒为人民",
+    "level": 2,
+    "chapter_index": 332,
+    "chapter_file": "chapter_332.html"
+  },
+  {
+    "title": "在中央政治局常委扩大会议上的讲话",
+    "level": 2,
+    "chapter_index": 333,
+    "chapter_file": "chapter_333.html"
+  },
+  {
+    "title": "对中宣部和北京市委的批评",
+    "level": 2,
+    "chapter_index": 334,
+    "chapter_file": "chapter_334.html"
+  },
+  {
+    "title": "学校一律要实行半工半读",
+    "level": 2,
+    "chapter_index": 335,
+    "chapter_file": "chapter_335.html"
+  },
+  {
+    "title": "部队文艺工作座谈会纪要",
+    "level": 2,
+    "chapter_index": 336,
+    "chapter_file": "chapter_336.html"
+  },
+  {
+    "title": "为什么要搞文化大革命",
+    "level": 2,
+    "chapter_index": 337,
+    "chapter_file": "chapter_337.html"
+  },
+  {
+    "title": "各行各业均应一业为主兼学别样——五·七指示",
+    "level": 2,
+    "chapter_index": 338,
+    "chapter_file": "chapter_338.html"
+  },
+  {
+    "title": "中国共产党中央委员会通知——五·一六通知",
+    "level": 2,
+    "chapter_index": 339,
+    "chapter_file": "chapter_339.html"
+  },
+  {
+    "title": "同胡志明的谈话——不搞清官贪官，搞文化大革命",
+    "level": 2,
+    "chapter_index": 340,
+    "chapter_file": "chapter_340.html"
+  },
+  {
+    "title": "给江青的信",
+    "level": 2,
+    "chapter_index": 341,
+    "chapter_file": "chapter_341.html"
+  },
+  {
+    "title": "凡是镇压学生运动的人，都没有好下场",
+    "level": 2,
+    "chapter_index": 342,
+    "chapter_file": "chapter_342.html"
+  },
+  {
+    "title": "工作组要撤，文化革命要依靠革命师生",
+    "level": 2,
+    "chapter_index": 343,
+    "chapter_file": "chapter_343.html"
+  },
+  {
+    "title": "给清华大学附属中学红卫兵的信",
+    "level": 2,
+    "chapter_index": 344,
+    "chapter_file": "chapter_344.html"
+  },
+  {
+    "title": "不许镇压学生运动",
+    "level": 2,
+    "chapter_index": 345,
+    "chapter_file": "chapter_345.html"
+  },
+  {
+    "title": "炮打司令部——我的一张大字报",
+    "level": 2,
+    "chapter_index": 346,
+    "chapter_file": "chapter_346.html"
+  },
+  {
+    "title": "中国共产党中央委员会关于无产阶级文化大革命的决定",
+    "level": 2,
+    "chapter_index": 347,
+    "chapter_file": "chapter_347.html"
+  },
+  {
+    "title": "在中共八届十一中全会闭幕会上的讲话",
+    "level": 2,
+    "chapter_index": 348,
+    "chapter_file": "chapter_348.html"
+  },
+  {
+    "title": "对四位外国专家的大字报的批语",
+    "level": 2,
+    "chapter_index": 349,
+    "chapter_file": "chapter_349.html"
+  },
+  {
+    "title": "驻外机关也要革命化",
+    "level": 2,
+    "chapter_index": 350,
+    "chapter_file": "chapter_350.html"
+  },
+  {
+    "title": "在中央工作会议上的讲话",
+    "level": 2,
+    "chapter_index": 351,
+    "chapter_file": "chapter_351.html"
+  },
+  {
+    "title": "斗争要文明些，坚持文斗，不用武斗",
+    "level": 2,
+    "chapter_index": 352,
+    "chapter_file": "chapter_352.html"
+  },
+  {
+    "title": "对刘少奇到学校做公开检查的批示",
+    "level": 2,
+    "chapter_index": 353,
+    "chapter_file": "chapter_353.html"
+  },
+  {
+    "title": "对《文汇报》、《解放日报》夺权事件的谈话",
+    "level": 2,
+    "chapter_index": 354,
+    "chapter_file": "chapter_354.html"
+  },
+  {
+    "title": "论夺权",
+    "level": 2,
+    "chapter_index": 355,
+    "chapter_file": "chapter_355.html"
+  },
+  {
+    "title": "人民解放军应该支持左派广大群众",
+    "level": 2,
+    "chapter_index": 356,
+    "chapter_file": "chapter_356.html"
+  },
+  {
+    "title": "接见卡博和巴卢库时的谈话",
+    "level": 2,
+    "chapter_index": 357,
+    "chapter_file": "chapter_357.html"
+  },
+  {
+    "title": "对上海文化大革命的指示",
+    "level": 2,
+    "chapter_index": 358,
+    "chapter_file": "chapter_358.html"
+  },
+  {
+    "title": "批评“二月逆流”",
+    "level": 2,
+    "chapter_index": 359,
+    "chapter_file": "chapter_359.html"
+  },
+  {
+    "title": "论革命的“三结合”",
+    "level": 2,
+    "chapter_index": 360,
+    "chapter_file": "chapter_360.html"
+  },
+  {
+    "title": "关于两条路线斗争的基本问题",
+    "level": 2,
+    "chapter_index": 361,
+    "chapter_file": "chapter_361.html"
+  },
+  {
+    "title": "是义和团侵略了帝国主义了吗？",
+    "level": 2,
+    "chapter_index": 362,
+    "chapter_file": "chapter_362.html"
+  },
+  {
+    "title": "中央军委关于支左工作十条命令",
+    "level": 2,
+    "chapter_index": 363,
+    "chapter_file": "chapter_363.html"
+  },
+  {
+    "title": "接见阿尔巴尼亚军事代表团时的谈话",
+    "level": 2,
+    "chapter_index": 364,
+    "chapter_file": "chapter_364.html"
+  },
+  {
+    "title": "论无产阶级专政下继续革命",
+    "level": 2,
+    "chapter_index": 365,
+    "chapter_file": "chapter_365.html"
+  },
+  {
+    "title": "在听了氢弹会议汇报后的讲话",
+    "level": 2,
+    "chapter_index": 366,
+    "chapter_file": "chapter_366.html"
+  },
+  {
+    "title": "视察华北、中南和华东地区时的重要指示",
+    "level": 2,
+    "chapter_index": 367,
+    "chapter_file": "chapter_367.html"
+  },
+  {
+    "title": "接见刚果（布）总理努马扎莱的谈话",
+    "level": 2,
+    "chapter_index": 368,
+    "chapter_file": "chapter_368.html"
+  },
+  {
+    "title": "关于“九大”和整党问题的谈话",
+    "level": 2,
+    "chapter_index": 369,
+    "chapter_file": "chapter_369.html"
+  },
+  {
+    "title": "祝贺越南南方民族解放阵线成立七周年的电报",
+    "level": 2,
+    "chapter_index": 370,
+    "chapter_file": "chapter_370.html"
+  },
+  {
+    "title": "关于国家机关的改革和革命委员会的基本经验",
+    "level": 2,
+    "chapter_index": 371,
+    "chapter_file": "chapter_371.html"
+  },
+  {
+    "title": "支持美国黑人抗暴斗争的声明",
+    "level": 2,
+    "chapter_index": 372,
+    "chapter_file": "chapter_372.html"
+  },
+  {
+    "title": "学校教育革命的方向——要和工农兵结合",
+    "level": 2,
+    "chapter_index": 373,
+    "chapter_file": "chapter_373.html"
+  },
+  {
+    "title": "接见首都红代会“五大领袖”时的谈话",
+    "level": 2,
+    "chapter_index": 374,
+    "chapter_file": "chapter_374.html"
+  },
+  {
+    "title": "医学教育革命的方向——赤脚医生就是好",
+    "level": 2,
+    "chapter_index": 375,
+    "chapter_file": "chapter_375.html"
+  },
+  {
+    "title": "广大干部下放劳动是一种重新学习的极好机会",
+    "level": 2,
+    "chapter_index": 376,
+    "chapter_file": "chapter_376.html"
+  },
+  {
+    "title": "在中共八届扩大的十二中全会上的讲话",
+    "level": 2,
+    "chapter_index": 377,
+    "chapter_file": "chapter_377.html"
+  },
+  {
+    "title": "赞成越南又打又谈的方针",
+    "level": 2,
+    "chapter_index": 378,
+    "chapter_file": "chapter_378.html"
+  },
+  {
+    "title": "关于知识青年到农村去的号召",
+    "level": 2,
+    "chapter_index": 379,
+    "chapter_file": "chapter_379.html"
+  },
+  {
+    "title": "对中国共产党第九次全国代表大会的讲话",
+    "level": 2,
+    "chapter_index": 380,
+    "chapter_file": "chapter_380.html"
+  },
+  {
+    "title": "关于战备疏散的指示",
+    "level": 2,
+    "chapter_index": 381,
+    "chapter_file": "chapter_381.html"
+  },
+  {
+    "title": "祝贺越南南方民族解放阵线成立九周年的电报",
+    "level": 2,
+    "chapter_index": 382,
+    "chapter_file": "chapter_382.html"
+  },
+  {
+    "title": "与黎笋的谈话",
+    "level": 2,
+    "chapter_index": 383,
+    "chapter_file": "chapter_383.html"
+  },
+  {
+    "title": "全世界人民团结起来，打败美国侵略者及其一切走狗",
+    "level": 2,
+    "chapter_index": 384,
+    "chapter_file": "chapter_384.html"
+  },
+  {
+    "title": "发展自己的工业和农业不要依靠外国",
+    "level": 2,
+    "chapter_index": 385,
+    "chapter_file": "chapter_385.html"
+  },
+  {
+    "title": "帝国主义怕第三世界",
+    "level": 2,
+    "chapter_index": 386,
+    "chapter_file": "chapter_386.html"
+  },
+  {
+    "title": "国际间的事要由大家商量解决",
+    "level": 2,
+    "chapter_index": 387,
+    "chapter_file": "chapter_387.html"
+  },
+  {
+    "title": "改变国家体制，不设国家主席",
+    "level": 2,
+    "chapter_index": 388,
+    "chapter_file": "chapter_388.html"
+  },
+  {
+    "title": "我的一点意见",
+    "level": 2,
+    "chapter_index": 389,
+    "chapter_file": "chapter_389.html"
+  },
+  {
+    "title": "与斯诺的谈话——关于文化大革命",
+    "level": 2,
+    "chapter_index": 390,
+    "chapter_file": "chapter_390.html"
+  },
+  {
+    "title": "对外宣传工作不可强加于人",
+    "level": 2,
+    "chapter_index": 391,
+    "chapter_file": "chapter_391.html"
+  },
+  {
+    "title": "思想上政治上的路线正确与否是决定一切的",
+    "level": 2,
+    "chapter_index": 392,
+    "chapter_file": "chapter_392.html"
+  },
+  {
+    "title": "恢复联合国席位后的谈话",
+    "level": 2,
+    "chapter_index": 393,
+    "chapter_file": "chapter_393.html"
+  },
+  {
+    "title": "对反革命不要杀，保留活证据",
+    "level": 2,
+    "chapter_index": 394,
+    "chapter_file": "chapter_394.html"
+  },
+  {
+    "title": "会见美国总统尼克松时的谈话",
+    "level": 2,
+    "chapter_index": 395,
+    "chapter_file": "chapter_395.html"
+  },
+  {
+    "title": "中美联合公报（“上海公报”）中国方面的声明",
+    "level": 2,
+    "chapter_index": 396,
+    "chapter_file": "chapter_396.html"
+  },
+  {
+    "title": "与日本首相田中角荣的谈话",
+    "level": 2,
+    "chapter_index": 397,
+    "chapter_file": "chapter_397.html"
+  },
+  {
+    "title": "深挖洞，广积粮，不称霸",
+    "level": 2,
+    "chapter_index": 398,
+    "chapter_file": "chapter_398.html"
+  },
+  {
+    "title": "祝贺越南人民取得的伟大胜利",
+    "level": 2,
+    "chapter_index": 399,
+    "chapter_file": "chapter_399.html"
+  },
+  {
+    "title": "接见基辛格时的谈话",
+    "level": 2,
+    "chapter_index": 400,
+    "chapter_file": "chapter_400.html"
+  },
+  {
+    "title": "启用邓小平",
+    "level": 2,
+    "chapter_index": 401,
+    "chapter_file": "chapter_401.html"
+  },
+  {
+    "title": "在政治局会议上的讲话——八大军区司令员对调",
+    "level": 2,
+    "chapter_index": 402,
+    "chapter_file": "chapter_402.html"
+  },
+  {
+    "title": "中国将修建青藏铁路",
+    "level": 2,
+    "chapter_index": 403,
+    "chapter_file": "chapter_403.html"
+  },
+  {
+    "title": "关于划分三个世界的谈话",
+    "level": 2,
+    "chapter_index": 404,
+    "chapter_file": "chapter_404.html"
+  },
+  {
+    "title": "同英国前首相希思的谈话",
+    "level": 2,
+    "chapter_index": 405,
+    "chapter_file": "chapter_405.html"
+  },
+  {
+    "title": "关于理论问题的谈话要点",
+    "level": 2,
+    "chapter_index": 406,
+    "chapter_file": "chapter_406.html"
+  },
+  {
+    "title": "对在押国民党战犯、党政军特人员一律释放",
+    "level": 2,
+    "chapter_index": 407,
+    "chapter_file": "chapter_407.html"
+  },
+  {
+    "title": "要安定团结不要分裂，不要搞阴谋诡计",
+    "level": 2,
+    "chapter_index": 408,
+    "chapter_file": "chapter_408.html"
+  },
+  {
+    "title": "关于《水浒》的评论",
+    "level": 2,
+    "chapter_index": 409,
+    "chapter_file": "chapter_409.html"
+  },
+  {
+    "title": "中美关系会一点点好起来",
+    "level": 2,
+    "chapter_index": 410,
+    "chapter_file": "chapter_410.html"
+  },
+  {
+    "title": "祝贺印度支那三国抗美救国战争取得胜利",
+    "level": 2,
+    "chapter_index": 411,
+    "chapter_file": "chapter_411.html"
+  },
+  {
+    "title": "走资派还在走，“永不翻案”靠不住",
+    "level": 2,
+    "chapter_index": 412,
+    "chapter_file": "chapter_412.html"
+  },
+  {
+    "title": "对天安门事件的指示",
+    "level": 2,
+    "chapter_index": 413,
+    "chapter_file": "chapter_413.html"
+  },
+  {
+    "title": "后事交代",
+    "level": 2,
+    "chapter_index": 414,
+    "chapter_file": "chapter_414.html"
+  },
+  {
+    "title": "版本信息",
+    "level": 1,
+    "chapter_index": 415,
+    "chapter_file": "chapter_415.html"
+  }
+]

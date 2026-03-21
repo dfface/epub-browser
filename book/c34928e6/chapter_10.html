@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="八 - 一九八四 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>八 - 一九八四</title>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/assets/manifest.json">
+
+</head>
+
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
+
+        <div class="control-btn" id="togglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+
+        <div class="control-btn" id="bookHomeToggle">
+            <i class="fas fa-book"></i>
+            <span class="control-name">Book</span>
+        </div>
+
+        <div class="control-btn" id="tocToggle">
+            <i class="fas fa-list"></i>
+            <span class="control-name">Toc</span>
+        </div>
+    </div>
+
+    <div class="toc-floating" id="bookHomeFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="bookHomeClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="toc-floating" id="tocFloating">
+        <div class="toc-header">
+            <h3>Toc</h3>
+            <button class="toc-close" id="tocClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb header" data-id="breadcrumb">
+            <a href="/index.html#c34928e6" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/c34928e6/index.html" alt="bookHome" class="a-book-home">一九八四</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">八</span>
+        </div> 
+
+        <div class="custom-css-panel" data-id="custom-css-panel">
+            <div class="panel-header" id="cssPanelToggle">
+                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
+                <button class="panel-toggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="cssPanelContent">
+                <div class="css-editor">
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{margin: 50px; width: auto}"></textarea>
+                    <div class="css-controls">
+                        <button class="css-btn primary" id="saveCssBtn">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="css-btn primary" id="saveAsDefaultBtn">
+                            <i class="fas fa-star"></i> Save as default
+                        </button>
+                        <button class="css-btn secondary" id="resetCssBtn">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button class="css-btn secondary" id="loadDefaultBtn">
+                            <i class="fas fa-download"></i> Load default
+                        </button>
+                        <button class="css-btn secondary" id="previewCssBtn">
+                            <i class="fas fa-eye"></i> Preview
+                        </button>
+                    </div>
+                    <div class="css-info">
+                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-container" data-id="content-container">
+            <article class="eb-content" id="eb-content" data-eb-styles>
+            
+  <h2 class="calibre5" id="calibre_pb_0">八</h2>
+
+  <p class="normal">通道尽头传来丝丝咖啡的香味，飘到街上。那是真正咖啡的香味，不是胜利咖啡。温斯顿不觉停下步来。在短短的两秒钟内，他又回到渐已遗忘的童年世界了。接着听到砰的一响，煮咖啡那家人的门关了，香味也随之消失，好像声音一样。</p>
+
+  <p class="normal">他在路上走了几公里，静脉曲张患处抽动起来了。这是三个星期内第二次没去公社中心的晚会了。开小差实在是不智之举，因为谁在那天晚上缺席，他们都查得清清楚楚。照规矩讲，党员是没有自由活动时间的，而除了晚上睡觉外，不应有个人行动。党的假定是，如果你不是在工作、吃饭和睡觉，那你一定正在参加团体活动。此外你做任何使人想到离群索居的事——就说一个人出外散步吧——都有危险。这种行动在新语中叫“私活”，意谓个人主义思想和怪僻行径。但今天晚上温斯顿走出真理部时，实在难以抗拒四月间醉人春风的诱惑。天空一片蔚蓝，入春以来难得看到。相较之下，那漫长嘈杂的公社节目就难以忍受了。玩的游戏既费气力，又闷得怕人。此外还要听演讲，还要假惺惺一番靠着杜松子酒的酒意来培养同志间的情感。因此一时冲动之下，他离开了公交车站，不分东西南北地在不知名的伦敦街头漫步。</p>
+
+  <p class="normal">“如果还有希望，”他在日记上这么写过，“只有寄托在无产者身上。”这些话在他脑中反复出现，这说法看来似真似假，想来却又荒唐。他已走到一个褐灰色的贫民区，就在以前叫圣潘克拉斯车站的地方的东北面。他走的那条斜街，是用圆石砌成的，两边有两层楼的小房子，破落的门口直开到行人道上去，乍看好像鼠洞。路面石块的缝里是一摊摊污水。各屋子昏暗的门口和街上两边的横巷子居然满是人头：嘴上搽着品质粗劣口红的如花少女，追逐着如花少女的少男，让你看到十年后这些少女会变成什么样子的臃肿妇人，哈着腰、拖着八字脚走路的老人，还有衣衫褴褛光着脚在污水里嬉戏、一听到母亲呵斥就作鸟兽散的小混混。这街上屋子的窗户，最少有四分之一是破裂得要用木板支撑着。这些人对温斯顿也不理会，只有两三个用好奇的眼光看他一眼。两个块头奇大、穿着围裙的女人，交叉着斑红的手臂，在门口吱喳说个没完。温斯顿走近她们时，听到其中几句。</p>
+
+  <p class="normal">“‘是呀，’我跟她讲，‘说来容易呀！’我说。‘但如果你是我，你还不是跟我一样做。批评别人可容易呀！’我说，‘可是你的问题跟我的不一样呀！’”</p>
+
+  <p class="normal">“呀，对啦！”另一个接嘴道，“可不是，正是这样！”</p>
+
+  <p class="normal">聒耳的声音突然中断。他打她们面前走过时，两人都带着敌意细看了他一眼。说来也不是什么敌意，只算是一种警觉，一种看到不知名的野兽在你面前经过时的本能紧张反应。这地区平时想是不常看到党员的制服。实话说，除非你有任务在身，不应在这种地区露面的。你若遇到巡逻警察，说不定要你停步。“同志，让我看看你的证件。你在这里干吗？你什么时间下班的？你平常回家也走这条路吗？”——他们会问你诸如此类问题。当然，没有什么法令说你不可以拐路回家，但如果思想警察知道，就会对你注意了。</p>
+
+  <p class="normal">蓦地街上四边起了骚动。大家奔走相告说赶快躲起来。各人连忙窜入门口，快捷得如野兔钻洞。一个年轻的妇人在温斯顿前面一个门口跃出，一把抓起在玩污水的小孩，用围裙一裹，又一跃钻回洞口，动作快捷得神出鬼没。同时在这一刹那，一个穿着像手风琴乐师黑西装的衣服的男子从一条横巷冒出，直奔温斯顿面前，紧张地指着天空。</p>
+
+  <p class="normal">“汽船！”他嚷道，“汽船！快炸了！赶快伏下！”</p>
+
+  <p class="normal">也不知道为了什么原因，无产者给火箭弹取的名字叫汽船。温斯顿连忙伏身在地。无产者的警告，通常准确得很。他们好像有第六感，能在几秒钟前就预知火箭弹的来临，虽然这武器的速度比声音还快。温斯顿双臂抱头，接着就听到一声隆然巨响，几乎地面都要跳起。不少零星物体掉到他背上。他站起来张望一下，才知道靠自己最近的一扇玻璃窗炸碎了。</p>
+
+  <p class="normal">他继续向前走。火箭弹已炸毁了前面离此两百米的几座房子。天空冒着一股黑烟，地上灰尘滚滚，不少人已结集在那儿观看。他面前的走道有一小堆灰泥，中间好像有一条鲜红的线。他走近一看，原来是一只齐腕被炸断的人手。除了断折的部位还带血丝外，整只手苍白得像个石膏肢架。</p>
+
+  <p class="normal">他把这东西踢到沟里去。为了躲过前面的人群，他转过身从右边一条横街走出去。走不到三四分钟的光景，已离开灾区。街上熙来攘往，好像什么事也没有发生过一样。这时快到二十点了，无产者常去光顾的酒吧已挤得水泄不通。酒吧的旋转门转个不停，里面的尿臭味、锯木屑味和啤酒的酸味扑面而来。一家酒吧前面的挑棚下，三个汉子靠紧站着。中间那个拿着一份对叠的报纸，旁边两人也就挨着他的肩膀观看。温斯顿虽然还没有靠近得看清楚他们脸上的表情，但也可从他们全神贯注的模样，猜出他们看的准是什么重要的新闻了。他还有几步就到他们面前时，三个人突然站开。其中两个开始吵架，气势汹汹的，好像随时会动武的样子。</p>
+
+  <p class="normal">“你妈的听我说好不好？我告诉你吧，十四个月来七压尾的从来没中过一次奖！”</p>
+
+  <p class="normal">“中过，当然中过！”</p>
+
+  <p class="normal">“没中就是没中！在家里我把两年来的中奖号码都记下来了，一次也没有忘记。妈的，你听着，七压尾的就从——”</p>
+
+  <p class="normal">“少废话，七赢过。我现在就告诉你，二月——二月的第二个星期中奖的号码，就是四——〇——七！”</p>
+
+  <p class="normal">“二月你的娘！我写得清清楚楚，就没有号码——”</p>
+
+  <p class="normal">“你们闭嘴，好不好？”第三个汉子忍不住说。</p>
+
+  <p class="normal">他们是为彩券的事争吵。温斯顿离开了他们三十米左右回过头来看，他们还是吵得面红耳赤。每周一次给人发大财机会的彩券，是无产者唯一认真研究的公家大事。有数百万的无产者把彩券的存在视为活下去的主要理由——如果不是唯一理由的话。彩券是他们快乐的泉源、愚昧的明证、止痛的灵药和知性的刺激。只要是涉及彩券的事，平日连自己姓名拼写也有困难的人，居然能解起复杂的数学问题来，记忆力也出奇的准确。成千上万的人就靠精研“彩券学”维生，出售指南、预测本这类册子和灵符妙方。温斯顿的工作与彩券的经营无关，因为负责这玩意儿的单位是迷裕部，但他知道（其实党内每个人都知道）大部分的奖额是虚构出来的。只有小奖才真付钱，中大奖的人都不存在。住在大洋邦东区的人与西区的根本没有什么名副其实的交往，这种瞒骗的事也就容易安排。</p>
+
+  <p class="normal">如果还有希望，只有寄托在无产者身上。你必须坚信这点。这话你写下来，你可能只觉得合情合理而已，但只要你看一看街头跟你擦身而过的人，这话就成了一种信念了。他刚才拐入的横街是下斜坡的小路。好像以前到过这区域，附近就有一条大道。前边什么地方突然传来一阵呼喝声。小路尽头是个大拐弯，走下一层石阶就是一条凹陷的巷子，里面有几个贩卖脱皮缺叶蔬菜的小摊子。温斯顿记起来了，这窄巷通到大街，再转一个弯，不消走五分钟就是那家旧货店。他那本现在用来写日记的本子就在那儿买的。而他那支羽毛笔杆和那瓶墨水，也是在离旧货店不远的一家小文具店买的。</p>
+
+  <p class="normal">他在石阶上层停了下来。窄巷的对面是一家阴暗的小酒吧，玻璃窗看似盖上薄霜，其实只是久未拭擦的灰尘。一个弯着背但行动尚算敏捷的老头推开旋转门走进去，他霜白的小胡子像对虾的触须一样翘起来。温斯顿看着这老头进去时，突然想到他最少也有八十岁了，因此革命期间他已是中年人。像他这类一把年纪的人，也就是接连行将消失的资本主义世界的最后几个环节了。党内就没有几个人的思想是在革命前形成的。老一辈的人在五六十年代大清算时已经除掉，硕果仅存的几个，早就吓得交了心，不敢再谈什么思想问题了。如果你要找一个活着的人给你讲革命初期的真实情况，那非无产者莫属。一下子他在日记上抄下的那段儿童历史书上的故事浮于脑际，而他也无法按捺住心头那阵疯子似的冲动：要跟着老头进酒吧，跟他搭关系，然后问他问题。他会这么问：“请你告诉我你的童年是怎样过的。那种生活像个什么样子？那个时候的日子是否比现在好过？还是比现在难受？”</p>
+
+  <p class="normal">他马上走下石阶，穿过窄巷，生怕稍一耽搁就会胆怯改变主意。当然，这是疯狂行为。不用说，党没有明文禁止你到无产者出没的酒吧喝酒，也没有阻止你跟他们谈话。可是这事实非寻常，总有人注意到的。如果碰到巡逻警察，他可以装说突然感到恶心要昏倒，所以才进来歇一下。可是他们又怎肯相信？他一推门进去，就闻到一阵扑面而来如恶臭的奶酪味一样的酸啤酒味。大家一见他进来，谈话的声量马上降低。他觉得背后每个人的眼睛都好像盯着他的蓝制服。房间的另一角落本有几个人在玩投镖游戏，看到他进来，也就停手差不多半分钟。比他先进来的那老头站在柜台前面，与酒保斗起嘴来。酒保高大个子，鹰钩鼻，胳膊粗大。不少酒客擎着杯子围着他们看热闹。</p>
+
+  <p class="normal">“我是客客气气地问你的，是不是？”老头挺直了肩膀，气呼呼地说，“你居然告诉我你这酒吧找不到一个一品脱的杯子！”</p>
+
+  <p class="normal">“妈的，什么叫品脱？”酒保手指按着柜面，挨近身子问道。</p>
+
+  <p class="normal">“你听听！他自称酒保，连什么叫品脱也不知道。一品脱就是半夸脱，四夸脱就是一个加仑！你真该再念幼儿园！”</p>
+
+  <p class="normal">“少啰唆，什么品脱夸脱，从未听过，”酒保没好气地说，“我们卖的是一升或半升装的。杯子就在你面前的酒架上。”</p>
+
+  <p class="normal">“我要一品脱，不多不少，”老头不甘示弱地还嘴道，“你没杯子也成，就倒给我一品脱的分量好了。什么一升半升，我们年轻时没听说过这种鬼东西。”</p>
+
+  <p class="normal">“你年轻时我们还在树上过活呢！”酒保向其他酒客眨眨眼说。</p>
+
+  <p class="normal">众人轰然大笑，刚才温斯顿让他们产生的戒备心全解除了。老头的脸上长着霜白的浓密短髭，此时气得一脸通红。他转身要走，口中还是咕哝个不停，与温斯顿碰个正着。温斯顿轻轻地用手扶着他。</p>
+
+  <p class="normal">“我请你喝一杯，好不好？”他说。</p>
+
+  <p class="normal">“呀，好一个君子。”老头又挺了挺肩膀说。他好像没注意到温斯顿的蓝制服。过后，他转过头去有理不让人地对酒保说：“一品脱，一品脱黄汤！”</p>
+
+  <p class="normal">酒保拿了两个粗厚的玻璃杯子，在柜台下面的水桶冲洗了一下，就盛了两份半升的棕黑色啤酒。在无产者的酒吧内，你能够喝到的就是啤酒了。理论上说无产者是不许喝杜松子酒的，虽然谁要喝都有办法弄来。玩投镖游戏的那个角落又热闹起来了，其他酒客又为彩券的事高谈阔论了，他们显然一时已忘记温斯顿的存在。靠窗的地方是一张松木台，在此跟老头聊天不怕别人会听到。危险总是危险的，但最少房间内没设电幕，这一点他一进来时就看清楚了。</p>
+
+  <p class="normal">“那家伙大可以给我倒一品脱来的。”老头坐下来后，又唠唠叨叨地说，“半升不够，不过瘾。一升又太多，膀胱受不了。价钱当然也是问题。”</p>
+
+  <p class="normal">“从你年轻时到今天，你一定经历过不少变化了。”温斯顿试探着说。</p>
+
+  <p class="normal">老头浅蓝色的眼睛，从投镖板看向酒吧各座位，又从座位看向男厕的门，好像要从这些地方找出变化的痕迹。</p>
+
+  <p class="normal">“那时的啤酒比现在的好，”老头最后搭腔了，“也便宜些。我年轻的时候，淡啤酒——我们那时叫黄汤——只卖四便士一品脱。当然，那是战前的事了。”</p>
+
+  <p class="normal">“哪个战前？”</p>
+
+  <p class="normal">“都一样，这么多战争，哪搞得清楚。”老人含糊地说，然后举起杯子，又挺了挺肩膀，“祝你身体健康！”</p>
+
+  <p class="normal">他突出的喉结在瘦长的脖子上上下滚动得奇快，呃，啤酒喝光了。温斯顿到柜台去又要了两份半升装的啤酒。老头显然改变了反对喝一升酒的死硬态度。</p>
+
+  <p class="normal">“你比我年纪大多了，”温斯顿说，“在我还未出生前，想你已是壮年。你一定记得革命前的日子是怎样的。我这种年纪的人，对从前的事真的一点也不知道。我们只能看书，但书上说的事未必可靠，这就是我想听听你意见的缘故。历史书说，革命前的生活与目前完全不同。那时百姓挨穷、受迫害，人间毫无正义可言——总之，情况坏得超乎我们的想象力就是。就拿伦敦来说，大部分人从生下来到死，从未真正吃饱过。半数以上的人得光着脚板走路。一天工作十二小时，九岁后就再无受教育的机会，晚上十个人睡一间房。但同时有少数人，大概为数不过数千吧，呃，他们叫资本家，却有钱有势，要什么有什么，住高楼大厦，奴婢成群，出入汽车马车代步，喝的是香槟酒，戴礼帽——”</p>
+
+  <p class="normal">老头听到这里，眼前一亮。“呀，礼帽，”他说，“真怪，你也提到这东西，昨天我也想到礼帽呢，鬼才知道为了什么原因。我只想到，好多年没看到这东西了。绝迹了，一定绝迹了。我最后一次戴礼帽，是为了参加嫂子的葬礼。唔，我记不起是哪一年了，总该是五十年前的事吧。当然，礼帽不是买的，租来应付应付而已。”</p>
+
+  <p class="normal">“问题不在礼帽本身，”温斯顿耐着性子说，“问题是，这些资本家靠着律师、教士和其他特权人物撑腰，为所欲为。什么东西都是为了他们的利益而存在。像你这种普通老百姓和工人，就是他们的奴隶。他们要怎样摆布你，就怎样摆布你。他们可以把你像牛马一样运到加拿大。如果他们看中你的女儿，就可以跟她睡觉。他们可以叫人用鞭子打你。你走过他们面前，就得脱去帽子。每个资本家出外，总有一群走狗跟随，听他——”</p>
+
+  <p class="normal">老头的脸上又见神采了。</p>
+
+  <p class="normal">“走狗！”他几乎叫出来，“喏，这又是一个我好久没听到的词！走狗！这真把我带回旧时代了。我想想看，呀，好像千万年以前的事了。那时我偶尔在星期天下午散步到海德公园去听那些笨蛋演讲。救世军啦、天主教徒啦、犹太人啦、印度人啦，总之各式各样的人物都有就是。其中的一个笨蛋——抱歉，名字忘了，他呀，真会说话！一点没骗你。你猜他怎么说的？‘走狗！资产阶级的走狗！统治阶级的奴才！’对了，他爱用的另一个词是‘寄生虫’。哦，还有——是了，‘狼心狗肺’！当然，你知道，他这些话都是针对工党说的。”</p>
+
+  <p class="normal">温斯顿觉得他们的谈话真是牛头不对马嘴。</p>
+
+  <p class="normal">“我想知道的是，”他说，“跟以前的日子比较，我们的自由是多了还是少了？现在你受的是人的待遇吗？从前的有钱人，就是那些高高在上的人——”</p>
+
+  <p class="normal">“上议院。”老头打岔说。</p>
+
+  <p class="normal">“好的，就说上议院吧。我问你的问题是，这些人所以能够把你像狗一般看待，就因为他们有钱而你是穷光蛋？譬如说，你走过他们面前，得脱下你的帽子，恭恭敬敬地称呼他们一声‘大人’，对吗？”</p>
+
+  <p class="normal">老头好像沉思着，等把第二杯啤酒喝了四分之一后才答说：“对的，他们最少要你点点帽子为礼。我自己一点也不习惯，但还不是乖乖做了，有什么办法？”</p>
+
+  <p class="normal">“我在历史书上看到，这些人和他们的走狗常常把你们从行人道推到水沟去，有没有这回事？”</p>
+
+  <p class="normal">“最少有一个人推了我一次，现在想来就好像昨天才发生似的。那天晚上是‘赛船夜’，闹得真不像话。我在莎夫茨伯里街上跟一个笨蛋迎头碰个正着。他穿得可体面，白衬衣、礼帽、黑大衣。他走路时左弯右拐的，冷不提防，我就撞到他了。他说：‘你走路不带眼睛？’我说：‘这条路是你买下来的吗？’他说：‘你再敢放肆，看我扭不扭断你的头。’我说：‘你醉了，等会儿我送你去警局。’嘿，想你也不相信，他一手放在我胸口，狠狠地一推，几乎把我推到一部正驶过来的公交车底下去！那时我血气方刚，真想还手，只是——”</p>
+
+  <p class="normal">温斯顿越听越觉得拿他毫无办法。这位老先生记忆中的东西，都是毫无意义的细节。再听他讲一天，也听不出什么究竟来。党的历史记载，这样说来有点道理了。说不定不但有道理，而且全部可能是真的。</p>
+
+  <p class="normal">但他还要最后试一次。“也许我的话没说清楚，”他说，“我的意思是这样：你活了一段长长的日子，你在革命前的社会长大，是不是？就说在一九二五年吧，你已是成年人。凭你的记忆，你比对一下，一九二五年时的生活比今天要好还是坏？或者说，如果由你选择，你要过今天的生活呢，还是回到旧时？”</p>
+
+  <p class="normal">老头若有所思地看着投镖板。他把啤酒喝完，动作比先前慢了点。他张嘴说话时，颇有哲学家洞明世事的神气，好像啤酒已使他变得温顺起来。</p>
+
+  <p class="normal">“我晓得你要听的是什么话，”他说，“你希望我说：‘唉，要是能够再年轻一次就好了。’是不是？大多数人都会这么想。年轻人身壮力健，你如果活到我这把年纪，就会知道身体上没有一样是对劲的。我的腿不听我指挥，膀胱呢，那更不用说了。每天晚上要起来六七次。可是，你要听我说，年纪大了也有些好处的，至少要烦心的事就与年轻人不同。譬如说，不必再愁怎样去讨好女人，那可省了不少事呵。你相不相信，我差不多有三十年不近女色了？想也没想过。”</p>
+
+  <p class="normal">温斯顿背靠窗台而坐。再谈下去也不过是白费时间而已。他正要准备再买一份啤酒时，老头突然站起来快步走到厕所去。那额外的半升酒显然发生效果了。温斯顿默默地对着面前的空杯子发呆。过了一两分钟后，他不自觉地就跑了出来。不到二十年后，他想，像“革命前的日子比现在好过吗”这种极其简单但再重要不过的问题，再也没有人可以回答了。其实，现在也回答不出来，因为剩下的几个遗老已无法把新旧两个世界的情况作什么比较。他们记忆中的东西，琐碎无聊：哪天跟同事吵了架，丢了的自行车气筒怎样找回来了，一个死去多年的姐妹脸上的表情，或七十年前一个多风的早晨卷起的沙尘旋涡。但关系最大的事件，他们却一无所知。他们真像蚂蚁，眼前除了芝麻小事，别的一概视而不见。到大家记忆消失而文字记录全部订正后，党说革命后生活水平提高，你也只好相信了，因为除了目前的生活，再无任何其他生活标准给你作比较。</p>
+
+  <p class="normal">他紊乱的思绪突然停止，停下步来举头一望，原来已走到一条狭小的街道上，两旁除了住家外，还有几家零零星星的小商店。在他面前的一家，悬着三个褪了色的铁球，看样子以前是镀金的。这铺子似曾相识。怪不得！这就是那家卖日记簿给他的旧货店呵！</p>
+
+  <p class="normal">此时他有点害怕起来。到这儿来买那本簿子已是冒险不过的事，自己不是发过誓永不涉足此地吗？可是脑袋犹豫不决的当儿，两条腿已不由自主地走到这儿来。他开始写日记的动机，原是为了防止这种自杀性的冲动。差不多二十一点了，这店还是开着。他想到站在行人道上反惹人注目，干脆就踏进铺子去。要是巡逻警察盘问，他可以说是来这里买刀片的。</p>
+
+  <p class="normal">店主刚点上油灯，要挂起来，气味虽不好受，但予人一种温暖的感觉。他约摸六十岁，身体瘦小，背有点驼，鼻子长而周正，眼镜片厚厚的，但仍掩盖不了柔和的目光。头发几乎全白了，但眉毛还是浓黑的。他的眼镜，他温柔得近乎吹毛求疵的举动，特别是他穿的那件陈旧的黑天鹅绒外套，都多少带有一种知识分子的气质。他可能是个文人，或者是音乐家吧？他的声音软得近乎飘逸，口音不像一般无产者那么粗鲁。</p>
+
+  <p class="normal">“你站在门口时我就认得你，”店主对温斯顿说，“你就是那位跟我买那本小姐用的纪念册的先生！那册子的纸张可漂亮呵。从前，那种纸张叫‘粉纸’，这一类东西少说也绝迹五十年了。”说到这里，他的眼睛越过了下垂的老花眼镜，打量了温斯顿一下，然后问道，“你想到了要买些什么东西吗？或者只是随便看看？”</p>
+
+  <p class="normal">“我路过这里，随便进来看看，”温斯顿胡乱应对着说，“没有什么特别的东西要买的。”</p>
+
+  <p class="normal">“这也好，因为我实在没有什么东西会令你满意。”他摊开柔软的掌心，带歉意地说，“你也看到了，铺子空空的，是不是？不妨坦白对你说，古董旧货这门生意也快完蛋了。根本没有几个人要买旧东西。要买也没有现货供应。家具、瓷器、玻璃，破得烂得也七七八八了。金属做的器皿呢，不消说，都熔掉来做别的东西。说来我也多年没看见过黄铜制的烛台了。”</p>
+
+  <p class="normal">事实上这店子里面摆满了各式各样的东西，只是几乎没有一样值钱的就是。地板的空间尤见狭小，因为墙壁的四边堆满了尘封的画框。窗台上放了一盘盘的螺帽、螺栓、破凿子、缺口的小刀、年久失修的手表和其他杂七杂八的东西。只有靠角落一张台子上摆着的小玩意儿里——如漆鼻烟盒子、玛瑙胸针等——也许还有值得一看的东西。温斯顿缓步走过去时，视线为一个圆滑物体吸引，这东西在油灯下发着柔和的光辉。他捡起来看。</p>
+
+  <p class="normal">这是一块沉甸甸的水晶玻璃，一边扁平一边隆起，差不多是半球状。它的色泽与结构都很别致，给人一种雨水的滋润般柔和的感觉。玻璃块隆起部分的作用等于一面放大镜，他因此清楚地看到此物里面有一个弯卷起来的东西，像玫瑰，也像海葵。</p>
+
+  <p class="normal">“这是什么东西？”温斯顿问，迷住了。</p>
+
+  <p class="normal">“珊瑚，”店主说，“一定是从印度洋来的。他们以前爱把这东西镶在玻璃块内。我想这是一百年前的工艺品吧，看样子还不止一百年呢。”</p>
+
+  <p class="normal">“真美。”温斯顿说。</p>
+
+  <p class="normal">“嗯，真美，”店主赏识地附和着说，“可是今天有这种眼光的人也不多了。”他咳了一阵，随后又说，“喏，你要买的话，就付四块钱吧。我记得以前像这么一块东西，最少也可卖个七八镑——唔，八镑等于今天多少钱，我也不会算了，总之不少钱就是。可是现在谁还有兴致买古董呢？实际上剩下来的也没有几件了。”</p>
+
+  <p class="normal">温斯顿连忙掏出四块钱给他，接着就把这心爱的东西放入口袋。令他着迷的，固然是这东西的美，可是更吸引他的，却是它氤氲着的思古幽情。这种油光水滑的玻璃，他生平没有见过。论实用价值，这东西派不上什么用场，虽然他猜想得到当时的人大概多用来压纸张文具。但温斯顿觉得它特别可爱的地方，正是它毫无显著的实用价值这一点。这东西塞在口袋里重死了，幸好并没有怎样鼓起来就是。无论如何，一个党员收藏这样一块东西，不但有点怪怪的，同时也可能会惹祸上身。任何旧的东西、美的东西，都会引人注意和怀疑。那老店主从他手上接过四块钱后，面露喜色。温斯顿这才想到，给他三块，甚至两块，他也肯卖的。</p>
+
+  <p class="normal">“楼上还有一个房间，你有没有兴趣看看？”老店主问，“除了几件家具，也实在没有什么东西了。如果你要看，我得点灯。”</p>
+
+  <p class="normal">他又点了一盏油灯，弓着背拾级走上陡狭破旧的楼梯。通过一条窄小的走道后，就到了一间背对着街道的房间，窗前是石砌的后院，可以看到一连串烟囱的管帽。温斯顿注意到房间家具的各种摆设，都给人起居如常的样子。地板上有一条地毯，墙上挂了一两张画，靠壁炉处还有一张脏兮兮的扶手椅。壁炉架上是一个十二小时计时的玻璃钟，滴答滴答地响着。临窗的一角，是一张大床，占了全屋差不多四分之一的面积，床垫还保留着。</p>
+
+  <p class="normal">“我太太逝世前我们都住在这里，”老店主用近乎抱歉的口吻说，“现在我打算把家具零售出去。喏，如果你把臭虫弄掉，这张床还很漂亮，红木做的呢。可惜就是笨重了点。”</p>
+
+  <p class="normal">说着，他把油灯提高了一下。在柔和的灯光下，这房间可真诱人。温斯顿突然想到，要是每周肯花几块钱，就可以租下这间房间。问题是他敢不敢冒这个险。这主意实在有点荒唐了，他一下子也就放弃了。但这房间的一切，又一次引起他思古之幽情，勾出他一些久远的记忆。他想象得到以前的人坐在这样一个房间里是什么滋味。壁炉里生着火，你瘫坐在扶手椅上，双腿搁在壁炉前面的围栏上，铁架上吊着一壶开水。只有你一个人，却有充分的安全感，因为你知道没有人会监视你，没有声音跟踪你。房间里除了水壶喷出来的音乐与玻璃钟的滴答滴答声音，一片宁静。</p>
+
+  <p class="normal">“没有电幕啊。”温斯顿忍不住低声地说。</p>
+
+  <p class="normal">“哦，我从来没买过这类东西，”老人说，“太贵了，再说也不需要。你看，这边还有一张折叠式的桌子，只是你要用时得装上新的铰链就是。”</p>
+
+  <p class="normal">另一角落还有一个小书架，温斯顿如获至宝地走过去。架上摆的，都是废物。搜查与焚烧旧书的命令执行得非常彻底，无产者区域也不例外，你在大洋邦各地再也难找到一本在一九六〇年前出版的书了。老店主在床对面挂在壁炉旁边的一张装在红木框架内的图片前站着。</p>
+
+  <p class="normal">“你对旧图片有没有兴趣？”他试探性地问道。</p>
+
+  <p class="normal">温斯顿走过去看看。那是一张钢板雕刻画：一座椭圆形的建筑物，窗子长方形的，前面是一个小塔。这建筑物的四边装有扶手栏杆，后面看似是个雕像。他凝望了好一会儿，觉得好像在哪儿见过，虽然记不起那雕像是谁了。</p>
+
+  <p class="normal">“这架子是嵌在墙上的，”老人说，“当然，你要的话，我可以把螺丝钉取出来。”</p>
+
+  <p class="normal">“我认得这座房子了，”温斯顿终于说，“现在已经塌了。就在正义宫外面那条街的中间，是不是？”</p>
+
+  <p class="normal">“对啦，法院的外面，多年前炸毁了。以前是教堂，圣克莱门特教堂。”老人带着歉意笑了笑，好像自己也知道所讲的事有点荒谬。接着，他又哼着说：“橘子与柠檬，吟着圣克莱门特的钟。”</p>
+
+  <p class="normal">“那是什么？”温斯顿问道。</p>
+
+  <p class="normal">“哦，橘子与柠檬，吟着圣克莱门特的钟——这是我小时候唱的歌谣。其余的记不起来了，结尾倒没有忘记，是这样的：‘这是亮你床头的蜡烛，那是断你人头的砍刀！’小孩子边唱边舞，手连手拱起来让你从下面穿过，唱到‘那是断你人头的砍刀’时你刚好在下面，他们就松手把你抓住。这歌每句都提到教堂的名字，全伦敦的主要教堂都在里面。”</p>
+
+  <p class="normal">温斯顿很想知道圣克莱门特教堂究竟建于哪一个世纪。伦敦建筑物的年代实在不容易弄清楚。任何宏伟的建筑物，只要样子还算新的，党一定说是革命后的建筑。而任何较古旧的房子，一定是中世纪黑暗时代的遗物。资本主义当道的那几百年，什么有价值的建筑物也没有留下来。你要从建筑物认识历史？那等于要从书本获知古旧世界的真相一样不可靠。雕像、题词、碑文、街道的名字——凡是可以使人联想到过去的痕迹，都经有计划的改头换面了。</p>
+
+  <p class="normal">“我一直不知道那房子原来是教堂。”温斯顿说。</p>
+
+  <p class="normal">“剩下来的教堂，实在还不少，”老人说，“只是现在再没有教堂就是。好吧，那首歌谣还有什么句子？呀，我记起来了！</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">橘子与柠檬，吟着圣克莱门特的钟；</p>
+
+  <p class="kt1">你欠我三法新，响着圣马丁的铃。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">我记得的，也就是这么多了。法新是硬币，和现在的一分钱差不多。”</p>
+
+  <p class="normal">“圣马丁教堂在哪里？”温斯顿问道。</p>
+
+  <p class="normal">“圣马丁？呀，今天还在呢，就在胜利广场嘛，与画廊并立，就是三角门廊、前面有不少柱子和一道长长的石阶的那栋。”</p>
+
+  <p class="normal">温斯顿晓得了。现在的圣马丁是博物馆，陈列着各式各样的宣传资料，如火箭弹和浮游堡垒的模型、描述敌人残忍无道的蜡像等。</p>
+
+  <p class="normal">“以前那地方叫‘在田间的圣马丁’，虽然我从来没有在那附近看见过什么稻田。”老人补充说。</p>
+
+  <p class="normal">温斯顿没有买那张钢板雕刻画，这东西比刚才买的水晶玻璃更惹人注目。再说，除非把框架除下，根本无法带回家。他又在店里盘桓了几分钟，相谈之下，才知道店主不叫威克斯先生（店子门口刻着的姓名），而是查林顿。他是个六十三岁的鳏夫，在这店子已住了三十年。他一直就要把门口刻着的名字改过来，可是折腾到今天还没动手。温斯顿嘴巴虽忙着和查林顿聊天，心中却念着那几句快要忘掉的歌谣：“橘子与柠檬，吟着圣克莱门特的钟；你欠我三法新，响着圣马丁的铃！”可真怪了，你心里念着时，就仿佛真的听到钟声——那个已经消逝了的伦敦的钟声，仍然在某个被遗忘的角落在你耳畔响着。从一个鬼影似的教堂的尖顶传到另一个尖顶，他好像听到了隆隆钟声。事实上就他记忆所及，他从未听过教堂的钟声。</p>
+
+  <p class="normal">他摆脱了查林顿先生，一个人走下楼梯。他不想让这老头看到他走出门前先察看街道四周。他已决定了在适当时机（大概一个月以后吧）再来这里。其实这比在公社中心缺席一个晚上也危险不了多少。最愚蠢不过的事，莫如跟一个完全不知是否可以相信的店主买日记簿，然后重临旧地。他已经做了。可是——</p>
+
+  <p class="normal">是的，他还要回来，还要买“美得可以”的废物。他要买圣克莱门特教堂的钢板雕刻画，从框架里拿出，藏在制服的上衣内带回家。他要继续发掘查林顿先生的记忆，把歌谣的全部内容学会。要把房间租下来的疯狂念头，又一次浮现于脑中。大概有五六秒钟之久，他兴奋得大意起来，出门前忘了先在窗口张望一下。他甚至把刚才听来的歌词即兴地乱哼起来：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">橘子与柠檬，吟着圣克莱门特的钟；</p>
+
+  <p class="kt1">你欠我三法新，响着——</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">还未唱完，心头已结了一层冷霜。在面前不到十米的地方，有一个穿着蓝制服的人朝他的方向走来。子虚科那个黑发女郎！灯光虽暗，但他一下子就认出她来。走到他面前时，她瞪了他一眼，然后又若无其事地快步跑开了。</p>
+
+  <p class="normal">温斯顿一下子觉得全身瘫软，动弹不得。好一会儿，他才转身往右边走，全没注意到他走的是和回家相反的方向。无论如何，他心中的疑团得到解答了。这黑发女郎在监视着他。她一定跟踪他到这儿来的。这里离任何党员的住宅区都有几公里，不可能说她在同一个晚上凑巧也在这样一些横街窄巷散步吧？那真是太巧合了。她是思想警察还是好管闲事的业余探子，这时已无关紧要了。她监视他、跟踪他，这才是问题的关键。说不定她还看着他走进酒吧。</p>
+
+  <p class="normal">走路非常吃力。每走一步，口袋里那块玻璃就擂他一下。他几乎忍不住要拿出来丢掉。更难受的是肚子的胀痛。在一两分钟内如果还找不到厕所，不如死了干净，他想。但这种地区是不设公厕的。幸好抽搐的痛楚终于过去，只剩下一种麻木的感觉。</p>
+
+  <p class="normal">温斯顿走的是一条死巷。他停了步，盘算了一下，然后掉头再走。他转身时才想到，那女郎三分钟前才和他擦身而过，如果他此刻加快脚步，说不定会赶上她。他可以尾随着她，到一个偏僻的地方再用石块把她的脑瓜打碎。身上带着的那块水晶玻璃正管用。可是这念头一下子就过去了，因为费劲的事连想一下也觉得吃力。一来他不能跑，二来连拿石块去击人的勇气都没有，再说她年轻力壮，准会还手。他也想过要不要赶回公社中心，在那儿流连到关门为止，这样最少会给自己留下半个晚上在场的证据。可是连这一点也办不到。他现在浑身慵倦，只想早些回家静坐下来。</p>
+
+  <p class="normal">他抵家时已是二十二点。电源的总开关二十三点半就关上。他直跑到厨房，倒了差不多一茶杯分量的胜利酒一口饮尽，然后再到桌子前坐下，从抽屉取出日记簿来，却没有翻开。电幕内有女人用黄铜似的声音高唱爱国歌曲。他的眼睛一直盯着日记簿的云石纸封面，尽力把这黄铜似的声音摒诸意识之外，但是一点气力也没有。</p>
+
+  <p class="normal">他们通常都在晚上抓人。最妥善的办法是在他们出现前自杀，不少人一定已这么做了。许多失踪的人，其实都是自杀死去。在大洋邦自杀需要无比的勇气，因为手枪等武器固然弄不到，就是快速有效致人死命的毒药也稀缺。他体悟到肉体感到的痛苦和恐惧多会摧毁人的意志，更认识到每每需要采取一种特别的行动时，自己的身体却不争气，一下子就整个崩溃。刚才要是他动作快一些，说不定就可以干掉那黑发女郎，可是一想到面临的危险，就失去勇气了。由此他更想到一个人面临危机时，要抵抗的通常不是外在的敌人，而是自己的身体。即使现在喝了杜松子酒，他的心情仍受到腹中麻木痛楚感的干扰，不能作有系统的思考。其他看来轰轰烈烈或悲壮感人的场面，也一定有这类考验吧。在战场、在刑房或在一条下沉的船上，你要为之牺牲奋斗的目标常会忘掉，因为你全部的精神和体力都集中到躯壳上。即使你没有被恐惧吓瘫软，你没有痛得呼天抢地，剩下来的生命也不过是每分每秒与饥寒斗争、与失眠纠缠、与闹肚子和牙痛交战的经历而已。</p>
+
+  <p class="normal">他打开了日记。一定得写些东西。电幕上那女人已换了一条曲子，她的声音好像玻璃碎片一样扎在他脑海中。他尽力把思绪转移到奥布赖恩身上去，这日记是为他写的，给他写的。可是他想到的，却是思想警察把他抓去后可能发生的事。如果他们一下子就把你蒸发掉，那没关系，反正抓到了就难逃一死。可是死前（没有人会提到这些事的，虽然谁也知道有这些事）总有例行的招供程序要抵受——匍匐在地，屈膝求怜，骨头折碎，牙齿断落，头发结着血块。既然结果都一样，你为什么要忍受这些？少活几天或几个星期不成吗？从来没有一个受监视的人逃得掉，从来没有人拒绝招供。一旦犯了“思罪”，总有一天会遭受到蒸发的命运。既然恐惧改变不了既定的命运，为什么要拖延着活下去呢？</p>
+
+  <p class="normal">他的思绪，慢慢终于集中在奥布赖恩的身上来了。“我们将来会在没有黑暗的地方见面。”对的，他对温斯顿说过这句话。他知道这话的意思，最少他认为自己听懂了。没有黑暗的地方就是想象中的未来，永远看不到的未来，但凭着一种神秘的预感，却可以参与。电幕的声音还在耳边嗡嗡地响个不休，他无法再思索下去了。他燃了一根烟，一不小心，半根烟的烟丝倒在舌头上。说“烟丝”不对，应说是“烟沙”，一沾在舌头上就不容易吐出来。老大哥的形象此时涌入脑海，取代了奥布赖恩。就像几天前一样，他从口袋摸出一个硬币，看了一眼。那张厚厚的脸往上瞧着他，冷静中带着关怀备至的神情，但谁晓得埋藏于黑髭后面的是一种什么笑容？那三句口号，又像丧钟鸣响一样激荡于胸中：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="center">战争是和平</p>
+
+  <p class="center">自由是奴役</p>
+
+  <p class="center">无知是力量</p>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/c34928e6/chapter_9.html" alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">Perv chapter</span></div></a>
+            <a href="/index.html#c34928e6" alt="home" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-home"></i>
+                    <span class="control-name">Home</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name">Prev page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name">Click</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name">Pure</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name">Reload</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name">Next page</span>
+                </div>
+            </div>
+            <a href="/book/c34928e6/chapter_11.html" alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="font-controls" id="fontControls" data-id="fontControls">
+        <div class="font-family-control">
+            <span>Font Family</span>
+        </div>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="system-ui, -apple-system, sans-serif">System default</option>
+                <option value="custom">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here">
+            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> Apply
+            </button>
+        </div>
+
+        <div>
+            <span>Font Size</span>
+        </div>
+        <div class="font-size-control">
+            <div class="font-size-btn font-small" data-size="small">A</div>
+            <div class="font-size-btn font-medium active" data-size="medium">A</div>
+            <div class="font-size-btn font-large" data-size="large">A</div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <div class="control-btn" id="scrollToTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name">Top</span>
+        </div>
+        <div class="control-btn" id="fontControlBtn">
+            <i class="fas fa-font"></i>
+            <span class="control-name">Font</span>
+        </div>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span class="control-name">Home</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <div class="control-btn" id="mobileTocBtn">
+            <i class="fas fa-list"></i>
+            <span>Toc</span>
+        </div>
+        <div class="control-btn" id="mobileThemeBtn">
+            <i class="fas fa-moon"></i>
+            <span>Theme</span>
+        </div>
+        <div class="control-btn" id="mobileTogglePagination">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name">Turning</span>
+        </div>
+        <a href="/book/c34928e6/chapter_9.html" alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>Perv</span></div></a>
+        <a href="/index.html#c34928e6" alt="Home">
+            <div class="control-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </div>
+        </a>
+        <a href="/book/c34928e6/chapter_11.html" alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>Next</span></div></a>
+        <div class="control-btn" id="mobileBookHomeBtn">
+            <i class="fas fa-book"></i>
+            <span>Book</span>
+        </div>
+        <div class="control-btn" id="mobileFontBtn">
+            <i class="fas fa-font"></i>
+            <span>Font</span>
+        </div>
+        <div class="control-btn" id="mobileTopBtn">
+            <i class="fas fa-arrow-up"></i>
+            <span>Top</span>
+        </div>
+    </div>
+
+    <footer class="footer" data-id="footer">
+        <p>EPUB Library &copy; 2026 | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
+    </footer>
+
+    <script>
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    // 检查当前的基路径
+    if (!path.startsWith("/book/")) {
+        // 处理所有资源，都要加上基路径
+        addBasePath(basePath);
+    }
+    function addBasePath(basePath) {
+        // 处理所有链接、图片和样式表
+        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
+        resources.forEach(resource => {
+            const src = resource.getAttribute('src');
+            const href = resource.getAttribute('href');
+            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
+                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
+            }
+            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
+                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // 检查当前的基路径
+    let path = window.location.pathname;
+    let basePath = path.split('/book/');
+    // 获取基路径
+    basePath = basePath[0] + "/";
+    
+    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
+    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    if (window.initScriptChapter) {
+        window.initScriptChapter();
+        console.log("init")
+    } else {
+        const src = js_resource.getAttribute('src');
+        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
+        newScript.onload = () => {
+            if (window.initScriptChapter) {
+                console.log("reinit")
+                window.initScriptChapter();
+            }
+        };
+    }
+
+    function reloadScriptByReplacement(scriptElement, newSrc) {
+        const newScript = document.createElement('script');
+        newScript.src = newSrc;
+        
+        // 复制原script的所有属性（除了src）
+        Array.from(scriptElement.attributes).forEach(attr => {
+            if (attr.name !== 'src') {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+        });
+        scriptElement.parentNode.replaceChild(newScript, scriptElement);
+        return newScript;
+    }
+    });
+    </script>
+    <script src="/assets/medium-zoom.min.js"></script>
+    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/sortable.min.js"></script>
+    <script src="/assets/highlight.min.js"></script>
+</body>
+</html>
