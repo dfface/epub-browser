@@ -334,14 +334,6 @@ body {
     line-height: 1.7;
 }
 
-#eb-content img {
-    max-width: 100%;
-    height: auto;
-    margin: 0;
-    object-fit: contain;
-    cursor: zoom-in;
-}
-
 #eb-content .img-wrapper{
     max-height: 70vh;
     display: inline;
@@ -954,8 +946,6 @@ body {
 
 /* 调整图片在分页模式下的显示 */
 .pagination-mode #eb-content img {
-    max-width: 100%;
-    height: auto;
     break-inside: auto;
     page-break-inside: auto;
     -webkit-column-break-inside: auto;
