@@ -686,7 +686,7 @@ function initBookshelf() {
         
         // 检查是否有嵌套分组
         if (targetGroup.groups && Object.keys(targetGroup.groups).length > 0) {
-            showNotification('Please delete all nested groups first before deleting this group.', 'error');
+            showNotification('Please delete all nested groups first before deleting this group.', 'warning');
             return;
         }
         
@@ -775,10 +775,10 @@ function initBookshelf() {
                         renderBookshelf('All');
                         showNotification('Bookshelf data imported successfully!', 'success');
                     } else {
-                        showNotification('Invalid bookshelf data format.', 'error');
+                        showNotification('Invalid bookshelf data format.', 'warning');
                     }
                 } catch (err) {
-                    showNotification('Failed to parse JSON file: ' + err.message, 'error');
+                    showNotification('Failed to parse JSON file: ' + err.message, 'warning');
                 }
             };
             reader.readAsText(file);
@@ -829,10 +829,10 @@ function initBookshelf() {
                     setBookshelfVersion(result.version);
                     showNotification('Sync: Data uploaded successfully!', 'success');
                 } else {
-                    showNotification('Sync error: ' + (result.message || 'Unknown error'), 'error');
+                    showNotification('Sync error: ' + (result.message || 'Unknown error'), 'warning');
                 }
             } catch (err) {
-                showNotification('Sync failed: ' + err.message, 'error');
+                showNotification('Sync failed: ' + err.message, 'warning');
             } finally {
                 syncShelfBtn.disabled = false;
                 syncShelfBtn.innerHTML = '<i class="fas fa-sync"></i> Sync';
