@@ -210,6 +210,7 @@ services:
     volumes:
       - "/Users/dfface/Calibre Library:/app/Library"
       - "/Users/dfface/data/epub-browser:/app/EpubBrowserFiles"
+      - "/Users/dfface/data/epub-browser-sync:/app/SyncData"
 ```
 
 or just with `docker`:
@@ -220,6 +221,7 @@ docker run -d \
   -p 8080:80 \
   -v /path/to/YourEpubDir:/app/Library \
   -v /path/to/EpubBrowserTmpFiles:/app/EpubBrowserFiles \
+  -v /path/to/EpubBrowserSyncData:/app/SyncData \
   epub-browser:latest
 ```
 

@@ -43,11 +43,11 @@ COPY --from=builder /build/epub-browser/dist/*.whl /app/
 RUN pip3 install --no-cache-dir /app/*.whl \
     && rm -rf /app/*.whl
 
-# 创建必要的目录（Library用于存放epub文件，EpubBrowserFiles用于输出）
-RUN mkdir -p /app/Library /app/EpubBrowserFiles
+# 创建必要的目录（Library用于存放epub文件，EpubBrowserFiles用于输出，SyncData用于同步数据）
+RUN mkdir -p /app/Library /app/EpubBrowserFiles /app/SyncData
 
 # 启动命令（严格按照要求执行，使用exec形式保证信号传递）
-CMD ["epub-browser", "/app/Library", "--watch", "--no-browser", "--output-dir=/app/EpubBrowserFiles",  "--port=80"]
+CMD ["epub-browser", "/app/Library", "--watch", "--no-browser", "--output-dir=/app/EpubBrowserFiles", "--sync-dir=/app/SyncData", "--port=80"]
 
 # 暴露端口（如果epub-browser需要）
 EXPOSE 80
