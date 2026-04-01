@@ -258,10 +258,10 @@ class EPUBLibrary:
                     <i class="fas fa-folder-plus"></i> Add Group
                 </button>
                 <button class="bookshelf-action-btn" id="exportShelfBtn">
-                    <i class="fas fa-download"></i> Export
+                    <i class="fas fa-upload"></i> Export
                 </button>
                 <button class="bookshelf-action-btn" id="importShelfBtn">
-                    <i class="fas fa-upload"></i> Import
+                    <i class="fas fa-download"></i> Import
                 </button>
                 <input type="file" id="importShelfFile" accept=".json" style="display: none;">
             </div>
