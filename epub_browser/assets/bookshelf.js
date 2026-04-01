@@ -416,12 +416,13 @@ function initBookshelf() {
     
     // 渲染分组内容
     function renderGroupContent(group, tag = 'All') {
+        // 立即清空旧内容，避免闪烁
+        groupBody.innerHTML = '';
         if (groupLoading) {
             groupLoading.classList.remove('hidden');
         }
         
         setTimeout(() => {
-            groupBody.innerHTML = '';
             
             let bookCount = 0;
             let subGroupCount = 0;

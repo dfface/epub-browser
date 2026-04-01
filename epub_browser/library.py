@@ -275,10 +275,10 @@ class EPUBLibrary:
         <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
             <span class="bookshelf-tag active" data-tag="All">All</span>
         </div>
+        <div class="bookshelf-loading" id="bookshelfLoading">
+            <div class="loading-spinner"></div>
+        </div>
         <div class="bookshelf-body" id="bookshelfBody">
-            <div class="bookshelf-loading" id="bookshelfLoading">
-                <div class="loading-spinner"></div>
-            </div>
         </div>
         <div class="bookshelf-footer" id="bookshelfFooter">
             <span id="bookshelfStats"></span>
@@ -314,10 +314,10 @@ class EPUBLibrary:
         <div class="bookshelf-tag-filter" id="groupTagFilter">
             <span class="bookshelf-tag active" data-tag="All">All</span>
         </div>
+        <div class="bookshelf-loading" id="groupLoading">
+            <div class="loading-spinner"></div>
+        </div>
         <div class="bookshelf-body" id="groupBody">
-            <div class="bookshelf-loading" id="groupLoading">
-                <div class="loading-spinner"></div>
-            </div>
         </div>
         <div class="bookshelf-footer" id="groupFooter">
             <span id="groupStats"></span>
