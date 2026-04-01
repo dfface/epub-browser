@@ -208,9 +208,10 @@ services:
     ports:
       - "8088:80"
     volumes:
-      - "/Users/dfface/Calibre Library:/app/Library"
-      - "/Users/dfface/data/epub-browser:/app/EpubBrowserFiles"
-      - "/Users/dfface/data/epub-browser-sync:/app/SyncData"
+      - "/Users/dfface/Calibre Library:/app/Library/Calibre"
+      - "/Users/dfface/xxx Book Library:/app/Library/xxxBook"
+      - "/Users/dfface/data/epub-browser/tmp-files:/app/EpubBrowserFiles"
+      - "/Users/dfface/data/epub-browser/sync-data:/app/SyncData"
 ```
 
 or just with `docker`:
