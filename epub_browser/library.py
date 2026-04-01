@@ -165,7 +165,7 @@ class EPUBLibrary:
 
         library_html += f"""
     <div class="container">
-        <header class="header" data-id="header">
+        <header class="eb-header" data-id="header">
             <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favion.svg" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">
                 <div class="stat-card">
@@ -324,7 +324,7 @@ class EPUBLibrary:
         </div>
     </div>
 </div>
-<footer class="footer" data-id="footer">
+<footer class="eb-footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """

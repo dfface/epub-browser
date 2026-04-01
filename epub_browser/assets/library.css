@@ -54,7 +54,7 @@ body {
     padding: 20px 0;
 }
 
-.header {
+.eb-header {
     text-align: center;
     margin-bottom: 40px;
     padding: 40px 20px;
@@ -66,7 +66,7 @@ body {
     transition: var(--transition);
 }
 
-.header::before {
+.eb-header::before {
     content: '';
     position: absolute;
     top: 0;
@@ -76,7 +76,7 @@ body {
     background: linear-gradient(to right, var(--primary), var(--success));
 }
 
-.header h1 {
+.eb-header h1 {
     font-size: 2.5rem;
     margin-bottom: 10px;
     color: var(--text-color);
@@ -84,7 +84,7 @@ body {
     transition: var(--transition);
 }
 
-.header p {
+.eb-header p {
     font-size: 1.1rem;
     color: var(--text-secondary);
     max-width: 600px;
@@ -381,7 +381,7 @@ body {
     transform: scale(1.1);
 }
 
-.footer {
+.eb-footer {
     text-align: center;
     padding: 10px 0;
     color: var(--text-secondary);
@@ -448,7 +448,7 @@ body {
         height: 220px;
     }
     
-    .header h1 {
+    .eb-header h1 {
         font-size: 2rem;
     }
     
@@ -509,7 +509,7 @@ body {
     }
 }
 
-.kindle-mode header, .kindle-mode .tag-cloud-item, .kindle-mode .book-cover, .kindle-mode .book-card, .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .search-box {
+.kindle-mode .eb-header, .kindle-mode .tag-cloud-item, .kindle-mode .book-cover, .kindle-mode .book-card, .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .search-box {
     box-shadow: none;
     border-radius: inherit;
 }
@@ -518,7 +518,7 @@ body {
     padding: 0;
 }
 
-.kindle-mode .header {
+.kindle-mode .eb-header {
     margin-bottom: 0;
 }
 
@@ -537,7 +537,7 @@ body {
         height: 200px;
     }
     
-    .header {
+    .eb-header {
         padding: 30px 15px;
     }
     

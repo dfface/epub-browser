@@ -440,7 +440,7 @@ class EPUBProcessor:
 """
         index_html += f"""
 <div class="container">
-    <div class="breadcrumb header" data-id="breadcrumb">
+    <div class="breadcrumb eb-header" data-id="breadcrumb">
         <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
@@ -521,7 +521,7 @@ class EPUBProcessor:
         </div>
     </a>
 </div>
-<footer class="footer" data-id="footer">
+<footer class="eb-footer" data-id="footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>"""
 
@@ -1012,7 +1012,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
 
     <div class="container">
-        <div class="breadcrumb header" data-id="breadcrumb">
+        <div class="breadcrumb eb-header" data-id="breadcrumb">
             <a href="/index.html#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" alt="bookHome" class="a-book-home">{self.book_title}</a>
@@ -1197,7 +1197,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </div>
     </div>
 
-    <footer class="footer" data-id="footer">
+    <footer class="eb-footer" data-id="footer">
         <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
     </footer>
 """

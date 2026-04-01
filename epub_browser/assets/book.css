@@ -52,7 +52,7 @@ body {
     margin: 0 auto;
 }
 
-.header {
+.eb-header {
     text-align: center;
     margin-bottom: 40px;
     padding: 40px 20px;
@@ -64,7 +64,7 @@ body {
     transition: var(--transition);
 }
 
-.header::before {
+.eb-header::before {
     content: '';
     position: absolute;
     top: 0;
@@ -74,7 +74,7 @@ body {
     background: linear-gradient(to right, var(--primary), var(--success));
 }
 
-.header h1 {
+.eb-header h1 {
     font-size: 2.2rem;
     margin-bottom: 10px;
     color: var(--text-color);
@@ -82,7 +82,7 @@ body {
     transition: var(--transition);
 }
 
-.header p {
+.eb-header p {
     font-size: 1.1rem;
     color: var(--text-secondary);
     max-width: 600px;
@@ -430,7 +430,7 @@ body {
 .toc-level-2 .chapter-icon { color: var(--warning); }
 .toc-level-3 .chapter-icon { color: var(--danger); }
 
-.footer {
+.eb-footer {
     text-align: center;
     padding: 10px 0;
     color: var(--text-secondary);
@@ -519,14 +519,14 @@ body {
     font-size: 0.5rem;
 }
 
-.kindle-mode .header, .kindle-mode .toc-container, 
+.kindle-mode .eb-header, .kindle-mode .toc-container, 
 .kindle-mode .content-container, .kindle-mode .navigation,
 .kindle-mode .theme-toggle, .kindle-mode .control-btn {
     box-shadow: none;
     border-radius: inherit;
 }
 
-.kindle-mode .book-info-card, .kindle-mode .footer{
+.kindle-mode .book-info-card, .kindle-mode .eb-footer{
     display: none;
 }
 
@@ -547,7 +547,7 @@ body {
 }
 
 @media (max-width: 768px) {
-    .header h1 {
+    .eb-header h1 {
         font-size: 1.8rem;
     }
     
@@ -565,7 +565,7 @@ body {
 }
 
 @media (max-width: 480px) {
-    .header {
+    .eb-header {
         padding: 30px 15px;
     }
     
