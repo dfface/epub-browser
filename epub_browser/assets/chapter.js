@@ -1785,12 +1785,37 @@ function initScript() {
             tocList.scrollTop = offsetTop - 150;  // 加点偏移
         }
     }
+
+    function bookHomeFloatingScrolling() {
+        // 滚动到当前章节位置
+        const bookHomeTocList = document.getElementById('bookHomeTocList');
+        if (bookHomeTocList) {
+            // 滚动到当前章节
+            const currentPath = window.location.pathname;
+            const currentChapter = currentPath.split('/').pop();
+            const activeLi = bookHomeTocList.querySelector(`a[href*="${currentChapter}"]`);
+            if (activeLi) {
+                const listItem = activeLi.parentElement;
+                // 移除其他active类
+                bookHomeTocList.querySelectorAll('.toc-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                // 添加active类
+                listItem.classList.add('active');
+                // 滚动到位置
+                bookHomeTocList.scrollTop = listItem.offsetTop - 150;
+            }
+        }
+    }
     tocToggle.addEventListener('click', function() {
         tocFloating.classList.toggle('active');
         tocFloatingScrolling();
     });
     bookHomeToggle.addEventListener('click', function() {
         bookHomeFloating.classList.toggle('active');
+        if (bookHomeFloating.classList.contains('active')) {
+            bookHomeFloatingScrolling();
+        }
     });
     
     // 切换目录显示 - 移动端
@@ -1804,6 +1829,9 @@ function initScript() {
         bookHomeFloating.classList.toggle('active');
         // 移动端点击后高亮按钮
         mobileBookHomeBtn.classList.toggle('active');
+        if (bookHomeFloating.classList.contains('active')) {
+            bookHomeFloatingScrolling();
+        }
     });
     
     // 关闭目录
