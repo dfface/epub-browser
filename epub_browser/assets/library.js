@@ -205,7 +205,7 @@ function initScript() {
                 bookCards.forEach(card => {
                     card.style.display = 'block';
                 });
-            } else if (tagText === 'NoTags') {
+            } else if (tagText === 'NoTag') {
                 bookCards.forEach(card => {
                     const tags = card.querySelectorAll('.book-tag');
                     let hasTag = tags.length > 0 ? true : false;

@@ -1052,8 +1052,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                 </div>
             </div>
         </div>
-
-        <div class="eb-content-container" id="eb-content-container">
+        <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
             <article class="eb-content" id="eb-content" data-eb-styles>
             {content}
             </article>
