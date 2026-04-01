@@ -119,7 +119,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             data = json.loads(body.decode('utf-8'))
             
             username = data.get('username', '')
-            client_version = data.get('version', 0)
+            client_version = data.get('version', 1)
             client_data = data.get('data')
             
             if not username:
@@ -156,18 +156,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 except ValueError:
                     continue
             
-            if max_version > client_version:
+            if max_version >= client_version:
                 with open(max_version_file, 'r', encoding='utf-8') as f:
                     server_data = json.load(f)
                 self.send_json_response(200, {
-                    "message": "Server has newer version",
+                    "message": "Server has newer or same version",
                     "version": max_version,
                     "data": server_data
                 })
-                return
-            
-            if max_version == client_version:
-                self.send_json_response(304, {"message": "No changes", "version": max_version})
                 return
             
             if client_data is None:
