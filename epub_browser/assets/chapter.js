@@ -957,7 +957,7 @@ function initScript() {
             case ' ':
             case 'ArrowDown':
             case 'Space':
-                e.preventDefault(); // 禁用默认跳转列行为
+                // 有默认向下的滚动行为
                 // 获取页面总高度
                 const scrollHeight = document.documentElement.scrollHeight;
                 // 获取可视区域高度
