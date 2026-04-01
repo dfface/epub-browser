@@ -521,7 +521,7 @@ class EPUBProcessor:
         </div>
     </a>
 </div>
-<footer class="eb-footer" data-id="footer">
+<footer class="eb-footer" data-id="eb-footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>"""
 
@@ -1029,7 +1029,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
             <div class="panel-content" id="cssPanelContent">
                 <div class="css-editor">
-                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content{{margin: 50px; width: auto}}"></textarea>
+                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
                     <div class="css-controls">
                         <button class="css-btn primary" id="saveCssBtn">
                             <i class="fas fa-save"></i> Save
@@ -1054,7 +1054,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
         </div>
 
-        <div class="content-container" data-id="content-container">
+        <div class="eb-content-container" id="eb-content-container">
             <article class="eb-content" id="eb-content" data-eb-styles>
             {content}
             </article>
@@ -1197,7 +1197,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </div>
     </div>
 
-    <footer class="eb-footer" data-id="footer">
+    <footer class="eb-footer" data-id="eb-footer">
         <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
     </footer>
 """

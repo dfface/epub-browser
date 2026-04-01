@@ -341,7 +341,7 @@ function initScript() {
     const totalPagesEl = document.getElementById('totalPages');
     const prevPageBtn = document.getElementById('prevPage');
     const nextPageBtn = document.getElementById('nextPage');
-    const contentContainer = document.querySelector('.content-container');
+    const contentContainer = document.querySelector('.eb-content-container');
     const content = document.getElementById('eb-content');
     const pageJumpInput = document.getElementById('pageJumpInput');
     const goToPageBtn = document.getElementById('goToPage');
@@ -668,7 +668,7 @@ function initScript() {
         const unifiedWidth = Math.floor(parentWidth);
         
         // 设置 content-container 宽度和高度
-        const contentContainer = document.querySelector('.content-container');
+        const contentContainer = document.querySelector('.eb-content-container');
         contentContainer.style.width = `${unifiedWidth}px`;
         // 高度由 flex 布局自动计算，确保填满剩余空间
         contentContainer.style.flex = '1';
@@ -1122,7 +1122,7 @@ function initScript() {
         updatePureModeButton();
         
         const navigation = document.querySelector('.navigation');
-        const contentContainer = document.querySelector('.content-container');
+        const contentContainer = document.querySelector('.eb-content-container');
         const ebContent = document.getElementById('eb-content');
         
         // 应用保存的状态 - 只在翻页模式下生效
@@ -1205,7 +1205,7 @@ function initScript() {
         updatePureModeButton();
         
         const navigation = document.querySelector('.navigation');
-        const contentContainer = document.querySelector('.content-container');
+        const contentContainer = document.querySelector('.eb-content-container');
         const ebContent = document.getElementById('eb-content');
         
         if (isPureModeEnabled) {

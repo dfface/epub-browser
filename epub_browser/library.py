@@ -324,7 +324,7 @@ class EPUBLibrary:
         </div>
     </div>
 </div>
-<footer class="eb-footer" data-id="footer">
+<footer class="eb-footer" data-id="eb-footer">
     <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
 </footer>
 """
