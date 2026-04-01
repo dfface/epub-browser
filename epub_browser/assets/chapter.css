@@ -1114,15 +1114,15 @@ body {
 }
 
 /* 引用 */
-.dark-mode #eb-content blockquote {
+/* .dark-mode #eb-content blockquote {
     border-left: 4px solid var(--primary) !important;
-}
+} */
 
 /* 列表项 */
-.dark-mode #eb-content ul li:before,
+/* .dark-mode #eb-content ul li:before,
 .dark-mode #eb-content ol li:before {
     color: var(--primary) !important;
-}
+} */
 
 /* medium-zoom 覆盖层 */
 .dark-mode .medium-zoom-overlay {
