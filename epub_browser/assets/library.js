@@ -54,11 +54,6 @@ function initScript() {
     }
 
     let kindleMode = getCookie("kindle-mode") || "false";  // 不能是 true，1 是默认就没设置 2 是点击后也是没设置
-    if (window.location.hash == "#kindle") {  // 保底方案
-        kindleMode = "true";
-    } else if (window.location.hash == "#not-kindle") {
-        kindleMode = "false";
-    }
     function isKindleMode() {
         return kindleMode == "true";
     }
