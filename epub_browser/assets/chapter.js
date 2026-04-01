@@ -1654,22 +1654,17 @@ function initScript() {
     wrapAllElements('table', 'div');
     wrapAllElements('img', 'div');
 
-    // 书籍目录锚点更新
-    const lastPart = pathParts[pathParts.length - 1];
-    var anchor = '';
-    if (lastPart.startsWith('chapter_') && lastPart.endsWith('.html')) {
-        anchor = "#" + lastPart.replace('.html', '');
-    }
-    if (anchor !== '') {
-        let bookHomes = document.querySelectorAll('.a-book-home');
-        bookHomes.forEach(item => {
-            item.href += anchor;
-        });
+    // 书籍章节进度保存
+    let lastPart = pathParts[pathParts.length - 1];
+    if (lastPart.startsWith('chapter_')) {
+        if (window.location.hash !== '') {
+            lastPart += window.location.hash;
+        }
         if (!isKindleMode()) {
-            localStorage.setItem(book_hash, anchor);
+            localStorage.setItem(book_hash, lastPart);
         } else {
-            setCookie(book_hash, anchor);
-        }   
+            setCookie(book_hash, lastPart);
+        }
     }
 
     // 主题切换功能

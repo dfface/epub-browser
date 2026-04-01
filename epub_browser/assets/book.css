@@ -395,12 +395,13 @@ body {
     background: var(--border-color);
 }
 
-.chapter-list a:target {
+/* 除了 hashtag 锚点，还支持 active class */
+.chapter-list a:target, .chapter-list a.active  {
     background: linear-gradient(to right, var(--primary), var(--success));
     color: #e9ecef;
 }
 
-.chapter-list a:target .chapter-page {
+.chapter-list a:target .chapter-page, .chapter-list a.active .chapter-page {
     color: #e9ecef;
 }
 

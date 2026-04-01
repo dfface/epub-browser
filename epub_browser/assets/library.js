@@ -119,21 +119,6 @@ function initScript() {
         });
     }
 
-    // 书籍目录锚点
-    const allBookLinks = document.querySelectorAll('.book-card .book-link');
-    allBookLinks.forEach(item => {
-        let pathParts = item.href.split('/');
-        pathParts = pathParts.filter(item => item !== "");
-        let book_hash = pathParts[pathParts.length - 2];  // 最后一个是 index.html
-        if (!isKindleMode()) {
-            let book_anchor = localStorage.getItem(book_hash) || '';
-            item.href += book_anchor;
-        } else {
-            let book_anchor = getCookie(book_hash) || '';
-            item.href += book_anchor;
-        }
-    });
-
     // 主题切换
     const themeToggle = document.getElementById('themeToggle');
     const themeIcon = themeToggle.querySelector('i');

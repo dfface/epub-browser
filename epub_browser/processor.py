@@ -494,17 +494,16 @@ class EPUBProcessor:
                 
                 if chapter_index is not None:
                     if chapter_anchor is not None:
-                        # 只加一个正向链接的 anchor 定位，反链接中的 id 不加 anchor 防止章节中锚点乱搞而回来时无法锚定
-                        index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="chapter_{chapter_index}.html#{chapter_anchor}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
-                        index_html += f'        <li class="{level_class}"><a href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="chapter_{chapter_index}.html"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
                 else:
                     print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
-                index_html += f'        <li><a href="/book/{self.book_hash}/chapter_{i}.html">{chapter["title"]}</a></li>\n'
+                index_html += f'        <li><a class="chapter-link" href="/book/{self.book_hash}/chapter_{i}.html" id="chapter_{i}.html">{chapter["title"]}</a></li>\n'
         
         index_html += f"""    </ul>
     </div>

@@ -155,15 +155,27 @@ function initScript() {
         });
     }
     
-    // 书籍目录锚点删除
-    const anchor = window.location.hash;
+    // 恢复书籍阅读的章节进度
+    let currentChapter = "";
     if (!isKindleMode()) {
-        if (anchor === '' || !anchor.startsWith('#chapter_')) {
-            localStorage.removeItem(book_hash);  // 此时 lastPart 就是 book_hash
-        }
+        currentChapter = localStorage.getItem(book_hash) || "";
     } else {
-        if (anchor === '' || !anchor.startsWith('#chapter_')) {
-            deleteCookie(book_hash);  // 此时 lastPart 就是 book_hash
+        currentChapter = getCookie(book_hash) || "";
+    }
+    if (currentChapter !== "") {
+        // 激活当前章节
+        const chapterElement = document.getElementById(currentChapter);
+        if (chapterElement) {
+            chapterElement.classList.add('active');
+            // 滚动到当前章节（兼容性写法）
+            let tocContainer = document.querySelector('.chapter-list');
+            if (isKindleMode()) {
+                // kindle mode 的滚动元素是不同的
+                tocContainer = document.documentElement
+            }
+            if (tocContainer) {
+                tocContainer.scrollTop = chapterElement.offsetTop - tocContainer.offsetTop - 50;
+            }
         }
     }
     
