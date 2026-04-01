@@ -189,6 +189,10 @@ class EPUBLibrary:
                         <div class="stat-value">Not Kindle</div>
                     </a>
                 </div>
+                <div class="stat-card" id="loginCard" style="cursor: pointer;">
+                    <i class="fas fa-user"></i>
+                    <div class="stat-value" id="loginValue">Login</div>
+                </div>
             </div>
         </header>
         <div class="controls" data-id="controls">

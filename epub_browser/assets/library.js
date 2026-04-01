@@ -58,6 +58,58 @@ function initScript() {
         return kindleMode == "true";
     }
 
+    const USERNAME_KEY = 'epub_browser_username';
+
+    function getUsername() {
+        if (isKindleMode()) {
+            return getCookie(USERNAME_KEY);
+        }
+        return localStorage.getItem(USERNAME_KEY);
+    }
+
+    function setUsername(username) {
+        if (isKindleMode()) {
+            setCookie(USERNAME_KEY, username);
+        } else {
+            localStorage.setItem(USERNAME_KEY, username);
+        }
+    }
+
+    function updateLoginDisplay() {
+        const loginValue = document.getElementById('loginValue');
+        const username = getUsername();
+        if (loginValue) {
+            if (username) {
+                loginValue.textContent = username;
+            } else {
+                loginValue.textContent = 'Login';
+            }
+        }
+    }
+
+    window.getUsername = getUsername;
+    window.setUsername = setUsername;
+    updateLoginDisplay();
+
+    const loginCard = document.getElementById('loginCard');
+    if (loginCard) {
+        loginCard.addEventListener('click', function() {
+            const currentUsername = getUsername();
+            const username = prompt('Please enter your username:', currentUsername || '');
+            if (username !== null) {
+                if (username.trim()) {
+                    setUsername(username.trim());
+                    updateLoginDisplay();
+                    showNotification('Username saved: ' + username.trim(), 'success');
+                } else if (username === '') {
+                    setUsername('');
+                    updateLoginDisplay();
+                    showNotification('Username cleared', 'info');
+                }
+            }
+        });
+    }
+
     const storageKeySortableBook = 'book-grid-sortable-order';
     const storageKeySortableTag = 'tag-cloud-sortable-order';
     const storageKeySortableContainer = 'library-container-sortable-order';

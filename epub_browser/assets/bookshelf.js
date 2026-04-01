@@ -789,9 +789,17 @@ function initBookshelf() {
     // 同步书架数据
     if (syncShelfBtn) {
         syncShelfBtn.addEventListener('click', async function() {
-            const username = prompt('Please enter your username for sync:');
-            if (!username || !username.trim()) {
-                return;
+            let username = window.getUsername ? window.getUsername() : null;
+            
+            if (!username) {
+                username = prompt('Please enter your username for sync:');
+                if (!username || !username.trim()) {
+                    return;
+                }
+                username = username.trim();
+                if (window.setUsername) {
+                    window.setUsername(username);
+                }
             }
             
             const version = getBookshelfVersion();
@@ -807,32 +815,34 @@ function initBookshelf() {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        username: username.trim(),
+                        username: username,
                         version: version,
                         data: shelfData
                     })
                 });
                 
-                const result = await response.json();
-                
                 if (response.status === 404) {
+                    const result = await response.json();
                     setBookshelfVersion(result.version || 1);
-                    showNotification('Sync: New user created, data uploaded successfully!', 'success');
+                    showNotification(`Sync (${username}): New user created, data uploaded successfully!`, 'success');
                 } else if (response.status === 200) {
+                    const result = await response.json();
                     localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(result.data));
                     setBookshelfVersion(result.version);
                     renderBookshelf('All');
-                    showNotification('Sync: Data updated from server!', 'success');
+                    showNotification(`Sync (${username}): Data updated from server!`, 'success');
                 } else if (response.status === 304) {
-                    showNotification('Sync: No changes, already up to date!', 'info');
+                    showNotification(`Sync (${username}): No changes, already up to date!`, 'info');
                 } else if (response.status === 201) {
+                    const result = await response.json();
                     setBookshelfVersion(result.version);
-                    showNotification('Sync: Data uploaded successfully!', 'success');
+                    showNotification(`Sync (${username}): Data uploaded successfully!`, 'success');
                 } else {
-                    showNotification('Sync error: ' + (result.message || 'Unknown error'), 'warning');
+                    const result = await response.json();
+                    showNotification(`Sync (${username}) error: ` + (result.message || 'Unknown error'), 'warning');
                 }
             } catch (err) {
-                showNotification('Sync failed: ' + err.message, 'warning');
+                showNotification(`Sync (${username}) failed: ` + err.message, 'warning');
             } finally {
                 syncShelfBtn.disabled = false;
                 syncShelfBtn.innerHTML = '<i class="fas fa-sync"></i> Sync';
