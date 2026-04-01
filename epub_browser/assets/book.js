@@ -261,6 +261,23 @@ function initBookShelfButton(bookHash) {
     const toggleShelfBtnText = document.getElementById('toggleShelfBtnText');
     
     if (!toggleShelfBtn) return;
+
+    // 获取书架版本号
+    function getBookshelfVersion() {
+        const version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
+        return version ? parseInt(version, 10) : 1;
+    }
+    
+    // 设置书架版本号
+    function setBookshelfVersion(version) {
+        localStorage.setItem(BOOKSHELF_VERSION_KEY, version.toString());
+    }
+    
+    // 增加书架版本号
+    function incrementBookshelfVersion() {
+        const currentVersion = getBookshelfVersion();
+        setBookshelfVersion(currentVersion + 1);
+    }
     
     // 获取书架数据
     function getBookshelf() {
@@ -274,6 +291,7 @@ function initBookShelfButton(bookHash) {
     // 保存书架数据
     function saveBookshelf(data) {
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
+        incrementBookshelfVersion();
     }
     
     // 检查书籍是否在书架中（包括所有分组）
