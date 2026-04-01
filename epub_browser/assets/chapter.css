@@ -287,7 +287,7 @@ body {
     transition: var(--transition);
 }
 
-.content-container {
+.eb-content-container {
     background: var(--content-bg);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
@@ -882,7 +882,7 @@ body {
     flex-direction: column;
 }
 
-.pagination-mode .content-container {
+.pagination-mode .eb-content-container {
     box-shadow: unset !important;
     margin-bottom: 0;
     overflow: hidden;
@@ -959,7 +959,7 @@ body {
 }
 
 .kindle-mode .eb-header, .kindle-mode .toc-container, 
-.kindle-mode .content-container, .kindle-mode .navigation,
+.kindle-mode .eb-content-container, .kindle-mode .navigation,
 .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .pagination-controls {
     box-shadow: none;
     border-radius: inherit;
@@ -989,7 +989,7 @@ body {
     border: 1px solid;
 }
 
-.kindle-mode .content-container {
+.kindle-mode .eb-content-container {
     margin-bottom: 0;
 }
 
