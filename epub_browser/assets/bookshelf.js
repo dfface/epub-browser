@@ -1,5 +1,6 @@
 function initBookshelf() {
     const BOOKSHELF_KEY = 'bookshelf';
+    const BOOKSHELF_VERSION_KEY = 'bookshelf_version';
     
     const bookshelfBtn = document.getElementById('bookshelfBtn');
     const bookshelfModal = document.getElementById('bookshelfModal');
@@ -12,6 +13,7 @@ function initBookshelf() {
     const exportShelfBtn = document.getElementById('exportShelfBtn');
     const importShelfBtn = document.getElementById('importShelfBtn');
     const importShelfFile = document.getElementById('importShelfFile');
+    const syncShelfBtn = document.getElementById('syncShelfBtn');
     
     const groupModal = document.getElementById('groupModal');
     const groupCloseBtn = document.getElementById('groupCloseBtn');
@@ -28,6 +30,23 @@ function initBookshelf() {
     let currentTag = 'All';
     let bookshelfSortableInstance = null;
     let groupSortableInstance = null;
+    
+    // 获取书架版本号
+    function getBookshelfVersion() {
+        const version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
+        return version ? parseInt(version, 10) : 1;
+    }
+    
+    // 设置书架版本号
+    function setBookshelfVersion(version) {
+        localStorage.setItem(BOOKSHELF_VERSION_KEY, version.toString());
+    }
+    
+    // 增加书架版本号
+    function incrementBookshelfVersion() {
+        const currentVersion = getBookshelfVersion();
+        setBookshelfVersion(currentVersion + 1);
+    }
     
     // 获取书架数据
     function getBookshelf() {
@@ -46,6 +65,7 @@ function initBookshelf() {
     // 保存书架数据
     function saveBookshelf(data) {
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
+        incrementBookshelfVersion();
     }
     
     // 生成唯一ID
@@ -765,6 +785,60 @@ function initBookshelf() {
         }
         e.target.value = '';
     });
+    
+    // 同步书架数据
+    if (syncShelfBtn) {
+        syncShelfBtn.addEventListener('click', async function() {
+            const username = prompt('Please enter your username for sync:');
+            if (!username || !username.trim()) {
+                return;
+            }
+            
+            const version = getBookshelfVersion();
+            const shelfData = getBookshelf();
+            
+            try {
+                syncShelfBtn.disabled = true;
+                syncShelfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+                
+                const response = await fetch('/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username.trim(),
+                        version: version,
+                        data: shelfData
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.status === 404) {
+                    setBookshelfVersion(result.version || 1);
+                    showNotification('Sync: New user created, data uploaded successfully!', 'success');
+                } else if (response.status === 200) {
+                    localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(result.data));
+                    setBookshelfVersion(result.version);
+                    renderBookshelf('All');
+                    showNotification('Sync: Data updated from server!', 'success');
+                } else if (response.status === 304) {
+                    showNotification('Sync: No changes, already up to date!', 'info');
+                } else if (response.status === 201) {
+                    setBookshelfVersion(result.version);
+                    showNotification('Sync: Data uploaded successfully!', 'success');
+                } else {
+                    showNotification('Sync error: ' + (result.message || 'Unknown error'), 'error');
+                }
+            } catch (err) {
+                showNotification('Sync failed: ' + err.message, 'error');
+            } finally {
+                syncShelfBtn.disabled = false;
+                syncShelfBtn.innerHTML = '<i class="fas fa-sync"></i> Sync';
+            }
+        });
+    }
     
     // 标签过滤点击事件
     bookshelfTagFilter.addEventListener('click', function(e) {

@@ -257,6 +257,9 @@ class EPUBLibrary:
                 <button class="bookshelf-action-btn" id="addShelfGroupBtn">
                     <i class="fas fa-folder-plus"></i> Add Group
                 </button>
+                <button class="bookshelf-action-btn" id="syncShelfBtn">
+                    <i class="fas fa-sync"></i> Sync
+                </button>
                 <button class="bookshelf-action-btn" id="exportShelfBtn">
                     <i class="fas fa-upload"></i> Export
                 </button>

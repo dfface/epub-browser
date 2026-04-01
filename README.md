@@ -67,6 +67,7 @@ It now supports the following features:
   - Drag-and-drop sorting for books and groups
   - Export/import shelf data as JSON (supports both file upload and URL import)
   - Statistics showing book and group counts
+  - Sync: Synchronize shelf data across devices using a username. The sync feature uses version control to manage data changes and supports conflict resolution.
 
 
 ## Usage
@@ -106,6 +107,9 @@ epub-browser book1.epub book2.epub --no-browser
 
 # Specify the server port
 epub-browser book1.epub --port 8080
+
+# Specify the sync directory for bookshelf data (default: same as output directory)
+epub-browser book1.epub --sync-dir /path/to/sync-data
 ```
 
 Then a browser will be opened to view the epub file.
@@ -114,7 +118,7 @@ For more usage information, please use the `--help` parameter.
 
 ```bash
 ➜ epub-browser --help                                                                                        
-usage: epub-browser [-h] [--port PORT] [--no-browser] [--output-dir OUTPUT_DIR] [--keep-files] [--log] [--no-server] [--watch]
+usage: epub-browser [-h] [--port PORT] [--no-browser] [--output-dir OUTPUT_DIR] [--keep-files] [--log] [--no-server] [--watch] [--sync-dir SYNC_DIR]
                     filename [filename ...]
 
 EPUB to Web Converter - Multi-book Support
@@ -133,6 +137,7 @@ options:
   --no-server           Do not start a server, just generate files which can be directly deployed on any web server such as Apache.
   --watch, -w           Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides).
                         When there are new additions or updates, automatically add them to the library.
+  --sync-dir SYNC_DIR   Directory to store bookshelf sync data (default: same as current work directory)
 ```
 
 ## Startup

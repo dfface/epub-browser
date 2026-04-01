@@ -3,6 +3,8 @@ import webbrowser
 import socket
 import threading
 import mimetypes
+import json
+import glob
 from socketserver import ThreadingMixIn
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
@@ -36,9 +38,10 @@ class StoppableThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     """自定义HTTP请求处理器"""
     
-    def __init__(self, *args, base_directory, enableLog, **kwargs):
+    def __init__(self, *args, base_directory, enableLog, sync_dir, **kwargs):
         self.enableLog = enableLog
         self.base_directory = base_directory
+        self.sync_dir = sync_dir
         super().__init__(*args, directory=self.base_directory, **kwargs)
     
     def handle_one_request(self):
@@ -82,6 +85,127 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.send_error(500, "Internal Server Error")
             except (BrokenPipeError, ConnectionResetError):
                 pass
+    
+    def do_POST(self):
+        """处理POST请求"""
+        try:
+            if getattr(self.server, '_is_shutting_down', False):
+                self.send_error(503, "Server is shutting down")
+                return
+            
+            parsed_path = urlparse(self.path)
+            path = parsed_path.path
+            
+            if path == '/sync':
+                self.handle_sync_request()
+                return
+            
+            self.send_error(404, "Not Found")
+            
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:
+            self.log_message(f"Unexpected error in do_POST: {e}")
+            try:
+                self.send_error(500, "Internal Server Error")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+    
+    def handle_sync_request(self):
+        """处理书架同步请求"""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode('utf-8'))
+            
+            username = data.get('username', '')
+            client_version = data.get('version', 0)
+            client_data = data.get('data')
+            
+            if not username:
+                self.send_json_response(400, {"message": "Username is required"})
+                return
+            
+            if not self.sync_dir:
+                self.sync_dir = self.base_directory
+            
+            pattern = os.path.join(self.sync_dir, f"epub-browser-bookshelf-{username}-*.json")
+            existing_files = glob.glob(pattern)
+            
+            if not existing_files:
+                if client_data is None:
+                    self.send_json_response(400, {"message": "No data provided for new user"})
+                    return
+                new_version = client_version if client_version > 0 else 1
+                filename = f"epub-browser-bookshelf-{username}-{new_version}.json"
+                filepath = os.path.join(self.sync_dir, filename)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    json.dump(client_data, f, ensure_ascii=False, indent=2)
+                self.send_json_response(404, {"message": "New user created", "version": new_version})
+                return
+            
+            max_version = 0
+            max_version_file = None
+            for f in existing_files:
+                basename = os.path.basename(f)
+                try:
+                    version = int(basename.split('-')[-1].replace('.json', ''))
+                    if version > max_version:
+                        max_version = version
+                        max_version_file = f
+                except ValueError:
+                    continue
+            
+            if max_version > client_version:
+                with open(max_version_file, 'r', encoding='utf-8') as f:
+                    server_data = json.load(f)
+                self.send_json_response(200, {
+                    "message": "Server has newer version",
+                    "version": max_version,
+                    "data": server_data
+                })
+                return
+            
+            if max_version == client_version:
+                self.send_json_response(304, {"message": "No changes", "version": max_version})
+                return
+            
+            if client_data is None:
+                self.send_json_response(400, {"message": "No data provided for update"})
+                return
+            
+            new_version = client_version
+            filename = f"epub-browser-bookshelf-{username}-{new_version}.json"
+            filepath = os.path.join(self.sync_dir, filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(client_data, f, ensure_ascii=False, indent=2)
+            
+            for f in existing_files:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+            
+            self.send_json_response(201, {"message": "Data updated", "version": new_version})
+            
+        except json.JSONDecodeError:
+            self.send_json_response(400, {"message": "Invalid JSON data"})
+        except Exception as e:
+            self.log_message(f"Error handling sync request: {e}")
+            self.send_json_response(500, {"message": f"Server error: {str(e)}"})
+    
+    def send_json_response(self, code, data):
+        """发送JSON响应"""
+        try:
+            response = json.dumps(data, ensure_ascii=False).encode('utf-8')
+            self.send_response(code)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(response)))
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(response)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
     
     def send_library_index(self):
         """发送图书馆首页"""
@@ -189,10 +313,11 @@ class EPUBServer:
     增强的EPUB服务器
     """
 
-    def __init__(self, base_directory, book_count, enableLog: bool):
+    def __init__(self, base_directory, book_count, enableLog: bool, sync_dir=None):
         self.base_directory = base_directory
         self.book_count = book_count
         self.enableLog = enableLog
+        self.sync_dir = sync_dir or os.getcwd()
         self.server = None
         self._is_running = False
         self._server_thread = None
@@ -221,7 +346,7 @@ class EPUBServer:
             # 创建自定义请求处理器 - 修复lambda作用域问题
             def create_handler(*args, **kwargs):
                 return EPUBHTTPRequestHandler(
-                    *args, base_directory=self.base_directory, enableLog=self.enableLog, **kwargs
+                    *args, base_directory=self.base_directory, enableLog=self.enableLog, sync_dir=self.sync_dir, **kwargs
                 )
             
             # 启动可停止的服务器

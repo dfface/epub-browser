@@ -27,10 +27,10 @@ def start_watcher_process(filenames, library, stop_event):
     except Exception as e:
         print(f"Watcher process error: {e}")
 
-def start_server_process(base_dir, book_count, port, no_browser, log_enabled, stop_event):
+def start_server_process(base_dir, book_count, port, no_browser, log_enabled, stop_event, sync_dir=None):
     """启动服务器进程"""
     try:
-        server_instance = EPUBServer(base_dir, book_count, log_enabled)
+        server_instance = EPUBServer(base_dir, book_count, log_enabled, sync_dir)
         server_instance.start_server(
             port=port, 
             no_browser=no_browser,
@@ -49,6 +49,7 @@ def main():
     parser.add_argument('--log', action='store_true', help='Enable log messages')
     parser.add_argument('--no-server', action='store_true', help='Do not start a server, just generate files which can be directly deployed on any web server such as Apache.')
     parser.add_argument('--watch', '-w', action='store_true', help="Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.")
+    parser.add_argument('--sync-dir', help='Directory to store bookshelf sync data (default: same as work directory)')
     
     args = parser.parse_args()
     
@@ -139,7 +140,7 @@ def main():
     # 启动服务器进程
     server_process = multiprocessing.Process(
         target=start_server_process,
-        args=(library.base_directory, len(library.books), args.port, args.no_browser, args.log, stop_event),
+        args=(library.base_directory, len(library.books), args.port, args.no_browser, args.log, stop_event, args.sync_dir),
         name="ServerProcess"
     )
     server_process.start()
