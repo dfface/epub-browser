@@ -256,6 +256,7 @@ function initScript() {
 function initBookShelfButton(bookHash) {
     // 书架功能
     const BOOKSHELF_KEY = 'bookshelf';
+    const BOOKSHELF_VERSION_KEY = 'bookshelf_version';
 
     const toggleShelfBtn = document.getElementById('toggleShelfBtn');
     const toggleShelfBtnText = document.getElementById('toggleShelfBtnText');
