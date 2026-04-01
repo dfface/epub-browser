@@ -1892,11 +1892,11 @@ function initScript() {
         });
     }
     
-    // 更新目录高亮
+    // 更新章节目录高亮（不包括书本目录）
     function updateTocHighlight() {
         const content = document.getElementById('eb-content');
         const headings = content.querySelectorAll('h2, h3, h4');
-        const tocItems = document.querySelectorAll('.toc-item');
+        const tocItems = document.querySelectorAll('#tocFloating .toc-item');
         
         // 找到当前可见的标题
         let currentHeadingId = '';
