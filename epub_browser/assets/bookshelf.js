@@ -833,6 +833,8 @@ function initBookshelf() {
                     showNotification(`Sync (${username}): Data updated from server!`, 'success');
                 } else if (response.status === 304) {
                     showNotification(`Sync (${username}): No changes, already up to date!`, 'info');
+                } else if (response.status === 405) {
+                    showNotification(`Sync (${username}): Not allowed to sync, check your configuration!`, 'warning');
                 } else if (response.status === 201) {
                     const result = await response.json();
                     setBookshelfVersion(result.version);
