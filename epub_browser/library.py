@@ -237,7 +237,7 @@ class EPUBLibrary:
 """      
         library_html += f"""
     </div>
-    <div class="theme-toggle" id="themeToggle">
+    <div class="theme-toggle" id="themeToggle" data-id="theme-toggle">
         <i class="fas fa-moon"></i>
         <span class="control-name">Theme</span>
     </div>
