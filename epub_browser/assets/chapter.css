@@ -333,8 +333,8 @@ body {
     line-height: 1.7;
 } */
 
-#eb-content .img-wrapper img {
-    max-width: 100%;
+#eb-content .img-wrapper {
+    overflow: scroll;
 }
 
 /* medium-zoom 样式 */
