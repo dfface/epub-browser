@@ -450,6 +450,7 @@ body {
     margin-top: 30px;
     gap: 25px;
     transition: var(--transition);
+    overflow: scroll;
 }
 
 .book-info-cover {
@@ -548,8 +549,43 @@ body {
 }
 
 @media (max-width: 768px) {
+    /* 优化 eb-header 紧凑性 */
+    .eb-header {
+        padding: 20px 15px;
+        margin-bottom: 20px;
+    }
+    
     .eb-header h1 {
-        font-size: 1.8rem;
+        font-size: 1.6rem;
+        margin-bottom: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .eb-header p {
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* 优化 toc-header 紧凑性 */
+    .toc-header {
+        padding: 12px 15px;
+    }
+    
+    .toc-header h2 {
+        font-size: 1.2rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .chapter-count {
+        padding: 3px 10px;
+        font-size: 0.8rem;
+        white-space: nowrap;
     }
     
     .book-info {
@@ -567,21 +603,41 @@ body {
 
 @media (max-width: 480px) {
     .eb-header {
-        padding: 30px 15px;
+        padding: 20px 15px;
     }
     
     .breadcrumb {
-        flex-wrap: wrap;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    
+    .breadcrumb a {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 1;
+    }
+    
+    .breadcrumb-current {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 1;
+        min-width: 0;
     }
     
     .breadcrumb-separator {
         margin: 0 5px;
+        flex-shrink: 0;
     }
     
     .toc-header {
-        flex-direction: column;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
         gap: 10px;
-        align-items: flex-start;
     }
 
     #clearReadingProgressBtn {
@@ -790,4 +846,46 @@ body {
 
 .kindle-mode .loading-spinner::after {
     content: "Loading...";
+}
+
+
+/* 移动端：当 book-info-desc 不为空时，改为上下排列 */
+@media (max-width: 768px) {
+    .book-info-card:has(.book-info-desc) {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .book-info-card:has(.book-info-desc) .book-info-cover {
+        flex: 0 0 auto;
+        margin-bottom: 20px;
+    }
+    
+    .book-info-card:has(.book-info-desc) .book-info-content {
+        flex: 1;
+        width: 100%;
+    }
+    
+    /* 确保 tags 和 controls 也居中 */
+    .book-info-card:has(.book-info-desc) .book-info-tags {
+        justify-content: center;
+    }
+    
+    .book-info-card:has(.book-info-desc) .css-controls {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+    
+    .book-info-card:has(.book-info-desc) .css-btn {
+        flex: 0 0 auto;
+    }
+    
+    /* 调整内边距和间距 */
+    .book-info-card:has(.book-info-desc) {
+        padding: 20px;
+        gap: 20px;
+    }
 }
