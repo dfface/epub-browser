@@ -1092,3 +1092,57 @@ body {
 .kindle-mode .loading-spinner::after {
     content: "Loading...";
 }
+
+
+/* 移动端：tag 栏只能一行横向移动 */
+@media (max-width: 768px) {
+    .bookshelf-tag-filter {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 6px 10px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    
+    .bookshelf-tag-filter::-webkit-scrollbar {
+        height: 4px;
+    }
+    
+    .bookshelf-tag-filter::-webkit-scrollbar-track {
+        background: var(--background-color);
+    }
+    
+    .bookshelf-tag-filter::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: 2px;
+    }
+    
+    .bookshelf-tag {
+        flex-shrink: 0;
+    }
+    
+    /* 移动端：header 和 footer 更紧凑 */
+    .bookshelf-header {
+        padding: 5px 10px;
+        gap: 4px;
+    }
+    
+    .bookshelf-header-left {
+        gap: 4px;
+    }
+    
+    .bookshelf-title {
+        font-size: 1.2rem;
+    }
+    
+    .bookshelf-action-btn {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+    
+    .bookshelf-footer {
+        padding: 2px 4px;
+        font-size: 0.75rem;
+    }
+}
