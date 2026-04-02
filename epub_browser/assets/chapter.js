@@ -461,16 +461,6 @@ function initScript() {
         });
         togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
         mobileTogglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
-        // 隐藏 tocFloatingBtn
-        let tocToggleBtn = document.getElementById('tocToggle');
-        if (tocToggleBtn) {
-            tocToggleBtn.style.display = 'none';
-        }
-        // 隐藏 mobileTocBtn
-        let mobileTocBtn = document.getElementById('mobileTocBtn');
-        if (mobileTocBtn) {
-            mobileTocBtn.style.display = 'none';
-        }
         
         // 添加滚动事件监听，更新当前页码
         content.addEventListener('scroll', function() {
@@ -636,10 +626,10 @@ function initScript() {
             content.style.columnWidth = 'auto';
             content.style.columnFill = 'auto';
             content.style.columnGap = '0';
-            content.style.overflowX = 'auto';
+            content.style.overflowX = 'hidden';
             content.style.overflowY = 'hidden';
-            content.style.scrollSnapType = 'x mandatory';
-            content.style.scrollBehavior = 'smooth';
+            content.style.scrollSnapType = 'none';  // 禁用滚动吸附
+            content.style.scrollBehavior = 'auto';  // 禁用平滑滚动
             
             // 确保内容能够正确分割
             content.style.breakInside = 'auto';
@@ -660,6 +650,9 @@ function initScript() {
     }
     
     // 计算总页数
+    // 存储标题到页面的映射
+    let headingPageMap = {};
+    
     function calculateTotalPages() {
         // 获取父容器宽度并计算统一的整数宽度
         const parentContainer = document.querySelector('.container');
@@ -1592,18 +1585,25 @@ function initScript() {
     }
     
     // 代码高亮
+    // highlight 之前的处理 pre 里面有无 code
     if (!isKindleMode()) {
-        // highlight 之前的处理 pre 里面有无 code
         let allPres = document.querySelectorAll("pre");
-        allPres.forEach(pre => {
-            if (pre.children.length == 0) {
+        allPres.forEach(function(pre) {
+            if (pre.children.length === 0) {
                 // 需要用 code 包裹
-                oldValue = pre.innerHTML;
-                code = document.createElement('code');
+                var oldValue = pre.innerHTML;
+                var code = document.createElement('code');
                 code.innerHTML = oldValue;
-                pre.replaceChildren(code);
+                
+                // 清空 pre 内容
+                while (pre.firstChild) {
+                    pre.removeChild(pre.firstChild);
+                }
+                
+                // 添加 code 元素
+                pre.appendChild(code);
             }
-        })
+        });
         // 高亮
         hljs.highlightAll();
     }
@@ -1868,15 +1868,44 @@ function initScript() {
                 // 平滑滚动到标题位置
                 const targetElement = document.getElementById(heading.id);
                 if (targetElement) {
-                    const offsetTop = targetElement.offsetTop - 100;
-                    window.scrollTo({
-                        top: offsetTop,
-                        behavior: 'smooth'
-                    });
+                    if (isPaginationMode) {
+                        // 翻页模式：使用 scrollIntoView 方法
+                        targetElement.scrollIntoView({
+                            behavior: 'auto',
+                            block: 'start'
+                        });
+                        
+                        // 等待滚动完成后更新页码
+                        setTimeout(function() {
+                            // 计算当前滚动位置对应的页码
+                            const currentScrollLeft = content.scrollLeft;
+                            const pageIndex = Math.round(currentScrollLeft / pageWidth);
+                            
+                            // 更新当前页码
+                            currentPage = Math.max(0, Math.min(pageIndex, totalPages - 1));
+                            currentPageEl.textContent = currentPage + 1;
+                            pageJumpInput.value = currentPage + 1;
+                            updateNavButtons();
+                            updateProgressIndicator();
+                            saveReadingProgress();
+                            
+                            // 更新目录高亮
+                            updateTocHighlight();
+                        }, 500);
+                    } else {
+                        // 滚动模式：平滑滚动
+                        const offsetTop = targetElement.offsetTop - 100;
+                        window.scrollTo({
+                            top: offsetTop,
+                            behavior: 'smooth'
+                        });
+                    }
                     
                     // 关闭目录浮窗
-                    // tocFloating.classList.remove('active');
-                    mobileTocBtn.classList.remove('active');
+                    tocFloating.classList.remove('active');
+                    if (mobileTocBtn) {
+                        mobileTocBtn.classList.remove('active');
+                    }
                 }
             });
             
@@ -1885,35 +1914,43 @@ function initScript() {
         });
     }
     
-    // 更新章节目录高亮（不包括书本目录）
+    // 更新章节目录高亮（不包括书本目录），翻页模式不高亮，因目前算法不支持
     function updateTocHighlight() {
         const content = document.getElementById('eb-content');
         const headings = content.querySelectorAll('h2, h3, h4');
         const tocItems = document.querySelectorAll('#tocFloating .toc-item');
         
-        // 找到当前可见的标题
         let currentHeadingId = '';
-        const scrollPosition = window.scrollY + 150; // 偏移量
         
-        for (let i = headings.length - 1; i >= 0; i--) {
-            const heading = headings[i];
-            if (heading.offsetTop <= scrollPosition) {
-                currentHeadingId = heading.id;
-                break;
+        if (!isPaginationMode) {
+            // 只在滚动模式下进行高亮
+            const scrollPosition = window.scrollY + 150; // 偏移量
+            
+            for (let i = headings.length - 1; i >= 0; i--) {
+                const heading = headings[i];
+                if (heading.offsetTop <= scrollPosition) {
+                    currentHeadingId = heading.id;
+                    break;
+                }
             }
         }
         
         // 更新目录高亮
         tocItems.forEach(item => {
             item.classList.remove('active');
-            const link = item.querySelector('a');
-            if (link && link.getAttribute('href') === `#${currentHeadingId}`) {
-                item.classList.add('active');
+            if (!isPaginationMode) {
+                // 只在滚动模式下显示高亮
+                const link = item.querySelector('a');
+                if (link && link.getAttribute('href') === `#${currentHeadingId}`) {
+                    item.classList.add('active');
+                }
             }
         });
 
         // 滚动到对应位置
-        tocFloatingScrolling();
+        if (!isPaginationMode) {
+            tocFloatingScrolling();
+        }
     }
     
     // 滚动到顶部功能

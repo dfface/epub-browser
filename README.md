@@ -23,7 +23,7 @@ It now supports the following features:
 
 - Reading progress bar
 
-- **Chapter-wise table of contents** (disabled in Page Turning Mode).
+- **Chapter-wise table of contents**.
 
 - Font size and font family adjustment
 
