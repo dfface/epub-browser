@@ -13,9 +13,20 @@ function initTheme() {
 
     // 检测是否是 Kindle 设备
     function isKindleDevice() {
+        // 优先从 window 缓存读取
+        if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
+            return window.epubBrowserCache.kindle_mode === 'true';
+        }
+        // 检测设备
         var ua = navigator.userAgent.toLowerCase();
         // 使用字符串包含检测，更兼容旧浏览器
-        return ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
+        var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
+        // 缓存结果到 window
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
+        return isKindle;
     }
 
     // 检查本地存储中的主题设置
