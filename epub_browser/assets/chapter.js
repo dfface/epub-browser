@@ -729,6 +729,14 @@ function initScript() {
                 // 延迟隐藏加载动画，确保页面完全渲染
                 setTimeout(function() {
                     hideLoading();
+                    // 重新初始化 medium-zoom，确保在翻页模式下也能正常工作
+                    if (window.mediumZoom) {
+                        window.mediumZoom('#eb-content img', {
+                            margin: 24,
+                            background: '#000',
+                            scrollOffset: 0
+                        });
+                    }
                 }, 500);
             }, 200);
         }, 200);
