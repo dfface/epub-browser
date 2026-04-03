@@ -421,6 +421,10 @@ body {
 }
 
 @media (max-width: 768px) {
+    body, .container {
+        padding: 0;
+    }
+    
     .book-grid {
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
         gap: 15px;

@@ -515,10 +515,13 @@ body {
 }
 
 @media (max-width: 768px) {
-    /* 优化 eb-header 紧凑性 */
-    .eb-header {
-        padding: 20px 15px;
-        margin-bottom: 20px;
+    body {
+        padding: 0;
+    }
+
+    .breadcrumb, .book-info-card, .eb-header, .toc-container {
+        margin: 0;
+        border-radius: unset;
     }
     
     .eb-header h1 {

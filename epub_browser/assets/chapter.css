@@ -1144,6 +1144,15 @@ body {
 }
 
 @media (max-width: 768px) {
+    body {
+        padding: 0;
+    }
+
+    .breadcrumb, .navigation, .custom-css-panel, .eb-content-container {
+        margin: 0;
+        border-radius: unset;
+    }
+    
     .desktop-only {
         display: none !important;
     }

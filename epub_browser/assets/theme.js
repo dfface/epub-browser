@@ -71,6 +71,8 @@ function initTheme() {
         const menu = document.createElement('div');
         menu.className = 'theme-menu';
         menu.style.display = 'none';
+        menu.style.position = 'fixed';
+        menu.style.zIndex = '10000';
         
         themes.forEach(theme => {
             const item = document.createElement('div');
@@ -90,11 +92,21 @@ function initTheme() {
     
     // 更新主题菜单位置
     function updateThemeMenuPosition(menu, toggleBtn) {
-        const rect = toggleBtn.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.top = (rect.bottom + 8) + 'px';
-        menu.style.right = (window.innerWidth - rect.right) + 'px';
-        menu.style.zIndex = '10000';
+        const mobileControls = document.querySelector('.mobile-controls');
+        const isMobile = mobileControls && window.getComputedStyle(mobileControls).display !== 'none';
+        
+        if (isMobile) {
+            // 移动端：固定在右下角，类似于 font-controls
+            menu.style.bottom = '80px';
+            menu.style.left = '20px';
+            menu.style.top = 'auto';
+        } else {
+            // 桌面端：相对于按钮定位
+            const rect = toggleBtn.getBoundingClientRect();
+            menu.style.top = (rect.bottom + 8) + 'px';
+            menu.style.right = (window.innerWidth - rect.right) + 'px';
+            menu.style.bottom = 'auto';
+        }
     }
 
     // 初始化主题
@@ -111,6 +123,8 @@ function initTheme() {
 
         // 初始化主题菜单
         let themeMenu = null;
+        let currentToggleBtn = null;
+        
         function handleThemeToggle(e) {
             e.stopPropagation();
             
@@ -125,6 +139,8 @@ function initTheme() {
                     themeMenu = createThemeMenu();
                     document.body.appendChild(themeMenu);
                 }
+                
+                currentToggleBtn = themeToggle;
                 
                 if (themeMenu.style.display === 'none') {
                     updateThemeMenuPosition(themeMenu, themeToggle);
@@ -150,6 +166,8 @@ function initTheme() {
                         document.body.appendChild(themeMenu);
                     }
                     
+                    currentToggleBtn = mobileThemeBtn;
+                    
                     if (themeMenu.style.display === 'none') {
                         updateThemeMenuPosition(themeMenu, mobileThemeBtn);
                         themeMenu.style.display = 'block';
@@ -169,8 +187,8 @@ function initTheme() {
         
         // 窗口大小改变时更新菜单位置
         window.addEventListener('resize', function() {
-            if (themeMenu && themeMenu.style.display !== 'none') {
-                updateThemeMenuPosition(themeMenu, themeToggle);
+            if (themeMenu && themeMenu.style.display !== 'none' && currentToggleBtn) {
+                updateThemeMenuPosition(themeMenu, currentToggleBtn);
             }
         });
     }
