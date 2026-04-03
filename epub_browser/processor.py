@@ -439,19 +439,19 @@ class EPUBProcessor:
             }
             return null;
         }
-        
-        var isKindle = getCookie("kindle-mode") === "true";
-        var theme;
-        if (!isKindle) {
-            try {
-                theme = localStorage.getItem('theme') || 'light';
-            } catch (e) {
-                theme = 'light';
+        var theme = 'light';
+        try {
+            var storedTheme = localStorage.getItem('theme');
+            if (storedTheme) {
+                theme = storedTheme;
+            } else if (getCookie("kindle-mode") === "true") {
+                theme = getCookie('theme') || 'light';
             }
-        } else {
-            theme = getCookie('theme') || 'light';
+        } catch (e) {
+            if (getCookie("kindle-mode") === "true") {
+                theme = getCookie('theme') || 'light';
+            }
         }
-        
         document.body.classList.add(theme + '-mode');
     </script>
 </head>
@@ -997,19 +997,19 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             }
             return null;
         }
-        
-        var isKindle = getCookie("kindle-mode") === "true";
-        var theme;
-        if (!isKindle) {
-            try {
-                theme = localStorage.getItem('theme') || 'light';
-            } catch (e) {
-                theme = 'light';
+        var theme = 'light';
+        try {
+            var storedTheme = localStorage.getItem('theme');
+            if (storedTheme) {
+                theme = storedTheme;
+            } else if (getCookie("kindle-mode") === "true") {
+                theme = getCookie('theme') || 'light';
             }
-        } else {
-            theme = getCookie('theme') || 'light';
+        } catch (e) {
+            if (getCookie("kindle-mode") === "true") {
+                theme = getCookie('theme') || 'light';
+            }
         }
-        
         document.body.classList.add(theme + '-mode');
     </script>
 </head>
