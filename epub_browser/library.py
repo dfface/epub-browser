@@ -145,7 +145,7 @@ class EPUBLibrary:
 <meta name="apple-mobile-web-app-title" content="EPUB Browser">
 <title>EPUB Library</title>
 <link rel="stylesheet" href="/assets/fa.all.min.css">
-<link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">
@@ -245,7 +245,7 @@ if (isKindle) {
         library_html += f"""
     <div class="container">
         <header class="eb-header" data-id="header">
-            <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favion.svg" class="theme-logo" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
+            <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favicon.svg" class="theme-logo" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">
                 <div class="stat-card">
                     <i class="fas fa-book"></i>
