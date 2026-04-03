@@ -5,6 +5,7 @@ import shutil
 import xml.etree.ElementTree as ET
 import re
 import hashlib
+import base64
 import json
 import urllib.parse
 import minify_html
@@ -65,7 +66,13 @@ class EPUBProcessor:
                     'src': toc_item.get('src'),
                     'level': toc_item.get('level'),
                 })
-            self.book_hash = hashlib.md5(json.dumps(toc_to_hash).encode()).hexdigest()[:8]
+            # 1. 压缩成稳定一行JSON
+            json_str = json.dumps(toc_to_hash, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+            # 2. 生成完整128位MD5字节
+            md5_bytes = hashlib.md5(json_str.encode('utf-8')).digest()
+            # 3. URL安全Base64 + 去掉无用的=填充符
+            safe_str = base64.urlsafe_b64encode(md5_bytes).decode().rstrip('=')
+            self.book_hash = safe_str
             # 如果重新生成 Hash，需要修改路径
             if self.output_dir:
                 new_temp_dir = os.path.join(self.output_dir, f'epub_{self.book_hash}')
