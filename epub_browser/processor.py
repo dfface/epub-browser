@@ -422,9 +422,38 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/book.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">
-"""
+    <link rel="manifest" href="/assets/manifest.json">"""
         index_html += """
+    <script>
+        // 立即应用主题，避免闪现
+        function getCookie(key) {
+            var cookies = document.cookie.split('; ');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i];
+                var parts = cookie.split('=');
+                var cookieKey = parts[0];
+                var cookieValue = parts.slice(1).join('=');
+                if (cookieKey === key) {
+                    return decodeURIComponent(cookieValue);
+                }
+            }
+            return null;
+        }
+        
+        var isKindle = getCookie("kindle-mode") === "true";
+        var theme;
+        if (!isKindle) {
+            try {
+                theme = localStorage.getItem('theme') || 'light';
+            } catch (e) {
+                theme = 'light';
+            }
+        } else {
+            theme = getCookie('theme') || 'light';
+        }
+        
+        document.body.classList.add(theme + '-mode');
+    </script>
 </head>
 <body>
     <!-- 加载动画 -->
@@ -951,9 +980,38 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="stylesheet" href="/assets/chapter.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">
-"""
+    <link rel="manifest" href="/assets/manifest.json">"""
         chapter_html += """
+    <script>
+        // 立即应用主题，避免闪现
+        function getCookie(key) {
+            var cookies = document.cookie.split('; ');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i];
+                var parts = cookie.split('=');
+                var cookieKey = parts[0];
+                var cookieValue = parts.slice(1).join('=');
+                if (cookieKey === key) {
+                    return decodeURIComponent(cookieValue);
+                }
+            }
+            return null;
+        }
+        
+        var isKindle = getCookie("kindle-mode") === "true";
+        var theme;
+        if (!isKindle) {
+            try {
+                theme = localStorage.getItem('theme') || 'light';
+            } catch (e) {
+                theme = 'light';
+            }
+        } else {
+            theme = getCookie('theme') || 'light';
+        }
+        
+        document.body.classList.add(theme + '-mode');
+    </script>
 </head>
 """
         chapter_html +=f"""
