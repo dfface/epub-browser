@@ -210,17 +210,39 @@ function initScript() {
     var tagCloudItems = document.querySelectorAll('.tag-cloud-item');
 
     searchBox.addEventListener('input', function() {
-        var searchTerm = this.value.toLowerCase();
+        var searchTerm = this.value.toLowerCase().trim();
         
         bookCards.forEach(function(card) {
             var title = card.querySelector('.book-title').textContent.toLowerCase();
             var author = card.querySelector('.book-author').textContent.toLowerCase();
             
-            if (title.includes(searchTerm) || author.includes(searchTerm)) {
-                card.style.display = 'block';
+            var match = false;
+            
+            if (searchTerm === '') {
+                match = true;
             } else {
-                card.style.display = 'none';
+                var titleMatch = title.includes(searchTerm);
+                var authorMatch = author.includes(searchTerm);
+                
+                var pinyinMatch = false;
+                if (typeof pinyinPro !== 'undefined') {
+                    try {
+                        var titlePinyin = pinyinPro.pinyin(title, { toneType: 'none', type: 'all' }).toLowerCase();
+                        var authorPinyin = pinyinPro.pinyin(author, { toneType: 'none', type: 'all' }).toLowerCase();
+                        var searchPinyin = pinyinPro.pinyin(searchTerm, { toneType: 'none', type: 'all' }).toLowerCase();
+                        
+                        if (titlePinyin.includes(searchPinyin) || authorPinyin.includes(searchPinyin)) {
+                            pinyinMatch = true;
+                        }
+                    } catch (e) {
+                        console.log('Pinyin match error:', e);
+                    }
+                }
+                
+                match = titleMatch || authorMatch || pinyinMatch;
             }
+            
+            card.style.display = match ? 'block' : 'none';
         });
     });
 

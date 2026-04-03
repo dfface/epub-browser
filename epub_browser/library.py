@@ -403,6 +403,7 @@ if (isKindle) {
 """
         library_html += """
         <script src="/assets/theme.js" defer></script>
+        <script src="/assets/pinyin-pro.min.js" defer></script>
         <script src="/assets/library.js" defer></script>
         <script src="/assets/sortable.min.js" defer></script>
         <script src="/assets/bookshelf.js" defer></script>
