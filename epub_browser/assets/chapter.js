@@ -649,10 +649,6 @@ function initScript() {
         }, 200);
     }
     
-    // 计算总页数
-    // 存储标题到页面的映射
-    let headingPageMap = {};
-    
     function calculateTotalPages() {
         // 获取父容器宽度并计算统一的整数宽度
         const parentContainer = document.querySelector('.container');
