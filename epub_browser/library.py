@@ -150,6 +150,7 @@ class EPUBLibrary:
 <link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/library.css">
+<link rel="stylesheet" href="/assets/bookshelf.css">
 <script>
 // 立即应用主题，避免闪现 —— Kindle 兼容版
 function isKindleDevice() {
