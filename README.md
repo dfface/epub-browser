@@ -13,7 +13,7 @@ Try it online: [https://epub-browser-test.yuhan.tech](https://epub-browser-test.
 
 It now supports the following features:
 
-- **Basic library management**: Search by title, author or tag.
+- **Basic library management**: Search by title, author or tag. Supports pinyin search for Chinese titles and authors (e.g., searching "santi" will match "三体").
 
 - **Theme system** (disabled in Kindle Mode): Multiple themes supported including light, dark, sepia, forest, ocean, peach, and lavender. Theme selection is available in the top right corner.
 
