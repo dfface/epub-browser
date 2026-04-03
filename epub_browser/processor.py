@@ -426,34 +426,52 @@ class EPUBProcessor:
         index_html += """
     <script>
         // 立即应用主题，避免闪现
-        function getCookie(key) {
-            var cookies = document.cookie.split('; ');
-            for (var i = 0; i < cookies.length; i++) {
-                var cookie = cookies[i];
-                var parts = cookie.split('=');
-                var cookieKey = parts[0];
-                var cookieValue = parts.slice(1).join('=');
-                if (cookieKey === key) {
-                    return decodeURIComponent(cookieValue);
-                }
-            }
-            return null;
+        function isKindleDevice() {
+            var ua = navigator.userAgent.toLowerCase();
+            return /kindle|silk/.test(ua);
         }
         var theme = 'light';
         try {
             var storedTheme = localStorage.getItem('theme');
             if (storedTheme) {
                 theme = storedTheme;
-            } else if (getCookie("kindle-mode") === "true") {
+            } else if (isKindleDevice()) {
+                function getCookie(key) {
+                    var cookies = document.cookie.split('; ');
+                    for (var i = 0; i < cookies.length; i++) {
+                        var cookie = cookies[i];
+                        var parts = cookie.split('=');
+                        var cookieKey = parts[0];
+                        var cookieValue = parts.slice(1).join('=');
+                        if (cookieKey === key) {
+                            return decodeURIComponent(cookieValue);
+                        }
+                    }
+                    return null;
+                }
                 theme = getCookie('theme') || 'light';
                 document.body.classList.add("kindle-mode");
             }
         } catch (e) {
-            if (getCookie("kindle-mode") === "true") {
+            if (isKindleDevice()) {
+                function getCookie(key) {
+                    var cookies = document.cookie.split('; ');
+                    for (var i = 0; i < cookies.length; i++) {
+                        var cookie = cookies[i];
+                        var parts = cookie.split('=');
+                        var cookieKey = parts[0];
+                        var cookieValue = parts.slice(1).join('=');
+                        if (cookieKey === key) {
+                            return decodeURIComponent(cookieValue);
+                        }
+                    }
+                    return null;
+                }
                 theme = getCookie('theme') || 'light';
                 document.body.classList.add("kindle-mode");
             }
         }
+        
         document.body.classList.add(theme + '-mode');
     </script>
 </head>
@@ -986,34 +1004,52 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         chapter_html += """
     <script>
         // 立即应用主题，避免闪现
-        function getCookie(key) {
-            var cookies = document.cookie.split('; ');
-            for (var i = 0; i < cookies.length; i++) {
-                var cookie = cookies[i];
-                var parts = cookie.split('=');
-                var cookieKey = parts[0];
-                var cookieValue = parts.slice(1).join('=');
-                if (cookieKey === key) {
-                    return decodeURIComponent(cookieValue);
-                }
-            }
-            return null;
+        function isKindleDevice() {
+            var ua = navigator.userAgent.toLowerCase();
+            return /kindle|silk/.test(ua);
         }
         var theme = 'light';
         try {
             var storedTheme = localStorage.getItem('theme');
             if (storedTheme) {
                 theme = storedTheme;
-            } else if (getCookie("kindle-mode") === "true") {
+            } else if (isKindleDevice()) {
+                function getCookie(key) {
+                    var cookies = document.cookie.split('; ');
+                    for (var i = 0; i < cookies.length; i++) {
+                        var cookie = cookies[i];
+                        var parts = cookie.split('=');
+                        var cookieKey = parts[0];
+                        var cookieValue = parts.slice(1).join('=');
+                        if (cookieKey === key) {
+                            return decodeURIComponent(cookieValue);
+                        }
+                    }
+                    return null;
+                }
                 theme = getCookie('theme') || 'light';
                 document.body.classList.add("kindle-mode");
             }
         } catch (e) {
-            if (getCookie("kindle-mode") === "true") {
+            if (isKindleDevice()) {
+                function getCookie(key) {
+                    var cookies = document.cookie.split('; ');
+                    for (var i = 0; i < cookies.length; i++) {
+                        var cookie = cookies[i];
+                        var parts = cookie.split('=');
+                        var cookieKey = parts[0];
+                        var cookieValue = parts.slice(1).join('=');
+                        if (cookieKey === key) {
+                            return decodeURIComponent(cookieValue);
+                        }
+                    }
+                    return null;
+                }
                 theme = getCookie('theme') || 'light';
                 document.body.classList.add("kindle-mode");
             }
         }
+        
         document.body.classList.add(theme + '-mode');
     </script>
 </head>

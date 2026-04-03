@@ -19,7 +19,7 @@ It now supports the following features:
 
 - **Page navigation**: Keyboard controls supported (Left Arrow, Right Arrow and Spacebar for page turning/scrolling).
 
-- **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen. Default is disabled. You can click the button to enable it or disable it.
+- **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen. Automatically detected based on device user agent (Kindle/Silk browsers).
 
 - Reading progress bar
 
@@ -29,7 +29,7 @@ It now supports the following features:
 
 - Image zoom functionality
 
-- **Mobile device compatibility**: Especially for Kindle users—remember to tap *Not Kindle* on the homepage header to enable Kindle Mode for an optimized experience.
+- **Mobile device compatibility**: Fully optimized for mobile devices including Kindle e-readers. Kindle Mode is automatically detected and enabled for Kindle/Silk browsers.
 
 - **Code highlighting** (disabled in Kindle Mode) with theme synchronization.
 

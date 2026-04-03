@@ -53,9 +53,10 @@ function initScript() {
         }
     }
 
-    let kindleMode = getCookie("kindle-mode") || "false";  // 不能是 true，1 是默认就没设置 2 是点击后也是没设置
+    // 检测是否是 Kindle 设备
     function isKindleMode() {
-        return kindleMode == "true";
+        var ua = navigator.userAgent.toLowerCase();
+        return /kindle|silk/.test(ua);
     }
 
     const USERNAME_KEY = 'epub_browser_username';
@@ -115,13 +116,9 @@ function initScript() {
     const storageKeySortableContainer = 'library-container-sortable-order';
 
     if (isKindleMode()) {
-        document.querySelector("#kindleModeValueNot").style.display = 'none';
-        document.querySelector("#kindleModeValueYes").style.display = 'inherit';
         document.body.classList.remove("kindle-mode");  // 防止重复添加
         document.body.classList.add("kindle-mode");
     } else {
-        document.querySelector("#kindleModeValueNot").style.display = 'inherit';
-        document.querySelector("#kindleModeValueYes").style.display = 'none';
         restoreOrder(storageKeySortableBook, 'book-grid');
         restoreOrder(storageKeySortableTag, 'tag-cloud');
         restoreOrder(storageKeySortableContainer, 'container');

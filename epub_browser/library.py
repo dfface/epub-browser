@@ -152,30 +152,47 @@ class EPUBLibrary:
 <link rel="stylesheet" href="/assets/library.css">
 <script>
     // 立即应用主题，避免闪现
-    function getCookie(key) {
-        var cookies = document.cookie.split('; ');
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = cookies[i];
-            var parts = cookie.split('=');
-            var cookieKey = parts[0];
-            var cookieValue = parts.slice(1).join('=');
-            if (cookieKey === key) {
-                return decodeURIComponent(cookieValue);
-            }
-        }
-        return null;
+    function isKindleDevice() {
+        var ua = navigator.userAgent.toLowerCase();
+        return /kindle|silk/.test(ua);
     }
     var theme = 'light';
     try {
         var storedTheme = localStorage.getItem('theme');
         if (storedTheme) {
             theme = storedTheme;
-        } else if (getCookie("kindle-mode") === "true") {
+        } else if (isKindleDevice()) {
+            function getCookie(key) {
+                var cookies = document.cookie.split('; ');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i];
+                    var parts = cookie.split('=');
+                    var cookieKey = parts[0];
+                    var cookieValue = parts.slice(1).join('=');
+                    if (cookieKey === key) {
+                        return decodeURIComponent(cookieValue);
+                    }
+                }
+                return null;
+            }
             theme = getCookie('theme') || 'light';
             document.body.classList.add("kindle-mode");
         }
     } catch (e) {
-        if (getCookie("kindle-mode") === "true") {
+        if (isKindleDevice()) {
+            function getCookie(key) {
+                var cookies = document.cookie.split('; ');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i];
+                    var parts = cookie.split('=');
+                    var cookieKey = parts[0];
+                    var cookieValue = parts.slice(1).join('=');
+                    if (cookieKey === key) {
+                        return decodeURIComponent(cookieValue);
+                    }
+                }
+                return null;
+            }
             theme = getCookie('theme') || 'light';
             document.body.classList.add("kindle-mode");
         }
@@ -219,15 +236,7 @@ class EPUBLibrary:
                         <div class="stat-value">{len(all_tags)} tag(s)</div>
                     </div>
                 </div>
-                <div class="stat-card" id="kindleMode">
-                    <i class="fas fa-mobile"></i>
-                    <a id="kindleModeValueYes" style="text-decoration: none; color: var(--text-color); cursor: pointer;" href="javascript:(function(){{document.cookie='kindle-mode=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax;';window.location.reload();}})();">
-                        <div class="stat-value">Kindle Mode</div>
-                    </a>
-                    <a id="kindleModeValueNot" style="text-decoration: none; color: var(--text-color); cursor: pointer;" href="javascript:document.cookie='kindle-mode=true;expires=Fri, 26 Jun 9999 20:10:00 GMT;path=/;SameSite=Lax';location.replace(location.pathname);">
-                        <div class="stat-value">Not Kindle</div>
-                    </a>
-                </div>
+
                 <div class="stat-card" id="loginCard" style="cursor: pointer;">
                     <i class="fas fa-user"></i>
                     <div class="stat-value" id="loginValue">Login</div>

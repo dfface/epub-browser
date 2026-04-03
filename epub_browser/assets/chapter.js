@@ -109,8 +109,8 @@ function getElementHeight(element) {
 }
 
 function isKindleMode() {
-    let kindleMode = getCookie("kindle-mode") || "false";
-    return kindleMode == "true";
+    var ua = navigator.userAgent.toLowerCase();
+    return /kindle|silk/.test(ua);
 }
 
 // 页面加载时恢复顺序

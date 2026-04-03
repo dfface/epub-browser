@@ -1,7 +1,7 @@
 // 主题切换功能
 function initTheme() {
     // 主题列表
-    const themes = [
+    var themes = [
         { id: 'light', name: 'Light', icon: 'fa-sun' },
         { id: 'dark', name: 'Dark', icon: 'fa-moon' },
         { id: 'sepia', name: 'Sepia', icon: 'fa-book' },
@@ -11,11 +11,21 @@ function initTheme() {
         { id: 'lavender', name: 'Lavender', icon: 'fa-spa' }
     ];
 
+    // 检测是否是 Kindle 设备
+    function isKindleDevice() {
+        var ua = navigator.userAgent.toLowerCase();
+        return /kindle|silk/.test(ua);
+    }
+
     // 检查本地存储中的主题设置
     function getCurrentTheme() {
-        const isKindle = getCookie("kindle-mode") === "true";
+        var isKindle = isKindleDevice();
         if (!isKindle) {
-            return localStorage.getItem('theme') || 'light';
+            try {
+                return localStorage.getItem('theme') || 'light';
+            } catch (e) {
+                return 'light';
+            }
         } else {
             return getCookie('theme') || 'light';
         }
@@ -23,9 +33,13 @@ function initTheme() {
 
     // 保存主题设置
     function saveTheme(theme) {
-        const isKindle = getCookie("kindle-mode") === "true";
+        var isKindle = isKindleDevice();
         if (!isKindle) {
-            localStorage.setItem('theme', theme);
+            try {
+                localStorage.setItem('theme', theme);
+            } catch (e) {
+                // 忽略错误
+            }
         } else {
             setCookie('theme', theme);
         }
@@ -36,24 +50,30 @@ function initTheme() {
         // 移除所有主题类
         document.body.classList.remove('light-mode', 'dark-mode', 'sepia-mode', 'forest-mode', 'ocean-mode', 'peach-mode', 'lavender-mode');
         // 添加当前主题类
-        document.body.classList.add(`${theme}-mode`);
+        document.body.classList.add(theme + '-mode');
         
         // 更新theme-toggle图标
-        const themeToggle = document.getElementById('themeToggle');
-        const mobileThemeBtn = document.getElementById('mobileThemeBtn');
-        const currentTheme = themes.find(t => t.id === theme);
+        var themeToggle = document.getElementById('themeToggle');
+        var mobileThemeBtn = document.getElementById('mobileThemeBtn');
+        var currentTheme = null;
+        for (var i = 0; i < themes.length; i++) {
+            if (themes[i].id === theme) {
+                currentTheme = themes[i];
+                break;
+            }
+        }
         
         if (themeToggle && currentTheme) {
-            const icon = themeToggle.querySelector('i');
+            var icon = themeToggle.querySelector('i');
             if (icon) {
-                icon.className = `fas ${currentTheme.icon}`;
+                icon.className = 'fas ' + currentTheme.icon;
             }
         }
         
         if (mobileThemeBtn && currentTheme) {
-            const icon = mobileThemeBtn.querySelector('i');
+            var icon = mobileThemeBtn.querySelector('i');
             if (icon) {
-                icon.className = `fas ${currentTheme.icon}`;
+                icon.className = 'fas ' + currentTheme.icon;
             }
         }
         
@@ -68,32 +88,35 @@ function initTheme() {
 
     // 创建主题选择菜单
     function createThemeMenu() {
-        const menu = document.createElement('div');
+        var menu = document.createElement('div');
         menu.className = 'theme-menu';
         menu.style.display = 'none';
         menu.style.position = 'fixed';
         menu.style.zIndex = '10000';
         
-        themes.forEach(theme => {
-            const item = document.createElement('div');
+        for (var i = 0; i < themes.length; i++) {
+            var theme = themes[i];
+            var item = document.createElement('div');
             item.className = 'theme-menu-item';
-            item.innerHTML = `<i class="fas ${theme.icon}"></i>${theme.name}`;
+            item.innerHTML = '<i class="fas ' + theme.icon + '"></i>' + theme.name;
             
-            item.addEventListener('click', function() {
-                applyTheme(theme.id);
-                menu.style.display = 'none';
-            });
+            item.addEventListener('click', function(themeId) {
+                return function() {
+                    applyTheme(themeId);
+                    menu.style.display = 'none';
+                };
+            }(theme.id));
             
             menu.appendChild(item);
-        });
+        }
         
         return menu;
     }
     
     // 更新主题菜单位置
     function updateThemeMenuPosition(menu, toggleBtn) {
-        const mobileControls = document.querySelector('.mobile-controls');
-        const isMobile = mobileControls && window.getComputedStyle(mobileControls).display !== 'none';
+        var mobileControls = document.querySelector('.mobile-controls');
+        var isMobile = mobileControls && window.getComputedStyle(mobileControls).display !== 'none';
         
         if (isMobile) {
             // 移动端：固定在右下角，类似于 font-controls
@@ -102,7 +125,7 @@ function initTheme() {
             menu.style.top = 'auto';
         } else {
             // 桌面端：相对于按钮定位
-            const rect = toggleBtn.getBoundingClientRect();
+            var rect = toggleBtn.getBoundingClientRect();
             menu.style.top = (rect.bottom + 8) + 'px';
             menu.style.right = (window.innerWidth - rect.right) + 'px';
             menu.style.bottom = 'auto';
@@ -111,27 +134,27 @@ function initTheme() {
 
     // 初始化主题
     function init() {
-        const themeToggle = document.getElementById('themeToggle');
+        var themeToggle = document.getElementById('themeToggle');
         if (!themeToggle) return;
 
-        const mobileThemeBtn = document.getElementById('mobileThemeBtn');
-        const isKindle = getCookie("kindle-mode") === "true";
+        var mobileThemeBtn = document.getElementById('mobileThemeBtn');
+        var isKindle = isKindleDevice();
 
         // 应用初始主题
-        const currentTheme = getCurrentTheme();
+        var currentTheme = getCurrentTheme();
         applyTheme(currentTheme);
 
         // 初始化主题菜单
-        let themeMenu = null;
-        let currentToggleBtn = null;
+        var themeMenu = null;
+        var currentToggleBtn = null;
         
         function handleThemeToggle(e) {
             e.stopPropagation();
             
             if (isKindle) {
                 // Kindle 模式下保持原有切换行为
-                const currentTheme = getCurrentTheme();
-                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                var currentTheme = getCurrentTheme();
+                var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                 applyTheme(newTheme);
             } else {
                 // 非 Kindle 模式下显示主题选择菜单
@@ -156,9 +179,10 @@ function initTheme() {
         if (mobileThemeBtn) {
             mobileThemeBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
+                var isKindle = isKindleDevice();
                 if (isKindle) {
-                    const currentTheme = getCurrentTheme();
-                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    var currentTheme = getCurrentTheme();
+                    var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                     applyTheme(newTheme);
                 } else {
                     if (!themeMenu) {
@@ -195,9 +219,12 @@ function initTheme() {
 
     // 工具函数：获取 Cookie
     function getCookie(key) {
-        const cookies = document.cookie.split('; ');
-        for (const cookie of cookies) {
-            const [cookieKey, cookieValue] = cookie.split('=');
+        var cookies = document.cookie.split('; ');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i];
+            var parts = cookie.split('=');
+            var cookieKey = parts[0];
+            var cookieValue = parts.slice(1).join('=');
             if (cookieKey === key) {
                 return decodeURIComponent(cookieValue);
             }
@@ -207,10 +234,10 @@ function initTheme() {
 
     // 工具函数：设置 Cookie
     function setCookie(key, value) {
-        const date = new Date();
+        var date = new Date();
         date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
-        const expires = "expires=" + date.toUTCString();
-        document.cookie = `${key}=${value}; ${expires}; path=/;`;
+        var expires = "expires=" + date.toUTCString();
+        document.cookie = key + "=" + value + "; " + expires + "; path=/;";
     }
 
     // 初始化
