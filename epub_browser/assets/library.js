@@ -179,8 +179,29 @@ function initScript() {
     let fontFamily = "system-ui, -apple-system, sans-serif";
     let fontFamilyInput = null;
     if (!isKindleMode()) {
-        fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
-        fontFamilyInput = localStorage.getItem('font_family_input');
+        // 优先从 window 读取
+        if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
+            fontFamily = window.epubBrowserCache.font_family;
+        } else {
+            fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+            if (fontFamily) {
+                if (!window.epubBrowserCache) {
+                    window.epubBrowserCache = {};
+                }
+                window.epubBrowserCache.font_family = fontFamily;
+            }
+        }
+        if (window.epubBrowserCache && window.epubBrowserCache.font_family_input) {
+            fontFamilyInput = window.epubBrowserCache.font_family_input;
+        } else {
+            fontFamilyInput = localStorage.getItem('font_family_input');
+            if (fontFamilyInput) {
+                if (!window.epubBrowserCache) {
+                    window.epubBrowserCache = {};
+                }
+                window.epubBrowserCache.font_family_input = fontFamilyInput;
+            }
+        }
     } else {
         fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
         fontFamilyInput = getCookie('font_family_input');

@@ -22,8 +22,21 @@ function initTheme() {
     function getCurrentTheme() {
         var isKindle = isKindleDevice();
         if (!isKindle) {
+            // 优先从 window 读取
+            if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+                return window.epubBrowserCache.theme;
+            }
             try {
-                return localStorage.getItem('theme') || 'light';
+                var theme = localStorage.getItem('theme');
+                if (theme) {
+                    // 缓存到 window
+                    if (!window.epubBrowserCache) {
+                        window.epubBrowserCache = {};
+                    }
+                    window.epubBrowserCache.theme = theme;
+                    return theme;
+                }
+                return 'light';
             } catch (e) {
                 return 'light';
             }
@@ -36,11 +49,17 @@ function initTheme() {
     function saveTheme(theme) {
         var isKindle = isKindleDevice();
         if (!isKindle) {
+            // 双写：既写入 localStorage 又写入 window
             try {
                 localStorage.setItem('theme', theme);
             } catch (e) {
                 // 忽略错误
             }
+            // 缓存到 window
+            if (!window.epubBrowserCache) {
+                window.epubBrowserCache = {};
+            }
+            window.epubBrowserCache.theme = theme;
         } else {
             setCookie('theme', theme);
         }
