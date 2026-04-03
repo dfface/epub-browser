@@ -179,55 +179,10 @@ function initScript() {
         }
     }
     
-    // 主题切换功能
-    const themeToggle = document.getElementById('themeToggle');
-    const themeIcon = themeToggle.querySelector('i');
-    let fontFamily = "system-ui, -apple-system, sans-serif";
-    let fontFamilyInput = null;
-    
-    // 检查本地存储中的主题设置
-    let currentTheme = 'light';
-    if (!isKindleMode()) {
-        currentTheme = localStorage.getItem('theme');
-        fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
-        fontFamilyInput = localStorage.getItem('font_family_input');
-    } else {
-        currentTheme = getCookie('theme');
-        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
-        fontFamilyInput = getCookie('font_family_input');
+    // 初始化主题
+    if (window.initTheme) {
+        window.initTheme();
     }
-
-    updateFontFamily(fontFamily, fontFamilyInput);
-    
-    // 应用保存的主题
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeIcon.classList.remove('fa-moon');
-        themeIcon.classList.add('fa-sun');
-    }
-    
-    // 切换主题
-    themeToggle.addEventListener('click', function() {
-        document.body.classList.toggle('dark-mode');
-        
-        if (document.body.classList.contains('dark-mode')) {
-            themeIcon.classList.remove('fa-moon');
-            themeIcon.classList.add('fa-sun');
-            if (!isKindleMode()) {
-                localStorage.setItem('theme', 'dark');
-            } else {
-                setCookie('theme', 'dark');
-            }
-        } else {
-            themeIcon.classList.remove('fa-sun');
-            themeIcon.classList.add('fa-moon');
-            if (!isKindleMode()) {
-                localStorage.setItem('theme', 'light');
-            } else {
-                setCookie('theme', 'light');
-            }
-        }
-    });
 
     // 滚动到顶部功能
     const scrollToTopBtn = document.getElementById('scrollToTopBtn');

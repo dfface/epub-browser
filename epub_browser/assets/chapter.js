@@ -1661,67 +1661,10 @@ function initScript() {
         setCookie(book_hash, saveBookChapterRead);
     }
 
-    // 主题切换功能
-    const themeToggle = document.getElementById('themeToggle');
-    const mobileThemeBtn = document.getElementById('mobileThemeBtn');
-    const themeIcon = themeToggle.querySelector('i');
-    
-    // 检查本地存储中的主题设置
-    let currentTheme =  'light';
-    if (!isKindleMode()) {
-        currentTheme = localStorage.getItem('theme');
-    } else {
-        currentTheme = getCookie('theme');
+    // 初始化主题
+    if (window.initTheme) {
+        window.initTheme();
     }
-    
-    // 应用保存的主题
-    if (currentTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeIcon.classList.remove('fa-moon');
-        themeIcon.classList.add('fa-sun');
-        mobileThemeBtn.querySelector('i').classList.remove('fa-moon');
-        mobileThemeBtn.querySelector('i').classList.add('fa-sun');
-        switchCodeTheme(true);
-    }
-    
-    // 切换主题
-    function toggleTheme() {
-        document.body.classList.toggle('dark-mode');
-        
-        if (document.body.classList.contains('dark-mode')) {
-            themeIcon.classList.remove('fa-moon');
-            themeIcon.classList.add('fa-sun');
-            mobileThemeBtn.querySelector('i').classList.remove('fa-moon');
-            mobileThemeBtn.querySelector('i').classList.add('fa-sun');
-            if (!isKindleMode()) {
-                localStorage.setItem('theme', 'dark');
-            } else {
-                setCookie('theme', 'dark');
-            }
-            switchCodeTheme(true);
-        } else {
-            themeIcon.classList.remove('fa-sun');
-            themeIcon.classList.add('fa-moon');
-            mobileThemeBtn.querySelector('i').classList.remove('fa-sun');
-            mobileThemeBtn.querySelector('i').classList.add('fa-moon');
-            if (!isKindleMode()) {
-                localStorage.setItem('theme', 'light');
-            } else {
-                setCookie('theme', 'light');
-            }
-            switchCodeTheme(false);
-        }
-    }
-
-    // 切换主题 - 桌面端
-    themeToggle.addEventListener('click', function() {
-        toggleTheme();
-    });
-
-    // 切换主题 - 移动端
-    mobileThemeBtn.addEventListener('click', function() {
-        toggleTheme();
-    });
     
     // 阅读进度功能
     const progressBar = document.getElementById('progressBar');

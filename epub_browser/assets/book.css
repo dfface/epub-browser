@@ -1,37 +1,3 @@
-:root {
-    --primary: #4361ee;
-    --primary-light: #4895ef;
-    --secondary: #3f37c9;
-    --dark: #1d3557;
-    --light: #f8f9fa;
-    --gray: #6c757d;
-    --gray-light: #e9ecef;
-    --success: #4cc9f0;
-    --danger: #e63946;
-    --border-radius: 12px;
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    --transition: all 0.3s ease;
-    
-    /* 浅色主题变量 */
-    --bg-color: #f8f9fa;
-    --card-bg: #ffffff;
-    --text-color: #1d3557;
-    --text-secondary: #6c757d;
-    --border-color: #e9ecef;
-    --header-bg: #ffffff;
-}
-
-.dark-mode {
-    /* 深色主题变量 */
-    --bg-color: #121212;
-    --card-bg: #1e1e1e;
-    --text-color: #e9ecef;
-    --text-secondary: #a0a0a0;
-    --border-color: #2d2d2d;
-    --header-bg: #1e1e1e;
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -40,8 +6,8 @@
 
 body {
     line-height: 1.6;
-    color: var(--text-color);
-    background: var(--bg-color);
+    color: var(--text);
+    background: var(--background);
     min-height: 100vh;
     transition: var(--transition);
     padding: 0 20px;
@@ -57,8 +23,8 @@ body {
     margin-bottom: 40px;
     padding: 40px 20px;
     background: var(--header-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
     position: relative;
     overflow: hidden;
     transition: var(--transition);
@@ -71,13 +37,13 @@ body {
     left: 0;
     width: 100%;
     height: 4px;
-    background: linear-gradient(to right, var(--primary), var(--success));
+    background: linear-gradient(to right, var(--primary), var(--secondary));
 }
 
 .eb-header h1 {
     font-size: 2.2rem;
     margin-bottom: 10px;
-    color: var(--text-color);
+    color: var(--text);
     font-weight: 700;
     transition: var(--transition);
 }
@@ -104,7 +70,7 @@ body {
 
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
 }
 
 .theme-toggle:hover {
@@ -113,7 +79,7 @@ body {
 
 .theme-toggle i {
     font-size: 1.3rem;
-    color: var(--text-color);
+    color: var(--text);
     transition: var(--transition);
 }
 
@@ -141,20 +107,20 @@ body {
     width: 50px;
     height: 50px;
     border-radius: 50%;
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
     border: none;
     flex-direction: column;
 }
 
 .reading-controls .control-btn:hover, .top-controls .control-btn:hover {
-    background: var(--secondary);
+    background: var(--button-hover);
     transform: scale(1.1);
 }
 
@@ -176,12 +142,12 @@ body {
 }
 
 .css-btn.primary {
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
 }
 
 .css-btn.primary:hover {
-    background: var(--secondary);
+    background: var(--button-hover);
     transform: translateY(-2px);
 }
 
@@ -201,15 +167,15 @@ body {
 }
 
 .custom-css-notification.success {
-    background: #4CAF50;
+    background: var(--notification-success);
 }
 
 .custom-css-notification.info {
-    background: var(--primary);
+    background: var(--notification-info);
 }
 
 .custom-css-notification.warning {
-    background: #f8961e;
+    background: var(--notification-warning);
 }
 
 .custom-css-notification.fade-out {
@@ -223,8 +189,8 @@ body {
     margin: 20px 0;
     padding: 15px 20px;
     background: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
     transition: var(--transition);
 }
 
@@ -237,16 +203,16 @@ body {
 }
 
 .breadcrumb a:hover {
-    color: var(--primary);
+    color: var(--breadcrumb-link-hover);
 }
 
 .breadcrumb-separator {
     margin: 0 10px;
-    color: var(--text-secondary);
+    color: var(--breadcrumb-separator);
 }
 
 .breadcrumb-current {
-    color: var(--text-color);
+    color: var(--text);
     font-weight: 600;
 }
 
@@ -260,9 +226,9 @@ body {
 .book-cover {
     flex: 0 0 200px;
     height: 280px;
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
 }
 
 .book-cover img {
@@ -287,8 +253,8 @@ body {
 }
 
 .book-tag {
-    background: var(--border-color);
-    color: var(--text-color);
+    background: var(--tag-bg);
+    color: var(--tag-text);
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 0.8rem;
@@ -306,7 +272,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     padding: 10px 20px;
     border-radius: 50px;
@@ -318,47 +284,47 @@ body {
 }
 
 .action-btn:hover {
-    background: var(--secondary);
+    background: var(--button-hover);
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(67, 97, 238, 0.4);
 }
 
 .action-btn.secondary {
     background: var(--card-bg);
-    color: var(--text-color);
-    border: 2px solid var(--border-color);
+    color: var(--text);
+    border: 2px solid var(--border);
 }
 
 .action-btn.secondary:hover {
-    background: var(--border-color);
+    background: var(--border);
     transform: translateY(-2px);
 }
 
 .toc-container {
     margin: 20px 0;
     background: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
     overflow: hidden;
     transition: var(--transition);
 }
 
 .toc-header {
     padding: 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 .toc-header h2 {
-    color: var(--text-color);
+    color: var(--text);
     font-size: 1.5rem;
     transition: var(--transition);
 }
 
 .chapter-count {
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     padding: 4px 12px;
     border-radius: 20px;
@@ -374,7 +340,7 @@ body {
 }
 
 .chapter-list li {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     transition: var(--transition);
 }
 
@@ -384,7 +350,7 @@ body {
 
 .chapter-list a {
     text-decoration: none;
-    color: var(--text-color);
+    color: var(--text);
     display: flex;
     align-items: center;
     padding: 15px 20px;
@@ -392,12 +358,12 @@ body {
 }
 
 .chapter-list a:hover {
-    background: var(--border-color);
+    background: var(--hover);
 }
 
 /* 除了 hashtag 锚点，还支持 active class */
 .chapter-list a:target, .chapter-list a.active  {
-    background: linear-gradient(to right, var(--primary), var(--success));
+    background: linear-gradient(to right, var(--primary), var(--secondary));
     color: #e9ecef;
 }
 
@@ -427,24 +393,24 @@ body {
 .toc-level-2 { margin-left: 50px; font-size: 0.9em; }
 .toc-level-3 { margin-left: 75px; font-size: 0.85em; }
 
-.toc-level-1 .chapter-icon { color: var(--success); }
-.toc-level-2 .chapter-icon { color: var(--warning); }
-.toc-level-3 .chapter-icon { color: var(--danger); }
+.toc-level-1 .chapter-icon { color: var(--notification-success); }
+.toc-level-2 .chapter-icon { color: var(--notification-warning); }
+.toc-level-3 .chapter-icon { color: var(--notification-error); }
 
 .eb-footer {
     text-align: center;
     padding: 10px 0;
-    color: var(--text-secondary);
+    color: var(--footer-text);
     font-size: 0.9rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--footer-border);
     transition: var(--transition);
 }
 
 .book-info-card {
     display: flex;
     background: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
     padding: 25px;
     margin-bottom: 30px;
     margin-top: 30px;
@@ -476,7 +442,7 @@ body {
 
 .book-info-title {
     font-size: 1.5rem;
-    color: var(--text-color);
+    color: var(--text);
     margin-bottom: 10px;
     font-weight: 700;
     line-height: 1.3;
@@ -490,7 +456,7 @@ body {
 
 .book-info-desc {
     font-size: 1rem;
-    color: var(--text-color);
+    color: var(--text);
     margin-bottom: 15px;
 }
 
@@ -502,7 +468,7 @@ body {
 }
 
 .book-tag {
-    background: var(--primary-light);
+    background: var(--button-bg);
     color: white;
     padding: 4px 12px;
     border-radius: 20px;
@@ -512,7 +478,7 @@ body {
 }
 
 .book-tag:hover {
-    background: var(--primary);
+    background: var(--button-hover);
     transform: translateY(-2px);
     cursor: pointer;
 }
@@ -655,7 +621,7 @@ body {
 }
 
 #toggleShelfBtn.in-shelf {
-    background: var(--danger);
+    background: var(--notification-error);
 }
 
 #toggleShelfBtn.in-shelf:hover {
@@ -684,9 +650,9 @@ body {
     width: 90%;
     max-width: 500px;
     max-height: 80vh;
-    background: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    background: var(--modal-content);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
 }
@@ -696,19 +662,19 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--modal-footer-border);
     flex-shrink: 0;
 }
 
 .select-group-header h3 {
     margin: 0;
-    color: var(--text-color);
+    color: var(--modal-header-text);
 }
 
 .select-group-close-btn {
     width: 32px;
     height: 32px;
-    background: var(--border-color);
+    background: var(--modal-footer);
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -716,11 +682,11 @@ body {
     align-items: center;
     justify-content: center;
     transition: var(--transition);
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .select-group-close-btn:hover {
-    background: var(--danger);
+    background: var(--notification-error);
     color: white;
 }
 
@@ -740,22 +706,22 @@ body {
     display: flex;
     align-items: center;
     padding: 10px 15px;
-    background: var(--bg-color);
+    background: var(--background);
     border-radius: 6px;
     cursor: pointer;
     transition: var(--transition);
     border: 2px solid transparent;
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .select-group-item:hover {
-    background: var(--primary-light);
+    background: var(--button-bg);
     color: white;
 }
 
 .select-group-item.selected {
-    border-color: var(--primary);
-    background: var(--primary-light);
+    border-color: var(--button-bg);
+    background: var(--button-bg);
     color: white;
 }
 
@@ -771,7 +737,7 @@ body {
 
 .select-group-footer {
     padding: 15px 20px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--modal-footer-border);
     display: flex;
     justify-content: flex-end;
     flex-shrink: 0;
@@ -783,7 +749,7 @@ body {
     justify-content: center;
     gap: 8px;
     padding: 12px 24px;
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     border: none;
     border-radius: 6px;
@@ -793,7 +759,7 @@ body {
 }
 
 .select-group-confirm-btn:hover {
-    background: var(--primary-light);
+    background: var(--button-hover);
 }
 
 /* 加载动画样式 */
@@ -803,7 +769,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(255, 255, 255, 1);
+    background-color: var(--loading-overlay);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -814,7 +780,7 @@ body {
     width: 50px;
     height: 50px;
     border: 5px solid #f3f3f3;
-    border-top: 5px solid var(--primary);
+    border-top: 5px solid var(--loading-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -830,7 +796,7 @@ body {
 
 .dark-mode .loading-spinner {
     border: 5px solid #333;
-    border-top: 5px solid var(--primary);
+    border-top: 5px solid var(--loading-spinner);
 }
 
 .kindle-mode .loading-spinner {

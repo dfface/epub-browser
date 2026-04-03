@@ -148,12 +148,19 @@ class EPUBLibrary:
 <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="manifest" href="/assets/manifest.json">
+<link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/library.css">
 </head>
 <body>
     <!-- 加载动画 -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
+    </div>
+    <div class="top-controls" data-id="top-controls">
+        <div class="theme-toggle" id="themeToggle">
+            <i class="fas fa-moon"></i>
+            <span class="control-name">Theme</span>
+        </div>
     </div>
 """
         all_tags = set()
@@ -236,10 +243,6 @@ class EPUBLibrary:
         </div>
 """      
         library_html += f"""
-    </div>
-    <div class="theme-toggle" id="themeToggle" data-id="theme-toggle">
-        <i class="fas fa-moon"></i>
-        <span class="control-name">Theme</span>
     </div>
     <div class="reading-controls" data-id="reading-controls">
         <button class="control-btn" id="scrollToTopBtn">
@@ -336,6 +339,7 @@ class EPUBLibrary:
 </footer>
 """
         library_html += """
+        <script src="/assets/theme.js" defer></script>
         <script src="/assets/library.js" defer></script>
         <script src="/assets/sortable.min.js" defer></script>
         <script src="/assets/bookshelf.js" defer></script>
@@ -373,7 +377,7 @@ class EPUBLibrary:
         }
         // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
         js_resource = document.querySelector('script[src="/assets/library.js"]');
-        if (window.initScriptLibrary) {
+        if (window.initScriptLibrary && window.initTheme) {
             window.initScriptLibrary();
             console.log("init")
             return;
@@ -381,7 +385,7 @@ class EPUBLibrary:
             const src = js_resource.getAttribute('src');
             newScript = reloadScriptByReplacement(js_resource, base_path.substr(0, base_path.length - 1) + src);
             newScript.onload = () => {
-                if (window.initScriptLibrary) {
+                if (window.initScriptLibrary && window.initTheme) {
                     console.log("reinit")
                     window.initScriptLibrary();
                 }

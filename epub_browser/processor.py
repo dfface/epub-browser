@@ -418,6 +418,7 @@ class EPUBProcessor:
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{self.book_title}</title>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/book.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -525,6 +526,7 @@ class EPUBProcessor:
 </footer>"""
 
         index_html += """
+<script src="/assets/theme.js" defer></script>
 <script src="/assets/book.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
@@ -563,14 +565,14 @@ basePath = basePath[0] + "/";
 
 // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
 const js_resource = document.querySelector('script[src="/assets/book.js"]');
-if (window.initScriptBook) {
+if (window.initScriptBook && window.initTheme) {
     console.log("init")
     window.initScriptBook();
 } else {
     const src = js_resource.getAttribute('src');
     newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
     newScript.onload = () => {
-        if (window.initScriptBook) {
+        if (window.initScriptBook && window.initTheme) {
             console.log("reinit")
             window.initScriptBook();
         }
@@ -945,6 +947,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/chapter.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favion.svg">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -1235,14 +1238,14 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     
     // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
     const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
-    if (window.initScriptChapter) {
+    if (window.initScriptChapter && window.initTheme) {
         window.initScriptChapter();
         console.log("init")
     } else {
         const src = js_resource.getAttribute('src');
         newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
         newScript.onload = () => {
-            if (window.initScriptChapter) {
+            if (window.initScriptChapter && window.initTheme) {
                 console.log("reinit")
                 window.initScriptChapter();
             }
@@ -1264,6 +1267,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     }
     });
     </script>
+    <script src="/assets/theme.js" defer></script>
     <script src="/assets/medium-zoom.min.js"></script>
     <script src="/assets/chapter.js" defer></script>
     <script src="/assets/sortable.min.js"></script>

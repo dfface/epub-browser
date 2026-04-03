@@ -1,38 +1,3 @@
-:root {
-    --primary: #4361ee;
-    --primary-light: #4895ef;
-    --secondary: #3f37c9;
-    --dark: #1d3557;
-    --light: #f8f9fa;
-    --gray: #6c757d;
-    --gray-light: #e9ecef;
-    --success: #4cc9f0;
-    --warning: #f8961e;
-    --danger: #e63946;
-    --border-radius: 12px;
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    --transition: all 0.3s ease;
-    
-    /* 浅色主题变量 */
-    --bg-color: #f8f9fa;
-    --card-bg: #ffffff;
-    --text-color: #1d3557;
-    --text-secondary: #6c757d;
-    --border-color: #e9ecef;
-    --header-bg: #ffffff;
-}
-
-.dark-mode {
-    /* 深色主题变量 */
-    --bg-color: #121212;
-    --card-bg: #1e1e1e;
-    --text-color: #e9ecef;
-    --text-secondary: #a0a0a0;
-    --border-color: #2d2d2d;
-    --header-bg: #1e1e1e;
-    --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -41,11 +6,21 @@
 
 body {
     line-height: 1.6;
-    color: var(--text-color);
-    background: var(--bg-color);
+    color: var(--text);
+    background: var(--background);
     min-height: 100vh;
     transition: var(--transition);
     padding: 0 20px;
+}
+
+.top-controls {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 22;
 }
 
 .container {
@@ -59,8 +34,8 @@ body {
     margin-bottom: 40px;
     padding: 40px 20px;
     background: var(--header-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
     position: relative;
     overflow: hidden;
     transition: var(--transition);
@@ -73,13 +48,13 @@ body {
     left: 0;
     width: 100%;
     height: 4px;
-    background: linear-gradient(to right, var(--primary), var(--success));
+    background: linear-gradient(to right, var(--primary), var(--secondary));
 }
 
 .eb-header h1 {
     font-size: 2.5rem;
     margin-bottom: 10px;
-    color: var(--text-color);
+    color: var(--text);
     font-weight: 700;
     transition: var(--transition);
 }
@@ -93,16 +68,12 @@ body {
 }
 
 .theme-toggle {
-    position: fixed;
-    top: 30px;
-    right: 30px;
     width: 50px;
     height: 50px;
     border-radius: 50%;
 
     background: var(--card-bg);
     border: none;
-    z-index: 98;
 
     display: flex;
     align-items: center;
@@ -111,7 +82,7 @@ body {
     flex-direction: column;
 
     transition: var(--transition);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
 }
 
 .theme-toggle:hover {
@@ -120,7 +91,7 @@ body {
 
 .theme-toggle i {
     font-size: 1.3rem;
-    color: var(--text-color);
+    color: var(--text);
     transition: var(--transition);
 }
 
@@ -142,17 +113,17 @@ body {
 .search-box {
     width: 100%;
     padding: 15px 50px 15px 20px;
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--border);
     border-radius: 50px;
     font-size: 1rem;
     transition: var(--transition);
-    background: var(--card-bg);
-    color: var(--text-color);
+    background: var(--search-bg);
+    color: var(--search-text);
 }
 
 .search-box:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--button-bg);
     box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
 }
 
@@ -174,7 +145,7 @@ body {
 
 .filter-btn {
     background: var(--card-bg);
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--border);
     padding: 10px 20px;
     border-radius: 50px;
     font-size: 0.9rem;
@@ -183,13 +154,13 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .filter-btn:hover, .filter-btn.active {
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
-    border-color: var(--primary);
+    border-color: var(--button-bg);
 }
 
 .stats {
@@ -202,7 +173,7 @@ body {
 .stat-card {
     background: var(--card-bg);
     padding: 5px;
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-lg);
     display: flex;
     align-items: center;
     transition: var(--transition);
@@ -210,7 +181,7 @@ body {
 
 .stat-card i {
     font-size: 1.5rem;
-    color: var(--primary);
+    color: var(--button-bg);
 }
 
 .book-grid {
@@ -221,10 +192,10 @@ body {
 }
 
 .book-card {
-    background: var(--card-bg);
-    border-radius: var(--border-radius);
+    background: var(--book-card-bg);
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
     transition: var(--transition);
     position: relative;
     display: flex;
@@ -254,7 +225,7 @@ body {
 .book-title {
     font-size: 1.2rem;
     font-weight: 600;
-    color: var(--text-color);
+    color: var(--book-title);
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -268,7 +239,7 @@ body {
 
 .book-author {
     font-size: 0.9rem;
-    color: var(--text-secondary);
+    color: var(--book-author);
     transition: var(--transition);
     width: 100%;
     white-space: nowrap;
@@ -297,7 +268,7 @@ body {
 }
 
 .book-card a:target{
-    background: linear-gradient(to right, var(--primary), var(--success));
+    background: linear-gradient(to right, var(--primary), var(--secondary));
     color: #e9ecef;
 }
 
@@ -306,8 +277,8 @@ body {
 }
 
 .book-tag {
-    background: var(--border-color);
-    color: var(--text-color);
+    background: var(--book-tag);
+    color: var(--book-tag-text);
     padding: 4px 10px;
     border-radius: 20px;
     font-size: 0.75rem;
@@ -316,7 +287,7 @@ body {
 }
 
 .book-tag:hover {
-    background: var(--primary);
+    background: var(--book-tag-hover);
     color: white;
     cursor: pointer;
 }
@@ -332,7 +303,7 @@ body {
 }
 
 .book-format {
-    background: var(--primary-light);
+    background: var(--button-bg);
     color: white;
     padding: 4px 10px;
     border-radius: 20px;
@@ -364,20 +335,20 @@ body {
     width: 50px;
     height: 50px;
     border-radius: 50%;
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
     border: none;
     flex-direction: column;
 }
 
 .control-btn:hover {
-    background: var(--secondary);
+    background: var(--button-hover);
     transform: scale(1.1);
 }
 
@@ -386,7 +357,7 @@ body {
     padding: 10px 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
     transition: var(--transition);
 }
 
@@ -399,13 +370,13 @@ body {
 .empty-state i {
     font-size: 4rem;
     margin-bottom: 20px;
-    color: var(--border-color);
+    color: var(--border);
 }
 
 .book-icon {
     width: 100%;
     height: 120px;
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    background: linear-gradient(135deg, var(--button-hover), var(--button-bg));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -428,12 +399,12 @@ body {
     font-size: 0.9rem;
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: var(--shadow);
-    color: var(--text-color);
+    box-shadow: var(--shadow-md);
+    color: var(--text);
 }
 
 .tag-cloud-item:hover, .tag-cloud-item.active {
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
 }
 
@@ -637,7 +608,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
@@ -657,7 +628,7 @@ body {
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     border: none;
     border-radius: 6px;
@@ -667,11 +638,11 @@ body {
 }
 
 .bookshelf-action-btn:hover {
-    background: var(--primary-light);
+    background: var(--button-hover);
 }
 
 .bookshelf-action-btn.bookshelf-delete-btn {
-    background: var(--danger);
+    background: var(--notification-error);
 }
 
 .bookshelf-action-btn.bookshelf-delete-btn:hover {
@@ -681,7 +652,7 @@ body {
 .bookshelf-close-btn {
     width: 36px;
     height: 36px;
-    background: var(--border-color);
+    background: var(--border);
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -689,13 +660,13 @@ body {
     align-items: center;
     justify-content: center;
     transition: var(--transition);
-    color: var(--text-color);
+    color: var(--text);
     margin-left: 4px;
     margin-right: 4px;
 }
 
 .bookshelf-close-btn:hover {
-    background: var(--danger);
+    background: var(--notification-error);
     color: white;
 }
 
@@ -704,22 +675,22 @@ body {
     flex-wrap: wrap;
     gap: 8px;
     padding: 12px 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
 .bookshelf-tag {
     padding: 6px 14px;
-    background: var(--border-color);
+    background: var(--border);
     border-radius: 20px;
     font-size: 0.85rem;
     cursor: pointer;
     transition: var(--transition);
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .bookshelf-tag:hover, .bookshelf-tag.active {
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
 }
 
@@ -741,12 +712,12 @@ body {
 }
 
 .bookshelf-item {
-    background: var(--bg-color);
-    border-radius: var(--border-radius);
+    background: var(--background);
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
     cursor: pointer;
     transition: var(--transition);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md);
     flex-shrink: 0;
     height: fit-content;
 }
@@ -760,7 +731,7 @@ body {
     width: 100%;
     height: 220px;
     object-fit: cover;
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    background: linear-gradient(135deg, var(--button-hover), var(--button-bg));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -784,7 +755,7 @@ body {
 .bookshelf-item-title {
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--text-color);
+    color: var(--text);
     margin-bottom: 4px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -800,7 +771,7 @@ body {
 }
 
 .bookshelf-item.group {
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    background: linear-gradient(135deg, var(--button-hover), var(--button-bg));
 }
 
 .bookshelf-item.group .bookshelf-item-info {
@@ -817,7 +788,7 @@ body {
 
 .bookshelf-footer {
     padding: 12px 20px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
     text-align: center;
     color: var(--text-secondary);
     font-size: 0.85rem;
@@ -835,7 +806,7 @@ body {
 .bookshelf-empty i {
     font-size: 4rem;
     margin-bottom: 20px;
-    color: var(--border-color);
+    color: var(--border);
 }
 
 .bookshelf-empty p {
@@ -847,7 +818,7 @@ body {
     margin: 0;
     font-size: 1.2rem;
     font-weight: 600;
-    color: var(--text-color);
+    color: var(--text);
     text-align: right;
     flex: 1;
     padding-right: 15px;
@@ -858,17 +829,17 @@ body {
 }
 
 .path-item {
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .path-item.clickable {
     cursor: pointer;
-    color: var(--primary);
+    color: var(--button-bg);
     transition: var(--transition);
 }
 
 .path-item.clickable:hover {
-    color: var(--primary-light);
+    color: var(--button-hover);
     text-decoration: underline;
 }
 
@@ -923,7 +894,7 @@ body {
     max-width: 500px;
     max-height: 80vh;
     background: var(--card-bg);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-lg);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
@@ -934,19 +905,19 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 15px 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
 .select-group-header h3 {
     margin: 0;
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .select-group-close-btn {
     width: 32px;
     height: 32px;
-    background: var(--border-color);
+    background: var(--border);
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -954,11 +925,11 @@ body {
     align-items: center;
     justify-content: center;
     transition: var(--transition);
-    color: var(--text-color);
+    color: var(--text);
 }
 
 .select-group-close-btn:hover {
-    background: var(--danger);
+    background: var(--notification-error);
     color: white;
 }
 
@@ -978,7 +949,7 @@ body {
     display: flex;
     align-items: center;
     padding: 10px 15px;
-    background: var(--bg-color);
+    background: var(--background);
     border-radius: 6px;
     cursor: pointer;
     transition: var(--transition);
@@ -986,13 +957,13 @@ body {
 }
 
 .select-group-item:hover {
-    background: var(--primary-light);
+    background: var(--button-hover);
     color: white;
 }
 
 .select-group-item.selected {
-    border-color: var(--primary);
-    background: var(--primary-light);
+    border-color: var(--button-bg);
+    background: var(--button-hover);
     color: white;
 }
 
@@ -1016,7 +987,7 @@ body {
 
 .select-group-footer {
     padding: 15px 20px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
     display: flex;
     justify-content: flex-end;
     flex-shrink: 0;
@@ -1028,7 +999,7 @@ body {
     justify-content: center;
     gap: 8px;
     padding: 12px 24px;
-    background: var(--primary);
+    background: var(--button-bg);
     color: white;
     border: none;
     border-radius: 6px;
@@ -1038,7 +1009,7 @@ body {
 }
 
 .select-group-confirm-btn:hover {
-    background: var(--primary-light);
+    background: var(--button-hover);
 }
 
 /* 加载动画样式 */
@@ -1059,7 +1030,7 @@ body {
     width: 50px;
     height: 50px;
     border: 5px solid #f3f3f3;
-    border-top: 5px solid var(--primary);
+    border-top: 5px solid var(--button-bg);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -1075,7 +1046,7 @@ body {
 
 .dark-mode .loading-spinner {
     border: 5px solid #333;
-    border-top: 5px solid var(--primary);
+    border-top: 5px solid var(--button-bg);
 }
 
 .kindle-mode .loading-spinner {
