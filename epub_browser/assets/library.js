@@ -227,9 +227,9 @@ function initScript() {
                 var pinyinMatch = false;
                 if (typeof pinyinPro !== 'undefined') {
                     try {
-                        var titlePinyin = pinyinPro.pinyin(title, { toneType: 'none', type: 'all' }).toLowerCase();
-                        var authorPinyin = pinyinPro.pinyin(author, { toneType: 'none', type: 'all' }).toLowerCase();
-                        var searchPinyin = pinyinPro.pinyin(searchTerm, { toneType: 'none', type: 'all' }).toLowerCase();
+                        var titlePinyin = pinyinPro.pinyin(title, { toneType: 'none' }).toLowerCase();
+                        var authorPinyin = pinyinPro.pinyin(author, { toneType: 'none' }).toLowerCase();
+                        var searchPinyin = pinyinPro.pinyin(searchTerm, { toneType: 'none' }).toLowerCase();
                         
                         if (titlePinyin.includes(searchPinyin) || authorPinyin.includes(searchPinyin)) {
                             pinyinMatch = true;
