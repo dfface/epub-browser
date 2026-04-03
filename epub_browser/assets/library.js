@@ -176,6 +176,18 @@ function initScript() {
         window.initTheme();
     }
 
+    // 初始化字体
+    let fontFamily = "system-ui, -apple-system, sans-serif";
+    let fontFamilyInput = null;
+    if (!isKindleMode()) {
+        fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = localStorage.getItem('font_family_input');
+    } else {
+        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = getCookie('font_family_input');
+    }
+    updateFontFamily(fontFamily, fontFamilyInput);
+
     // 搜索功能
     const searchBox = document.querySelector('.search-box');
     const bookCards = document.querySelectorAll('.book-card');

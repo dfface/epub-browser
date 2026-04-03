@@ -184,6 +184,18 @@ function initScript() {
         window.initTheme();
     }
 
+    // 初始化字体
+    let fontFamily = "system-ui, -apple-system, sans-serif";
+    let fontFamilyInput = null;
+    if (!isKindleMode()) {
+        fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = localStorage.getItem('font_family_input');
+    } else {
+        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamilyInput = getCookie('font_family_input');
+    }
+    updateFontFamily(fontFamily, fontFamilyInput);
+
     // 滚动到顶部功能
     const scrollToTopBtn = document.getElementById('scrollToTopBtn');
     
