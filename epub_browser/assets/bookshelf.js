@@ -1,39 +1,70 @@
 function initBookshelf() {
-    const BOOKSHELF_KEY = 'bookshelf';
-    const BOOKSHELF_VERSION_KEY = 'bookshelf_version';
+    var BOOKSHELF_KEY = 'bookshelf';
+    var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
     
-    const bookshelfBtn = document.getElementById('bookshelfBtn');
-    const bookshelfModal = document.getElementById('bookshelfModal');
-    const bookshelfCloseBtn = document.getElementById('bookshelfCloseBtn');
-    const bookshelfBody = document.getElementById('bookshelfBody');
-    const bookshelfTagFilter = document.getElementById('bookshelfTagFilter');
-    const bookshelfStats = document.getElementById('bookshelfStats');
-    const bookshelfLoading = document.getElementById('bookshelfLoading');
-    const addShelfGroupBtn = document.getElementById('addShelfGroupBtn');
-    const exportShelfBtn = document.getElementById('exportShelfBtn');
-    const importShelfBtn = document.getElementById('importShelfBtn');
-    const importShelfFile = document.getElementById('importShelfFile');
-    const syncShelfBtn = document.getElementById('syncShelfBtn');
+    var bookMetadataCache = null;
     
-    const groupModal = document.getElementById('groupModal');
-    const groupCloseBtn = document.getElementById('groupCloseBtn');
-    const groupBody = document.getElementById('groupBody');
-    const groupTagFilter = document.getElementById('groupTagFilter');
-    const groupStats = document.getElementById('groupStats');
-    const groupLoading = document.getElementById('groupLoading');
-    const addGroupSubGroupBtn = document.getElementById('addGroupSubGroupBtn');
-    const deleteGroupBtn = document.getElementById('deleteGroupBtn');
-    const renameGroupBtn = document.getElementById('renameGroupBtn');
+    function loadBookMetadata(callback) {
+        if (bookMetadataCache) {
+            callback(bookMetadataCache);
+            return;
+        }
+        
+        var metadataUrl = "/book-metadata.json";
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', metadataUrl, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    try {
+                        bookMetadataCache = JSON.parse(xhr.responseText);
+                        callback(bookMetadataCache);
+                    } catch (e) {
+                        console.error('Failed to parse book metadata:', e);
+                        callback([]);
+                    }
+                } else {
+                    console.error('Failed to load book metadata:', xhr.status);
+                    callback([]);
+                }
+            }
+        };
+        xhr.send();
+    }
     
-    let currentGroupId = null;
-    let currentGroupPath = [];
-    let currentTag = 'All';
-    let bookshelfSortableInstance = null;
-    let groupSortableInstance = null;
+    var bookshelfBtn = document.getElementById('bookshelfBtn');
+    var bookshelfModal = document.getElementById('bookshelfModal');
+    var bookshelfCloseBtn = document.getElementById('bookshelfCloseBtn');
+    var bookshelfBody = document.getElementById('bookshelfBody');
+    var bookshelfTagFilter = document.getElementById('bookshelfTagFilter');
+    var bookshelfStats = document.getElementById('bookshelfStats');
+    var bookshelfLoading = document.getElementById('bookshelfLoading');
+    var addShelfGroupBtn = document.getElementById('addShelfGroupBtn');
+    var exportShelfBtn = document.getElementById('exportShelfBtn');
+    var importShelfBtn = document.getElementById('importShelfBtn');
+    var importShelfFile = document.getElementById('importShelfFile');
+    var syncShelfBtn = document.getElementById('syncShelfBtn');
+    
+    var groupModal = document.getElementById('groupModal');
+    var groupCloseBtn = document.getElementById('groupCloseBtn');
+    var groupBody = document.getElementById('groupBody');
+    var groupTagFilter = document.getElementById('groupTagFilter');
+    var groupStats = document.getElementById('groupStats');
+    var groupLoading = document.getElementById('groupLoading');
+    var addGroupSubGroupBtn = document.getElementById('addGroupSubGroupBtn');
+    var deleteGroupBtn = document.getElementById('deleteGroupBtn');
+    var renameGroupBtn = document.getElementById('renameGroupBtn');
+    
+    var currentGroupId = null;
+    var currentGroupPath = [];
+    var currentTag = 'All';
+    var bookshelfSortableInstance = null;
+    var groupSortableInstance = null;
     
     // 获取书架版本号
     function getBookshelfVersion() {
-        const version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
+        var version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
         return version ? parseInt(version, 10) : 1;
     }
     
@@ -44,15 +75,15 @@ function initBookshelf() {
     
     // 增加书架版本号
     function incrementBookshelfVersion() {
-        const currentVersion = getBookshelfVersion();
+        var currentVersion = getBookshelfVersion();
         setBookshelfVersion(currentVersion + 1);
     }
     
     // 获取书架数据
     function getBookshelf() {
-        const data = localStorage.getItem(BOOKSHELF_KEY);
+        var data = localStorage.getItem(BOOKSHELF_KEY);
         if (data) {
-            const shelfData = JSON.parse(data);
+            var shelfData = JSON.parse(data);
             // 兼容旧数据：如果没有 order，根据 items 和 groups 生成
             if (!shelfData.order) {
                 shelfData.order = [...(shelfData.items || []), ...Object.keys(shelfData.groups || {})];
@@ -75,14 +106,33 @@ function initBookshelf() {
     
     // 获取书籍信息
     function getBookInfo(bookHash) {
-        const bookCard = document.querySelector(`.book-card[data-id="${bookHash}"]`);
-        if (bookCard) {
-            const title = bookCard.querySelector('.book-title')?.textContent || 'Unknown';
-            const author = bookCard.querySelector('.book-author')?.textContent || 'Unknown';
-            const coverImg = bookCard.querySelector('img[class="book-cover"]');
-            const cover = coverImg ? coverImg.src : null;
-            const tags = Array.from(bookCard.querySelectorAll('.book-tag')).map(t => t.textContent);
-            return { hash: bookHash, title, author, cover, tags };
+        if (!bookMetadataCache) {
+            return null;
+        }
+        
+        for (var i = 0; i < bookMetadataCache.length; i++) {
+            if (bookMetadataCache[i].hash === bookHash) {
+                var book = bookMetadataCache[i];
+                var authors = '';
+                if (book.authors && book.authors.length > 0) {
+                    authors = book.authors.join(' & ');
+                }
+                var cover = null;
+                if (book.cover) {
+                    var basePath = window.location.pathname;
+                    if (basePath.endsWith("index.html")) {
+                        basePath = basePath.replace(/index.html$/, '');
+                    }
+                    cover = basePath + 'book/' + bookHash + '/' + book.cover;
+                }
+                return {
+                    hash: bookHash,
+                    title: book.title,
+                    author: authors,
+                    cover: cover,
+                    tags: book.tags || []
+                };
+            }
         }
         return null;
     }
@@ -91,7 +141,7 @@ function initBookshelf() {
     function isBookInShelf(bookHash, shelfData) {
         if (!shelfData) shelfData = getBookshelf();
         if (shelfData.items.includes(bookHash)) return true;
-        for (const groupId in shelfData.groups) {
+        for (var groupId in shelfData.groups) {
             if (isBookInGroup(bookHash, shelfData.groups[groupId])) return true;
         }
         return false;
@@ -101,7 +151,7 @@ function initBookshelf() {
     function isBookInGroup(bookHash, group) {
         if (group.items && group.items.includes(bookHash)) return true;
         if (group.groups) {
-            for (const subGroupId in group.groups) {
+            for (var subGroupId in group.groups) {
                 if (isBookInGroup(bookHash, group.groups[subGroupId])) return true;
             }
         }
@@ -110,33 +160,33 @@ function initBookshelf() {
     
     // 获取书架中所有书籍的标签
     function getShelfTags(shelfData) {
-        const tags = new Set();
-        shelfData.items.forEach(bookHash => {
-            const bookInfo = getBookInfo(bookHash);
+        var tags = new Set();
+        shelfData.items.forEach(function(bookHash) {
+            var bookInfo = getBookInfo(bookHash);
             if (bookInfo && bookInfo.tags) {
-                bookInfo.tags.forEach(tag => tags.add(tag));
+                bookInfo.tags.forEach(function(tag) { tags.add(tag); });
             }
         });
-        for (const groupId in shelfData.groups) {
-            const groupTags = getGroupTags(shelfData.groups[groupId]);
-            groupTags.forEach(tag => tags.add(tag));
+        for (var groupId in shelfData.groups) {
+            var groupTags = getGroupTags(shelfData.groups[groupId]);
+            groupTags.forEach(function(tag) { tags.add(tag); });
         }
         return Array.from(tags);
     }
     
     // 获取分组中所有书籍的标签（递归）
     function getGroupTags(group) {
-        const tags = new Set();
-        group.items.forEach(bookHash => {
-            const bookInfo = getBookInfo(bookHash);
+        var tags = new Set();
+        group.items.forEach(function(bookHash) {
+            var bookInfo = getBookInfo(bookHash);
             if (bookInfo && bookInfo.tags) {
-                bookInfo.tags.forEach(tag => tags.add(tag));
+                bookInfo.tags.forEach(function(tag) { tags.add(tag); });
             }
         });
         if (group.groups) {
-            for (const subGroupId in group.groups) {
-                const subTags = getGroupTags(group.groups[subGroupId]);
-                subTags.forEach(tag => tags.add(tag));
+            for (var subGroupId in group.groups) {
+                var subTags = getGroupTags(group.groups[subGroupId]);
+                subTags.forEach(function(tag) { tags.add(tag); });
             }
         }
         return Array.from(tags);
@@ -146,8 +196,8 @@ function initBookshelf() {
     function renderTagFilter(container, tags, activeTag) {
         container.innerHTML = '<span class="bookshelf-tag ' + (activeTag === 'All' ? 'active' : '') + '" data-tag="All">All</span>';
         container.innerHTML += '<span class="bookshelf-tag ' + (activeTag === 'NoTag' ? 'active' : '') + '" data-tag="NoTag">NoTag</span>';
-        tags.forEach(tag => {
-            const tagEl = document.createElement('span');
+        tags.forEach(function(tag) {
+            var tagEl = document.createElement('span');
             tagEl.className = 'bookshelf-tag' + (activeTag === tag ? ' active' : '');
             tagEl.dataset.tag = tag;
             tagEl.textContent = tag;
@@ -156,108 +206,120 @@ function initBookshelf() {
     }
     
     // 渲染书架内容
-    function renderBookshelf(tag = 'All') {
+    function renderBookshelf(tag) {
+        if (!tag) tag = 'All';
         if (bookshelfLoading) {
             bookshelfLoading.classList.remove('hidden');
         }
         
-        setTimeout(() => {
-            const shelfData = getBookshelf();
-            const allTags = getShelfTags(shelfData);
-            
-            renderTagFilter(bookshelfTagFilter, allTags, tag);
-            
-            bookshelfBody.innerHTML = '';
-            
-            let bookCount = 0;
-            let groupCount = 0;
-            
-            // 按照 order 顺序渲染分组和书籍
-            const order = shelfData.order || [...(shelfData.items || []), ...Object.keys(shelfData.groups || {})];
-            for (const id of order) {
-                // 检查是否是分组
-                if (shelfData.groups && shelfData.groups[id]) {
-                    const group = shelfData.groups[id];
+        loadBookMetadata(function(metadata) {
+            setTimeout(function() {
+                var shelfData = getBookshelf();
+                var allTags = getShelfTags(shelfData);
+                
+                renderTagFilter(bookshelfTagFilter, allTags, tag);
+                
+                bookshelfBody.innerHTML = '';
+                
+                var bookCount = 0;
+                var groupCount = 0;
+                
+                // 按照 order 顺序渲染分组和书籍
+                var order = shelfData.order || shelfData.items.concat(Object.keys(shelfData.groups || {}));
+                for (var i = 0; i < order.length; i++) {
+                    var id = order[i];
+                    // 检查是否是分组
+                    if (shelfData.groups && shelfData.groups[id]) {
+                        var group = shelfData.groups[id];
+                        if (tag === 'NoTag') {
+                            if (!groupHasNoTagInTree(group)) continue;
+                        } else if (tag !== 'All' && !groupHasTagInTree(group, tag)) continue;
+                    
+                    var groupEl = document.createElement('div');
+                    groupEl.className = 'bookshelf-item group';
+                    groupEl.dataset.id = id;
+                    
+                    var coverCoversHtml = renderGroupCovers(group);
+                    
+                    groupEl.innerHTML = 
+                        '<div class="bookshelf-item-cover">' +
+                            coverCoversHtml +
+                        '</div>' +
+                        '<div class="bookshelf-item-info">' +
+                            '<div class="bookshelf-item-title">' + group.name + '</div>' +
+                            '<div class="bookshelf-item-author">' + countGroupItems(group) + '</div>' +
+                        '</div>';
+                    
+                    (function(groupId) {
+                        groupEl.addEventListener('click', function() {
+                            openGroup(groupId, []);
+                        });
+                    })(id);
+                    
+                    bookshelfBody.appendChild(groupEl);
+                    groupCount++;
+                } 
+                // 检查是否是书籍
+                else if (shelfData.items && shelfData.items.indexOf(id) !== -1) {
+                    var bookInfo = getBookInfo(id);
+                    if (!bookInfo) continue;
                     if (tag === 'NoTag') {
-                        if (!groupHasNoTagInTree(group)) continue;
-                    } else if (tag !== 'All' && !groupHasTagInTree(group, tag)) continue;
-                
-                const groupEl = document.createElement('div');
-                groupEl.className = 'bookshelf-item group';
-                groupEl.dataset.id = id;
-                
-                const coverCoversHtml = renderGroupCovers(group);
-                
-                groupEl.innerHTML = `
-                    <div class="bookshelf-item-cover">
-                        ${coverCoversHtml}
-                    </div>
-                    <div class="bookshelf-item-info">
-                        <div class="bookshelf-item-title">${group.name}</div>
-                        <div class="bookshelf-item-author">${countGroupItems(group)}</div>
-                    </div>
-                `;
-                groupEl.addEventListener('click', () => openGroup(id, []));
-                bookshelfBody.appendChild(groupEl);
-                groupCount++;
-            } 
-            // 检查是否是书籍
-            else if (shelfData.items && shelfData.items.includes(id)) {
-                const bookInfo = getBookInfo(id);
-                if (!bookInfo) continue;
-                if (tag === 'NoTag') {
-                    if (bookInfo.tags && bookInfo.tags.length > 0) continue;
-                } else if (tag !== 'All' && !bookInfo.tags.includes(tag)) continue;
-                
-                const bookEl = document.createElement('div');
-                bookEl.className = 'bookshelf-item book';
-                bookEl.dataset.id = id;
-                bookEl.innerHTML = `
-                    <div class="bookshelf-item-cover">
-                        ${bookInfo.cover ? `<img src="${bookInfo.cover}" alt="${bookInfo.title}">` : '<i class="fas fa-book"></i>'}
-                    </div>
-                    <div class="bookshelf-item-info">
-                        <div class="bookshelf-item-title">${bookInfo.title}</div>
-                        <div class="bookshelf-item-author">${bookInfo.author}</div>
-                    </div>
-                `;
-                bookEl.addEventListener('click', () => {
-                    window.location.href = `/book/${id}/index.html`;
-                });
-                bookshelfBody.appendChild(bookEl);
-                bookCount++;
+                        if (bookInfo.tags && bookInfo.tags.length > 0) continue;
+                    } else if (tag !== 'All' && bookInfo.tags.indexOf(tag) === -1) continue;
+                    
+                    var bookEl = document.createElement('div');
+                    bookEl.className = 'bookshelf-item book';
+                    bookEl.dataset.id = id;
+                    bookEl.innerHTML = 
+                        '<div class="bookshelf-item-cover">' +
+                            (bookInfo.cover ? '<img src="' + bookInfo.cover + '" alt="' + bookInfo.title + '">' : '<i class="fas fa-book"></i>') +
+                        '</div>' +
+                        '<div class="bookshelf-item-info">' +
+                            '<div class="bookshelf-item-title">' + bookInfo.title + '</div>' +
+                            '<div class="bookshelf-item-author">' + bookInfo.author + '</div>' +
+                        '</div>';
+                    
+                    (function(bookHash) {
+                        bookEl.addEventListener('click', function() {
+                            window.location.href = '/book/' + bookHash + '/index.html';
+                        });
+                    })(id);
+                    
+                    bookshelfBody.appendChild(bookEl);
+                    bookCount++;
+                }
             }
-        }
-        
-        if (bookCount === 0 && groupCount === 0) {
-            bookshelfBody.innerHTML = `
-                <div class="bookshelf-empty">
-                    <i class="fas fa-bookmark"></i>
-                    <p>Your bookshelf is empty</p>
-                </div>
-            `;
-        }
-        
-        const total = countAllItems(shelfData);
-        bookshelfStats.textContent = `Current: ${bookCount} book(s), ${groupCount} group(s) | Total: ${total.books} book(s), ${total.groups} group(s)`;
-        
-        // 初始化拖拽排序
-        initBookshelfSortable();
-        
-        if (bookshelfLoading) {
-            bookshelfLoading.classList.add('hidden');
-        }
-        }, 100);
+            
+            if (bookCount === 0 && groupCount === 0) {
+                bookshelfBody.innerHTML = 
+                    '<div class="bookshelf-empty">' +
+                        '<i class="fas fa-bookmark"></i>' +
+                        '<p>Your bookshelf is empty</p>' +
+                    '</div>';
+            }
+            
+            var total = countAllItems(shelfData);
+            bookshelfStats.textContent = 'Current: ' + bookCount + ' book(s), ' + groupCount + ' group(s) | Total: ' + total.books + ' book(s), ' + total.groups + ' group(s)';
+            
+            // 初始化拖拽排序
+            initBookshelfSortable();
+            
+            if (bookshelfLoading) {
+                bookshelfLoading.classList.add('hidden');
+            }
+            }, 100);
+        });
     }
     
     // 检查分组树中是否有书籍包含指定标签
     function groupHasTagInTree(group, tag) {
-        for (const bookHash of group.items) {
-            const bookInfo = getBookInfo(bookHash);
-            if (bookInfo && bookInfo.tags.includes(tag)) return true;
+        for (var i = 0; i < group.items.length; i++) {
+            var bookHash = group.items[i];
+            var bookInfo = getBookInfo(bookHash);
+            if (bookInfo && bookInfo.tags.indexOf(tag) !== -1) return true;
         }
         if (group.groups) {
-            for (const subGroupId in group.groups) {
+            for (var subGroupId in group.groups) {
                 if (groupHasTagInTree(group.groups[subGroupId], tag)) return true;
             }
         }
@@ -266,12 +328,13 @@ function initBookshelf() {
     
     // 检查分组是否包含无标签书籍
     function groupHasNoTagInTree(group) {
-        for (const bookHash of group.items) {
-            const bookInfo = getBookInfo(bookHash);
+        for (var i = 0; i < group.items.length; i++) {
+            var bookHash = group.items[i];
+            var bookInfo = getBookInfo(bookHash);
             if (bookInfo && (!bookInfo.tags || bookInfo.tags.length === 0)) return true;
         }
         if (group.groups) {
-            for (const subGroupId in group.groups) {
+            for (var subGroupId in group.groups) {
                 if (groupHasNoTagInTree(group.groups[subGroupId])) return true;
             }
         }
@@ -280,17 +343,17 @@ function initBookshelf() {
     
     // 渲染分组封面（拼接最多4本书的封面）
     function renderGroupCovers(group) {
-        const covers = getGroupCovers(group, 4);
+        var covers = getGroupCovers(group, 4);
         if (covers.length === 0) {
             return '<i class="fas fa-folder"></i>';
         }
         
-        let html = '<div class="group-covers">';
-        covers.forEach(cover => {
-            html += `<div class="group-cover-item"><img src="${cover}" alt=""></div>`;
+        var html = '<div class="group-covers">';
+        covers.forEach(function(cover) {
+            html += '<div class="group-cover-item"><img src="' + cover + '" alt=""></div>';
         });
         // 填充空白
-        for (let i = covers.length; i < 4; i++) {
+        for (var i = covers.length; i < 4; i++) {
             html += '<div class="group-cover-item"></div>';
         }
         html += '</div>';
@@ -299,20 +362,21 @@ function initBookshelf() {
     
     // 获取分组中的封面（递归获取最多n个）
     function getGroupCovers(group, maxCount) {
-        const covers = [];
+        var covers = [];
         
-        for (const bookHash of group.items) {
+        for (var i = 0; i < group.items.length; i++) {
+            var bookHash = group.items[i];
             if (covers.length >= maxCount) break;
-            const bookInfo = getBookInfo(bookHash);
+            var bookInfo = getBookInfo(bookHash);
             if (bookInfo && bookInfo.cover) {
                 covers.push(bookInfo.cover);
             }
         }
         
         if (covers.length < maxCount && group.groups) {
-            for (const subGroupId in group.groups) {
+            for (var subGroupId in group.groups) {
                 if (covers.length >= maxCount) break;
-                const subCovers = getGroupCovers(group.groups[subGroupId], maxCount - covers.length);
+                var subCovers = getGroupCovers(group.groups[subGroupId], maxCount - covers.length);
                 covers.push(...subCovers);
             }
         }
@@ -322,15 +386,15 @@ function initBookshelf() {
     
     // 统计分组内直接子项目数量（只统计下一层）
     function countGroupItems(group) {
-        const bookCount = (group.items || []).length;
-        const groupCount = group.groups ? Object.keys(group.groups).length : 0;
+        var bookCount = (group.items || []).length;
+        var groupCount = group.groups ? Object.keys(group.groups).length : 0;
         
         if (bookCount > 0 && groupCount > 0) {
-            return `${bookCount} books, ${groupCount} subgroups`;
+            return bookCount + ' books, ' + groupCount + ' subgroups';
         } else if (bookCount > 0) {
-            return `${bookCount} books`;
+            return bookCount + ' books';
         } else if (groupCount > 0) {
-            return `${groupCount} subgroups`;
+            return groupCount + ' subgroups';
         } else {
             return 'Empty group';
         }
@@ -338,13 +402,13 @@ function initBookshelf() {
     
     // 递归统计所有嵌套的书籍和分组数量
     function countAllItems(shelfData) {
-        let totalBooks = 0;
-        let totalGroups = 0;
+        var totalBooks = 0;
+        var totalGroups = 0;
         
         function countGroup(group) {
             totalBooks += (group.items || []).length;
             if (group.groups) {
-                for (const groupId in group.groups) {
+                for (var groupId in group.groups) {
                     totalGroups++;
                     countGroup(group.groups[groupId]);
                 }
@@ -353,7 +417,7 @@ function initBookshelf() {
         
         totalBooks += (shelfData.items || []).length;
         if (shelfData.groups) {
-            for (const groupId in shelfData.groups) {
+            for (var groupId in shelfData.groups) {
                 totalGroups++;
                 countGroup(shelfData.groups[groupId]);
             }
@@ -364,13 +428,13 @@ function initBookshelf() {
     
     // 递归统计分组内所有嵌套的书籍和分组数量
     function countAllGroupItems(group) {
-        let totalBooks = (group.items || []).length;
-        let totalGroups = 0;
+        var totalBooks = (group.items || []).length;
+        var totalGroups = 0;
         
         if (group.groups) {
-            for (const groupId in group.groups) {
+            for (var groupId in group.groups) {
                 totalGroups++;
-                const subResult = countAllGroupItems(group.groups[groupId]);
+                var subResult = countAllGroupItems(group.groups[groupId]);
                 totalBooks += subResult.books;
                 totalGroups += subResult.groups;
             }
@@ -384,14 +448,15 @@ function initBookshelf() {
         currentGroupId = groupId;
         currentGroupPath = path || [];
         
-        const shelfData = getBookshelf();
-        let group = shelfData.groups[groupId];
-        let fullPath = [group.name];
-        let pathIds = [groupId];
+        var shelfData = getBookshelf();
+        var group = shelfData.groups[groupId];
+        var fullPath = [group.name];
+        var pathIds = [groupId];
         
         // 按路径找到嵌套分组并构建完整路径
-        let currentParent = shelfData.groups[groupId];
-        for (const pathId of currentGroupPath) {
+        var currentParent = shelfData.groups[groupId];
+        for (var i = 0; i < currentGroupPath.length; i++) {
+            var pathId = currentGroupPath[i];
             currentParent = currentParent.groups[pathId];
             fullPath.push(currentParent.name);
             pathIds.push(pathId);
@@ -399,33 +464,33 @@ function initBookshelf() {
         }
         
         // 设置分组标题（可点击的路径）
-        const groupModalTitle = document.getElementById('groupModalTitle');
+        var groupModalTitle = document.getElementById('groupModalTitle');
         if (groupModalTitle) {
-            let pathHtml = '<i class="fas fa-folder"></i> ';
-            fullPath.forEach((name, index) => {
+            var pathHtml = '<i class="fas fa-folder"></i> ';
+            fullPath.forEach(function(name, index) {
                 if (index > 0) {
                     pathHtml += ' <span class="path-separator">→</span> ';
                 }
                 if (index < fullPath.length - 1) {
-                    pathHtml += `<span class="path-item clickable" data-group-id="${pathIds[0]}" data-path="${index === 0 ? '' : pathIds.slice(1, index + 1).join(',')}">${name}</span>`;
+                    pathHtml += '<span class="path-item clickable" data-group-id="' + pathIds[0] + '" data-path="' + (index === 0 ? '' : pathIds.slice(1, index + 1).join(',')) + '">' + name + '</span>';
                 } else {
-                    pathHtml += `<span class="path-item">${name}</span>`;
+                    pathHtml += '<span class="path-item">' + name + '</span>';
                 }
             });
             groupModalTitle.innerHTML = pathHtml;
             
             // 添加点击事件
-            groupModalTitle.querySelectorAll('.path-item.clickable').forEach(item => {
+            groupModalTitle.querySelectorAll('.path-item.clickable').forEach(function(item) {
                 item.addEventListener('click', function() {
-                    const groupId = this.dataset.groupId;
-                    const pathStr = this.dataset.path;
-                    const path = pathStr ? pathStr.split(',') : [];
+                    var groupId = this.dataset.groupId;
+                    var pathStr = this.dataset.path;
+                    var path = pathStr ? pathStr.split(',') : [];
                     openGroup(groupId, path);
                 });
             });
         }
         
-        const groupTags = getGroupTags(group);
+        var groupTags = getGroupTags(group);
         renderTagFilter(groupTagFilter, groupTags, 'All');
         
         renderGroupContent(group, 'All');
@@ -435,86 +500,95 @@ function initBookshelf() {
     }
     
     // 渲染分组内容
-    function renderGroupContent(group, tag = 'All') {
+    function renderGroupContent(group, tag) {
+        if (!tag) tag = 'All';
         // 立即清空旧内容，避免闪烁
         groupBody.innerHTML = '';
         if (groupLoading) {
             groupLoading.classList.remove('hidden');
         }
         
-        setTimeout(() => {
+        setTimeout(function() {
             
-            let bookCount = 0;
-            let subGroupCount = 0;
+            var bookCount = 0;
+            var subGroupCount = 0;
             
             // 按照 order 顺序渲染分组和书籍
-            const order = group.order || [...(group.items || []), ...Object.keys(group.groups || {})];
-            for (const id of order) {
+            var order = group.order || (group.items || []).concat(Object.keys(group.groups || {}));
+            for (var i = 0; i < order.length; i++) {
+                var id = order[i];
                 // 检查是否是子分组
                 if (group.groups && group.groups[id]) {
-                    const subGroup = group.groups[id];
+                    var subGroup = group.groups[id];
                     if (tag === 'NoTag') {
                         if (!groupHasNoTagInTree(subGroup)) continue;
                     } else if (tag !== 'All' && !groupHasTagInTree(subGroup, tag)) continue;
                     
-                    const groupEl = document.createElement('div');
+                    var groupEl = document.createElement('div');
                     groupEl.className = 'bookshelf-item group';
                     groupEl.dataset.id = id;
                     
-                    const coverCoversHtml = renderGroupCovers(subGroup);
+                    var coverCoversHtml = renderGroupCovers(subGroup);
                     
-                    groupEl.innerHTML = `
-                        <div class="bookshelf-item-cover">
-                            ${coverCoversHtml}
-                        </div>
-                        <div class="bookshelf-item-info">
-                            <div class="bookshelf-item-title">${subGroup.name}</div>
-                            <div class="bookshelf-item-author">${countGroupItems(subGroup)}</div>
-                        </div>
-                    `;
-                    groupEl.addEventListener('click', () => openGroup(currentGroupId, [...currentGroupPath, id]));
+                    groupEl.innerHTML = 
+                        '<div class="bookshelf-item-cover">' +
+                            coverCoversHtml +
+                        '</div>' +
+                        '<div class="bookshelf-item-info">' +
+                            '<div class="bookshelf-item-title">' + subGroup.name + '</div>' +
+                            '<div class="bookshelf-item-author">' + countGroupItems(subGroup) + '</div>' +
+                        '</div>';
+                    
+                    (function(gId, path) {
+                        groupEl.addEventListener('click', function() {
+                            openGroup(gId, path);
+                        });
+                    })(currentGroupId, currentGroupPath.concat([id]));
+                    
                     groupBody.appendChild(groupEl);
                     subGroupCount++;
                 }
                 // 检查是否是书籍
-                else if (group.items && group.items.includes(id)) {
-                    const bookInfo = getBookInfo(id);
+                else if (group.items && group.items.indexOf(id) !== -1) {
+                    var bookInfo = getBookInfo(id);
                     if (!bookInfo) continue;
                     if (tag === 'NoTag') {
                         if (bookInfo.tags && bookInfo.tags.length > 0) continue;
-                    } else if (tag !== 'All' && !bookInfo.tags.includes(tag)) continue;
+                    } else if (tag !== 'All' && bookInfo.tags.indexOf(tag) === -1) continue;
                     
-                    const bookEl = document.createElement('div');
+                    var bookEl = document.createElement('div');
                     bookEl.className = 'bookshelf-item book';
                     bookEl.dataset.id = id;
-                    bookEl.innerHTML = `
-                        <div class="bookshelf-item-cover">
-                            ${bookInfo.cover ? `<img src="${bookInfo.cover}" alt="${bookInfo.title}">` : '<i class="fas fa-book"></i>'}
-                        </div>
-                        <div class="bookshelf-item-info">
-                            <div class="bookshelf-item-title">${bookInfo.title}</div>
-                            <div class="bookshelf-item-author">${bookInfo.author}</div>
-                        </div>
-                    `;
-                    bookEl.addEventListener('click', () => {
-                        window.location.href = `/book/${id}/index.html`;
-                    });
+                    bookEl.innerHTML = 
+                        '<div class="bookshelf-item-cover">' +
+                            (bookInfo.cover ? '<img src="' + bookInfo.cover + '" alt="' + bookInfo.title + '">' : '<i class="fas fa-book"></i>') +
+                        '</div>' +
+                        '<div class="bookshelf-item-info">' +
+                            '<div class="bookshelf-item-title">' + bookInfo.title + '</div>' +
+                            '<div class="bookshelf-item-author">' + bookInfo.author + '</div>' +
+                        '</div>';
+                    
+                    (function(bookHash) {
+                        bookEl.addEventListener('click', function() {
+                            window.location.href = '/book/' + bookHash + '/index.html';
+                        });
+                    })(id);
+                    
                     groupBody.appendChild(bookEl);
                     bookCount++;
             }
         }
         
         if (bookCount === 0 && subGroupCount === 0) {
-            groupBody.innerHTML = `
-                <div class="bookshelf-empty">
-                    <i class="fas fa-folder-open"></i>
-                    <p>This group is empty</p>
-                </div>
-            `;
+            groupBody.innerHTML = 
+                '<div class="bookshelf-empty">' +
+                    '<i class="fas fa-folder-open"></i>' +
+                    '<p>This group is empty</p>' +
+                '</div>';
         }
         
-        const total = countAllGroupItems(group);
-        groupStats.textContent = `Current: ${bookCount} book(s), ${subGroupCount} group(s) | Total: ${total.books} book(s), ${total.groups} group(s)`;
+        var total = countAllGroupItems(group);
+        groupStats.textContent = 'Current: ' + bookCount + ' book(s), ' + subGroupCount + ' group(s) | Total: ' + total.books + ' book(s), ' + total.groups + ' group(s)';
         
         // 初始化拖拽排序
         initGroupSortable();
@@ -536,13 +610,13 @@ function initBookshelf() {
                 delay: 300,
                 delayOnTouchOnly: true,
                 onEnd: function(evt) {
-                    const shelfData = getBookshelf();
-                    const newOrder = [];
-                    const newItems = [];
-                    const newGroups = {};
+                    var shelfData = getBookshelf();
+                    var newOrder = [];
+                    var newItems = [];
+                    var newGroups = {};
                     
-                    Array.from(bookshelfBody.children).forEach(child => {
-                        const id = child.dataset.id;
+                    Array.from(bookshelfBody.children).forEach(function(child) {
+                        var id = child.dataset.id;
                         newOrder.push(id);
                         if (child.classList.contains('book')) {
                             newItems.push(id);
@@ -572,18 +646,19 @@ function initBookshelf() {
                 delay: 300,
                 delayOnTouchOnly: true,
                 onEnd: function(evt) {
-                    const shelfData = getBookshelf();
-                    let targetGroup = shelfData.groups[currentGroupId];
-                    for (const pathId of currentGroupPath) {
+                    var shelfData = getBookshelf();
+                    var targetGroup = shelfData.groups[currentGroupId];
+                    for (var i = 0; i < currentGroupPath.length; i++) {
+                        var pathId = currentGroupPath[i];
                         targetGroup = targetGroup.groups[pathId];
                     }
                     
-                    const newOrder = [];
-                    const newItems = [];
-                    const newGroups = {};
+                    var newOrder = [];
+                    var newItems = [];
+                    var newGroups = {};
                     
-                    Array.from(groupBody.children).forEach(child => {
-                        const id = child.dataset.id;
+                    Array.from(groupBody.children).forEach(function(child) {
+                        var id = child.dataset.id;
                         newOrder.push(id);
                         if (child.classList.contains('book')) {
                             newItems.push(id);
@@ -604,10 +679,10 @@ function initBookshelf() {
     
     // 添加分组
     addShelfGroupBtn.addEventListener('click', function() {
-        const groupName = prompt('Enter group name:');
+        var groupName = prompt('Enter group name:');
         if (groupName && groupName.trim()) {
-            const shelfData = getBookshelf();
-            const groupId = generateId();
+            var shelfData = getBookshelf();
+            var groupId = generateId();
             shelfData.groups[groupId] = {
                 id: groupId,
                 name: groupName.trim(),
@@ -626,11 +701,12 @@ function initBookshelf() {
     
     // 添加子分组
     addGroupSubGroupBtn.addEventListener('click', function() {
-        const groupName = prompt('Enter group name:');
+        var groupName = prompt('Enter group name:');
         if (groupName && groupName.trim()) {
-            const shelfData = getBookshelf();
-            let targetGroup = shelfData.groups[currentGroupId];
-            for (const pathId of currentGroupPath) {
+            var shelfData = getBookshelf();
+            var targetGroup = shelfData.groups[currentGroupId];
+            for (var i = 0; i < currentGroupPath.length; i++) {
+                var pathId = currentGroupPath[i];
                 targetGroup = targetGroup.groups[pathId];
             }
             
@@ -641,7 +717,7 @@ function initBookshelf() {
                 targetGroup.order = [];
             }
             
-            const groupId = generateId();
+            var groupId = generateId();
             targetGroup.groups[groupId] = {
                 id: groupId,
                 name: groupName.trim(),
@@ -652,8 +728,9 @@ function initBookshelf() {
             targetGroup.order.push(groupId);
             saveBookshelf(shelfData);
             
-            let group = shelfData.groups[currentGroupId];
-            for (const pathId of currentGroupPath) {
+            var group = shelfData.groups[currentGroupId];
+            for (var i = 0; i < currentGroupPath.length; i++) {
+                var pathId = currentGroupPath[i];
                 group = group.groups[pathId];
             }
             renderGroupContent(group, currentTag);
@@ -662,16 +739,16 @@ function initBookshelf() {
     
     // 删除分组
     deleteGroupBtn.addEventListener('click', function() {
-        const shelfData = getBookshelf();
-        let targetGroup = shelfData;
-        let parentGroups = shelfData.groups;
-        let targetId = currentGroupId;
-        let parentGroup = null;
+        var shelfData = getBookshelf();
+        var targetGroup = shelfData;
+        var parentGroups = shelfData.groups;
+        var targetId = currentGroupId;
+        var parentGroup = null;
         
         if (currentGroupPath.length > 0) {
             targetGroup = shelfData.groups[currentGroupId];
             parentGroup = targetGroup;
-            for (let i = 0; i < currentGroupPath.length - 1; i++) {
+            for (var i = 0; i < currentGroupPath.length - 1; i++) {
                 parentGroup = parentGroup.groups[currentGroupPath[i]];
             }
             if (currentGroupPath.length > 0) {
@@ -690,16 +767,16 @@ function initBookshelf() {
             return;
         }
         
-        if (confirm(`Are you sure you want to delete the group "${targetGroup.name}"?`)) {
+        if (confirm('Are you sure you want to delete the group "' + targetGroup.name + '"?')) {
             delete parentGroups[targetId];
             
             if (currentGroupPath.length > 0) {
                 if (parentGroup.order) {
-                    parentGroup.order = parentGroup.order.filter(id => id !== targetId);
+                    parentGroup.order = parentGroup.order.filter(function(id) { return id !== targetId; });
                 }
             } else {
                 if (shelfData.order) {
-                    shelfData.order = shelfData.order.filter(id => id !== targetId);
+                    shelfData.order = shelfData.order.filter(function(id) { return id !== targetId; });
                 }
             }
             
@@ -712,30 +789,33 @@ function initBookshelf() {
     
     // 重命名分组
     renameGroupBtn.addEventListener('click', function() {
-        const shelfData = getBookshelf();
-        let targetGroup = shelfData.groups[currentGroupId];
-        for (const pathId of currentGroupPath) {
+        var shelfData = getBookshelf();
+        var targetGroup = shelfData.groups[currentGroupId];
+        for (var i = 0; i < currentGroupPath.length; i++) {
+            var pathId = currentGroupPath[i];
             targetGroup = targetGroup.groups[pathId];
         }
         
-        const newName = prompt('Enter new group name:', targetGroup.name);
+        var newName = prompt('Enter new group name:', targetGroup.name);
         if (newName && newName.trim() && newName.trim() !== targetGroup.name) {
             targetGroup.name = newName.trim();
             saveBookshelf(shelfData);
             
-            const groupModalTitle = document.getElementById('groupModalTitle');
+            var groupModalTitle = document.getElementById('groupModalTitle');
             if (groupModalTitle) {
-                let fullPath = [shelfData.groups[currentGroupId].name];
-                let currentParent = shelfData.groups[currentGroupId];
-                for (const pathId of currentGroupPath) {
+                var fullPath = [shelfData.groups[currentGroupId].name];
+                var currentParent = shelfData.groups[currentGroupId];
+                for (var i = 0; i < currentGroupPath.length; i++) {
+                    var pathId = currentGroupPath[i];
                     currentParent = currentParent.groups[pathId];
                     fullPath.push(currentParent.name);
                 }
-                groupModalTitle.innerHTML = `<i class="fas fa-folder"></i> ${fullPath.join(' → ')}`;
+                groupModalTitle.innerHTML = '<i class="fas fa-folder"></i> ' + fullPath.join(' → ');
             }
             
-            let group = shelfData.groups[currentGroupId];
-            for (const pathId of currentGroupPath) {
+            var group = shelfData.groups[currentGroupId];
+            for (var i = 0; i < currentGroupPath.length; i++) {
+                var pathId = currentGroupPath[i];
                 group = group.groups[pathId];
             }
             renderGroupContent(group, currentTag);
@@ -745,11 +825,11 @@ function initBookshelf() {
     
     // 导出书架数据
     exportShelfBtn.addEventListener('click', function() {
-        const shelfData = getBookshelf();
-        const dataStr = JSON.stringify(shelfData, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var shelfData = getBookshelf();
+        var dataStr = JSON.stringify(shelfData, null, 2);
+        var blob = new Blob([dataStr], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
         a.download = 'bookshelf_data.json';
         document.body.appendChild(a);
@@ -764,12 +844,12 @@ function initBookshelf() {
     });
     
     importShelfFile.addEventListener('change', function(e) {
-        const file = e.target.files[0];
+        var file = e.target.files[0];
         if (file) {
-            const reader = new FileReader();
+            var reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const data = JSON.parse(e.target.result);
+                    var data = JSON.parse(e.target.result);
                     if (data.items && data.groups !== undefined) {
                         saveBookshelf(data);
                         renderBookshelf('All');
@@ -789,7 +869,7 @@ function initBookshelf() {
     // 同步书架数据
     if (syncShelfBtn) {
         syncShelfBtn.addEventListener('click', async function() {
-            let username = window.getUsername ? window.getUsername() : null;
+            var username = window.getUsername ? window.getUsername() : null;
             
             if (!username) {
                 username = prompt('Please enter your username for sync:');
@@ -802,14 +882,14 @@ function initBookshelf() {
                 }
             }
             
-            const version = getBookshelfVersion();
-            const shelfData = getBookshelf();
+            var version = getBookshelfVersion();
+            var shelfData = getBookshelf();
             
             try {
                 syncShelfBtn.disabled = true;
                 syncShelfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
                 
-                const response = await fetch('/sync', {
+                var response = await fetch('/sync', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -822,29 +902,29 @@ function initBookshelf() {
                 });
                 
                 if (response.status === 404) {
-                    const result = await response.json();
+                    var result = await response.json();
                     setBookshelfVersion(result.version || 1);
-                    showNotification(`Sync (${username}): New user created, data uploaded successfully!`, 'success');
+                    showNotification('Sync (' + username + '): New user created, data uploaded successfully!', 'success');
                 } else if (response.status === 200) {
-                    const result = await response.json();
+                    var result = await response.json();
                     localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(result.data));
                     setBookshelfVersion(result.version);
                     renderBookshelf('All');
-                    showNotification(`Sync (${username}): Data updated from server!`, 'success');
+                    showNotification('Sync (' + username + '): Data updated from server!', 'success');
                 } else if (response.status === 304) {
-                    showNotification(`Sync (${username}): No changes, already up to date!`, 'info');
+                    showNotification('Sync (' + username + '): No changes, already up to date!', 'info');
                 } else if (response.status === 405) {
-                    showNotification(`Sync (${username}): Not allowed to sync, check your configuration!`, 'warning');
+                    showNotification('Sync (' + username + '): Not allowed to sync, check your configuration!', 'warning');
                 } else if (response.status === 201) {
-                    const result = await response.json();
+                    var result = await response.json();
                     setBookshelfVersion(result.version);
-                    showNotification(`Sync (${username}): Data uploaded successfully!`, 'success');
+                    showNotification('Sync (' + username + '): Data uploaded successfully!', 'success');
                 } else {
-                    const result = await response.json();
-                    showNotification(`Sync (${username}) error: ` + (result.message || 'Unknown error'), 'warning');
+                    var result = await response.json();
+                    showNotification('Sync (' + username + ') error: ' + (result.message || 'Unknown error'), 'warning');
                 }
             } catch (err) {
-                showNotification(`Sync (${username}) failed: ` + err.message, 'warning');
+                showNotification('Sync (' + username + ') failed: ' + err.message, 'warning');
             } finally {
                 syncShelfBtn.disabled = false;
                 syncShelfBtn.innerHTML = '<i class="fas fa-sync"></i> Sync';
@@ -856,7 +936,7 @@ function initBookshelf() {
     bookshelfTagFilter.addEventListener('click', function(e) {
         if (e.target.classList.contains('bookshelf-tag')) {
             currentTag = e.target.dataset.tag;
-            bookshelfTagFilter.querySelectorAll('.bookshelf-tag').forEach(t => t.classList.remove('active'));
+            bookshelfTagFilter.querySelectorAll('.bookshelf-tag').forEach(function(t) { t.classList.remove('active'); });
             e.target.classList.add('active');
             renderBookshelf(currentTag);
         }
@@ -865,12 +945,13 @@ function initBookshelf() {
     groupTagFilter.addEventListener('click', function(e) {
         if (e.target.classList.contains('bookshelf-tag')) {
             currentTag = e.target.dataset.tag;
-            groupTagFilter.querySelectorAll('.bookshelf-tag').forEach(t => t.classList.remove('active'));
+            groupTagFilter.querySelectorAll('.bookshelf-tag').forEach(function(t) { t.classList.remove('active'); });
             e.target.classList.add('active');
             
-            const shelfData = getBookshelf();
-            let group = shelfData.groups[currentGroupId];
-            for (const pathId of currentGroupPath) {
+            var shelfData = getBookshelf();
+            var group = shelfData.groups[currentGroupId];
+            for (var i = 0; i < currentGroupPath.length; i++) {
+                var pathId = currentGroupPath[i];
                 group = group.groups[pathId];
             }
             renderGroupContent(group, currentTag);
@@ -899,7 +980,7 @@ function initBookshelf() {
     });
     
     // 关闭所有弹窗（分组和书架）
-    const groupCloseAllBtn = document.getElementById('groupCloseAllBtn');
+    var groupCloseAllBtn = document.getElementById('groupCloseAllBtn');
     if (groupCloseAllBtn) {
         groupCloseAllBtn.addEventListener('click', function() {
             groupModal.classList.remove('active');
