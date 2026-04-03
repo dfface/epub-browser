@@ -224,7 +224,7 @@ if (isKindle) {
 </head>
 <body>
     <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay" id="loadingOverlay" data-id="loadingOverlay">
         <div class="loading-spinner"></div>
     </div>
     <div class="top-controls" data-id="top-controls">
@@ -283,27 +283,9 @@ if (isKindle) {
 
         library_html += """
         <div class="book-grid" data-id="book-grid">
-"""
-        for book_hash, book_info in self.books.items():
-            library_html += f"""
-        <div class="book-card" data-id="{book_hash}">
-            <a href="/book/{book_hash}/index.html" class="book-link" id="{book_hash}">
-                <img src="/book/{book_hash}/{book_info['cover']}" alt="cover" class="book-cover"/>
-                <div class="book-card-content">
-                    <h3 class="book-title">{book_info['title']}</h3>
-                    <div class="book-author">{" & ".join(book_info['authors']) if book_info['authors'] else ""}</div>
-            """
-            if book_info['tags']:
-                library_html += """<div class="book-tags">"""
-                for tag in book_info['tags']:
-                    library_html += f"""
-                        <span class="book-tag">{tag}</span>
-"""
-                library_html += """</div>"""
-            library_html += """
-                </div>
-            </a>
-        </div>
+            <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading">
+                <div class="loading-spinner"></div>
+            </div>
 """      
         library_html += f"""
     </div>
@@ -477,6 +459,24 @@ if (isKindle) {
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
         with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(library_html)
+        
+        self.generate_book_metadata()
+    
+    def generate_book_metadata(self):
+        import json
+        books_data = []
+        for book_hash, book_info in self.books.items():
+            books_data.append({
+                'hash': book_hash,
+                'title': book_info['title'],
+                'authors': book_info['authors'],
+                'tags': book_info['tags'],
+                'cover': book_info['cover']
+            })
+        
+        metadata_path = os.path.join(self.base_directory, 'book-metadata.json')
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(books_data, f, ensure_ascii=False, indent=2)
     
     def move_book(self, book_hash):
         """按 href 的格式组织目录"""

@@ -191,6 +191,14 @@ body {
     margin-bottom: 40px;
 }
 
+.book-grid-loading {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 0;
+}
+
 .book-card {
     background: var(--book-card-bg);
     border-radius: var(--border-radius-lg);
