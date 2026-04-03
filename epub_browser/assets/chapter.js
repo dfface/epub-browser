@@ -446,8 +446,8 @@ function initScript() {
     }
 
     if (isKindleMode()) {
-        document.body.classList.remove("kindle-mode");  // 防止重复添加
-        document.body.classList.add("kindle-mode");
+        document.documentElement.classList.remove("kindle-mode");  // 防止重复添加
+        document.documentElement.classList.add("kindle-mode");
     }
 
     if (isPaginationMode) {

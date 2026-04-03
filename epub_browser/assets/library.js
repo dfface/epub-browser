@@ -117,8 +117,8 @@ function initScript() {
     const storageKeySortableContainer = 'library-container-sortable-order';
 
     if (isKindleMode()) {
-        document.body.classList.remove("kindle-mode");  // 防止重复添加
-        document.body.classList.add("kindle-mode");
+        document.documentElement.classList.remove("kindle-mode");  // 防止重复添加
+        document.documentElement.classList.add("kindle-mode");
     } else {
         restoreOrder(storageKeySortableBook, 'book-grid');
         restoreOrder(storageKeySortableTag, 'tag-cloud');

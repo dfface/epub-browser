@@ -432,11 +432,13 @@ class EPUBProcessor:
             return ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
         }
         var theme = 'light';
+        var isKindle = false;
         try {
             var storedTheme = localStorage.getItem('theme');
             if (storedTheme) {
                 theme = storedTheme;
             } else if (isKindleDevice()) {
+                isKindle = true;
                 function getCookie(key) {
                     var cookies = document.cookie.split('; ');
                     for (var i = 0; i < cookies.length; i++) {
@@ -451,10 +453,10 @@ class EPUBProcessor:
                     return null;
                 }
                 theme = getCookie('theme') || 'light';
-                document.body.classList.add("kindle-mode");
             }
         } catch (e) {
             if (isKindleDevice()) {
+                isKindle = true;
                 function getCookie(key) {
                     var cookies = document.cookie.split('; ');
                     for (var i = 0; i < cookies.length; i++) {
@@ -469,11 +471,15 @@ class EPUBProcessor:
                     return null;
                 }
                 theme = getCookie('theme') || 'light';
-                document.body.classList.add("kindle-mode");
             }
         }
         
-        document.body.classList.add(theme + '-mode');
+        // 使用 html 元素添加类名，避免 body 元素不存在的问题
+        var htmlElement = document.documentElement;
+        htmlElement.classList.add(theme + '-mode');
+        if (isKindle) {
+            htmlElement.classList.add("kindle-mode");
+        }
     </script>
 </head>
 <body>
@@ -1011,11 +1017,13 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             return ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
         }
         var theme = 'light';
+        var isKindle = false;
         try {
             var storedTheme = localStorage.getItem('theme');
             if (storedTheme) {
                 theme = storedTheme;
             } else if (isKindleDevice()) {
+                isKindle = true;
                 function getCookie(key) {
                     var cookies = document.cookie.split('; ');
                     for (var i = 0; i < cookies.length; i++) {
@@ -1030,10 +1038,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                     return null;
                 }
                 theme = getCookie('theme') || 'light';
-                document.body.classList.add("kindle-mode");
             }
         } catch (e) {
             if (isKindleDevice()) {
+                isKindle = true;
                 function getCookie(key) {
                     var cookies = document.cookie.split('; ');
                     for (var i = 0; i < cookies.length; i++) {
@@ -1048,11 +1056,15 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                     return null;
                 }
                 theme = getCookie('theme') || 'light';
-                document.body.classList.add("kindle-mode");
             }
         }
         
-        document.body.classList.add(theme + '-mode');
+        // 使用 html 元素添加类名，避免 body 元素不存在的问题
+        var htmlElement = document.documentElement;
+        htmlElement.classList.add(theme + '-mode');
+        if (isKindle) {
+            htmlElement.classList.add("kindle-mode");
+        }
     </script>
 </head>
 """

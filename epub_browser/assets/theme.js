@@ -49,9 +49,9 @@ function initTheme() {
     // 应用主题
     function applyTheme(theme) {
         // 移除所有主题类
-        document.body.classList.remove('light-mode', 'dark-mode', 'sepia-mode', 'forest-mode', 'ocean-mode', 'peach-mode', 'lavender-mode');
+        document.documentElement.classList.remove('light-mode', 'dark-mode', 'sepia-mode', 'forest-mode', 'ocean-mode', 'peach-mode', 'lavender-mode');
         // 添加当前主题类
-        document.body.classList.add(theme + '-mode');
+        document.documentElement.classList.add(theme + '-mode');
         
         // 更新theme-toggle图标
         var themeToggle = document.getElementById('themeToggle');
