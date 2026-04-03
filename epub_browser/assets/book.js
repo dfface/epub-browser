@@ -177,7 +177,25 @@ function initScript() {
     }
     if (currentChapter !== "") {
         // 激活当前章节
-        const chapterElement = document.getElementById(currentChapter);
+        let chapterElement = document.getElementById(currentChapter);
+        
+        // 如果直接找不到，尝试对每个 .chapter-link 的 id 进行试探
+        if (!chapterElement) {
+            const chapterLinks = document.querySelectorAll('.chapter-link');
+            for (let i = 0; i < chapterLinks.length; i++) {
+                const link = chapterLinks[i];
+                const linkId = link.id;
+                if (linkId) {
+                    // 去掉 id 中的 # 及其后面的内容
+                    const cleanId = linkId.split('#')[0];
+                    if (cleanId === currentChapter) {
+                        chapterElement = link;
+                        break;
+                    }
+                }
+            }
+        }
+        
         if (chapterElement) {
             chapterElement.classList.add('active');
             // 滚动到当前章节（兼容性写法）
