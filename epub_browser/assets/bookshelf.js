@@ -119,11 +119,7 @@ function initBookshelf() {
                 }
                 var cover = null;
                 if (book.cover) {
-                    var basePath = window.location.pathname;
-                    if (basePath.endsWith("index.html")) {
-                        basePath = basePath.replace(/index.html$/, '');
-                    }
-                    cover = basePath + 'book/' + bookHash + '/' + book.cover;
+                    cover = '/book/' + bookHash + '/' + book.cover;
                 }
                 return {
                     hash: bookHash,
