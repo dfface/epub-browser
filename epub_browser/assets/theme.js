@@ -60,20 +60,19 @@ function initTheme() {
     function saveTheme(theme) {
         var isKindle = isKindleDevice();
         if (!isKindle) {
-            // 双写：既写入 localStorage 又写入 window
             try {
                 localStorage.setItem('theme', theme);
             } catch (e) {
                 // 忽略错误
             }
-            // 缓存到 window
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.theme = theme;
         } else {
             setCookie('theme', theme);
         }
+        // 缓存到 window
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.theme = theme;
     }
 
     // 应用主题

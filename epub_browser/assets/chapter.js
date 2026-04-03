@@ -45,29 +45,29 @@ function updateFontFamily(fontFamily, fontFamilyInput) {
     // 保存选项
     if (fontFamily == "custom") {
         if (!isKindleMode()) {
-            // 双写：既写入 localStorage 又写入 window
             localStorage.setItem('font_family_input', fontFamilyInput);
             localStorage.setItem('font_family', "custom");
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.font_family_input = fontFamilyInput;
-            window.epubBrowserCache.font_family = "custom";
         } else {
             setCookie('font_family_input', fontFamilyInput);
             setCookie('font_family', "custom");
         }
+        // 缓存
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.font_family_input = fontFamilyInput;
+        window.epubBrowserCache.font_family = "custom";
     } else {
         if (!isKindleMode()) {
-            // 双写：既写入 localStorage 又写入 window
             localStorage.setItem('font_family', fontFamily);
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.font_family = fontFamily;
         } else {
             setCookie('font_family', fontFamily);
         }
+        // 缓存
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.font_family = fontFamily;
     }
 }
 
@@ -557,27 +557,23 @@ function initScript() {
         
         if (isPaginationMode) {
             if (!isKindleMode()) {
-                // 双写：既写入 localStorage 又写入 window
                 localStorage.setItem('turning', 'true');
-                if (!window.epubBrowserCache) {
-                    window.epubBrowserCache = {};
-                }
-                window.epubBrowserCache.turning = 'true';
             } else {
                 setCookie('turning', 'true');
             }
         } else {
             if (!isKindleMode()) {
-                // 双写：既写入 localStorage 又写入 window
                 localStorage.removeItem('turning');
-                if (!window.epubBrowserCache) {
-                    window.epubBrowserCache = {};
-                }
-                window.epubBrowserCache.turning = 'false';
             } else {
                 deleteCookie('turning');
             }
         }
+
+        // 缓存
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.turning = isPaginationMode ? 'true' : 'false';
 
         location.reload();
     }
@@ -589,15 +585,16 @@ function initScript() {
     // 启用翻页模式
     function enablePaginationMode() {
         if (!isKindleMode()) {
-            // 双写：既写入 localStorage 又写入 window
             localStorage.setItem('turning', 'true');
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.turning = 'true';
         } else {
             setCookie('turning', 'true');
         }
+
+        // 缓存
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.turning = 'true';
         
         // 添加翻页模式类
         document.body.classList.add('pagination-mode');
@@ -1171,15 +1168,16 @@ function initScript() {
     // 保存点击翻页功能状态
     function saveClickPageState() {
         if (!isKindleMode()) {
-            // 双写：既写入 localStorage 又写入 window
             localStorage.setItem('clickPageEnabled', isClickPageEnabled.toString());
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.clickPageEnabled = isClickPageEnabled.toString();
         } else {
             setCookie('clickPageEnabled', isClickPageEnabled.toString());
         }
+
+        // 缓存
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.clickPageEnabled = isClickPageEnabled.toString();
     }
     
     // 更新点击翻页按钮状态
@@ -1290,15 +1288,15 @@ function initScript() {
     // 保存纯净阅读模式状态
     function savePureModeState() {
         if (!isKindleMode()) {
-            // 双写：既写入 localStorage 又写入 window
             localStorage.setItem('pureModeEnabled', isPureModeEnabled.toString());
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.pureModeEnabled = isPureModeEnabled.toString();
         } else {
             setCookie('pureModeEnabled', isPureModeEnabled.toString());
         }
+        // 缓存
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.pureModeEnabled = isPureModeEnabled.toString();
     }
     
     // 切换纯净阅读模式

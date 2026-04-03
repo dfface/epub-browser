@@ -171,7 +171,20 @@ class EPUBLibrary:
     var theme = 'light';
     var isKindle = false;
     try {
-        var storedTheme = localStorage.getItem('theme');
+        // 优先从 window 缓存读取
+        var storedTheme = null;
+        if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+            storedTheme = window.epubBrowserCache.theme;
+        } else {
+            storedTheme = localStorage.getItem('theme');
+            if (storedTheme) {
+                // 缓存到 window
+                if (!window.epubBrowserCache) {
+                    window.epubBrowserCache = {};
+                }
+                window.epubBrowserCache.theme = storedTheme;
+            }
+        }
         if (storedTheme) {
             theme = storedTheme;
         } else if (isKindleDevice()) {
