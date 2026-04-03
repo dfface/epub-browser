@@ -227,11 +227,13 @@ function initScript() {
                 var pinyinMatch = false;
                 if (typeof pinyinPro !== 'undefined') {
                     try {
-                        var titlePinyin = pinyinPro.pinyin(title, { toneType: 'none' }).toLowerCase().replaceAll(" ", "");
-                        var authorPinyin = pinyinPro.pinyin(author, { toneType: 'none' }).toLowerCase().replaceAll(" ", "");
-                        var searchPinyin = pinyinPro.pinyin(searchTerm, { toneType: 'none' }).toLowerCase().replaceAll(" ", "");
+                        // 替换 replaceAll 为正则全局替换（Kindle 兼容）
+                        var titlePinyin = pinyinPro.pinyin(title, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
+                        var authorPinyin = pinyinPro.pinyin(author, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
+                        var searchPinyin = pinyinPro.pinyin(searchTerm, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
                         
-                        if (titlePinyin.includes(searchPinyin) || authorPinyin.includes(searchPinyin)) {
+                        // includes 可以保留（Kindle 支持），也可以换成 indexOf（更保险）
+                        if (titlePinyin.indexOf(searchPinyin) !== -1 || authorPinyin.indexOf(searchPinyin) !== -1) {
                             pinyinMatch = true;
                         }
                     } catch (e) {
