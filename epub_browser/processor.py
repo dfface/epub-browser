@@ -18,7 +18,7 @@ class EPUBProcessor:
     def __init__(self, epub_path, output_dir=None):
         self.epub_path = epub_path
         self.output_dir = output_dir
-        self.book_hash = hashlib.md5(epub_path.encode()).hexdigest()[:8]  # 使用哈希值作为标识，后续可能会根据 ncx 更新
+        self.book_hash = base64.urlsafe_b64encode(hashlib.md5(epub_path.encode('utf-8')).digest()).decode().rstrip('=')  # 使用哈希值作为标识，后续可能会根据 ncx 更新
         
         if output_dir:
             # 使用用户指定的输出目录
