@@ -172,10 +172,12 @@ class EPUBLibrary:
             theme = storedTheme;
         } else if (getCookie("kindle-mode") === "true") {
             theme = getCookie('theme') || 'light';
+            document.body.classList.add("kindle-mode");
         }
     } catch (e) {
         if (getCookie("kindle-mode") === "true") {
             theme = getCookie('theme') || 'light';
+            document.body.classList.add("kindle-mode");
         }
     }
     document.body.classList.add(theme + '-mode');

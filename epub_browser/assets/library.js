@@ -117,6 +117,7 @@ function initScript() {
     if (isKindleMode()) {
         document.querySelector("#kindleModeValueNot").style.display = 'none';
         document.querySelector("#kindleModeValueYes").style.display = 'inherit';
+        document.body.classList.remove("kindle-mode");  // 防止重复添加
         document.body.classList.add("kindle-mode");
     } else {
         document.querySelector("#kindleModeValueNot").style.display = 'inherit';

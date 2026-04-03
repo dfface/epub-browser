@@ -445,6 +445,7 @@ function initScript() {
     }
 
     if (isKindleMode()) {
+        document.body.classList.remove("kindle-mode");  // 防止重复添加
         document.body.classList.add("kindle-mode");
     }
 
