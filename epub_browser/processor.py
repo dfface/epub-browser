@@ -848,7 +848,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         # 保存为 JSON 文件到书籍自己的文件夹下
         toc_json_path = os.path.join(self.web_dir, 'toc.json')
         with open(toc_json_path, 'w', encoding='utf-8') as f:
-            json.dump(toc_data, f, ensure_ascii=False, indent=2)
+            json.dump(toc_data, f, ensure_ascii=False, separators=(',', ':'))
         
         # print(f"TOC JSON file created: {toc_json_path} with {len(toc_data)} items")
     

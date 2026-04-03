@@ -477,7 +477,7 @@ if (isKindle) {
         
         metadata_path = os.path.join(self.base_directory, 'book-metadata.json')
         with open(metadata_path, 'w', encoding='utf-8') as f:
-            json.dump(books_data, f, ensure_ascii=False, indent=2)
+            json.dump(books_data, f, ensure_ascii=False, separators=(',', ':'))
     
     def move_book(self, book_hash):
         """按 href 的格式组织目录"""
