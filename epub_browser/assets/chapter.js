@@ -1488,6 +1488,20 @@ function initScript() {
     window.addEventListener('load', function() {
         document.body.focus();
     });
+
+    function bookshelfSupport() {
+        var bookshelfBtn = document.getElementById('bookshelfBtn');
+        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
+        if (window.initBookshelf) {
+            window.initBookshelf();
+        } else {
+            setTimeout(bookshelfSupport, 100);
+        }
+    }
+
+    if (!isKindleMode()) {
+        bookshelfSupport();
+    }
 }
 
 window.initScriptChapter = initScript;

@@ -1106,7 +1106,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="stylesheet" href="/assets/chapter.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">"""
+    <link rel="manifest" href="/assets/manifest.json">
+    <link rel="stylesheet" href="/assets/bookshelf.css">
+"""
         chapter_html += """
     <script>
     // 立即应用主题，避免闪现 —— Kindle 兼容版
@@ -1379,6 +1381,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <i class="fas fa-font"></i>
             <span class="control-name">Font</span>
         </div>
+        <button class="control-btn" id="bookshelfBtn" style="display: none;">
+            <i class="fas fa-bookmark"></i>
+            <span class="control-name">Shelf</span>
+        </button>
         <a href="/index.html#{self.book_hash}" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
@@ -1423,6 +1429,84 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </div>
     </div>
 
+    <!-- 书架弹窗 -->
+    <div class="bookshelf-modal" id="bookshelfModal">
+        <div class="bookshelf-content">
+            <div class="bookshelf-header">
+                <div class="bookshelf-header-left">
+                    <button class="bookshelf-action-btn" id="addShelfGroupBtn">
+                        <i class="fas fa-folder-plus"></i> Add Group
+                    </button>
+                    <button class="bookshelf-action-btn" id="syncShelfBtn">
+                        <i class="fas fa-sync"></i> Sync
+                    </button>
+                    <button class="bookshelf-action-btn" id="exportShelfBtn">
+                        <i class="fas fa-upload"></i> Export
+                    </button>
+                    <button class="bookshelf-action-btn" id="importShelfBtn">
+                        <i class="fas fa-download"></i> Import
+                    </button>
+                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                </div>
+                <h2 class="bookshelf-title"><i class="fas fa-home"></i> Bookshelf</h2>
+                <div class="bookshelf-header-right">
+                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
+                <span class="bookshelf-tag active" data-tag="All">All</span>
+            </div>
+            <div class="bookshelf-loading" id="bookshelfLoading">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="bookshelf-body" id="bookshelfBody">
+            </div>
+            <div class="bookshelf-footer" id="bookshelfFooter">
+                <span id="bookshelfStats"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分组弹窗 -->
+    <div class="bookshelf-modal" id="groupModal">
+        <div class="bookshelf-content">
+            <div class="bookshelf-header">
+                <div class="bookshelf-header-left">
+                    <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
+                        <i class="fas fa-folder-plus"></i> Add Group
+                    </button>
+                    <button class="bookshelf-action-btn" id="renameGroupBtn">
+                        <i class="fas fa-edit"></i> Rename
+                    </button>
+                    <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
+                        <i class="fas fa-trash"></i> Delete Group
+                    </button>
+                </div>
+                <h2 class="bookshelf-title" id="groupModalTitle">Group</h2>
+                <div class="bookshelf-header-right">
+                    <button class="bookshelf-close-btn" id="groupCloseBtn">
+                        <i class="fas fa-home"></i>
+                    </button>
+                    <button class="bookshelf-close-btn" id="groupCloseAllBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bookshelf-tag-filter" id="groupTagFilter">
+                <span class="bookshelf-tag active" data-tag="All">All</span>
+            </div>
+            <div class="bookshelf-loading" id="groupLoading">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="bookshelf-body" id="groupBody">
+            </div>
+            <div class="bookshelf-footer" id="groupFooter">
+                <span id="groupStats"></span>
+            </div>
+        </div>
+    </div>
     <footer class="eb-footer" data-id="eb-footer">
         <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
     </footer>
@@ -1497,6 +1581,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/chapter.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
+    <script src="/assets/bookshelf.js" defer></script>
 </body>
 </html>
 """
