@@ -110,7 +110,8 @@ function getElementHeight(element) {
 
 function isKindleMode() {
     var ua = navigator.userAgent.toLowerCase();
-    return /kindle|silk/.test(ua);
+    // 使用字符串包含检测，更兼容旧浏览器
+    return ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
 }
 
 // 页面加载时恢复顺序

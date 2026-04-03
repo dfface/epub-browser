@@ -109,7 +109,8 @@ function initScript() {
     // 检测是否是 Kindle 设备
     function isKindleMode() {
         var ua = navigator.userAgent.toLowerCase();
-        return /kindle|silk/.test(ua);
+        // 使用字符串包含检测，更兼容旧浏览器
+        return ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
     }
 
     // 清除阅读进度
