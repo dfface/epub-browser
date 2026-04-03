@@ -181,10 +181,10 @@
     --disabled-text: #999;
     --divider: #ddd;
     --backdrop: rgba(0, 0, 0, 0.5);
-    --shadow-sm: rgba(0, 0, 0, 0.05);
-    --shadow-md: rgba(0, 0, 0, 0.1);
-    --shadow-lg: rgba(0, 0, 0, 0.15);
-    --shadow-xl: rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 1px 5px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.1);
     --transition: all 0.3s ease;
     --border-radius: 4px;
     --border-radius-lg: 8px;
@@ -475,10 +475,10 @@
     --disabled-text: #888;
     --divider: #333;
     --backdrop: rgba(0, 0, 0, 0.8);
-    --shadow-sm: rgba(0, 0, 0, 0.2);
-    --shadow-md: rgba(0, 0, 0, 0.3);
-    --shadow-lg: rgba(0, 0, 0, 0.4);
-    --shadow-xl: rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 1px 5px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.4);
     
     /* Theme Menu Variables */
     --theme-menu-bg: #1e1e1e;
@@ -682,10 +682,10 @@
     --disabled-text: #8d6e63;
     --divider: #d4b996;
     --backdrop: rgba(93, 64, 55, 0.8);
-    --shadow-sm: rgba(139, 69, 19, 0.1);
-    --shadow-md: rgba(139, 69, 19, 0.2);
-    --shadow-lg: rgba(139, 69, 19, 0.3);
-    --shadow-xl: rgba(139, 69, 19, 0.4);
+    --shadow-sm: 0 1px 5px rgba(139, 69, 19, 0.1);
+    --shadow-md: 0 2px 10px rgba(139, 69, 19, 0.2);
+    --shadow-lg: 0 4px 20px rgba(139, 69, 19, 0.2);
+    --shadow-xl: 0 8px 30px rgba(139, 69, 19, 0.3);
     
     /* Theme Menu Variables */
     --theme-menu-bg: #f0d9b5;
@@ -889,10 +889,10 @@
     --disabled-text: #388e3c;
     --divider: #c8e6c9;
     --backdrop: rgba(46, 125, 50, 0.8);
-    --shadow-sm: rgba(46, 125, 50, 0.1);
-    --shadow-md: rgba(46, 125, 50, 0.2);
-    --shadow-lg: rgba(46, 125, 50, 0.3);
-    --shadow-xl: rgba(46, 125, 50, 0.4);
+    --shadow-sm: 0 1px 5px rgba(46, 125, 50, 0.1);
+    --shadow-md: 0 2px 10px rgba(46, 125, 50, 0.2);
+    --shadow-lg: 0 4px 20px rgba(46, 125, 50, 0.2);
+    --shadow-xl: 0 8px 30px rgba(46, 125, 50, 0.3);
     
     /* Theme Menu Variables */
     --theme-menu-bg: #e8f5e8;
@@ -1096,10 +1096,10 @@
     --disabled-text: #1976d2;
     --divider: #90caf9;
     --backdrop: rgba(21, 101, 192, 0.8);
-    --shadow-sm: rgba(21, 101, 192, 0.1);
-    --shadow-md: rgba(21, 101, 192, 0.2);
-    --shadow-lg: rgba(21, 101, 192, 0.3);
-    --shadow-xl: rgba(21, 101, 192, 0.4);
+    --shadow-sm: 0 1px 5px rgba(21, 101, 192, 0.1);
+    --shadow-md: 0 2px 10px rgba(21, 101, 192, 0.2);
+    --shadow-lg: 0 4px 20px rgba(21, 101, 192, 0.2);
+    --shadow-xl: 0 8px 30px rgba(21, 101, 192, 0.3);
     
     /* Theme Menu Variables */
     --theme-menu-bg: #bbdefb;
@@ -1303,10 +1303,10 @@
     --disabled-text: #6b5b66;
     --divider: #ffd1dc;
     --backdrop: rgba(255, 107, 138, 0.8);
-    --shadow-sm: rgba(255, 107, 138, 0.1);
-    --shadow-md: rgba(255, 107, 138, 0.2);
-    --shadow-lg: rgba(255, 107, 138, 0.3);
-    --shadow-xl: rgba(255, 107, 138, 0.4);
+    --shadow-sm: 0 1px 5px rgba(255, 107, 138, 0.1);
+    --shadow-md: 0 2px 10px rgba(255, 107, 138, 0.2);
+    --shadow-lg: 0 4px 20px rgba(255, 107, 138, 0.2);
+    --shadow-xl: 0 8px 30px rgba(255, 107, 138, 0.3);
     
     /* Theme Menu Variables */
     --theme-menu-bg: #ffe4e9;
@@ -1514,10 +1514,10 @@
     --disabled-text: #7b1fa2;
     --divider: #d1c4e9;
     --backdrop: rgba(156, 39, 176, 0.8);
-    --shadow-sm: rgba(156, 39, 176, 0.1);
-    --shadow-md: rgba(156, 39, 176, 0.2);
-    --shadow-lg: rgba(156, 39, 176, 0.3);
-    --shadow-xl: rgba(156, 39, 176, 0.4);
+    --shadow-sm: 0 1px 5px rgba(156, 39, 176, 0.1);
+    --shadow-md: 0 2px 10px rgba(156, 39, 176, 0.2);
+    --shadow-lg: 0 4px 20px rgba(156, 39, 176, 0.2);
+    --shadow-xl: 0 8px 30px rgba(156, 39, 176, 0.3);
     
     /* Theme Menu Variables */
     --theme-menu-bg: #e1bee7;

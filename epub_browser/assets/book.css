@@ -858,3 +858,10 @@ body {
         gap: 20px;
     }
 }
+
+/* Desktop styles */
+@media (min-width: 769px) {
+    .breadcrumb, .book-info-card, .eb-header, .toc-container {
+        box-shadow: var(--shadow-lg);
+    }
+}

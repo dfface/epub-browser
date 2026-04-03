@@ -1316,6 +1316,13 @@ body {
     }
 }
 
+/* Desktop styles */
+@media (min-width: 769px) {
+    .breadcrumb, .navigation, .custom-css-panel, .eb-content-container {
+        box-shadow: var(--shadow-lg);
+    }
+}
+
 /* 加载动画样式 */
 .loading-overlay {
     position: fixed;

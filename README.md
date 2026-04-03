@@ -15,7 +15,7 @@ It now supports the following features:
 
 - **Basic library management**: Search by title, author or tag.
 
-- Dark mode
+- **Theme system** (disabled in Kindle Mode): Multiple themes supported including light, dark, sepia, forest, ocean, peach, and lavender. Theme selection is available in the top right corner.
 
 - **Page navigation**: Keyboard controls supported (Left Arrow, Right Arrow and Spacebar for page turning/scrolling).
 

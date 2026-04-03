@@ -1121,3 +1121,10 @@ body {
         font-size: 0.75rem;
     }
 }
+
+/* Desktop styles */
+@media (min-width: 769px) {
+    .eb-header {
+        box-shadow: var(--shadow-lg);
+    }
+}
