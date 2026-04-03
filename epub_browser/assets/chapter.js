@@ -729,14 +729,16 @@ function initScript() {
                 // 延迟隐藏加载动画，确保页面完全渲染
                 setTimeout(function() {
                     hideLoading();
-                    // 重新初始化 medium-zoom，确保在翻页模式下也能正常工作
-                    if (window.mediumZoom) {
-                        window.mediumZoom('#eb-content img', {
-                            margin: 24,
-                            background: '#000',
-                            scrollOffset: 0
-                        });
+                    // 先 detach 卸载旧的 medium-zoom 实例，避免生成多个 overlay
+                    if (document.documentElement.mediumZoomInstance) {
+                        document.documentElement.mediumZoomInstance.detach();
                     }
+                    // 重新初始化 medium-zoom，确保在翻页模式下也能正常工作
+                    document.documentElement.mediumZoomInstance = mediumZoom('#eb-content img', {
+                        margin: 24,
+                        background: '#000',
+                        scrollOffset: 0
+                    });
                 }, 500);
             }, 200);
         }, 200);
@@ -2063,7 +2065,10 @@ function initScript() {
     
 
     // 图片缩放功能 - 使用 medium-zoom
-    mediumZoom('#eb-content img', {
+    if (document.documentElement.mediumZoomInstance) {
+        document.documentElement.mediumZoomInstance.detach();
+    }
+    document.documentElement.mediumZoomInstance = mediumZoom('#eb-content img', {
         margin: 24,
         background: '#000',
         scrollOffset: 0
