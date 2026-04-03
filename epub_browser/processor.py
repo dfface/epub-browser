@@ -425,85 +425,75 @@ class EPUBProcessor:
     <link rel="manifest" href="/assets/manifest.json">"""
         index_html += """
     <script>
-        // 立即应用主题，避免闪现
-        function isKindleDevice() {
-            // 优先从 window 缓存读取
-            if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-                return window.epubBrowserCache.kindle_mode === 'true';
-            }
-            // 检测设备
-            var ua = navigator.userAgent.toLowerCase();
-            // 使用字符串包含检测，更兼容旧浏览器
-            var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-            // 缓存结果到 window
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-            return isKindle;
+    // 立即应用主题，避免闪现 —— Kindle 兼容版
+    function isKindleDevice() {
+    // 优先从 window 缓存读取
+    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
+        return window.epubBrowserCache.kindle_mode === "true";
+    }
+    // 检测设备
+    var ua = navigator.userAgent.toLowerCase();
+    var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
+    
+    if (!window.epubBrowserCache) {
+        window.epubBrowserCache = {};
+    }
+    window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
+    return isKindle;
+    }
+
+    // 通用 Cookie 方法（只定义一次）
+    function getCookie(key) {
+    var cookies = document.cookie.split("; ");
+    for (var i = 0; i < cookies.length; i++) {
+        var parts = cookies[i].split("=");
+        var cookieKey = parts[0];
+        var cookieValue = parts.slice(1).join("=");
+        if (cookieKey === key) {
+        return decodeURIComponent(cookieValue);
         }
-        var theme = 'light';
-        var isKindle = false;
-        try {
-            // 优先从 window 缓存读取
-            var storedTheme = null;
-            if (window.epubBrowserCache && window.epubBrowserCache.theme) {
-                storedTheme = window.epubBrowserCache.theme;
-            } else {
-                storedTheme = localStorage.getItem('theme');
-                if (storedTheme) {
-                    // 缓存到 window
-                    if (!window.epubBrowserCache) {
-                        window.epubBrowserCache = {};
-                    }
-                    window.epubBrowserCache.theme = storedTheme;
-                }
-            }
-            if (storedTheme) {
-                theme = storedTheme;
-            } else if (isKindleDevice()) {
-                isKindle = true;
-                function getCookie(key) {
-                    var cookies = document.cookie.split('; ');
-                    for (var i = 0; i < cookies.length; i++) {
-                        var cookie = cookies[i];
-                        var parts = cookie.split('=');
-                        var cookieKey = parts[0];
-                        var cookieValue = parts.slice(1).join('=');
-                        if (cookieKey === key) {
-                            return decodeURIComponent(cookieValue);
-                        }
-                    }
-                    return null;
-                }
-                theme = getCookie('theme') || 'light';
-            }
-        } catch (e) {
-            if (isKindleDevice()) {
-                isKindle = true;
-                function getCookie(key) {
-                    var cookies = document.cookie.split('; ');
-                    for (var i = 0; i < cookies.length; i++) {
-                        var cookie = cookies[i];
-                        var parts = cookie.split('=');
-                        var cookieKey = parts[0];
-                        var cookieValue = parts.slice(1).join('=');
-                        if (cookieKey === key) {
-                            return decodeURIComponent(cookieValue);
-                        }
-                    }
-                    return null;
-                }
-                theme = getCookie('theme') || 'light';
-            }
+    }
+    return null;
+    }
+
+    var theme = "light";
+    var isKindle = false;
+
+    try {
+    // 优先从 window 缓存读取
+    var storedTheme = null;
+    if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+        storedTheme = window.epubBrowserCache.theme;
+    } else {
+        storedTheme = localStorage.getItem("theme");
+        if (storedTheme) {
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
         }
-        
-        // 使用 html 元素添加类名，避免 body 元素不存在的问题
-        var htmlElement = document.documentElement;
-        htmlElement.classList.add(theme + '-mode');
-        if (isKindle) {
-            htmlElement.classList.add("kindle-mode");
+        window.epubBrowserCache.theme = storedTheme;
         }
+    }
+
+    if (storedTheme) {
+        theme = storedTheme;
+    } else if (isKindleDevice()) {
+        isKindle = true;
+        theme = getCookie("theme") || "light";
+    }
+    } catch (e) {
+    // 捕获异常，兼容 Kindle
+    if (isKindleDevice()) {
+        isKindle = true;
+        theme = getCookie("theme") || "light";
+    }
+    }
+
+    // 使用 html 元素添加类名
+    var htmlElement = document.documentElement;
+    htmlElement.classList.add(theme + "-mode");
+    if (isKindle) {
+    htmlElement.classList.add("kindle-mode");
+    }
     </script>
 </head>
 <body>
@@ -1034,72 +1024,75 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="manifest" href="/assets/manifest.json">"""
         chapter_html += """
     <script>
-        // 立即应用主题，避免闪现
-        function isKindleDevice() {
-            // 优先从 window 缓存读取
-            if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-                return window.epubBrowserCache.kindle_mode === 'true';
-            }
-            // 检测设备
-            var ua = navigator.userAgent.toLowerCase();
-            // 使用字符串包含检测，更兼容旧浏览器
-            var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-            // 缓存结果到 window
-            if (!window.epubBrowserCache) {
-                window.epubBrowserCache = {};
-            }
-            window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-            return isKindle;
+    // 立即应用主题，避免闪现 —— Kindle 兼容版
+    function isKindleDevice() {
+    // 优先从 window 缓存读取
+    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
+        return window.epubBrowserCache.kindle_mode === "true";
+    }
+    // 检测设备
+    var ua = navigator.userAgent.toLowerCase();
+    var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
+    
+    if (!window.epubBrowserCache) {
+        window.epubBrowserCache = {};
+    }
+    window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
+    return isKindle;
+    }
+
+    // 通用 Cookie 方法（只定义一次）
+    function getCookie(key) {
+    var cookies = document.cookie.split("; ");
+    for (var i = 0; i < cookies.length; i++) {
+        var parts = cookies[i].split("=");
+        var cookieKey = parts[0];
+        var cookieValue = parts.slice(1).join("=");
+        if (cookieKey === key) {
+        return decodeURIComponent(cookieValue);
         }
-        var theme = 'light';
-        var isKindle = false;
-        try {
-            var storedTheme = localStorage.getItem('theme');
-            if (storedTheme) {
-                theme = storedTheme;
-            } else if (isKindleDevice()) {
-                isKindle = true;
-                function getCookie(key) {
-                    var cookies = document.cookie.split('; ');
-                    for (var i = 0; i < cookies.length; i++) {
-                        var cookie = cookies[i];
-                        var parts = cookie.split('=');
-                        var cookieKey = parts[0];
-                        var cookieValue = parts.slice(1).join('=');
-                        if (cookieKey === key) {
-                            return decodeURIComponent(cookieValue);
-                        }
-                    }
-                    return null;
-                }
-                theme = getCookie('theme') || 'light';
-            }
-        } catch (e) {
-            if (isKindleDevice()) {
-                isKindle = true;
-                function getCookie(key) {
-                    var cookies = document.cookie.split('; ');
-                    for (var i = 0; i < cookies.length; i++) {
-                        var cookie = cookies[i];
-                        var parts = cookie.split('=');
-                        var cookieKey = parts[0];
-                        var cookieValue = parts.slice(1).join('=');
-                        if (cookieKey === key) {
-                            return decodeURIComponent(cookieValue);
-                        }
-                    }
-                    return null;
-                }
-                theme = getCookie('theme') || 'light';
-            }
+    }
+    return null;
+    }
+
+    var theme = "light";
+    var isKindle = false;
+
+    try {
+    // 优先从 window 缓存读取
+    var storedTheme = null;
+    if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+        storedTheme = window.epubBrowserCache.theme;
+    } else {
+        storedTheme = localStorage.getItem("theme");
+        if (storedTheme) {
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
         }
-        
-        // 使用 html 元素添加类名，避免 body 元素不存在的问题
-        var htmlElement = document.documentElement;
-        htmlElement.classList.add(theme + '-mode');
-        if (isKindle) {
-            htmlElement.classList.add("kindle-mode");
+        window.epubBrowserCache.theme = storedTheme;
         }
+    }
+
+    if (storedTheme) {
+        theme = storedTheme;
+    } else if (isKindleDevice()) {
+        isKindle = true;
+        theme = getCookie("theme") || "light";
+    }
+    } catch (e) {
+    // 捕获异常，兼容 Kindle
+    if (isKindleDevice()) {
+        isKindle = true;
+        theme = getCookie("theme") || "light";
+    }
+    }
+
+    // 使用 html 元素添加类名
+    var htmlElement = document.documentElement;
+    htmlElement.classList.add(theme + "-mode");
+    if (isKindle) {
+    htmlElement.classList.add("kindle-mode");
+    }
     </script>
 </head>
 """

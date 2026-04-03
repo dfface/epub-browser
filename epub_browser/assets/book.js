@@ -1,29 +1,30 @@
 // 设置 cookie
 function setCookie(key, value) {
-    const date = new Date();
-    date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000); // 3650天的毫秒数
-    const expires = "expires=" + date.toUTCString(); // 转换为 UTC 格式
-    document.cookie = `${key}=${value}; ${expires}; path=/;`;
+    var date = new Date();
+    date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
+    var expires = "expires=" + date.toUTCString();
+    document.cookie = key + "=" + value + "; " + expires + "; path=/;";
 }
 
 // 解析指定 key 的 Cookie
 function getCookie(key) {
-    // 分割所有 Cookie 为数组
-    const cookies = document.cookie.split('; ');
-    for (const cookie of cookies) {
-        // 分割键和值
-        const [cookieKey, cookieValue] = cookie.split('=');
-        // 解码并返回匹配的值
+    var cookies = document.cookie.split('; ');
+    // 替换 for...of 为普通 for 循环
+    for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i];
+        // 替换解构赋值
+        var parts = cookie.split('=');
+        var cookieKey = parts[0];
+        var cookieValue = parts.slice(1).join('=');
         if (cookieKey === key) {
-        return decodeURIComponent(cookieValue);
+            return decodeURIComponent(cookieValue);
         }
     }
-    return null; // 未找到
+    return null;
 }
 
 function deleteCookie(name) {
-    // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 }
 
 function updateFontFamily(fontFamily, fontFamilyInput) {
@@ -36,23 +37,19 @@ function updateFontFamily(fontFamily, fontFamilyInput) {
 
 // 显示通知
 function showNotification(message, type) {
-    // 移除现有通知
-    const existingNotification = document.querySelector('.custom-css-notification');
+    var existingNotification = document.querySelector('.custom-css-notification');
     if (existingNotification) {
         existingNotification.remove();
     }
-    // 创建新通知
-    const notification = document.createElement('div');
-    notification.className = `custom-css-notification ${type}`;
+    var notification = document.createElement('div');
+    notification.className = "custom-css-notification " + type;
     notification.textContent = message;
-    
-    // 添加到页面
+
     document.body.appendChild(notification);
-    
-    // 自动移除
-    setTimeout(() => {
+
+    setTimeout(function() {
         notification.classList.add('fade-out');
-        setTimeout(() => {
+        setTimeout(function() {
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
             }
@@ -65,9 +62,8 @@ function restoreOrder(storageKey, elementClass) {
     var savedOrder = localStorage.getItem(storageKey);
     if (savedOrder) {
         var itemIds = JSON.parse(savedOrder);
-        var container = document.querySelector(`.${elementClass}`);
-        
-        // 按照保存的顺序重新排列元素
+        var container = document.querySelector("." + elementClass);
+
         itemIds.forEach(function(id) {
             var element = document.querySelector('[data-id="' + id + '"]');
             if (element) {
@@ -79,44 +75,35 @@ function restoreOrder(storageKey, elementClass) {
 
 // 删除指定前缀的所有 localStorage 键
 function deleteKeysByPrefix(prefix) {
-    const keysToDelete = [];
-    
-    // 遍历 localStorage 中的所有键
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        
-        // 检查键是否以指定前缀开头
-        if (key.startsWith(prefix)) {
+    var keysToDelete = [];
+
+    for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key.indexOf(prefix) === 0) {
             keysToDelete.push(key);
         }
     }
-    
-    // 删除匹配的键
-    keysToDelete.forEach(key => {
+
+    keysToDelete.forEach(function(key) {
         localStorage.removeItem(key);
-        console.log(`Deleted: ${key}`);
+        console.log("Deleted: " + key);
     });
-    
+
     return keysToDelete.length;
 }
 
 function initScript() {
-    const path = window.location.pathname;  // 获取当前URL路径
-    let pathParts = path.split('/');
-    pathParts = pathParts.filter(item => item !== "");
-    const book_hash = pathParts[pathParts.indexOf('book') + 1];
+    var path = window.location.pathname;
+    var pathParts = path.split('/');
+    pathParts = pathParts.filter(function(item) { return item !== ""; });
+    var book_hash = pathParts[pathParts.indexOf('book') + 1];
 
-    // 检测是否是 Kindle 设备
     function isKindleMode() {
-        // 优先从 window 缓存读取
         if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
             return window.epubBrowserCache.kindle_mode === 'true';
         }
-        // 检测设备
         var ua = navigator.userAgent.toLowerCase();
-        // 使用字符串包含检测，更兼容旧浏览器
         var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-        // 缓存结果到 window
         if (!window.epubBrowserCache) {
             window.epubBrowserCache = {};
         }
@@ -124,70 +111,64 @@ function initScript() {
         return isKindle;
     }
 
-    // 清除阅读进度
     if (!isKindleMode()) {
-        const clearBtn = document.querySelector("#clearReadingProgressBtn");
+        var clearBtn = document.querySelector("#clearReadingProgressBtn");
         clearBtn.addEventListener("click", function() {
-            let prefix1 = `scroll_${book_hash}_`;
-            let prefix2 = `turning_${book_hash}_`;
+            var prefix1 = "scroll_" + book_hash + "_";
+            var prefix2 = "turning_" + book_hash + "_";
             deleteKeysByPrefix(prefix1);
             deleteKeysByPrefix(prefix2);
             deleteKeysByPrefix(book_hash);
             showNotification("All reading progress for this book has been deleted!", "success");
-        })
-        
-        // 书架功能（仅非 Kindle 模式）
+        });
+
         initBookShelfButton(book_hash);
     }
 
-    const storageKeySortableContainer = 'book-container-sortable-order';
+    var storageKeySortableContainer = 'book-container-sortable-order';
 
     if (isKindleMode()) {
-        document.documentElement.classList.remove("kindle-mode");  // 防止重复添加
+        document.documentElement.classList.remove("kindle-mode");
         document.documentElement.classList.add("kindle-mode");
     } else {
         restoreOrder(storageKeySortableContainer, 'container');
     }
 
-    // 拖拽
     var el = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortable = Sortable.create(el, {
-        delay: 300, // 延迟300ms后才开始拖动，避免移动端滑动时误触发
-        delayOnTouchOnly: true, // 只在触摸设备上应用延迟
-        filter: '.toc-container', // 允许直接选择文字
-        preventOnFilter: false, // 过滤时不阻止默认行为
-        onEnd: function(evt) {
-            // 获取所有项目的ID
-            var itemIds = Array.from(evt.from.children).map(function(child) {
-                return child.dataset.id;
-            });
-            // 保存到 localStorage
-            localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
-        }
+            delay: 300,
+            delayOnTouchOnly: true,
+            filter: '.toc-container',
+            preventOnFilter: false,
+            onEnd: function(evt) {
+                // 替换 Array.from
+                var children = evt.from.children;
+                var itemIds = [];
+                for (var i = 0; i < children.length; i++) {
+                    itemIds.push(children[i].dataset.id);
+                }
+                localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
+            }
         });
     }
-    
-    // 恢复书籍阅读的章节进度
-    let currentChapter = "";
+
+    var currentChapter = "";
     if (!isKindleMode()) {
         currentChapter = localStorage.getItem(book_hash) || "";
     } else {
         currentChapter = getCookie(book_hash) || "";
     }
     if (currentChapter !== "") {
-        // 激活当前章节
-        let chapterElement = document.getElementById(currentChapter);
-        
-        // 如果直接找不到，尝试对每个 .chapter-link 的 id 进行试探
+        var chapterElement = document.getElementById(currentChapter);
+
         if (!chapterElement) {
-            const chapterLinks = document.querySelectorAll('.chapter-link');
-            for (let i = 0; i < chapterLinks.length; i++) {
-                const link = chapterLinks[i];
-                const linkId = link.id;
+            var chapterLinks = document.querySelectorAll('.chapter-link');
+            for (var i = 0; i < chapterLinks.length; i++) {
+                var link = chapterLinks[i];
+                var linkId = link.id;
                 if (linkId) {
-                    // 去掉 id 中的 # 及其后面的内容
-                    const cleanId = linkId.split('#')[0];
+                    var cleanId = linkId.split('#')[0];
                     if (cleanId === currentChapter) {
                         chapterElement = link;
                         break;
@@ -195,31 +176,26 @@ function initScript() {
                 }
             }
         }
-        
+
         if (chapterElement) {
             chapterElement.classList.add('active');
-            // 滚动到当前章节（兼容性写法）
-            let tocContainer = document.querySelector('.chapter-list');
+            var tocContainer = document.querySelector('.chapter-list');
             if (isKindleMode()) {
-                // kindle mode 的滚动元素是不同的
-                tocContainer = document.documentElement
+                tocContainer = document.documentElement;
             }
             if (tocContainer) {
                 tocContainer.scrollTop = chapterElement.offsetTop - tocContainer.offsetTop - 50;
             }
         }
     }
-    
-    // 初始化主题
+
     if (window.initTheme) {
         window.initTheme();
     }
 
-    // 初始化字体
-    let fontFamily = "system-ui, -apple-system, sans-serif";
-    let fontFamilyInput = null;
+    var fontFamily = "system-ui, -apple-system, sans-serif";
+    var fontFamilyInput = null;
     if (!isKindleMode()) {
-        // 优先从 window 读取
         if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
             fontFamily = window.epubBrowserCache.font_family;
         } else {
@@ -248,9 +224,7 @@ function initScript() {
     }
     updateFontFamily(fontFamily, fontFamilyInput);
 
-    // 滚动到顶部功能
-    const scrollToTopBtn = document.getElementById('scrollToTopBtn');
-    
+    var scrollToTopBtn = document.getElementById('scrollToTopBtn');
     scrollToTopBtn.addEventListener('click', function() {
         window.scrollTo({
             top: 0,
@@ -258,88 +232,77 @@ function initScript() {
         });
     });
 
-    // 隐藏加载动画
     function hideLoading() {
-        const overlay = document.getElementById('loadingOverlay');
+        var overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.style.display = 'none';
         }
     }
-    
-    // 延迟隐藏加载动画，确保页面完全渲染
+
     setTimeout(function() {
         hideLoading();
     }, 500);
-};
+}
 
 function initBookShelfButton(bookHash) {
-    // 书架功能
-    const BOOKSHELF_KEY = 'bookshelf';
-    const BOOKSHELF_VERSION_KEY = 'bookshelf_version';
+    var BOOKSHELF_KEY = 'bookshelf';
+    var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
 
-    const toggleShelfBtn = document.getElementById('toggleShelfBtn');
-    const toggleShelfBtnText = document.getElementById('toggleShelfBtnText');
-    
+    var toggleShelfBtn = document.getElementById('toggleShelfBtn');
+    var toggleShelfBtnText = document.getElementById('toggleShelfBtnText');
+
     if (!toggleShelfBtn) return;
 
-    // 获取书架版本号
     function getBookshelfVersion() {
-        const version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
+        var version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
         return version ? parseInt(version, 10) : 1;
     }
-    
-    // 设置书架版本号
+
     function setBookshelfVersion(version) {
         localStorage.setItem(BOOKSHELF_VERSION_KEY, version.toString());
     }
-    
-    // 增加书架版本号
+
     function incrementBookshelfVersion() {
-        const currentVersion = getBookshelfVersion();
+        var currentVersion = getBookshelfVersion();
         setBookshelfVersion(currentVersion + 1);
     }
-    
-    // 获取书架数据
+
     function getBookshelf() {
-        const data = localStorage.getItem(BOOKSHELF_KEY);
+        var data = localStorage.getItem(BOOKSHELF_KEY);
         if (data) {
             return JSON.parse(data);
         }
         return { items: [], groups: {} };
     }
-    
-    // 保存书架数据
+
     function saveBookshelf(data) {
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
         incrementBookshelfVersion();
     }
-    
-    // 检查书籍是否在书架中（包括所有分组）
+
     function isBookInShelf(bookHash, shelfData) {
         if (!shelfData) shelfData = getBookshelf();
-        if (shelfData.items.includes(bookHash)) return true;
-        for (const groupId in shelfData.groups) {
+        if (shelfData.items.indexOf(bookHash) > -1) return true;
+        for (var groupId in shelfData.groups) {
             if (isBookInGroup(bookHash, shelfData.groups[groupId])) return true;
         }
         return false;
     }
-    
-    // 检查书籍是否在分组中（递归）
+
     function isBookInGroup(bookHash, group) {
-        if (group.items && group.items.includes(bookHash)) return true;
+        if (group.items && group.items.indexOf(bookHash) > -1) return true;
         if (group.groups) {
-            for (const subGroupId in group.groups) {
+            for (var subGroupId in group.groups) {
                 if (isBookInGroup(bookHash, group.groups[subGroupId])) return true;
             }
         }
         return false;
     }
-    
-    // 更新按钮状态
+
     function updateButtonState() {
-        const shelfData = getBookshelf();
-        const inShelf = isBookInShelf(bookHash, shelfData);
-        
+        var shelfData = getBookshelf();
+        var inShelf = isBookInShelf(bookHash, shelfData);
+
         if (inShelf) {
             toggleShelfBtnText.textContent = 'Remove from Shelf';
             toggleShelfBtn.classList.add('in-shelf');
@@ -348,45 +311,43 @@ function initBookShelfButton(bookHash) {
             toggleShelfBtn.classList.remove('in-shelf');
         }
     }
-    
-    // 从书架中移除书籍（递归查找并移除）
+
     function removeBookFromShelf(bookHash, shelfData) {
-        const index = shelfData.items.indexOf(bookHash);
+        var index = shelfData.items.indexOf(bookHash);
         if (index > -1) {
             shelfData.items.splice(index, 1);
             if (shelfData.order) {
-                const orderIndex = shelfData.order.indexOf(bookHash);
+                var orderIndex = shelfData.order.indexOf(bookHash);
                 if (orderIndex > -1) {
                     shelfData.order.splice(orderIndex, 1);
                 }
             }
             return true;
         }
-        
-        for (const groupId in shelfData.groups) {
+
+        for (var groupId in shelfData.groups) {
             if (removeBookFromGroup(bookHash, shelfData.groups[groupId])) {
                 return true;
             }
         }
         return false;
     }
-    
-    // 从分组中移除书籍（递归）
+
     function removeBookFromGroup(bookHash, group) {
-        const index = group.items.indexOf(bookHash);
+        var index = group.items.indexOf(bookHash);
         if (index > -1) {
             group.items.splice(index, 1);
             if (group.order) {
-                const orderIndex = group.order.indexOf(bookHash);
+                var orderIndex = group.order.indexOf(bookHash);
                 if (orderIndex > -1) {
                     group.order.splice(orderIndex, 1);
                 }
             }
             return true;
         }
-        
+
         if (group.groups) {
-            for (const subGroupId in group.groups) {
+            for (var subGroupId in group.groups) {
                 if (removeBookFromGroup(bookHash, group.groups[subGroupId])) {
                     return true;
                 }
@@ -394,74 +355,75 @@ function initBookShelfButton(bookHash) {
         }
         return false;
     }
-    
-    // 渲染分组树
-    function renderGroupTree(container, groups, level = 0, parentPath = '') {
-        for (const groupId in groups) {
-            const group = groups[groupId];
-            const fullPath = parentPath ? `${parentPath} → ${group.name}` : group.name;
-            const itemEl = document.createElement('div');
+
+    function renderGroupTree(container, groups, level, parentPath) {
+        if (level === undefined) level = 0;
+        if (parentPath === undefined) parentPath = '';
+
+        for (var groupId in groups) {
+            var group = groups[groupId];
+            var fullPath = parentPath ? parentPath + " → " + group.name : group.name;
+            var itemEl = document.createElement('div');
             itemEl.className = 'select-group-item';
             itemEl.dataset.id = groupId;
             itemEl.dataset.level = level;
-            itemEl.innerHTML = `
-                <span class="select-group-item-icon"><i class="fas fa-folder"></i></span>
-                <span class="select-group-item-name">${fullPath}</span>
-            `;
+            itemEl.innerHTML =
+                '<span class="select-group-item-icon"><i class="fas fa-folder"></i></span>' +
+                '<span class="select-group-item-name">' + fullPath + '</span>';
             itemEl.addEventListener('click', function() {
-                container.querySelectorAll('.select-group-item').forEach(i => i.classList.remove('selected'));
+                container.querySelectorAll('.select-group-item').forEach(function(i) {
+                    i.classList.remove('selected');
+                });
                 this.classList.add('selected');
             });
             container.appendChild(itemEl);
-            
+
             if (group.groups && Object.keys(group.groups).length > 0) {
                 renderGroupTree(container, group.groups, level + 1, fullPath);
             }
         }
     }
-    
-    // 显示选择分组弹窗
+
     function showSelectGroupModal() {
-        let modal = document.getElementById('selectGroupModal');
+        var modal = document.getElementById('selectGroupModal');
         if (!modal) {
             modal = document.createElement('div');
             modal.className = 'select-group-modal';
             modal.id = 'selectGroupModal';
-            modal.innerHTML = `
-                <div class="select-group-content">
-                    <div class="select-group-header">
-                        <h3>Add to Shelf</h3>
-                        <button class="select-group-close-btn" id="selectGroupCloseBtn">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="select-group-body">
-                        <div class="select-group-tree" id="selectGroupTree">
-                            <div class="select-group-item selected" data-id="root" data-level="-1">
-                                <span class="select-group-item-icon"><i class="fas fa-home"></i></span>
-                                <span class="select-group-item-name">Shelf Home</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="select-group-footer">
-                        <button class="select-group-confirm-btn" id="selectGroupConfirmBtn">
-                            <i class="fas fa-check"></i> Confirm
-                        </button>
-                    </div>
-                </div>
-            `;
+            modal.innerHTML =
+                '<div class="select-group-content">' +
+                    '<div class="select-group-header">' +
+                        '<h3>Add to Shelf</h3>' +
+                        '<button class="select-group-close-btn" id="selectGroupCloseBtn">' +
+                            '<i class="fas fa-times"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="select-group-body">' +
+                        '<div class="select-group-tree" id="selectGroupTree">' +
+                            '<div class="select-group-item selected" data-id="root" data-level="-1">' +
+                                '<span class="select-group-item-icon"><i class="fas fa-home"></i></span>' +
+                                '<span class="select-group-item-name">Shelf Home</span>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="select-group-footer">' +
+                        '<button class="select-group-confirm-btn" id="selectGroupConfirmBtn">' +
+                            '<i class="fas fa-check"></i> Confirm' +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
             document.body.appendChild(modal);
-            
+
             modal.querySelector('#selectGroupCloseBtn').addEventListener('click', function() {
                 modal.classList.remove('active');
             });
-            
+
             modal.querySelector('#selectGroupConfirmBtn').addEventListener('click', function() {
-                const selected = modal.querySelector('.select-group-item.selected');
+                var selected = modal.querySelector('.select-group-item.selected');
                 if (selected) {
-                    const targetId = selected.dataset.id;
-                    const shelfData = getBookshelf();
-                    
+                    var targetId = selected.dataset.id;
+                    var shelfData = getBookshelf();
+
                     if (targetId === 'root') {
                         shelfData.items.unshift(bookHash);
                         if (!shelfData.order) {
@@ -469,7 +431,7 @@ function initBookShelfButton(bookHash) {
                         }
                         shelfData.order.unshift(bookHash);
                     } else {
-                        let targetGroup = findGroupById(shelfData, targetId);
+                        var targetGroup = findGroupById(shelfData, targetId);
                         if (targetGroup) {
                             targetGroup.items.unshift(bookHash);
                             if (!targetGroup.order) {
@@ -478,73 +440,71 @@ function initBookShelfButton(bookHash) {
                             targetGroup.order.unshift(bookHash);
                         }
                     }
-                    
+
                     saveBookshelf(shelfData);
                     showNotification('Book added to shelf!', 'success');
                     updateButtonState();
                     modal.classList.remove('active');
                 }
             });
-            
+
             modal.addEventListener('click', function(e) {
                 if (e.target === modal) {
                     modal.classList.remove('active');
                 }
             });
         }
-        
-        const tree = modal.querySelector('#selectGroupTree');
-        tree.innerHTML = `
-            <div class="select-group-item selected" data-id="root" data-level="-1">
-                <span class="select-group-item-icon"><i class="fas fa-home"></i></span>
-                <span class="select-group-item-name">Shelf Home</span>
-            </div>
-        `;
-        
-        const shelfData = getBookshelf();
+
+        var tree = modal.querySelector('#selectGroupTree');
+        tree.innerHTML =
+            '<div class="select-group-item selected" data-id="root" data-level="-1">' +
+                '<span class="select-group-item-icon"><i class="fas fa-home"></i></span>' +
+                '<span class="select-group-item-name">Shelf Home</span>' +
+            '</div>';
+
+        var shelfData = getBookshelf();
         renderGroupTree(tree, shelfData.groups, 0);
-        
+
         tree.querySelector('[data-id="root"]').addEventListener('click', function() {
-            tree.querySelectorAll('.select-group-item').forEach(i => i.classList.remove('selected'));
+            tree.querySelectorAll('.select-group-item').forEach(function(i) {
+                i.classList.remove('selected');
+            });
             this.classList.add('selected');
         });
-        
+
         modal.classList.add('active');
     }
-    
-    // 根据ID查找分组
+
     function findGroupById(shelfData, groupId) {
         if (shelfData.groups && shelfData.groups[groupId]) {
             return shelfData.groups[groupId];
         }
-        
-        for (const gId in shelfData.groups) {
-            const found = findGroupInGroup(shelfData.groups[gId], groupId);
+
+        for (var gId in shelfData.groups) {
+            var found = findGroupInGroup(shelfData.groups[gId], groupId);
             if (found) return found;
         }
         return null;
     }
-    
-    // 在分组中递归查找分组
+
     function findGroupInGroup(group, groupId) {
         if (group.groups && group.groups[groupId]) {
             return group.groups[groupId];
         }
-        
+
         if (group.groups) {
-            for (const gId in group.groups) {
-                const found = findGroupInGroup(group.groups[gId], groupId);
+            for (var gId in group.groups) {
+                var found = findGroupInGroup(group.groups[gId], groupId);
                 if (found) return found;
             }
         }
         return null;
     }
-    
-    // 切换书架状态
+
     toggleShelfBtn.addEventListener('click', function() {
-        const shelfData = getBookshelf();
-        const inShelf = isBookInShelf(bookHash, shelfData);
-        
+        var shelfData = getBookshelf();
+        var inShelf = isBookInShelf(bookHash, shelfData);
+
         if (inShelf) {
             removeBookFromShelf(bookHash, shelfData);
             saveBookshelf(shelfData);
@@ -554,8 +514,7 @@ function initBookShelfButton(bookHash) {
             showSelectGroupModal();
         }
     });
-    
-    // 初始化按钮状态
+
     updateButtonState();
 }
 

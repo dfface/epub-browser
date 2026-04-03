@@ -1,30 +1,31 @@
 function initScript() {
     // 设置 cookie
     function setCookie(key, value) {
-        const date = new Date();
+        var date = new Date();
         date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
-        const expires = "expires=" + date.toUTCString();
-        // 重点：加上 SameSite=Lax，和你的按钮完全一致
+        var expires = "expires=" + date.toUTCString();
         document.cookie = key + "=" + value + ";" + expires + "; path=/; SameSite=Lax";
     }
 
-    // 解析指定 key 的 Cookie
+    // 解析指定 key 的 Cookie —— Kindle 兼容版
     function getCookie(key) {
-        // 分割所有 Cookie 为数组
-        const cookies = document.cookie.split('; ');
-        for (const cookie of cookies) {
-            // 分割键和值
-            const [cookieKey, cookieValue] = cookie.split('=');
-            // 解码并返回匹配的值
+        var cookies = document.cookie.split('; ');
+        // 替换 for...of 为传统 for 循环
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i];
+            // 替换解构赋值
+            var parts = cookie.split('=');
+            var cookieKey = parts[0];
+            var cookieValue = parts.slice(1).join('=');
+            
             if (cookieKey === key) {
-            return decodeURIComponent(cookieValue);
+                return decodeURIComponent(cookieValue);
             }
         }
-        return null; // 未找到
+        return null;
     }
 
     function deleteCookie(name) {
-        // 设置 Cookie 过期时间为过去（例如：1970年1月1日）
         document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     }
 
@@ -33,9 +34,8 @@ function initScript() {
         var savedOrder = localStorage.getItem(storageKey);
         if (savedOrder) {
             var itemIds = JSON.parse(savedOrder);
-            var container = document.querySelector(`.${elementClass}`);
+            var container = document.querySelector('.' + elementClass);
             
-            // 按照保存的顺序重新排列元素
             itemIds.forEach(function(id) {
                 var element = document.querySelector('[data-id="' + id + '"]');
                 if (element) {
@@ -55,15 +55,11 @@ function initScript() {
 
     // 检测是否是 Kindle 设备
     function isKindleMode() {
-        // 优先从 window 缓存读取
         if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
             return window.epubBrowserCache.kindle_mode === 'true';
         }
-        // 检测设备
         var ua = navigator.userAgent.toLowerCase();
-        // 使用字符串包含检测，更兼容旧浏览器
         var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-        // 缓存结果到 window
         if (!window.epubBrowserCache) {
             window.epubBrowserCache = {};
         }
@@ -71,7 +67,7 @@ function initScript() {
         return isKindle;
     }
 
-    const USERNAME_KEY = 'epub_browser_username';
+    var USERNAME_KEY = 'epub_browser_username';
 
     function getUsername() {
         if (isKindleMode()) {
@@ -89,8 +85,8 @@ function initScript() {
     }
 
     function updateLoginDisplay() {
-        const loginValue = document.getElementById('loginValue');
-        const username = getUsername();
+        var loginValue = document.getElementById('loginValue');
+        var username = getUsername();
         if (loginValue) {
             if (username) {
                 loginValue.textContent = username;
@@ -104,11 +100,11 @@ function initScript() {
     window.setUsername = setUsername;
     updateLoginDisplay();
 
-    const loginCard = document.getElementById('loginCard');
+    var loginCard = document.getElementById('loginCard');
     if (loginCard) {
         loginCard.addEventListener('click', function() {
-            const currentUsername = getUsername();
-            const username = prompt('Please enter your username:', currentUsername || '');
+            var currentUsername = getUsername();
+            var username = prompt('Please enter your username:', currentUsername || '');
             if (username !== null) {
                 if (username.trim()) {
                     setUsername(username.trim());
@@ -123,12 +119,12 @@ function initScript() {
         });
     }
 
-    const storageKeySortableBook = 'book-grid-sortable-order';
-    const storageKeySortableTag = 'tag-cloud-sortable-order';
-    const storageKeySortableContainer = 'library-container-sortable-order';
+    var storageKeySortableBook = 'book-grid-sortable-order';
+    var storageKeySortableTag = 'tag-cloud-sortable-order';
+    var storageKeySortableContainer = 'library-container-sortable-order';
 
     if (isKindleMode()) {
-        document.documentElement.classList.remove("kindle-mode");  // 防止重复添加
+        document.documentElement.classList.remove("kindle-mode");
         document.documentElement.classList.add("kindle-mode");
     } else {
         restoreOrder(storageKeySortableBook, 'book-grid');
@@ -136,61 +132,51 @@ function initScript() {
         restoreOrder(storageKeySortableContainer, 'container');
     }
 
-    // 拖拽
     var elBook = document.querySelector('.book-grid');
     var elTag = document.querySelector('.tag-cloud');
     var elContainer = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortableBook = Sortable.create(elBook, {
-        delay: 300, // 延迟300ms后才开始拖动，避免移动端滑动时误触发
-        delayOnTouchOnly: true, // 只在触摸设备上应用延迟
-        onEnd: function(evt) {
-            // 获取所有项目的ID
-            var itemIds = Array.from(evt.from.children).map(function(child) {
-                return child.dataset.id;
-            });
-            // 保存到 localStorage
-            localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
-        }
+            delay: 300,
+            delayOnTouchOnly: true,
+            onEnd: function(evt) {
+                var itemIds = Array.from(evt.from.children).map(function(child) {
+                    return child.dataset.id;
+                });
+                localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
+            }
         });
         var sortableTag = Sortable.create(elTag, {
-        delay: 300, // 延迟300ms后才开始拖动，避免移动端滑动时误触发
-        delayOnTouchOnly: true, // 只在触摸设备上应用延迟
-        onEnd: function(evt) {
-            // 获取所有项目的ID
-            var itemIds = Array.from(evt.from.children).map(function(child) {
-                return child.dataset.id;
-            });
-            // 保存到 localStorage
-            localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
-        }
+            delay: 300,
+            delayOnTouchOnly: true,
+            onEnd: function(evt) {
+                var itemIds = Array.from(evt.from.children).map(function(child) {
+                    return child.dataset.id;
+                });
+                localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
+            }
         });
         var sortableContainer = Sortable.create(elContainer, {
-        delay: 300, // 延迟300ms后才开始拖动，给用户选择文字的时间
-        delayOnTouchOnly: true, // 只在触摸设备上应用延迟
-        filter: '.book-grid, .search-box', // 允许直接选择.content中的文字
-        preventOnFilter: false, // 过滤时不阻止默认行为
-        onEnd: function(evt) {
-            // 获取所有项目的ID
-            var itemIds = Array.from(evt.from.children).map(function(child) {
-                return child.dataset.id;
-            });
-            // 保存到 localStorage
-            localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
-        }
+            delay: 300,
+            delayOnTouchOnly: true,
+            filter: '.book-grid, .search-box',
+            preventOnFilter: false,
+            onEnd: function(evt) {
+                var itemIds = Array.from(evt.from.children).map(function(child) {
+                    return child.dataset.id;
+                });
+                localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
+            }
         });
     }
 
-    // 初始化主题
     if (window.initTheme) {
         window.initTheme();
     }
 
-    // 初始化字体
-    let fontFamily = "system-ui, -apple-system, sans-serif";
-    let fontFamilyInput = null;
+    var fontFamily = "system-ui, -apple-system, sans-serif";
+    var fontFamilyInput = null;
     if (!isKindleMode()) {
-        // 优先从 window 读取
         if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
             fontFamily = window.epubBrowserCache.font_family;
         } else {
@@ -219,18 +205,16 @@ function initScript() {
     }
     updateFontFamily(fontFamily, fontFamilyInput);
 
-    // 搜索功能
-    const searchBox = document.querySelector('.search-box');
-    const bookCards = document.querySelectorAll('.book-card');
-    const tagCloudItems = document.querySelectorAll('.tag-cloud-item');
+    var searchBox = document.querySelector('.search-box');
+    var bookCards = document.querySelectorAll('.book-card');
+    var tagCloudItems = document.querySelectorAll('.tag-cloud-item');
 
-    // 搜索功能
     searchBox.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
+        var searchTerm = this.value.toLowerCase();
         
-        bookCards.forEach(card => {
-            const title = card.querySelector('.book-title').textContent.toLowerCase();
-            const author = card.querySelector('.book-author').textContent.toLowerCase();
+        bookCards.forEach(function(card) {
+            var title = card.querySelector('.book-title').textContent.toLowerCase();
+            var author = card.querySelector('.book-author').textContent.toLowerCase();
             
             if (title.includes(searchTerm) || author.includes(searchTerm)) {
                 card.style.display = 'block';
@@ -240,119 +224,83 @@ function initScript() {
         });
     });
 
-    // 标签云筛选功能
-    tagCloudItems.forEach(tag => {
+    tagCloudItems.forEach(function(tag) {
         tag.addEventListener('click', function() {
-            // 移除所有标签的active类
-            tagCloudItems.forEach(t => t.classList.remove('active'));
-            // 为当前点击的标签添加active类
+            tagCloudItems.forEach(function(t) { t.classList.remove('active'); });
             this.classList.add('active');
             
-            const tagText = this.textContent.trim();
+            var tagText = this.textContent.trim();
             
             if (tagText === 'All') {
-                bookCards.forEach(card => {
-                    card.style.display = 'block';
-                });
+                bookCards.forEach(function(card) { card.style.display = 'block'; });
             } else if (tagText === 'NoTag') {
-                bookCards.forEach(card => {
-                    const tags = card.querySelectorAll('.book-tag');
-                    let hasTag = tags.length > 0 ? true : false;
-                    if (!hasTag) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
+                bookCards.forEach(function(card) {
+                    var tags = card.querySelectorAll('.book-tag');
+                    var hasTag = tags.length > 0;
+                    card.style.display = hasTag ? 'none' : 'block';
                 });
             } else {
-                bookCards.forEach(card => {
-                    const tags = card.querySelectorAll('.book-tag');
-                    let hasTag = false;
+                bookCards.forEach(function(card) {
+                    var tags = card.querySelectorAll('.book-tag');
+                    var hasTag = false;
                     
-                    tags.forEach(t => {
-                        if (t.textContent === tagText) {
-                            hasTag = true;
-                        }
+                    tags.forEach(function(t) {
+                        if (t.textContent === tagText) hasTag = true;
                     });
                     
-                    if (hasTag) {
-                        card.style.display = 'block';
-                    } else {
-                        card.style.display = 'none';
-                    }
+                    card.style.display = hasTag ? 'block' : 'none';
                 });
             }
         });
     });
 
-    // 书籍标签点击筛选功能
-    const bookTags = document.querySelectorAll('.book-tag');
-    bookTags.forEach(tag => {
+    var bookTags = document.querySelectorAll('.book-tag');
+    bookTags.forEach(function(tag) {
         tag.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            const tagText = this.textContent;
+            var tagText = this.textContent;
             
-            // 移除所有标签云的active类
-            tagCloudItems.forEach(t => t.classList.remove('active'));
-            
-            // 激活对应的标签云项
-            tagCloudItems.forEach(t => {
-                if (t.textContent === tagText) {
-                    t.classList.add('active');
-                }
+            tagCloudItems.forEach(function(t) { t.classList.remove('active'); });
+            tagCloudItems.forEach(function(t) {
+                if (t.textContent === tagText) t.classList.add('active');
             });
             
-            // 筛选书籍
-            bookCards.forEach(card => {
-                const tags = card.querySelectorAll('.book-tag');
-                let hasTag = false;
+            bookCards.forEach(function(card) {
+                var tags = card.querySelectorAll('.book-tag');
+                var hasTag = false;
                 
-                tags.forEach(t => {
-                    if (t.textContent === tagText) {
-                        hasTag = true;
-                    }
+                tags.forEach(function(t) {
+                    if (t.textContent === tagText) hasTag = true;
                 });
                 
-                if (hasTag) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
+                card.style.display = hasTag ? 'block' : 'none';
             });
         });
     });
 
-    // 滚动到顶部功能
-    const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+    var scrollToTopBtn = document.getElementById('scrollToTopBtn');
 
     scrollToTopBtn.addEventListener('click', function() {
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
+        // 移除 smooth，Kindle 兼容
+        window.scrollTo(0, 0);
     });
 
-    // 显示通知
     function showNotification(message, type) {
-        // 移除现有通知
-        const existingNotification = document.querySelector('.custom-css-notification');
+        var existingNotification = document.querySelector('.custom-css-notification');
         if (existingNotification) {
             existingNotification.remove();
         }
-        // 创建新通知
-        const notification = document.createElement('div');
-        notification.className = `custom-css-notification ${type}`;
+        var notification = document.createElement('div');
+        notification.className = 'custom-css-notification ' + type;
         notification.textContent = message;
         
-        // 添加到页面
         document.body.appendChild(notification);
         
-        // 自动移除
-        setTimeout(() => {
+        setTimeout(function() {
             notification.classList.add('fade-out');
-            setTimeout(() => {
+            setTimeout(function() {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
                 }
@@ -360,28 +308,24 @@ function initScript() {
         }, 3000);
     }
     
-    // 将 showNotification 暴露到全局作用域
     window.showNotification = showNotification;
 
-    // PWA 安装提示和更新按钮
     function pwaSupport() {
-        // 注册 Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('/sw.js')
                     .then(function(registration) {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                        console.log('ServiceWorker registration successful');
                     })
                     .catch(function(error) {
-                        console.log('ServiceWorker registration failed: ', error);
+                        console.log('ServiceWorker registration failed');
                     });
             });
         }
-        let deferredPrompt;
-        const readingControls = document.querySelector('.reading-controls');
+        var deferredPrompt;
+        var readingControls = document.querySelector('.reading-controls');
         
-        // 安装应用按钮
-        const installBtn = document.createElement('button');
+        var installBtn = document.createElement('button');
         installBtn.id = 'pwa-install-btn';
         installBtn.className = 'control-btn';
         installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name">Install</div>';
@@ -390,8 +334,7 @@ function initScript() {
             readingControls.appendChild(installBtn);
         }
 
-        // 更新缓存按钮
-        const updateCacheBtn = document.createElement('button');
+        var updateCacheBtn = document.createElement('button');
         updateCacheBtn.id = 'update-cache-btn';
         updateCacheBtn.className = 'control-btn';
         updateCacheBtn.innerHTML = '<i class="fas fa-sync"></i><div class="control-name">Update</div>';
@@ -402,10 +345,7 @@ function initScript() {
         window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
-            if (installBtn) {
-                installBtn.style.display = 'block';
-            }
-            console.log('PWA install prompt captured');
+            if (installBtn) installBtn.style.display = 'block';
         });
 
         if (installBtn) {
@@ -418,10 +358,8 @@ function initScript() {
                     deferredPrompt.userChoice.then(function(choiceResult) {
                         if (choiceResult.outcome === 'accepted') {
                             showNotification('App installed successfully!', 'success');
-                            console.log('User accepted the install prompt');
                         } else {
                             showNotification('Install cancelled', 'info');
-                            console.log('User dismissed the install prompt');
                         }
                         deferredPrompt = null;
                     });
@@ -435,7 +373,6 @@ function initScript() {
                 showNotification('Updating cache...', 'info');
                 
                 if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                    // 发送消息给 Service Worker 清除缓存
                     navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
                     showNotification('Cache cleared, page will reload...', 'info');
                     setTimeout(function() {
@@ -451,56 +388,31 @@ function initScript() {
         }
 
         window.addEventListener('appinstalled', function() {
-            if (installBtn) {
-                installBtn.style.display = 'none';
-            }
-            console.log('PWA installed successfully');
+            if (installBtn) installBtn.style.display = 'none';
         });
     }
 
     function bookshelfSupport() {
-        const bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) {
-            bookshelfBtn.style.display = 'inherit';
-        }
+        var bookshelfBtn = document.getElementById('bookshelfBtn');
+        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {
-            setTimeout(bookshelfSupport, 100)
+            setTimeout(bookshelfSupport, 100);
         }
     }
 
-    // 书架功能（仅非 Kindle 模式）
     if (!isKindleMode()) {
         pwaSupport();
         bookshelfSupport();
     }
 
-    // 隐藏加载动画
     function hideLoading() {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-        }
+        var overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.style.display = 'none';
     }
 
     setTimeout(hideLoading, 500);
-};
+}
 
-// 书架数据结构:
-// {
-//   "bookshelf": {
-//     "items": ["book_hash_1", "book_hash_2", ...],  // 书籍ID数组，支持排序
-//     "groups": {
-//       "group_id_1": {
-//         "id": "group_id_1",
-//         "name": "分组名称",
-//         "items": ["book_hash_3", ...],  // 分组内的书籍
-//         "groups": {}  // 嵌套分组
-//       }
-//     }
-//   }
-// }
-
-// 如果DOM已经加载完成，立即初始化
 window.initScriptLibrary = initScript;
