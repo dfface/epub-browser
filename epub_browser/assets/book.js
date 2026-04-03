@@ -27,6 +27,19 @@ function deleteCookie(name) {
     document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 }
 
+function isKindleMode() {
+    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
+        return window.epubBrowserCache.kindle_mode === 'true';
+    }
+    var ua = navigator.userAgent.toLowerCase();
+    var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
+    if (!window.epubBrowserCache) {
+        window.epubBrowserCache = {};
+    }
+    window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
+    return isKindle;
+}
+
 function updateFontFamily(fontFamily, fontFamilyInput) {
     if (fontFamily == "custom") {
         document.body.style.fontFamily = fontFamilyInput;
@@ -97,19 +110,6 @@ function initScript() {
     var pathParts = path.split('/');
     pathParts = pathParts.filter(function(item) { return item !== ""; });
     var book_hash = pathParts[pathParts.indexOf('book') + 1];
-
-    function isKindleMode() {
-        if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-            return window.epubBrowserCache.kindle_mode === 'true';
-        }
-        var ua = navigator.userAgent.toLowerCase();
-        var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-        if (!window.epubBrowserCache) {
-            window.epubBrowserCache = {};
-        }
-        window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-        return isKindle;
-    }
 
     if (!isKindleMode()) {
         var clearBtn = document.querySelector("#clearReadingProgressBtn");

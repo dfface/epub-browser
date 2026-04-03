@@ -1,6 +1,22 @@
 function initBookshelf() {
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
+    var USERNAME_KEY = 'epub_browser_username';
+
+    function getUsername() {
+        if (isKindleMode()) {
+            return getCookie(USERNAME_KEY);
+        }
+        return localStorage.getItem(USERNAME_KEY);
+    }
+
+    function setUsername(username) {
+        if (isKindleMode()) {
+            setCookie(USERNAME_KEY, username);
+        } else {
+            localStorage.setItem(USERNAME_KEY, username);
+        }
+    }
     
     var bookMetadataCache = null;
     
@@ -865,7 +881,7 @@ function initBookshelf() {
     // 同步书架数据
     if (syncShelfBtn) {
         syncShelfBtn.addEventListener('click', async function() {
-            var username = window.getUsername ? window.getUsername() : null;
+            var username = getUsername();
             
             if (!username) {
                 username = prompt('Please enter your username for sync:');
@@ -873,9 +889,7 @@ function initBookshelf() {
                     return;
                 }
                 username = username.trim();
-                if (window.setUsername) {
-                    window.setUsername(username);
-                }
+                setUsername(username);
             }
             
             var version = getBookshelfVersion();

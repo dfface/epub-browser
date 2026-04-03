@@ -19,6 +19,50 @@ function showNotification(message, type) {
     }, 3000);
 }
 
+// 设置 cookie
+function setCookie(key, value) {
+    var date = new Date();
+    date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
+    var expires = "expires=" + date.toUTCString();
+    document.cookie = key + "=" + value + ";" + expires + "; path=/; SameSite=Lax";
+}
+
+// 解析指定 key 的 Cookie —— Kindle 兼容版
+function getCookie(key) {
+    var cookies = document.cookie.split('; ');
+    // 替换 for...of 为传统 for 循环
+    for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i];
+        // 替换解构赋值
+        var parts = cookie.split('=');
+        var cookieKey = parts[0];
+        var cookieValue = parts.slice(1).join('=');
+        
+        if (cookieKey === key) {
+            return decodeURIComponent(cookieValue);
+        }
+    }
+    return null;
+}
+
+function deleteCookie(name) {
+    document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+}
+
+// 检测是否是 Kindle 设备
+function isKindleMode() {
+    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
+        return window.epubBrowserCache.kindle_mode === 'true';
+    }
+    var ua = navigator.userAgent.toLowerCase();
+    var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
+    if (!window.epubBrowserCache) {
+        window.epubBrowserCache = {};
+    }
+    window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
+    return isKindle;
+}
+
 function initScript() {
     function loadBookMetadata(callback) {
         var metadataUrl = "/book-metadata.json";
@@ -100,36 +144,6 @@ function initScript() {
             window.onBookCardsLoaded();
         }
     });
-    
-    // 设置 cookie
-    function setCookie(key, value) {
-        var date = new Date();
-        date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
-        var expires = "expires=" + date.toUTCString();
-        document.cookie = key + "=" + value + ";" + expires + "; path=/; SameSite=Lax";
-    }
-
-    // 解析指定 key 的 Cookie —— Kindle 兼容版
-    function getCookie(key) {
-        var cookies = document.cookie.split('; ');
-        // 替换 for...of 为传统 for 循环
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = cookies[i];
-            // 替换解构赋值
-            var parts = cookie.split('=');
-            var cookieKey = parts[0];
-            var cookieValue = parts.slice(1).join('=');
-            
-            if (cookieKey === key) {
-                return decodeURIComponent(cookieValue);
-            }
-        }
-        return null;
-    }
-
-    function deleteCookie(name) {
-        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    }
 
     // 页面加载时恢复顺序
     function restoreOrder(storageKey, elementClass) {
@@ -153,20 +167,6 @@ function initScript() {
         } else {
             document.body.style.fontFamily = fontFamily;
         }
-    }
-
-    // 检测是否是 Kindle 设备
-    function isKindleMode() {
-        if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-            return window.epubBrowserCache.kindle_mode === 'true';
-        }
-        var ua = navigator.userAgent.toLowerCase();
-        var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-        if (!window.epubBrowserCache) {
-            window.epubBrowserCache = {};
-        }
-        window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-        return isKindle;
     }
 
     var USERNAME_KEY = 'epub_browser_username';
@@ -198,8 +198,6 @@ function initScript() {
         }
     }
 
-    window.getUsername = getUsername;
-    window.setUsername = setUsername;
     updateLoginDisplay();
 
     var loginCard = document.getElementById('loginCard');
