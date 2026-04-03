@@ -134,6 +134,20 @@ function initScript() {
         restoreOrder(storageKeySortableContainer, 'container');
     }
 
+    function bookshelfSupport() {
+        var bookshelfBtn = document.getElementById('bookshelfBtn');
+        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
+        if (window.initBookshelf) {
+            window.initBookshelf();
+        } else {
+            setTimeout(bookshelfSupport, 100);
+        }
+    }
+
+    if (!isKindleMode()) {
+        bookshelfSupport();
+    }
+
     var el = document.querySelector('.container');
     if (!isKindleMode()) {
         var sortable = Sortable.create(el, {
