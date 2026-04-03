@@ -1,10 +1,6 @@
 function initScript() {
     function loadBookMetadata(callback) {
-        var basePath = window.location.pathname;
-        if (basePath.endsWith("index.html")) {
-            basePath = basePath.replace(/index.html$/, '');
-        }
-        var metadataUrl = basePath + "book-metadata.json";
+        var metadataUrl = "/book-metadata.json";
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', metadataUrl, true);
