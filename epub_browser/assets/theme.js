@@ -36,6 +36,25 @@ function initTheme() {
         // 添加当前主题类
         document.body.classList.add(`${theme}-mode`);
         
+        // 更新theme-toggle图标
+        const themeToggle = document.getElementById('themeToggle');
+        const mobileThemeBtn = document.getElementById('mobileThemeBtn');
+        const currentTheme = themes.find(t => t.id === theme);
+        
+        if (themeToggle && currentTheme) {
+            const icon = themeToggle.querySelector('i');
+            if (icon) {
+                icon.className = `fas ${currentTheme.icon}`;
+            }
+        }
+        
+        if (mobileThemeBtn && currentTheme) {
+            const icon = mobileThemeBtn.querySelector('i');
+            if (icon) {
+                icon.className = `fas ${currentTheme.icon}`;
+            }
+        }
+        
         // 保存主题设置
         saveTheme(theme);
         
@@ -49,46 +68,31 @@ function initTheme() {
     function createThemeMenu() {
         const menu = document.createElement('div');
         menu.className = 'theme-menu';
-        menu.style.position = 'absolute';
-        menu.style.top = '100%';
-        menu.style.right = '0';
-        menu.style.marginTop = '8px';
-        menu.style.background = 'white';
-        menu.style.border = '1px solid #ddd';
-        menu.style.borderRadius = '4px';
-        menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-        menu.style.zIndex = '1000';
-        menu.style.padding = '8px 0';
-        menu.style.minWidth = '120px';
+        menu.style.display = 'none';
         
         themes.forEach(theme => {
             const item = document.createElement('div');
             item.className = 'theme-menu-item';
-            item.style.padding = '8px 16px';
-            item.style.cursor = 'pointer';
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.gap = '8px';
-            item.style.fontSize = '14px';
-            
-            item.addEventListener('mouseenter', function() {
-                item.style.background = '#f5f5f5';
-            });
-            
-            item.addEventListener('mouseleave', function() {
-                item.style.background = 'transparent';
-            });
+            item.innerHTML = `<i class="fas ${theme.icon}"></i>${theme.name}`;
             
             item.addEventListener('click', function() {
                 applyTheme(theme.id);
                 menu.style.display = 'none';
             });
             
-            item.innerHTML = `<i class="fas ${theme.icon}"></i>${theme.name}`;
             menu.appendChild(item);
         });
         
         return menu;
+    }
+    
+    // 更新主题菜单位置
+    function updateThemeMenuPosition(menu, toggleBtn) {
+        const rect = toggleBtn.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.top = (rect.bottom + 8) + 'px';
+        menu.style.right = (window.innerWidth - rect.right) + 'px';
+        menu.style.zIndex = '10000';
     }
 
     // 初始化主题
@@ -117,24 +121,54 @@ function initTheme() {
                 // 非 Kindle 模式下显示主题选择菜单
                 if (!themeMenu) {
                     themeMenu = createThemeMenu();
-                    themeToggle.parentNode.appendChild(themeMenu);
-                    themeMenu.style.display = 'none';
+                    document.body.appendChild(themeMenu);
                 }
                 
-                themeMenu.style.display = themeMenu.style.display === 'none' ? 'block' : 'none';
+                if (themeMenu.style.display === 'none') {
+                    updateThemeMenuPosition(themeMenu, themeToggle);
+                    themeMenu.style.display = 'block';
+                } else {
+                    themeMenu.style.display = 'none';
+                }
             }
         }
 
         // 绑定主题切换事件
         themeToggle.addEventListener('click', handleThemeToggle);
         if (mobileThemeBtn) {
-            mobileThemeBtn.addEventListener('click', handleThemeToggle);
+            mobileThemeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (isKindle) {
+                    const currentTheme = getCurrentTheme();
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    applyTheme(newTheme);
+                } else {
+                    if (!themeMenu) {
+                        themeMenu = createThemeMenu();
+                        document.body.appendChild(themeMenu);
+                    }
+                    
+                    if (themeMenu.style.display === 'none') {
+                        updateThemeMenuPosition(themeMenu, mobileThemeBtn);
+                        themeMenu.style.display = 'block';
+                    } else {
+                        themeMenu.style.display = 'none';
+                    }
+                }
+            });
         }
 
         // 点击其他地方关闭主题菜单
         document.addEventListener('click', function(e) {
             if (themeMenu && !themeToggle.contains(e.target) && !themeMenu.contains(e.target) && (!mobileThemeBtn || !mobileThemeBtn.contains(e.target))) {
                 themeMenu.style.display = 'none';
+            }
+        });
+        
+        // 窗口大小改变时更新菜单位置
+        window.addEventListener('resize', function() {
+            if (themeMenu && themeMenu.style.display !== 'none') {
+                updateThemeMenuPosition(themeMenu, themeToggle);
             }
         });
     }

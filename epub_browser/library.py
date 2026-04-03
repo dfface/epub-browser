@@ -173,7 +173,7 @@ class EPUBLibrary:
         library_html += f"""
     <div class="container">
         <header class="eb-header" data-id="header">
-            <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favion.svg" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
+            <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favion.svg" class="theme-logo" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">
                 <div class="stat-card">
                     <i class="fas fa-book"></i>
