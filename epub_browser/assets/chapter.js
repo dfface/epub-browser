@@ -92,6 +92,27 @@ function deleteCookie(name) {
     document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 }
 
+function showNotification(message, type) {
+    var existingNotification = document.querySelector('.custom-css-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    var notification = document.createElement('div');
+    notification.className = "custom-css-notification " + type;
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    setTimeout(function() {
+        notification.classList.add('fade-out');
+        setTimeout(function() {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
 function getElementHeight(element) {
     var content = document.getElementById('eb-content');
     var tempElement = element.cloneNode(true);
@@ -1135,21 +1156,6 @@ function initScript() {
         setTimeout(function() {
             hideLoading();
         }, 500);
-    }
-
-    function showNotification(msg, type) {
-        var old = document.querySelector('.custom-css-notification');
-        if (old) old.remove();
-        var n = document.createElement('div');
-        n.className = 'custom-css-notification ' + type;
-        n.textContent = msg;
-        document.body.appendChild(n);
-        setTimeout(function() {
-            n.classList.add('fade-out');
-            setTimeout(function() {
-                if (n.parentNode) n.parentNode.removeChild(n);
-            }, 300);
-        }, 3000);
     }
     
     loadBookHomeToc();

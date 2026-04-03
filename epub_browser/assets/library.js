@@ -1,3 +1,24 @@
+function showNotification(message, type) {
+    var existingNotification = document.querySelector('.custom-css-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    var notification = document.createElement('div');
+    notification.className = "custom-css-notification " + type;
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
+    setTimeout(function() {
+        notification.classList.add('fade-out');
+        setTimeout(function() {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
 function initScript() {
     function loadBookMetadata(callback) {
         var metadataUrl = "/book-metadata.json";
@@ -400,29 +421,6 @@ function initScript() {
         // 移除 smooth，Kindle 兼容
         window.scrollTo(0, 0);
     });
-
-    function showNotification(message, type) {
-        var existingNotification = document.querySelector('.custom-css-notification');
-        if (existingNotification) {
-            existingNotification.remove();
-        }
-        var notification = document.createElement('div');
-        notification.className = 'custom-css-notification ' + type;
-        notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(function() {
-            notification.classList.add('fade-out');
-            setTimeout(function() {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }, 3000);
-    }
-    
-    window.showNotification = showNotification;
 
     function pwaSupport() {
         if ('serviceWorker' in navigator) {
