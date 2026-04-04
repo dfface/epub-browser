@@ -9,6 +9,8 @@
 
 A modern web-based EPUB reader with library management, dark mode, Kindle optimization, code highlighting, and PWA support for an enhanced reading experience across devices.
 
+It functions as a static site generator, and the generated static files can be deployed to Cloudflare Pages, GitHub Pages, and other platforms.
+
 Try it online: [https://epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech)
 
 It now supports the following features:
