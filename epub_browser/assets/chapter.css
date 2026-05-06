@@ -298,6 +298,7 @@ body {
 
 #eb-content .img-wrapper {
     overflow: scroll;
+    display: initial;
 }
 
 /* medium-zoom 样式 */
