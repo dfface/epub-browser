@@ -65,7 +65,7 @@ function isKindleMode() {
 
 function initScript() {
     function loadBookMetadata(callback) {
-        var metadataUrl = "/book-metadata.json";
+        var metadataUrl = "/book-metadata.json?" + Date.now();
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', metadataUrl, true);
