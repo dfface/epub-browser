@@ -25,7 +25,6 @@ setup(
     install_requires=[  # 项目依赖的第三方包
         # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []
         "tqdm",
-        "minify-html",
         "watchdog"
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
