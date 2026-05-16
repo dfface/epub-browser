@@ -18,9 +18,9 @@ setup(
     package_data={'epub_browser': ['assets/*']},
     classifiers=[  # 项目分类器，帮助用户找到你的项目
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",  # 请根据实际情况选择许可证
         "Operating System :: OS Independent",
     ],
+    license="MIT",
     python_requires='>=3.6',  # 指定Python版本要求
     install_requires=[  # 项目依赖的第三方包
         # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []
