@@ -1479,7 +1479,6 @@ function initScript() {
         .font-small { font-size: 1rem; }
         .font-medium { font-size: 1.5rem; }
         .font-large { font-size: 2rem; }
-        img.zoomed { width: 90vw; max-height: 100vh; cursor: zoom-out; }
     `;
     document.head.appendChild(style);
 
