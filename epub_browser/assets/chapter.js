@@ -572,13 +572,8 @@ function initScript() {
                 pageJumpInput.setAttribute('max', totalPages);
                 setTimeout(function() {
                     hideLoading();
-                    if (document.documentElement.mediumZoomInstance) {
-                        document.documentElement.mediumZoomInstance.detach();
-                    }
-                    document.documentElement.mediumZoomInstance = mediumZoom('#eb-content img', {
-                        margin: 24,
-                        background: '#000',
-                        scrollOffset: 0
+                    Fancybox.bind('#eb-content img', {
+                        // Your custom options
                     });
                 }, 500);
             }, 200);
@@ -817,7 +812,7 @@ function initScript() {
         var tn = t.tagName.toLowerCase();
         if (tn === 'a' || tn === 'button' || tn === 'input' || tn === 'textarea' || tn === 'select' || tn === 'img') interactive = true;
         else if (t.closest('a') || t.closest('button') || t.closest('input') || t.closest('textarea') || t.closest('select')) interactive = true;
-        else if (t.closest('.navigation') || t.closest('.font-controls') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.medium-zoom-container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
+        else if (t.closest('.navigation') || t.closest('.font-controls') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.fancybox__container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
         if (interactive) return;
         
         var w = window.innerWidth;
@@ -1003,7 +998,7 @@ function initScript() {
     
     document.getElementById('eb-content').addEventListener('click', function(e) {
         var t = e.target;
-        var img = t.tagName.toLowerCase() === 'img' || t.closest('img') || t.closest('.medium-zoom-container');
+        var img = t.tagName.toLowerCase() === 'img' || t.closest('img') || t.closest('.fancybox__container');
         if (img) return;
         var rect = e.currentTarget.getBoundingClientRect();
         var cx = rect.left + rect.width/2;
@@ -1417,14 +1412,11 @@ function initScript() {
     } else {
         mobileControls.style.transform = 'translateY(0)';
     }
-    
-    if (document.documentElement.mediumZoomInstance) {
-        document.documentElement.mediumZoomInstance.detach();
-    }
-    document.documentElement.mediumZoomInstance = mediumZoom('#eb-content img', {
-        margin:24, background:'#000', scrollOffset:0
+
+    Fancybox.bind('#eb-content img', {
+        // Your custom options
     });
-    
+
     var fontControlBtn = document.getElementById('fontControlBtn');
     var mobileFontBtn = document.getElementById('mobileFontBtn');
     var fontControls = document.getElementById('fontControls');

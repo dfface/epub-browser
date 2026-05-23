@@ -1,4 +1,4 @@
-const CACHE_NAME = 'epub-browser-v7';
+const CACHE_NAME = 'epub-browser-v8';
 
 const STATIC_ASSETS = [
     '/',
@@ -11,7 +11,8 @@ const STATIC_ASSETS = [
     '/assets/chapter.js',
     '/assets/fa.all.min.css',
     '/assets/sortable.min.js',
-    '/assets/medium-zoom.min.js',
+    '/assets/fancybox.min.css',
+    '/assets/fancybox.min.js',
     '/assets/manifest.json',
     '/assets/icon-192.png',
     '/assets/icon-512.png',
