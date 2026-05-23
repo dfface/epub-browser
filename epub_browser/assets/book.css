@@ -178,6 +178,10 @@ body {
     background: var(--notification-warning);
 }
 
+.custom-css-notification.error {
+    background: #f44336;
+}
+
 .custom-css-notification.fade-out {
     opacity: 0;
     transform: translateY(-10px);

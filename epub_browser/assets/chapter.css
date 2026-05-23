@@ -301,6 +301,11 @@ body {
     display: initial;
 }
 
+#eb-content img {
+    max-width: 100%;
+    height: auto;
+}
+
 /* medium-zoom 样式 */
 .medium-zoom-container {
     z-index: 9999;
@@ -735,6 +740,10 @@ body {
 
 .custom-css-notification.warning {
     background: var(--notification-warning);
+}
+
+.custom-css-notification.error {
+    background: #f44336;
 }
 
 .custom-css-notification.fade-out {
