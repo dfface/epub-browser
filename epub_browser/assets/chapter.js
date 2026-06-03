@@ -1450,7 +1450,8 @@ function initScript() {
         } else {
             customFontInput.style.display = 'none';
             updateFontFamily(this.value, null);
-            location.reload();
+            if (!isKindleMode()) localStorage.setItem('font_family', this.value);
+            else setCookie('font_family', this.value);
         }
     });
 
@@ -1459,10 +1460,23 @@ function initScript() {
         var f = custom.value ? "'" + custom.value + "', sans-serif" : "system-ui, -apple-system, sans-serif";
         if (f === "system-ui, -apple-system, sans-serif") {
             updateFontFamily(f, null);
+            if (!isKindleMode()) {
+                localStorage.setItem('font_family', f);
+                localStorage.removeItem('font_family_input');
+            } else {
+                setCookie('font_family', f);
+                setCookie('font_family_input', '');
+            }
         } else {
             updateFontFamily("custom", f);
+            if (!isKindleMode()) {
+                localStorage.setItem('font_family', "custom");
+                localStorage.setItem('font_family_input', f);
+            } else {
+                setCookie('font_family', "custom");
+                setCookie('font_family_input', f);
+            }
         }
-        location.reload();
     });
     
     settingsControlBtn.addEventListener('click', function() {
