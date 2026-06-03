@@ -1385,10 +1385,17 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <span>Font Size</span>
         </div>
         <div class="font-size-control">
-            <div class="font-size-btn font-small" data-size="small">A</div>
-            <div class="font-size-btn font-medium active" data-size="medium">A</div>
-            <div class="font-size-btn font-large" data-size="large">A</div>
-                </div>
+            <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
+            <div class="font-size-scale">
+                <span class="scale-mark major"></span>
+                <span class="scale-mark"></span>
+                <span class="scale-mark"></span>
+                <span class="scale-mark major"></span>
+                <span class="scale-mark"></span>
+                <span class="scale-mark"></span>
+                <span class="scale-mark major"></span>
+            </div>
+        </div>
             </div>
         </div>
     </div>

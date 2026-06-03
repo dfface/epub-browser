@@ -339,7 +339,7 @@ function initScript() {
     var pageWidth = 0;
     var isClickPageEnabled = false;
 
-    var fontSize = "small";
+    var fontSize = "3";
     var fontFamily = "ebook-default";
     var fontFamilyInput = null;
     var supportedFonts = getAvailableFonts();
@@ -370,7 +370,7 @@ function initScript() {
         if (window.epubBrowserCache && window.epubBrowserCache.font_size) {
             fontSize = window.epubBrowserCache.font_size;
         } else {
-            fontSize = localStorage.getItem('font_size') || "small";
+            fontSize = localStorage.getItem('font_size') || "3";
             if (fontSize) {
                 if (!window.epubBrowserCache) window.epubBrowserCache = {};
                 window.epubBrowserCache.font_size = fontSize;
@@ -401,7 +401,7 @@ function initScript() {
     } else {
         var currentPaginationMode = getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
-        fontSize = getCookie('font_size') || "small";
+        fontSize = getCookie('font_size') || "3";
         fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
         fontFamilyInput = getCookie('font_family_input');
     }
@@ -1473,31 +1473,33 @@ function initScript() {
     });
 
     function updateFontSize(size) {
-        var btns = document.querySelectorAll('.font-size-btn');
-        btns.forEach(function(b) { b.classList.remove('active'); });
-        btns.forEach(function(b) {
-            if (b.getAttribute('data-size') === size) b.classList.add('active');
-        });
-        content.classList.remove('font-small', 'font-medium', 'font-large');
-        if (size === 'small') content.classList.add('font-small');
-        else if (size === 'medium') content.classList.add('font-medium');
-        else if (size === 'large') content.classList.add('font-large');
+        var slider = document.getElementById('fontSizeSlider');
+        if (slider) {
+            slider.value = size;
+        }
+        content.classList.remove('font-size-1', 'font-size-2', 'font-size-3', 'font-size-4', 'font-size-5', 'font-size-6', 'font-size-7');
+        content.classList.add('font-size-' + size);
     }
     
-    fontSizeBtns.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var s = this.getAttribute('data-size');
+    var fontSizeSlider = document.getElementById('fontSizeSlider');
+    if (fontSizeSlider) {
+        fontSizeSlider.addEventListener('input', function() {
+            var s = this.value;
             if (!isKindleMode()) localStorage.setItem('font_size', s);
             else setCookie('font_size', s);
-            location.reload();
+            updateFontSize(s);
         });
-    });
+    }
     
     var style = document.createElement('style');
     style.textContent = `
-        .font-small { font-size: 1rem; }
-        .font-medium { font-size: 1.5rem; }
-        .font-large { font-size: 2rem; }
+        .font-size-1 { font-size: 0.9rem; }
+        .font-size-2 { font-size: 1.1rem; }
+        .font-size-3 { font-size: 1.3rem; }
+        .font-size-4 { font-size: 1.5rem; }
+        .font-size-5 { font-size: 1.7rem; }
+        .font-size-6 { font-size: 1.9rem; }
+        .font-size-7 { font-size: 2.2rem; }
     `;
     document.head.appendChild(style);
 
