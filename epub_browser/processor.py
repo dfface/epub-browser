@@ -1352,12 +1352,23 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </div>
     </div>
 
-    <div class="font-controls" id="fontControls" data-id="fontControls">
-        <div class="font-family-control">
+    <div class="settings-modal" id="settingsModal" data-id="settingsModal">
+        <div class="settings-header">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+        </div>
+        <div class="settings-content">
+            <div class="settings-section">
+                <div class="settings-section-title">
+                    <i class="fas fa-font"></i>
+                    <span>Font Settings</span>
+                </div>
+                <div class="font-family-control">
             <span>Font Family</span>
         </div>
         <div class="font-family-selector">
             <select id="fontFamilySelect">
+                <option value="ebook-default" selected>Book default</option>
                 <option value="system-ui, -apple-system, sans-serif">System default</option>
                 <option value="custom">Custom by input</option>
             </select>
@@ -1377,6 +1388,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="font-size-btn font-small" data-size="small">A</div>
             <div class="font-size-btn font-medium active" data-size="medium">A</div>
             <div class="font-size-btn font-large" data-size="large">A</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1385,9 +1398,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <i class="fas fa-arrow-up"></i>
             <span class="control-name">Top</span>
         </div>
-        <div class="control-btn" id="fontControlBtn">
-            <i class="fas fa-font"></i>
-            <span class="control-name">Font</span>
+        <div class="control-btn" id="settingsControlBtn">
+            <i class="fas fa-cog"></i>
+            <span class="control-name">Settings</span>
         </div>
         <button class="control-btn" id="bookshelfBtn" style="display: none;">
             <i class="fas fa-bookmark"></i>
@@ -1427,9 +1440,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <i class="fas fa-book"></i>
             <span>Book</span>
         </div>
-        <div class="control-btn" id="mobileFontBtn">
-            <i class="fas fa-font"></i>
-            <span>Font</span>
+        <div class="control-btn" id="mobileSettingsBtn">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
         </div>
         <div class="control-btn" id="mobileTopBtn">
             <i class="fas fa-arrow-up"></i>

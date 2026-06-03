@@ -32,12 +32,31 @@ function updateFontFamily(fontFamily, fontFamilyInput) {
     var customFontInput = document.getElementById('customFontInput');
     var customFontFamily = document.getElementById('customFontFamily');
     fontFamilySelect.value = fontFamily;
+    
+    // 获取 EPUB 内容容器
+    var ebContent = document.querySelector('[data-eb-styles]');
+    
+    if (fontFamily === "ebook-default") {
+        // 使用电子书内置字体 - 移除字体覆盖样式
+        document.documentElement.style.setProperty('--font-family', '');
+        document.body.style.fontFamily = '';
+        if (ebContent) {
+            ebContent.classList.add('ebook-font-default');
+        }
+    } else {
+        // 使用用户选择的字体 - 添加字体覆盖样式
+        var targetFontFamily = fontFamily === "custom" ? fontFamilyInput : fontFamily;
+        document.documentElement.style.setProperty('--font-family', targetFontFamily);
+        document.body.style.fontFamily = targetFontFamily;
+        if (ebContent) {
+            ebContent.classList.remove('ebook-font-default');
+        }
+    }
+    
     if (fontFamily == "custom") {
-        document.body.style.fontFamily = fontFamilyInput;
         customFontInput.style.display = 'flex';
         customFontFamily.value = fontFamilyInput;
     } else {
-        document.body.style.fontFamily = fontFamily;
         customFontInput.style.display = 'none';
     }
     if (fontFamily == "custom") {
@@ -321,7 +340,7 @@ function initScript() {
     var isClickPageEnabled = false;
 
     var fontSize = "small";
-    var fontFamily = "system-ui, -apple-system, sans-serif";
+    var fontFamily = "ebook-default";
     var fontFamilyInput = null;
     var supportedFonts = getAvailableFonts();
     
@@ -812,7 +831,7 @@ function initScript() {
         var tn = t.tagName.toLowerCase();
         if (tn === 'a' || tn === 'button' || tn === 'input' || tn === 'textarea' || tn === 'select' || tn === 'img') interactive = true;
         else if (t.closest('a') || t.closest('button') || t.closest('input') || t.closest('textarea') || t.closest('select')) interactive = true;
-        else if (t.closest('.navigation') || t.closest('.font-controls') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.fancybox__container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
+        else if (t.closest('.navigation') || t.closest('.settings-modal') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.fancybox__container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
         if (interactive) return;
         
         var w = window.innerWidth;
@@ -915,12 +934,12 @@ function initScript() {
             nav.style.display = 'flex';
             if (isMobile()) {
                 var mc = document.querySelector('.mobile-controls');
-                if (mc) mc.style.display = 'flex';
+                if (mc) mc.style.display = '';
             } else {
                 var topc = document.querySelector('.top-controls');
                 var rc = document.querySelector('.reading-controls');
-                if (topc) topc.style.display = 'flex';
-                if (rc) rc.style.display = 'flex';
+                if (topc) topc.style.display = '';
+                if (rc) rc.style.display = '';
             }
             cc.style.marginTop = '';
             cc.style.marginBottom = '';
@@ -965,12 +984,12 @@ function initScript() {
             nav.style.display = 'flex';
             if (isMobile()) {
                 var mc = document.querySelector('.mobile-controls');
-                if (mc) mc.style.display = 'flex';
+                if (mc) mc.style.display = '';
             } else {
                 var topc = document.querySelector('.top-controls');
                 var rc = document.querySelector('.reading-controls');
-                if (topc) topc.style.display = 'flex';
-                if (rc) rc.style.display = 'flex';
+                if (topc) topc.style.display = '';
+                if (rc) rc.style.display = '';
             }
             cc.style.marginTop = '';
             cc.style.marginBottom = '';
@@ -1417,9 +1436,9 @@ function initScript() {
         // Your custom options
     });
 
-    var fontControlBtn = document.getElementById('fontControlBtn');
-    var mobileFontBtn = document.getElementById('mobileFontBtn');
-    var fontControls = document.getElementById('fontControls');
+    var settingsControlBtn = document.getElementById('settingsControlBtn');
+    var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+    var settingsModal = document.getElementById('settingsModal');
     var fontSizeBtns = document.querySelectorAll('.font-size-btn');
     var fontFamilySelect = document.getElementById('fontFamilySelect');
     var customFontInput = document.getElementById('customFontInput');
@@ -1446,11 +1465,11 @@ function initScript() {
         location.reload();
     });
     
-    fontControlBtn.addEventListener('click', function() {
-        fontControls.classList.toggle('show');
+    settingsControlBtn.addEventListener('click', function() {
+        settingsModal.classList.toggle('show');
     });
-    mobileFontBtn.addEventListener('click', function() {
-        fontControls.classList.toggle('show');
+    mobileSettingsBtn.addEventListener('click', function() {
+        settingsModal.classList.toggle('show');
     });
 
     function updateFontSize(size) {

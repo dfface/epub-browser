@@ -149,7 +149,7 @@ function initTheme() {
         var isMobile = mobileControls && window.getComputedStyle(mobileControls).display !== 'none';
         
         if (isMobile) {
-            // 移动端：固定在右下角，类似于 font-controls
+            // 移动端：固定在右下角，类似于 settings-modal
             menu.style.bottom = '80px';
             menu.style.left = '20px';
             menu.style.top = 'auto';

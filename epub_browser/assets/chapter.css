@@ -8,11 +8,18 @@ body {
     line-height: 1.6;
     color: var(--text);
     background: var(--background);
+    font-family: var(--font-family, system-ui, -apple-system, sans-serif);
     min-height: 100vh;
     padding: 0 20px;
     transition: var(--transition);
     display: flex;
     flex-direction: column;
+}
+
+/* 覆盖 EPUB 内容中的字体样式（非电子书默认字体时） */
+[data-eb-styles]:not(.ebook-font-default),
+[data-eb-styles]:not(.ebook-font-default) * {
+    font-family: var(--font-family, system-ui, -apple-system, sans-serif) !important;
 }
 
 .container {
@@ -484,23 +491,55 @@ body {
     transform: scale(1.1);
 }
 
-.font-controls {
+.settings-modal {
     position: fixed;
-    bottom: 150px;
+    bottom: 210px;
     right: 20px;
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
-    padding: 15px;
+    padding: 0;
     box-shadow: var(--shadow-md);
     display: none;
     flex-direction: column;
-    gap: 10px;
-    width: 200px;
+    gap: 0;
+    width: 260px;
     z-index: 88;
 }
 
-.font-controls.show {
+.settings-modal.show {
     display: flex;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.settings-content {
+    padding: 12px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
 }
 
 .font-size-control {
@@ -1250,7 +1289,7 @@ body {
         display: flex;
     }
 
-    .font-controls {
+    .settings-modal {
         bottom: 80px;
     }
 
