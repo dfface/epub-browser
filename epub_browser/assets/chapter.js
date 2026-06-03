@@ -1579,6 +1579,20 @@ function initScript() {
     if (!isKindleMode()) {
         bookshelfSupport();
     }
+    
+    // Initialize annotation module
+    function initAnnotationModule() {
+        if (window.AnnotationModule) {
+            window.AnnotationModule.init({
+                bookHash: book_hash,
+                chapterIndex: parseInt(chapter_index, 10)
+            });
+        } else {
+            // Wait for annotation.js to load
+            setTimeout(initAnnotationModule, 100);
+        }
+    }
+    initAnnotationModule();
 }
 
 window.initScriptChapter = initScript;

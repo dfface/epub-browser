@@ -1612,6 +1612,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
     <script src="/assets/bookshelf.js" defer></script>

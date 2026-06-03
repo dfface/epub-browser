@@ -71,6 +71,19 @@ It now supports the following features:
   - Statistics showing book and group counts
   - Sync: Synchronize shelf data across devices using a username. The sync feature uses version control to manage data changes and supports conflict resolution.
 
+- **Text Highlighting & Annotation**: Highlight selected text and add notes to your reading. Features include:
+  - Select text in the reading area to create highlights with customizable colors
+  - Add notes to any highlight for personal annotations
+  - View, edit, and delete annotations with a click on highlighted text
+  - **Annotation Settings** (in Settings modal):
+    - Enable/disable annotation feature
+    - Choose storage location (Local IndexedDB or Cloud backend API)
+    - Set default highlight color
+    - Custom color management: drag to reorder, add custom colors, delete custom colors
+    - Export all annotations or book-specific annotations as JSON
+  - **Data Migration**: When switching storage locations, optionally migrate existing annotations
+  - Compatible with all devices including Kindle
+
 
 ## Usage
 
@@ -236,4 +249,3 @@ docker run -d \
 * Tags can be managed by [calibre](https://calibre-ebook.com/). After adding tags, **you should click "Edit book" and just close the window to update the epub file** or the tags will not change in the browser.
 * By default, the program listens on the address `0.0.0.0`. This means you can access the service via any of your local machine's addresses (such as a local area network (LAN) address like `192.168.1.233`), not just `localhost`.
 * Just find calibre library and run `epub-browser .`, it will collect all books that managed by calibre.
-* You can combine web reading with the web extension called [Circle Reader](https://circlereader.com/) to gain more elegant experience.Other extensions that are recommended are: [Diigo](https://www.diigo.com/): Read more effectively with annotation tools ...

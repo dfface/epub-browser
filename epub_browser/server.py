@@ -5,10 +5,47 @@ import threading
 import mimetypes
 import json
 import glob
+import sqlite3
 from socketserver import ThreadingMixIn
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import errno
+
+# Annotation database path
+ANNOTATION_DB_PATH = None
+
+def init_annotation_db(base_dir):
+    """Initialize annotation database"""
+    global ANNOTATION_DB_PATH
+    ANNOTATION_DB_PATH = os.path.join(base_dir, 'annotations.db')
+    
+    conn = sqlite3.connect(ANNOTATION_DB_PATH)
+    cursor = conn.cursor()
+    
+    # Create annotations table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS annotations (
+            id TEXT PRIMARY KEY,
+            book_hash TEXT NOT NULL,
+            chapter_index INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            note TEXT,
+            start_xpath TEXT NOT NULL,
+            end_xpath TEXT NOT NULL,
+            start_offset INTEGER NOT NULL,
+            end_offset INTEGER NOT NULL,
+            color TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    ''')
+    
+    # Create indexes
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_book_hash ON annotations(book_hash)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chapter ON annotations(book_hash, chapter_index)')
+    
+    conn.commit()
+    conn.close()
 
 class StoppableThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """可停止的多线程HTTP服务器"""
@@ -74,6 +111,16 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.serve_book(path)
                 return
             
+            # Annotation API routes
+            if path.startswith('/api/'):
+                # Health check endpoint
+                if path == '/api/health':
+                    self.send_json_response(200, {"status": "ok"})
+                    return
+                
+                self.handle_annotation_api('GET', path)
+                return
+            
             super().do_GET()
             
         except (BrokenPipeError, ConnectionResetError):
@@ -96,6 +143,11 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             parsed_path = urlparse(self.path)
             path = parsed_path.path
             
+            # Annotation API routes
+            if path.startswith('/api/'):
+                self.handle_annotation_api('POST', path)
+                return
+            
             if path == '/sync':
                 self.handle_sync_request()
                 return
@@ -106,6 +158,56 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_POST: {e}")
+            try:
+                self.send_error(500, "Internal Server Error")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+    
+    def do_PUT(self):
+        """处理PUT请求"""
+        try:
+            if getattr(self.server, '_is_shutting_down', False):
+                self.send_error(503, "Server is shutting down")
+                return
+            
+            parsed_path = urlparse(self.path)
+            path = parsed_path.path
+            
+            if path.startswith('/api/'):
+                self.handle_annotation_api('PUT', path)
+                return
+            
+            self.send_error(404, "Not Found")
+            
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:
+            self.log_message(f"Unexpected error in do_PUT: {e}")
+            try:
+                self.send_error(500, "Internal Server Error")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+    
+    def do_DELETE(self):
+        """处理DELETE请求"""
+        try:
+            if getattr(self.server, '_is_shutting_down', False):
+                self.send_error(503, "Server is shutting down")
+                return
+            
+            parsed_path = urlparse(self.path)
+            path = parsed_path.path
+            
+            if path.startswith('/api/'):
+                self.handle_annotation_api('DELETE', path)
+                return
+            
+            self.send_error(404, "Not Found")
+            
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as e:
+            self.log_message(f"Unexpected error in do_DELETE: {e}")
             try:
                 self.send_error(500, "Internal Server Error")
             except (BrokenPipeError, ConnectionResetError):
@@ -202,6 +304,193 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(response)
         except (BrokenPipeError, ConnectionResetError):
             pass
+    
+    def handle_annotation_api(self, method, path):
+        """Handle annotation API requests"""
+        try:
+            # Parse path
+            # /api/annotations - all annotations
+            # /api/annotations/{book_hash} - book annotations
+            # /api/annotations/{book_hash}/{chapter_index} - chapter annotations
+            # /api/annotations/{id} - single annotation
+            # /api/annotations/batch - batch operation
+            
+            parts = path.split('/')
+            # parts = ['', 'api', 'annotations', ...]
+            
+            if len(parts) < 3 or parts[2] != 'annotations':
+                self.send_json_response(404, {"message": "Not found"})
+                return
+            
+            if not ANNOTATION_DB_PATH:
+                self.send_json_response(503, {"message": "Database not initialized"})
+                return
+            
+            conn = sqlite3.connect(ANNOTATION_DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            try:
+                # GET 请求
+                if method == 'GET':
+                    self._handle_annotation_get(cursor, parts)
+                
+                # POST 请求
+                elif method == 'POST':
+                    self._handle_annotation_post(cursor, parts, conn)
+                
+                # PUT 请求
+                elif method == 'PUT':
+                    self._handle_annotation_put(cursor, parts, conn)
+                
+                # DELETE 请求
+                elif method == 'DELETE':
+                    self._handle_annotation_delete(cursor, parts, conn)
+                
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            self.log_message(f"Error handling annotation API: {e}")
+            self.send_json_response(500, {"message": f"Server error: {str(e)}"})
+    
+    def _handle_annotation_get(self, cursor, parts):
+        """处理标注GET请求"""
+        # /api/annotations
+        if len(parts) == 3:
+            cursor.execute('SELECT * FROM annotations ORDER BY created_at DESC')
+            rows = cursor.fetchall()
+            self.send_json_response(200, {"data": [dict(row) for row in rows]})
+            return
+        
+        # /api/annotations/batch
+        if parts[3] == 'batch':
+            self.send_json_response(400, {"message": "Batch requires POST"})
+            return
+        
+        # /api/annotations/{book_hash}
+        if len(parts) == 4:
+            book_hash = parts[3]
+            cursor.execute('SELECT * FROM annotations WHERE book_hash = ? ORDER BY created_at DESC', (book_hash,))
+            rows = cursor.fetchall()
+            self.send_json_response(200, {"data": [dict(row) for row in rows]})
+            return
+        
+        # /api/annotations/{book_hash}/{chapter_index}
+        if len(parts) == 5:
+            book_hash = parts[3]
+            try:
+                chapter_index = int(parts[4])
+            except ValueError:
+                self.send_json_response(400, {"message": "Invalid chapter index"})
+                return
+            cursor.execute('SELECT * FROM annotations WHERE book_hash = ? AND chapter_index = ? ORDER BY created_at DESC', (book_hash, chapter_index))
+            rows = cursor.fetchall()
+            self.send_json_response(200, {"data": [dict(row) for row in rows]})
+            return
+        
+        self.send_json_response(404, {"message": "Not found"})
+    
+    def _handle_annotation_post(self, cursor, parts, conn):
+        """处理标注POST请求"""
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length)
+        data = json.loads(body.decode('utf-8'))
+        
+        # /api/annotations/batch
+        if len(parts) == 4 and parts[3] == 'batch':
+            annotations = data.get('annotations', [])
+            created = 0
+            failed = 0
+            
+            for ann in annotations:
+                try:
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO annotations 
+                        (id, book_hash, chapter_index, text, note, start_xpath, end_xpath, 
+                         start_offset, end_offset, color, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        ann['id'], ann['book_hash'], ann['chapter_index'], ann['text'],
+                        ann.get('note', ''), ann['start_xpath'], ann['end_xpath'],
+                        ann['start_offset'], ann['end_offset'], ann['color'],
+                        ann['created_at'], ann['updated_at']
+                    ))
+                    created += 1
+                except Exception:
+                    failed += 1
+            
+            conn.commit()
+            self.send_json_response(201, {"created": created, "failed": failed})
+            return
+        
+        # /api/annotations - 创建单个标注
+        if len(parts) == 3:
+            cursor.execute('''
+                INSERT INTO annotations 
+                (id, book_hash, chapter_index, text, note, start_xpath, end_xpath, 
+                 start_offset, end_offset, color, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data['id'], data['book_hash'], data['chapter_index'], data['text'],
+                data.get('note', ''), data['start_xpath'], data['end_xpath'],
+                data['start_offset'], data['end_offset'], data['color'],
+                data['created_at'], data['updated_at']
+            ))
+            conn.commit()
+            self.send_json_response(201, {"data": data})
+            return
+        
+        self.send_json_response(404, {"message": "Not found"})
+    
+    def _handle_annotation_put(self, cursor, parts, conn):
+        """处理标注PUT请求"""
+        # /api/annotations/{id}
+        if len(parts) == 4:
+            ann_id = parts[3]
+            
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode('utf-8'))
+            
+            # 检查是否存在
+            cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
+            if not cursor.fetchone():
+                self.send_json_response(404, {"message": "Annotation not found"})
+                return
+            
+            # 更新
+            import datetime
+            updated_at = datetime.datetime.now().isoformat()
+            
+            cursor.execute('''
+                UPDATE annotations 
+                SET note = ?, color = ?, updated_at = ?
+                WHERE id = ?
+            ''', (data.get('note', ''), data.get('color', '#FFEB3B'), updated_at, ann_id))
+            
+            conn.commit()
+            
+            cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
+            row = cursor.fetchone()
+            self.send_json_response(200, {"data": dict(row)})
+            return
+        
+        self.send_json_response(404, {"message": "Not found"})
+    
+    def _handle_annotation_delete(self, cursor, parts, conn):
+        """处理标注DELETE请求"""
+        # /api/annotations/{id}
+        if len(parts) == 4:
+            ann_id = parts[3]
+            
+            cursor.execute('DELETE FROM annotations WHERE id = ?', (ann_id,))
+            conn.commit()
+            
+            self.send_json_response(200, {"message": "Deleted"})
+            return
+        
+        self.send_json_response(404, {"message": "Not found"})
     
     def send_library_index(self):
         """发送图书馆首页"""
@@ -337,6 +626,9 @@ class EPUBServer:
         if self.book_count <= 0:
             print("No books available to serve")
             return False
+        
+        # Initialize annotation database
+        init_annotation_db(self.base_directory)
         
         try:
             # 创建自定义请求处理器 - 修复lambda作用域问题
