@@ -53,6 +53,8 @@
     --modal-bg: rgba(0, 0, 0, 0.5);
     --modal-content: white;
     --modal-border: #ddd;
+    --settings-overlay: rgba(67, 97, 238, 0.3);
+    --settings-overlay-dark: rgba(67, 97, 238, 0.4);
     --modal-header: #f0f0f0;
     --modal-header-text: #333;
     --modal-footer: #f0f0f0;
@@ -301,7 +303,7 @@
     --card-bg: #1e1e1e;
     --text: #e0e0e0;
     --text-secondary: #b0b0b0;
-    --border: #333;
+    --border: #1e3a5f;
     --shadow: rgba(0, 0, 0, 0.5);
     --hover: #2a2a2a;
     --active: #3a3a3a;
@@ -345,6 +347,7 @@
     --button-secondary-hover: #3a3a3a;
     --button-secondary-text: #e0e0e0;
     --modal-bg: rgba(0, 0, 0, 0.8);
+    --settings-overlay: rgba(67, 97, 238, 0.4);
     --modal-content: #1e1e1e;
     --modal-border: #333;
     --modal-header: #2a2a2a;
@@ -508,7 +511,7 @@
     --card-bg: #f0d9b5;
     --text: #5d4037;
     --text-secondary: #8d6e63;
-    --border: #d4b996;
+    --border: #d7ccc8;
     --shadow: rgba(139, 69, 19, 0.2);
     --hover: #e8d2b0;
     --active: #d4b996;
@@ -552,6 +555,7 @@
     --button-secondary-hover: #e8d2b0;
     --button-secondary-text: #5d4037;
     --modal-bg: rgba(93, 64, 55, 0.8);
+    --settings-overlay: rgba(139, 69, 19, 0.3);
     --modal-content: #f0d9b5;
     --modal-border: #d4b996;
     --modal-header: #e8d2b0;
@@ -715,7 +719,7 @@
     --card-bg: #e8f5e8;
     --text: #2e7d32;
     --text-secondary: #388e3c;
-    --border: #c8e6c9;
+    --border: #a5d6a7;
     --shadow: rgba(46, 125, 50, 0.2);
     --hover: #dcedc8;
     --active: #c8e6c9;
@@ -759,6 +763,7 @@
     --button-secondary-hover: #dcedc8;
     --button-secondary-text: #2e7d32;
     --modal-bg: rgba(46, 125, 50, 0.8);
+    --settings-overlay: rgba(46, 125, 50, 0.3);
     --modal-content: #e8f5e8;
     --modal-border: #c8e6c9;
     --modal-header: #dcedc8;
@@ -922,7 +927,7 @@
     --card-bg: #bbdefb;
     --text: #0d47a1;
     --text-secondary: #1976d2;
-    --border: #90caf9;
+    --border: #64b5f6;
     --shadow: rgba(21, 101, 192, 0.2);
     --hover: #90caf9;
     --active: #64b5f6;
@@ -966,6 +971,7 @@
     --button-secondary-hover: #90caf9;
     --button-secondary-text: #0d47a1;
     --modal-bg: rgba(13, 71, 161, 0.8);
+    --settings-overlay: rgba(13, 71, 161, 0.3);
     --modal-content: #bbdefb;
     --modal-border: #90caf9;
     --modal-header: #90caf9;
@@ -1129,7 +1135,7 @@
     --card-bg: #ffe4e9;
     --text: #2d1f2e;
     --text-secondary: #6b5b66;
-    --border: #ffd1dc;
+    --border: #f48fb1;
     --shadow: rgba(255, 107, 138, 0.15);
     --hover: #ffe4e9;
     --active: #ffd1dc;
@@ -1173,6 +1179,7 @@
     --button-secondary-hover: #ffd1dc;
     --button-secondary-text: #2d1f2e;
     --modal-bg: rgba(45, 31, 46, 0.8);
+    --settings-overlay: rgba(255, 107, 138, 0.3);
     --modal-content: #ffe4e9;
     --modal-border: #ffd1dc;
     --modal-header: #ffd1dc;
@@ -1340,7 +1347,7 @@
     --card-bg: #e1bee7;
     --text: #4a148c;
     --text-secondary: #7b1fa2;
-    --border: #d1c4e9;
+    --border: #b39ddb;
     --shadow: rgba(156, 39, 176, 0.15);
     --hover: #e1bee7;
     --active: #d1c4e9;
@@ -1384,6 +1391,7 @@
     --button-secondary-hover: #d1c4e9;
     --button-secondary-text: #4a148c;
     --modal-bg: rgba(74, 20, 140, 0.8);
+    --settings-overlay: rgba(156, 39, 176, 0.3);
     --modal-content: #e1bee7;
     --modal-border: #d1c4e9;
     --modal-header: #d1c4e9;

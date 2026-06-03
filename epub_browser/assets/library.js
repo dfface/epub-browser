@@ -280,13 +280,13 @@ function initScript() {
         window.initTheme();
     }
 
-    var fontFamily = "system-ui, -apple-system, sans-serif";
+    var fontFamily = "ebook-default";
     var fontFamilyInput = null;
     if (!isKindleMode()) {
         if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
             fontFamily = window.epubBrowserCache.font_family;
         } else {
-            fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+            fontFamily = localStorage.getItem('font_family') || "ebook-default";
             if (fontFamily) {
                 if (!window.epubBrowserCache) {
                     window.epubBrowserCache = {};
@@ -306,7 +306,7 @@ function initScript() {
             }
         }
     } else {
-        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamily = getCookie('font_family') || "ebook-default";
         fontFamilyInput = getCookie('font_family_input');
     }
     updateFontFamily(fontFamily, fontFamilyInput);

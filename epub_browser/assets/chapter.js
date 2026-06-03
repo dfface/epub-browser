@@ -380,7 +380,7 @@ function initScript() {
         if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
             fontFamily = window.epubBrowserCache.font_family;
         } else {
-            fontFamily = localStorage.getItem('font_family') || "system-ui, -apple-system, sans-serif";
+            fontFamily = localStorage.getItem('font_family') || "ebook-default";
             if (fontFamily) {
                 if (!window.epubBrowserCache) window.epubBrowserCache = {};
                 window.epubBrowserCache.font_family = fontFamily;
@@ -402,7 +402,7 @@ function initScript() {
         var currentPaginationMode = getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
         fontSize = getCookie('font_size') || "3";
-        fontFamily = getCookie('font_family') || "system-ui, -apple-system, sans-serif";
+        fontFamily = getCookie('font_family') || "ebook-default";
         fontFamilyInput = getCookie('font_family_input');
     }
     updateFontSize(fontSize);
@@ -1439,10 +1439,13 @@ function initScript() {
     var settingsControlBtn = document.getElementById('settingsControlBtn');
     var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
     var settingsModal = document.getElementById('settingsModal');
+    var settingsOverlay = document.getElementById('settingsOverlay');
+    var settingsCloseBtn = document.getElementById('settingsCloseBtn');
     var fontSizeBtns = document.querySelectorAll('.font-size-btn');
     var fontFamilySelect = document.getElementById('fontFamilySelect');
     var customFontInput = document.getElementById('customFontInput');
     var applyFontSettings = document.getElementById('applyFontSettings');
+    var settingsTabs = document.querySelectorAll('.settings-tab');
 
     fontFamilySelect.addEventListener('change', function() {
         if (this.value === 'custom') {
@@ -1479,11 +1482,53 @@ function initScript() {
         }
     });
     
+    function showSettingsModal() {
+        settingsModal.classList.add('show');
+        settingsOverlay.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideSettingsModal() {
+        settingsModal.classList.remove('show');
+        settingsOverlay.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
     settingsControlBtn.addEventListener('click', function() {
-        settingsModal.classList.toggle('show');
+        showSettingsModal();
     });
     mobileSettingsBtn.addEventListener('click', function() {
-        settingsModal.classList.toggle('show');
+        showSettingsModal();
+    });
+
+    settingsOverlay.addEventListener('click', function() {
+        hideSettingsModal();
+    });
+
+    settingsCloseBtn.addEventListener('click', function() {
+        hideSettingsModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && settingsModal.classList.contains('show')) {
+            hideSettingsModal();
+        }
+    });
+
+    settingsTabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var tabId = this.getAttribute('data-tab');
+            
+            settingsTabs.forEach(function(t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            document.querySelectorAll('.settings-tab-panel').forEach(function(panel) {
+                panel.classList.remove('active');
+            });
+            document.getElementById(tabId + '-tab').classList.add('active');
+        });
     });
 
     function updateFontSize(size) {

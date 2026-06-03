@@ -1352,20 +1352,25 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </div>
     </div>
 
+    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay"></div>
     <div class="settings-modal" id="settingsModal" data-id="settingsModal">
         <div class="settings-header">
             <i class="fas fa-cog"></i>
             <span>Settings</span>
+            <button class="settings-close-btn" id="settingsCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="font">
+                <i class="fas fa-font"></i>
+                <span>Font</span>
+            </button>
         </div>
         <div class="settings-content">
-            <div class="settings-section">
-                <div class="settings-section-title">
-                    <i class="fas fa-font"></i>
-                    <span>Font Settings</span>
-                </div>
-                <div class="font-family-control">
-            <span>Font Family</span>
-        </div>
+            <div class="settings-tab-panel active" id="font-tab">
+                <div class="settings-group">
+                    <label class="settings-label">Font Family</label>
         <div class="font-family-selector">
             <select id="fontFamilySelect">
                 <option value="ebook-default" selected>Book default</option>
@@ -1380,22 +1385,22 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                 <i class="fas fa-check"></i> Apply
             </button>
         </div>
-
-        <div>
-            <span>Font Size</span>
-        </div>
-        <div class="font-size-control">
-            <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
-            <div class="font-size-scale">
-                <span class="scale-mark major"></span>
-                <span class="scale-mark"></span>
-                <span class="scale-mark"></span>
-                <span class="scale-mark major"></span>
-                <span class="scale-mark"></span>
-                <span class="scale-mark"></span>
-                <span class="scale-mark major"></span>
-            </div>
-        </div>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Font Size</label>
+                    <div class="font-size-control">
+                        <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
+                        <div class="font-size-scale">
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
