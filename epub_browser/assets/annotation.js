@@ -337,7 +337,7 @@
         // 创建标注
         create: function(annotation) {
             return this._transaction(CONFIG.STORE_NAME, 'readwrite', function(store) {
-                return store.add(annotation);
+                return store.put(annotation);
             });
         },
         
@@ -450,7 +450,7 @@
                 
                 for (var i = 0; i < annotations.length; i++) {
                     try {
-                        store.add(annotations[i]);
+                        store.put(annotations[i]);
                         created++;
                     } catch (e) {
                         failed++;
