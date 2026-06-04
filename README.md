@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/github/license/dfface/epub-browser)](https://pypi.org/project/epub-browser/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dd/epub-browser)
 
-A modern web-based EPUB reader with library management, dark mode, Kindle optimization, code highlighting, and PWA support for an enhanced reading experience across devices.
+A modern web-based EPUB reader with library management, dark mode, Kindle optimization, code highlighting, text highlighting & annotation and PWA support for an enhanced reading experience across devices.
 
 It functions as a static site generator, and the generated static files can be deployed to Cloudflare Pages, GitHub Pages, and other platforms.
 
