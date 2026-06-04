@@ -10,7 +10,6 @@
         DB_NAME: 'epub-browser-annotations',
         DB_VERSION: 1,
         STORE_NAME: 'annotations',
-        SETTINGS_STORE: 'settings',
         BASE_COLORS: ['#FFEB3B', '#4CAF50', '#2196F3', '#9C27B0', '#F44336', '#FF9800', '#00BCD4', '#795548'],
         DEFAULT_COLOR: '#FFEB3B',
         HEALTH_TIMEOUT: 3000,
@@ -21,6 +20,7 @@
         getColors: function() {
             var order = Settings.colorOrder || [];
             var custom = Settings.customColors || [];
+            var deleted = Settings.deletedColors || [];
             
             // If no color order (never dragged/sorted), use base colors + custom colors
             if (order.length === 0) {
@@ -31,7 +31,8 @@
                         result.push(custom[j]);
                     }
                 }
-                return result;
+                // Filter out deleted colors
+                return result.filter(function(c) { return deleted.indexOf(c) === -1; });
             }
             
             // Merge: first use color order, then add custom colors not in order
@@ -40,7 +41,7 @@
             
             // First add colors in order
             for (var i = 0; i < order.length; i++) {
-                if (order[i] && !seen[order[i]]) {
+                if (order[i] && !seen[order[i]] && deleted.indexOf(order[i]) === -1) {
                     allColors.push(order[i]);
                     seen[order[i]] = true;
                 }
@@ -48,7 +49,7 @@
             
             // Then add custom colors not in order
             for (var j = 0; j < custom.length; j++) {
-                if (!seen[custom[j]]) {
+                if (!seen[custom[j]] && deleted.indexOf(custom[j]) === -1) {
                     allColors.push(custom[j]);
                     seen[custom[j]] = true;
                 }
@@ -57,6 +58,31 @@
             return allColors;
         }
     };
+    
+    // ========== Web Highlighter Integration ==========
+    var highlighter = null;
+    
+    function initHighlighter() {
+        if (highlighter) return highlighter;
+        
+        // Wait for web-highlighter to be available
+        if (typeof Highlighter === 'undefined') {
+            console.error('web-highlighter not loaded');
+            return null;
+        }
+        
+        highlighter = new Highlighter({
+            $root: document.getElementById('eb-content') || document.documentElement,
+            exceptSelectors: ['pre', 'code', 'a', 'br'],
+            wrapTag: 'span',
+            style: {
+                className: CONFIG.ANNOTATION_CLASS,
+                backgroundColor: Utils.addColorAlpha(Settings.defaultColor, 0.4)
+            }
+        });
+        
+        return highlighter;
+    }
     
     // Current book and chapter info (set by external code)
     var currentBookHash = '';
@@ -194,6 +220,34 @@
             document.cookie = key + '=' + value + '; expires=' + date.toUTCString() + '; path=/;';
         },
         
+        // 与首页 Login 保持一致的用户名管理
+        USERNAME_KEY: 'epub_browser_username',
+        
+        getAnnotationUsername: function() {
+            if (this.isKindleMode()) {
+                return this.getCookie(this.USERNAME_KEY) || '';
+            }
+            try {
+                return localStorage.getItem(this.USERNAME_KEY) || '';
+            } catch (e) {
+                return '';
+            }
+        },
+        
+        setAnnotationUsername: function(username) {
+            if (this.isKindleMode()) {
+                this.setCookie(this.USERNAME_KEY, username);
+            } else {
+                try {
+                    localStorage.setItem(this.USERNAME_KEY, username);
+                } catch (e) {}
+            }
+            // 同步更新首页 Login 显示
+            if (typeof window.updateLoginDisplay === 'function') {
+                window.updateLoginDisplay();
+            }
+        },
+        
         // Add alpha to hex color
         addColorAlpha: function(hex, alpha) {
             // Convert hex to rgba
@@ -243,11 +297,6 @@
                         store.createIndex('book_hash', 'book_hash', { unique: false });
                         store.createIndex('chapter', ['book_hash', 'chapter_index'], { unique: false });
                         store.createIndex('created_at', 'created_at', { unique: false });
-                    }
-                    
-                    // 创建设置存储
-                    if (!db.objectStoreNames.contains(CONFIG.SETTINGS_STORE)) {
-                        db.createObjectStore(CONFIG.SETTINGS_STORE, { keyPath: 'key' });
                     }
                 };
             });
@@ -422,25 +471,6 @@
             return this._transaction(CONFIG.STORE_NAME, 'readwrite', function(store) {
                 return store.clear();
             });
-        },
-        
-        // 获取设置
-        getSettings: function() {
-            var self = this;
-            return new Promise(function(resolve, reject) {
-                self._transaction(CONFIG.SETTINGS_STORE, 'readonly', function(store) {
-                    return store.get('annotation_settings');
-                }).then(function(result) {
-                    resolve(result ? result.value : null);
-                }).catch(reject);
-            });
-        },
-        
-        // 保存设置
-        saveSettings: function(settings) {
-            return this._transaction(CONFIG.SETTINGS_STORE, 'readwrite', function(store) {
-                return store.put({ key: 'annotation_settings', value: settings });
-            });
         }
     };
     
@@ -449,7 +479,7 @@
         baseUrl: '/api',
         available: null,
         
-        // 检测后端是否可用
+        // 检测后端是否可用（纯健康检查，不耦合登录）
         checkHealth: function() {
             var self = this;
             return new Promise(function(resolve) {
@@ -459,24 +489,24 @@
                 
                 xhr.onload = function() {
                     self.available = xhr.status >= 200 && xhr.status < 300;
-                    resolve(self.available);
+                    resolve({ available: self.available });
                 };
                 
                 xhr.onerror = function() {
                     self.available = false;
-                    resolve(false);
+                    resolve({ available: false });
                 };
                 
                 xhr.ontimeout = function() {
                     self.available = false;
-                    resolve(false);
+                    resolve({ available: false });
                 };
                 
                 try {
                     xhr.send();
                 } catch (e) {
                     self.available = false;
-                    resolve(false);
+                    resolve({ available: false });
                 }
             });
         },
@@ -484,10 +514,12 @@
         // 发送请求
         _request: function(method, path, data) {
             var self = this;
+            var username = Utils.getAnnotationUsername();
             return new Promise(function(resolve, reject) {
                 var xhr = new XMLHttpRequest();
                 xhr.open(method, self.baseUrl + path, true);
                 xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('X-Username', username);
                 xhr.timeout = 10000;
                 
                 xhr.onload = function() {
@@ -527,19 +559,19 @@
         
         // 更新标注
         update: function(id, data) {
-            return this._request('PUT', '/annotations/' + id, data).then(function(res) {
+            return this._request('PUT', '/annotations/item/' + id, data).then(function(res) {
                 return res.data || res;
             });
         },
         
         // 删除标注
         delete: function(id) {
-            return this._request('DELETE', '/annotations/' + id);
+            return this._request('DELETE', '/annotations/item/' + id);
         },
         
         // 获取单个标注
         getById: function(id) {
-            return this._request('GET', '/annotations/' + id).then(function(res) {
+            return this._request('GET', '/annotations/item/' + id).then(function(res) {
                 return res.data || res;
             });
         },
@@ -628,10 +660,10 @@
         init: function() {
             var self = this;
             return IDBStorage.init().then(function() {
-                return IDBStorage.getSettings();
-            }).then(function(settings) {
-                if (settings) {
-                    self.currentType = settings.storage_type || 'idb';
+                // 从 localStorage 加载 storageType
+                var storageType = Utils.getStorage('annotation_storage_type');
+                if (storageType) {
+                    self.currentType = storageType;
                 }
             });
         },
@@ -655,7 +687,10 @@
                 
                 var finish = function() {
                     self.currentType = type;
-                    self.saveSettings().then(resolve).catch(reject);
+                    // 保存到 localStorage
+                    Settings.storageType = type;
+                    Settings.save();
+                    resolve();
                 };
                 
                 if (shouldMigrate) {
@@ -673,15 +708,6 @@
         // 检测后端是否可用
         isBackendAvailable: function() {
             return BackendStorage.checkHealth();
-        },
-        
-        // 保存设置
-        saveSettings: function() {
-            return IDBStorage.saveSettings({
-                enabled: Settings.enabled,
-                storage_type: this.currentType,
-                default_color: Settings.defaultColor
-            });
         },
         
         // CRUD 操作
@@ -722,6 +748,7 @@
         backendAvailable: false,
         colorOrder: [],
         customColors: [],
+        deletedColors: [],
         
         // Load settings
         load: function() {
@@ -730,6 +757,7 @@
             var storageType = Utils.getStorage('annotation_storage_type');
             var colorOrder = Utils.getStorage('annotation_color_order');
             var customColors = Utils.getStorage('annotation_custom_colors');
+            var deletedColors = Utils.getStorage('annotation_deleted_colors');
             
             if (enabled !== null) this.enabled = enabled === 'true';
             if (color) this.defaultColor = color;
@@ -740,6 +768,9 @@
             if (customColors) {
                 try { this.customColors = JSON.parse(customColors); } catch (e) { this.customColors = []; }
             }
+            if (deletedColors) {
+                try { this.deletedColors = JSON.parse(deletedColors); } catch (e) { this.deletedColors = []; }
+            }
         },
         
         // Save settings
@@ -749,152 +780,221 @@
             Utils.setStorage('annotation_storage_type', this.storageType);
             Utils.setStorage('annotation_color_order', JSON.stringify(this.colorOrder));
             Utils.setStorage('annotation_custom_colors', JSON.stringify(this.customColors));
-        }
-    };
-    
-    // ========== XPath 工具 ==========
-    var XPathUtils = {
-        // 生成XPath
-        generate: function(node) {
-            var paths = [];
-            var content = document.getElementById('eb-content');
-            
-            while (node && node !== content && node !== document.body) {
-                var index = 0;
-                var sibling = node;
-                var hasSameSiblings = false;
-                
-                // 计算同级索引
-                while (sibling) {
-                    if (sibling.nodeType === node.nodeType && 
-                        sibling.nodeName === node.nodeName) {
-                        index++;
-                        hasSameSiblings = true;
-                    }
-                    sibling = sibling.previousSibling;
-                }
-                
-                var nodeName = node.nodeType === Node.TEXT_NODE ? 'text()' : node.nodeName.toLowerCase();
-                var path = hasSameSiblings ? (nodeName + '[' + index + ']') : nodeName;
-                paths.unshift(path);
-                node = node.parentNode;
-            }
-            
-            return '/' + paths.join('/');
-        },
-        
-        // 解析XPath
-        resolve: function(xpath, root) {
-            root = root || document.getElementById('eb-content');
-            if (!root || !xpath) return null;
-            
-            try {
-                var result = document.evaluate(
-                    xpath,
-                    root,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                );
-                return result.singleNodeValue;
-            } catch (e) {
-                return null;
-            }
-        },
-        
-        // 获取选区信息
-        getSelectionInfo: function(selection) {
-            if (!selection || selection.rangeCount === 0) return null;
-            
-            var range = selection.getRangeAt(0);
-            var text = selection.toString().trim();
-            
-            if (!text) return null;
-            
-            return {
-                text: text,
-                startContainer: range.startContainer,
-                startOffset: range.startOffset,
-                endContainer: range.endContainer,
-                endOffset: range.endOffset,
-                startXPath: this.generate(range.startContainer),
-                endXPath: this.generate(range.endContainer)
-            };
+            Utils.setStorage('annotation_deleted_colors', JSON.stringify(this.deletedColors));
         }
     };
     
     // ========== 划线交互模块 ==========
     var HighlightInteraction = {
         activeDialog: null,
+        outsideClickHandler: null,
         annotations: [],
-        
-        // 初始化
+        isRendering: false,
+        isListening: false,
+        isBound: false,
+        pendingDraft: null,
+
         init: function() {
+            var hl = initHighlighter();
+            if (!hl) return;
+            if (!this.isBound) {
+                this.bindHighlighterEvents(hl);
+                this.isBound = true;
+            }
+            this.syncEnabledState();
+        },
+
+        bindHighlighterEvents: function(hl) {
             var self = this;
-            
-            // 监听鼠标抬起事件
-            document.addEventListener('mouseup', function(e) {
-                self.handleMouseUp(e);
+            hl.on(Highlighter.event.CREATE, function(data) {
+                self.handleHighlightCreate(data);
             });
-            
-            // 监听触摸结束事件
-            document.addEventListener('touchend', function(e) {
-                setTimeout(function() {
-                    self.handleMouseUp(e);
-                }, 100);
-            });
-            
-            // 点击高亮标注
-            document.addEventListener('click', function(e) {
-                var target = e.target;
-                if (target.classList && target.classList.contains(CONFIG.ANNOTATION_CLASS)) {
-                    e.stopPropagation();
-                    var id = target.getAttribute('data-annotation-id');
-                    if (id) {
-                        self.showDetailDialog(id);
-                    }
+            hl.on(Highlighter.event.CLICK, function(data) {
+                var annotationId = (data && data.id) || self.getAnnotationIdFromNode(data && data.target);
+                if (annotationId) {
+                    self.showDetailDialog(annotationId);
                 }
             });
         },
-        
-        // Handle mouse up
-        handleMouseUp: function(e) {
-            // Check if annotation feature is enabled
-            if (!Settings.enabled) return;
-            
-            // Check if click is inside a dialog
-            if (this.activeDialog && this.activeDialog.contains(e.target)) return;
-            
-            // Check if click is inside settings modal
-            var settingsModal = document.getElementById('settingsModal');
-            if (settingsModal && settingsModal.classList.contains('show') && settingsModal.contains(e.target)) return;
-            
-            // Check if selection is within eb-content-container
-            var contentContainer = document.getElementById('eb-content-container');
-            if (!contentContainer) return;
-            
-            var selection = window.getSelection();
-            
-            // Verify selection is within content container
-            if (selection.rangeCount > 0) {
-                var range = selection.getRangeAt(0);
-                if (!contentContainer.contains(range.commonAncestorContainer)) {
-                    return;
+
+        syncEnabledState: function() {
+            if (!highlighter) return;
+            if (Settings.enabled) {
+                if (!this.isListening) {
+                    highlighter.run();
+                    this.isListening = true;
                 }
+                return;
             }
-            
-            var info = XPathUtils.getSelectionInfo(selection);
-            
-            if (info && info.text.length > 0) {
-                this.showCreateDialog(info, e);
+            if (this.isListening) {
+                highlighter.stop();
+                this.isListening = false;
+            }
+            this.cancelPendingDraft();
+        },
+
+        setContext: function(bookHash, chapterIndex) {
+            currentBookHash = bookHash || '';
+            currentChapterIndex = typeof chapterIndex === 'number' ? chapterIndex : 0;
+            this.renderAll();
+        },
+
+        normalizeAnnotation: function(raw) {
+            if (!raw || !raw.id || !raw.startMeta || !raw.endMeta) return null;
+            return {
+                id: raw.id,
+                book_hash: raw.book_hash,
+                chapter_index: raw.chapter_index,
+                text: raw.text || '',
+                note: raw.note || '',
+                startMeta: raw.startMeta,
+                endMeta: raw.endMeta,
+                color: raw.color || Settings.defaultColor,
+                created_at: raw.created_at || Utils.getISOTime(),
+                updated_at: raw.updated_at || raw.created_at || Utils.getISOTime()
+            };
+        },
+
+        buildAnnotationFromSource: function(source, color, note) {
+            return {
+                id: source.id || Utils.generateUUID(),
+                book_hash: currentBookHash,
+                chapter_index: currentChapterIndex,
+                text: source.text || '',
+                note: note || '',
+                startMeta: Utils.deepClone(source.startMeta),
+                endMeta: Utils.deepClone(source.endMeta),
+                color: color,
+                created_at: Utils.getISOTime(),
+                updated_at: Utils.getISOTime()
+            };
+        },
+
+        getAnnotationIdFromNode: function(node) {
+            if (!node || !highlighter) return null;
+            try {
+                return highlighter.getIdByDom(node) || null;
+            } catch (e) {
+                return null;
             }
         },
-        
-        // Show create dialog
-        showCreateDialog: function(info, event) {
+
+        getHighlightNodesByAnnotationId: function(id) {
+            if (!id || !highlighter) return [];
+            try {
+                return highlighter.getDoms(id) || [];
+            } catch (e) {
+                return [];
+            }
+        },
+
+        bindHighlightHoverState: function(node, annotationId) {
+            var self = this;
+            if (!node || !annotationId || node.dataset.annotationHoverBound === annotationId) return;
+            node.dataset.annotationHoverBound = annotationId;
+            node.addEventListener('mouseenter', function() {
+                self.getHighlightNodesByAnnotationId(annotationId).forEach(function(sib) {
+                    sib.classList.add('annotation-hover-active');
+                });
+            });
+            node.addEventListener('mouseleave', function() {
+                self.getHighlightNodesByAnnotationId(annotationId).forEach(function(sib) {
+                    sib.classList.remove('annotation-hover-active');
+                });
+            });
+        },
+
+        applyHighlightStyles: function(annotation, nodes) {
+            var hasNote = !!(annotation.note && annotation.note.trim());
+            var bgColor = Utils.addColorAlpha(annotation.color, 0.4);
+            var hoverColor = Utils.addColorAlpha(annotation.color, 0.6);
+            var borderColor = Utils.addColorAlpha(annotation.color, 0.8);
+            var self = this;
+            (nodes || []).forEach(function(node, index) {
+                node.style.backgroundColor = bgColor;
+                node.style.setProperty('--annotation-color', bgColor);
+                node.style.setProperty('--annotation-hover-color', hoverColor);
+                node.style.setProperty('--annotation-border-color', borderColor);
+                if (hasNote && index === nodes.length - 1) {
+                    node.classList.add('has-note');
+                } else {
+                    node.classList.remove('has-note');
+                }
+                self.bindHighlightHoverState(node, annotation.id);
+            });
+        },
+
+        closeDialog: function() {
+            if (this.activeDialog) {
+                this.activeDialog.remove();
+                this.activeDialog = null;
+            }
+            if (this.outsideClickHandler) {
+                document.removeEventListener('click', this.outsideClickHandler);
+                this.outsideClickHandler = null;
+            }
+        },
+
+        setPendingDraft: function(source) {
+            if (!source || !source.id) return;
+            this.pendingDraft = {
+                id: source.id,
+                source: source
+            };
+        },
+
+        clearPendingDraftState: function() {
+            this.pendingDraft = null;
+        },
+
+        cancelPendingDraft: function() {
+            var draftId = this.pendingDraft && this.pendingDraft.id;
+            this.closeDialog();
+            this.clearPendingDraftState();
+            if (draftId && highlighter) {
+                try {
+                    highlighter.remove(draftId);
+                } catch (e) {}
+            }
+            if (window.getSelection) {
+                window.getSelection().removeAllRanges();
+            }
+        },
+
+        handleHighlightCreate: function(data) {
+            var source = data && data.sources && data.sources[0];
+            if (!source || !source.text) return;
+            if (this.isRendering) return;
+            if (!Settings.enabled) {
+                if (source.id && highlighter) {
+                    highlighter.remove(source.id);
+                }
+                return;
+            }
+            // Cancel previous pending draft before starting a new one
+            if (this.pendingDraft) {
+                var oldId = this.pendingDraft.id;
+                this.closeDialog();
+                this.clearPendingDraftState();
+                if (oldId && highlighter) {
+                    try {
+                        highlighter.remove(oldId);
+                    } catch (e) {}
+                }
+            }
+            this.setPendingDraft(source);
+            this.applyHighlightStyles({
+                id: source.id,
+                color: Settings.defaultColor,
+                note: ''
+            }, this.getHighlightNodesByAnnotationId(source.id));
+            this.showCreateDialogFromSource(source);
+        },
+
+        showCreateDialogFromSource: function(source) {
             var self = this;
             this.closeDialog();
-            
+
             var dialog = document.createElement('div');
             dialog.className = 'annotation-dialog annotation-dialog-compact';
             dialog.innerHTML = '\
@@ -909,88 +1009,88 @@
                     <button class="annotation-btn annotation-btn-cancel">Cancel</button>\
                     <button class="annotation-btn annotation-btn-confirm">Add</button>\
                 </div>';
-            
-            // Color picker - only show first 4 colors from settings
+
             var colorOptions = dialog.querySelector('.color-options-compact');
-            var allColors = CONFIG.getColors();
-            for (var i = 0; i < Math.min(allColors.length, 4); i++) {
-                var color = allColors[i];
+            var noteInput = dialog.querySelector('textarea');
+            var colors = CONFIG.getColors();
+
+            colors.slice(0, 4).forEach(function(color) {
                 var btn = document.createElement('button');
                 btn.className = 'color-option-compact' + (color === Settings.defaultColor ? ' selected' : '');
                 btn.style.backgroundColor = color;
                 btn.setAttribute('data-color', color);
-                btn.addEventListener('click', function(e) {
-                    colorOptions.querySelectorAll('.color-option-compact').forEach(function(b) {
-                        b.classList.remove('selected');
+                btn.addEventListener('click', function() {
+                    var newColor = this.getAttribute('data-color');
+                    colorOptions.querySelectorAll('.color-option-compact').forEach(function(option) {
+                        option.classList.remove('selected');
                     });
                     this.classList.add('selected');
+                    self.applyHighlightStyles({
+                        id: source.id,
+                        color: newColor,
+                        note: ''
+                    }, self.getHighlightNodesByAnnotationId(source.id));
                 });
                 colorOptions.appendChild(btn);
+            });
+
+            // Position near the highlighted text
+            var nodes = self.getHighlightNodesByAnnotationId(source.id);
+            if (nodes.length > 0) {
+                var rect = nodes[0].getBoundingClientRect();
+                var dialogW = 240;
+                var dialogH = 140;
+                var left = rect.left + (rect.width - dialogW) / 2;
+                var top = rect.bottom + 8;
+                // Keep within viewport
+                left = Math.max(10, Math.min(left, window.innerWidth - dialogW - 10));
+                if (top + dialogH > window.innerHeight - 10) {
+                    top = rect.top - dialogH - 8;
+                }
+                if (top < 10) top = 10;
+                dialog.style.left = left + 'px';
+                dialog.style.top = top + 'px';
+            } else {
+                dialog.style.left = Math.max(10, (window.innerWidth - 240) / 2) + 'px';
+                dialog.style.top = Math.max(10, (window.innerHeight - 140) / 2) + 'px';
             }
-            
-            // Position dialog - more compact positioning
-            var x = event.clientX || (event.changedTouches && event.changedTouches[0].clientX) || 100;
-            var y = event.clientY || (event.changedTouches && event.changedTouches[0].clientY) || 100;
-            
-            var dialogWidth = 240; // Smaller width
-            var dialogHeight = 140; // Estimated height
-            
-            // Smart positioning: prefer below selection, but show above if no space below
-            var showBelow = (y + 10 + dialogHeight) < window.innerHeight;
-            var posX = Math.max(10, Math.min(x - dialogWidth / 2, window.innerWidth - dialogWidth - 10));
-            var posY = showBelow ? (y + 10) : Math.max(10, y - dialogHeight - 10);
-            
-            dialog.style.left = posX + 'px';
-            dialog.style.top = posY + 'px';
-            
+
             document.body.appendChild(dialog);
             this.activeDialog = dialog;
-            
-            // Bind events
-            var closeBtn = dialog.querySelector('.annotation-dialog-close');
-            var cancelBtn = dialog.querySelector('.annotation-btn-cancel');
-            var confirmBtn = dialog.querySelector('.annotation-btn-confirm');
-            var noteInput = dialog.querySelector('textarea');
-            
-            var closeHandler = function() {
-                self.closeDialog();
-                window.getSelection().removeAllRanges();
-            };
-            
-            closeBtn.addEventListener('click', closeHandler);
-            cancelBtn.addEventListener('click', closeHandler);
-            
-            confirmBtn.addEventListener('click', function() {
+
+            dialog.querySelector('.annotation-dialog-close').addEventListener('click', function() {
+                self.cancelPendingDraft();
+            });
+            dialog.querySelector('.annotation-btn-cancel').addEventListener('click', function() {
+                self.cancelPendingDraft();
+            });
+            dialog.querySelector('.annotation-btn-confirm').addEventListener('click', function() {
                 var selectedColor = colorOptions.querySelector('.color-option-compact.selected');
                 var color = selectedColor ? selectedColor.getAttribute('data-color') : Settings.defaultColor;
-                var note = noteInput.value.trim();
-                
-                self.createAnnotation(info, color, note);
-                self.closeDialog();
-                window.getSelection().removeAllRanges();
+                self.createAnnotationFromSource(source, color, noteInput.value.trim());
             });
-            
-            // Click outside to close
+
             setTimeout(function() {
-                document.addEventListener('click', self.outsideClickHandler = function(e) {
+                self.outsideClickHandler = function(e) {
                     if (dialog && !dialog.contains(e.target)) {
-                        self.closeDialog();
+                        self.cancelPendingDraft();
                     }
-                });
+                };
+                document.addEventListener('click', self.outsideClickHandler);
             }, 10);
         },
-        
-        // Show detail dialog
+
         showDetailDialog: function(id) {
             var self = this;
             this.closeDialog();
-            
             StorageManager.getById(id).then(function(annotation) {
+                annotation = self.normalizeAnnotation(annotation);
                 if (!annotation) {
                     Utils.showNotification('Annotation not found', 'warning');
                     return;
                 }
-                
+
+                var textPreview = annotation.text.substring(0, 100) + (annotation.text.length > 100 ? '...' : '');
                 var dialog = document.createElement('div');
                 dialog.className = 'annotation-dialog';
                 dialog.innerHTML = '\
@@ -999,14 +1099,14 @@
                         <button class="annotation-dialog-close"><i class="fas fa-times"></i></button>\
                     </div>\
                     <div class="annotation-dialog-body">\
-                        <div class="annotation-dialog-text">' + Utils.escapeHtml(annotation.text.substring(0, 100)) + (annotation.text.length > 100 ? '...' : '') + '</div>\
+                        <div class="annotation-dialog-text">' + Utils.escapeHtml(textPreview) + '</div>\
                         <div class="annotation-color-picker">\
                             <label>Color:</label>\
                             <div class="color-options"></div>\
                         </div>\
                         <div class="annotation-note-input">\
                             <label>Note:</label>\
-                            <textarea placeholder="Add description...">' + (annotation.note || '') + '</textarea>\
+                            <textarea placeholder="Add description...">' + Utils.escapeHtml(annotation.note) + '</textarea>\
                         </div>\
                         <div class="annotation-meta">\
                             <span>Created: ' + Utils.formatDateTime(annotation.created_at) + '</span>\
@@ -1017,299 +1117,177 @@
                         <button class="annotation-btn annotation-btn-delete"><i class="fas fa-trash"></i> Delete</button>\
                         <button class="annotation-btn annotation-btn-confirm">Save</button>\
                     </div>';
-                
-                // Show Updated if different from Created
+
                 if (annotation.updated_at && annotation.updated_at !== annotation.created_at) {
-                    var updatedSpan = dialog.querySelector('.annotation-updated');
-                    updatedSpan.textContent = 'Updated: ' + Utils.formatDateTime(annotation.updated_at);
+                    dialog.querySelector('.annotation-updated').textContent = 'Updated: ' + Utils.formatDateTime(annotation.updated_at);
                 }
-                
-                // Color picker - show first 7 colors from settings
+
                 var colorOptions = dialog.querySelector('.color-options');
-                var colors = CONFIG.getColors();
-                for (var i = 0; i < Math.min(colors.length, 7); i++) {
-                    var color = colors[i];
+                CONFIG.getColors().slice(0, 7).forEach(function(color) {
                     var btn = document.createElement('button');
                     btn.className = 'color-option' + (color === annotation.color ? ' selected' : '');
                     btn.style.backgroundColor = color;
                     btn.setAttribute('data-color', color);
-                    btn.addEventListener('click', function(e) {
-                        colorOptions.querySelectorAll('.color-option').forEach(function(b) {
-                            b.classList.remove('selected');
+                    btn.addEventListener('click', function() {
+                        colorOptions.querySelectorAll('.color-option').forEach(function(option) {
+                            option.classList.remove('selected');
                         });
                         this.classList.add('selected');
                     });
                     colorOptions.appendChild(btn);
-                }
-                
-                // Position dialog - centered on screen with smart bounds
-                var dialogWidth = 300;
-                var dialogHeight = 320;
-                var posX = Math.max(10, Math.min((window.innerWidth - dialogWidth) / 2, window.innerWidth - dialogWidth - 10));
-                var posY = Math.max(10, Math.min((window.innerHeight - dialogHeight) / 2, window.innerHeight - dialogHeight - 10));
-                
-                dialog.style.left = posX + 'px';
-                dialog.style.top = posY + 'px';
-                
+                });
+
+                dialog.style.left = Math.max(10, Math.min((window.innerWidth - 300) / 2, window.innerWidth - 310)) + 'px';
+                dialog.style.top = Math.max(10, Math.min((window.innerHeight - 320) / 2, window.innerHeight - 330)) + 'px';
+
                 document.body.appendChild(dialog);
                 self.activeDialog = dialog;
-                
-                // Bind events
-                var closeBtn = dialog.querySelector('.annotation-dialog-close');
-                var deleteBtn = dialog.querySelector('.annotation-btn-delete');
-                var saveBtn = dialog.querySelector('.annotation-btn-confirm');
+
                 var noteInput = dialog.querySelector('textarea');
                 var textEl = dialog.querySelector('.annotation-dialog-text');
-                
-                // Click to copy text
-                if (textEl) {
-                    textEl.style.cursor = 'pointer';
-                    textEl.title = 'Click to copy';
-                    textEl.addEventListener('click', function() {
-                        var text = annotation.text;
-                        if (navigator.clipboard && navigator.clipboard.writeText) {
-                            navigator.clipboard.writeText(text).then(function() {
-                                Utils.showNotification('Text copied', 'success');
-                            }).catch(function() {
-                                // Fallback
-                                var textarea = document.createElement('textarea');
-                                textarea.value = text;
-                                textarea.style.position = 'fixed';
-                                textarea.style.opacity = '0';
-                                document.body.appendChild(textarea);
-                                textarea.select();
-                                document.execCommand('copy');
-                                document.body.removeChild(textarea);
-                                Utils.showNotification('Text copied', 'success');
-                            });
-                        } else {
-                            // Fallback for older browsers
-                            var textarea = document.createElement('textarea');
-                            textarea.value = text;
-                            textarea.style.position = 'fixed';
-                            textarea.style.opacity = '0';
-                            document.body.appendChild(textarea);
-                            textarea.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(textarea);
-                            Utils.showNotification('Text copied', 'success');
-                        }
-                    });
-                }
-                
-                closeBtn.addEventListener('click', function() {
+
+                textEl.style.cursor = 'pointer';
+                textEl.title = 'Click to copy';
+                textEl.addEventListener('click', function() {
+                    var textarea = document.createElement('textarea');
+                    textarea.value = annotation.text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    Utils.showNotification('Text copied', 'success');
+                });
+
+                dialog.querySelector('.annotation-dialog-close').addEventListener('click', function() {
                     self.closeDialog();
                 });
-                
-                deleteBtn.addEventListener('click', function() {
+                dialog.querySelector('.annotation-btn-delete').addEventListener('click', function() {
                     if (confirm('Delete this annotation?')) {
-                        self.deleteAnnotation(id);
+                        self.deleteAnnotation(annotation.id);
                         self.closeDialog();
                     }
                 });
-                
-                saveBtn.addEventListener('click', function() {
+                dialog.querySelector('.annotation-btn-confirm').addEventListener('click', function() {
                     var selectedColor = colorOptions.querySelector('.color-option.selected');
                     var color = selectedColor ? selectedColor.getAttribute('data-color') : annotation.color;
-                    var note = noteInput.value.trim();
-                    
-                    self.updateAnnotation(id, { color: color, note: note });
+                    self.updateAnnotation(annotation.id, {
+                        color: color,
+                        note: noteInput.value.trim()
+                    });
                     self.closeDialog();
                 });
+            }).catch(function(err) {
+                Utils.showNotification('Failed to load annotation: ' + err.message, 'error');
             });
         },
-        
-        // 关闭弹窗
-        closeDialog: function() {
-            if (this.activeDialog) {
-                this.activeDialog.remove();
-                this.activeDialog = null;
-            }
-            if (this.outsideClickHandler) {
-                document.removeEventListener('click', this.outsideClickHandler);
-                this.outsideClickHandler = null;
-            }
-        },
-        
-        // 创建标注
-        createAnnotation: function(info, color, note) {
-            var annotation = {
-                id: Utils.generateUUID(),
-                book_hash: currentBookHash,
-                chapter_index: currentChapterIndex,
-                text: info.text,
-                note: note || '',
-                start_xpath: info.startXPath,
-                end_xpath: info.endXPath,
-                start_offset: info.startOffset,
-                end_offset: info.endOffset,
-                color: color,
-                created_at: Utils.getISOTime(),
-                updated_at: Utils.getISOTime()
-            };
-            
+
+        createAnnotationFromSource: function(source, color, note) {
             var self = this;
+            var annotation = this.buildAnnotationFromSource(source, color, note);
             StorageManager.create(annotation).then(function() {
                 self.annotations.push(annotation);
-                // Use simple highlight for immediate rendering
-                self.renderSimpleHighlight(annotation);
+                self.applyHighlightStyles(annotation, self.getHighlightNodesByAnnotationId(annotation.id));
+                self.clearPendingDraftState();
+                self.closeDialog();
                 Utils.showNotification('Annotation added', 'success');
             }).catch(function(err) {
+                self.cancelPendingDraft();
                 Utils.showNotification('Failed to add: ' + err.message, 'error');
             });
         },
-        
-        // Update annotation
+
         updateAnnotation: function(id, data) {
             var self = this;
-            var now = Utils.getISOTime();
             var updateData = {
                 color: data.color,
                 note: data.note,
-                updated_at: now
+                updated_at: Utils.getISOTime()
             };
-            StorageManager.update(id, updateData).then(function(updated) {
-                // Update local cache
-                for (var i = 0; i < self.annotations.length; i++) {
-                    if (self.annotations[i].id === id) {
-                        self.annotations[i].color = data.color;
-                        self.annotations[i].note = data.note;
-                        self.annotations[i].updated_at = now;
-                        break;
-                    }
-                }
-                // Update highlight color and note indicator
-                var highlights = document.querySelectorAll('.' + CONFIG.ANNOTATION_CLASS + '[data-annotation-id="' + id + '"]');
-                highlights.forEach(function(el) {
-                    el.style.backgroundColor = Utils.addColorAlpha(data.color, 0.4);
-                    if (data.note && data.note.trim()) {
-                        el.classList.add('has-note');
-                    } else {
-                        el.classList.remove('has-note');
-                    }
+            StorageManager.update(id, updateData).then(function() {
+                var updatedAnnotation = null;
+                self.annotations = self.annotations.map(function(annotation) {
+                    if (annotation.id !== id) return annotation;
+                    annotation.color = data.color;
+                    annotation.note = data.note;
+                    annotation.updated_at = updateData.updated_at;
+                    updatedAnnotation = annotation;
+                    return annotation;
                 });
+                if (updatedAnnotation) {
+                    self.applyHighlightStyles(updatedAnnotation, self.getHighlightNodesByAnnotationId(id));
+                }
                 Utils.showNotification('Annotation updated', 'success');
             }).catch(function(err) {
                 Utils.showNotification('Failed to update: ' + err.message, 'error');
             });
         },
-        
-        // Delete annotation
+
         deleteAnnotation: function(id) {
             var self = this;
             StorageManager.delete(id).then(function() {
-                // Remove from local cache
-                self.annotations = self.annotations.filter(function(a) {
-                    return a.id !== id;
+                self.annotations = self.annotations.filter(function(annotation) {
+                    return annotation.id !== id;
                 });
-                // Remove highlight
-                var highlights = document.querySelectorAll('.' + CONFIG.ANNOTATION_CLASS + '[data-annotation-id="' + id + '"]');
-                highlights.forEach(function(el) {
-                    var parent = el.parentNode;
-                    while (el.firstChild) {
-                        parent.insertBefore(el.firstChild, el);
-                    }
-                    parent.removeChild(el);
-                });
+                if (highlighter) {
+                    highlighter.remove(id);
+                }
                 Utils.showNotification('Annotation deleted', 'info');
             }).catch(function(err) {
                 Utils.showNotification('Failed to delete: ' + err.message, 'error');
             });
         },
-        
-        // 渲染高亮
+
         renderHighlight: function(annotation) {
-            var selection = window.getSelection();
-            selection.removeAllRanges();
-            
+            if (!highlighter || !annotation) return;
             try {
-                var startNode = XPathUtils.resolve(annotation.start_xpath);
-                var endNode = XPathUtils.resolve(annotation.end_xpath);
-                
-                if (startNode && endNode) {
-                    var range = document.createRange();
-                    range.setStart(startNode, annotation.start_offset);
-                    range.setEnd(endNode, annotation.end_offset);
-                    
-                    var span = document.createElement('span');
-                    span.className = CONFIG.ANNOTATION_CLASS;
-                    if (annotation.note) span.classList.add('has-note');
-                    span.setAttribute('data-annotation-id', annotation.id);
-                    span.style.backgroundColor = Utils.addColorAlpha(annotation.color, 0.4);
-                    
-                    range.surroundContents(span);
-                }
+                var source = highlighter.fromStore(
+                    annotation.startMeta,
+                    annotation.endMeta,
+                    annotation.text,
+                    annotation.id
+                );
+                if (!source) return;
+                this.applyHighlightStyles(annotation, this.getHighlightNodesByAnnotationId(annotation.id));
             } catch (e) {
-                // Cross-element selection, use simplified method
-                this.renderSimpleHighlight(annotation);
+                console.error('Failed to render highlight:', e);
             }
         },
-        
-        // Simplified highlight rendering (for cross-element cases)
-        renderSimpleHighlight: function(annotation) {
-            var content = document.getElementById('eb-content');
-            if (!content) return;
-            
-            // Find element containing annotation text
-            var walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null, false);
-            var node;
-            var found = false;
-            
-            while (node = walker.nextNode()) {
-                if (node.textContent.indexOf(annotation.text) !== -1) {
-                    try {
-                        var range = document.createRange();
-                        var start = node.textContent.indexOf(annotation.text);
-                        range.setStart(node, start);
-                        range.setEnd(node, start + annotation.text.length);
-                        
-                        var span = document.createElement('span');
-                        span.className = CONFIG.ANNOTATION_CLASS;
-                        if (annotation.note) span.classList.add('has-note');
-                        span.setAttribute('data-annotation-id', annotation.id);
-                        span.style.backgroundColor = Utils.addColorAlpha(annotation.color, 0.4);
-                        
-                        range.surroundContents(span);
-                        found = true;
-                        break;
-                    } catch (e) {
-                        continue;
-                    }
-                }
-            }
-        },
-        
-        // 渲染所有标注
-        renderAll: function() {
-            var self = this;
-            
-            // 清除现有高亮
-            this.clearHighlights();
-            
-            // 获取当前章节标注
-            StorageManager.getByChapter(currentBookHash, currentChapterIndex).then(function(annotations) {
-                self.annotations = annotations || [];
-                
-                // 逐个渲染
-                for (var i = 0; i < self.annotations.length; i++) {
-                    try {
-                        self.renderSimpleHighlight(self.annotations[i]);
-                    } catch (e) {}
-                }
-            }).catch(function(err) {
-                console.error('Failed to load annotations:', err);
-            });
-        },
-        
-        // 清除高亮
+
         clearHighlights: function() {
-            var highlights = document.querySelectorAll('.' + CONFIG.ANNOTATION_CLASS);
-            highlights.forEach(function(el) {
+            if (highlighter) {
+                highlighter.removeAll();
+            }
+            document.querySelectorAll('.' + CONFIG.ANNOTATION_CLASS).forEach(function(el) {
                 var parent = el.parentNode;
+                if (!parent) return;
                 while (el.firstChild) {
                     parent.insertBefore(el.firstChild, el);
                 }
                 parent.removeChild(el);
+            });
+        },
+
+        renderAll: function() {
+            var self = this;
+            if (!highlighter) return Promise.resolve();
+            this.isRendering = true;
+            this.cancelPendingDraft();
+            this.clearHighlights();
+            return StorageManager.getByChapter(currentBookHash, currentChapterIndex).then(function(annotations) {
+                self.annotations = (annotations || []).map(function(annotation) {
+                    return self.normalizeAnnotation(annotation);
+                }).filter(Boolean).sort(function(a, b) {
+                    return (b.text || '').length - (a.text || '').length;
+                });
+                self.annotations.forEach(function(annotation) {
+                    self.renderHighlight(annotation);
+                });
+            }).catch(function(err) {
+                console.error('Failed to load annotations:', err);
+            }).finally(function() {
+                self.isRendering = false;
             });
         }
     };
@@ -1347,7 +1325,6 @@
                         <label class="storage-option" id="storageOptionIdb">\
                             <input type="radio" name="annotationStorage" value="idb" ' + (Settings.storageType === 'idb' ? 'checked' : '') + '>\
                             <span class="storage-option-text">Local Storage</span>\
-                            <span class="storage-option-status current">Current</span>\
                         </label>\
                         <label class="storage-option" id="storageOptionBackend">\
                             <input type="radio" name="annotationStorage" value="backend" ' + (Settings.storageType === 'backend' ? 'checked' : '') + '>\
@@ -1396,17 +1373,10 @@
         rebindTabEvents: function() {
             var allTabs = document.querySelectorAll('.settings-tab');
             
-            // Remove existing click listeners by cloning nodes
+            // Add new click listeners (use once flag to avoid duplicates)
             allTabs.forEach(function(tab) {
-                var newTab = tab.cloneNode(true);
-                tab.parentNode.replaceChild(newTab, tab);
-            });
-            
-            // Re-query after cloning
-            allTabs = document.querySelectorAll('.settings-tab');
-            
-            // Add new click listeners
-            allTabs.forEach(function(tab) {
+                if (tab.dataset.tabBound) return;
+                tab.dataset.tabBound = '1';
                 tab.addEventListener('click', function() {
                     var tabId = this.getAttribute('data-tab');
                     
@@ -1455,6 +1425,12 @@
             enabledCheckbox.addEventListener('change', function() {
                 Settings.enabled = this.checked;
                 Settings.save();
+                HighlightInteraction.syncEnabledState();
+                if (Settings.enabled) {
+                    HighlightInteraction.renderAll();
+                } else {
+                    HighlightInteraction.clearHighlights();
+                }
                 Utils.showNotification(Settings.enabled ? 'Annotation enabled' : 'Annotation disabled', 'info');
             });
             
@@ -1462,15 +1438,48 @@
             var storageRadios = tabPanel.querySelectorAll('input[name="annotationStorage"]');
             storageRadios.forEach(function(radio) {
                 radio.addEventListener('change', function() {
-                    if (this.value === 'backend' && !Settings.backendAvailable) {
-                        Utils.showNotification('Cloud storage unavailable', 'warning');
-                        this.checked = false;
+                    var targetType = this.value;
+                    
+                    // 如果选择的是当前存储类型，不处理
+                    if (targetType === Settings.storageType) return;
+                    
+                    // 切换到云端存储
+                    if (targetType === 'backend') {
+                        if (!Settings.backendAvailable) {
+                            Utils.showNotification('Cloud storage unavailable', 'warning');
+                            self.revertStorageRadio(Settings.storageType);
+                            return;
+                        }
+                        
+                        // 检查是否已登录，提示用户
+                        var currentUsername = Utils.getAnnotationUsername();
+                        if (!currentUsername) {
+                            var msg = 'You are not logged in.\n\n' +
+                                '- Click OK to enter a username (annotations will be isolated by user)\n' +
+                                '- Click Cancel to use shared mode (all users share the same annotations)';
+                            var username = prompt(msg, '');
+                            if (username === null) {
+                                // 用户取消 → 使用共享模式
+                                Utils.showNotification('Using shared cloud storage (no user isolation)', 'info');
+                            } else {
+                                username = username.trim();
+                                if (username) {
+                                    Utils.setAnnotationUsername(username);
+                                    Utils.showNotification('Logged in as: ' + username + ' (annotations isolated)', 'success');
+                                    self.checkBackendStatus();
+                                } else {
+                                    Utils.showNotification('Using shared cloud storage (no user isolation)', 'info');
+                                }
+                            }
+                        }
+                        
+                        // 继续迁移流程
+                        self.showMigrationDialog(Settings.storageType, targetType);
                         return;
                     }
                     
-                    if (this.value !== Settings.storageType) {
-                        self.showMigrationDialog(Settings.storageType, this.value);
-                    }
+                    // 切换到本地存储
+                    self.showMigrationDialog(Settings.storageType, targetType);
                 });
             });
             
@@ -1546,7 +1555,12 @@
                         var wrapper = this.closest('.color-option-wrapper');
                         var c = wrapper.getAttribute('data-color');
                         
-                        // Remove from settings
+                        // Add to deleted colors (tracks both base and custom colors)
+                        if (!Settings.deletedColors) Settings.deletedColors = [];
+                        if (Settings.deletedColors.indexOf(c) === -1) {
+                            Settings.deletedColors.push(c);
+                        }
+                        // Remove from custom colors and color order
                         var idx = Settings.customColors.indexOf(c);
                         if (idx !== -1) Settings.customColors.splice(idx, 1);
                         idx = Settings.colorOrder.indexOf(c);
@@ -1702,8 +1716,10 @@
                 // Add to custom colors
                 if (Settings.customColors.indexOf(color) === -1) {
                     Settings.customColors.push(color);
-                    Settings.save();
                 }
+                var deletedIdx = Settings.deletedColors.indexOf(color);
+                if (deletedIdx !== -1) Settings.deletedColors.splice(deletedIdx, 1);
+                Settings.save();
                 
                 closeDialog();
             });
@@ -1731,12 +1747,18 @@
             this.backendChecking = true;
             statusEl.textContent = 'Checking...';
             
-            StorageManager.isBackendAvailable().then(function(available) {
+            StorageManager.isBackendAvailable().then(function(result) {
+                var available = result.available;
                 Settings.backendAvailable = available;
                 self.backendChecking = false;
                 
                 if (available) {
-                    statusEl.textContent = 'Connected';
+                    var username = Utils.getAnnotationUsername();
+                    if (username) {
+                        statusEl.textContent = 'Connected (' + username + ')';
+                    } else {
+                        statusEl.textContent = 'Connected (shared)';
+                    }
                     statusEl.className = 'storage-option-status connected';
                     backendOption.classList.remove('disabled');
                 } else {
@@ -1745,6 +1767,14 @@
                     backendOption.classList.add('disabled');
                 }
             });
+        },
+        
+        // Revert radio button back to current storage type
+        revertStorageRadio: function(targetType) {
+            var radio = document.querySelector('input[name="annotationStorage"][value="' + targetType + '"]');
+            if (radio) {
+                radio.checked = true;
+            }
         },
         
         // Show migration dialog
@@ -1789,10 +1819,7 @@
             
             cancelBtn.addEventListener('click', function() {
                 // Cancel switch, restore original selection
-                var originalRadio = document.querySelector('input[name="annotationStorage"][value="' + fromType + '"]');
-                if (originalRadio) {
-                    originalRadio.checked = true;
-                }
+                self.revertStorageRadio(fromType);
                 dialog.remove();
             });
             
@@ -1824,35 +1851,8 @@
                 Settings.storageType = newType;
                 Settings.save();
                 
-                // Update UI - clear all current classes first
-                var idbOption = document.getElementById('storageOptionIdb');
-                var backendOption = document.getElementById('storageOptionBackend');
-                
-                if (idbOption) {
-                    var idbStatus = idbOption.querySelector('.storage-option-status');
-                    if (idbStatus) {
-                        if (newType === 'idb') {
-                            idbStatus.textContent = 'Current';
-                            idbStatus.className = 'storage-option-status current';
-                        } else {
-                            idbStatus.textContent = '';
-                            idbStatus.className = 'storage-option-status';
-                        }
-                    }
-                }
-                
-                if (backendOption) {
-                    var backendStatus = backendOption.querySelector('.storage-option-status');
-                    if (backendStatus) {
-                        if (newType === 'backend') {
-                            backendStatus.textContent = 'Current';
-                            backendStatus.className = 'storage-option-status current';
-                        } else {
-                            backendStatus.textContent = '';
-                            backendStatus.className = 'storage-option-status';
-                        }
-                    }
-                }
+                // Refresh backend status display
+                self.checkBackendStatus();
                 
                 Utils.showNotification('Storage location changed', 'success');
                 
@@ -1927,11 +1927,15 @@
         
         // Initialize
         init: function(options) {
-            if (this.initialized) return;
-            
             options = options || {};
             currentBookHash = options.bookHash || '';
             currentChapterIndex = options.chapterIndex || 0;
+
+            if (this.initialized) {
+                HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
+                HighlightInteraction.syncEnabledState();
+                return;
+            }
             
             // Load settings
             Settings.load();
@@ -1945,10 +1949,7 @@
                 // Create settings tab
                 SettingsTab.createContent();
                 
-                // Render existing annotations
-                if (Settings.enabled) {
-                    HighlightInteraction.renderAll();
-                }
+                HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
                 
                 self.initialized = true;
             }).catch(function(err) {
@@ -1958,23 +1959,24 @@
         
         // Destroy
         destroy: function() {
+            HighlightInteraction.cancelPendingDraft();
             HighlightInteraction.closeDialog();
             HighlightInteraction.clearHighlights();
+            if (highlighter && HighlightInteraction.isListening) {
+                highlighter.stop();
+                HighlightInteraction.isListening = false;
+            }
             this.initialized = false;
         },
         
         // Refresh
         refresh: function() {
-            if (Settings.enabled) {
-                HighlightInteraction.renderAll();
-            }
+            HighlightInteraction.renderAll();
         },
         
         // Set book info
         setBookInfo: function(bookHash, chapterIndex) {
-            currentBookHash = bookHash;
-            currentChapterIndex = chapterIndex;
-            this.refresh();
+            HighlightInteraction.setContext(bookHash, chapterIndex);
         },
         
         // Get annotation count

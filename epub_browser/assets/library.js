@@ -198,6 +198,9 @@ function initScript() {
         }
     }
 
+    // 暴露给全局，供 annotation.js 同步更新 Login 显示
+    window.updateLoginDisplay = updateLoginDisplay;
+
     updateLoginDisplay();
 
     var loginCard = document.getElementById('loginCard');

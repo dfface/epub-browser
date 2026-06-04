@@ -26,23 +26,22 @@ def init_annotation_db(base_dir):
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS annotations (
             id TEXT PRIMARY KEY,
+            username TEXT NOT NULL DEFAULT '',
             book_hash TEXT NOT NULL,
             chapter_index INTEGER NOT NULL,
             text TEXT NOT NULL,
             note TEXT,
-            start_xpath TEXT NOT NULL,
-            end_xpath TEXT NOT NULL,
-            start_offset INTEGER NOT NULL,
-            end_offset INTEGER NOT NULL,
+            start_meta TEXT,
+            end_meta TEXT,
             color TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
     ''')
-    
     # Create indexes
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_book_hash ON annotations(book_hash)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chapter ON annotations(book_hash, chapter_index)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chapter_username ON annotations(book_hash, chapter_index, username)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_book_username ON annotations(book_hash, username)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_username ON annotations(username)')
     
     conn.commit()
     conn.close()
@@ -113,7 +112,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             
             # Annotation API routes
             if path.startswith('/api/'):
-                # Health check endpoint
+                # Health check endpoint (pure health check, no user coupling)
                 if path == '/api/health':
                     self.send_json_response(200, {"status": "ok"})
                     return
@@ -305,6 +304,10 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
     
+    def _get_username(self):
+        """从请求头中提取用户名"""
+        return self.headers.get('X-Username', '').strip()
+    
     def handle_annotation_api(self, method, path):
         """Handle annotation API requests"""
         try:
@@ -354,28 +357,66 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.log_message(f"Error handling annotation API: {e}")
             self.send_json_response(500, {"message": f"Server error: {str(e)}"})
     
+    def _parse_row_meta(self, row_dict):
+        """Parse start_meta and end_meta from JSON strings"""
+        if row_dict.get('start_meta'):
+            try:
+                row_dict['startMeta'] = json.loads(row_dict['start_meta'])
+            except:
+                row_dict['startMeta'] = None
+        if row_dict.get('end_meta'):
+            try:
+                row_dict['endMeta'] = json.loads(row_dict['end_meta'])
+            except:
+                row_dict['endMeta'] = None
+        return row_dict
+    
     def _handle_annotation_get(self, cursor, parts):
         """处理标注GET请求"""
+        username = self._get_username()
+        
         # /api/annotations
         if len(parts) == 3:
-            cursor.execute('SELECT * FROM annotations ORDER BY created_at DESC')
+            if username:
+                cursor.execute('SELECT * FROM annotations WHERE username = ? ORDER BY created_at DESC', (username,))
+            else:
+                cursor.execute('SELECT * FROM annotations ORDER BY created_at DESC')
             rows = cursor.fetchall()
-            self.send_json_response(200, {"data": [dict(row) for row in rows]})
+            data = [self._parse_row_meta(dict(row)) for row in rows]
+            self.send_json_response(200, {"data": data})
             return
-        
+
+        # /api/annotations/item/{id}
+        if len(parts) == 5 and parts[3] == 'item':
+            ann_id = parts[4]
+            if username:
+                cursor.execute('SELECT * FROM annotations WHERE id = ? AND username = ?', (ann_id, username))
+            else:
+                cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
+            row = cursor.fetchone()
+            if not row:
+                self.send_json_response(404, {"message": "Annotation not found"})
+                return
+            self.send_json_response(200, {"data": self._parse_row_meta(dict(row))})
+            return
+
         # /api/annotations/batch
-        if parts[3] == 'batch':
+        if len(parts) >= 4 and parts[3] == 'batch':
             self.send_json_response(400, {"message": "Batch requires POST"})
             return
-        
+
         # /api/annotations/{book_hash}
         if len(parts) == 4:
             book_hash = parts[3]
-            cursor.execute('SELECT * FROM annotations WHERE book_hash = ? ORDER BY created_at DESC', (book_hash,))
+            if username:
+                cursor.execute('SELECT * FROM annotations WHERE book_hash = ? AND username = ? ORDER BY created_at DESC', (book_hash, username))
+            else:
+                cursor.execute('SELECT * FROM annotations WHERE book_hash = ? ORDER BY created_at DESC', (book_hash,))
             rows = cursor.fetchall()
-            self.send_json_response(200, {"data": [dict(row) for row in rows]})
+            data = [self._parse_row_meta(dict(row)) for row in rows]
+            self.send_json_response(200, {"data": data})
             return
-        
+
         # /api/annotations/{book_hash}/{chapter_index}
         if len(parts) == 5:
             book_hash = parts[3]
@@ -384,11 +425,15 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             except ValueError:
                 self.send_json_response(400, {"message": "Invalid chapter index"})
                 return
-            cursor.execute('SELECT * FROM annotations WHERE book_hash = ? AND chapter_index = ? ORDER BY created_at DESC', (book_hash, chapter_index))
+            if username:
+                cursor.execute('SELECT * FROM annotations WHERE book_hash = ? AND chapter_index = ? AND username = ? ORDER BY created_at DESC', (book_hash, chapter_index, username))
+            else:
+                cursor.execute('SELECT * FROM annotations WHERE book_hash = ? AND chapter_index = ? ORDER BY created_at DESC', (book_hash, chapter_index))
             rows = cursor.fetchall()
-            self.send_json_response(200, {"data": [dict(row) for row in rows]})
+            data = [self._parse_row_meta(dict(row)) for row in rows]
+            self.send_json_response(200, {"data": data})
             return
-        
+
         self.send_json_response(404, {"message": "Not found"})
     
     def _handle_annotation_post(self, cursor, parts, conn):
@@ -396,65 +441,74 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length)
         data = json.loads(body.decode('utf-8'))
-        
+        username = self._get_username()
+
         # /api/annotations/batch
         if len(parts) == 4 and parts[3] == 'batch':
             annotations = data.get('annotations', [])
             created = 0
             failed = 0
-            
+
             for ann in annotations:
                 try:
                     cursor.execute('''
                         INSERT OR REPLACE INTO annotations 
-                        (id, book_hash, chapter_index, text, note, start_xpath, end_xpath, 
-                         start_offset, end_offset, color, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (id, book_hash, chapter_index, text, note, start_meta, end_meta, 
+                         color, created_at, updated_at, username)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         ann['id'], ann['book_hash'], ann['chapter_index'], ann['text'],
-                        ann.get('note', ''), ann['start_xpath'], ann['end_xpath'],
-                        ann['start_offset'], ann['end_offset'], ann['color'],
-                        ann['created_at'], ann['updated_at']
+                        ann.get('note', ''),
+                        json.dumps(ann['startMeta']) if ann.get('startMeta') else None,
+                        json.dumps(ann['endMeta']) if ann.get('endMeta') else None,
+                        ann['color'], ann['created_at'], ann['updated_at'],
+                        username
                     ))
                     created += 1
                 except Exception:
                     failed += 1
-            
+
             conn.commit()
             self.send_json_response(201, {"created": created, "failed": failed})
             return
-        
+
         # /api/annotations - 创建单个标注
         if len(parts) == 3:
             cursor.execute('''
                 INSERT INTO annotations 
-                (id, book_hash, chapter_index, text, note, start_xpath, end_xpath, 
-                 start_offset, end_offset, color, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, book_hash, chapter_index, text, note, start_meta, end_meta, 
+                 color, created_at, updated_at, username)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data['id'], data['book_hash'], data['chapter_index'], data['text'],
-                data.get('note', ''), data['start_xpath'], data['end_xpath'],
-                data['start_offset'], data['end_offset'], data['color'],
-                data['created_at'], data['updated_at']
+                data.get('note', ''),
+                json.dumps(data['startMeta']) if data.get('startMeta') else None,
+                json.dumps(data['endMeta']) if data.get('endMeta') else None,
+                data['color'], data['created_at'], data['updated_at'],
+                username
             ))
             conn.commit()
             self.send_json_response(201, {"data": data})
             return
-        
+
         self.send_json_response(404, {"message": "Not found"})
     
     def _handle_annotation_put(self, cursor, parts, conn):
         """处理标注PUT请求"""
-        # /api/annotations/{id}
-        if len(parts) == 4:
-            ann_id = parts[3]
+        # /api/annotations/item/{id}
+        if len(parts) == 5 and parts[3] == 'item':
+            ann_id = parts[4]
+            username = self._get_username()
             
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
             
-            # 检查是否存在
-            cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
+            # 检查是否存在（带用户名过滤）
+            if username:
+                cursor.execute('SELECT * FROM annotations WHERE id = ? AND username = ?', (ann_id, username))
+            else:
+                cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
             if not cursor.fetchone():
                 self.send_json_response(404, {"message": "Annotation not found"})
                 return
@@ -463,28 +517,42 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             import datetime
             updated_at = datetime.datetime.now().isoformat()
             
-            cursor.execute('''
-                UPDATE annotations 
-                SET note = ?, color = ?, updated_at = ?
-                WHERE id = ?
-            ''', (data.get('note', ''), data.get('color', '#FFEB3B'), updated_at, ann_id))
+            if username:
+                cursor.execute('''
+                    UPDATE annotations 
+                    SET note = ?, color = ?, updated_at = ?
+                    WHERE id = ? AND username = ?
+                ''', (data.get('note', ''), data.get('color', '#FFEB3B'), updated_at, ann_id, username))
+            else:
+                cursor.execute('''
+                    UPDATE annotations 
+                    SET note = ?, color = ?, updated_at = ?
+                    WHERE id = ?
+                ''', (data.get('note', ''), data.get('color', '#FFEB3B'), updated_at, ann_id))
             
             conn.commit()
             
-            cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
+            if username:
+                cursor.execute('SELECT * FROM annotations WHERE id = ? AND username = ?', (ann_id, username))
+            else:
+                cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
             row = cursor.fetchone()
-            self.send_json_response(200, {"data": dict(row)})
+            self.send_json_response(200, {"data": self._parse_row_meta(dict(row))})
             return
         
         self.send_json_response(404, {"message": "Not found"})
     
     def _handle_annotation_delete(self, cursor, parts, conn):
         """处理标注DELETE请求"""
-        # /api/annotations/{id}
-        if len(parts) == 4:
-            ann_id = parts[3]
+        # /api/annotations/item/{id}
+        if len(parts) == 5 and parts[3] == 'item':
+            ann_id = parts[4]
+            username = self._get_username()
             
-            cursor.execute('DELETE FROM annotations WHERE id = ?', (ann_id,))
+            if username:
+                cursor.execute('DELETE FROM annotations WHERE id = ? AND username = ?', (ann_id, username))
+            else:
+                cursor.execute('DELETE FROM annotations WHERE id = ?', (ann_id,))
             conn.commit()
             
             self.send_json_response(200, {"message": "Deleted"})

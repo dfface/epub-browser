@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
     '/assets/book.css',
     '/assets/book.js',
     '/assets/chapter.css',
+    '/assets/annotation.css',
     '/assets/chapter.js',
     '/assets/fa.all.min.css',
     '/assets/sortable.min.js',

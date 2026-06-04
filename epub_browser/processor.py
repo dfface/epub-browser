@@ -1111,6 +1111,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -1611,6 +1612,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </script>
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
+    <script src="/assets/web-highlighter.min.js"></script>
     <script src="/assets/chapter.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>

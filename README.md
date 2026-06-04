@@ -82,8 +82,6 @@ It now supports the following features:
     - Custom color management: drag to reorder, add custom colors, delete custom colors
     - Export all annotations or book-specific annotations as JSON
   - **Data Migration**: When switching storage locations, optionally migrate existing annotations
-  - Compatible with all devices including Kindle
-
 
 ## Usage
 
