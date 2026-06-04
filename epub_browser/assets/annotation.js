@@ -488,7 +488,16 @@
                 xhr.timeout = CONFIG.HEALTH_TIMEOUT;
                 
                 xhr.onload = function() {
-                    self.available = xhr.status >= 200 && xhr.status < 300;
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            var resp = JSON.parse(xhr.responseText);
+                            self.available = resp.status === 'ok';
+                        } catch (e) {
+                            self.available = false;
+                        }
+                    } else {
+                        self.available = false;
+                    }
                     resolve({ available: self.available });
                 };
                 
