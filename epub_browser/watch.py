@@ -183,9 +183,27 @@ class EpubFileHandler(FileSystemEventHandler):
     def _handle_move_destination(self, dest_path):
         """处理移动操作目标文件的后台任务"""
         try:
-            print(f"[{str(datetime.now())}][Move] Wait for 3 seconds to allow the file to stabilize before adding it: {dest_path}")
-            time.sleep(3)  # 等待文件稳定
-            print(f"[{str(datetime.now())}][Move] Processing destination addition: {dest_path}")
+            # Wait for the file to stabilize (rclone/WebDAV uploads may need extra time)
+            print(f"[{str(datetime.now())}][Move] Waiting for file to stabilize: {dest_path}")
+            stable = False
+            last_size = -1
+            for attempt in range(10):  # up to ~5 seconds of stabilization
+                if not os.path.exists(dest_path):
+                    print(f"[{str(datetime.now())}][Move] File not found, waiting: {dest_path}")
+                    time.sleep(0.5)
+                    continue
+                current_size = os.path.getsize(dest_path)
+                if current_size == last_size and current_size > 0:
+                    stable = True
+                    break
+                last_size = current_size
+                time.sleep(0.5)
+            
+            if not stable:
+                print(f"[{str(datetime.now())}][Move] File did not stabilize, skipping: {dest_path}")
+                return
+            
+            print(f"[{str(datetime.now())}][Move] File stabilized ({last_size} bytes), processing: {dest_path}")
             with self.library_lock:
                 ok, book_info = self.library.add_book(dest_path)
                 if ok:
@@ -200,27 +218,38 @@ class EpubFileHandler(FileSystemEventHandler):
             sys.stderr.flush()
     
     def on_moved(self, event):
-        if not event.is_directory and event.src_path.endswith('.epub'):
-            print(f"[{str(datetime.now())}][Move] EPUB file detected: from {event.src_path} to {event.dest_path}")
-            # 处理源文件删除（如果存在）
-            if event.src_path in self.library.file2hash:
-                book_hash = self.library.file2hash[event.src_path]
-                if book_hash in self.library.books:
-                    book_info = self.library.books[book_hash]
-                    # 提交源文件处理到线程池
-                    task_id = f"move_src_{event.src_path}"
-                    self._submit_task(task_id, self._handle_move_source, event.src_path, book_hash, book_info)
-            
-            # 处理目标文件添加
-            if event.dest_path.endswith('.epub'):
-                if (not os.path.basename(event.dest_path).startswith(".")) and (not self.has_hidden_component(event.dest_path)):
-                    dest_path = event.dest_path
-                    if (os.path.basename(dest_path).startswith(".")) or (self.has_hidden_component(dest_path)):
-                        print(f"[{str(datetime.now())}][Move] Hidden file will not be processed: {dest_path}")
-                        return
-                    # 提交目标文件处理到线程池
-                    task_id = f"move_dest_{dest_path}"
-                    self._submit_task(task_id, self._handle_move_destination, dest_path)
+        if event.is_directory:
+            return
+
+        dest_is_epub = event.dest_path.endswith('.epub')
+        src_is_epub = event.src_path.endswith('.epub')
+
+        # Handle .partial → .epub rename (common with rclone/WebDAV uploads)
+        if not src_is_epub and dest_is_epub:
+            # e.g. file.epub..partial → file.epub
+            if not os.path.basename(event.dest_path).startswith(".") and not self.has_hidden_component(event.dest_path):
+                print(f"[{str(datetime.now())}][Move] EPUB file detected (partial rename): from {event.src_path} to {event.dest_path}")
+                task_id = f"move_dest_{event.dest_path}"
+                self._submit_task(task_id, self._handle_move_destination, event.dest_path)
+            return
+
+        if not src_is_epub:
+            return
+
+        print(f"[{str(datetime.now())}][Move] EPUB file detected: from {event.src_path} to {event.dest_path}")
+        # Handle source deletion (if existed)
+        if event.src_path in self.library.file2hash:
+            book_hash = self.library.file2hash[event.src_path]
+            if book_hash in self.library.books:
+                book_info = self.library.books[book_hash]
+                task_id = f"move_src_{event.src_path}"
+                self._submit_task(task_id, self._handle_move_source, event.src_path, book_hash, book_info)
+
+        # Handle destination addition
+        if dest_is_epub:
+            if not os.path.basename(event.dest_path).startswith(".") and not self.has_hidden_component(event.dest_path):
+                task_id = f"move_dest_{event.dest_path}"
+                self._submit_task(task_id, self._handle_move_destination, event.dest_path)
     
     def shutdown(self):
         """关闭线程池"""

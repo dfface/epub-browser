@@ -92,6 +92,17 @@ class EPUBLibrary:
             
             # 存储书籍信息
             book_info = processor.get_book_info()
+            
+            # 如果同一路径之前已有旧记录，先清理旧记录
+            # （用于处理覆盖同名 EPUB 文件的情况，旧 hash 与新 hash 不同）
+            origin_path = book_info['origin_file_path']
+            if origin_path in self.file2hash:
+                old_hash = self.file2hash[origin_path]
+                new_hash = book_info['hash']
+                if old_hash != new_hash and old_hash in self.books:
+                    print(f"[Add] Replacing old version: {self.books[old_hash]['title']} (hash: {old_hash})")
+                    self.remove_book(old_hash)
+            
             self.books[book_info['hash']] = {
                 'temp_dir': book_info['temp_dir'],
                 'title': book_info['title'],
@@ -102,7 +113,7 @@ class EPUBLibrary:
                 'processor': processor,
                 'origin_file_path': book_info['origin_file_path']
             }
-            self.file2hash[book_info['origin_file_path']] = book_info['hash']
+            self.file2hash[origin_path] = book_info['hash']
             
             # print(f"Successfully added book: {book_info['title']} (Hash: {book_info['hash']})")
             return True, book_info
@@ -240,7 +251,8 @@ if (isKindle) {
             cur_tags = book_info['tags']
             if cur_tags:
                 for cur_tag in cur_tags:
-                    all_tags.add(cur_tag)
+                    if isinstance(cur_tag, str) and cur_tag.strip():
+                        all_tags.add(cur_tag.strip())
 
         library_html += f"""
     <div class="container">
@@ -276,7 +288,7 @@ if (isKindle) {
                 <div class="tag-cloud-item active" data-id="All">All</div>
                 <div class="tag-cloud-item" data-id="NoTag">NoTag</div>
 """
-        for tag in sorted(all_tags):
+        for tag in sorted(t for t in all_tags if isinstance(t, str) and t.strip()):
             library_html += f"""<div class="tag-cloud-item" data-id="{tag}">{tag}</div>"""
         library_html += """
             </div>
@@ -505,12 +517,20 @@ if (isKindle) {
     def remove_book(self, book_hash):
         book_path = os.path.join(self.base_directory, "book")
         cur_path = os.path.join(book_path, book_hash)
+        
+        # Clean up file2hash mapping
+        if book_hash in self.books:
+            origin_path = self.books[book_hash].get('origin_file_path')
+            if origin_path and origin_path in self.file2hash:
+                del self.file2hash[origin_path]
+        
         if os.path.exists(cur_path):
             try:
                 shutil.rmtree(cur_path)
-                self.books.pop(book_hash)
             except Exception as e:
                 print(f"remove {cur_path} failed, err: {e}")
+        
+        self.books.pop(book_hash, None)
 
     def reorganize_files(self):
         """按照 href 的格式组织目录"""
