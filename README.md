@@ -21,6 +21,8 @@ It now supports the following features:
 
 - **Page navigation**: Keyboard controls supported (Left Arrow, Right Arrow and Spacebar for page turning/scrolling).
 
+- **Continuous Scroll** (Scrolling mode only): Seamlessly load the next chapter when scrolling past the end of the current one. Enable via Settings > Reading > Scroll Mode. Ideal for books with many short sections. Note: scroll progress save/restore is disabled in this mode (chapter position tracked via URL).
+
 - **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen. Automatically detected based on device user agent (Kindle/Silk browsers).
 
 - Reading progress bar
