@@ -1,3 +1,8 @@
+// 禁用浏览器自动恢复滚动位置（连续滚动模式自己管理位置）
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+}
+
 function isFontAvailable(fontName) {
     var canvas = document.createElement('canvas');
     var context = canvas.getContext('2d');
@@ -341,6 +346,7 @@ function initScript() {
     var isClickPageEnabled = false;
     var loadedChapters = {};  // 记录已加载的章节 {chapterIndex: true}
     var isLoadingChapter = false;  // 防止重复加载
+    var maxScrollTopSoFar = 0;  // 连续滚动模式下，跟踪用户向下滚过的最远位置
 
     var fontSize = "3";
     var fontFamily = "ebook-default";
@@ -1340,8 +1346,13 @@ function initScript() {
             if (scrollBottom < 300) {
                 loadNextChapter();
             }
-            // 距离顶部 100px 时加载上一章
-            if (st < 100) {
+            // 跟踪用户向下滚过的最远位置
+            if (st > maxScrollTopSoFar) {
+                maxScrollTopSoFar = st;
+            }
+            // 只有用户已经向下滚过至少 300px 后再回滚到顶部附近，才加载上一章
+            // 避免刚进入页面时轻微滚动就触发 loadPrevChapter 导致位置跳变
+            if (st < 100 && maxScrollTopSoFar >= 300) {
                 loadPrevChapter();
             }
         }
@@ -1780,6 +1791,10 @@ function initScript() {
         
         isLoadingChapter = true;
         
+        // 记录加载前的滚动高度和位置，用于加载完成后保持阅读位置
+        var prevScrollHeight = document.documentElement.scrollHeight;
+        var prevScrollY = window.scrollY;
+        
         // 在内容顶部插入加载指示器
         var loader = document.createElement('div');
         loader.className = 'continuous-scroll-loader';
@@ -1790,9 +1805,6 @@ function initScript() {
         } else {
             content.appendChild(loader);
         }
-        
-        // 记录加载前的滚动高度，用于保持阅读位置
-        var prevScrollHeight = document.documentElement.scrollHeight;
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', getChapterUrl(prevIdx), true);
@@ -1843,7 +1855,12 @@ function initScript() {
                     // 调整滚动位置，保持在原来的阅读位置
                     var newScrollHeight = document.documentElement.scrollHeight;
                     var heightDiff = newScrollHeight - prevScrollHeight;
-                    window.scrollTo(0, window.scrollY + heightDiff);
+                    var newScrollY = prevScrollY + heightDiff;
+                    window.scrollTo(0, newScrollY);
+                    // 更新 maxScrollTopSoFar，因为内容插入后整体坐标变化
+                    if (newScrollY > maxScrollTopSoFar) {
+                        maxScrollTopSoFar = newScrollY;
+                    }
                 }
             }
             isLoadingChapter = false;
