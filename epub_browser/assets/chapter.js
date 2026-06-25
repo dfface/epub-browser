@@ -727,7 +727,7 @@ function initScript() {
                 var key = getStorageKey("scroll");
                 var pos = localStorage.getItem(key);
                 var wh = window.innerHeight;
-                setTimeout(function() {
+                var scrollRestoreTimer = setTimeout(function() {
                     if (pos && parseInt(pos) > 0) {
                         window.scrollTo(0, parseInt(pos));
                         var total = document.documentElement.scrollHeight - wh;
@@ -735,6 +735,21 @@ function initScript() {
                         showNotification('Progress loaded: '+pct+'%', 'info');
                     }
                 }, 1000);
+                // 用户在恢复前手动滚动则取消自动恢复
+                var cancelScrollRestore = function() {
+                    if (scrollRestoreTimer) {
+                        clearTimeout(scrollRestoreTimer);
+                        scrollRestoreTimer = null;
+                    }
+                    window.removeEventListener('scroll', cancelScrollRestore);
+                    window.removeEventListener('wheel', cancelScrollRestore);
+                    window.removeEventListener('touchstart', cancelScrollRestore);
+                    window.removeEventListener('keydown', cancelScrollRestore);
+                };
+                window.addEventListener('scroll', cancelScrollRestore, { once: true });
+                window.addEventListener('wheel', cancelScrollRestore, { once: true });
+                window.addEventListener('touchstart', cancelScrollRestore, { once: true });
+                window.addEventListener('keydown', cancelScrollRestore, { once: true });
             }
         }
     }
