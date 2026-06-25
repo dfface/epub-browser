@@ -556,7 +556,7 @@
 .continuous-scroll-tip:hover::after {
     content: attr(data-tip);
     position: absolute;
-    bottom: calc(100% + 8px);
+    top: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%);
     background: var(--text);
@@ -577,11 +577,11 @@
 .continuous-scroll-tip:hover::before {
     content: '';
     position: absolute;
-    bottom: calc(100% + 2px);
+    top: calc(100% + 2px);
     left: 50%;
     transform: translateX(-50%);
     border: 5px solid transparent;
-    border-top-color: var(--text);
+    border-bottom-color: var(--text);
     z-index: 9999;
 }
 
