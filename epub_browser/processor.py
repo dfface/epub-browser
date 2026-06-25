@@ -1292,7 +1292,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
         </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
-            <article class="eb-content" id="eb-content" data-eb-styles>
+            <article class="eb-content" id="eb-content" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
         </div>
@@ -1367,6 +1367,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                 <i class="fas fa-font"></i>
                 <span>Font</span>
             </button>
+            <button class="settings-tab" data-tab="reading">
+                <i class="fas fa-book-reader"></i>
+                <span>Reading</span>
+            </button>
         </div>
         <div class="settings-content">
             <div class="settings-tab-panel active" id="font-tab">
@@ -1401,6 +1405,19 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                             <span class="scale-mark major"></span>
                         </div>
                     </div>
+                </div>
+            </div>
+            <div class="settings-tab-panel" id="reading-tab">
+                <div class="settings-group">
+                    <label class="settings-label">Scroll Mode</label>
+                    <div class="setting-toggle-row">
+                        <span class="setting-label-text">Continuous Scroll</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="continuousScrollToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <small class="setting-hint" id="continuousScrollHint">Only available in Scrolling mode. When enabled, scrolling past the end of a chapter will automatically load the next chapter, creating a seamless reading experience across chapter boundaries.</small>
                 </div>
             </div>
         </div>

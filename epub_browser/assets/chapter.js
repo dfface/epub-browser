@@ -333,11 +333,14 @@ function initScript() {
     }
     
     var isPaginationMode = false;
+    var isContinuousScroll = false;
     var currentPage = 0;
     var totalPages = 0;
     var contentWidth = 0;
     var pageWidth = 0;
     var isClickPageEnabled = false;
+    var loadedChapters = {};  // 记录已加载的章节 {chapterIndex: true}
+    var isLoadingChapter = false;  // 防止重复加载
 
     var fontSize = "3";
     var fontFamily = "ebook-default";
@@ -366,6 +369,19 @@ function initScript() {
             }
         }
         isPaginationMode = currentPaginationMode == "true";
+        
+        // 连续滚动模式状态（仅在非翻页模式下生效）
+        if (!isPaginationMode) {
+            if (window.epubBrowserCache && window.epubBrowserCache.continuousScroll !== undefined) {
+                isContinuousScroll = window.epubBrowserCache.continuousScroll === 'true';
+            } else {
+                isContinuousScroll = localStorage.getItem('continuousScroll') === 'true';
+                if (localStorage.getItem('continuousScroll') !== null) {
+                    if (!window.epubBrowserCache) window.epubBrowserCache = {};
+                    window.epubBrowserCache.continuousScroll = isContinuousScroll ? 'true' : 'false';
+                }
+            }
+        }
         
         if (window.epubBrowserCache && window.epubBrowserCache.font_size) {
             fontSize = window.epubBrowserCache.font_size;
@@ -474,6 +490,9 @@ function initScript() {
         });
     } else {
         loadReadingProgress();
+        if (isContinuousScroll) {
+            initContinuousScroll();
+        }
     }
     
     function savePaginationModeAndReload() {
@@ -703,17 +722,21 @@ function initScript() {
                 showPage(0);
             }
         } else {
-            var key = getStorageKey("scroll");
-            var pos = localStorage.getItem(key);
-            var wh = window.innerHeight;
-            setTimeout(function() {
-                if (pos && parseInt(pos) > 0) {
-                    window.scrollTo(0, parseInt(pos));
-                    var total = document.documentElement.scrollHeight - wh;
-                    var pct = Math.round((parseInt(pos)/total)*100);
-                    showNotification('Progress loaded: '+pct+'%', 'info');
-                }
-            }, 1000);
+            if (isContinuousScroll) {
+                loadContinuousScrollProgress();
+            } else {
+                var key = getStorageKey("scroll");
+                var pos = localStorage.getItem(key);
+                var wh = window.innerHeight;
+                setTimeout(function() {
+                    if (pos && parseInt(pos) > 0) {
+                        window.scrollTo(0, parseInt(pos));
+                        var total = document.documentElement.scrollHeight - wh;
+                        var pct = Math.round((parseInt(pos)/total)*100);
+                        showNotification('Progress loaded: '+pct+'%', 'info');
+                    }
+                }, 1000);
+            }
         }
     }
 
@@ -785,9 +808,14 @@ function initScript() {
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
-                    var prev = document.querySelector(".prev-chapter").href;
-                    if (prev === location.href) showNotification('First', 'warning');
-                    else location.href=prev;
+                    // 连续滚动模式下，用浏览器前进/后退替代跳转
+                    if (isContinuousScroll) {
+                        window.history.back();
+                    } else {
+                        var prev = document.querySelector(".prev-chapter").href;
+                        if (prev === location.href) showNotification('First', 'warning');
+                        else location.href=prev;
+                    }
                     break;
                 case ' ':
                 case 'ArrowDown':
@@ -798,9 +826,14 @@ function initScript() {
                     if (st+ch < sh) break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    var next = document.querySelector(".next-chapter").href;
-                    if (next === location.href) showNotification('Last', 'warning');
-                    else location.href=next;
+                    // 连续滚动模式下，滚动到底部时用浏览器前进替代跳转
+                    if (isContinuousScroll) {
+                        window.history.forward();
+                    } else {
+                        var next = document.querySelector(".next-chapter").href;
+                        if (next === location.href) showNotification('Last', 'warning');
+                        else location.href=next;
+                    }
                     break;
             }
         }
@@ -1278,10 +1311,28 @@ function initScript() {
             progressBar.style.width = pct + '%';
         }
         if (!isKindleMode() && !document.body.classList.contains('pagination-mode')) {
-            var k = getStorageKey("scroll");
-            localStorage.setItem(k, window.scrollY);
+            // 连续滚动模式：保存全局阅读进度
+            if (isContinuousScroll) {
+                saveContinuousScrollProgress();
+            } else {
+                var k = getStorageKey("scroll");
+                localStorage.setItem(k, window.scrollY);
+            }
         }
         updateTocHighlight();
+        
+        // 连续滚动模式：检测是否滚动到底部或顶部
+        if (isContinuousScroll && !isLoadingChapter && !isPaginationMode) {
+            var scrollBottom = dh - st;
+            // 距离底部 300px 时预加载下一章
+            if (scrollBottom < 300) {
+                loadNextChapter();
+            }
+            // 距离顶部 100px 时加载上一章
+            if (st < 100) {
+                loadPrevChapter();
+            }
+        }
     });
     
     var tocToggle = document.getElementById('tocToggle');
@@ -1593,6 +1644,301 @@ function initScript() {
         }
     }
     initAnnotationModule();
+
+    // ==================== 连续滚动模式 ====================
+
+    function initContinuousScroll() {
+        // 标记当前章节已加载
+        var currentIdx = parseInt(chapter_index, 10);
+        loadedChapters[currentIdx] = true;
+    }
+    
+    function updateContinuousScrollUrl(chapterIdx) {
+        var newUrl = '/book/' + book_hash + '/chapter_' + chapterIdx + '.html';
+        if (window.location.pathname !== newUrl) {
+            try {
+                window.history.replaceState({chapterIndex: chapterIdx}, '', newUrl);
+            } catch(e) {}
+        }
+    }
+    
+    function getChapterUrl(idx) {
+        return '/book/' + book_hash + '/chapter_' + idx + '.html';
+    }
+    
+    function loadNextChapter() {
+        var currentIdx = parseInt(chapter_index, 10);
+        var totalChapters = parseInt(content.getAttribute('data-total-chapters'), 10) || 999;
+        var nextIdx = currentIdx + 1;
+        
+        // 找到最后已加载章节的下一章
+        var maxLoaded = currentIdx;
+        for (var key in loadedChapters) {
+            if (loadedChapters.hasOwnProperty(key)) {
+                var k = parseInt(key, 10);
+                if (k > maxLoaded) maxLoaded = k;
+            }
+        }
+        nextIdx = maxLoaded + 1;
+        
+        if (nextIdx >= totalChapters || loadedChapters[nextIdx]) return;
+        
+        isLoadingChapter = true;
+        
+        // 在内容末尾插入加载指示器
+        var loader = document.createElement('div');
+        loader.className = 'continuous-scroll-loader';
+        loader.id = 'scrollLoader';
+        loader.innerHTML = '<span>Loading next chapter</span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+        content.appendChild(loader);
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', getChapterUrl(nextIdx), true);
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                // 从返回的 HTML 中提取正文内容
+                var html = xhr.responseText;
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                var chapterContent = tempDiv.querySelector('#eb-content');
+                
+                // 移除加载指示器
+                var loaderEl = document.getElementById('scrollLoader');
+                if (loaderEl) loaderEl.remove();
+                
+                if (chapterContent) {
+                    // 提取章节标题
+                    var chapterTitle = '';
+                    var titleEl = tempDiv.querySelector('.breadcrumb-current');
+                    if (titleEl) chapterTitle = titleEl.textContent.trim();
+                    if (!chapterTitle) {
+                        var pageTitle = tempDiv.querySelector('title');
+                        if (pageTitle) {
+                            chapterTitle = pageTitle.textContent.split(' - ')[0].trim();
+                        }
+                    }
+                    
+                    // 添加章节分隔符
+                    var separator = document.createElement('div');
+                    separator.className = 'chapter-separator';
+                    separator.innerHTML = '<div class="chapter-sep-title">' + escapeHtml(chapterTitle || ('Chapter ' + (nextIdx + 1))) + '</div><div class="chapter-sep-index">Chapter ' + (nextIdx + 1) + '</div>';
+                    content.appendChild(separator);
+                    
+                    // 追加章节内容
+                    var childNodes = chapterContent.childNodes;
+                    for (var i = 0; i < childNodes.length; i++) {
+                        content.appendChild(childNodes[i].cloneNode(true));
+                    }
+                    
+                    loadedChapters[nextIdx] = true;
+                    
+                    // 更新 URL
+                    updateContinuousScrollUrl(nextIdx);
+                    
+                    // 对新增内容重新绑定 Fancybox
+                    if (typeof Fancybox !== 'undefined') {
+                        Fancybox.bind('#eb-content img:not([data-fancybox])', {});
+                    }
+                }
+            }
+            isLoadingChapter = false;
+        };
+        xhr.onerror = function() {
+            var loaderEl = document.getElementById('scrollLoader');
+            if (loaderEl) loaderEl.remove();
+            isLoadingChapter = false;
+        };
+        xhr.send();
+    }
+    
+    function loadPrevChapter() {
+        var currentIdx = parseInt(chapter_index, 10);
+        
+        // 找到最先已加载章节的前一章
+        var minLoaded = currentIdx;
+        for (var key in loadedChapters) {
+            if (loadedChapters.hasOwnProperty(key)) {
+                var k = parseInt(key, 10);
+                if (k < minLoaded) minLoaded = k;
+            }
+        }
+        var prevIdx = minLoaded - 1;
+        
+        if (prevIdx < 0 || loadedChapters[prevIdx]) return;
+        
+        isLoadingChapter = true;
+        
+        // 在内容顶部插入加载指示器
+        var loader = document.createElement('div');
+        loader.className = 'continuous-scroll-loader';
+        loader.id = 'scrollLoaderTop';
+        loader.innerHTML = '<span>Loading previous chapter</span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+        if (content.firstChild) {
+            content.insertBefore(loader, content.firstChild);
+        } else {
+            content.appendChild(loader);
+        }
+        
+        // 记录加载前的滚动高度，用于保持阅读位置
+        var prevScrollHeight = document.documentElement.scrollHeight;
+        
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', getChapterUrl(prevIdx), true);
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                var html = xhr.responseText;
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                var chapterContent = tempDiv.querySelector('#eb-content');
+                
+                var loaderEl = document.getElementById('scrollLoaderTop');
+                if (loaderEl) loaderEl.remove();
+                
+                if (chapterContent) {
+                    var chapterTitle = '';
+                    var titleEl = tempDiv.querySelector('.breadcrumb-current');
+                    if (titleEl) chapterTitle = titleEl.textContent.trim();
+                    if (!chapterTitle) {
+                        var pageTitle = tempDiv.querySelector('title');
+                        if (pageTitle) {
+                            chapterTitle = pageTitle.textContent.split(' - ')[0].trim();
+                        }
+                    }
+                    
+                    // 创建临时容器收集新内容
+                    var fragment = document.createDocumentFragment();
+                    
+                    // 章节分隔符放在新内容的末尾
+                    var separator = document.createElement('div');
+                    separator.className = 'chapter-separator';
+                    separator.innerHTML = '<div class="chapter-sep-title">' + escapeHtml(chapterTitle || ('Chapter ' + (prevIdx + 1))) + '</div><div class="chapter-sep-index">Chapter ' + (prevIdx + 1) + '</div>';
+                    
+                    var childNodes = chapterContent.childNodes;
+                    for (var i = 0; i < childNodes.length; i++) {
+                        fragment.appendChild(childNodes[i].cloneNode(true));
+                    }
+                    fragment.appendChild(separator);
+                    
+                    // 插入到内容最前面
+                    if (content.firstChild) {
+                        content.insertBefore(fragment, content.firstChild);
+                    } else {
+                        content.appendChild(fragment);
+                    }
+                    
+                    loadedChapters[prevIdx] = true;
+                    
+                    // 调整滚动位置，保持在原来的阅读位置
+                    var newScrollHeight = document.documentElement.scrollHeight;
+                    var heightDiff = newScrollHeight - prevScrollHeight;
+                    window.scrollTo(0, window.scrollY + heightDiff);
+                }
+            }
+            isLoadingChapter = false;
+        };
+        xhr.onerror = function() {
+            var loaderEl = document.getElementById('scrollLoaderTop');
+            if (loaderEl) loaderEl.remove();
+            isLoadingChapter = false;
+        };
+        xhr.send();
+    }
+    
+    function saveContinuousScrollProgress() {
+        // 保存全局阅读进度：基于已加载的所有章节计算当前阅读百分比
+        var totalChapters = parseInt(content.getAttribute('data-total-chapters'), 10);
+        if (!totalChapters) return;
+        
+        // 找到当前视口对应的章节
+        var st = window.scrollY;
+        var chapters = content.querySelectorAll('.chapter-separator');
+        var currentVisibleChapter = parseInt(chapter_index, 10);
+        
+        for (var i = chapters.length - 1; i >= 0; i--) {
+            if (chapters[i].offsetTop <= st + 100) {
+                // 根据分隔符位置推断当前章节
+                currentVisibleChapter = parseInt(chapter_index, 10) + i;
+                break;
+            }
+        }
+        
+        var key = 'continuous_' + book_hash;
+        localStorage.setItem(key, JSON.stringify({
+            scrollY: window.scrollY,
+            chapterIndex: currentVisibleChapter,
+            timestamp: Date.now()
+        }));
+    }
+    
+    function loadContinuousScrollProgress() {
+        var key = 'continuous_' + book_hash;
+        var saved = localStorage.getItem(key);
+        if (saved) {
+            try {
+                var data = JSON.parse(saved);
+                if (data.scrollY > 0) {
+                    setTimeout(function() {
+                        window.scrollTo(0, data.scrollY);
+                        var total = document.documentElement.scrollHeight - window.innerHeight;
+                        var pct = Math.round((data.scrollY / total) * 100);
+                        showNotification('Progress loaded: ' + pct + '%', 'info');
+                    }, 1000);
+                }
+            } catch(e) {}
+        }
+    }
+    
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+    
+    // 绑定 continuous scroll toggle 开关
+    var continuousScrollToggle = document.getElementById('continuousScrollToggle');
+    var continuousScrollHint = document.getElementById('continuousScrollHint');
+    if (continuousScrollToggle) {
+        // 翻页模式下禁用该开关
+        if (isPaginationMode) {
+            continuousScrollToggle.disabled = true;
+            continuousScrollToggle.checked = false;
+            if (continuousScrollHint) {
+                continuousScrollHint.textContent = 'Continuous scroll is only available in Scrolling mode. Switch to Scrolling mode first to enable this feature.';
+            }
+        } else {
+            continuousScrollToggle.disabled = false;
+            continuousScrollToggle.checked = isContinuousScroll;
+            if (continuousScrollHint) {
+                continuousScrollHint.textContent = 'When enabled, scrolling past the end of a chapter will automatically load the next chapter, creating a seamless reading experience across chapter boundaries.';
+            }
+        }
+        
+        continuousScrollToggle.addEventListener('change', function() {
+            // 翻页模式下不允许切换
+            if (isPaginationMode) {
+                this.checked = false;
+                showNotification('Continuous scroll requires Scrolling mode', 'warning');
+                return;
+            }
+            
+            isContinuousScroll = this.checked;
+            if (!isKindleMode()) {
+                localStorage.setItem('continuousScroll', isContinuousScroll ? 'true' : 'false');
+            } else {
+                setCookie('continuousScroll', isContinuousScroll ? 'true' : 'false');
+            }
+            if (!window.epubBrowserCache) window.epubBrowserCache = {};
+            window.epubBrowserCache.continuousScroll = isContinuousScroll ? 'true' : 'false';
+            
+            if (isContinuousScroll) {
+                showNotification('Continuous scroll enabled - reloading...', 'info');
+            } else {
+                showNotification('Continuous scroll disabled - reloading...', 'info');
+            }
+            // 重新加载以应用/取消连续滚动模式
+            setTimeout(function() { location.reload(); }, 500);
+        });
+    }
 }
 
 window.initScriptChapter = initScript;
