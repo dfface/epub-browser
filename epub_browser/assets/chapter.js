@@ -722,9 +722,8 @@ function initScript() {
                 showPage(0);
             }
         } else {
-            if (isContinuousScroll) {
-                loadContinuousScrollProgress();
-            } else {
+            // 连续滚动模式下不恢复滚动进度（章节位置通过 URL 记录）
+            if (!isContinuousScroll) {
                 var key = getStorageKey("scroll");
                 var pos = localStorage.getItem(key);
                 var wh = window.innerHeight;
@@ -1311,10 +1310,8 @@ function initScript() {
             progressBar.style.width = pct + '%';
         }
         if (!isKindleMode() && !document.body.classList.contains('pagination-mode')) {
-            // 连续滚动模式：保存全局阅读进度
-            if (isContinuousScroll) {
-                saveContinuousScrollProgress();
-            } else {
+            // 连续滚动模式下不保存滚动进度（章节位置通过 URL 记录）
+            if (!isContinuousScroll) {
                 var k = getStorageKey("scroll");
                 localStorage.setItem(k, window.scrollY);
             }
@@ -1909,7 +1906,7 @@ function initScript() {
             continuousScrollToggle.disabled = false;
             continuousScrollToggle.checked = isContinuousScroll;
             if (continuousScrollHint) {
-                continuousScrollHint.textContent = 'When enabled, scrolling past the end of a chapter will automatically load the next chapter, creating a seamless reading experience across chapter boundaries.';
+                continuousScrollHint.textContent = 'When enabled, scrolling past the end of a chapter automatically loads the next chapter. Scroll progress save/restore is disabled (chapter position tracked via URL). Tip: in scrolling mode, double-tap Space for similar seamless reading.';
             }
         }
         

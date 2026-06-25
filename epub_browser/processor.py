@@ -1410,13 +1410,11 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
                     <label class="settings-label">Scroll Mode</label>
-                    <div class="setting-toggle-row">
-                        <span class="setting-label-text">Continuous Scroll</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="continuousScrollToggle">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="continuousScrollToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text">Enable Continuous Scroll</span>
+                    </label>
                     <small class="setting-hint" id="continuousScrollHint">Only available in Scrolling mode. When enabled, scrolling past the end of a chapter will automatically load the next chapter, creating a seamless reading experience across chapter boundaries.</small>
                 </div>
             </div>
