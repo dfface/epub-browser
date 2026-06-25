@@ -1936,6 +1936,31 @@ function initScript() {
             setTimeout(function() { location.reload(); }, 500);
         });
     }
+    
+    // 连续滚动开关的 hint tooltip（JS 动态创建 append 到 body，避免被 settings-content 的 overflow 裁剪）
+    if (continuousScrollTip) {
+        var tipTooltip = null;
+        continuousScrollTip.addEventListener('mouseenter', function() {
+            var tipText = continuousScrollTip.getAttribute('data-tip');
+            if (!tipText) return;
+            
+            tipTooltip = document.createElement('div');
+            tipTooltip.className = 'continuous-scroll-tooltip';
+            tipTooltip.textContent = tipText;
+            document.body.appendChild(tipTooltip);
+            
+            var iconRect = continuousScrollTip.getBoundingClientRect();
+            tipTooltip.style.left = (iconRect.left + iconRect.width / 2) + 'px';
+            tipTooltip.style.transform = 'translateX(-50%)';
+            tipTooltip.style.bottom = (window.innerHeight - iconRect.top + 8) + 'px';
+        });
+        continuousScrollTip.addEventListener('mouseleave', function() {
+            if (tipTooltip) {
+                tipTooltip.remove();
+                tipTooltip = null;
+            }
+        });
+    }
 }
 
 window.initScriptChapter = initScript;

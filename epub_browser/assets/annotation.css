@@ -553,12 +553,8 @@
     content: 'Drag to reorder.';
 }
 
-.continuous-scroll-tip:hover::after {
-    content: attr(data-tip);
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
+.continuous-scroll-tooltip {
+    position: fixed;
     background: var(--text);
     color: var(--background);
     padding: 8px 12px;
@@ -572,17 +568,17 @@
     text-align: left;
     z-index: 9999;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: none;
 }
 
-.continuous-scroll-tip:hover::before {
+.continuous-scroll-tooltip::after {
     content: '';
     position: absolute;
-    top: calc(100% + 2px);
+    top: 100%;
     left: 50%;
     transform: translateX(-50%);
     border: 5px solid transparent;
-    border-bottom-color: var(--text);
-    z-index: 9999;
+    border-top-color: var(--text);
 }
 
 .color-add-btn {
