@@ -556,7 +556,7 @@
 .continuous-scroll-tip:hover::after {
     content: attr(data-tip);
     position: absolute;
-    top: calc(100% + 8px);
+    bottom: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%);
     background: var(--text);
@@ -570,19 +570,19 @@
     max-width: min(320px, calc(100vw - 40px));
     line-height: 1.5;
     text-align: left;
-    z-index: 100;
+    z-index: 9999;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
 .continuous-scroll-tip:hover::before {
     content: '';
     position: absolute;
-    top: calc(100% + 2px);
+    bottom: calc(100% + 2px);
     left: 50%;
     transform: translateX(-50%);
     border: 5px solid transparent;
-    border-bottom-color: var(--text);
-    z-index: 100;
+    border-top-color: var(--text);
+    z-index: 9999;
 }
 
 .color-add-btn {
