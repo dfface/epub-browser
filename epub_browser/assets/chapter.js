@@ -1893,20 +1893,20 @@ function initScript() {
     
     // 绑定 continuous scroll toggle 开关
     var continuousScrollToggle = document.getElementById('continuousScrollToggle');
-    var continuousScrollHint = document.getElementById('continuousScrollHint');
+    var continuousScrollTip = document.getElementById('continuousScrollTip');
     if (continuousScrollToggle) {
         // 翻页模式下禁用该开关
         if (isPaginationMode) {
             continuousScrollToggle.disabled = true;
             continuousScrollToggle.checked = false;
-            if (continuousScrollHint) {
-                continuousScrollHint.textContent = 'Continuous scroll is only available in Scrolling mode. Switch to Scrolling mode first to enable this feature.';
+            if (continuousScrollTip) {
+                continuousScrollTip.setAttribute('data-tip', 'Continuous scroll is only available in Scrolling mode. Switch to Scrolling mode first to enable this feature.');
             }
         } else {
             continuousScrollToggle.disabled = false;
             continuousScrollToggle.checked = isContinuousScroll;
-            if (continuousScrollHint) {
-                continuousScrollHint.textContent = 'When enabled, scrolling past the end of a chapter automatically loads the next chapter. Scroll progress save/restore is disabled (chapter position tracked via URL). Tip: in scrolling mode, double-tap Space for similar seamless reading.';
+            if (continuousScrollTip) {
+                continuousScrollTip.setAttribute('data-tip', 'Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off.');
             }
         }
         

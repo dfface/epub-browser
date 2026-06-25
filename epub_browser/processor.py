@@ -1414,8 +1414,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
                         <span class="switch-text">Enable Continuous Scroll</span>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
                     </label>
-                    <small class="setting-hint" id="continuousScrollHint">Only available in Scrolling mode. When enabled, scrolling past the end of a chapter will automatically load the next chapter, creating a seamless reading experience across chapter boundaries.</small>
                 </div>
             </div>
         </div>

@@ -498,7 +498,8 @@
 
 .color-info-tip,
 .color-tip-default,
-.color-tip-reorder {
+.color-tip-reorder,
+.continuous-scroll-tip {
     cursor: help;
     color: var(--text-secondary);
     font-size: 0.8rem;
@@ -511,7 +512,8 @@
 
 .color-info-tip:hover,
 .color-tip-default:hover,
-.color-tip-reorder:hover {
+.color-tip-reorder:hover,
+.continuous-scroll-tip:hover {
     opacity: 1;
 }
 
@@ -549,6 +551,38 @@
 
 .color-tip-reorder:hover::after {
     content: 'Drag to reorder.';
+}
+
+.continuous-scroll-tip:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--background);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: normal;
+    word-break: break-word;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 40px));
+    line-height: 1.5;
+    text-align: left;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.continuous-scroll-tip:hover::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--text);
+    z-index: 100;
 }
 
 .color-add-btn {
