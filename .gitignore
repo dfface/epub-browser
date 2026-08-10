@@ -6,3 +6,5 @@ dist
 epub_browser.egg-info
 epub_browser/__pycache__/
 .worktrees/
+.agents/
+.codegraph/
