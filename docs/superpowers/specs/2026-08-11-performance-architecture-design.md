@@ -37,6 +37,63 @@ local annotations, and the current book/shelf features.
   chapter URL while trimming distant DOM content.
 - Stale prefetches are cancelled when reading direction changes.
 
+### Reader experience and extensible UI profiles
+
+- Presentation is a build-time `UIProfile` boundary, separate from book data,
+  release publication, URLs, reader state, annotations, shelves, and sync.
+  A profile owns page templates, entry assets, visual tokens, and optional
+  presentation-only interaction hooks; it must not own persistence or chapter
+  delivery.
+- The CLI accepts `--ui=<profile-id>` and defaults to the new Kindle-inspired
+  `reader` profile, displayed to users as **Quiet**. `--ui=legacy`, displayed
+  as **Classic**, deliberately produces the current interface for conservative
+  rollout and Kindle/Silk compatibility. The profile registry is open for
+  future distinct designs (including deliberately expressive ones) without
+  changing the conversion pipeline.
+- Every installed profile emits the same stable chapter URLs and consumes the
+  same immutable release data and chapter fragments. Selection is explicit at
+  generation time, not a runtime server switch or a separate deployment.
+- The default `reader` profile is an MPA-first progressive enhancement: every
+  chapter URL opens as a complete page; capable browsers retain a persistent
+  Reader App Shell and progressively navigate same-book previous/next and
+  table-of-contents links. Native navigation remains the fallback for
+  unsupported browsers, failures, cross-book links, and new-tab requests.
+- The `reader` visual language is Kindle-inspired and content-first: paper/ink
+  light and dark tokens, no remote font dependency, no glass/blur/parallax,
+  and only restrained opacity/transform transitions. `prefers-reduced-motion`
+  disables the transition.
+- The reading measure, line height, responsive gutters, semantic landmarks,
+  focus transfer after progressive navigation, keyboard controls, and 44px
+  touch targets are part of the `reader` profile contract. Controls may recede
+  during reading but remain immediately recoverable.
+- Loading feedback is announced politely and appears only after a short delay,
+  so fast navigation neither flashes a skeleton nor shifts the reading layout.
+
+### Internationalization
+
+- Internationalization is a shared runtime service, independent from
+  `UIProfile`. A profile supplies visual treatment and `data-i18n` keys; the
+  locale service supplies text, plural/formatting rules, document language, and
+  accessible labels. This lets Quiet, Classic, and future profiles use the same
+  languages without duplicating their catalogs.
+- First-class locales are `zh-CN` and `en`. The initial document is rendered in
+  `zh-CN` to preserve the current Chinese-first experience. When JavaScript is
+  available, selection is: saved user preference, compatible browser language,
+  then `zh-CN`. Users can switch language in the UI, and the preference is
+  retained locally.
+- Selection happens wholly in the browser and never changes a chapter URL,
+  release, annotation, bookshelf, or reading-progress key. Docker and Pages
+  serve exactly the same static output; there is no language-specific site tree
+  or server content negotiation.
+- All product UI strings, plural forms, date/number formatting, document
+  `lang`, control labels, notifications, and ARIA text use stable message keys.
+  EPUB titles and source chapter content are never machine-translated. Missing
+  translations fall back to `en` and are surfaced by development tests.
+- Locale catalogs are local, versioned release assets. The initial Chinese
+  document remains usable without JavaScript; another catalog is fetched only
+  when required and then cached with the release. No remote translation or font
+  service is introduced.
+
 ### Static delivery and release publication
 
 - Runtime Python support changes from `>=3.6` to `>=3.9`.
@@ -81,38 +138,51 @@ Uvicorn / Starlette
 
 Browser shared runtime
   -> Library module        -> manifest, LibrarySnapshot, lazy cards
-  -> Reader module         -> ChapterStream -> ChapterSource adapter
+  -> UIProfile entrypoint  -> Reader App Shell -> ReaderNavigation / ChapterStream
+                                             -> ChapterSource adapter
+  -> I18n module           -> locale catalog, browser/local preference, formatters
   -> Annotation / shelf    -> local storage first; server adapter on demand
 ```
 
-`ReleasePublisher`, `LibrarySnapshot`, `ChapterStream`, and `StaticDelivery`
-are deep modules. Their interfaces hide file layout, version selection,
-prefetch state, DOM lifecycle, and HTTP response details. This gives the
-performance policies locality and provides leverage across Docker and Pages.
+`ReleasePublisher`, `LibrarySnapshot`, `UIProfile`, `I18n`,
+`ReaderNavigation`, `ChapterStream`, and `StaticDelivery` are deep modules.
+Their interfaces hide file layout, version selection, presentation and locale
+choice, navigation/prefetch state, DOM lifecycle, and HTTP response details.
+This gives the performance policies locality and provides leverage across
+Docker and Pages.
 
 ## Delivery phases
 
 1. Add regression harnesses, then implement `LibrarySnapshot` and lazy card
    rendering.
-2. Generate chapter fragments and introduce `ChapterStream` behind the current
-   reader UI.
+2. Generate chapter fragments and introduce the default Reader App Shell,
+   `ReaderNavigation`, and `ChapterStream`; retain the existing interface as
+   the explicit `legacy` UI profile.
 3. Publish staging snapshots and replace the hand-written HTTP server with
    Uvicorn/Starlette `StaticDelivery` plus the API module.
-4. Split browser scripts and replace the service-worker cache policy.
+4. Split browser scripts, add the shared locale service, and replace the
+   service-worker cache policy.
 
 Each phase preserves existing CLI arguments, Docker startup behavior, stable
-URLs, and static output. A later phase may consume artifacts created earlier,
-but no phase requires a big-bang migration.
+URLs, and static output. `--ui=reader` becomes the default while
+`--ui=legacy` preserves the old generated experience. A later phase may consume
+artifacts created earlier, but no phase requires a big-bang migration.
 
 ## Verification
 
 - Python `unittest`: snapshot creation, atomic publish/rollback, static cache
   headers, ETag/conditional requests, and Range responses.
 - `node --test`: `LibrarySnapshot` consumer behavior and `ChapterStream`
-  prefetch, append, trim, cancellation, and scroll-position logic.
+  prefetch, append, trim, cancellation, scroll-position logic, plus
+  `ReaderNavigation` history, native fallback, focus behavior, and catalog
+  selection/fallback and message-key coverage for `zh-CN` and `en`.
 - Browser regression: a cold library with 131 books does not eagerly request
   every cover; continuous reading of short and long books prefetches before the
-  visible boundary and retains at most five chapters.
+  visible boundary and retains at most five chapters; `--ui=legacy` still
+  renders the current reader markup and `--ui=reader` provides the immersive
+  App Shell without breaking direct chapter loads. Language switching changes
+  all product controls and accessibility text without changing the current
+  chapter URL or local reading state.
 - Deployment regression: Docker and Cloudflare Pages serve the same generated
   output; local annotations and bookshelf work on Pages, while server sync
   remains available in Docker.
