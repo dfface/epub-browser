@@ -10,3 +10,4 @@ __pycache__/
 .codegraph/
 *.py[cod]
 *.egg-info/
+.agents/
