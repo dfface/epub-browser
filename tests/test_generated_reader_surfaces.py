@@ -39,6 +39,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         chapter_html = self._chapter_html()
 
         self.assertIn(".breadcrumb-library-label", css)
+        self.assertIn("@media (max-width: 768px)", css)
         self.assertIn("flex-wrap: nowrap;", css)
         self.assertIn("min-width: 0;", css)
         self.assertIn("text-overflow: ellipsis;", css)

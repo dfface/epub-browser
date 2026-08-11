@@ -59,7 +59,7 @@
     color: var(--breadcrumb-separator);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     /* Keep the reader path on one predictable line; long names truncate in place. */
     .breadcrumb-container,
     .chapter-top-bar {
