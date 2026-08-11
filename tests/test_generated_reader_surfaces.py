@@ -39,6 +39,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('/assets/book.css?v=13', processor_source)
         self.assertIn('/assets/book.js?v=13', processor_source)
 
+    def test_pagination_mode_does_not_access_the_removed_custom_css_panel(self):
+        script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
+
+        self.assertNotIn('document.querySelector(".custom-css-panel").style', script)
+
+    def test_chapter_script_bypasses_a_stale_service_worker_cache(self):
+        self.assertIn('/assets/chapter.js?v=14', self._chapter_html())
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)

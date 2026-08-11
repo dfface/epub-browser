@@ -460,7 +460,6 @@ function initScript() {
     });
 
     if (isKindleMode() || isPaginationMode) {
-        document.querySelector(".custom-css-panel").style.display = "none";
         var mobileControls = document.querySelector('.mobile-controls');
         var bottomNav = document.querySelector('.navigation');
         bottomNav.style.marginBottom = getElementHeight(mobileControls) + 'px';
@@ -554,15 +553,12 @@ function initScript() {
     }
 
     function toggleHideUnnecessary(hide) {
-        var panel = document.querySelector(".custom-css-panel");
         var bread = document.querySelector(".breadcrumb");
         var footer = document.querySelector("footer");
         if (hide) {
-            panel.style.display = 'none';
             bread.style.display = 'none';
             footer.style.display = 'none';
         } else {
-            panel.style.display = 'inherit';
             bread.style.display = 'inherit';
             footer.style.display = 'inherit';
         }
