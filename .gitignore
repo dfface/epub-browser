@@ -1,7 +1,3 @@
-.DS_Store
-.venv
-venv
-build
-dist
-epub_browser.egg-info
-epub_browser/__pycache__/
+__pycache__/
+*.py[cod]
+*.egg-info/

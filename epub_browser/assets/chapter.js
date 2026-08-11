@@ -347,6 +347,7 @@ function initScript() {
     var loadedChapters = {};  // 记录已加载的章节 {chapterIndex: true}
     var isLoadingChapter = false;  // 防止重复加载
     var maxScrollTopSoFar = 0;  // 连续滚动模式下，跟踪用户向下滚过的最远位置
+    var continuousChapterWindow = null;
 
     var fontSize = "3";
     var fontFamily = "ebook-default";
@@ -1673,7 +1674,26 @@ function initScript() {
     function initContinuousScroll() {
         // 标记当前章节已加载
         var currentIdx = parseInt(chapter_index, 10);
+        var initialSection = document.createElement('section');
+        initialSection.className = 'continuous-chapter';
+        initialSection.setAttribute('data-chapter-index', currentIdx);
+        while (content.firstChild) initialSection.appendChild(content.firstChild);
+        content.appendChild(initialSection);
         loadedChapters[currentIdx] = true;
+        continuousChapterWindow = new EpubChapterWindow(currentIdx, 5);
+    }
+
+    function pruneContinuousWindow(direction, index) {
+        var change = continuousChapterWindow.add(index, direction);
+        change.evicted.forEach(function(index) {
+            var chapter = content.querySelector('.continuous-chapter[data-chapter-index="' + index + '"]');
+            if (!chapter) return;
+            var height = chapter.getBoundingClientRect().height;
+            var aboveViewport = chapter.getBoundingClientRect().bottom <= 0;
+            chapter.remove();
+            delete loadedChapters[index];
+            if (aboveViewport) window.scrollBy(0, -height);
+        });
     }
     
     function updateContinuousScrollUrl(chapterIdx) {
@@ -1741,19 +1761,24 @@ function initScript() {
                         }
                     }
                     
-                    // 添加章节分隔符
+                    // 添加章节分隔符和可淘汰的章节容器
+                    var chapterSection = document.createElement('section');
+                    chapterSection.className = 'continuous-chapter';
+                    chapterSection.setAttribute('data-chapter-index', nextIdx);
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
                     separator.innerHTML = '<div class="chapter-sep-title">' + escapeHtml(chapterTitle || ('Chapter ' + (nextIdx + 1))) + '</div><div class="chapter-sep-index">Chapter ' + (nextIdx + 1) + '</div>';
-                    content.appendChild(separator);
+                    chapterSection.appendChild(separator);
                     
                     // 追加章节内容
                     var childNodes = chapterContent.childNodes;
                     for (var i = 0; i < childNodes.length; i++) {
-                        content.appendChild(childNodes[i].cloneNode(true));
+                        chapterSection.appendChild(childNodes[i].cloneNode(true));
                     }
+                    content.appendChild(chapterSection);
                     
                     loadedChapters[nextIdx] = true;
+                    pruneContinuousWindow('next', nextIdx);
                     
                     // 更新 URL
                     updateContinuousScrollUrl(nextIdx);
@@ -1829,8 +1854,10 @@ function initScript() {
                         }
                     }
                     
-                    // 创建临时容器收集新内容
-                    var fragment = document.createDocumentFragment();
+                    // 创建可淘汰的章节容器
+                    var chapterSection = document.createElement('section');
+                    chapterSection.className = 'continuous-chapter';
+                    chapterSection.setAttribute('data-chapter-index', prevIdx);
                     
                     // 章节分隔符放在新内容的末尾
                     var separator = document.createElement('div');
@@ -1839,18 +1866,19 @@ function initScript() {
                     
                     var childNodes = chapterContent.childNodes;
                     for (var i = 0; i < childNodes.length; i++) {
-                        fragment.appendChild(childNodes[i].cloneNode(true));
+                        chapterSection.appendChild(childNodes[i].cloneNode(true));
                     }
-                    fragment.appendChild(separator);
+                    chapterSection.appendChild(separator);
                     
                     // 插入到内容最前面
                     if (content.firstChild) {
-                        content.insertBefore(fragment, content.firstChild);
+                        content.insertBefore(chapterSection, content.firstChild);
                     } else {
-                        content.appendChild(fragment);
+                        content.appendChild(chapterSection);
                     }
                     
                     loadedChapters[prevIdx] = true;
+                    pruneContinuousWindow('previous', prevIdx);
                     
                     // 调整滚动位置，保持在原来的阅读位置
                     var newScrollHeight = document.documentElement.scrollHeight;
