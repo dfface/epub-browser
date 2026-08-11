@@ -299,13 +299,13 @@ function scopeEBStyles(scopeSelector) {
 
 function initScript() {
     function showLoading() {
-        var overlay = document.getElementById('loadingOverlay');
-        if (overlay) overlay.style.display = 'flex';
+        var overlay = document.getElementById('contentLoading');
+        if (overlay) overlay.classList.add('is-visible');
     }
     
     function hideLoading() {
-        var overlay = document.getElementById('loadingOverlay');
-        if (overlay) overlay.style.display = 'none';
+        var overlay = document.getElementById('contentLoading');
+        if (overlay) overlay.classList.remove('is-visible');
     }
 
     scopeEBStyles();
