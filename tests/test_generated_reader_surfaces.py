@@ -7,6 +7,17 @@ from epub_browser.processor import EPUBProcessor
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_annotation_menu_includes_a_text_only_copy_action(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+
+        self.assertIn('annotation-btn-copy', script)
+        self.assertIn('copyText(source.text)', script)
+
+    def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
+        for html in (self._library_html(), self._chapter_html()):
+            self.assertNotIn('id="loadingOverlay"', html)
+        self.assertIn('id="contentLoading"', self._chapter_html())
+
     def _library_html(self):
         with tempfile.TemporaryDirectory() as directory:
             library = EPUBLibrary(directory)

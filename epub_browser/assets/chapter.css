@@ -28,6 +28,8 @@ body {
     margin: 0 auto;
 }
 
+.breadcrumb-container { max-width: 1000px; margin: 0 auto; padding-top: 20px; }
+
 .eb-header {
     text-align: center;
     margin-bottom: 40px;
@@ -209,6 +211,16 @@ body {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.breadcrumb::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
 }
 
 .breadcrumb a {

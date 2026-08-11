@@ -236,10 +236,6 @@ if (isKindle) {
 </script>
 </head>
 <body>
-    <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay" data-id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
     <div class="top-controls" data-id="top-controls">
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
@@ -256,10 +252,12 @@ if (isKindle) {
                         all_tags.add(cur_tag.strip())
 
         library_html += f"""
-    <div class="container">
+    <div class="breadcrumb-container">
         <nav class="breadcrumb" aria-label="Breadcrumb">
             <span class="breadcrumb-current" aria-current="page">Library</span>
         </nav>
+    </div>
+    <div class="container">
         <header class="library-info" data-id="header">
             <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favicon.svg" class="theme-logo" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">

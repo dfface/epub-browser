@@ -507,10 +507,6 @@ class EPUBProcessor:
     </script>
 </head>
 <body>
-    <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
 
 <div class="top-controls">
     <div class="theme-toggle" id="themeToggle">
@@ -520,12 +516,14 @@ class EPUBProcessor:
 </div>
 """
         index_html += f"""
-<div class="container">
+<div class="breadcrumb-container">
     <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
         <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Library</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
     </nav>
+</div>
+<div class="container">
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
@@ -1196,10 +1194,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 """
         chapter_html +=f"""
 <body>
-    <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
 
     <div class="reading-progress-container">
         <div class="progress-bar" id="progressBar"></div>
@@ -1251,7 +1245,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </ul>
     </div>
 
-    <div class="container">
+    <div class="breadcrumb-container">
         <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
             <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left:8px;">Library</span></a>
             <span class="breadcrumb-separator">/</span>
@@ -1259,7 +1253,12 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-current" aria-current="page">{chapter_title}</span>
         </nav>
+    </div>
+    <div class="container">
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
+            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content">
+                <div class="loading-spinner"></div>
+            </div>
             <article class="eb-content" id="eb-content" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
