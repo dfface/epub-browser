@@ -149,18 +149,20 @@ class EPUBLibrary:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#4a90d9">
+<meta name="theme-color" content="#244548">
 <meta name="description" content="EPUB Library - A web-based EPUB reader">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="EPUB Browser">
 <title>EPUB Library</title>
 <link rel="stylesheet" href="/assets/fa.all.min.css">
-<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">
-<link rel="stylesheet" href="/assets/library.css">
+<link rel="stylesheet" href="/assets/library.css?v=13">
+<link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
+<link rel="stylesheet" href="/assets/loading.css?v=15">
 <link rel="stylesheet" href="/assets/bookshelf.css">
 <script>
 // 立即应用主题，避免闪现 —— Kindle 兼容版
@@ -235,10 +237,6 @@ if (isKindle) {
 </script>
 </head>
 <body>
-    <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay" data-id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
     <div class="top-controls" data-id="top-controls">
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
@@ -255,29 +253,17 @@ if (isKindle) {
                         all_tags.add(cur_tag.strip())
 
         library_html += f"""
-    <div class="container">
-        <header class="eb-header" data-id="header">
-            <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favicon.svg" class="theme-logo" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
-            <div class="stats">
-                <div class="stat-card">
-                    <i class="fas fa-book"></i>
-                    <div>
-                        <div class="stat-value">{len(self.books)} book(s)</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-tags"></i>
-                    <div>
-                        <div class="stat-value">{len(all_tags)} tag(s)</div>
-                    </div>
-                </div>
-
-                <div class="stat-card" id="loginCard" style="cursor: pointer;">
-                    <i class="fas fa-user"></i>
-                    <div class="stat-value" id="loginValue">Login</div>
-                </div>
+    <div class="breadcrumb-container">
+        <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span>Library</span></span>
+            <div class="library-meta" aria-label="Library information">
+                <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i>{len(self.books)} book(s)</span>
+                <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i>{len(all_tags)} tag(s)</span>
+                <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue">Login</span></button>
             </div>
-        </header>
+        </nav>
+    </div>
+    <div class="container">
         <div class="controls" data-id="controls">
             <div class="search-container">
                 <input type="text" class="search-box" placeholder="Search by book title, author, or tag...">
@@ -399,7 +385,7 @@ if (isKindle) {
         library_html += """
         <script src="/assets/theme.js" defer></script>
         <script src="/assets/pinyin-pro.min.js" defer></script>
-        <script src="/assets/library.js" defer></script>
+        <script src="/assets/library.js?v=13" defer></script>
         <script src="/assets/sortable.min.js" defer></script>
         <script src="/assets/bookshelf.js" defer></script>
         <script>
@@ -435,7 +421,7 @@ if (isKindle) {
             base_path = base_path.replace(/index.html$/, '');
         }
         // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-        js_resource = document.querySelector('script[src="/assets/library.js"]');
+        js_resource = document.querySelector('script[src="/assets/library.js?v=13"]');
         if (window.initScriptLibrary && window.initTheme) {
             window.initScriptLibrary();
             console.log("init")

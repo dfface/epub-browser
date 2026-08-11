@@ -28,6 +28,8 @@ body {
     margin: 0 auto;
 }
 
+.chapter-top-bar { width: min(100%, 1000px); max-width: 1000px; margin: 0 auto; padding-top: 20px; }
+
 .eb-header {
     text-align: center;
     margin-bottom: 40px;
@@ -139,7 +141,7 @@ body {
 }
 
 .toc-header {
-    padding: 15px 20px;
+    padding: 28px 24px;
     height: 60px;
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -209,6 +211,16 @@ body {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.breadcrumb::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
 }
 
 .breadcrumb a {
@@ -262,6 +274,7 @@ body {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     overflow: hidden;
+    position: relative;
     transition: var(--transition);
 }
 
@@ -629,6 +642,41 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.settings-group-custom-css {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    gap: 8px;
+}
+
+.settings-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.settings-section-title {
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.settings-section-optional {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--hover-bg);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.3;
+}
+
+.settings-section-description {
+    margin: -2px 0 2px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.45;
 }
 
 .settings-label {
@@ -1494,58 +1542,6 @@ body {
     .breadcrumb, .navigation, .custom-css-panel, .eb-content-container {
         box-shadow: var(--shadow-lg);
     }
-}
-
-/* 加载动画样式 */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 255, 255, 1);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-}
-
-.loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid var(--button-bg);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.dark-mode .loading-overlay {
-    background-color: rgba(0, 0, 0, 1);
-}
-
-.dark-mode .loading-spinner {
-    border: 5px solid #333;
-    border-top: 5px solid var(--button-bg);
-}
-
-.kindle-mode .loading-spinner {
-    width: auto;
-    height: auto;
-    border: none;
-    border-radius: 0;
-    animation: none;
-    font-size: 18px;
-    color: var(--text);
-    font-family: var(--font-family);
-}
-
-.kindle-mode .loading-spinner::after {
-    content: "Loading...";
 }
 
 /* ==================== Reading Settings Tab ==================== */

@@ -418,7 +418,7 @@ class EPUBProcessor:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4a90d9">
+    <meta name="theme-color" content="#244548">
     <meta name="description" content="{self.book_title} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -426,8 +426,10 @@ class EPUBProcessor:
     <title>{self.book_title}</title>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
-    <link rel="stylesheet" href="/assets/book.css">
-    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+    <link rel="stylesheet" href="/assets/book.css?v=13">
+    <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
+    <link rel="stylesheet" href="/assets/loading.css?v=15">
+    <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
@@ -506,10 +508,6 @@ class EPUBProcessor:
     </script>
 </head>
 <body>
-    <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
 
 <div class="top-controls">
     <div class="theme-toggle" id="themeToggle">
@@ -519,12 +517,14 @@ class EPUBProcessor:
 </div>
 """
         index_html += f"""
-<div class="container">
-    <div class="breadcrumb eb-header" data-id="breadcrumb">
-        <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
+<div class="breadcrumb-container">
+    <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
+        <a href="/index.html#{self.book_hash}"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
         <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
-    </div>
+        <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
+    </nav>
+</div>
+<div class="container">
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
@@ -688,7 +688,7 @@ class EPUBProcessor:
 
         index_html += """
 <script src="/assets/theme.js" defer></script>
-<script src="/assets/book.js" defer></script>
+<script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
@@ -726,7 +726,7 @@ let basePath = path.split('/book/');
 basePath = basePath[0] + "/";
 
 // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-const js_resource = document.querySelector('script[src="/assets/book.js"]');
+const js_resource = document.querySelector('script[src="/assets/book.js?v=13"]');
 if (window.initScriptBook && window.initTheme) {
     console.log("init")
     window.initScriptBook();
@@ -1099,7 +1099,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4a90d9">
+    <meta name="theme-color" content="#244548">
     <meta name="description" content="{chapter_title} - {self.book_title} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1110,10 +1110,12 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
-    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="stylesheet" href="/assets/chapter.css?v=17">
+    <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
+    <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/fancybox.min.css">
-    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+    <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
@@ -1194,10 +1196,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 """
         chapter_html +=f"""
 <body>
-    <!-- 加载动画 -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
-    </div>
 
     <div class="reading-progress-container">
         <div class="progress-bar" id="progressBar"></div>
@@ -1249,49 +1247,20 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </ul>
     </div>
 
+    <div class="chapter-top-bar">
+        <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
+            <a href="/index.html#{self.book_hash}"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current" aria-current="page">{chapter_title}</span>
+        </nav>
+    </div>
     <div class="container">
-        <div class="breadcrumb eb-header" data-id="breadcrumb">
-            <a href="/index.html#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
-            <span class="breadcrumb-separator">/</span>
-            <a href="/book/{self.book_hash}/index.html" alt="bookHome" class="a-book-home">{self.book_title}</a>
-            <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-current">{chapter_title}</span>
-        </div> 
-
-        <div class="custom-css-panel" data-id="custom-css-panel">
-            <div class="panel-header" id="cssPanelToggle">
-                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
-                <button class="panel-toggle">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-            </div>
-            <div class="panel-content" id="cssPanelContent">
-                <div class="css-editor">
-                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
-                    <div class="css-controls">
-                        <button class="css-btn primary" id="saveCssBtn">
-                            <i class="fas fa-save"></i> Save
-                        </button>
-                        <button class="css-btn primary" id="saveAsDefaultBtn">
-                            <i class="fas fa-star"></i> Save as default
-                        </button>
-                        <button class="css-btn secondary" id="resetCssBtn">
-                            <i class="fas fa-undo"></i> Reset
-                        </button>
-                        <button class="css-btn secondary" id="loadDefaultBtn">
-                            <i class="fas fa-download"></i> Load default
-                        </button>
-                        <button class="css-btn secondary" id="previewCssBtn">
-                            <i class="fas fa-eye"></i> Preview
-                        </button>
-                    </div>
-                    <div class="css-info">
-                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
+            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content">
+                <div class="loading-spinner"></div>
+            </div>
             <article class="eb-content" id="eb-content" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
@@ -1409,7 +1378,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
-                    <label class="settings-label">Scroll Mode</label>
+                    <label class="settings-label">Reading mode</label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
@@ -1418,6 +1387,36 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                             <i class="fas fa-info-circle"></i>
                         </span>
                     </label>
+                </div>
+                <div class="settings-group settings-group-custom-css">
+                    <div class="settings-section-heading">
+                        <span class="settings-section-title">Custom styles</span>
+                        <span class="settings-section-optional">Optional</span>
+                    </div>
+                    <p class="settings-section-description">Use CSS to fine-tune this book’s typography and layout.</p>
+                    <div class="css-editor">
+                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
+                        <div class="css-controls">
+                            <button class="css-btn primary" id="saveCssBtn">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                            <button class="css-btn primary" id="saveAsDefaultBtn">
+                                <i class="fas fa-star"></i> Save as default
+                            </button>
+                            <button class="css-btn secondary" id="resetCssBtn">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
+                            <button class="css-btn secondary" id="loadDefaultBtn">
+                                <i class="fas fa-download"></i> Load default
+                            </button>
+                            <button class="css-btn secondary" id="previewCssBtn">
+                                <i class="fas fa-eye"></i> Preview
+                            </button>
+                        </div>
+                        <div class="css-info">
+                            <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1597,7 +1596,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     basePath = basePath[0] + "/";
     
     // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-    const js_resource = document.querySelector('script[src="/assets/chapter.js"]');
+    const js_resource = document.querySelector('script[src="/assets/chapter.js?v=17"]');
     if (window.initScriptChapter && window.initTheme) {
         window.initScriptChapter();
         console.log("init")
@@ -1630,7 +1629,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>
-    <script src="/assets/chapter.js" defer></script>
+    <script src="/assets/chapter-window.js" defer></script>
+    <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>

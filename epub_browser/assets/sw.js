@@ -1,13 +1,15 @@
-const CACHE_NAME = 'epub-browser-v8';
+const CACHE_NAME = 'epub-browser-v21';
 
 const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/assets/library.css',
+    '/assets/breadcrumb.css',
     '/assets/library.js',
     '/assets/book.css',
     '/assets/book.js',
     '/assets/chapter.css',
+    '/assets/loading.css',
     '/assets/annotation.css',
     '/assets/chapter.js',
     '/assets/fa.all.min.css',
@@ -17,6 +19,7 @@ const STATIC_ASSETS = [
     '/assets/manifest.json',
     '/assets/icon-192.png',
     '/assets/icon-512.png',
+    '/assets/favicon.png',
     '/assets/screenshot-wide.png',
     '/assets/screenshot-narrow.png'
 ];

@@ -131,6 +131,24 @@
             div.textContent = text;
             return div.innerHTML;
         },
+
+        copyText: function(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text);
+            }
+            return new Promise(function(resolve, reject) {
+                var input = document.createElement('textarea');
+                input.value = text;
+                input.setAttribute('readonly', '');
+                input.style.position = 'fixed';
+                input.style.opacity = '0';
+                document.body.appendChild(input);
+                input.select();
+                var copied = document.execCommand('copy');
+                input.remove();
+                copied ? resolve() : reject(new Error('Clipboard unavailable'));
+            });
+        },
         
         // Format date as YYYY-MM-DD HH:MM:SS
         formatDateTime: function(dateStr) {
@@ -1016,6 +1034,7 @@
                 </div>\
                 <div class="annotation-compact-footer">\
                     <button class="annotation-btn annotation-btn-cancel">Cancel</button>\
+                    <button class="annotation-btn annotation-btn-copy">Copy</button>\
                     <button class="annotation-btn annotation-btn-confirm">Add</button>\
                 </div>';
 
@@ -1072,6 +1091,13 @@
             });
             dialog.querySelector('.annotation-btn-cancel').addEventListener('click', function() {
                 self.cancelPendingDraft();
+            });
+            dialog.querySelector('.annotation-btn-copy').addEventListener('click', function() {
+                Utils.copyText(source.text).then(function() {
+                    Utils.showNotification('Copied', 'success');
+                }).catch(function() {
+                    Utils.showNotification('Unable to copy', 'error');
+                });
             });
             dialog.querySelector('.annotation-btn-confirm').addEventListener('click', function() {
                 var selectedColor = colorOptions.querySelector('.color-option-compact.selected');

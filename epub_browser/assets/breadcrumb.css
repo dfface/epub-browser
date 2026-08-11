@@ -1,0 +1,66 @@
+/* One navigation surface for library, book, and chapter pages. */
+.breadcrumb-container {
+    width: min(100%, 1000px);
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-top: 20px;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    padding: 15px 20px;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.breadcrumb::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
+}
+
+.breadcrumb a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb a:hover { color: var(--breadcrumb-link-hover); }
+
+.breadcrumb-brand-mark {
+    display: block;
+    width: 22px;
+    height: 22px;
+    margin-right: 8px;
+    align-self: center;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.breadcrumb-current {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.breadcrumb-separator {
+    margin: 0 10px;
+    color: var(--breadcrumb-separator);
+}
+
+@media (max-width: 480px) {
+    .breadcrumb { padding: 15px 20px; flex-wrap: wrap; }
+    .breadcrumb-brand-mark { width: 20px; height: 20px; margin-right: 7px; }
+    .breadcrumb-separator { margin: 0 5px; }
+}

@@ -8,6 +8,7 @@ body {
     line-height: 1.6;
     color: var(--text);
     background: var(--background);
+    font-family: var(--font-family, system-ui, -apple-system, sans-serif);
     min-height: 100vh;
     transition: var(--transition);
     padding: 0 20px;
@@ -17,6 +18,8 @@ body {
     max-width: 1000px;
     margin: 0 auto;
 }
+
+.breadcrumb-container { max-width: 1000px; margin: 0 auto; padding-top: 20px; }
 
 .eb-header {
     text-align: center;
@@ -191,11 +194,21 @@ body {
     display: flex;
     align-items: center;
     margin: 20px 0;
-    padding: 15px 20px;
+    padding: 28px 24px;
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.breadcrumb::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 4px;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
 }
 
 .breadcrumb a {
@@ -767,58 +780,6 @@ body {
 
 .select-group-confirm-btn:hover {
     background: var(--button-hover);
-}
-
-/* 加载动画样式 */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--loading-overlay);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-}
-
-.loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid var(--loading-spinner);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.dark-mode .loading-overlay {
-    background-color: rgba(0, 0, 0, 1);
-}
-
-.dark-mode .loading-spinner {
-    border: 5px solid #333;
-    border-top: 5px solid var(--loading-spinner);
-}
-
-.kindle-mode .loading-spinner {
-    width: auto;
-    height: auto;
-    border: none;
-    border-radius: 0;
-    animation: none;
-    font-size: 18px;
-    color: var(--text);
-    font-family: var(--font-family);
-}
-
-.kindle-mode .loading-spinner::after {
-    content: "Loading...";
 }
 
 

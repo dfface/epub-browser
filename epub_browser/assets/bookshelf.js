@@ -26,7 +26,7 @@ function initBookshelf() {
             return;
         }
         
-        var metadataUrl = "/book-metadata.json?" + Date.now();
+        var metadataUrl = "/book-metadata.json";
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', metadataUrl, true);
@@ -284,7 +284,7 @@ function initBookshelf() {
                     bookEl.dataset.id = id;
                     bookEl.innerHTML = 
                         '<div class="bookshelf-item-cover">' +
-                            (bookInfo.cover ? '<img src="' + bookInfo.cover + '" alt="' + bookInfo.title + '">' : '<i class="fas fa-book"></i>') +
+                            (bookInfo.cover ? '<img src="' + bookInfo.cover + '" alt="' + bookInfo.title + '" loading="lazy" decoding="async">' : '<i class="fas fa-book"></i>') +
                         '</div>' +
                         '<div class="bookshelf-item-info">' +
                             '<div class="bookshelf-item-title">' + bookInfo.title + '</div>' +
@@ -362,7 +362,7 @@ function initBookshelf() {
         
         var html = '<div class="group-covers">';
         covers.forEach(function(cover) {
-            html += '<div class="group-cover-item"><img src="' + cover + '" alt=""></div>';
+            html += '<div class="group-cover-item"><img src="' + cover + '" alt="" loading="lazy" decoding="async"></div>';
         });
         // 填充空白
         for (var i = covers.length; i < 4; i++) {

@@ -8,3 +8,6 @@ epub_browser/__pycache__/
 .worktrees/
 .agents/
 .codegraph/
+__pycache__/
+*.py[cod]
+*.egg-info/

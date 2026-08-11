@@ -10,6 +10,128 @@ from socketserver import ThreadingMixIn
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import errno
+from starlette.applications import Starlette
+from starlette.responses import FileResponse, JSONResponse, PlainTextResponse
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
+import uvicorn
+
+
+class CachedStaticFiles(StaticFiles):
+    """Static file adapter with one cache policy for browser assets and books."""
+
+    def file_response(self, full_path, stat_result, scope, status_code=200):
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        extension = os.path.splitext(full_path)[1].lower()
+        if extension in {'.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif', '.woff', '.woff2', '.ttf'}:
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+        else:
+            response.headers['Cache-Control'] = 'no-cache'
+        return response
+
+
+def create_app(base_directory, sync_dir=None):
+    """Create the ASGI module used by Uvicorn to serve an EPUB library."""
+    base_directory = os.path.abspath(base_directory)
+    init_annotation_db(base_directory)
+
+    async def library_index(request):
+        index_path = os.path.join(base_directory, 'index.html')
+        if not os.path.isfile(index_path):
+            return PlainTextResponse('Library index not found', status_code=404)
+        response = FileResponse(index_path, media_type='text/html')
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
+
+    async def health(request):
+        return JSONResponse({'status': 'ok'}, headers={'Cache-Control': 'no-cache'})
+
+    def response(data, status=200):
+        return JSONResponse(data, status_code=status, headers={'Cache-Control': 'no-cache'})
+
+    def row_data(row):
+        data = dict(row)
+        for key, target in [('start_meta', 'startMeta'), ('end_meta', 'endMeta')]:
+            data[target] = json.loads(data[key]) if data.get(key) else None
+        return data
+
+    async def annotations(request):
+        parts = [part for part in request.path_params['path'].split('/') if part]
+        if not parts or parts[0] != 'annotations': return response({'message': 'Not found'}, 404)
+        username = request.headers.get('X-Username', '').strip()
+        conn = sqlite3.connect(os.path.join(base_directory, 'annotations.db'))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        try:
+            tail = parts[1:]
+            if request.method == 'GET':
+                if tail[:1] == ['batch']: return response({'message': 'Batch requires POST'}, 400)
+                if tail[:1] == ['item'] and len(tail) == 2:
+                    sql, args = ('SELECT * FROM annotations WHERE id = ?', [tail[1]]) if not username else ('SELECT * FROM annotations WHERE id = ? AND username = ?', [tail[1], username])
+                    row = cursor.execute(sql, args).fetchone()
+                    return response({'data': row_data(row)}, 200) if row else response({'message': 'Annotation not found'}, 404)
+                where, args = '', []
+                if len(tail) >= 1: where, args = ' WHERE book_hash = ?', [tail[0]]
+                if len(tail) == 2:
+                    try: args.append(int(tail[1]))
+                    except ValueError: return response({'message': 'Invalid chapter index'}, 400)
+                    where += ' AND chapter_index = ?'
+                if username: where += (' AND ' if where else ' WHERE ') + 'username = ?'; args.append(username)
+                rows = cursor.execute('SELECT * FROM annotations' + where + ' ORDER BY created_at DESC', args).fetchall()
+                return response({'data': [row_data(row) for row in rows]})
+            data = await request.json()
+            if request.method == 'POST':
+                entries = data.get('annotations', []) if tail == ['batch'] else [data]
+                created = failed = 0
+                for entry in entries:
+                    try:
+                        cursor.execute('INSERT OR REPLACE INTO annotations (id,book_hash,chapter_index,text,note,start_meta,end_meta,color,created_at,updated_at,username) VALUES (?,?,?,?,?,?,?,?,?,?,?)', (entry['id'], entry['book_hash'], entry['chapter_index'], entry['text'], entry.get('note',''), json.dumps(entry.get('startMeta')) if entry.get('startMeta') else None, json.dumps(entry.get('endMeta')) if entry.get('endMeta') else None, entry['color'], entry['created_at'], entry['updated_at'], username)); created += 1
+                    except Exception: failed += 1
+                conn.commit()
+                return response({'created': created, 'failed': failed}, 201) if tail == ['batch'] else response({'data': data}, 201)
+            if len(tail) != 2 or tail[0] != 'item': return response({'message': 'Not found'}, 404)
+            annotation_id = tail[1]; selector, args = ('id = ?', [annotation_id]) if not username else ('id = ? AND username = ?', [annotation_id, username])
+            if request.method == 'DELETE': cursor.execute('DELETE FROM annotations WHERE ' + selector, args); conn.commit(); return response({'message': 'Deleted'})
+            cursor.execute('UPDATE annotations SET note = ?, color = ?, updated_at = datetime(\'now\') WHERE ' + selector, [data.get('note',''), data.get('color','#FFEB3B')] + args); conn.commit()
+            row = cursor.execute('SELECT * FROM annotations WHERE ' + selector, args).fetchone()
+            return response({'data': row_data(row)}, 200) if row else response({'message': 'Annotation not found'}, 404)
+        finally: conn.close()
+
+    async def sync(request):
+        try:
+            data = await request.json()
+            username, version, shelf = data.get('username', ''), data.get('version', 1), data.get('data')
+            if not username: return response({'message': 'Username is required'}, 400)
+            directory = sync_dir or base_directory
+            pattern = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-*.json')
+            records = []
+            for filename in glob.glob(pattern):
+                try: records.append((int(os.path.basename(filename).rsplit('-', 1)[1][:-5]), filename))
+                except (IndexError, ValueError): pass
+            if records:
+                current_version, current_file = max(records)
+                if current_version == version:
+                    return response({}, 304)
+                if current_version > version:
+                    with open(current_file, encoding='utf-8') as source: return response({'message': 'Server has newer or same version', 'version': current_version, 'data': json.load(source)})
+            if shelf is None: return response({'message': 'No data provided for update'}, 400)
+            new_version = max(version, 1)
+            filename = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-' + str(new_version) + '.json')
+            with open(filename, 'w', encoding='utf-8') as target: json.dump(shelf, target, ensure_ascii=False, indent=2)
+            for _, old_file in records:
+                if old_file != filename: os.remove(old_file)
+            return response({'message': 'New user created' if not records else 'Data updated', 'version': new_version}, 404 if not records else 201)
+        except json.JSONDecodeError: return response({'message': 'Invalid JSON data'}, 400)
+
+    routes = [
+        Route('/', library_index),
+        Route('/index.html', library_index),
+        Route('/api/health', health),
+        Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
+        Route('/sync', sync, methods=['POST']),
+        Mount('/', app=CachedStaticFiles(directory=base_directory, html=False)),
+    ]
+    return Starlette(routes=routes)
 
 # Annotation database path
 ANNOTATION_DB_PATH = None
@@ -697,6 +819,21 @@ class EPUBServer:
         
         # Initialize annotation database
         init_annotation_db(self.base_directory)
+
+        bind_host = host or '0.0.0.0'
+        display_host = host or 'localhost'
+        self.server = uvicorn.Server(uvicorn.Config(create_app(self.base_directory, self.sync_dir), host=bind_host, port=port, log_level='info' if self.enableLog else 'warning'))
+        if stop_event is not None:
+            threading.Thread(target=lambda: (stop_event.wait(), setattr(self.server, 'should_exit', True)), daemon=True).start()
+        print(f"Available books count: {self.book_count}")
+        print(f"Web server started: \n\thttp://{display_host}:{port}/")
+        if not no_browser: webbrowser.open(f'http://{display_host}:{port}/')
+        self._is_running = True
+        try:
+            self.server.run()
+            return True
+        finally:
+            self._is_running = False
         
         try:
             # 创建自定义请求处理器 - 修复lambda作用域问题
@@ -779,8 +916,7 @@ class EPUBServer:
         # 停止服务器
         if self.server:
             try:
-                self.server.shutdown()
-                self.server.server_close()
+                self.server.should_exit = True
                 print("Server socket closed")
             except Exception as e:
                 print(f"Error during server shutdown: {e}")
