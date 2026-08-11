@@ -63,7 +63,7 @@
     /* Keep the reader path on one predictable line; long names truncate in place. */
     .breadcrumb-container,
     .chapter-top-bar {
-        padding: 12px 16px 0;
+        padding: 0 16px;
     }
 
     .breadcrumb {
