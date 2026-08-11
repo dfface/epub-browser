@@ -41,7 +41,9 @@ function isKindleMode() {
 }
 
 function updateFontFamily(fontFamily, fontFamilyInput) {
-    if (fontFamily == "custom") {
+    if (fontFamily === "ebook-default") {
+        document.body.style.fontFamily = '';
+    } else if (fontFamily == "custom") {
         document.body.style.fontFamily = fontFamilyInput;
     } else {
         document.body.style.fontFamily = fontFamily;

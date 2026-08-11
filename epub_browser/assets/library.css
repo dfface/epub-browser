@@ -8,6 +8,7 @@ body {
     line-height: 1.6;
     color: var(--text);
     background: var(--background);
+    font-family: var(--font-family, system-ui, -apple-system, sans-serif);
     min-height: 100vh;
     transition: var(--transition);
     padding: 0 20px;

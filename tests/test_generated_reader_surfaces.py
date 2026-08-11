@@ -22,6 +22,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("width: min(100%, 1000px)", css)
         self.assertIn("padding: 15px 20px", css)
 
+    def test_reader_chrome_uses_one_default_font_stack(self):
+        for path in ("library.css", "book.css", "chapter.css"):
+            css = Path("epub_browser/assets", path).read_text(encoding="utf-8")
+            self.assertIn("font-family: var(--font-family, system-ui, -apple-system, sans-serif)", css)
+        for path in ("library.js", "book.js"):
+            script = Path("epub_browser/assets", path).read_text(encoding="utf-8")
+            self.assertIn('fontFamily === "ebook-default"', script)
+            self.assertIn("document.body.style.fontFamily = '';", script)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
