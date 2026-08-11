@@ -426,7 +426,7 @@ class EPUBProcessor:
     <title>{self.book_title}</title>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
-    <link rel="stylesheet" href="/assets/book.css">
+    <link rel="stylesheet" href="/assets/book.css?v=13">
     <link rel="stylesheet" href="/assets/breadcrumb.css">
     <link rel="stylesheet" href="/assets/loading.css">
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
@@ -688,7 +688,7 @@ class EPUBProcessor:
 
         index_html += """
 <script src="/assets/theme.js" defer></script>
-<script src="/assets/book.js" defer></script>
+<script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
@@ -726,7 +726,7 @@ let basePath = path.split('/book/');
 basePath = basePath[0] + "/";
 
 // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-const js_resource = document.querySelector('script[src="/assets/book.js"]');
+const js_resource = document.querySelector('script[src="/assets/book.js?v=13"]');
 if (window.initScriptBook && window.initTheme) {
     console.log("init")
     window.initScriptBook();

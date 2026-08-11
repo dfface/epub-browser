@@ -160,7 +160,7 @@ class EPUBLibrary:
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">
-<link rel="stylesheet" href="/assets/library.css">
+<link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css">
 <link rel="stylesheet" href="/assets/loading.css">
 <link rel="stylesheet" href="/assets/bookshelf.css">
@@ -385,7 +385,7 @@ if (isKindle) {
         library_html += """
         <script src="/assets/theme.js" defer></script>
         <script src="/assets/pinyin-pro.min.js" defer></script>
-        <script src="/assets/library.js" defer></script>
+        <script src="/assets/library.js?v=13" defer></script>
         <script src="/assets/sortable.min.js" defer></script>
         <script src="/assets/bookshelf.js" defer></script>
         <script>
@@ -421,7 +421,7 @@ if (isKindle) {
             base_path = base_path.replace(/index.html$/, '');
         }
         // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-        js_resource = document.querySelector('script[src="/assets/library.js"]');
+        js_resource = document.querySelector('script[src="/assets/library.js?v=13"]');
         if (window.initScriptLibrary && window.initTheme) {
             window.initScriptLibrary();
             console.log("init")

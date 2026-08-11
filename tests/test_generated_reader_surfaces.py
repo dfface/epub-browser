@@ -31,6 +31,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('fontFamily === "ebook-default"', script)
             self.assertIn("document.body.style.fontFamily = '';", script)
 
+    def test_default_reader_assets_bypass_a_stale_service_worker_cache(self):
+        library_html = self._library_html()
+        self.assertIn('/assets/library.css?v=13', library_html)
+        self.assertIn('/assets/library.js?v=13', library_html)
+        processor_source = Path("epub_browser/processor.py").read_text(encoding="utf-8")
+        self.assertIn('/assets/book.css?v=13', processor_source)
+        self.assertIn('/assets/book.js?v=13', processor_source)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
