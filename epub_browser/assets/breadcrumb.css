@@ -85,7 +85,11 @@
         flex: 0 0 auto;
     }
 
-    .breadcrumb a:not(:first-of-type),
+    .breadcrumb a:not(:first-of-type) {
+        flex: 0 1 auto;
+        max-width: 45%;
+    }
+
     .breadcrumb-current {
         flex: 1 1 auto;
     }
