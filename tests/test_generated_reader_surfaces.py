@@ -47,6 +47,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_chapter_script_bypasses_a_stale_service_worker_cache(self):
         self.assertIn('/assets/chapter.js?v=14', self._chapter_html())
 
+    def test_content_loading_uses_the_active_theme_surface(self):
+        css = Path("epub_browser/assets/loading.css").read_text(encoding="utf-8")
+
+        self.assertIn('color-mix(in srgb, var(--card-bg) 72%, transparent)', css)
+        self.assertNotIn('rgba(15, 23, 42, 0.32)', css)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)

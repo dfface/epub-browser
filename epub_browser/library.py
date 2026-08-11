@@ -162,7 +162,7 @@ class EPUBLibrary:
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css">
-<link rel="stylesheet" href="/assets/loading.css">
+<link rel="stylesheet" href="/assets/loading.css?v=15">
 <link rel="stylesheet" href="/assets/bookshelf.css">
 <script>
 // 立即应用主题，避免闪现 —— Kindle 兼容版
