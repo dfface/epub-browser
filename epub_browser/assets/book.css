@@ -193,7 +193,7 @@ body {
     display: flex;
     align-items: center;
     margin: 20px 0;
-    padding: 15px 20px;
+    padding: 28px 24px;
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);

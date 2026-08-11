@@ -141,7 +141,7 @@ body {
 }
 
 .toc-header {
-    padding: 15px 20px;
+    padding: 28px 24px;
     height: 60px;
     border-bottom: 1px solid var(--border);
     display: flex;

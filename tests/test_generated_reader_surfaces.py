@@ -13,6 +13,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('annotation-btn-copy', script)
         self.assertIn('copyText(source.text)', script)
 
+    def test_breadcrumb_styles_have_shared_medium_padding(self):
+        for path in ("library.css", "book.css", "chapter.css"):
+            css = Path("epub_browser/assets", path).read_text(encoding="utf-8")
+            self.assertIn("padding: 28px 24px", css)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
