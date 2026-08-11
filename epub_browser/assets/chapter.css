@@ -270,6 +270,7 @@ body {
 }
 
 .eb-content-container {
+    margin-top: 18px;
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);

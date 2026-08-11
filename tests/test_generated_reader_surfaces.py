@@ -122,6 +122,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("border-top: 1px solid var(--footer-border);", footer_rules)
         self.assertNotIn("background: var(--header-bg);", footer_rules)
 
+    def test_chapter_content_has_desktop_breathing_room_below_the_breadcrumb(self):
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+        content_rules = css[css.index(".eb-content-container {"):css.index("}", css.index(".eb-content-container {"))]
+
+        self.assertIn("margin-top: 18px;", content_rules)
+        self.assertIn(".navigation, .custom-css-panel, .eb-content-container", css)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
