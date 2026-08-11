@@ -418,7 +418,7 @@ class EPUBProcessor:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4a90d9">
+    <meta name="theme-color" content="#244548">
     <meta name="description" content="{self.book_title} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -519,7 +519,7 @@ class EPUBProcessor:
         index_html += f"""
 <div class="breadcrumb-container">
     <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-        <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Library</span></a>
+        <a href="/index.html#{self.book_hash}"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
     </nav>
@@ -1099,7 +1099,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4a90d9">
+    <meta name="theme-color" content="#244548">
     <meta name="description" content="{chapter_title} - {self.book_title} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1249,7 +1249,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
     <div class="chapter-top-bar">
         <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-            <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left:8px;">Library</span></a>
+            <a href="/index.html#{self.book_hash}"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>

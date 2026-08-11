@@ -149,7 +149,7 @@ class EPUBLibrary:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#4a90d9">
+<meta name="theme-color" content="#244548">
 <meta name="description" content="EPUB Library - A web-based EPUB reader">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -255,7 +255,7 @@ if (isKindle) {
         library_html += f"""
     <div class="breadcrumb-container">
         <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb">
-            <span class="breadcrumb-current" aria-current="page"><i class="fas fa-home" aria-hidden="true"></i><span style="margin-left: 8px;">Library</span></span>
+            <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span>Library</span></span>
             <div class="library-meta" aria-label="Library information">
                 <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i>{len(self.books)} book(s)</span>
                 <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i>{len(all_tags)} tag(s)</span>

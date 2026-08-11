@@ -97,7 +97,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\baria-label=(?:["\'])?Breadcrumb(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>.*Library.*</span>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
-        self.assertIn('fa-home', breadcrumb)
+        self.assertIn('/assets/logo-mark-color.png', breadcrumb)
+        self.assertIn('breadcrumb-brand-mark', breadcrumb)
         self.assertRegex(breadcrumb, r'\bclass=(?:["\'])?library-meta(?:["\'])?')
         self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-title', breadcrumb)
