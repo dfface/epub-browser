@@ -22,13 +22,13 @@ body {
     font-family: var(--font-family, system-ui, -apple-system, sans-serif) !important;
 }
 
-.container {
+.container, .chapter-top-bar {
     max-width: 1000px;
     width: 80%;
     margin: 0 auto;
 }
 
-.chapter-top-bar { width: min(100%, 1000px); max-width: 1000px; margin: 0 auto; padding-top: 20px; }
+.chapter-top-bar { padding-top: 20px; }
 
 .eb-header {
     text-align: center;
@@ -1377,6 +1377,10 @@ body {
     }
     
     body:not(.pagination-mode) .container {
+        width: 100%;
+    }
+
+    body:not(.pagination-mode) .chapter-top-bar {
         width: 100%;
     }
 

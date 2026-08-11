@@ -104,6 +104,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('class="chapter-top-bar"', html)
         self.assertNotIn('class="breadcrumb-container"', html)
 
+    def test_chapter_breadcrumb_and_reading_container_share_a_width_rule(self):
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+
+        self.assertIn(".container, .chapter-top-bar", css)
+        self.assertIn("width: 80%;", css)
+        self.assertIn("body:not(.pagination-mode) .chapter-top-bar", css)
+        self.assertIn("width: 100%;", css)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
