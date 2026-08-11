@@ -631,6 +631,11 @@ body {
     gap: 10px;
 }
 
+.settings-group-advanced {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+}
+
 .settings-label {
     font-size: 0.9rem;
     font-weight: 500;
