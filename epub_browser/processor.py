@@ -1110,7 +1110,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
-    <link rel="stylesheet" href="/assets/chapter.css">
+    <link rel="stylesheet" href="/assets/chapter.css?v=16">
     <link rel="stylesheet" href="/assets/breadcrumb.css">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">

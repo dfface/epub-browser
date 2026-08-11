@@ -274,6 +274,7 @@ body {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     overflow: hidden;
+    position: relative;
     transition: var(--transition);
 }
 

@@ -60,6 +60,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('color-mix(in srgb, var(--card-bg) 72%, transparent)', css)
         self.assertNotIn('rgba(15, 23, 42, 0.32)', css)
 
+    def test_content_loading_is_scoped_to_the_reading_content_container(self):
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+
+        container_rules = css[css.index('.eb-content-container {'):css.index('}', css.index('.eb-content-container {'))]
+        self.assertIn('position: relative;', container_rules)
+        self.assertIn('/assets/chapter.css?v=16', self._chapter_html())
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
