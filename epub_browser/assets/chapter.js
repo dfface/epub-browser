@@ -428,7 +428,16 @@ function initScript() {
         fontFamily = getCookie('font_family') || "ebook-default";
         fontFamilyInput = getCookie('font_family_input');
     }
-    updateFontSize(fontSize);
+    if (isPaginationMode) {
+        updateFontSize(fontSize);
+    } else {
+        showLoading();
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                updateFontSize(fontSize);
+            });
+        });
+    }
     updateFontFamily(fontFamily, fontFamilyInput);
 
     document.addEventListener('keydown', handleKeyDown);
@@ -1597,39 +1606,13 @@ function initScript() {
         content.classList.add('font-size-' + size);
     }
 
-    var fontSizeLoadingTimer;
-    var fontSizeChangeVersion = 0;
-    function applyFontSizeWithLoading(size) {
-        var changeVersion = ++fontSizeChangeVersion;
-        showLoading();
-        clearTimeout(fontSizeLoadingTimer);
-
-        requestAnimationFrame(function() {
-            requestAnimationFrame(function() {
-                if (changeVersion !== fontSizeChangeVersion) return;
-                updateFontSize(size);
-                fontSizeLoadingTimer = setTimeout(function() {
-                    if (isPaginationMode) {
-                        var pageToRestore = currentPage;
-                        createPages();
-                        setTimeout(function() {
-                            showPage(Math.min(pageToRestore, totalPages));
-                        }, 500);
-                    } else {
-                        hideLoading();
-                    }
-                }, 160);
-            });
-        });
-    }
-    
     var fontSizeSlider = document.getElementById('fontSizeSlider');
     if (fontSizeSlider) {
         fontSizeSlider.addEventListener('input', function() {
             var s = this.value;
             if (!isKindleMode()) localStorage.setItem('font_size', s);
             else setCookie('font_size', s);
-            applyFontSizeWithLoading(s);
+            updateFontSize(s);
         });
     }
     

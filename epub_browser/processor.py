@@ -1596,7 +1596,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     basePath = basePath[0] + "/";
     
     // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-    const js_resource = document.querySelector('script[src="/assets/chapter.js?v=15"]');
+    const js_resource = document.querySelector('script[src="/assets/chapter.js?v=16"]');
     if (window.initScriptChapter && window.initTheme) {
         window.initScriptChapter();
         console.log("init")
@@ -1630,7 +1630,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>
     <script src="/assets/chapter-window.js" defer></script>
-    <script src="/assets/chapter.js?v=15" defer></script>
+    <script src="/assets/chapter.js?v=16" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
