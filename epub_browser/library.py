@@ -156,7 +156,7 @@ class EPUBLibrary:
 <meta name="apple-mobile-web-app-title" content="EPUB Browser">
 <title>EPUB Library</title>
 <link rel="stylesheet" href="/assets/fa.all.min.css">
-<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">

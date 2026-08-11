@@ -2,6 +2,10 @@
 
 > **A personal EPUB reader and static-site generator. Read privately. Publish anywhere.**
 
+<p align="center">
+  <img src="epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
+</p>
+
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)

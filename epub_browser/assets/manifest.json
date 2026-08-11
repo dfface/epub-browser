@@ -1,11 +1,11 @@
 {
     "name": "EPUB Browser",
     "short_name": "EPUB Browser",
-    "description": "A web-based EPUB reader with pagination support",
+    "description": "A personal EPUB reader and static-site generator",
     "start_url": "/index.html",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#4a90d9",
+    "background_color": "#f4f0e6",
+    "theme_color": "#244548",
     "orientation": "any",
     "icons": [
         {

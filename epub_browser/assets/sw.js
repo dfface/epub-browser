@@ -1,4 +1,4 @@
-const CACHE_NAME = 'epub-browser-v20';
+const CACHE_NAME = 'epub-browser-v21';
 
 const STATIC_ASSETS = [
     '/',
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
     '/assets/manifest.json',
     '/assets/icon-192.png',
     '/assets/icon-512.png',
+    '/assets/favicon.png',
     '/assets/screenshot-wide.png',
     '/assets/screenshot-narrow.png'
 ];
