@@ -527,7 +527,7 @@ class EPUBProcessor:
         index_html += f"""
 <div class="breadcrumb-container">
     <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-        <a href="/#{self.book_hash}"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
+        <a href="/"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
     </nav>
@@ -605,7 +605,7 @@ class EPUBProcessor:
         <i class="fas fa-bookmark"></i>
         <span class="control-name">Shelf</span>
     </button>
-    <a href="/#{self.book_hash}" alt="Home">
+    <a href="/" alt="Home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
             <span class="control-name">Home</span>
@@ -1258,7 +1258,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
     <div class="chapter-top-bar">
         <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-            <a href="/#{self.book_hash}"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
+            <a href="/"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
@@ -1277,7 +1277,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
         <div class="navigation" data-id="navigation">
             {prev_link}
-            <a href="/#{self.book_hash}" alt="home" id="navigationHomeBtn">
+            <a href="/" alt="home" id="navigationHomeBtn">
                 <div class="control-btn">
                     <i class="fas fa-home"></i>
                     <span class="control-name">Home</span>
@@ -1444,7 +1444,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <i class="fas fa-bookmark"></i>
             <span class="control-name">Shelf</span>
         </button>
-        <a href="/#{self.book_hash}" alt="Home">
+        <a href="/" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
                 <span class="control-name">Home</span>
@@ -1467,7 +1467,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <span class="control-name">Turning</span>
         </div>
         {prev_link_mobile}
-        <a href="/#{self.book_hash}" alt="Home">
+        <a href="/" alt="Home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
                 <span>Home</span>
