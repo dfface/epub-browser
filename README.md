@@ -152,7 +152,6 @@ epub-browser --help
 | Read continuously | **Settings → Reading**; scrolling mode only |
 | Focus on the book | **Pure** in the navigation controls, or click the page centre on supported devices |
 | Highlight, annotate, or copy | Select original text in the reading area |
-| Update an installed library | **Update** on the library page |
 
 Kindle/Silk browsers are detected automatically and receive an e-reader-friendly mode. Some browser-heavy features, such as code highlighting and the bookshelf, are intentionally reduced there.
 

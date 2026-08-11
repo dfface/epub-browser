@@ -16,17 +16,6 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-self.addEventListener('message', (event) => {
-    if (!event.data || event.data.action !== 'CLEAR_CACHE') return;
-
-    event.waitUntil(
-        caches.keys().then((names) => Promise.all(
-            names.filter((name) => name.startsWith('epub-browser-')).map((name) => caches.delete(name))
-        )).then(() => caches.open(CACHE_NAME))
-            .then((cache) => cache.addAll(PRECACHE_URLS))
-    );
-});
-
 function isPrecachedAsset(request) {
     return PRECACHE_URLS.includes(new URL(request.url).pathname);
 }

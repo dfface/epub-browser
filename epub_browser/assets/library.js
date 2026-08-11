@@ -449,14 +449,6 @@ function initScript() {
             readingControls.appendChild(installBtn);
         }
 
-        var updateCacheBtn = document.createElement('button');
-        updateCacheBtn.id = 'update-cache-btn';
-        updateCacheBtn.className = 'control-btn';
-        updateCacheBtn.innerHTML = '<i class="fas fa-sync"></i><div class="control-name">Update</div>';
-        if (readingControls) {
-            readingControls.appendChild(updateCacheBtn);
-        }
-
         window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
@@ -478,26 +470,6 @@ function initScript() {
                         }
                         deferredPrompt = null;
                     });
-                }
-            });
-        }
-
-        if (updateCacheBtn) {
-            updateCacheBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                showNotification('Updating cache...', 'info');
-                
-                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                    navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
-                    showNotification('Cache cleared, page will reload...', 'info');
-                    setTimeout(function() {
-                        location.reload();
-                    }, 1000);
-                } else {
-                    showNotification('Page will reload...', 'info');
-                    setTimeout(function() {
-                        location.reload();
-                    }, 500);
                 }
             });
         }

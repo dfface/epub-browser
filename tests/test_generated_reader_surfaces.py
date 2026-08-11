@@ -13,6 +13,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('annotation-btn-copy', script)
         self.assertIn('copyText(source.text)', script)
 
+    def test_library_does_not_offer_a_manual_cache_update_button(self):
+        script = Path("epub_browser/assets/library.js").read_text(encoding="utf-8")
+
+        self.assertNotIn('update-cache-btn', script)
+        self.assertNotIn('Updating cache...', script)
+
     def test_pages_link_one_shared_breadcrumb_stylesheet(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertRegex(html, r'/assets/immutable/breadcrumb\.[0-9a-f]{12}\.css')
