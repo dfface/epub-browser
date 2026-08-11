@@ -161,7 +161,7 @@ class EPUBLibrary:
 <link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/library.css?v=13">
-<link rel="stylesheet" href="/assets/breadcrumb.css">
+<link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
 <link rel="stylesheet" href="/assets/loading.css?v=15">
 <link rel="stylesheet" href="/assets/bookshelf.css">
 <script>

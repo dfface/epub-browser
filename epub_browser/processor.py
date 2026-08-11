@@ -427,7 +427,7 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
-    <link rel="stylesheet" href="/assets/breadcrumb.css">
+    <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -1111,7 +1111,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
-    <link rel="stylesheet" href="/assets/breadcrumb.css">
+    <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/fancybox.min.css">

@@ -17,10 +17,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         for html in (self._library_html(), self._chapter_html()):
             self.assertIn('/assets/breadcrumb.css', html)
         processor_source = Path("epub_browser/processor.py").read_text(encoding="utf-8")
-        self.assertEqual(processor_source.count('href="/assets/breadcrumb.css"'), 2)
+        self.assertEqual(processor_source.count('href="/assets/breadcrumb.css?v=2"'), 2)
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         self.assertIn("width: min(100%, 1000px)", css)
         self.assertIn("padding: 15px 20px", css)
+        self.assertIn("align-self: center;", css)
 
     def test_reader_chrome_uses_one_default_font_stack(self):
         for path in ("library.css", "book.css", "chapter.css"):
