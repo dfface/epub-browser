@@ -1,0 +1,44 @@
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.32) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(1.05);
+    backdrop-filter: blur(12px) saturate(1.05);
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.65);
+    border-top-color: var(--loading-spinner, var(--button-bg));
+    border-radius: 50%;
+    animation: loading-spin 1s linear infinite;
+}
+
+@keyframes loading-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.kindle-mode .loading-spinner {
+    width: auto;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    animation: none;
+    font-size: 18px;
+    color: var(--text);
+    font-family: var(--font-family);
+}
+
+.kindle-mode .loading-spinner::after {
+    content: "Loading...";
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-spinner { animation: none; }
+}
