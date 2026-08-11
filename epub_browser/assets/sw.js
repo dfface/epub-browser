@@ -1,4 +1,4 @@
-const CACHE_NAME = 'epub-browser-v9';
+const CACHE_NAME = 'epub-browser-v10';
 
 const STATIC_ASSETS = [
     '/',

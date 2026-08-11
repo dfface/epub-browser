@@ -9,9 +9,8 @@
 .breadcrumb {
     display: flex;
     align-items: center;
-    min-height: 82px;
     margin: 20px 0;
-    padding: 28px 24px;
+    padding: 15px 20px;
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
@@ -49,6 +48,6 @@
 }
 
 @media (max-width: 480px) {
-    .breadcrumb { padding: 20px; flex-wrap: wrap; }
+    .breadcrumb { padding: 15px 20px; flex-wrap: wrap; }
     .breadcrumb-separator { margin: 0 5px; }
 }

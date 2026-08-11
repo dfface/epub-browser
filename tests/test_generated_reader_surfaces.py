@@ -20,7 +20,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertEqual(processor_source.count('href="/assets/breadcrumb.css"'), 2)
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         self.assertIn("width: min(100%, 1000px)", css)
-        self.assertIn("padding: 28px 24px", css)
+        self.assertIn("padding: 15px 20px", css)
 
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
