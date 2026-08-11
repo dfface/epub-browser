@@ -562,13 +562,13 @@ function initScript() {
     }
 
     function toggleHideUnnecessary(hide) {
-        var bread = document.querySelector(".breadcrumb");
+        var chapterTopBar = document.querySelector(".chapter-top-bar");
         var footer = document.querySelector("footer");
         if (hide) {
-            bread.style.display = 'none';
+            chapterTopBar.style.display = 'none';
             footer.style.display = 'none';
         } else {
-            bread.style.display = 'inherit';
+            chapterTopBar.style.display = '';
             footer.style.display = 'inherit';
         }
     }

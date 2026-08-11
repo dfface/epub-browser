@@ -28,7 +28,7 @@ body {
     margin: 0 auto;
 }
 
-.breadcrumb-container { max-width: 1000px; margin: 0 auto; padding-top: 20px; }
+.chapter-top-bar { width: min(100%, 1000px); max-width: 1000px; margin: 0 auto; padding-top: 20px; }
 
 .eb-header {
     text-align: center;

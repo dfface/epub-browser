@@ -1110,7 +1110,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
-    <link rel="stylesheet" href="/assets/chapter.css?v=16">
+    <link rel="stylesheet" href="/assets/chapter.css?v=17">
     <link rel="stylesheet" href="/assets/breadcrumb.css">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
@@ -1247,7 +1247,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         </ul>
     </div>
 
-    <div class="breadcrumb-container">
+    <div class="chapter-top-bar">
         <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
             <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left:8px;">Library</span></a>
             <span class="breadcrumb-separator">/</span>
@@ -1596,7 +1596,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     basePath = basePath[0] + "/";
     
     // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-    const js_resource = document.querySelector('script[src="/assets/chapter.js?v=16"]');
+    const js_resource = document.querySelector('script[src="/assets/chapter.js?v=17"]');
     if (window.initScriptChapter && window.initTheme) {
         window.initScriptChapter();
         console.log("init")
@@ -1630,7 +1630,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>
     <script src="/assets/chapter-window.js" defer></script>
-    <script src="/assets/chapter.js?v=16" defer></script>
+    <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>

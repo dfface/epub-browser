@@ -45,7 +45,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('document.querySelector(".custom-css-panel").style', script)
 
     def test_chapter_script_bypasses_a_stale_service_worker_cache(self):
-        self.assertIn('/assets/chapter.js?v=16', self._chapter_html())
+        self.assertIn('/assets/chapter.js?v=17', self._chapter_html())
 
     def test_initial_font_size_update_uses_content_loading_only(self):
         script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
@@ -65,7 +65,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         container_rules = css[css.index('.eb-content-container {'):css.index('}', css.index('.eb-content-container {'))]
         self.assertIn('position: relative;', container_rules)
-        self.assertIn('/assets/chapter.css?v=16', self._chapter_html())
+        self.assertIn('/assets/chapter.css?v=17', self._chapter_html())
+
+    def test_pagination_uses_a_chapter_top_bar_not_a_breadcrumb_container(self):
+        html = self._chapter_html()
+
+        self.assertIn('class="chapter-top-bar"', html)
+        self.assertNotIn('class="breadcrumb-container"', html)
 
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
