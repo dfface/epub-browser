@@ -113,6 +113,8 @@ function initScript() {
     pathParts = pathParts.filter(function(item) { return item !== ""; });
     var book_hash = pathParts[pathParts.indexOf('book') + 1];
 
+    updateContinueReadingButton(book_hash);
+
     if (!isKindleMode()) {
         var clearBtn = document.querySelector("#clearReadingProgressBtn");
         clearBtn.addEventListener("click", function() {
@@ -121,6 +123,7 @@ function initScript() {
             deleteKeysByPrefix(prefix1);
             deleteKeysByPrefix(prefix2);
             deleteKeysByPrefix(book_hash);
+            updateContinueReadingButton(book_hash);
             showNotification("All reading progress for this book has been deleted!", "success");
         });
 
@@ -258,6 +261,28 @@ function initScript() {
     setTimeout(function() {
         hideLoading();
     }, 500);
+}
+
+function updateContinueReadingButton(bookHash) {
+    var continueButton = document.getElementById('continueReadingBtn');
+    var continueButtonText = document.getElementById('continueReadingBtnText');
+    var firstChapter = document.querySelector('.chapter-link');
+    if (!continueButton || !continueButtonText || !firstChapter) {
+        if (continueButton) continueButton.hidden = true;
+        return;
+    }
+
+    var readKey = isKindleMode() ? getCookie(bookHash) : localStorage.getItem(bookHash);
+    var resumeChapter = readKey ? document.getElementById(readKey) : null;
+    if (resumeChapter && resumeChapter.href) {
+        continueButton.href = resumeChapter.href;
+        continueButtonText.textContent = 'Continue reading';
+        continueButton.setAttribute('aria-label', 'Continue reading');
+    } else {
+        continueButton.href = firstChapter.href;
+        continueButtonText.textContent = 'Start reading';
+        continueButton.setAttribute('aria-label', 'Start reading');
+    }
 }
 
 function initBookShelfButton(bookHash) {

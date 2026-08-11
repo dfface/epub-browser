@@ -142,6 +142,7 @@ body {
     text-align: center;
     white-space: nowrap;
     margin-bottom: 4px;
+    text-decoration: none;
 }
 
 .css-btn.primary {
@@ -152,6 +153,30 @@ body {
 .css-btn.primary:hover {
     background: var(--button-hover);
     transform: translateY(-2px);
+}
+
+.css-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.css-btn.secondary:hover {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.clearReadingProgress {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.clearReadingProgress .css-btn {
+    min-height: 42px;
+    margin-bottom: 0;
 }
 
 /* 通知样式 */

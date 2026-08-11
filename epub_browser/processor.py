@@ -554,8 +554,9 @@ class EPUBProcessor:
         index_html += f"""
                 </div>
                 <div class="css-controls clearReadingProgress">
-                    <button class="css-btn primary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
-                    <button class="css-btn primary" id="clearReadingProgressBtn"><i class="fas fa-eraser"></i>Clear reading progress</button>
+                    <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
+                    <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
+                    <button class="css-btn secondary" id="clearReadingProgressBtn"><i class="fas fa-eraser"></i>Clear reading progress</button>
                 </div>
             </div>
         </div>

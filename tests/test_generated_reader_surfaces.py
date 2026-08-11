@@ -19,6 +19,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('update-cache-btn', script)
         self.assertNotIn('Updating cache...', script)
 
+    def test_book_page_offers_a_progress_aware_continue_reading_action(self):
+        html = self._book_html()
+        script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
+
+        self.assertRegex(html, r'id=(?:["\'])?continueReadingBtn')
+        self.assertRegex(html, r'id=(?:["\'])?continueReadingBtnText')
+        self.assertIn("updateContinueReadingButton(book_hash);", script)
+        self.assertIn("document.getElementById(readKey)", script)
+        self.assertIn("Continue reading", script)
+        self.assertIn("Start reading", script)
+
     def test_book_and_chapter_return_to_the_library_without_redirect_or_unused_fragment(self):
         for html in (self._book_html(), self._chapter_html()):
             self.assertNotIn('/index.html#', html)
