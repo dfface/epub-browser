@@ -12,10 +12,12 @@ import minify_html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+from .asset_publisher import AssetPublisher, rewrite_asset_urls
+
 class EPUBProcessor:
     """处理EPUB文件的类"""
     
-    def __init__(self, epub_path, output_dir=None):
+    def __init__(self, epub_path, output_dir=None, asset_manifest=None):
         self.epub_path = epub_path
         self.output_dir = output_dir
         self.book_hash = base64.urlsafe_b64encode(hashlib.md5(epub_path.encode('utf-8')).digest()).decode().rstrip('=')  # 使用哈希值作为标识，后续可能会根据 ncx 更新
@@ -42,6 +44,12 @@ class EPUBProcessor:
         self.chapters = []
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
+        if asset_manifest is not None:
+            self.asset_manifest = asset_manifest
+        else:
+            assets_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets')
+            asset_output_dir = output_dir or self.temp_dir
+            self.asset_manifest = AssetPublisher(assets_dir, asset_output_dir).publish()
     
     def cleanup(self):
         # 诸如 extract 失败
@@ -758,6 +766,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 </script>
 </body>
 </html>"""
+        index_html = rewrite_asset_urls(index_html, self.asset_manifest)
         # kindle 支持，不能压缩 css 和 js
         index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
         with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
@@ -1638,6 +1647,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 </body>
 </html>
 """
+        chapter_html = rewrite_asset_urls(chapter_html, self.asset_manifest)
         # kindle 支持，不能压缩 css 和 js
         # 部分 xhtml 书籍压缩之后会丢失标签，说明压缩算法可能存在问题
         # chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)

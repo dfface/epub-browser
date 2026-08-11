@@ -17,16 +17,20 @@ from starlette.staticfiles import StaticFiles
 import uvicorn
 
 
+def cache_control_for_path(path):
+    """Only content-addressed app assets may be cached without revalidation."""
+    normalized = os.path.normpath(path).replace(os.sep, '/')
+    if '/assets/immutable/' in normalized:
+        return 'public, max-age=31536000, immutable'
+    return 'no-cache'
+
+
 class CachedStaticFiles(StaticFiles):
     """Static file adapter with one cache policy for browser assets and books."""
 
     def file_response(self, full_path, stat_result, scope, status_code=200):
         response = super().file_response(full_path, stat_result, scope, status_code)
-        extension = os.path.splitext(full_path)[1].lower()
-        if extension in {'.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif', '.woff', '.woff2', '.ttf'}:
-            response.headers['Cache-Control'] = 'public, max-age=3600'
-        else:
-            response.headers['Cache-Control'] = 'no-cache'
+        response.headers['Cache-Control'] = cache_control_for_path(full_path)
         return response
 
 
@@ -742,10 +746,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.send_header('Content-type', content_type)
             self.send_header('Content-Length', str(file_size))
             
-            if self.should_cache_file(file_path):
-                self.send_header('Cache-Control', 'public, max-age=3600')
-            else:
-                self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Cache-Control', cache_control_for_path(file_path))
                 
             self.end_headers()
             
@@ -772,8 +773,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
     
     def should_cache_file(self, file_path):
         """判断文件是否应该被缓存"""
-        cache_extensions = {'.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf'}
-        return any(file_path.endswith(ext) for ext in cache_extensions)
+        return cache_control_for_path(file_path).endswith('immutable')
     
     def log_message(self, format, *args):
         """自定义日志格式"""

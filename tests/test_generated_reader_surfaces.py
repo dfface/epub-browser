@@ -15,9 +15,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
     def test_pages_link_one_shared_breadcrumb_stylesheet(self):
         for html in (self._library_html(), self._chapter_html()):
-            self.assertIn('/assets/breadcrumb.css', html)
-        processor_source = Path("epub_browser/processor.py").read_text(encoding="utf-8")
-        self.assertEqual(processor_source.count('href="/assets/breadcrumb.css?v=2"'), 2)
+            self.assertRegex(html, r'/assets/immutable/breadcrumb\.[0-9a-f]{12}\.css')
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         self.assertIn("width: min(100%, 1000px)", css)
         self.assertIn("padding: 15px 20px", css)
@@ -32,21 +30,22 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('fontFamily === "ebook-default"', script)
             self.assertIn("document.body.style.fontFamily = '';", script)
 
-    def test_default_reader_assets_bypass_a_stale_service_worker_cache(self):
+    def test_default_reader_assets_use_immutable_content_addressed_urls(self):
         library_html = self._library_html()
-        self.assertIn('/assets/library.css?v=13', library_html)
-        self.assertIn('/assets/library.js?v=13', library_html)
-        processor_source = Path("epub_browser/processor.py").read_text(encoding="utf-8")
-        self.assertIn('/assets/book.css?v=13', processor_source)
-        self.assertIn('/assets/book.js?v=13', processor_source)
+        book_html = self._book_html()
+        self.assertRegex(library_html, r'/assets/immutable/library\.[0-9a-f]{12}\.css')
+        self.assertRegex(library_html, r'/assets/immutable/library\.[0-9a-f]{12}\.js')
+        self.assertRegex(book_html, r'/assets/immutable/book\.[0-9a-f]{12}\.css')
+        self.assertRegex(book_html, r'/assets/immutable/book\.[0-9a-f]{12}\.js')
+        self.assertNotIn('?v=', library_html + book_html)
 
     def test_pagination_mode_does_not_access_the_removed_custom_css_panel(self):
         script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
 
         self.assertNotIn('document.querySelector(".custom-css-panel").style', script)
 
-    def test_chapter_script_bypasses_a_stale_service_worker_cache(self):
-        self.assertIn('/assets/chapter.js?v=17', self._chapter_html())
+    def test_chapter_script_uses_an_immutable_content_addressed_url(self):
+        self.assertRegex(self._chapter_html(), r'/assets/immutable/chapter\.[0-9a-f]{12}\.js')
 
     def test_initial_font_size_update_uses_content_loading_only(self):
         script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
@@ -66,7 +65,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         container_rules = css[css.index('.eb-content-container {'):css.index('}', css.index('.eb-content-container {'))]
         self.assertIn('position: relative;', container_rules)
-        self.assertIn('/assets/chapter.css?v=17', self._chapter_html())
+        self.assertRegex(self._chapter_html(), r'/assets/immutable/chapter\.[0-9a-f]{12}\.css')
 
     def test_pagination_uses_a_chapter_top_bar_not_a_breadcrumb_container(self):
         html = self._chapter_html()
@@ -92,13 +91,21 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             processor.chapters = [{"title": "One"}]
             return processor.create_chapter_template("<p>Text</p>", "", 0, "One")
 
+    def _book_html(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory)
+            processor.book_title = "A Book"
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            return Path(processor.web_dir, "index.html").read_text(encoding="utf-8")
+
     def test_library_places_its_summary_inside_the_current_location_breadcrumb(self):
         html = self._library_html()
 
         self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\baria-label=(?:["\'])?Breadcrumb(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>.*Library.*</span>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
-        self.assertIn('/assets/logo-mark-color.png', breadcrumb)
+        self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertIn('breadcrumb-brand-mark', breadcrumb)
         self.assertRegex(breadcrumb, r'\bclass=(?:["\'])?library-meta(?:["\'])?')
         self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
@@ -117,5 +124,5 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('id="cssPanelToggle"', html)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
-        self.assertIn("/assets/loading.css", self._library_html())
-        self.assertIn("/assets/loading.css", self._chapter_html())
+        self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
+        self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

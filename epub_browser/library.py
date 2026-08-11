@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+from .asset_publisher import AssetPublisher, rewrite_asset_urls
 from .processor import EPUBProcessor
 
 class EPUBLibrary:
@@ -30,6 +31,8 @@ class EPUBLibrary:
         else:
             self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
 
+        assets_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets')
+        self.asset_manifest = AssetPublisher(assets_dir, self.base_directory).publish()
         print(f"Library base directory: {self.base_directory}")
     
     def is_epub_file(self, filename):
@@ -65,7 +68,7 @@ class EPUBLibrary:
         """添加一本书籍到图书馆"""
         try:
             # print(f"Adding book: {epub_path}")
-            processor = EPUBProcessor(epub_path, self.base_directory)
+            processor = EPUBProcessor(epub_path, self.base_directory, self.asset_manifest)
             
             # 解压EPUB
             if not processor.extract_epub():
@@ -123,23 +126,9 @@ class EPUBLibrary:
             return False, None
     
     def add_assets(self):
-        # 复制 assets
-        BASE_DIR = os.path.dirname(os.path.realpath(__file__))
-        ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
-        assets_path = os.path.join(self.base_directory, "assets")
-        for root, dirs, files in os.walk(ASSETS_DIR):
-            for file in files:
-                src_path = os.path.join(root, file)
-                dst_path = os.path.join(assets_path, file)
-                # 确保目标目录存在
-                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                shutil.copy2(src_path, dst_path)
-        
-        # 复制 sw.js 到根目录（PWA 需要 Service Worker 在根目录）
-        sw_src = os.path.join(ASSETS_DIR, 'sw.js')
-        sw_dst = os.path.join(self.base_directory, 'sw.js')
-        if os.path.exists(sw_src):
-            shutil.copy2(sw_src, sw_dst)
+        """Publish immutable app assets and stable update entry points."""
+        assets_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets')
+        self.asset_manifest = AssetPublisher(assets_dir, self.base_directory).publish()
             
     
     def create_library_home(self):
@@ -455,6 +444,7 @@ if (isKindle) {
         </script>
     </body>
 </html>"""
+        library_html = rewrite_asset_urls(library_html, self.asset_manifest)
         library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
         with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
             f.write(library_html)

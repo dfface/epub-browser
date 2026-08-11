@@ -56,7 +56,7 @@ It is designed as both a dependable reading companion and a practical publishing
 
 - Install the generated library as a Progressive Web App on supported browsers.
 - Run the included local server, or generate static files for Cloudflare Pages, GitHub Pages, Apache, Nginx, and similar hosts.
-- Use the cache update control when you deploy a refreshed library.
+- Receive refreshed reader code automatically after a normal reload.
 
 ## Start reading in two minutes
 
@@ -112,6 +112,12 @@ epub-browser /path/to/books \
 ```
 
 Upload the contents of `/path/to/public-library` to your preferred static host. This is the direct deployment path for Cloudflare Pages, GitHub Pages, Apache, Nginx, and similar platforms—no application server is required.
+
+### Deploy updates without stale browser assets
+
+Each generated library publishes its CSS, JavaScript, icons, and fonts with a content-addressed filename. Those files can be cached indefinitely because a changed file always receives a new URL. The library HTML, PWA manifest, and Service Worker remain revalidated entry points, so a regular refresh discovers the new release without asking readers to clear their browser cache.
+
+Publish the complete generated directory in one deployment whenever your host supports it. If a CDN or reverse proxy overrides origin cache headers, configure it to revalidate `index.html`, `sw.js`, and `assets/manifest.json`, while allowing `assets/immutable/` to use long-lived immutable caching.
 
 ### Useful options
 

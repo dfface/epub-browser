@@ -15,20 +15,34 @@ class ServerCacheTests(unittest.TestCase):
         os.makedirs(os.path.join(self.directory.name, "assets"))
         with open(os.path.join(self.directory.name, "assets", "cover.webp"), "wb") as cover:
             cover.write(b"cover")
+        os.makedirs(os.path.join(self.directory.name, "assets", "immutable"))
+        with open(os.path.join(self.directory.name, "assets", "immutable", "app.0123456789ab.js"), "w", encoding="utf-8") as app:
+            app.write("console.log('app')")
+        with open(os.path.join(self.directory.name, "assets", "manifest.json"), "w", encoding="utf-8") as manifest:
+            manifest.write("{}")
+        with open(os.path.join(self.directory.name, "sw.js"), "w", encoding="utf-8") as worker:
+            worker.write("self.addEventListener('fetch', () => {})")
         self.client = TestClient(create_app(self.directory.name))
 
     def tearDown(self):
         self.directory.cleanup()
 
-    def test_static_cover_is_cacheable_and_validates_with_etag(self):
-        response = self.client.get("/assets/cover.webp")
+    def test_immutable_assets_are_long_lived_and_validate_with_etag(self):
+        response = self.client.get("/assets/immutable/app.0123456789ab.js")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("public", response.headers["cache-control"])
+        self.assertEqual(response.headers["cache-control"], "public, max-age=31536000, immutable")
         self.assertIn("etag", response.headers)
 
-        cached = self.client.get("/assets/cover.webp", headers={"If-None-Match": response.headers["etag"]})
+        cached = self.client.get("/assets/immutable/app.0123456789ab.js", headers={"If-None-Match": response.headers["etag"]})
         self.assertEqual(cached.status_code, 304)
+
+    def test_mutable_assets_and_worker_revalidate(self):
+        for path in ("/assets/cover.webp", "/assets/manifest.json", "/sw.js"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["cache-control"], "no-cache")
 
     def test_html_is_revalidated_instead_of_long_lived(self):
         response = self.client.get("/")
