@@ -30,6 +30,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertRegex(html, r'/assets/immutable/breadcrumb\.[0-9a-f]{12}\.css')
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         self.assertIn("width: min(100%, 1000px)", css)
+        self.assertIn("padding-top: 12px", css)
+        self.assertIn("margin: 12px 0", css)
         self.assertIn("padding: 15px 20px", css)
         self.assertIn("align-self: center;", css)
 
@@ -109,6 +111,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertIn(".container, .chapter-top-bar", css)
         self.assertIn("width: 80%;", css)
+        self.assertIn(".chapter-top-bar { padding-top: 12px; }", css)
         self.assertIn("body:not(.pagination-mode) .chapter-top-bar", css)
         self.assertIn("width: 100%;", css)
 
