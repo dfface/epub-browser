@@ -254,7 +254,7 @@ if (isKindle) {
         library_html += f"""
     <div class="breadcrumb-container">
         <nav class="breadcrumb" aria-label="Breadcrumb">
-            <span class="breadcrumb-current" aria-current="page">Library</span>
+            <span class="breadcrumb-current" aria-current="page"><i class="fas fa-home" aria-hidden="true"></i><span style="margin-left: 8px;">Library</span></span>
         </nav>
     </div>
     <div class="container">
