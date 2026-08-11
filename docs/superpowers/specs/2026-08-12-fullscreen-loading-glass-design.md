@@ -23,6 +23,13 @@ Make the library, book, and chapter views use the same navigation hierarchy: a b
 - Express each breadcrumb as a `<nav aria-label="Breadcrumb">`, and mark the current location with `aria-current="page"`.
 - Reuse the existing mobile breadcrumb wrapping behavior; no additional navigation interaction is introduced.
 
+## Reader Settings Scope
+
+- Move the existing Custom CSS editor from the chapter page into the existing `Reading` settings tab.
+- Keep `Font` and `Reading` as the only settings tabs. Do not introduce an additional tab.
+- Separate the Reading tab into `Reading mode` (continuous scroll) and `Reading appearance (advanced)` (Custom CSS) groups.
+- Preserve all current Custom CSS actions and behavior: preview, per-book save, save as default, load default, reset, storage keys, and Kindle-mode behavior.
+
 ## Loading Visual Behavior
 
 - Use one neutral translucent background: `rgba(15, 23, 42, 0.32)`.
@@ -39,15 +46,23 @@ Make the library, book, and chapter views use the same navigation hierarchy: a b
 - The library information card remains visually prominent but is separate from navigation. Its current title, logo, statistics, and login affordance are retained.
 - Book details and chapter controls remain unchanged below their now-neutral breadcrumb.
 
+## Reader Settings Visual Behavior
+
+- The chapter page opens directly onto the reading content, without the Custom CSS panel preceding it.
+- The Reading tab keeps its familiar default control and presents Custom CSS below it as a clearly labelled advanced section.
+- The Custom CSS editor retains its current controls and helper copy inside the settings modal, where it remains available on desktop and mobile.
+
 ## Validation
 
 - Automated style checks assert that all three full-screen overlay declarations carry the shared background, blur, and reduced-motion behavior.
 - A visual smoke check covers the library, reader, and chapter overlays in light and dark modes; each must reveal blurred underlying content without a white or opaque full-screen flash.
 - Generated library, book, and chapter HTML use semantic navigation landmarks and the correct breadcrumb depth.
 - A responsive smoke check at the mobile breakpoint confirms breadcrumb items wrap without horizontal overflow.
+- The chapter page no longer renders the standalone Custom CSS panel; all Custom CSS controls are available in the Reading tab and retain their existing behavior.
 
 ## Non-Goals
 
 - No changes to loading timing, DOM structure, spinner markup, or local loading indicators.
 - No changes to theme tokens unrelated to full-screen loading.
 - No changes to the information displayed by the library header, book detail card, or chapter controls.
+- No change to Custom CSS persistence, preview behavior, or Kindle-mode availability.
