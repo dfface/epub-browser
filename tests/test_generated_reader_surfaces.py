@@ -19,6 +19,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('update-cache-btn', script)
         self.assertNotIn('Updating cache...', script)
 
+    def test_book_and_chapter_return_to_the_library_without_an_index_redirect(self):
+        for html in (self._book_html(), self._chapter_html()):
+            self.assertNotIn('/index.html#', html)
+            self.assertIn('/#AwU__ARVZEOf9_LKuztYxQ', html)
+
     def test_pages_link_one_shared_breadcrumb_stylesheet(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertRegex(html, r'/assets/immutable/breadcrumb\.[0-9a-f]{12}\.css')
