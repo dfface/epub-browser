@@ -43,7 +43,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("flex-wrap: nowrap;", css)
         self.assertIn("min-width: 0;", css)
         self.assertIn("text-overflow: ellipsis;", css)
-        self.assertIn("padding: 0 16px;", css)
+        self.assertIn("padding: 0;", css)
         self.assertIn("margin: 0;", css)
         self.assertIn(".library-breadcrumb", css)
         for html in (book_html, chapter_html):
