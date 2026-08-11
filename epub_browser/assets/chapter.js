@@ -1596,6 +1596,32 @@ function initScript() {
         content.classList.remove('font-size-1', 'font-size-2', 'font-size-3', 'font-size-4', 'font-size-5', 'font-size-6', 'font-size-7');
         content.classList.add('font-size-' + size);
     }
+
+    var fontSizeLoadingTimer;
+    var fontSizeChangeVersion = 0;
+    function applyFontSizeWithLoading(size) {
+        var changeVersion = ++fontSizeChangeVersion;
+        showLoading();
+        clearTimeout(fontSizeLoadingTimer);
+
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                if (changeVersion !== fontSizeChangeVersion) return;
+                updateFontSize(size);
+                fontSizeLoadingTimer = setTimeout(function() {
+                    if (isPaginationMode) {
+                        var pageToRestore = currentPage;
+                        createPages();
+                        setTimeout(function() {
+                            showPage(Math.min(pageToRestore, totalPages));
+                        }, 500);
+                    } else {
+                        hideLoading();
+                    }
+                }, 160);
+            });
+        });
+    }
     
     var fontSizeSlider = document.getElementById('fontSizeSlider');
     if (fontSizeSlider) {
@@ -1603,7 +1629,7 @@ function initScript() {
             var s = this.value;
             if (!isKindleMode()) localStorage.setItem('font_size', s);
             else setCookie('font_size', s);
-            updateFontSize(s);
+            applyFontSizeWithLoading(s);
         });
     }
     

@@ -45,7 +45,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('document.querySelector(".custom-css-panel").style', script)
 
     def test_chapter_script_bypasses_a_stale_service_worker_cache(self):
-        self.assertIn('/assets/chapter.js?v=14', self._chapter_html())
+        self.assertIn('/assets/chapter.js?v=15', self._chapter_html())
+
+    def test_font_size_updates_use_content_loading(self):
+        script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
+
+        self.assertIn('function applyFontSizeWithLoading(size)', script)
+        self.assertIn('applyFontSizeWithLoading(s);', script)
+        self.assertIn('requestAnimationFrame(function()', script)
 
     def test_content_loading_uses_the_active_theme_surface(self):
         css = Path("epub_browser/assets/loading.css").read_text(encoding="utf-8")
