@@ -49,3 +49,11 @@ class ServerCacheTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["version"], 1)
+
+    def test_sync_returns_not_modified_when_versions_match(self):
+        payload = {"username": "reader", "version": 1, "data": {"items": []}}
+        self.client.post("/sync", json=payload)
+
+        response = self.client.post("/sync", json=payload)
+
+        self.assertEqual(response.status_code, 304)

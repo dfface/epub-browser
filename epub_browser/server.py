@@ -110,7 +110,9 @@ def create_app(base_directory, sync_dir=None):
                 except (IndexError, ValueError): pass
             if records:
                 current_version, current_file = max(records)
-                if current_version >= version:
+                if current_version == version:
+                    return response({}, 304)
+                if current_version > version:
                     with open(current_file, encoding='utf-8') as source: return response({'message': 'Server has newer or same version', 'version': current_version, 'data': json.load(source)})
             if shelf is None: return response({'message': 'No data provided for update'}, 400)
             new_version = max(version, 1)
