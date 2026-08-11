@@ -447,7 +447,7 @@ body {
     padding: 10px 0;
     color: var(--footer-text);
     font-size: 0.9rem;
-    background: var(--header-bg);
+    border-top: 1px solid var(--footer-border);
     transition: var(--transition);
 }
 
@@ -455,7 +455,6 @@ body {
     text-align: center;
     color: var(--footer-text);
     font-size: 0.9rem;
-    background: var(--header-bg);
     transition: var(--transition);
 }
 

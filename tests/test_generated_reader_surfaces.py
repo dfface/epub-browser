@@ -112,6 +112,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("body:not(.pagination-mode) .chapter-top-bar", css)
         self.assertIn("width: 100%;", css)
 
+    def test_chapter_footer_uses_a_divider_instead_of_a_header_surface(self):
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+        footer_rules = css[css.index(".eb-footer {"):css.index("}", css.index(".eb-footer {"))]
+
+        self.assertIn("border-top: 1px solid var(--footer-border);", footer_rules)
+        self.assertNotIn("background: var(--header-bg);", footer_rules)
+
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
             self.assertNotIn('id="loadingOverlay"', html)
