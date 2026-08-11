@@ -520,11 +520,11 @@ class EPUBProcessor:
 """
         index_html += f"""
 <div class="container">
-    <div class="breadcrumb eb-header" data-id="breadcrumb">
-        <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Home</span></a>
+    <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
+        <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left: 8px;">Library</span></a>
         <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current" id="book_home">{self.book_title}</span>
-    </div>
+        <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
+    </nav>
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
@@ -1250,47 +1250,13 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
 
     <div class="container">
-        <div class="breadcrumb eb-header" data-id="breadcrumb">
-            <a href="/index.html#{self.book_hash}" alt="home"><i class="fas fa-home"></i><span style="margin-left:8px;">Home</span></a>
+        <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
+            <a href="/index.html#{self.book_hash}"><i class="fas fa-home"></i><span style="margin-left:8px;">Library</span></a>
             <span class="breadcrumb-separator">/</span>
-            <a href="/book/{self.book_hash}/index.html" alt="bookHome" class="a-book-home">{self.book_title}</a>
+            <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-current">{chapter_title}</span>
-        </div> 
-
-        <div class="custom-css-panel" data-id="custom-css-panel">
-            <div class="panel-header" id="cssPanelToggle">
-                <h3><i class="fas fa-paint-brush"></i>Custom CSS</h3>
-                <button class="panel-toggle">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-            </div>
-            <div class="panel-content" id="cssPanelContent">
-                <div class="css-editor">
-                    <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
-                    <div class="css-controls">
-                        <button class="css-btn primary" id="saveCssBtn">
-                            <i class="fas fa-save"></i> Save
-                        </button>
-                        <button class="css-btn primary" id="saveAsDefaultBtn">
-                            <i class="fas fa-star"></i> Save as default
-                        </button>
-                        <button class="css-btn secondary" id="resetCssBtn">
-                            <i class="fas fa-undo"></i> Reset
-                        </button>
-                        <button class="css-btn secondary" id="loadDefaultBtn">
-                            <i class="fas fa-download"></i> Load default
-                        </button>
-                        <button class="css-btn secondary" id="previewCssBtn">
-                            <i class="fas fa-eye"></i> Preview
-                        </button>
-                    </div>
-                    <div class="css-info">
-                        <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <span class="breadcrumb-current" aria-current="page">{chapter_title}</span>
+        </nav>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
             <article class="eb-content" id="eb-content" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
             {content}
@@ -1409,7 +1375,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
-                    <label class="settings-label">Scroll Mode</label>
+                    <label class="settings-label">Reading mode</label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
@@ -1418,6 +1384,32 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                             <i class="fas fa-info-circle"></i>
                         </span>
                     </label>
+                </div>
+                <div class="settings-group settings-group-advanced">
+                    <label class="settings-label">Reading appearance (advanced)</label>
+                    <div class="css-editor">
+                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
+                        <div class="css-controls">
+                            <button class="css-btn primary" id="saveCssBtn">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                            <button class="css-btn primary" id="saveAsDefaultBtn">
+                                <i class="fas fa-star"></i> Save as default
+                            </button>
+                            <button class="css-btn secondary" id="resetCssBtn">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
+                            <button class="css-btn secondary" id="loadDefaultBtn">
+                                <i class="fas fa-download"></i> Load default
+                            </button>
+                            <button class="css-btn secondary" id="previewCssBtn">
+                                <i class="fas fa-eye"></i> Preview
+                            </button>
+                        </div>
+                        <div class="css-info">
+                            <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

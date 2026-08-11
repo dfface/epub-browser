@@ -1121,8 +1121,6 @@ function initScript() {
     
     function customCssFunc() {
         if (isKindleMode()) return;
-        var cssToggle = document.getElementById('cssPanelToggle');
-        var cssContent = document.getElementById('cssPanelContent');
         var cssInput = document.getElementById('customCssInput');
         var saveBtn = document.getElementById('saveCssBtn');
         var saveDefaultBtn = document.getElementById('saveAsDefaultBtn');
@@ -1131,18 +1129,6 @@ function initScript() {
         var loadDefaultBtn = document.getElementById('loadDefaultBtn');
         var key = 'custom_css_' + book_hash;
         var defKey = 'custom_css_default';
-        
-        cssToggle.addEventListener('click', function() {
-            cssContent.classList.toggle('expanded');
-            var icon = cssToggle.querySelector('i');
-            if (cssContent.classList.contains('expanded')) {
-                icon.classList.remove('fa-chevron-down');
-                icon.classList.add('fa-chevron-up');
-            } else {
-                icon.classList.remove('fa-chevron-up');
-                icon.classList.add('fa-chevron-down');
-            }
-        });
         
         function load() {
             var saved = localStorage.getItem(key);

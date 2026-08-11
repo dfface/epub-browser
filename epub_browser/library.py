@@ -256,7 +256,10 @@ if (isKindle) {
 
         library_html += f"""
     <div class="container">
-        <header class="eb-header" data-id="header">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-current" aria-current="page">Library</span>
+        </nav>
+        <header class="library-info" data-id="header">
             <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favicon.svg" class="theme-logo" style="width:60px; height:60px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
             <div class="stats">
                 <div class="stat-card">
