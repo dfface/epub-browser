@@ -1,251 +1,178 @@
-# epub-browser
+# EPUB Browser
 
-![GitHub Repo stars](https://img.shields.io/github/stars/dfface/epub-browser)
-[![python](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![pypi](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
-[![wheel](https://img.shields.io/pypi/wheel/epub-browser)](https://pypi.org/project/epub-browser/)
-[![license](https://img.shields.io/github/license/dfface/epub-browser)](https://pypi.org/project/epub-browser/)
-![PyPI - Downloads](https://img.shields.io/pypi/dd/epub-browser)
+> **A calm, self-hosted place for your EPUB library.**
 
-A modern web-based EPUB reader with library management, dark mode, Kindle optimization, code highlighting, text highlighting & annotation and PWA support for an enhanced reading experience across devices.
+[![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
+[![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![GitHub stars](https://img.shields.io/github/stars/dfface/epub-browser)](https://github.com/dfface/epub-browser)
 
-It functions as a static site generator, and the generated static files can be deployed to Cloudflare Pages, GitHub Pages, and other platforms.
+EPUB Browser turns an EPUB collection into a polished, private reading library you can open in any modern browser. It is a static-site generator and a local server: keep your books where you choose, read on the devices you already own, and shape the reading experience around your habits.
 
-Try it online: [https://epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech)
+[Try the demo](https://epub-browser-test.yuhan.tech) · [Install from PyPI](https://pypi.org/project/epub-browser/) · [Report an issue](https://github.com/dfface/epub-browser/issues)
 
-It now supports the following features:
+## Reading, without the platform
 
-- **Basic library management**: Search by title, author or tag. Supports pinyin search for Chinese titles and authors (e.g., searching "santi" will match "三体").
+Most reading tools ask you to adapt to their library, account, and interface. EPUB Browser takes the opposite view: your collection is the center of the product.
 
-- **Theme system** (disabled in Kindle Mode): Multiple themes supported including light, dark, sepia, forest, ocean, peach, and lavender. Theme selection is available in the top right corner.
+- **Your library stays yours.** Run it locally, on your own server, or as a static site. No account is required to start reading.
+- **Your reading can be personal.** Choose a theme, font, font size, page-turning or scrolling, and optional custom styles.
+- **Your attention stays with the book.** Use pure reading mode, resume where you left off, and keep notes close to the passage that matters.
 
-- **Page navigation**: Keyboard controls supported (Left Arrow, Right Arrow and Spacebar for page turning/scrolling).
+It is designed as a dependable reading companion: quiet when you are immersed, capable when you need to organise, annotate, or share a library across your own devices.
 
-- **Continuous Scroll** (Scrolling mode only): Seamlessly load the next chapter when scrolling past the end of the current one. Enable via Settings > Reading > Scroll Mode. Ideal for books with many short sections. Note: scroll progress save/restore is disabled in this mode (chapter position tracked via URL).
+## What you can do
 
-- **Kindle Mode**: Enhanced style optimizations; allows page turning by tapping either side of the screen. Automatically detected based on device user agent (Kindle/Silk browsers).
+### Build a library that feels familiar
 
-- Reading progress bar
+- Import one EPUB, a folder, or an entire Calibre library.
+- Search titles, authors, and tags — including pinyin search for Chinese metadata.
+- Read Calibre tags and descriptions directly from EPUB metadata.
+- Sort library surfaces and organise a personal bookshelf with nested groups, tags, import/export, and optional sync.
+- Keep the library current with `--watch` when files are added or updated.
 
-- **Chapter-wise table of contents**.
+### Settle into the page
 
-- Font size and font family adjustment
+- Switch between scrolling and page-turning reading modes.
+- Resume the last chapter and reading location.
+- Adjust font family and size, use one of several themes, or add per-book custom CSS.
+- Use continuous scroll for books with many short sections.
+- Enter pure reading mode when you want the interface to disappear.
+- Zoom images, highlight code, and use keyboard navigation.
+- Read comfortably on phones, tablets, desktops, and Kindle/Silk browsers.
 
-- Image zoom functionality
+### Keep what you notice
 
-- **Mobile device compatibility**: Fully optimized for mobile devices including Kindle e-readers. Kindle Mode is automatically detected and enabled for Kindle/Silk browsers.
+- Highlight selected text, add notes, and copy the original selected passage.
+- Choose highlight colours and manage them in Settings.
+- Store annotations locally or use a compatible cloud API; export annotations as JSON whenever you need them.
 
-- **Code highlighting** (disabled in Kindle Mode) with theme synchronization.
+### Take it where you read
 
-- **Reading position retention**: Restores your last-read chapter (supported on all devices including Kindle) and your last-read location (supported on all devices *except* Kindle).
+- Install the generated library as a Progressive Web App on supported browsers.
+- Run the included local server, or generate static files for Cloudflare Pages, GitHub Pages, Apache, Nginx, and similar hosts.
+- Use the cache update control when you deploy a refreshed library.
 
-- **Custom CSS**: Tailor the reading experience with custom styles, e.g.
+## Start reading in two minutes
 
-    ```css
-    #eb-content { margin: 50px; }
-    #eb-content p { font-size: 2rem; }
-    ```
-
-  *Note: All core content is nested under the element with the `#eb-content` selector.*
-
-- **Direct deployment** on any web server (e.g. Apache): Use the `--no-server` parameter.
-
-- Multithreading support
-
-- **Drag-and-drop sorting**: Main interface elements are draggable.
-
-- **Calibre metadata integration**: Displays tags (`dc:subject`) and comments (`dc:description`) edited in Calibre. *Note: After editing metadata in Calibre, use the "Edit book" function to save your changes.*
-
-- **Watchdog utility**: Monitors the user-specified directory (or the directory containing EPUB files) with `--watch` parameter. Automatically adds newly added or updated EPUB files to the library.
-
-- **Progressive Web App (PWA)**: Installable as a native app on supported devices for a more app-like experience.
-
-- **Pure Reading Mode**: Hides all toolbars for distraction-free reading. On desktop, toggle via the "Pure" button in the navigation bar or by clicking the center of the screen. On mobile, toggle by clicking the center of the screen.
-
-- **Cache management**: Update button in library to clear Service Worker cache and refresh content.
-
-- **Bookshelf**: Personal bookshelf with grouping support (non-Kindle mode only). Features include:
-  - Add/remove books to shelf from book detail page
-  - Create nested groups for organization
-  - Tag-based filtering within shelf and groups
-  - Drag-and-drop sorting for books and groups
-  - Export/import shelf data as JSON (supports both file upload and URL import)
-  - Statistics showing book and group counts
-  - Sync: Synchronize shelf data across devices using a username. The sync feature uses version control to manage data changes and supports conflict resolution.
-
-- **Text Highlighting & Annotation**: Highlight selected text and add notes to your reading. Features include:
-  - Select text in the reading area to create highlights with customizable colors
-  - Add notes to any highlight for personal annotations
-  - View, edit, and delete annotations with a click on highlighted text
-  - **Annotation Settings** (in Settings modal):
-    - Enable/disable annotation feature
-    - Choose storage location (Local IndexedDB or Cloud backend API)
-    - Set default highlight color
-    - Custom color management: drag to reorder, add custom colors, delete custom colors
-    - Export all annotations or book-specific annotations as JSON
-  - **Data Migration**: When switching storage locations, optionally migrate existing annotations
-
-## Usage
-
-Type the command in the terminal:
+### Install
 
 ```bash
 pip install epub-browser
+```
 
-# Open single book
-epub-browser path/to/book1.epub
+### Open a book or library
 
-# Open multiple books
+```bash
+# One book
+epub-browser path/to/book.epub
+
+# A few books
 epub-browser book1.epub book2.epub book3.epub
 
-# Open multiple books under the path
-epub-browser *.epub
-
-# Open multiple books under the current path
-epub-browser .
-
-# Do not start the server; only generate static website files, which can be directly deployed on any web server such as Apache.
-epub-browser . --no-server
-
-# Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.
-epub-browser . --watch
-
-# Specify the output directory of html files, or use tmp directory by default
-epub-browser book1.epub book2.epub --output-dir /path/to/output
-
-# Save the converted html files, will not clean the target tmp directory;
-# Note: These files are for inspection purposes only and cannot be directly deployed to a web server. To enable direct deployment, please use the --no-server parameter.
-epub-browser book1.epub --keep-files
-
-# Do not open the browser automatically
-epub-browser book1.epub book2.epub --no-browser
-
-# Specify the server port
-epub-browser book1.epub --port 8080
-
-# Specify the sync directory for bookshelf data (default: same as output directory)
-epub-browser book1.epub --sync-dir /path/to/sync-data
+# Every EPUB in a folder (including a Calibre library)
+epub-browser /path/to/books
 ```
 
-Then a browser will be opened to view the epub file.
+EPUB Browser creates a library and opens it in your browser. By default, the local server listens on port `8000` and is available to devices on your local network.
 
-For more usage information, please use the `--help` parameter.
+## Common workflows
+
+### Keep a local library running
+
+Use a fixed output directory when you want generated files and bookshelf data to persist between runs:
 
 ```bash
-➜ epub-browser --help                                                                                        
-usage: epub-browser [-h] [--port PORT] [--no-browser] [--output-dir OUTPUT_DIR] [--keep-files] [--log] [--no-server] [--watch] [--sync-dir SYNC_DIR]
-                    filename [filename ...]
-
-EPUB to Web Converter - Multi-book Support
-
-positional arguments:
-  filename              EPUB file path(s)
-
-options:
-  -h, --help            show this help message and exit
-  --port, -p PORT       Web server port (default: 8000)
-  --no-browser          Do not automatically open browser
-  --output-dir, -o OUTPUT_DIR
-                        Output directory for converted books
-  --keep-files          Keep converted files after server stops. To enable direct deployment, please use the --no-server parameter.
-  --log                 Enable log messages
-  --no-server           Do not start a server, just generate files which can be directly deployed on any web server such as Apache.
-  --watch, -w           Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides).
-                        When there are new additions or updates, automatically add them to the library.
-  --sync-dir SYNC_DIR   Directory to store bookshelf sync data (default: same as current work directory)
+epub-browser /path/to/books \
+  --output-dir /path/to/epub-browser-library \
+  --sync-dir /path/to/epub-browser-sync \
+  --keep-files \
+  --no-browser
 ```
 
-## Startup
-
-How do I set it to start automatically on boot?
-
-### macOS
-
-1. add a file `epub-browser.plist` in `~/Library/LaunchAgents`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-    <dict>
-        <key>Label</key>
-        <string>Epub-Browser</string>
-        <key>ProgramArguments</key>
-        <array>
-            <string>/path/to/.venv/bin/epub-browser</string>
-            <string>--output-dir</string>
-            <string>/path/to/workdir</string>
-            <string>--watch</string>
-            <string>--no-browser</string>
-            <string>--keep-files</string>
-            <string>/path/to/Calibre Library</string>
-        </array>
-        <key>RunAtLoad</key>
-        <true/>
-        <key>WorkingDirectory</key>
-        <string>/path/to/workdir</string>
-        <key>StandardOutPath</key>
-        <string>/path/to/workdir/run.log</string>
-        <key>StandardErrorPath</key>
-        <string>/path/to/workdir/err.log</string>
-    </dict>
-</plist>
-```
-
-> run `which epub-browser` to get the full path of `epub-browser`
-
-1. run the command to make effective:
+Add `--watch` to monitor the source folder and add or update books automatically:
 
 ```bash
-launchctl load -w ~/Library/LaunchAgents/epub-browser.plist
-# launchctl unload -w ~/Library/LaunchAgents/epub-browser.plist
-launchctl start epub-browser
-# using kickstart to restart like this:
-# launchctl kickstart -k gui/501/Epub-Browser 
-
+epub-browser /path/to/books --watch --output-dir /path/to/epub-browser-library --keep-files
 ```
 
-### Linux
+### Generate a static site
 
-wait someone to add or ask ChatGPT.
+Use `--no-server` when the output will be served by your own web server or static host:
+
+```bash
+epub-browser /path/to/books \
+  --output-dir /path/to/public-library \
+  --no-server
+```
+
+Upload the contents of `/path/to/public-library` to your preferred static host.
+
+### Useful options
+
+```bash
+# Choose a port and do not launch a browser
+epub-browser book.epub --port 8080 --no-browser
+
+# Keep generated files after a temporary local reading session
+epub-browser book.epub --keep-files
+
+# See every available option
+epub-browser --help
+```
+
+| Option | Purpose |
+| --- | --- |
+| `--output-dir`, `-o` | Directory for generated library files. |
+| `--no-server` | Generate deployable static files without starting the local server. |
+| `--keep-files` | Preserve generated files after the local server stops. |
+| `--watch`, `-w` | Watch the input directory for EPUB additions and changes. |
+| `--sync-dir` | Directory used by the optional bookshelf sync data. |
+| `--port`, `-p` | Local server port; defaults to `8000`. |
+| `--no-browser` | Do not open a browser automatically. |
+
+## Reading controls
+
+| Need | Where to find it |
+| --- | --- |
+| Change font, size, or reading mode | **Settings** in a chapter |
+| Add custom styles | **Settings → Reading → Custom styles** |
+| Turn pages | Left/Right Arrow or Space; use the page controls in page-turning mode |
+| Read continuously | **Settings → Reading**; scrolling mode only |
+| Focus on the book | **Pure** in the navigation controls, or click the page centre on supported devices |
+| Highlight, annotate, or copy | Select original text in the reading area |
+| Update an installed library | **Update** on the library page |
+
+Kindle/Silk browsers are detected automatically and receive an e-reader-friendly mode. Some browser-heavy features, such as code highlighting and the bookshelf, are intentionally reduced there.
+
+## Deploy and run continuously
+
+The `--no-server` output is static and can be hosted wherever you host static files. For a self-hosted always-on library, run the command above with a persistent output directory and supervise it with your platform's service manager.
 
 ### Docker
 
-Start the service using `docker-compose up -d`:
-
-```
-version: "3"
-services:
-  epub-browser:
-    image: dfface/epub-browser:latest
-    user: 1000:1000 # should be owner of volumes
-    restart: unless-stopped
-    ports:
-      - "8088:80"
-    volumes:
-      - "/Users/dfface/Calibre Library:/app/Library/Calibre"
-      - "/Users/dfface/xxx Book Library:/app/Library/xxxBook"
-      - "/Users/dfface/data/epub-browser/tmp-files:/app/EpubBrowserFiles"
-      - "/Users/dfface/data/epub-browser/sync-data:/app/SyncData"
-```
-
-or just with `docker`:
-
 ```bash
 docker run -d \
-  --name epub-browser-service \
+  --name epub-browser \
   -p 8080:80 \
-  -v /path/to/YourEpubDir:/app/Library \
-  -v /path/to/EpubBrowserTmpFiles:/app/EpubBrowserFiles \
-  -v /path/to/EpubBrowserSyncData:/app/SyncData \
+  -v /path/to/your-books:/app/Library \
+  -v /path/to/generated-library:/app/EpubBrowserFiles \
+  -v /path/to/sync-data:/app/SyncData \
   epub-browser:latest
 ```
 
-## Tips
+Mount paths and ownership should match the user running the container.
 
-* If there are errors or some mistakes in epub files, then you can use [Calibre](https://calibre-ebook.com/) to convert to epub again.
-  * Issue: EPUB table of contents fails to display properly, usually due to missing `toc.ncx` file.
-  * Fix: Use Calibre to re-convert the original file to EPUB. This generates a specification-compliant EPUB with correct TOC display.
-* Tags can be managed by [calibre](https://calibre-ebook.com/). After adding tags, **you should click "Edit book" and just close the window to update the epub file** or the tags will not change in the browser.
-* By default, the program listens on the address `0.0.0.0`. This means you can access the service via any of your local machine's addresses (such as a local area network (LAN) address like `192.168.1.233`), not just `localhost`.
-* Just find calibre library and run `epub-browser .`, it will collect all books that managed by calibre.
+## A note on EPUB metadata
+
+EPUB Browser reads standard EPUB metadata, including title, author, `dc:subject` tags, and descriptions. For Calibre-managed libraries, edit metadata in Calibre and save the book after editing so the EPUB file itself is updated.
+
+If a book has a broken table of contents or malformed markup, opening and reconverting it with [Calibre](https://calibre-ebook.com/) often produces a standards-compliant EPUB that reads correctly.
+
+## Contributing
+
+Issues, bug reports, and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the EPUB source when it can be shared, the browser/device, the reading mode, and clear reproduction steps.
+
+## License
+
+[MIT](License.txt)
