@@ -254,33 +254,17 @@ if (isKindle) {
 
         library_html += f"""
     <div class="breadcrumb-container">
-        <nav class="breadcrumb" aria-label="Breadcrumb">
+        <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb">
             <span class="breadcrumb-current" aria-current="page"><i class="fas fa-home" aria-hidden="true"></i><span style="margin-left: 8px;">Library</span></span>
+            <div class="library-meta" aria-label="Library information">
+                <span class="library-title"><img src="/assets/favicon.svg" class="theme-logo" alt="" aria-hidden="true">EPUB Library</span>
+                <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i>{len(self.books)} book(s)</span>
+                <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i>{len(all_tags)} tag(s)</span>
+                <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue">Login</span></button>
+            </div>
         </nav>
     </div>
     <div class="container">
-        <header class="library-info" data-id="header">
-            <h1 style="display: flex; justify-content: center; align-items: center; text-align:center"> <img src="/assets/favicon.svg" class="theme-logo" style="width:44px; height:44px; margin-right:10px; display: flex"> <span style="display: flex">EPUB Library</span></h1>
-            <div class="stats">
-                <div class="stat-card">
-                    <i class="fas fa-book"></i>
-                    <div>
-                        <div class="stat-value">{len(self.books)} book(s)</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-tags"></i>
-                    <div>
-                        <div class="stat-value">{len(all_tags)} tag(s)</div>
-                    </div>
-                </div>
-
-                <div class="stat-card" id="loginCard" style="cursor: pointer;">
-                    <i class="fas fa-user"></i>
-                    <div class="stat-value" id="loginValue">Login</div>
-                </div>
-            </div>
-        </header>
         <div class="controls" data-id="controls">
             <div class="search-container">
                 <input type="text" class="search-box" placeholder="Search by book title, author, or tag...">

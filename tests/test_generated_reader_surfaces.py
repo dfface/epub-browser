@@ -40,14 +40,16 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             processor.chapters = [{"title": "One"}]
             return processor.create_chapter_template("<p>Text</p>", "", 0, "One")
 
-    def test_library_has_a_current_location_breadcrumb_before_library_info(self):
+    def test_library_places_its_summary_inside_the_current_location_breadcrumb(self):
         html = self._library_html()
 
         self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\baria-label=(?:["\'])?Breadcrumb(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>.*Library.*</span>')
-        self.assertLess(html.index("aria-label"), html.index("library-info"))
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
         self.assertIn('fa-home', breadcrumb)
+        self.assertRegex(breadcrumb, r'\bclass=(?:["\'])?library-meta(?:["\'])?')
+        self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
+        self.assertNotIn('library-info', html)
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()
