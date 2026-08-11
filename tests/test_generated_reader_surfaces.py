@@ -49,6 +49,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('fa-home', breadcrumb)
         self.assertRegex(breadcrumb, r'\bclass=(?:["\'])?library-meta(?:["\'])?')
         self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
+        self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):

@@ -257,7 +257,6 @@ if (isKindle) {
         <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb">
             <span class="breadcrumb-current" aria-current="page"><i class="fas fa-home" aria-hidden="true"></i><span style="margin-left: 8px;">Library</span></span>
             <div class="library-meta" aria-label="Library information">
-                <span class="library-title"><img src="/assets/favicon.svg" class="theme-logo" alt="" aria-hidden="true">EPUB Library</span>
                 <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i>{len(self.books)} book(s)</span>
                 <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i>{len(all_tags)} tag(s)</span>
                 <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue">Login</span></button>
