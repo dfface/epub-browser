@@ -1367,7 +1367,7 @@ body {
         padding: 0;
     }
 
-    .breadcrumb, .navigation, .custom-css-panel, .eb-content-container {
+    .navigation, .custom-css-panel, .eb-content-container {
         margin: 0;
         border-radius: unset;
     }
@@ -1520,14 +1520,6 @@ body {
         min-width: 80%;
     }
 
-    .breadcrumb {
-        flex-wrap: wrap;
-    }
-    
-    .breadcrumb-separator {
-        margin: 0 5px;
-    }
-    
     #eb-content {
         padding: 20px;
     }

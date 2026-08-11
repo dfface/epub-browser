@@ -536,7 +536,7 @@ body {
         padding: 0;
     }
 
-    .breadcrumb, .book-info-card, .eb-header, .toc-container {
+    .book-info-card, .eb-header, .toc-container {
         margin: 0;
         border-radius: unset;
     }
@@ -590,33 +590,6 @@ body {
 @media (max-width: 480px) {
     .eb-header {
         padding: 20px 15px;
-    }
-    
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-    
-    .breadcrumb a {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex-shrink: 1;
-    }
-    
-    .breadcrumb-current {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex-shrink: 1;
-        min-width: 0;
-    }
-    
-    .breadcrumb-separator {
-        margin: 0 5px;
-        flex-shrink: 0;
     }
     
     .toc-header {

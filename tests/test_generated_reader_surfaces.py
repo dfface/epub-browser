@@ -33,6 +33,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("padding: 15px 20px", css)
         self.assertIn("align-self: center;", css)
 
+    def test_mobile_reader_breadcrumb_uses_the_shared_compact_layout(self):
+        css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
+        book_html = self._book_html()
+        chapter_html = self._chapter_html()
+
+        self.assertIn(".breadcrumb-library-label", css)
+        self.assertIn("flex-wrap: nowrap;", css)
+        self.assertIn("min-width: 0;", css)
+        self.assertIn("text-overflow: ellipsis;", css)
+        self.assertIn(".library-breadcrumb", css)
+        for html in (book_html, chapter_html):
+            self.assertRegex(html, r'aria-label=(?:["\'])?Library')
+            self.assertRegex(html, r'class=(?:["\'])?breadcrumb-library-label')
+
     def test_reader_chrome_uses_one_default_font_stack(self):
         for path in ("library.css", "book.css", "chapter.css"):
             css = Path("epub_browser/assets", path).read_text(encoding="utf-8")

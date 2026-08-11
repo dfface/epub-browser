@@ -527,7 +527,7 @@ class EPUBProcessor:
         index_html += f"""
 <div class="breadcrumb-container">
     <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-        <a href="/"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
+        <a href="/" aria-label="Library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label">Library</span></a>
         <span class="breadcrumb-separator">/</span>
         <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
     </nav>
@@ -1258,7 +1258,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
     <div class="chapter-top-bar">
         <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-            <a href="/"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span>Library</span></a>
+            <a href="/" aria-label="Library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label">Library</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
