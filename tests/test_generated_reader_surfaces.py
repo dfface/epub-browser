@@ -57,7 +57,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         reading_tab_start = html.index('id="reading-tab"')
         editor_start = html.index('id="customCssInput"')
         self.assertGreater(editor_start, reading_tab_start)
-        self.assertIn('Reading appearance (advanced)', html)
+        self.assertIn('Custom styles', html)
+        self.assertIn('Optional', html)
+        self.assertNotIn('Reading appearance (advanced)', html)
         self.assertNotIn('id="cssPanelToggle"', html)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):

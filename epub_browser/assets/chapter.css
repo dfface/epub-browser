@@ -643,9 +643,39 @@ body {
     gap: 10px;
 }
 
-.settings-group-advanced {
+.settings-group-custom-css {
     border-top: 1px solid var(--border);
-    padding-top: 20px;
+    padding-top: 16px;
+    gap: 8px;
+}
+
+.settings-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.settings-section-title {
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.settings-section-optional {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--hover-bg);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.3;
+}
+
+.settings-section-description {
+    margin: -2px 0 2px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.45;
 }
 
 .settings-label {

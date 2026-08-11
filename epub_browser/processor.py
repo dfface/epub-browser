@@ -1388,8 +1388,12 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                         </span>
                     </label>
                 </div>
-                <div class="settings-group settings-group-advanced">
-                    <label class="settings-label">Reading appearance (advanced)</label>
+                <div class="settings-group settings-group-custom-css">
+                    <div class="settings-section-heading">
+                        <span class="settings-section-title">Custom styles</span>
+                        <span class="settings-section-optional">Optional</span>
+                    </div>
+                    <p class="settings-section-description">Use CSS to fine-tune this book’s typography and layout.</p>
                     <div class="css-editor">
                         <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
                         <div class="css-controls">
