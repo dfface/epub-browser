@@ -31,11 +31,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("Continue reading", script)
         self.assertIn("Start reading", script)
 
-    def test_book_toc_marks_server_synced_reading_progress_with_the_username(self):
+    def test_book_toc_marks_server_synced_reading_progress_with_the_reader_identity(self):
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
         css = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
 
-        self.assertIn("markReadingChapter(readKey, getProgressUsername())", script)
+        self.assertIn("markReadingChapter(readKey, getProgressIdentity())", script)
+        self.assertIn("return window.EpubReadingProgress.getUsername() || 'shared';", script)
         self.assertIn("chapter-sync-tag", script)
         self.assertIn("'Cloud sync · ' + username", script)
         self.assertIn(".chapter-sync-tag", css)

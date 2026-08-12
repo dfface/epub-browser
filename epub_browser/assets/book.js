@@ -123,7 +123,7 @@ function initScript() {
                 var readKey = 'eb_ci_' + progress.chapter_index;
                 localStorage.setItem(book_hash, readKey);
                 updateContinueReadingButton(book_hash);
-                markReadingChapter(readKey, getProgressUsername());
+                markReadingChapter(readKey, getProgressIdentity());
             });
     }
 
@@ -254,9 +254,9 @@ function initScript() {
     }, 500);
 }
 
-function getProgressUsername() {
-    if (!window.EpubReadingProgress || !window.EpubReadingProgress.getUsername) return '';
-    return window.EpubReadingProgress.getUsername();
+function getProgressIdentity() {
+    if (!window.EpubReadingProgress || !window.EpubReadingProgress.getUsername) return 'shared';
+    return window.EpubReadingProgress.getUsername() || 'shared';
 }
 
 function markReadingChapter(readKey, username) {
@@ -281,13 +281,11 @@ function markReadingChapter(readKey, username) {
 
     if (!chapterElement) return;
     chapterElement.classList.add('active');
-    if (username) {
-        var syncTag = document.createElement('span');
-        syncTag.className = 'chapter-sync-tag';
-        syncTag.textContent = 'Cloud sync · ' + username;
-        syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
-        chapterElement.appendChild(syncTag);
-    }
+    var syncTag = document.createElement('span');
+    syncTag.className = 'chapter-sync-tag';
+    syncTag.textContent = 'Cloud sync · ' + username;
+    syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
+    chapterElement.appendChild(syncTag);
 
     var tocContainer = document.querySelector('.chapter-list');
     if (isKindleMode()) tocContainer = document.documentElement;
