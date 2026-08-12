@@ -25,9 +25,11 @@
     this.pending = undefined;
     this.reported = undefined;
     this.timer = null;
+    this.selectionVersion = 0;
   }
 
   ChapterReporter.prototype.select = function(index) {
+    this.selectionVersion++;
     if (this.timer !== null) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -51,6 +53,7 @@
     }
     if (this.pending === undefined || this.pending === this.reported) return Promise.resolve(null);
     var index = this.pending;
+    var selectionVersion = this.selectionVersion;
     this.pending = undefined;
     var result;
     try {
@@ -61,10 +64,10 @@
     var self = this;
     return Promise.resolve(result).then(function(response) {
       if (response) self.reported = index;
-      else if (self.pending === undefined) self.pending = index;
+      else if (self.selectionVersion === selectionVersion && self.pending === undefined) self.pending = index;
       return response;
     }, function() {
-      if (self.pending === undefined) self.pending = index;
+      if (self.selectionVersion === selectionVersion && self.pending === undefined) self.pending = index;
       return null;
     });
   };

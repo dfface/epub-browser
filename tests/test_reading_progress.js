@@ -55,6 +55,24 @@ test('a failed older report does not replace a newer chapter selection', async (
   assert.equal(reporter.pending, 3);
 });
 
+test('reselecting an already reported chapter is not overwritten by an older failure', async () => {
+  let finishOld;
+  const reporter = new Progress.ChapterReporter(index => {
+    if (index === 2) return new Promise(resolve => { finishOld = resolve; });
+    return Promise.resolve({ chapter_index: index });
+  }, 1);
+  reporter.reported = 3;
+
+  reporter.select(2);
+  const oldRequest = reporter.flush();
+  reporter.select(3);
+  finishOld(null);
+  await oldRequest;
+
+  assert.equal(reporter.pending, undefined);
+  assert.equal(reporter.reported, 3);
+});
+
 test('progress-bar preference defaults to visible and hides only its fixed container', () => {
   assert.equal(Progress.showProgressBar(null), true);
   assert.equal(Progress.progressBarClass(false), 'is-progress-bar-hidden');
