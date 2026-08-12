@@ -42,6 +42,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("'Cloud sync · ' + username", script)
         self.assertIn(".chapter-sync-tag", css)
         self.assertIn(".chapter-title-with-sync", css)
+        self.assertIn(".chapter-page", css)
+        self.assertIn("flex: 0 0 auto;", css)
 
     def test_reader_includes_chapter_sync_and_progress_bar_controls(self):
         book_html = self._book_html()

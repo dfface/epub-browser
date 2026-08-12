@@ -435,6 +435,7 @@ body {
 }
 
 .chapter-title {
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -443,15 +444,18 @@ body {
 
 .chapter-title-with-sync {
     display: flex;
-    flex: 1;
+    flex: 1 1 0;
     min-width: 0;
     align-items: center;
     gap: 8px;
 }
 
 .chapter-page {
+    flex: 0 0 auto;
+    margin-left: auto;
     color: var(--text-secondary);
     font-size: 0.9rem;
+    white-space: nowrap;
 }
 
 .toc-level-0 { margin-left: 0px; }
