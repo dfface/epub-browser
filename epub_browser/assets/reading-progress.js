@@ -61,10 +61,10 @@
     var self = this;
     return Promise.resolve(result).then(function(response) {
       if (response) self.reported = index;
-      else self.pending = index;
+      else if (self.pending === undefined) self.pending = index;
       return response;
     }, function() {
-      self.pending = index;
+      if (self.pending === undefined) self.pending = index;
       return null;
     });
   };
