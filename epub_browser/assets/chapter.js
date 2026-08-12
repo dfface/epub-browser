@@ -1333,7 +1333,8 @@ function initScript() {
         
         // 连续滚动模式：检测是否滚动到底部或顶部
         if (isContinuousScroll && !isLoadingChapter && !isPaginationMode) {
-            var scrollBottom = dh - st;
+            var contentBottom = content.getBoundingClientRect().bottom + window.scrollY;
+            var scrollBottom = contentBottom - (st + wh);
             // 距离底部 300px 时预加载下一章
             if (scrollBottom < 300) {
                 loadNextChapter();
@@ -1672,6 +1673,21 @@ function initScript() {
         content.appendChild(initialSection);
         loadedChapters[currentIdx] = true;
         continuousChapterWindow = new EpubChapterWindow(currentIdx, 5);
+        loadNextChapter();
+        setTimeout(function() {
+            if (!isLoadingChapter && Object.keys(loadedChapters).length === 1) loadNextChapter();
+        }, 2000);
+    }
+
+    function ensureContinuousScrollBuffer() {
+        if (!isContinuousScroll || isLoadingChapter) return;
+        var contentBottom = content.getBoundingClientRect().bottom + window.scrollY;
+        var needsMore = typeof EpubContinuousBuffer !== 'undefined'
+            ? EpubContinuousBuffer.needsMoreContinuousContent(contentBottom, window.scrollY, window.innerHeight)
+            : contentBottom - (window.scrollY + window.innerHeight) < window.innerHeight * 2;
+        if (needsMore) {
+            loadNextChapter();
+        }
     }
 
     function pruneContinuousWindow(direction, index) {
@@ -1726,6 +1742,7 @@ function initScript() {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', getChapterUrl(nextIdx), true);
         xhr.onload = function() {
+            var appendedChapter = false;
             if (xhr.status >= 200 && xhr.status < 300) {
                 // 从返回的 HTML 中提取正文内容
                 var html = xhr.responseText;
@@ -1770,6 +1787,7 @@ function initScript() {
                     pruneContinuousWindow('next', nextIdx);
                     EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
                     EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
+                    appendedChapter = true;
                     
                     // 更新 URL
                     updateContinuousScrollUrl(nextIdx);
@@ -1781,6 +1799,7 @@ function initScript() {
                 }
             }
             isLoadingChapter = false;
+            if (appendedChapter) ensureContinuousScrollBuffer();
         };
         xhr.onerror = function() {
             var loaderEl = document.getElementById('scrollLoader');
