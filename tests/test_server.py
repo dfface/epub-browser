@@ -1,4 +1,7 @@
+import json
 import os
+from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 
@@ -87,3 +90,36 @@ class ServerCacheTests(unittest.TestCase):
         response = self.client.post("/sync", json=payload)
 
         self.assertEqual(response.status_code, 304)
+
+    def test_sync_persists_the_shelf_in_sqlite(self):
+        payload = {"username": "reader", "version": 2, "data": {"items": ["book-a"], "groups": {}}}
+
+        response = self.client.post("/sync", json=payload)
+
+        self.assertEqual(response.status_code, 404)
+        with sqlite3.connect(os.path.join(self.directory.name, "annotations.db")) as connection:
+            row = connection.execute(
+                "SELECT version, data FROM bookshelves WHERE username = ?", ("reader",)
+            ).fetchone()
+        self.assertEqual(row, (2, json.dumps(payload["data"], ensure_ascii=False)))
+
+    def test_sync_returns_the_sqlite_shelf_to_an_older_client(self):
+        self.client.post("/sync", json={"username": "reader", "version": 3, "data": {"items": ["server"], "groups": {}}})
+
+        response = self.client.post("/sync", json={"username": "reader", "version": 2, "data": {"items": ["client"], "groups": {}}})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Server has newer or same version", "version": 3, "data": {"items": ["server"], "groups": {}}})
+
+    def test_sync_imports_the_highest_version_legacy_shelf_once(self):
+        Path(self.directory.name, "epub-browser-bookshelf-reader-2.json").write_text('{"items":["old"],"groups":{}}', encoding="utf-8")
+        Path(self.directory.name, "epub-browser-bookshelf-reader-4.json").write_text('{"items":["new"],"groups":{}}', encoding="utf-8")
+
+        response = self.client.post("/sync", json={"username": "reader", "version": 1, "data": {"items": [], "groups": {}}})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["version"], 4)
+        self.assertEqual(response.json()["data"]["items"], ["new"])
+        with sqlite3.connect(os.path.join(self.directory.name, "annotations.db")) as connection:
+            row = connection.execute("SELECT version FROM bookshelves WHERE username = ?", ("reader",)).fetchone()
+        self.assertEqual(row, (4,))

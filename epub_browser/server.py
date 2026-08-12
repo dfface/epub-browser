@@ -27,6 +27,66 @@ def cache_control_for_path(path):
     return 'no-cache'
 
 
+def load_legacy_bookshelf(directory, username):
+    """Return the newest readable legacy bookshelf JSON record, if any."""
+    pattern = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-*.json')
+    records = []
+    for filename in glob.glob(pattern):
+        try:
+            version = int(os.path.basename(filename).rsplit('-', 1)[1][:-5])
+            with open(filename, encoding='utf-8') as source:
+                records.append((version, json.load(source)))
+        except (IndexError, ValueError, OSError, json.JSONDecodeError):
+            continue
+    return max(records, key=lambda record: record[0]) if records else None
+
+
+def sync_bookshelf(database_path, legacy_directory, username, client_version, client_data):
+    """Synchronize one bookshelf document and return its response payload and status."""
+    with sqlite3.connect(database_path) as connection:
+        row = connection.execute(
+            'SELECT version, data FROM bookshelves WHERE username = ?', (username,)
+        ).fetchone()
+        if row is None:
+            legacy = load_legacy_bookshelf(legacy_directory, username)
+            if legacy is not None:
+                legacy_version, legacy_data = legacy
+                connection.execute(
+                    'INSERT INTO bookshelves (username, version, data) VALUES (?, ?, ?)',
+                    (username, legacy_version, json.dumps(legacy_data, ensure_ascii=False)),
+                )
+                row = (legacy_version, json.dumps(legacy_data, ensure_ascii=False))
+
+        if row is not None:
+            stored_version, stored_data = row
+            if stored_version == client_version:
+                return {}, 304
+            if stored_version > client_version:
+                return {
+                    'message': 'Server has newer or same version',
+                    'version': stored_version,
+                    'data': json.loads(stored_data),
+                }, 200
+
+        if client_data is None:
+            return {'message': 'No data provided for update'}, 400
+
+        new_version = max(client_version, 1)
+        serialized_data = json.dumps(client_data, ensure_ascii=False)
+        if row is None:
+            connection.execute(
+                'INSERT INTO bookshelves (username, version, data) VALUES (?, ?, ?)',
+                (username, new_version, serialized_data),
+            )
+            return {'message': 'New user created', 'version': new_version}, 404
+
+        connection.execute(
+            'UPDATE bookshelves SET version = ?, data = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?',
+            (new_version, serialized_data, username),
+        )
+        return {'message': 'Data updated', 'version': new_version}, 201
+
+
 class CachedStaticFiles(StaticFiles):
     """Static file adapter with one cache policy for browser assets and books."""
 
@@ -108,25 +168,11 @@ def create_app(base_directory, sync_dir=None):
             data = await request.json()
             username, version, shelf = data.get('username', ''), data.get('version', 1), data.get('data')
             if not username: return response({'message': 'Username is required'}, 400)
-            directory = sync_dir or base_directory
-            pattern = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-*.json')
-            records = []
-            for filename in glob.glob(pattern):
-                try: records.append((int(os.path.basename(filename).rsplit('-', 1)[1][:-5]), filename))
-                except (IndexError, ValueError): pass
-            if records:
-                current_version, current_file = max(records)
-                if current_version == version:
-                    return response({}, 304)
-                if current_version > version:
-                    with open(current_file, encoding='utf-8') as source: return response({'message': 'Server has newer or same version', 'version': current_version, 'data': json.load(source)})
-            if shelf is None: return response({'message': 'No data provided for update'}, 400)
-            new_version = max(version, 1)
-            filename = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-' + str(new_version) + '.json')
-            with open(filename, 'w', encoding='utf-8') as target: json.dump(shelf, target, ensure_ascii=False, indent=2)
-            for _, old_file in records:
-                if old_file != filename: os.remove(old_file)
-            return response({'message': 'New user created' if not records else 'Data updated', 'version': new_version}, 404 if not records else 201)
+            payload, status = sync_bookshelf(
+                os.path.join(base_directory, 'annotations.db'), sync_dir or base_directory,
+                username, version, shelf,
+            )
+            return response(payload, status)
         except json.JSONDecodeError: return response({'message': 'Invalid JSON data'}, 400)
 
     routes = [
@@ -170,6 +216,14 @@ def init_annotation_db(base_dir):
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_chapter_username ON annotations(book_hash, chapter_index, username)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_book_username ON annotations(book_hash, username)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_username ON annotations(username)')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bookshelves (
+            username TEXT PRIMARY KEY,
+            version INTEGER NOT NULL,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -355,63 +409,12 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.send_json_response(400, {"message": "Username is required"})
                 return
             
-            if not self.sync_dir:
-                self.sync_dir = self.base_directory
-            
-            pattern = os.path.join(self.sync_dir, f"epub-browser-bookshelf-{username}-*.json")
-            existing_files = glob.glob(pattern)
-            
-            if not existing_files:
-                if client_data is None:
-                    self.send_json_response(400, {"message": "No data provided for new user"})
-                    return
-                new_version = client_version if client_version > 0 else 1
-                filename = f"epub-browser-bookshelf-{username}-{new_version}.json"
-                filepath = os.path.join(self.sync_dir, filename)
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    json.dump(client_data, f, ensure_ascii=False, indent=2)
-                self.send_json_response(404, {"message": "New user created", "version": new_version})
-                return
-            
-            max_version = 0
-            max_version_file = None
-            for f in existing_files:
-                basename = os.path.basename(f)
-                try:
-                    version = int(basename.split('-')[-1].replace('.json', ''))
-                    if version > max_version:
-                        max_version = version
-                        max_version_file = f
-                except ValueError:
-                    continue
-            
-            if max_version >= client_version:
-                with open(max_version_file, 'r', encoding='utf-8') as f:
-                    server_data = json.load(f)
-                self.send_json_response(200, {
-                    "message": "Server has newer or same version",
-                    "version": max_version,
-                    "data": server_data
-                })
-                return
-            
-            if client_data is None:
-                self.send_json_response(400, {"message": "No data provided for update"})
-                return
-            
-            new_version = client_version
-            filename = f"epub-browser-bookshelf-{username}-{new_version}.json"
-            filepath = os.path.join(self.sync_dir, filename)
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(client_data, f, ensure_ascii=False, indent=2)
-            
-            for f in existing_files:
-                try:
-                    os.remove(f)
-                except Exception:
-                    pass
-            
-            self.send_json_response(201, {"message": "Data updated", "version": new_version})
+            payload, status = sync_bookshelf(
+                os.path.join(self.base_directory, 'annotations.db'),
+                self.sync_dir or self.base_directory,
+                username, client_version, client_data,
+            )
+            self.send_json_response(status, payload)
             
         except json.JSONDecodeError:
             self.send_json_response(400, {"message": "Invalid JSON data"})
