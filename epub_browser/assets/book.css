@@ -452,10 +452,16 @@ body {
 
 .chapter-page {
     flex: 0 0 auto;
-    margin-left: auto;
+    margin-left: 16px;
     color: var(--text-secondary);
     font-size: 0.9rem;
     white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .chapter-page {
+        margin-left: 10px;
+    }
 }
 
 .toc-level-0 { margin-left: 0px; }

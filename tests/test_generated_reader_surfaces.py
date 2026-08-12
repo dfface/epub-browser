@@ -44,6 +44,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn(".chapter-title-with-sync", css)
         self.assertIn(".chapter-page", css)
         self.assertIn("flex: 0 0 auto;", css)
+        self.assertIn("margin-left: 16px;", css)
+        self.assertIn("margin-left: 10px;", css)
 
     def test_reader_includes_chapter_sync_and_progress_bar_controls(self):
         book_html = self._book_html()
