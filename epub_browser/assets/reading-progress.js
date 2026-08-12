@@ -1,8 +1,8 @@
 (function(root, factory) {
-  var EpubReadingProgress = factory();
+  var EpubReadingProgress = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = EpubReadingProgress;
   root.EpubReadingProgress = EpubReadingProgress;
-})(typeof window !== 'undefined' ? window : globalThis, function() {
+})(typeof window !== 'undefined' ? window : globalThis, function(root) {
   function activeChapter(sections, viewportMidpoint) {
     var nearest;
     var nearestDistance = Infinity;
@@ -105,11 +105,22 @@
   function showProgressBar(value) { return value !== 'false'; }
   function progressBarClass(visible) { return visible ? '' : 'is-progress-bar-hidden'; }
 
+  function getUsername() {
+    try {
+      return root.localStorage ? root.localStorage.getItem('epub_browser_username') || '' : '';
+    } catch (error) {
+      return '';
+    }
+  }
+
   function request(method, url, chapterIndex, keepalive) {
     var options = { method: method };
     if (keepalive) options.keepalive = true;
+    var username = getUsername();
+    if (username) options.headers = { 'X-Username': username };
     if (method === 'PUT') {
-      options.headers = { 'Content-Type': 'application/json' };
+      if (!options.headers) options.headers = {};
+      options.headers['Content-Type'] = 'application/json';
       options.body = JSON.stringify({ chapter_index: chapterIndex });
     }
     try {
@@ -129,6 +140,7 @@
     ChapterReporter: ChapterReporter,
     showProgressBar: showProgressBar,
     progressBarClass: progressBarClass,
+    getUsername: getUsername,
     request: request
   };
 });

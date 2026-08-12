@@ -413,6 +413,19 @@ body {
     color: #e9ecef;
 }
 
+.chapter-sync-tag {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
 .chapter-icon {
     margin-right: 12px;
     color: var(--text-secondary);

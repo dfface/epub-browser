@@ -140,3 +140,20 @@ test('reading progress requests persist only a chapter index', async () => {
   assert.equal(received.options.keepalive, true);
   assert.deepEqual(JSON.parse(received.options.body), { chapter_index: 5 });
 });
+
+test('reading progress requests identify the signed-in sync user', async () => {
+  const originalFetch = global.fetch;
+  const originalLocalStorage = global.localStorage;
+  let received;
+  global.localStorage = { getItem: key => key === 'epub_browser_username' ? 'alice' : null };
+  global.fetch = (url, options) => {
+    received = { url, options };
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ chapter_index: 5 }) });
+  };
+
+  await Progress.request('GET', '/api/reading-progress/book');
+  global.fetch = originalFetch;
+  global.localStorage = originalLocalStorage;
+
+  assert.equal(received.options.headers['X-Username'], 'alice');
+});

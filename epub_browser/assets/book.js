@@ -120,8 +120,10 @@ function initScript() {
         window.EpubReadingProgress.request('GET', '/api/reading-progress/' + encodeURIComponent(book_hash))
             .then(function(progress) {
                 if (version !== readingProgressLoadVersion || !progress || typeof progress.chapter_index !== 'number') return;
-                localStorage.setItem(book_hash, 'eb_ci_' + progress.chapter_index);
+                var readKey = 'eb_ci_' + progress.chapter_index;
+                localStorage.setItem(book_hash, readKey);
                 updateContinueReadingButton(book_hash);
+                markReadingChapter(readKey, getProgressUsername());
             });
     }
 
@@ -195,35 +197,7 @@ function initScript() {
     } else {
         currentChapter = getCookie(book_hash) || "";
     }
-    if (currentChapter !== "") {
-        var chapterElement = document.getElementById(currentChapter);
-
-        if (!chapterElement) {
-            var chapterLinks = document.querySelectorAll('.chapter-link');
-            for (var i = 0; i < chapterLinks.length; i++) {
-                var link = chapterLinks[i];
-                var linkId = link.id;
-                if (linkId) {
-                    var cleanId = linkId.split('#')[0];
-                    if (cleanId === currentChapter) {
-                        chapterElement = link;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (chapterElement) {
-            chapterElement.classList.add('active');
-            var tocContainer = document.querySelector('.chapter-list');
-            if (isKindleMode()) {
-                tocContainer = document.documentElement;
-            }
-            if (tocContainer) {
-                tocContainer.scrollTop = chapterElement.offsetTop - tocContainer.offsetTop - 50;
-            }
-        }
-    }
+    if (currentChapter !== "") markReadingChapter(currentChapter);
 
     if (window.initTheme) {
         window.initTheme();
@@ -278,6 +252,46 @@ function initScript() {
     setTimeout(function() {
         hideLoading();
     }, 500);
+}
+
+function getProgressUsername() {
+    if (!window.EpubReadingProgress || !window.EpubReadingProgress.getUsername) return '';
+    return window.EpubReadingProgress.getUsername();
+}
+
+function markReadingChapter(readKey, username) {
+    var chapterLinks = document.querySelectorAll('.chapter-link');
+    var chapterElement = document.getElementById(readKey);
+    var i;
+
+    if (!chapterElement) {
+        for (i = 0; i < chapterLinks.length; i++) {
+            if (chapterLinks[i].id.split('#')[0] === readKey) {
+                chapterElement = chapterLinks[i];
+                break;
+            }
+        }
+    }
+
+    for (i = 0; i < chapterLinks.length; i++) {
+        chapterLinks[i].classList.remove('active');
+        var existingTag = chapterLinks[i].querySelector('.chapter-sync-tag');
+        if (existingTag) existingTag.remove();
+    }
+
+    if (!chapterElement) return;
+    chapterElement.classList.add('active');
+    if (username) {
+        var syncTag = document.createElement('span');
+        syncTag.className = 'chapter-sync-tag';
+        syncTag.textContent = 'Cloud sync · ' + username;
+        syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
+        chapterElement.appendChild(syncTag);
+    }
+
+    var tocContainer = document.querySelector('.chapter-list');
+    if (isKindleMode()) tocContainer = document.documentElement;
+    if (tocContainer) tocContainer.scrollTop = chapterElement.offsetTop - tocContainer.offsetTop - 50;
 }
 
 function updateContinueReadingButton(bookHash) {
