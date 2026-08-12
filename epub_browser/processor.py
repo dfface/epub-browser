@@ -1640,6 +1640,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>
     <script src="/assets/chapter-window.js" defer></script>
+    <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>

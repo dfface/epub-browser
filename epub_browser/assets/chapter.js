@@ -1679,11 +1679,8 @@ function initScript() {
         change.evicted.forEach(function(index) {
             var chapter = content.querySelector('.continuous-chapter[data-chapter-index="' + index + '"]');
             if (!chapter) return;
-            var height = chapter.getBoundingClientRect().height;
-            var aboveViewport = chapter.getBoundingClientRect().bottom <= 0;
             chapter.remove();
             delete loadedChapters[index];
-            if (aboveViewport) window.scrollBy(0, -height);
         });
     }
     
@@ -1766,10 +1763,13 @@ function initScript() {
                     for (var i = 0; i < childNodes.length; i++) {
                         chapterSection.appendChild(childNodes[i].cloneNode(true));
                     }
+                    var viewportAnchor = EpubViewportAnchor.capture(content);
                     content.appendChild(chapterSection);
                     
                     loadedChapters[nextIdx] = true;
                     pruneContinuousWindow('next', nextIdx);
+                    EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
+                    EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
                     
                     // 更新 URL
                     updateContinuousScrollUrl(nextIdx);
@@ -1806,10 +1806,6 @@ function initScript() {
         if (prevIdx < 0 || loadedChapters[prevIdx]) return;
         
         isLoadingChapter = true;
-        
-        // 记录加载前的滚动高度和位置，用于加载完成后保持阅读位置
-        var prevScrollHeight = document.documentElement.scrollHeight;
-        var prevScrollY = window.scrollY;
         
         // 在内容顶部插入加载指示器
         var loader = document.createElement('div');
@@ -1861,6 +1857,7 @@ function initScript() {
                     }
                     chapterSection.appendChild(separator);
                     
+                    var viewportAnchor = EpubViewportAnchor.capture(content);
                     // 插入到内容最前面
                     if (content.firstChild) {
                         content.insertBefore(chapterSection, content.firstChild);
@@ -1870,16 +1867,8 @@ function initScript() {
                     
                     loadedChapters[prevIdx] = true;
                     pruneContinuousWindow('previous', prevIdx);
-                    
-                    // 调整滚动位置，保持在原来的阅读位置
-                    var newScrollHeight = document.documentElement.scrollHeight;
-                    var heightDiff = newScrollHeight - prevScrollHeight;
-                    var newScrollY = prevScrollY + heightDiff;
-                    window.scrollTo(0, newScrollY);
-                    // 更新 maxScrollTopSoFar，因为内容插入后整体坐标变化
-                    if (newScrollY > maxScrollTopSoFar) {
-                        maxScrollTopSoFar = newScrollY;
-                    }
+                    EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
+                    EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
                 }
             }
             isLoadingChapter = false;
