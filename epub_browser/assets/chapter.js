@@ -329,6 +329,7 @@ function initScript() {
     var pageJumpInput = document.getElementById('pageJumpInput');
     var goToPageBtn = document.getElementById('goToPage');
     var progressFill = document.getElementById('progressBar');
+    var readingProgressContainer = document.querySelector('.reading-progress-container');
     var pageHeightSetBtn = document.querySelector("#setPageHeight");
     var pageHeightInput = document.querySelector("#pageHeightInput");
     var toggleClickPageBtn = document.getElementById('toggleClickPage');
@@ -348,6 +349,28 @@ function initScript() {
     var isLoadingChapter = false;  // 防止重复加载
     var maxScrollTopSoFar = 0;  // 连续滚动模式下，跟踪用户向下滚过的最远位置
     var continuousChapterWindow = null;
+
+    function getReadingPreference(key) {
+        return isKindleMode() ? getCookie(key) : localStorage.getItem(key);
+    }
+
+    function setReadingPreference(key, value) {
+        if (isKindleMode()) setCookie(key, value);
+        else localStorage.setItem(key, value);
+    }
+
+    function applyReadingProgressBarVisibility(visible) {
+        if (!readingProgressContainer) return;
+        var className = window.EpubReadingProgress
+            ? window.EpubReadingProgress.progressBarClass(visible)
+            : (visible ? '' : 'is-progress-bar-hidden');
+        readingProgressContainer.classList.toggle('is-progress-bar-hidden', className !== '');
+    }
+
+    var showReadingProgressBar = window.EpubReadingProgress
+        ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
+        : getReadingPreference('showReadingProgressBar') !== 'false';
+    applyReadingProgressBarVisibility(showReadingProgressBar);
 
     var fontSize = "3";
     var fontFamily = "ebook-default";
@@ -1305,10 +1328,24 @@ function initScript() {
     wrapAllElements('table', 'div');
     wrapAllElements('img', 'div');
 
+    var readingProgressReporter = null;
+    if (!isKindleMode() && window.EpubReadingProgress) {
+        readingProgressReporter = new window.EpubReadingProgress.ChapterReporter(function(index, keepalive) {
+            return window.EpubReadingProgress.request(
+                'PUT', '/api/reading-progress/' + encodeURIComponent(book_hash), index, keepalive
+            );
+        });
+    }
+
+    function selectReadingChapter(index) {
+        if (readingProgressReporter && !isNaN(index)) readingProgressReporter.select(index);
+    }
+
     var readKey = "eb_ci_" + chapter_index;
     if (window.location.hash !== '') readKey += window.location.hash;
     if (!isKindleMode()) localStorage.setItem(book_hash, readKey);
     else setCookie(book_hash, readKey);
+    selectReadingChapter(parseInt(chapter_index, 10));
 
     if (window.initTheme) window.initTheme();
     
@@ -1330,6 +1367,7 @@ function initScript() {
             }
         }
         updateTocHighlight();
+        if (isContinuousScroll) updateContinuousReadingChapter();
         
         // 连续滚动模式：检测是否滚动到底部或顶部
         if (isContinuousScroll && !isLoadingChapter && !isPaginationMode) {
@@ -1349,6 +1387,10 @@ function initScript() {
                 loadPrevChapter();
             }
         }
+    });
+
+    window.addEventListener('pagehide', function() {
+        if (readingProgressReporter) readingProgressReporter.flush(true);
     });
     
     var tocToggle = document.getElementById('tocToggle');
@@ -1708,6 +1750,25 @@ function initScript() {
             } catch(e) {}
         }
     }
+
+    function updateContinuousReadingChapter() {
+        if (!readingProgressReporter) return;
+        var elements = content.querySelectorAll('.continuous-chapter');
+        var sections = [];
+        for (var i = 0; i < elements.length; i++) {
+            var bounds = elements[i].getBoundingClientRect();
+            sections.push({
+                index: parseInt(elements[i].getAttribute('data-chapter-index'), 10),
+                top: bounds.top,
+                bottom: bounds.bottom
+            });
+        }
+        var currentIdx = window.EpubReadingProgress.activeChapter(sections, window.innerHeight / 2);
+        if (isNaN(currentIdx)) return;
+        localStorage.setItem(book_hash, 'eb_ci_' + currentIdx);
+        updateContinuousScrollUrl(currentIdx);
+        selectReadingChapter(currentIdx);
+    }
     
     function getChapterUrl(idx) {
         return '/book/' + book_hash + '/chapter_' + idx + '.html';
@@ -1788,9 +1849,6 @@ function initScript() {
                     EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
                     EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
                     appendedChapter = true;
-                    
-                    // 更新 URL
-                    updateContinuousScrollUrl(nextIdx);
                     
                     // 对新增内容重新绑定 Fancybox
                     if (typeof Fancybox !== 'undefined') {
@@ -1953,6 +2011,15 @@ function initScript() {
     // 绑定 continuous scroll toggle 开关
     var continuousScrollToggle = document.getElementById('continuousScrollToggle');
     var continuousScrollTip = document.getElementById('continuousScrollTip');
+    var showReadingProgressBarToggle = document.getElementById('showReadingProgressBarToggle');
+    if (showReadingProgressBarToggle) {
+        showReadingProgressBarToggle.checked = showReadingProgressBar;
+        showReadingProgressBarToggle.addEventListener('change', function() {
+            showReadingProgressBar = this.checked;
+            setReadingPreference('showReadingProgressBar', showReadingProgressBar ? 'true' : 'false');
+            applyReadingProgressBarVisibility(showReadingProgressBar);
+        });
+    }
     if (continuousScrollToggle) {
         // 翻页模式下禁用该开关
         if (isPaginationMode) {
