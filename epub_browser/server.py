@@ -18,10 +18,12 @@ import uvicorn
 
 
 def cache_control_for_path(path):
-    """Only content-addressed app assets may be cached without revalidation."""
+    """Cache immutable app assets and stable EPUB resources without caching pages."""
     normalized = os.path.normpath(path).replace(os.sep, '/')
     if '/assets/immutable/' in normalized:
         return 'public, max-age=31536000, immutable'
+    if '/book/' in normalized and '/resources/' in normalized:
+        return 'public, max-age=2592000'
     return 'no-cache'
 
 

@@ -22,6 +22,13 @@ class ServerCacheTests(unittest.TestCase):
             manifest.write("{}")
         with open(os.path.join(self.directory.name, "sw.js"), "w", encoding="utf-8") as worker:
             worker.write("self.addEventListener('fetch', () => {})")
+        os.makedirs(os.path.join(self.directory.name, "book", "demo", "resources"))
+        with open(os.path.join(self.directory.name, "book", "demo", "index.html"), "w", encoding="utf-8") as book_index:
+            book_index.write("book")
+        with open(os.path.join(self.directory.name, "book", "demo", "chapter_0.html"), "w", encoding="utf-8") as chapter:
+            chapter.write("chapter")
+        with open(os.path.join(self.directory.name, "book", "demo", "resources", "cover.webp"), "wb") as cover:
+            cover.write(b"cover")
         self.client = TestClient(create_app(self.directory.name))
 
     def tearDown(self):
@@ -49,6 +56,15 @@ class ServerCacheTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "no-cache")
+
+    def test_book_resources_are_cached_while_book_pages_revalidate(self):
+        book_page = self.client.get("/book/demo/index.html")
+        chapter_page = self.client.get("/book/demo/chapter_0.html")
+        cover = self.client.get("/book/demo/resources/cover.webp")
+
+        self.assertEqual(book_page.headers["cache-control"], "no-cache")
+        self.assertEqual(chapter_page.headers["cache-control"], "no-cache")
+        self.assertEqual(cover.headers["cache-control"], "public, max-age=2592000")
 
     def test_annotation_routes_preserve_create_and_read_behavior(self):
         annotation = {"id": "a1", "book_hash": "book", "chapter_index": 1, "text": "note", "color": "#fff", "created_at": "2026-01-01", "updated_at": "2026-01-01"}
