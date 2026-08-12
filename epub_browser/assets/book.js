@@ -285,7 +285,16 @@ function markReadingChapter(readKey, username) {
     syncTag.className = 'chapter-sync-tag';
     syncTag.textContent = 'Cloud sync · ' + username;
     syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
-    chapterElement.appendChild(syncTag);
+    var title = chapterElement.querySelector('.chapter-title');
+    if (title) {
+        var titleWithSync = document.createElement('span');
+        titleWithSync.className = 'chapter-title-with-sync';
+        title.parentNode.insertBefore(titleWithSync, title);
+        titleWithSync.appendChild(title);
+        titleWithSync.appendChild(syncTag);
+    } else {
+        chapterElement.appendChild(syncTag);
+    }
 
     var tocContainer = document.querySelector('.chapter-list');
     if (isKindleMode()) tocContainer = document.documentElement;

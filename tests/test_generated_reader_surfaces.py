@@ -38,8 +38,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("markReadingChapter(readKey, getProgressIdentity())", script)
         self.assertIn("return window.EpubReadingProgress.getUsername() || 'shared';", script)
         self.assertIn("chapter-sync-tag", script)
+        self.assertIn("chapter-title-with-sync", script)
         self.assertIn("'Cloud sync · ' + username", script)
         self.assertIn(".chapter-sync-tag", css)
+        self.assertIn(".chapter-title-with-sync", css)
 
     def test_reader_includes_chapter_sync_and_progress_bar_controls(self):
         book_html = self._book_html()

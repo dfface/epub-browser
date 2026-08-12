@@ -416,7 +416,7 @@ body {
 .chapter-sync-tag {
     display: inline-flex;
     align-items: center;
-    margin-left: auto;
+    flex: 0 0 auto;
     padding: 3px 8px;
     border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
     border-radius: 999px;
@@ -435,7 +435,18 @@ body {
 }
 
 .chapter-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chapter-title-with-sync {
+    display: flex;
     flex: 1;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
 }
 
 .chapter-page {
