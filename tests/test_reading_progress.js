@@ -50,14 +50,17 @@ test('a failed older report does not replace a newer chapter selection', async (
   reporter.select(3);
   finishFirst(null);
   await first;
+  await reporter.flush();
 
-  assert.deepEqual(reports, [2]);
-  assert.equal(reporter.pending, 3);
+  assert.deepEqual(reports, [2, 3]);
+  assert.equal(reporter.reported, 3);
 });
 
 test('reselecting an already reported chapter is not overwritten by an older failure', async () => {
+  const reports = [];
   let finishOld;
   const reporter = new Progress.ChapterReporter(index => {
+    reports.push(index);
     if (index === 2) return new Promise(resolve => { finishOld = resolve; });
     return Promise.resolve({ chapter_index: index });
   }, 1);
@@ -68,8 +71,31 @@ test('reselecting an already reported chapter is not overwritten by an older fai
   reporter.select(3);
   finishOld(null);
   await oldRequest;
+  await reporter.flush();
 
   assert.equal(reporter.pending, undefined);
+  assert.equal(reporter.reported, 3);
+  assert.deepEqual(reports, [2, 3]);
+});
+
+test('a stale successful report is followed by the latest selected chapter', async () => {
+  const reports = [];
+  let finishOld;
+  const reporter = new Progress.ChapterReporter(index => {
+    reports.push(index);
+    if (index === 2) return new Promise(resolve => { finishOld = resolve; });
+    return Promise.resolve({ chapter_index: index });
+  }, 1);
+  reporter.reported = 3;
+
+  reporter.select(2);
+  const oldRequest = reporter.flush();
+  reporter.select(3);
+  finishOld({ chapter_index: 2 });
+  await oldRequest;
+  await reporter.flush();
+
+  assert.deepEqual(reports, [2, 3]);
   assert.equal(reporter.reported, 3);
 });
 
