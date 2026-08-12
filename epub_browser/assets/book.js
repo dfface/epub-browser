@@ -197,7 +197,7 @@ function initScript() {
     } else {
         currentChapter = getCookie(book_hash) || "";
     }
-    if (currentChapter !== "") markReadingChapter(currentChapter);
+    if (currentChapter !== "") markReadingChapter(currentChapter, getProgressIdentity());
 
     if (window.initTheme) {
         window.initTheme();
@@ -260,6 +260,7 @@ function getProgressIdentity() {
 }
 
 function markReadingChapter(readKey, username) {
+    username = username || 'shared';
     var chapterLinks = document.querySelectorAll('.chapter-link');
     var chapterElement = document.getElementById(readKey);
     var i;
