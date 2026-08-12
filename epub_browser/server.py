@@ -29,7 +29,10 @@ def migrate_legacy_database(base_directory):
     target = database_path(base_directory)
     legacy = os.path.join(base_directory, LEGACY_DATABASE_FILENAME)
     if not os.path.exists(target) and os.path.isfile(legacy):
-        os.replace(legacy, target)
+        try:
+            os.replace(legacy, target)
+        except OSError:
+            pass
     return target
 
 

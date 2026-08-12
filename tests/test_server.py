@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest import mock
 
 from starlette.testclient import TestClient
 
@@ -153,3 +154,16 @@ class ServerCacheTests(unittest.TestCase):
             bookshelf = connection.execute("SELECT username, version, data FROM bookshelves").fetchone()
         self.assertEqual(annotation, ("annotation-1", "Saved note"))
         self.assertEqual(bookshelf, ("reader", 3, '{\"items\":[\"book-a\"]}'))
+
+    def test_startup_uses_a_new_database_when_legacy_rename_fails(self):
+        legacy_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(legacy_directory.cleanup)
+        legacy_path = os.path.join(legacy_directory.name, "annotations.db")
+        legacy_connection = sqlite3.connect(legacy_path)
+        legacy_connection.close()
+
+        with mock.patch("epub_browser.server.os.replace", side_effect=OSError("disk error")):
+            create_app(legacy_directory.name)
+
+        self.assertTrue(os.path.isfile(legacy_path))
+        self.assertTrue(os.path.isfile(os.path.join(legacy_directory.name, "epub-browser.db")))
