@@ -27,8 +27,19 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(html, r'id=(?:["\'])?continueReadingBtnText')
         self.assertIn("updateContinueReadingButton(book_hash);", script)
         self.assertIn("document.getElementById(readKey)", script)
+        self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
         self.assertIn("Continue reading", script)
         self.assertIn("Start reading", script)
+
+    def test_reader_includes_chapter_sync_and_progress_bar_controls(self):
+        book_html = self._book_html()
+        chapter_html = self._chapter_html()
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+
+        self.assertRegex(book_html, r'/assets/immutable/reading-progress\.[0-9a-f]{12}\.js')
+        self.assertRegex(chapter_html, r'/assets/immutable/reading-progress\.[0-9a-f]{12}\.js')
+        self.assertIn('id="showReadingProgressBarToggle"', chapter_html)
+        self.assertIn('.reading-progress-container.is-progress-bar-hidden', css)
 
     def test_book_and_chapter_return_to_the_library_without_redirect_or_unused_fragment(self):
         for html in (self._book_html(), self._chapter_html()):

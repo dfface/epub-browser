@@ -697,6 +697,7 @@ class EPUBProcessor:
 
         index_html += """
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/reading-progress.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
@@ -1390,6 +1391,11 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
                 <div class="settings-group">
                     <label class="settings-label">Reading mode</label>
                     <label class="settings-switch">
+                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
+                        <span class="switch-slider"></span>
+                        <span class="switch-text">Show reading progress bar</span>
+                    </label>
+                    <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
                         <span class="switch-text">Enable Continuous Scroll</span>
@@ -1642,6 +1648,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/chapter-window.js" defer></script>
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
+    <script src="/assets/reading-progress.js" defer></script>
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>

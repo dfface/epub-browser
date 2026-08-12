@@ -112,17 +112,34 @@ function initScript() {
     var pathParts = path.split('/');
     pathParts = pathParts.filter(function(item) { return item !== ""; });
     var book_hash = pathParts[pathParts.indexOf('book') + 1];
+    var readingProgressLoadVersion = 0;
+
+    function loadReadingProgress() {
+        if (isKindleMode() || !window.EpubReadingProgress) return;
+        var version = ++readingProgressLoadVersion;
+        window.EpubReadingProgress.request('GET', '/api/reading-progress/' + encodeURIComponent(book_hash))
+            .then(function(progress) {
+                if (version !== readingProgressLoadVersion || !progress || typeof progress.chapter_index !== 'number') return;
+                localStorage.setItem(book_hash, 'eb_ci_' + progress.chapter_index);
+                updateContinueReadingButton(book_hash);
+            });
+    }
 
     updateContinueReadingButton(book_hash);
+    loadReadingProgress();
 
     if (!isKindleMode()) {
         var clearBtn = document.querySelector("#clearReadingProgressBtn");
         clearBtn.addEventListener("click", function() {
+            readingProgressLoadVersion++;
             var prefix1 = "scroll_" + book_hash + "_";
             var prefix2 = "turning_" + book_hash + "_";
             deleteKeysByPrefix(prefix1);
             deleteKeysByPrefix(prefix2);
             deleteKeysByPrefix(book_hash);
+            if (window.EpubReadingProgress) {
+                window.EpubReadingProgress.request('DELETE', '/api/reading-progress/' + encodeURIComponent(book_hash), null, true);
+            }
             updateContinueReadingButton(book_hash);
             showNotification("All reading progress for this book has been deleted!", "success");
         });
@@ -274,6 +291,15 @@ function updateContinueReadingButton(bookHash) {
 
     var readKey = isKindleMode() ? getCookie(bookHash) : localStorage.getItem(bookHash);
     var resumeChapter = readKey ? document.getElementById(readKey) : null;
+    if (!resumeChapter && readKey) {
+        var chapterLinks = document.querySelectorAll('.chapter-link');
+        for (var i = 0; i < chapterLinks.length; i++) {
+            if (chapterLinks[i].id.split('#')[0] === readKey) {
+                resumeChapter = chapterLinks[i];
+                break;
+            }
+        }
+    }
     if (resumeChapter && resumeChapter.href) {
         continueButton.href = resumeChapter.href;
         continueButtonText.textContent = 'Continue reading';

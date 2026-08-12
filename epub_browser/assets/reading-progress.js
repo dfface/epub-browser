@@ -72,10 +72,30 @@
   function showProgressBar(value) { return value !== 'false'; }
   function progressBarClass(visible) { return visible ? '' : 'is-progress-bar-hidden'; }
 
+  function request(method, url, chapterIndex, keepalive) {
+    var options = { method: method };
+    if (keepalive) options.keepalive = true;
+    if (method === 'PUT') {
+      options.headers = { 'Content-Type': 'application/json' };
+      options.body = JSON.stringify({ chapter_index: chapterIndex });
+    }
+    try {
+      return Promise.resolve(fetch(url, options)).then(function(response) {
+        if (!response.ok || response.status === 204) return null;
+        return response.json();
+      }, function() {
+        return null;
+      });
+    } catch (error) {
+      return Promise.resolve(null);
+    }
+  }
+
   return {
     activeChapter: activeChapter,
     ChapterReporter: ChapterReporter,
     showProgressBar: showProgressBar,
-    progressBarClass: progressBarClass
+    progressBarClass: progressBarClass,
+    request: request
   };
 });

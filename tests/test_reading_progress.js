@@ -40,3 +40,20 @@ test('progress-bar preference defaults to visible and hides only its fixed conta
   assert.equal(Progress.showProgressBar(null), true);
   assert.equal(Progress.progressBarClass(false), 'is-progress-bar-hidden');
 });
+
+test('reading progress requests persist only a chapter index', async () => {
+  const originalFetch = global.fetch;
+  let received;
+  global.fetch = (url, options) => {
+    received = { url, options };
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ chapter_index: 5 }) });
+  };
+
+  const result = await Progress.request('PUT', '/api/reading-progress/book', 5, true);
+  global.fetch = originalFetch;
+
+  assert.deepEqual(result, { chapter_index: 5 });
+  assert.equal(received.url, '/api/reading-progress/book');
+  assert.equal(received.options.keepalive, true);
+  assert.deepEqual(JSON.parse(received.options.body), { chapter_index: 5 });
+});
