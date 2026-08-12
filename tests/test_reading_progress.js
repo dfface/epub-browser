@@ -99,6 +99,26 @@ test('a stale successful report is followed by the latest selected chapter', asy
   assert.equal(reporter.reported, 3);
 });
 
+test('pagehide keeps the pending latest chapter unload-safe after an in-flight request', async () => {
+  const reports = [];
+  let finishOld;
+  const reporter = new Progress.ChapterReporter((index, keepalive) => {
+    reports.push({ index, keepalive });
+    if (index === 2) return new Promise(resolve => { finishOld = resolve; });
+    return Promise.resolve({ chapter_index: index });
+  }, 1);
+
+  reporter.select(2);
+  const oldRequest = reporter.flush();
+  reporter.select(3);
+  reporter.flush(true);
+  finishOld({ chapter_index: 2 });
+  await oldRequest;
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.deepEqual(reports, [{ index: 2, keepalive: undefined }, { index: 3, keepalive: true }]);
+});
+
 test('progress-bar preference defaults to visible and hides only its fixed container', () => {
   assert.equal(Progress.showProgressBar(null), true);
   assert.equal(Progress.progressBarClass(false), 'is-progress-bar-hidden');

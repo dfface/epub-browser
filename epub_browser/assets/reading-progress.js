@@ -29,6 +29,7 @@
     this.selected = undefined;
     this.forcePending = false;
     this.inFlight = null;
+    this.pendingKeepalive = false;
   }
 
   ChapterReporter.prototype.select = function(index) {
@@ -57,7 +58,10 @@
       clearTimeout(this.timer);
       this.timer = null;
     }
-    if (this.inFlight !== null) return this.inFlight;
+    if (this.inFlight !== null) {
+      if (keepalive) this.pendingKeepalive = true;
+      return this.inFlight;
+    }
     if (this.pending === undefined || (this.pending === this.reported && !this.forcePending)) return Promise.resolve(null);
     var index = this.pending;
     var selectionVersion = this.selectionVersion;
@@ -88,7 +92,11 @@
       return null;
     }).then(function(response) {
       self.inFlight = null;
-      if (self.selectionVersion !== selectionVersion && self.pending !== undefined) self.flush();
+      if (self.selectionVersion !== selectionVersion && self.pending !== undefined) {
+        var nextKeepalive = self.pendingKeepalive;
+        self.pendingKeepalive = false;
+        self.flush(nextKeepalive);
+      }
       return response;
     });
     return this.inFlight;
