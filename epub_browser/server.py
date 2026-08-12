@@ -194,10 +194,52 @@ def create_app(base_directory, sync_dir=None):
             return response(payload, status)
         except json.JSONDecodeError: return response({'message': 'Invalid JSON data'}, 400)
 
+    async def reading_progress(request):
+        book_hash = request.path_params['book_hash']
+        username = request.headers.get('X-Username', '')
+        database = database_path(base_directory)
+
+        if request.method == 'GET':
+            with sqlite3.connect(database) as connection:
+                row = connection.execute(
+                    'SELECT chapter_index FROM reading_progress WHERE username = ? AND book_hash = ?',
+                    (username, book_hash),
+                ).fetchone()
+            return response({'chapter_index': row[0]}) if row else response({'message': 'Reading progress not found'}, 404)
+
+        if request.method == 'PUT':
+            try:
+                data = await request.json()
+            except json.JSONDecodeError:
+                return response({'message': 'Invalid JSON data'}, 400)
+            chapter_index = data.get('chapter_index') if isinstance(data, dict) else None
+            if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
+                return response({'message': 'Invalid chapter index'}, 400)
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    '''
+                    INSERT INTO reading_progress(username, book_hash, chapter_index, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(username, book_hash) DO UPDATE SET
+                        chapter_index = excluded.chapter_index,
+                        updated_at = CURRENT_TIMESTAMP
+                    ''',
+                    (username, book_hash, chapter_index),
+                )
+            return response({'chapter_index': chapter_index})
+
+        with sqlite3.connect(database) as connection:
+            connection.execute(
+                'DELETE FROM reading_progress WHERE username = ? AND book_hash = ?',
+                (username, book_hash),
+            )
+        return response({'message': 'Deleted'})
+
     routes = [
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/api/health', health),
+        Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
         Route('/sync', sync, methods=['POST']),
         Mount('/', app=CachedStaticFiles(directory=base_directory, html=False)),
@@ -241,6 +283,15 @@ def init_annotation_db(base_dir):
             version INTEGER NOT NULL,
             data TEXT NOT NULL,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS reading_progress (
+            username TEXT NOT NULL DEFAULT '',
+            book_hash TEXT NOT NULL,
+            chapter_index INTEGER NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (username, book_hash)
         )
     ''')
     

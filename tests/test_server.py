@@ -92,6 +92,36 @@ class ServerCacheTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 304)
 
+    def test_reading_progress_defaults_to_shared_reader_and_can_be_cleared(self):
+        self.assertEqual(self.client.get("/api/reading-progress/book").status_code, 404)
+
+        saved = self.client.put("/api/reading-progress/book", json={"chapter_index": 4})
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json(), {"chapter_index": 4})
+        self.assertEqual(self.client.get("/api/reading-progress/book").json(), {"chapter_index": 4})
+        self.assertEqual(self.client.delete("/api/reading-progress/book").status_code, 200)
+        self.assertEqual(self.client.get("/api/reading-progress/book").status_code, 404)
+
+    def test_reading_progress_isolated_by_username_and_rejects_invalid_chapters(self):
+        self.client.put("/api/reading-progress/book", json={"chapter_index": 4})
+        named = self.client.put(
+            "/api/reading-progress/book",
+            json={"chapter_index": 7},
+            headers={"X-Username": "reader"},
+        )
+
+        self.assertEqual(named.json(), {"chapter_index": 7})
+        self.assertEqual(self.client.get("/api/reading-progress/book").json(), {"chapter_index": 4})
+        self.assertEqual(
+            self.client.get("/api/reading-progress/book", headers={"X-Username": "reader"}).json(),
+            {"chapter_index": 7},
+        )
+        self.assertEqual(
+            self.client.put("/api/reading-progress/book", json={"chapter_index": -1}).status_code,
+            400,
+        )
+
     def test_sync_persists_the_shelf_in_sqlite(self):
         payload = {"username": "reader", "version": 2, "data": {"items": ["book-a"], "groups": {}}}
 
