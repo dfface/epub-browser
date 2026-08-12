@@ -97,7 +97,7 @@ class ServerCacheTests(unittest.TestCase):
         response = self.client.post("/sync", json=payload)
 
         self.assertEqual(response.status_code, 404)
-        with sqlite3.connect(os.path.join(self.directory.name, "annotations.db")) as connection:
+        with sqlite3.connect(os.path.join(self.directory.name, "epub-browser.db")) as connection:
             row = connection.execute(
                 "SELECT version, data FROM bookshelves WHERE username = ?", ("reader",)
             ).fetchone()
@@ -120,6 +120,36 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["version"], 4)
         self.assertEqual(response.json()["data"]["items"], ["new"])
-        with sqlite3.connect(os.path.join(self.directory.name, "annotations.db")) as connection:
+        with sqlite3.connect(os.path.join(self.directory.name, "epub-browser.db")) as connection:
             row = connection.execute("SELECT version FROM bookshelves WHERE username = ?", ("reader",)).fetchone()
         self.assertEqual(row, (4,))
+
+    def test_startup_renames_the_legacy_annotation_database_without_losing_data(self):
+        legacy_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(legacy_directory.cleanup)
+        legacy_path = os.path.join(legacy_directory.name, "annotations.db")
+        with sqlite3.connect(legacy_path) as connection:
+            connection.execute("""
+                CREATE TABLE annotations (
+                    id TEXT PRIMARY KEY, username TEXT NOT NULL DEFAULT '', book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL, text TEXT NOT NULL, note TEXT, start_meta TEXT,
+                    end_meta TEXT, color TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+                )
+            """)
+            connection.execute(
+                "INSERT INTO annotations (id, book_hash, chapter_index, text, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                ("annotation-1", "book-a", 1, "Saved note", "#fff", "2026-08-12", "2026-08-12"),
+            )
+            connection.execute("CREATE TABLE bookshelves (username TEXT PRIMARY KEY, version INTEGER NOT NULL, data TEXT NOT NULL)")
+            connection.execute("INSERT INTO bookshelves (username, version, data) VALUES (?, ?, ?)", ("reader", 3, '{\"items\":[\"book-a\"]}'))
+
+        create_app(legacy_directory.name)
+
+        database_path = os.path.join(legacy_directory.name, "epub-browser.db")
+        self.assertTrue(os.path.isfile(database_path))
+        self.assertFalse(os.path.exists(legacy_path))
+        with sqlite3.connect(database_path) as connection:
+            annotation = connection.execute("SELECT id, text FROM annotations").fetchone()
+            bookshelf = connection.execute("SELECT username, version, data FROM bookshelves").fetchone()
+        self.assertEqual(annotation, ("annotation-1", "Saved note"))
+        self.assertEqual(bookshelf, ("reader", 3, '{\"items\":[\"book-a\"]}'))

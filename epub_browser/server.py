@@ -16,6 +16,22 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 import uvicorn
 
+DATABASE_FILENAME = 'epub-browser.db'
+LEGACY_DATABASE_FILENAME = 'annotations.db'
+
+
+def database_path(base_directory):
+    return os.path.join(base_directory, DATABASE_FILENAME)
+
+
+def migrate_legacy_database(base_directory):
+    """Atomically rename the former annotation-only database when needed."""
+    target = database_path(base_directory)
+    legacy = os.path.join(base_directory, LEGACY_DATABASE_FILENAME)
+    if not os.path.exists(target) and os.path.isfile(legacy):
+        os.replace(legacy, target)
+    return target
+
 
 def cache_control_for_path(path):
     """Cache immutable app assets and stable EPUB resources without caching pages."""
@@ -125,7 +141,7 @@ def create_app(base_directory, sync_dir=None):
         parts = [part for part in request.path_params['path'].split('/') if part]
         if not parts or parts[0] != 'annotations': return response({'message': 'Not found'}, 404)
         username = request.headers.get('X-Username', '').strip()
-        conn = sqlite3.connect(os.path.join(base_directory, 'annotations.db'))
+        conn = sqlite3.connect(database_path(base_directory))
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
@@ -169,7 +185,7 @@ def create_app(base_directory, sync_dir=None):
             username, version, shelf = data.get('username', ''), data.get('version', 1), data.get('data')
             if not username: return response({'message': 'Username is required'}, 400)
             payload, status = sync_bookshelf(
-                os.path.join(base_directory, 'annotations.db'), sync_dir or base_directory,
+                database_path(base_directory), sync_dir or base_directory,
                 username, version, shelf,
             )
             return response(payload, status)
@@ -185,15 +201,15 @@ def create_app(base_directory, sync_dir=None):
     ]
     return Starlette(routes=routes)
 
-# Annotation database path
-ANNOTATION_DB_PATH = None
+# Shared server database path
+DATABASE_PATH = None
 
 def init_annotation_db(base_dir):
-    """Initialize annotation database"""
-    global ANNOTATION_DB_PATH
-    ANNOTATION_DB_PATH = os.path.join(base_dir, 'annotations.db')
+    """Initialize the shared server database."""
+    global DATABASE_PATH
+    DATABASE_PATH = migrate_legacy_database(base_dir)
     
-    conn = sqlite3.connect(ANNOTATION_DB_PATH)
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
     # Create annotations table
@@ -410,7 +426,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 return
             
             payload, status = sync_bookshelf(
-                os.path.join(self.base_directory, 'annotations.db'),
+                database_path(self.base_directory),
                 self.sync_dir or self.base_directory,
                 username, client_version, client_data,
             )
@@ -456,11 +472,11 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.send_json_response(404, {"message": "Not found"})
                 return
             
-            if not ANNOTATION_DB_PATH:
+            if not DATABASE_PATH:
                 self.send_json_response(503, {"message": "Database not initialized"})
                 return
             
-            conn = sqlite3.connect(ANNOTATION_DB_PATH)
+            conn = sqlite3.connect(DATABASE_PATH)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
