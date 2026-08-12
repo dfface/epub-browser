@@ -37,8 +37,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertIn("markReadingChapter(readKey, getProgressIdentity())", script)
         self.assertIn("return window.EpubReadingProgress.getUsername() || 'shared';", script)
-        self.assertIn("markReadingChapter(currentChapter, getProgressIdentity())", script)
-        self.assertIn("username = username || 'shared';", script)
+        self.assertIn("markReadingChapter(currentChapter);", script)
+        self.assertIn("if (username) {", script)
         self.assertIn("chapter-sync-tag", script)
         self.assertIn("chapter-title-with-sync", script)
         self.assertIn("'Cloud sync · ' + username", script)

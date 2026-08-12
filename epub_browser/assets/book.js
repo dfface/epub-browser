@@ -197,7 +197,9 @@ function initScript() {
     } else {
         currentChapter = getCookie(book_hash) || "";
     }
-    if (currentChapter !== "") markReadingChapter(currentChapter, getProgressIdentity());
+    // Browser-local progress restores the active chapter, but is not evidence
+    // of a server sync (notably in static Pages builds).
+    if (currentChapter !== "") markReadingChapter(currentChapter);
 
     if (window.initTheme) {
         window.initTheme();
@@ -260,7 +262,6 @@ function getProgressIdentity() {
 }
 
 function markReadingChapter(readKey, username) {
-    username = username || 'shared';
     var chapterLinks = document.querySelectorAll('.chapter-link');
     var chapterElement = document.getElementById(readKey);
     var i;
@@ -282,19 +283,21 @@ function markReadingChapter(readKey, username) {
 
     if (!chapterElement) return;
     chapterElement.classList.add('active');
-    var syncTag = document.createElement('span');
-    syncTag.className = 'chapter-sync-tag';
-    syncTag.textContent = 'Cloud sync · ' + username;
-    syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
-    var title = chapterElement.querySelector('.chapter-title');
-    if (title) {
-        var titleWithSync = document.createElement('span');
-        titleWithSync.className = 'chapter-title-with-sync';
-        title.parentNode.insertBefore(titleWithSync, title);
-        titleWithSync.appendChild(title);
-        titleWithSync.appendChild(syncTag);
-    } else {
-        chapterElement.appendChild(syncTag);
+    if (username) {
+        var syncTag = document.createElement('span');
+        syncTag.className = 'chapter-sync-tag';
+        syncTag.textContent = 'Cloud sync · ' + username;
+        syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
+        var title = chapterElement.querySelector('.chapter-title');
+        if (title) {
+            var titleWithSync = document.createElement('span');
+            titleWithSync.className = 'chapter-title-with-sync';
+            title.parentNode.insertBefore(titleWithSync, title);
+            titleWithSync.appendChild(title);
+            titleWithSync.appendChild(syncTag);
+        } else {
+            chapterElement.appendChild(syncTag);
+        }
     }
 
     var tocContainer = document.querySelector('.chapter-list');
