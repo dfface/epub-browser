@@ -674,11 +674,12 @@ body {
 }
 
 #toggleShelfBtn.in-shelf {
-    background: var(--notification-error);
+    background: #c0392b;
+    color: #fff;
 }
 
 #toggleShelfBtn.in-shelf:hover {
-    background: #c0392b;
+    background: #a93226;
 }
 
 /* 选择分组弹窗样式 */

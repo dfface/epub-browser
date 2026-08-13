@@ -820,6 +820,7 @@
         isListening: false,
         isBound: false,
         pendingDraft: null,
+        renderVersion: 0,
 
         init: function() {
             var hl = initHighlighter();
@@ -1226,7 +1227,6 @@
                 self.applyHighlightStyles(annotation, self.getHighlightNodesByAnnotationId(annotation.id));
                 self.clearPendingDraftState();
                 self.closeDialog();
-                Utils.showNotification('Annotation added', 'success');
             }).catch(function(err) {
                 self.cancelPendingDraft();
                 Utils.showNotification('Failed to add: ' + err.message, 'error');
@@ -1253,7 +1253,6 @@
                 if (updatedAnnotation) {
                     self.applyHighlightStyles(updatedAnnotation, self.getHighlightNodesByAnnotationId(id));
                 }
-                Utils.showNotification('Annotation updated', 'success');
             }).catch(function(err) {
                 Utils.showNotification('Failed to update: ' + err.message, 'error');
             });
@@ -1268,14 +1267,13 @@
                 if (highlighter) {
                     highlighter.remove(id);
                 }
-                Utils.showNotification('Annotation deleted', 'info');
             }).catch(function(err) {
                 Utils.showNotification('Failed to delete: ' + err.message, 'error');
             });
         },
 
         renderHighlight: function(annotation) {
-            if (!highlighter || !annotation) return;
+            if (!highlighter || !annotation) return false;
             try {
                 var source = highlighter.fromStore(
                     annotation.startMeta,
@@ -1283,10 +1281,12 @@
                     annotation.text,
                     annotation.id
                 );
-                if (!source) return;
+                if (!source) return false;
                 this.applyHighlightStyles(annotation, this.getHighlightNodesByAnnotationId(annotation.id));
+                return true;
             } catch (e) {
                 console.error('Failed to render highlight:', e);
+                return false;
             }
         },
 
@@ -1304,25 +1304,41 @@
             });
         },
 
-        renderAll: function() {
+        renderAll: function(isRetry) {
             var self = this;
             if (!highlighter) return Promise.resolve();
+            var renderVersion = ++this.renderVersion;
             this.isRendering = true;
             this.cancelPendingDraft();
             this.clearHighlights();
             return StorageManager.getByChapter(currentBookHash, currentChapterIndex).then(function(annotations) {
+                if (renderVersion !== self.renderVersion) return;
                 self.annotations = (annotations || []).map(function(annotation) {
                     return self.normalizeAnnotation(annotation);
                 }).filter(Boolean).sort(function(a, b) {
                     return (b.text || '').length - (a.text || '').length;
                 });
+                var failedToRestore = false;
                 self.annotations.forEach(function(annotation) {
-                    self.renderHighlight(annotation);
+                    if (!self.renderHighlight(annotation)) failedToRestore = true;
                 });
+                if (!failedToRestore) return;
+                if (!isRetry) {
+                    requestAnimationFrame(function() {
+                        requestAnimationFrame(function() {
+                            if (renderVersion === self.renderVersion) self.renderAll(true);
+                        });
+                    });
+                    return;
+                }
+                Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error');
             }).catch(function(err) {
                 console.error('Failed to load annotations:', err);
+                if (renderVersion === self.renderVersion) {
+                    Utils.showNotification('Failed to load annotations: ' + err.message, 'error');
+                }
             }).finally(function() {
-                self.isRendering = false;
+                if (renderVersion === self.renderVersion) self.isRendering = false;
             });
         }
     };

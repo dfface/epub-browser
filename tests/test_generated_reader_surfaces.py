@@ -13,6 +13,35 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('annotation-btn-copy', script)
         self.assertIn('copyText(source.text)', script)
 
+    def test_reader_annotation_edits_are_silent_when_successful(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+
+        self.assertNotIn("Utils.showNotification('Annotation added', 'success')", script)
+        self.assertNotIn("Utils.showNotification('Annotation updated', 'success')", script)
+        self.assertNotIn("Utils.showNotification('Annotation deleted', 'info')", script)
+        self.assertIn("Utils.showNotification('Failed to add: ' + err.message, 'error')", script)
+        self.assertIn("Utils.showNotification('Failed to update: ' + err.message, 'error')", script)
+        self.assertIn("Utils.showNotification('Failed to delete: ' + err.message, 'error')", script)
+
+    def test_remove_from_shelf_uses_theme_safe_destructive_colors(self):
+        css = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
+
+        rules = css[css.index('#toggleShelfBtn.in-shelf {'):css.index('}', css.index('#toggleShelfBtn.in-shelf {'))]
+        hover_rules = css[css.index('#toggleShelfBtn.in-shelf:hover {'):css.index('}', css.index('#toggleShelfBtn.in-shelf:hover {'))]
+        self.assertIn('background: #c0392b;', rules)
+        self.assertIn('color: #fff;', rules)
+        self.assertIn('background: #a93226;', hover_rules)
+
+    def test_cloud_annotations_retry_restoration_without_applying_a_stale_chapter_response(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+
+        self.assertIn('renderVersion: 0,', script)
+        self.assertIn('var renderVersion = ++this.renderVersion;', script)
+        self.assertIn('if (renderVersion !== self.renderVersion) return;', script)
+        self.assertIn('return false;', script)
+        self.assertIn('self.renderAll(true);', script)
+        self.assertIn("Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error')", script)
+
     def test_library_does_not_offer_a_manual_cache_update_button(self):
         script = Path("epub_browser/assets/library.js").read_text(encoding="utf-8")
 
