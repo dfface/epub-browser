@@ -933,21 +933,15 @@
         },
 
         applyHighlightStyles: function(annotation, nodes) {
-            var hasNote = !!(annotation.note && annotation.note.trim());
             var bgColor = Utils.addColorAlpha(annotation.color, 0.4);
             var hoverColor = Utils.addColorAlpha(annotation.color, 0.6);
             var borderColor = Utils.addColorAlpha(annotation.color, 0.8);
             var self = this;
-            (nodes || []).forEach(function(node, index) {
+            (nodes || []).forEach(function(node) {
                 node.style.backgroundColor = bgColor;
                 node.style.setProperty('--annotation-color', bgColor);
                 node.style.setProperty('--annotation-hover-color', hoverColor);
                 node.style.setProperty('--annotation-border-color', borderColor);
-                if (hasNote && index === nodes.length - 1) {
-                    node.classList.add('has-note');
-                } else {
-                    node.classList.remove('has-note');
-                }
                 self.bindHighlightHoverState(node, annotation.id);
             });
         },

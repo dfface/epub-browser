@@ -44,6 +44,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("Utils.showNotification('Failed to update: ' + err.message, 'error')", script)
         self.assertIn("Utils.showNotification('Failed to delete: ' + err.message, 'error')", script)
 
+    def test_reader_does_not_append_an_emoji_to_noted_highlights(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation.css").read_text(encoding="utf-8")
+
+        self.assertNotIn('has-note', script)
+        self.assertNotIn("content: '📝'", css)
+
     def test_remove_from_shelf_uses_theme_safe_destructive_colors(self):
         css = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
 
@@ -75,7 +82,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertRegex(html, r'id=(?:["\'])?continueReadingBtn')
         self.assertRegex(html, r'id=(?:["\'])?continueReadingBtnText')
+        self.assertRegex(html, r'id=(?:["\'])?continueReadingMenuToggle')
+        self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressMenu')
+        self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressBtn')
         self.assertIn("updateContinueReadingButton(book_hash);", script)
+        self.assertIn("setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());", script)
+        self.assertIn("clearButton.hidden = !available;", script)
+        self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
+        self.assertNotIn("matchMedia", script)
         self.assertIn("document.getElementById(readKey)", script)
         self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
         self.assertIn("Continue reading", script)

@@ -179,6 +179,74 @@ body {
     margin-bottom: 0;
 }
 
+.continue-reading-control {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+}
+
+.continue-reading-control #continueReadingBtn {
+    margin-bottom: 0;
+}
+
+.continue-reading-control.has-reading-progress #continueReadingBtn {
+    border-radius: 6px 0 0 6px;
+}
+
+.continue-reading-menu-toggle {
+    width: 40px;
+    border: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 0 6px 6px 0;
+    color: #fff;
+    background: var(--button-bg);
+    cursor: pointer;
+}
+
+.continue-reading-menu-toggle:hover,
+.continue-reading-menu-toggle:focus-visible {
+    background: var(--button-hover);
+}
+
+.continue-reading-menu-toggle:focus-visible,
+.continue-reading-menu-item:focus-visible {
+    outline: 3px solid var(--button-bg);
+    outline-offset: 2px;
+}
+
+.continue-reading-menu {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 220px;
+    padding: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+}
+
+.continue-reading-menu-item {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 5px;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+}
+
+.continue-reading-menu-item:hover {
+    background: var(--hover);
+}
+
 /* 通知样式 */
 .custom-css-notification {
     position: fixed;
@@ -659,10 +727,6 @@ body {
         gap: 10px;
     }
 
-    #clearReadingProgressBtn {
-        font-size: 0.5rem;
-    }
-    
     #toggleShelfBtn {
         font-size: 0.5rem;
     }

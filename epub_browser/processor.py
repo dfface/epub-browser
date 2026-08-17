@@ -555,10 +555,15 @@ class EPUBProcessor:
         index_html += f"""
                 </div>
                 <div class="css-controls clearReadingProgress">
-                    <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
+                    <div class="continue-reading-control" id="continueReadingControl">
+                        <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
+                        <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                        <div class="continue-reading-menu" id="clearReadingProgressMenu" hidden>
+                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" hidden><i class="fas fa-eraser" aria-hidden="true"></i>Clear reading progress</button>
+                        </div>
+                    </div>
                     <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i>Annotations</button>
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
-                    <button class="css-btn secondary" id="clearReadingProgressBtn"><i class="fas fa-eraser"></i>Clear reading progress</button>
                 </div>
             </div>
         </div>

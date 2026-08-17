@@ -132,19 +132,48 @@ function initScript() {
 
     if (!isKindleMode()) {
         var clearBtn = document.querySelector("#clearReadingProgressBtn");
-        clearBtn.addEventListener("click", function() {
-            readingProgressLoadVersion++;
-            var prefix1 = "scroll_" + book_hash + "_";
-            var prefix2 = "turning_" + book_hash + "_";
-            deleteKeysByPrefix(prefix1);
-            deleteKeysByPrefix(prefix2);
-            deleteKeysByPrefix(book_hash);
-            if (window.EpubReadingProgress) {
-                window.EpubReadingProgress.request('DELETE', '/api/reading-progress/' + encodeURIComponent(book_hash), null, true);
-            }
-            updateContinueReadingButton(book_hash);
-            showNotification("All reading progress for this book has been deleted!", "success");
-        });
+        var clearMenu = document.getElementById('clearReadingProgressMenu');
+        var clearMenuToggle = document.getElementById('continueReadingMenuToggle');
+        var clearControl = document.getElementById('continueReadingControl');
+        function closeClearMenu() {
+            if (!clearMenu || !clearMenuToggle) return;
+            clearMenu.hidden = true;
+            clearMenuToggle.setAttribute('aria-expanded', 'false');
+        }
+        if (clearMenuToggle && clearMenu && clearControl && !clearMenuToggle.dataset.bound) {
+            clearMenuToggle.dataset.bound = 'true';
+            clearMenuToggle.addEventListener('click', function() {
+                var willOpen = clearMenu.hidden;
+                clearMenu.hidden = !willOpen;
+                clearMenuToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            });
+            document.addEventListener('click', function(event) {
+                if (!clearControl.contains(event.target)) closeClearMenu();
+            });
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && !clearMenu.hidden) {
+                    closeClearMenu();
+                    clearMenuToggle.focus();
+                }
+            });
+        }
+        if (clearBtn && !clearBtn.dataset.bound) {
+            clearBtn.dataset.bound = 'true';
+            clearBtn.addEventListener("click", function() {
+                readingProgressLoadVersion++;
+                var prefix1 = "scroll_" + book_hash + "_";
+                var prefix2 = "turning_" + book_hash + "_";
+                deleteKeysByPrefix(prefix1);
+                deleteKeysByPrefix(prefix2);
+                deleteKeysByPrefix(book_hash);
+                if (window.EpubReadingProgress) {
+                    window.EpubReadingProgress.request('DELETE', '/api/reading-progress/' + encodeURIComponent(book_hash), null, true);
+                }
+                updateContinueReadingButton(book_hash);
+                closeClearMenu();
+                showNotification("All reading progress for this book has been deleted!", "success");
+            });
+        }
 
         initBookShelfButton(book_hash);
     }
@@ -311,6 +340,7 @@ function updateContinueReadingButton(bookHash) {
     var firstChapter = document.querySelector('.chapter-link');
     if (!continueButton || !continueButtonText || !firstChapter) {
         if (continueButton) continueButton.hidden = true;
+        setClearReadingProgressAvailability(false);
         return;
     }
 
@@ -334,6 +364,21 @@ function updateContinueReadingButton(bookHash) {
         continueButtonText.textContent = 'Start reading';
         continueButton.setAttribute('aria-label', 'Start reading');
     }
+    setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());
+}
+
+function setClearReadingProgressAvailability(available) {
+    var clearButton = document.getElementById('clearReadingProgressBtn');
+    var menu = document.getElementById('clearReadingProgressMenu');
+    var toggle = document.getElementById('continueReadingMenuToggle');
+    var control = document.getElementById('continueReadingControl');
+    if (clearButton) clearButton.hidden = !available;
+    if (toggle) {
+        toggle.hidden = !available;
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+    if (menu) menu.hidden = true;
+    if (control) control.classList.toggle('has-reading-progress', available);
 }
 
 function initBookShelfButton(bookHash) {
