@@ -193,14 +193,28 @@ body {
     border-radius: 6px 0 0 6px;
 }
 
+/* Keep the primary action and its overflow trigger visually and spatially one control. */
+.continue-reading-control.has-reading-progress:hover #continueReadingBtn,
+.continue-reading-control.has-reading-progress:focus-within #continueReadingBtn {
+    background: var(--button-hover);
+    transform: none;
+}
+
+.continue-reading-control.has-reading-progress:focus-within {
+    border-radius: 8px;
+    outline: 3px solid var(--button-bg);
+    outline-offset: 2px;
+}
+
 .continue-reading-menu-toggle {
-    width: 40px;
+    min-width: 44px;
     border: 0;
     border-left: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 0 6px 6px 0;
     color: #fff;
     background: var(--button-bg);
     cursor: pointer;
+    transition: background-color 180ms ease-out;
 }
 
 .continue-reading-menu-toggle:hover,
@@ -208,7 +222,18 @@ body {
     background: var(--button-hover);
 }
 
-.continue-reading-menu-toggle:focus-visible,
+.continue-reading-menu-toggle i {
+    transition: transform 180ms ease-out;
+}
+
+.continue-reading-menu-toggle[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+
+.continue-reading-menu-toggle:focus-visible {
+    outline: none;
+}
+
 .continue-reading-menu-item:focus-visible {
     outline: 3px solid var(--button-bg);
     outline-offset: 2px;
@@ -230,7 +255,7 @@ body {
 .continue-reading-menu-item {
     display: flex;
     width: 100%;
-    min-height: 40px;
+    min-height: 44px;
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
@@ -245,6 +270,13 @@ body {
 
 .continue-reading-menu-item:hover {
     background: var(--hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .continue-reading-menu-toggle,
+    .continue-reading-menu-toggle i {
+        transition: none;
+    }
 }
 
 /* 通知样式 */
@@ -561,7 +593,8 @@ body {
     margin-top: 30px;
     gap: 25px;
     transition: var(--transition);
-    overflow: scroll;
+    /* Action menus must be able to extend beyond the card instead of being clipped. */
+    overflow: visible;
 }
 
 .book-info-cover {

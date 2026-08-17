@@ -79,6 +79,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_book_page_offers_a_progress_aware_continue_reading_action(self):
         html = self._book_html()
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
+        styles = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
 
         self.assertRegex(html, r'id=(?:["\'])?continueReadingBtn')
         self.assertRegex(html, r'id=(?:["\'])?continueReadingBtnText')
@@ -90,6 +91,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
         self.assertNotIn("matchMedia", script)
+        self.assertIn(".continue-reading-control.has-reading-progress:hover #continueReadingBtn", styles)
+        self.assertIn("transform: none;", styles)
+        self.assertIn(".continue-reading-control.has-reading-progress:focus-within", styles)
+        self.assertIn(".continue-reading-menu-toggle[aria-expanded=\"true\"] i", styles)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", styles)
+        self.assertIn("overflow: visible;", styles)
         self.assertIn("document.getElementById(readKey)", script)
         self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
         self.assertIn("Continue reading", script)
