@@ -294,6 +294,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("document.body.classList.add('annotation-hub-open')", script)
         self.assertIn("modalState.opener.focus()", script)
         self.assertIn('.annotation-hub-header-button[hidden] { display: none; }', css)
+        self.assertIn('grid-column: 3;', css)
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()

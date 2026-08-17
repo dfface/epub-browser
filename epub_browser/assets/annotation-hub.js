@@ -44,7 +44,12 @@
 
     function tocTitles(toc) {
         var titles = {};
-        (toc || []).forEach(function(item) { if (item && typeof item.index === 'number') titles[item.index] = item.title; });
+        (toc || []).forEach(function(item) {
+            if (!item || !item.title) return;
+            var index = Number(item.chapter_index);
+            if (isNaN(index)) index = Number(item.index);
+            if (!isNaN(index)) titles[index] = item.title;
+        });
         return titles;
     }
 

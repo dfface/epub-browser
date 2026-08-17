@@ -24,6 +24,14 @@ test('groups one book in reading order and supplies a chapter fallback title', (
   assert.deepEqual(groups[1].annotations.map(annotation => annotation.id), ['early', 'late']);
 });
 
+test('uses the chapter_index field published by toc.json for chapter titles', () => {
+  const groups = Hub.groupByChapter([
+    { id: 'annotation', chapter_index: 3, created_at: '2026-08-11T00:00:00Z' },
+  ], [{ chapter_index: 3, title: 'Part one · Chapter one' }]);
+
+  assert.equal(groups[0].title, 'Part one · Chapter one');
+});
+
 test('builds a chapter deep link with an encoded annotation id', () => {
   assert.equal(Hub.annotationHref({ book_hash: 'book', chapter_index: 3, id: 'note / 1' }), '/book/book/chapter_3.html?annotation=note%20%2F%201');
 });

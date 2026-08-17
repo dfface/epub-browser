@@ -4,11 +4,11 @@ body.annotation-hub-open { position: fixed; width: 100%; overflow: hidden; }
 .annotation-hub-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .56); }
 .annotation-hub-dialog { position: relative; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; max-height: 100vh; max-height: 100dvh; overflow: auto; background: var(--background); box-shadow: var(--shadow-md); animation: annotation-hub-enter .18s ease-out; }
 .annotation-hub-modal-header { position: sticky; z-index: 1; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; min-height: 60px; padding: 0 20px; background: var(--card-bg); border-bottom: 1px solid var(--border); }
-.annotation-hub-header-label { justify-self: center; font-weight: 700; }
+.annotation-hub-header-label { grid-column: 2; justify-self: center; font-weight: 700; }
 .annotation-hub-header-button,.annotation-hub-icon-button,.annotation-hub-retry { min-height: 44px; border: 0; border-radius: 8px; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
-.annotation-hub-header-button { justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px; background: transparent; }
+.annotation-hub-header-button { grid-column: 1; justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px; background: transparent; }
 .annotation-hub-header-button[hidden] { display: none; }
-.annotation-hub-icon-button { justify-self: end; display: inline-grid; width: 44px; place-items: center; background: transparent; }
+.annotation-hub-icon-button { grid-column: 3; justify-self: end; display: inline-grid; width: 44px; place-items: center; background: transparent; }
 .annotation-hub-header-button:hover,.annotation-hub-icon-button:hover { background: var(--hover); }
 .annotation-hub-header-button:focus-visible,.annotation-hub-icon-button:focus-visible,.annotation-book-card:focus-visible,.annotation-card:focus-visible,.annotation-hub-retry:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
 .annotation-hub-container { width: min(100% - 40px, 920px); margin: 32px auto 72px; }
