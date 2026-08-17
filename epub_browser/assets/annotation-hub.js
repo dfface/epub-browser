@@ -93,7 +93,14 @@
         return node;
     }
     function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
-    function formatDate(time) { return time ? new Date(time).toLocaleDateString() : ''; }
+    function formatTimestamp(time) {
+        if (!time) return '';
+        var date = new Date(time);
+        if (isNaN(date.getTime())) return '';
+        function pad(value) { return String(value).padStart(2, '0'); }
+        return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+            ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+    }
     function labelCount(count) { return count + ' annotation' + (count === 1 ? '' : 's'); }
 
     function ensureModal() {
@@ -169,7 +176,7 @@
             var content = element('div', 'annotation-book-card-content');
             content.appendChild(element('h2', '', book.title));
             if (book.authors.length) content.appendChild(element('p', 'annotation-book-author', book.authors.join(' & ')));
-            content.appendChild(element('p', 'annotation-book-meta', labelCount(book.count) + (book.latestAt ? ' · updated ' + formatDate(book.latestAt) : '')));
+            content.appendChild(element('p', 'annotation-book-meta', labelCount(book.count) + (book.latestAt ? ' · updated ' + formatTimestamp(book.latestAt) : '')));
             card.appendChild(content); list.appendChild(card);
         });
         container.appendChild(list);
@@ -196,7 +203,7 @@
                 var content = element('div', 'annotation-card-content');
                 content.appendChild(element('blockquote', '', annotation.text || ''));
                 if (annotation.note && annotation.note.trim()) content.appendChild(element('p', 'annotation-card-note', annotation.note));
-                content.appendChild(element('p', 'annotation-card-meta', formatDate(annotationTime(annotation))));
+                content.appendChild(element('p', 'annotation-card-meta', formatTimestamp(annotationTime(annotation))));
                 card.appendChild(content); section.appendChild(card);
             });
             container.appendChild(section);
@@ -262,5 +269,5 @@
         else bind();
     }
 
-    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, open: open, close: close, bind: bind };
+    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, open: open, close: close, bind: bind };
 });

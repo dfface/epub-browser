@@ -32,6 +32,10 @@ test('uses the chapter_index field published by toc.json for chapter titles', ()
   assert.equal(groups[0].title, 'Part one · Chapter one');
 });
 
+test('formats annotation timestamps in a locale-independent numeric format', () => {
+  assert.match(Hub.formatTimestamp('2026-08-18T01:02:03Z'), /^2026-08-18 \d{2}:02:03$/);
+});
+
 test('builds a chapter deep link with an encoded annotation id', () => {
   assert.equal(Hub.annotationHref({ book_hash: 'book', chapter_index: 3, id: 'note / 1' }), '/book/book/chapter_3.html?annotation=note%20%2F%201');
 });
