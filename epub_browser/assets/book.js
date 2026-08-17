@@ -160,6 +160,8 @@ function initScript() {
         if (clearBtn && !clearBtn.dataset.bound) {
             clearBtn.dataset.bound = 'true';
             clearBtn.addEventListener("click", function() {
+                closeClearMenu();
+                if (!window.confirm("Clear reading progress for this book?")) return;
                 readingProgressLoadVersion++;
                 var prefix1 = "scroll_" + book_hash + "_";
                 var prefix2 = "turning_" + book_hash + "_";
@@ -170,7 +172,6 @@ function initScript() {
                     window.EpubReadingProgress.request('DELETE', '/api/reading-progress/' + encodeURIComponent(book_hash), null, true);
                 }
                 updateContinueReadingButton(book_hash);
-                closeClearMenu();
                 showNotification("All reading progress for this book has been deleted!", "success");
             });
         }

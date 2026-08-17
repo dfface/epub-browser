@@ -559,7 +559,7 @@ class EPUBProcessor:
                         <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
                         <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                         <div class="continue-reading-menu" id="clearReadingProgressMenu" hidden>
-                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" hidden><i class="fas fa-eraser" aria-hidden="true"></i>Clear reading progress</button>
+                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" hidden><i class="fas fa-eraser" aria-hidden="true"></i>Clear</button>
                         </div>
                     </div>
                     <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i>Annotations</button>

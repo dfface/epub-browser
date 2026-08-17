@@ -5,7 +5,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function(root) {
     'use strict';
 
-    var modalState = { modal: null, opener: null, scrollY: 0, bookHash: '', data: null };
+    var modalState = { modal: null, opener: null, scrollY: 0, bookHash: '', data: null, loadVersion: 0 };
 
     function annotationTime(annotation) {
         var value = annotation && (annotation.updated_at || annotation.created_at);
@@ -142,6 +142,7 @@
     function renderState(title, detail, retry) {
         var container = modalState.container;
         clear(container);
+        container.removeAttribute('aria-busy');
         var box = element('section', 'annotation-hub-state');
         var heading = element('h1', 'annotation-hub-title', title);
         heading.id = 'annotationHubTitle';
@@ -154,9 +155,21 @@
         container.appendChild(box);
     }
 
+    function renderLoading() {
+        var container = modalState.container;
+        clear(container);
+        container.setAttribute('aria-busy', 'true');
+        var loading = element('section', 'annotation-hub-loading');
+        loading.setAttribute('role', 'status');
+        loading.appendChild(element('span', 'annotation-hub-spinner'));
+        loading.appendChild(element('p', '', 'Loading annotations…'));
+        container.appendChild(loading);
+    }
+
     function renderBookCards(books) {
         var container = modalState.container;
         clear(container);
+        container.removeAttribute('aria-busy');
         var heading = element('header', 'annotation-hub-heading');
         var title = element('h1', 'annotation-hub-title', 'Annotated books');
         title.id = 'annotationHubTitle';
@@ -185,6 +198,7 @@
     function renderBookAnnotations(bookHash, annotations, metadata, toc) {
         var container = modalState.container, book = bookMap(metadata)[bookHash];
         clear(container);
+        container.removeAttribute('aria-busy');
         var heading = element('header', 'annotation-hub-heading');
         var title = element('h1', 'annotation-hub-title', book ? book.title : bookHash);
         title.id = 'annotationHubTitle';
@@ -212,21 +226,29 @@
 
     function load(bookHash) {
         if (!ensureModal() || !root.AnnotationStorage) return;
+        var loadVersion = ++modalState.loadVersion;
         modalState.bookHash = bookHash || '';
         modalState.back.hidden = !modalState.bookHash;
-        renderState('Loading annotations', '');
+        renderLoading();
         Promise.resolve(root.AnnotationStorage.init()).then(function() {
+            if (loadVersion !== modalState.loadVersion) return null;
             if (root.AnnotationStorage.getStorageType() === 'backend') return root.AnnotationStorage.isBackendAvailable().then(function(result) {
                 if (!result.available) throw new Error('Cloud annotations are unavailable on this static site.');
             });
-        }).then(function() { return Promise.all([root.AnnotationStorage.getAll(), requestJson('/book-metadata.json')]); }).then(function(data) {
-            if (modalState.bookHash !== (bookHash || '')) return;
+        }).then(function() {
+            if (loadVersion !== modalState.loadVersion) return null;
+            return Promise.all([root.AnnotationStorage.getAll(), requestJson('/book-metadata.json')]);
+        }).then(function(data) {
+            if (!data || loadVersion !== modalState.loadVersion || modalState.bookHash !== (bookHash || '')) return;
             modalState.data = { annotations: data[0] || [], metadata: data[1] || [] };
             if (!modalState.bookHash) { renderBookCards(aggregateBooks(modalState.data.annotations, modalState.data.metadata)); return; }
             requestJson('/book/' + encodeURIComponent(modalState.bookHash) + '/toc.json').catch(function() { return []; }).then(function(toc) {
-                if (modalState.bookHash === bookHash) renderBookAnnotations(bookHash, modalState.data.annotations.filter(function(annotation) { return annotation.book_hash === bookHash; }), modalState.data.metadata, toc);
+                if (loadVersion === modalState.loadVersion && modalState.bookHash === bookHash) renderBookAnnotations(bookHash, modalState.data.annotations.filter(function(annotation) { return annotation.book_hash === bookHash; }), modalState.data.metadata, toc);
             });
-        }).catch(function(error) { renderState('Unable to load annotations', error.message || 'Please try again.', function() { load(modalState.bookHash); }); });
+        }).catch(function(error) {
+            if (loadVersion !== modalState.loadVersion) return;
+            renderState('Unable to load annotations', error.message || 'Please try again.', function() { load(modalState.bookHash); });
+        });
     }
 
     function open(options) {

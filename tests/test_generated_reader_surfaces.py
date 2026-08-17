@@ -86,10 +86,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(html, r'id=(?:["\'])?continueReadingMenuToggle')
         self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressMenu')
         self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressBtn')
+        self.assertIn('aria-label="Clear reading progress"', html)
+        self.assertIn('>Clear</button>', html)
         self.assertIn("updateContinueReadingButton(book_hash);", script)
         self.assertIn("setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());", script)
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
+        self.assertIn('window.confirm("Clear reading progress for this book?")', script)
         self.assertNotIn("matchMedia", script)
         self.assertIn(".continue-reading-control.has-reading-progress:hover #continueReadingBtn", styles)
         self.assertIn("transform: none;", styles)
@@ -316,6 +319,18 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("modalState.opener.focus()", script)
         self.assertIn('.annotation-hub-header-button[hidden] { display: none; }', css)
         self.assertIn('grid-column: 3;', css)
+
+    def test_annotation_modal_announces_loading_while_data_is_requested(self):
+        script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation-hub.css").read_text(encoding="utf-8")
+
+        self.assertIn('function renderLoading()', script)
+        self.assertIn("container.setAttribute('aria-busy', 'true');", script)
+        self.assertIn("loading.setAttribute('role', 'status');", script)
+        self.assertIn('renderLoading();', script)
+        self.assertIn('.annotation-hub-spinner', css)
+        self.assertIn('@keyframes annotation-hub-spin', css)
+        self.assertIn('.annotation-hub-spinner { animation: none;', css)
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()
