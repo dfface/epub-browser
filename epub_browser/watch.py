@@ -69,15 +69,17 @@ class EpubFileHandler(FileSystemEventHandler):
             
             future = self.executor.submit(func, *args, **kwargs)
             self.pending_tasks[task_id] = future
-            
-            # 添加回调来清理完成的任务
-            def cleanup(f):
-                with self.lock:
-                    if task_id in self.pending_tasks:
-                        del self.pending_tasks[task_id]
-            
-            future.add_done_callback(cleanup)
-            return future
+
+        # A future may finish before add_done_callback() is called. In that case
+        # concurrent.futures invokes the callback synchronously, so registering
+        # it while holding self.lock would deadlock the watchdog dispatch thread.
+        def cleanup(completed_future):
+            with self.lock:
+                if self.pending_tasks.get(task_id) is completed_future:
+                    del self.pending_tasks[task_id]
+
+        future.add_done_callback(cleanup)
+        return future
     
     def _handle_created(self, src_path):
         """处理文件创建的后台任务"""
