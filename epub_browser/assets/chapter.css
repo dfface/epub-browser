@@ -160,17 +160,52 @@ body {
     transition: var(--transition);
 }
 
+.toc-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toc-book-home,
 .toc-close {
     background: none;
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 1.2rem;
+    min-width: 44px;
+    min-height: 44px;
+    font: inherit;
     transition: var(--transition);
 }
 
+.toc-book-home {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.toc-close {
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 6px;
+    font-size: 1.2rem;
+}
+
+.toc-book-home:hover,
 .toc-close:hover {
     color: var(--button-bg);
+    background: var(--hover);
+}
+
+.toc-book-home:focus-visible,
+.toc-close:focus-visible {
+    outline: 3px solid var(--button-bg);
+    outline-offset: 2px;
 }
 
 .toc-list {

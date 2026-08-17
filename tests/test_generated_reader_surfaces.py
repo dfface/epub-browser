@@ -230,6 +230,16 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("body:not(.pagination-mode) .chapter-top-bar", css)
         self.assertIn("width: 100%;", css)
 
+    def test_book_toc_offers_a_direct_book_home_link(self):
+        html = self._chapter_html()
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+
+        self.assertRegex(html, r'<a\b[^>]*\bclass="toc-book-home"[^>]*\bhref="index\.html"')
+        self.assertIn('aria-label="Open book home"', html)
+        self.assertIn('id="bookHomeClose"', html)
+        self.assertIn('.toc-header-actions', css)
+        self.assertIn('min-width: 44px;', css)
+
     def test_chapter_footer_uses_a_divider_instead_of_a_header_surface(self):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
         footer_rules = css[css.index(".eb-footer {"):css.index("}", css.index(".eb-footer {"))]

@@ -1246,9 +1246,14 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="toc-floating" id="bookHomeFloating">
         <div class="toc-header">
             <h3>Toc</h3>
-            <button class="toc-close" id="bookHomeClose">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="toc-header-actions">
+                <a class="toc-book-home" href="index.html" aria-label="Open book home">
+                    <i class="fas fa-book" aria-hidden="true"></i><span>Book home</span>
+                </a>
+                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close table of contents">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
         </div>
         <ul class="toc-list" id="bookHomeTocList">
             <!-- 动态生成的书籍目录将放在这里 -->
