@@ -153,6 +153,7 @@ class EPUBLibrary:
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
 <link rel="stylesheet" href="/assets/loading.css?v=15">
 <link rel="stylesheet" href="/assets/bookshelf.css">
+<link rel="stylesheet" href="/assets/annotation-hub.css">
 <script>
 // 立即应用主题，避免闪现 —— Kindle 兼容版
 function isKindleDevice() {
@@ -248,7 +249,7 @@ if (isKindle) {
             <div class="library-meta" aria-label="Library information">
                 <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i>{len(self.books)} book(s)</span>
                 <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i>{len(all_tags)} tag(s)</span>
-                <a class="library-meta-action" id="annotationsLink" href="/annotations/index.html"><i class="fas fa-highlighter" aria-hidden="true"></i><span>Annotations</span></a>
+                <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span>Annotations</span></button>
                 <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue">Login</span></button>
             </div>
         </nav>
@@ -378,6 +379,8 @@ if (isKindle) {
         <script src="/assets/library.js?v=13" defer></script>
         <script src="/assets/sortable.min.js" defer></script>
         <script src="/assets/bookshelf.js" defer></script>
+        <script src="/assets/annotation.js" defer></script>
+        <script src="/assets/annotation-hub.js" defer></script>
         <script>
         let base_path = window.location.pathname;
         if (base_path.endsWith("index.html")) {
@@ -451,29 +454,6 @@ if (isKindle) {
             f.write(library_html)
         
         self.generate_book_metadata()
-        self.create_annotation_center()
-
-    def create_annotation_center(self):
-        """Generate the static annotation hub used by both build and server modes."""
-        annotation_dir = os.path.join(self.base_directory, 'annotations')
-        os.makedirs(annotation_dir, exist_ok=True)
-        html = """<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#244548"><title>Annotations - EPUB Browser</title>
-<link rel="stylesheet" href="/assets/fa.all.min.css"><link rel="stylesheet" href="/assets/theme.css">
-<link rel="stylesheet" href="/assets/breadcrumb.css"><link rel="stylesheet" href="/assets/annotation-hub.css">
-<link rel="icon" type="image/png" href="/assets/favicon.png"><link rel="manifest" href="/assets/manifest.json">
-</head><body class="annotation-hub-page">
-<div class="top-controls"><button class="theme-toggle" id="themeToggle" type="button"><i class="fas fa-moon"></i><span class="control-name">Theme</span></button></div>
-<main class="annotation-hub-container" id="annotationHub" aria-live="polite"></main>
-<script src="/assets/theme.js" defer></script><script src="/assets/annotation.js" defer></script><script src="/assets/annotation-hub.js" defer></script>
-<script>window.addEventListener('DOMContentLoaded', function(){ if(window.initTheme) window.initTheme(); if(window.AnnotationHub) window.AnnotationHub.init(); });</script>
-</body></html>"""
-        html = rewrite_asset_urls(html, self.asset_manifest)
-        html = minify_html.minify(html, minify_css=True, minify_js=True)
-        with open(os.path.join(annotation_dir, 'index.html'), 'w', encoding='utf-8') as f:
-            f.write(html)
     
     def generate_book_metadata(self):
         import json

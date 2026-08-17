@@ -441,6 +441,7 @@ class EPUBProcessor:
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
+    <link rel="stylesheet" href="/assets/annotation-hub.css">
 """
         index_html += """
     <script>
@@ -555,7 +556,7 @@ class EPUBProcessor:
                 </div>
                 <div class="css-controls clearReadingProgress">
                     <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
-                    <a class="css-btn secondary" id="bookAnnotationsLink" href="/annotations/index.html?book={self.book_hash}"><i class="fas fa-highlighter"></i>Annotations</a>
+                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i>Annotations</button>
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
                     <button class="css-btn secondary" id="clearReadingProgressBtn"><i class="fas fa-eraser"></i>Clear reading progress</button>
                 </div>
@@ -701,6 +702,8 @@ class EPUBProcessor:
 <script src="/assets/reading-progress.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
+<script src="/assets/annotation.js" defer></script>
+<script src="/assets/annotation-hub.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
 function addBasePath(basePath) {

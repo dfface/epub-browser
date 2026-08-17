@@ -15,7 +15,6 @@ class StaticAssetDeliveryTests(unittest.TestCase):
 
             root = Path(directory)
             html = (root / 'index.html').read_text(encoding='utf-8')
-            annotation_hub = (root / 'annotations' / 'index.html').read_text(encoding='utf-8')
             asset_urls = re.findall(r'/assets/immutable/[A-Za-z0-9_.-]+', html)
 
             self.assertTrue(asset_urls)
@@ -25,7 +24,7 @@ class StaticAssetDeliveryTests(unittest.TestCase):
             self.assertTrue((root / 'assets' / 'asset-manifest.json').is_file())
             for public_url in asset_urls:
                 self.assertTrue((root / public_url.lstrip('/')).is_file(), public_url)
-            self.assertRegex(annotation_hub, r'\bid=(?:["\'])?annotationHub')
+            self.assertFalse((root / 'annotations' / 'index.html').exists())
 
             manifest = json.loads((root / 'assets' / 'manifest.json').read_text(encoding='utf-8'))
             for icon in manifest['icons']:

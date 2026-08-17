@@ -259,21 +259,41 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
 
-    def test_library_and_book_offer_annotation_center_entries(self):
-        self.assertRegex(self._library_html(), r'\bid=(?:["\'])?annotationsLink')
-        self.assertIn('/annotations/index.html', self._library_html())
-        self.assertRegex(self._book_html(), r'\bid=(?:["\'])?bookAnnotationsLink')
-        self.assertIn('/annotations/index.html?book=', self._book_html())
+    def test_library_and_book_open_annotation_center_as_a_modal(self):
+        library_html = self._library_html()
+        book_html = self._book_html()
 
-    def test_library_generates_an_annotation_center_with_immutable_assets(self):
+        self.assertRegex(library_html, r'\bid=(?:["\'])?annotationsBtn')
+        self.assertRegex(library_html, r'\bdata-annotation-hub')
+        self.assertIn('aria-haspopup=dialog', library_html)
+        self.assertRegex(library_html, r'/assets/immutable/annotation\.[0-9a-f]{12}\.js')
+        self.assertRegex(library_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.js')
+        self.assertNotIn('/annotations/index.html', library_html)
+        self.assertRegex(book_html, r'\bid=(?:["\'])?bookAnnotationsBtn')
+        self.assertRegex(book_html, r'\bdata-book-hash=')
+        self.assertIn('aria-haspopup=dialog', book_html)
+        self.assertRegex(book_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
+
+    def test_annotation_modal_assets_are_immutable_and_not_a_separate_page(self):
         with tempfile.TemporaryDirectory() as directory:
             library = EPUBLibrary(directory)
             library.create_library_home()
-            html = Path(directory, 'annotations', 'index.html').read_text(encoding='utf-8')
+            html = Path(directory, 'index.html').read_text(encoding='utf-8')
+            self.assertFalse(Path(directory, 'annotations', 'index.html').exists())
 
-        self.assertRegex(html, r'\bid=(?:["\'])?annotationHub')
         self.assertRegex(html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.js')
         self.assertRegex(html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
+
+    def test_annotation_modal_keeps_keyboard_and_scroll_return_paths(self):
+        script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation-hub.css").read_text(encoding="utf-8")
+
+        self.assertIn("modal.setAttribute('role', 'dialog')", script)
+        self.assertIn("modal.setAttribute('aria-modal', 'true')", script)
+        self.assertIn("if (event.key === 'Escape')", script)
+        self.assertIn("document.body.classList.add('annotation-hub-open')", script)
+        self.assertIn("modalState.opener.focus()", script)
+        self.assertIn('.annotation-hub-header-button[hidden] { display: none; }', css)
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()
