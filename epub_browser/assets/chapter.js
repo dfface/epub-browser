@@ -1690,11 +1690,23 @@ function initScript() {
     }
     
     // Initialize annotation module
+    function requestedAnnotationId() {
+        var match = window.location.search.match(/[?&]annotation=([^&]*)/);
+        return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
+    }
     function initAnnotationModule() {
         if (window.AnnotationModule) {
             window.AnnotationModule.init({
                 bookHash: book_hash,
                 chapterIndex: parseInt(chapter_index, 10)
+            }).then(function() {
+                var annotationId = requestedAnnotationId();
+                if (!annotationId) return;
+                return window.AnnotationModule.focusAnnotation(annotationId).then(function(found) {
+                    if (!found) showNotification('Could not locate this annotation. Opened its chapter instead.', 'warning');
+                });
+            }).catch(function() {
+                if (requestedAnnotationId()) showNotification('Could not load this annotation. Opened its chapter instead.', 'warning');
             });
         } else {
             // Wait for annotation.js to load

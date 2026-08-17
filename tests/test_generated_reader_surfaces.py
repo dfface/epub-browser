@@ -13,6 +13,27 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('annotation-btn-copy', script)
         self.assertIn('copyText(source.text)', script)
 
+    def test_annotation_storage_exposes_reading_independent_read_apis(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+
+        self.assertIn('var AnnotationStorage = {', script)
+        self.assertIn('init: function() {', script)
+        self.assertIn('getAll: function() {', script)
+        self.assertIn('getByBook: function(bookHash) {', script)
+        self.assertIn('getStorageType: function() {', script)
+        self.assertIn('isBackendAvailable: function() {', script)
+        self.assertIn('global.AnnotationStorage = AnnotationStorage;', script)
+
+    def test_chapter_can_focus_an_annotation_requested_by_query_parameter(self):
+        script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
+        annotation_script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation.css").read_text(encoding="utf-8")
+
+        self.assertIn("requestedAnnotationId()", script)
+        self.assertIn("focusAnnotation(annotationId)", script)
+        self.assertIn("focusAnnotation: function(id)", annotation_script)
+        self.assertIn("annotation-focus-active", css)
+
     def test_reader_annotation_edits_are_silent_when_successful(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 
@@ -237,6 +258,22 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
+
+    def test_library_and_book_offer_annotation_center_entries(self):
+        self.assertRegex(self._library_html(), r'\bid=(?:["\'])?annotationsLink')
+        self.assertIn('/annotations/index.html', self._library_html())
+        self.assertRegex(self._book_html(), r'\bid=(?:["\'])?bookAnnotationsLink')
+        self.assertIn('/annotations/index.html?book=', self._book_html())
+
+    def test_library_generates_an_annotation_center_with_immutable_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            library = EPUBLibrary(directory)
+            library.create_library_home()
+            html = Path(directory, 'annotations', 'index.html').read_text(encoding='utf-8')
+
+        self.assertRegex(html, r'\bid=(?:["\'])?annotationHub')
+        self.assertRegex(html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.js')
+        self.assertRegex(html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()

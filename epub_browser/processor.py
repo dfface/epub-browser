@@ -555,6 +555,7 @@ class EPUBProcessor:
                 </div>
                 <div class="css-controls clearReadingProgress">
                     <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
+                    <a class="css-btn secondary" id="bookAnnotationsLink" href="/annotations/index.html?book={self.book_hash}"><i class="fas fa-highlighter"></i>Annotations</a>
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
                     <button class="css-btn secondary" id="clearReadingProgressBtn"><i class="fas fa-eraser"></i>Clear reading progress</button>
                 </div>

@@ -864,7 +864,7 @@
         setContext: function(bookHash, chapterIndex) {
             currentBookHash = bookHash || '';
             currentChapterIndex = typeof chapterIndex === 'number' ? chapterIndex : 0;
-            this.renderAll();
+            return this.renderAll();
         },
 
         normalizeAnnotation: function(raw) {
@@ -1983,9 +1983,9 @@
             currentChapterIndex = options.chapterIndex || 0;
 
             if (this.initialized) {
-                HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
+                var refresh = HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
                 HighlightInteraction.syncEnabledState();
-                return;
+                return refresh;
             }
             
             // Load settings
@@ -1993,18 +1993,19 @@
             
             // Initialize storage
             var self = this;
-            StorageManager.init().then(function() {
+            return StorageManager.init().then(function() {
                 // Initialize interaction
                 HighlightInteraction.init();
                 
                 // Create settings tab
                 SettingsTab.createContent();
                 
-                HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
-                
+                return HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
+            }).then(function() {
                 self.initialized = true;
             }).catch(function(err) {
                 console.error('Annotation module init failed:', err);
+                throw err;
             });
         },
         
@@ -2033,10 +2034,50 @@
         // Get annotation count
         getAnnotationCount: function() {
             return HighlightInteraction.annotations.length;
+        },
+        focusAnnotation: function(id) {
+            return new Promise(function(resolve) {
+                var attempts = 0;
+                var focus = function() {
+                    var nodes = HighlightInteraction.getHighlightNodesByAnnotationId(id);
+                    if (nodes.length) {
+                        nodes.forEach(function(node) { node.classList.add('annotation-focus-active'); });
+                        nodes[0].scrollIntoView({ behavior: 'auto', block: 'center' });
+                        setTimeout(function() { nodes.forEach(function(node) { node.classList.remove('annotation-focus-active'); }); }, 1800);
+                        resolve(true);
+                        return;
+                    }
+                    attempts++;
+                    if (attempts < 6) { requestAnimationFrame(focus); return; }
+                    resolve(false);
+                };
+                focus();
+            });
+        }
+    };
+
+    // Read-only storage facade for pages that must share annotation data without
+    // starting the reader's highlighter, selection handlers, or settings panel.
+    var AnnotationStorage = {
+        init: function() {
+            return StorageManager.init();
+        },
+        getAll: function() {
+            return StorageManager.getAll();
+        },
+        getByBook: function(bookHash) {
+            return StorageManager.getByBook(bookHash);
+        },
+        getStorageType: function() {
+            return StorageManager.currentType;
+        },
+        isBackendAvailable: function() {
+            return StorageManager.isBackendAvailable();
         }
     };
     
     // 导出模块
     global.AnnotationModule = AnnotationModule;
+    global.AnnotationStorage = AnnotationStorage;
     
 })(window);

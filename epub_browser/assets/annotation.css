@@ -12,6 +12,16 @@
     display: inline;
 }
 
+.annotation-highlight.annotation-focus-active {
+    outline: 2px solid var(--annotation-border-color, currentColor);
+    outline-offset: 3px;
+    animation: annotation-focus-pulse 0.9s ease-in-out 2;
+}
+
+@keyframes annotation-focus-pulse {
+    50% { filter: brightness(1.15); }
+}
+
 .annotation-highlight.annotation-hover-active {
     background-color: var(--annotation-hover-color, rgba(255, 235, 59, 0.6));
     outline: 2px solid var(--annotation-border-color, rgba(255, 235, 59, 0.8));
