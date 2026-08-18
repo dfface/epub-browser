@@ -125,6 +125,65 @@ test('renders failure values through textContent', () => {
   assert.equal(harness.nodes['[data-progress-failure-list]'].children[0].textContent, unsafe + ': ' + unsafe);
 });
 
+test('keeps a named progressbar during discovery and announces a meaningful degraded failure once', () => {
+  const harness = progressMount();
+  const root = {
+    document: { createElement: harness.createElement },
+    EpubBrowserI18n: { t(key) { return key; } },
+  };
+  const controller = Progress.createController(Progress.createDomOptions(root, harness.mount));
+  controller.accept(snapshot({ total: 5, completed: 2, phase: 'processing' }));
+  controller.accept(snapshot({ revision: 2, total: 5, phase: 'discovering' }));
+
+  const track = harness.nodes['[data-progress-track]'];
+  assert.equal(track.getAttribute('role'), 'progressbar');
+  assert.equal(track.getAttribute('aria-labelledby'), 'libraryProgressTitle');
+  assert.equal(track.getAttribute('aria-valuemin'), '0');
+  assert.equal(track.getAttribute('aria-valuemax'), '5');
+  assert.equal(track.getAttribute('aria-valuenow'), null);
+
+  controller.accept(snapshot({ revision: 3, total: 5, phase: 'degraded', failed: 1, failures: [{ filename: 'broken.epub', message: 'invalid file' }] }));
+  const summary = harness.nodes['[data-progress-summary]'];
+  assert.equal(summary.getAttribute('role'), 'alert');
+  assert.match(summary.textContent, /library\.progress\.degraded/);
+
+  controller.accept(snapshot({ revision: 4, total: 5, phase: 'degraded', failed: 1, failures: [{ filename: 'broken.epub', message: 'invalid file' }] }));
+  assert.equal(summary.getAttribute('role'), null);
+  assert.equal(summary.getAttribute('aria-live'), 'polite');
+});
+
+test('starts EventSource at the normalized server events URL and wires progress, reconnect, and close', () => {
+  const harness = progressMount();
+  let source;
+  function FakeEventSource(url) {
+    this.url = url;
+    this.listeners = {};
+    source = this;
+  }
+  FakeEventSource.prototype.addEventListener = function(name, listener) { this.listeners[name] = listener; };
+  const root = {
+    EpubBrowserMode: 'server',
+    EpubBrowserBasePath: '/reader/',
+    EventSource: FakeEventSource,
+    EpubBrowserI18n: { t(key) { return key; } },
+    document: {
+      getElementById(id) { return id === 'libraryProgress' ? harness.mount : null; },
+      createElement: harness.createElement,
+    },
+    setTimeout() { return 1; },
+    clearTimeout() {},
+  };
+
+  const started = Progress.start(root);
+  assert.equal(source.url, '/reader/api/library-events');
+  source.listeners.progress({ data: JSON.stringify(snapshot({ completed: 1 })) });
+  assert.equal(started.controller.state.snapshot.completed, 1);
+  source.onerror();
+  assert.equal(started.controller.state.connected, false);
+  harness.nodes['[data-progress-close]'].listener();
+  assert.equal(started.controller.state.visible, false);
+});
+
 test('start only opens EventSource for a server page with a mount', () => {
   let opened = 0;
   const root = {

@@ -198,20 +198,27 @@
         summary.removeAttribute('aria-live');
         summary.setAttribute('role', 'alert');
       }
-      summary.textContent = state.connected ?
-        t('library.progress.summary', { completed: snapshot.completed, total: snapshot.total }) :
-        t('library.progress.reconnecting');
+      if (!state.connected) {
+        summary.textContent = t('library.progress.reconnecting');
+      } else if (state.announceDegraded) {
+        summary.textContent = t('library.progress.degraded') + ' ' +
+          t('library.progress.summary', { completed: snapshot.completed, total: snapshot.total });
+      } else {
+        summary.textContent = t('library.progress.summary', { completed: snapshot.completed, total: snapshot.total });
+      }
 
       if (snapshot.phase === 'discovering') {
         track.classList.add('library-progress-track--indeterminate');
-        track.removeAttribute('role');
-        track.removeAttribute('aria-valuemin');
-        track.removeAttribute('aria-valuemax');
+        track.setAttribute('role', 'progressbar');
+        track.setAttribute('aria-labelledby', 'libraryProgressTitle');
+        track.setAttribute('aria-valuemin', '0');
+        track.setAttribute('aria-valuemax', String(snapshot.total));
         track.removeAttribute('aria-valuenow');
         bar.style.width = '';
       } else {
         track.classList.remove('library-progress-track--indeterminate');
         track.setAttribute('role', 'progressbar');
+        track.setAttribute('aria-labelledby', 'libraryProgressTitle');
         track.setAttribute('aria-valuemin', '0');
         track.setAttribute('aria-valuemax', String(snapshot.total));
         track.setAttribute('aria-valuenow', String(snapshot.completed));
