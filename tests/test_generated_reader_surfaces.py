@@ -438,3 +438,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(script, r"showNotification\(\s*['\"]")
         self.assertNotRegex(script, r"confirm\(\s*['\"]")
         self.assertIn("i18n.t('bookshelf.currentStats'", script)
+
+    def test_bookshelf_renders_adversarial_group_and_book_metadata_as_text(self):
+        script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
+
+        self.assertIn('titleElement.textContent = group.name;', script)
+        self.assertIn('titleElement.textContent = bookInfo.title;', script)
+        self.assertIn('authorElement.textContent = bookInfo.author;', script)
+        self.assertIn('pathItem.textContent = name;', script)
+        self.assertNotRegex(
+            script,
+            r'innerHTML\s*=\s*[\s\S]{0,300}(?:group\.name|bookInfo\.(?:title|author))',
+        )
