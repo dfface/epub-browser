@@ -1,4 +1,5 @@
 import os
+import ntpath
 import zipfile
 import tempfile
 import shutil
@@ -12,24 +13,37 @@ import urllib.parse
 import minify_html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path, PurePosixPath
 
 from .asset_publisher import AssetPublisher, rewrite_asset_urls
+from .models import BookMetadata, ConvertedBook
+from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 class EPUBProcessor:
     """处理EPUB文件的类"""
     
-    def __init__(self, epub_path, output_dir=None, asset_manifest=None):
-        self.epub_path = epub_path
+    def __init__(
+        self,
+        epub_path,
+        output_dir=None,
+        asset_manifest=None,
+        book_id=None,
+        urls=None,
+    ):
+        self.epub_path = os.fspath(epub_path)
         self.output_dir = output_dir
-        self.book_hash = base64.urlsafe_b64encode(hashlib.md5(epub_path.encode('utf-8')).digest()).decode().rstrip('=')  # 使用哈希值作为标识，后续可能会根据 ncx 更新
+        self.urls = urls or SiteURLs()
+        self._caller_supplied_book_id = book_id is not None
+        self.book_hash = book_id or base64.urlsafe_b64encode(
+            hashlib.md5(self.epub_path.encode('utf-8')).digest()
+        ).decode().rstrip('=')  # 使用哈希值作为标识，后续可能会根据 ncx 更新
         
         if output_dir:
             # 使用用户指定的输出目录
             # 这里一般会始终使用 base_directory，也就是上层已经处理了，可能是 temp dir
             self.temp_dir = os.path.join(output_dir, f'epub_{self.book_hash}')
-            if not os.path.exists(self.temp_dir):
-                os.mkdir(self.temp_dir)
+            os.makedirs(self.temp_dir, exist_ok=True)
         else:
             # 使用系统临时目录
             # 本程序永远走不到这里来的，除非作为库被别人调用
@@ -41,6 +55,7 @@ class EPUBProcessor:
         self.authors = None
         self.tags = None
         self.description = None
+        self.epub_identifier = None
         self.cover_info = None
         self.lang = 'en'
         self.chapters = []
@@ -51,7 +66,11 @@ class EPUBProcessor:
         else:
             assets_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets')
             asset_output_dir = output_dir or self.temp_dir
-            self.asset_manifest = AssetPublisher(assets_dir, asset_output_dir).publish()
+            self.asset_manifest = AssetPublisher(
+                assets_dir,
+                asset_output_dir,
+                urls=self.urls,
+            ).publish()
     
     def cleanup(self):
         # 诸如 extract 失败
@@ -67,6 +86,8 @@ class EPUBProcessor:
         content.opf 可能因修改元数据如标签而更改；
         toc.ncx 一般不会变化，用这个来 Hash 比较合适，而这个解析出来的是 toc 变量；
         """
+        if self._caller_supplied_book_id:
+            return
         if self.toc:
             # 预处理 self.toc，只取  'title', 'src', 'level'，不取 'anchor'
             toc_to_hash = []
@@ -92,19 +113,59 @@ class EPUBProcessor:
                     self.temp_dir = new_temp_dir
                     self.web_dir = os.path.join(self.temp_dir, 'web')
                     self.extract_dir = os.path.join(self.temp_dir, 'extracted')
-                except Exception as e:
-                    print(f"Modify directory name failed, old: {self.temp_dir}, new: {new_temp_dir}, err: {e}")
+                except OSError:
+                    return
         
     def extract_epub(self):
         """解压EPUB文件"""
         try:
             with zipfile.ZipFile(self.epub_path, 'r') as zip_ref:
-                zip_ref.extractall(self.extract_dir)
-            # print(f"EPUB file extracted to: {self.extract_dir}")
+                extract_root = Path(self.extract_dir).resolve()
+                extract_root.mkdir(parents=True, exist_ok=True)
+                for member in zip_ref.infolist():
+                    member_name = member.filename.replace("\\", "/")
+                    drive, _ = ntpath.splitdrive(member_name)
+                    member_path = PurePosixPath(member_name)
+                    if (
+                        drive
+                        or member_path.is_absolute()
+                        or ".." in member_path.parts
+                    ):
+                        raise ValueError(
+                            f"Unsafe EPUB archive path: {member.filename}"
+                        )
+                    destination = extract_root.joinpath(*member_path.parts).resolve()
+                    try:
+                        destination.relative_to(extract_root)
+                    except ValueError as error:
+                        raise ValueError(
+                            f"Unsafe EPUB archive path: {member.filename}"
+                        ) from error
+                    zip_ref.extract(member, extract_root)
             return True
-        except Exception as e:
-            print(f"Failed to extract EPUB file: {e}")
+        except ValueError:
+            raise
+        except (OSError, zipfile.BadZipFile):
             return False
+
+    def convert(self):
+        """Convert one EPUB into its caller-owned staging directory."""
+        if not self.extract_epub():
+            raise ValueError(f"Unable to extract EPUB file: {self.epub_path}")
+        opf_path = self.parse_container()
+        if not opf_path:
+            raise ValueError(f"Unable to parse EPUB container file: {self.epub_path}")
+        if not self.parse_opf(opf_path):
+            raise ValueError(f"Unable to parse EPUB package file: {self.epub_path}")
+        self.generate_hash()
+        self.create_web_interface()
+        return ConvertedBook(
+            book_id=self.book_hash,
+            source_path=Path(self.epub_path),
+            output_dir=Path(self.web_dir),
+            metadata=self.get_metadata(),
+            chapter_count=len(self.chapters),
+        )
     
     def parse_container(self):
         """解析container.xml获取内容文件路径"""
@@ -310,6 +371,10 @@ class EPUBProcessor:
             title_elem = root.find('.//dc:title', ns)
             if title_elem is not None and title_elem.text:
                 self.book_title = title_elem.text
+
+            identifier_elem = root.find('.//dc:identifier', ns)
+            if identifier_elem is not None and identifier_elem.text:
+                self.epub_identifier = identifier_elem.text.strip() or None
             
             # 获取作者名
             authors = tree.findall('.//dc:creator', ns)
@@ -719,73 +784,14 @@ class EPUBProcessor:
 <script src="/assets/annotation-hub.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
-function addBasePath(basePath) {
-    // 处理所有链接、图片和样式表
-    const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
-    resources.forEach(resource => {
-        const src = resource.getAttribute('src');
-        const href = resource.getAttribute('href');
-        if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
-            resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-        }
-        if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
-            resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-        }
-    });
-}
-
-// 检查当前的基路径
-let path = window.location.pathname;
-let basePath = path.split('/book/');
-// 获取基路径
-basePath = basePath[0] + "/";
-// 检查当前的基路径
-if (!path.startsWith("/book/")) {
-    // 处理所有资源，都要加上基路径
-    addBasePath(basePath);
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-// 检查当前的基路径
-let path = window.location.pathname;
-let basePath = path.split('/book/');
-// 获取基路径
-basePath = basePath[0] + "/";
-
-// 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-const js_resource = document.querySelector('script[src="/assets/book.js?v=13"]');
-if (window.initScriptBook && window.initTheme) {
-    console.log("init")
-    window.initScriptBook();
-} else {
-    const src = js_resource.getAttribute('src');
-    newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
-    newScript.onload = () => {
-        if (window.initScriptBook && window.initTheme) {
-            console.log("reinit")
-            window.initScriptBook();
-        }
-    };
-}
-
-function reloadScriptByReplacement(scriptElement, newSrc) {
-    const newScript = document.createElement('script');
-    newScript.src = newSrc;
-    
-    // 复制原script的所有属性（除了src）
-    Array.from(scriptElement.attributes).forEach(attr => {
-        if (attr.name !== 'src') {
-            newScript.setAttribute(attr.name, attr.value);
-        }
-    });
-    scriptElement.parentNode.replaceChild(newScript, scriptElement);
-    return newScript;
-}
+    if (window.initScriptBook) window.initScriptBook();
 });
 </script>
 </body>
 </html>"""
         index_html = rewrite_asset_urls(index_html, self.asset_manifest)
+        index_html = rewrite_root_urls(index_html, self.urls)
         # kindle 支持，不能压缩 css 和 js
         index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
         with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
@@ -1598,70 +1604,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     {render_footer(datetime.now().year)}
 """
         chapter_html += """
-    <script>
-    // 检查当前的基路径
-    let path = window.location.pathname;
-    let basePath = path.split('/book/');
-    // 获取基路径
-    basePath = basePath[0] + "/";
-    // 检查当前的基路径
-    if (!path.startsWith("/book/")) {
-        // 处理所有资源，都要加上基路径
-        addBasePath(basePath);
-    }
-    function addBasePath(basePath) {
-        // 处理所有链接、图片和样式表
-        const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
-        resources.forEach(resource => {
-            const src = resource.getAttribute('src');
-            const href = resource.getAttribute('href');
-            if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
-                resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-            }
-            if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
-                resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-            }
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-    // 检查当前的基路径
-    let path = window.location.pathname;
-    let basePath = path.split('/book/');
-    // 获取基路径
-    basePath = basePath[0] + "/";
-    
-    // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-    const js_resource = document.querySelector('script[src="/assets/chapter.js?v=17"]');
-    if (window.initScriptChapter && window.initTheme) {
-        window.initScriptChapter();
-        console.log("init")
-    } else {
-        const src = js_resource.getAttribute('src');
-        newScript = reloadScriptByReplacement(js_resource, basePath.substr(0, basePath.length - 1) + src);
-        newScript.onload = () => {
-            if (window.initScriptChapter && window.initTheme) {
-                console.log("reinit")
-                window.initScriptChapter();
-            }
-        };
-    }
-
-    function reloadScriptByReplacement(scriptElement, newSrc) {
-        const newScript = document.createElement('script');
-        newScript.src = newSrc;
-        
-        // 复制原script的所有属性（除了src）
-        Array.from(scriptElement.attributes).forEach(attr => {
-            if (attr.name !== 'src') {
-                newScript.setAttribute(attr.name, attr.value);
-            }
-        });
-        scriptElement.parentNode.replaceChild(newScript, scriptElement);
-        return newScript;
-    }
-    });
-    </script>
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
@@ -1676,10 +1618,16 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
     <script src="/assets/bookshelf.js" defer></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.initScriptChapter) window.initScriptChapter();
+    });
+    </script>
 </body>
 </html>
 """
         chapter_html = rewrite_asset_urls(chapter_html, self.asset_manifest)
+        chapter_html = rewrite_root_urls(chapter_html, self.urls)
         # kindle 支持，不能压缩 css 和 js
         # 部分 xhtml 书籍压缩之后会丢失标签，说明压缩算法可能存在问题
         # chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)
@@ -1732,6 +1680,22 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             'tags': self.tags,
             'origin_file_path': self.epub_path,
         }
+
+    def get_metadata(self):
+        """Return immutable metadata shared by SSG and Server publishers."""
+        cover_path = None
+        if self.cover_info and self.cover_info.get('full_path'):
+            cover_path = os.path.normpath(
+                os.path.join(self.resources_base, self.cover_info['full_path'])
+            )
+        return BookMetadata(
+            title=self.book_title,
+            authors=tuple(self.authors or ()),
+            tags=tuple(self.tags or ()),
+            cover=cover_path,
+            language=self.lang or 'en',
+            epub_identifier=self.epub_identifier,
+        )
     
     def cleanup(self):
         """清理临时文件"""
