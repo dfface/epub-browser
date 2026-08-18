@@ -93,6 +93,43 @@
         return i18n && i18n.t ? i18n.t('annotations.' + key, params) : key;
     }
 
+    var BACKEND_ERROR_CODES = {
+        not_found: true,
+        username_required: true,
+        invalid_json: true,
+        no_sync_data: true,
+        annotation_not_found: true,
+        invalid_chapter_index: true,
+        batch_requires_post: true,
+        database_unavailable: true,
+        reading_progress_not_found: true,
+        server_error: true,
+        network: true,
+        timeout: true
+    };
+
+    function backendErrorMessage(code) {
+        var key = BACKEND_ERROR_CODES[code] ? code : 'server_error';
+        return tr('error.' + key);
+    }
+
+    function backendRequestError(code) {
+        var normalizedCode = BACKEND_ERROR_CODES[code] ? code : 'server_error';
+        var error = new Error(backendErrorMessage(normalizedCode));
+        error.code = normalizedCode;
+        return error;
+    }
+
+    function errorCodeFromPayload(responseText) {
+        var payload;
+        try {
+            payload = JSON.parse(responseText);
+        } catch (e) {
+            return '';
+        }
+        return payload && typeof payload.code === 'string' ? payload.code : '';
+    }
+
     function formatAnnotationDate(value) {
         var i18n = window.EpubBrowserI18n;
         if (i18n && i18n.formatDate) {
@@ -573,22 +610,22 @@
                             resolve(xhr.responseText);
                         }
                     } else {
-                        reject(new Error('HTTP ' + xhr.status));
+                        reject(backendRequestError(errorCodeFromPayload(xhr.responseText)));
                     }
                 };
                 
                 xhr.onerror = function() {
-                    reject(new Error('Network error'));
+                    reject(backendRequestError('network'));
                 };
                 
                 xhr.ontimeout = function() {
-                    reject(new Error('Request timeout'));
+                    reject(backendRequestError('timeout'));
                 };
                 
                 try {
                     xhr.send(data ? JSON.stringify(data) : null);
                 } catch (e) {
-                    reject(e);
+                    reject(backendRequestError('network'));
                 }
             });
         },
@@ -2095,5 +2132,6 @@
     // 导出模块
     global.AnnotationModule = AnnotationModule;
     global.AnnotationStorage = AnnotationStorage;
+    if (global.__EPUB_BROWSER_TESTING__) global.AnnotationBackendStorage = BackendStorage;
     
 })(window);
