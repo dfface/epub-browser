@@ -128,7 +128,8 @@ class ServerLibraryManager:
             self.public_dir,
             urls=self.urls,
         ).publish()
-        self._refresh_public_shell()
+        with self._commit_lock:
+            self._refresh_public_shell()
         return self.public_dir
 
     def reconcile(self) -> ReconcileSummary:
@@ -183,14 +184,22 @@ class ServerLibraryManager:
                     and existing.source_mtime_ns == stat.st_mtime_ns
                     and self._cache_valid(existing)
                 ):
-                    record = self.state_store.resolve_book(
-                        source,
-                        existing.epub_identifier,
-                        existing.source_fingerprint,
-                        json.loads(existing.metadata_json),
-                        source_size=stat.st_size,
-                        source_mtime_ns=stat.st_mtime_ns,
-                    )
+                    try:
+                        with self._commit_lock:
+                            self._require_source_stat(source, stat)
+                            record = self.state_store.resolve_book(
+                                source,
+                                existing.epub_identifier,
+                                existing.source_fingerprint,
+                                json.loads(existing.metadata_json),
+                                source_size=stat.st_size,
+                                source_mtime_ns=stat.st_mtime_ns,
+                            )
+                    except (OSError, _StaleSourceError) as error:
+                        failures.append(
+                            ConversionFailure(source, existing.book_id, str(error), True)
+                        )
+                        continue
                     reused_records.append(record)
                     continue
 
@@ -201,15 +210,17 @@ class ServerLibraryManager:
                     metadata = self._probe_metadata(source)
                     if self._stop_event.is_set():
                         break
-                    record = self.state_store.resolve_book(
-                        source,
-                        None if existing else metadata.epub_identifier,
-                        fingerprint,
-                        metadata,
-                        source_size=None if existing else stat.st_size,
-                        source_mtime_ns=None if existing else stat.st_mtime_ns,
-                        preferred_book_id=legacy_ids.get(source),
-                    )
+                    with self._commit_lock:
+                        self._require_source_stat(source, stat)
+                        record = self.state_store.resolve_book(
+                            source,
+                            None if existing else metadata.epub_identifier,
+                            fingerprint,
+                            metadata,
+                            source_size=None if existing else stat.st_size,
+                            source_mtime_ns=None if existing else stat.st_mtime_ns,
+                            preferred_book_id=legacy_ids.get(source),
+                        )
                 except Exception as error:
                     kept = bool(existing and self._cache_valid(existing))
                     failures.append(
@@ -257,8 +268,7 @@ class ServerLibraryManager:
                 )
 
             converted_records = []
-            self._refresh_public_shell()
-            self._write_catalog(self._valid_active_records(), failures)
+            self._publish_current_state(failures)
             if plans:
                 for plan, converted, error in self._conversion_outcomes(plans):
                     if error is None:
@@ -266,7 +276,8 @@ class ServerLibraryManager:
                     elif not isinstance(error, _ConversionCancelled):
                         kept = self._cache_valid(plan.record)
                         if not kept:
-                            self.state_store.mark_missing(plan.record.book_id)
+                            with self._commit_lock:
+                                self.state_store.mark_missing(plan.record.book_id)
                         failures.append(
                             ConversionFailure(
                                 plan.source,
@@ -278,12 +289,9 @@ class ServerLibraryManager:
                         self.reporter.detail(
                             f"Failed to convert {plan.source}: {error}"
                         )
-                    self._refresh_public_shell()
-                    self._write_catalog(self._valid_active_records(), failures)
+                    self._publish_current_state(failures)
 
-            self._refresh_public_shell()
-            active_records = self._valid_active_records()
-            self._write_catalog(active_records, failures)
+            active_records = self._publish_current_state(failures)
             if self.migration_manager:
                 self.migration_manager.record_cache_reconciled(
                     successful=not failures
@@ -353,6 +361,25 @@ class ServerLibraryManager:
             callback(*args)
         except Exception as error:
             self.reporter.detail(f"Server reconciliation callback failed: {error}")
+
+    @staticmethod
+    def _require_source_stat(source: Path, expected) -> None:
+        current = source.stat()
+        expected_size = (
+            expected.st_size
+            if hasattr(expected, "st_size")
+            else expected.source_size
+        )
+        expected_mtime_ns = (
+            expected.st_mtime_ns
+            if hasattr(expected, "st_mtime_ns")
+            else expected.source_mtime_ns
+        )
+        if (
+            current.st_size != expected_size
+            or current.st_mtime_ns != expected_mtime_ns
+        ):
+            raise _StaleSourceError("source changed while conversion was in progress")
 
     def _discover_sources(self) -> tuple[Path, ...]:
         discovered = set()
@@ -479,6 +506,7 @@ class ServerLibraryManager:
             with self._commit_lock:
                 if self._stop_event.is_set():
                     raise _ConversionCancelled("Server is stopping")
+                self._require_source_stat(plan.source, plan)
                 destination = self.public_dir / "book" / plan.record.book_id
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 rollback = self.staging_dir / (
@@ -627,6 +655,16 @@ class ServerLibraryManager:
             temporary_path = Path(temporary.name)
         os.replace(temporary_path, self.catalog_path)
 
+    def _publish_current_state(
+        self,
+        failures: Sequence[ConversionFailure],
+    ) -> tuple[BookRecord, ...]:
+        with self._commit_lock:
+            self._refresh_public_shell()
+            active_records = self._valid_active_records()
+            self._write_catalog(active_records, failures)
+            return active_records
+
     def queue_path(self, path: Path):
         if self._stop_event.is_set():
             return None
@@ -656,14 +694,14 @@ class ServerLibraryManager:
     def mark_deleted(self, path: Path) -> None:
         if self._stop_event.is_set():
             return
-        record = self.state_store.book_by_source(Path(path))
-        if record:
-            self.state_store.mark_missing(record.book_id)
-            if self._assets is None:
-                self.prepare_public_shell()
-            else:
+        if self._assets is None:
+            self.prepare_public_shell()
+        with self._commit_lock:
+            record = self.state_store.book_by_source(Path(path))
+            if record:
+                self.state_store.mark_missing(record.book_id)
                 self._refresh_public_shell()
-            self._write_catalog(self._valid_active_records(), ())
+                self._write_catalog(self._valid_active_records(), ())
 
     def request_stop(self) -> None:
         self._stop_event.set()

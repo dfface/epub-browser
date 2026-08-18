@@ -118,6 +118,41 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual([book["hash"] for book in metadata], [original.book_id])
         manager.shutdown()
 
+    def test_delete_between_validation_and_commit_cannot_reactivate_book(self):
+        manager = self._manager()
+        validated = threading.Event()
+        release_commit = threading.Event()
+        original_validate = manager._validate_converted_book
+
+        def pause_after_validation(converted):
+            original_validate(converted)
+            validated.set()
+            release_commit.wait(timeout=5)
+
+        manager._validate_converted_book = pause_after_validation
+        result = []
+        reconcile_thread = threading.Thread(
+            target=lambda: result.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(validated.wait(timeout=2))
+            self.source.unlink()
+            manager.mark_deleted(self.source)
+        finally:
+            release_commit.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(result[0].active_books, ())
+        self.assertEqual(self.store.active_books(), ())
+        metadata = json.loads(
+            (manager.public_dir / "book-metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(metadata, [])
+        manager.shutdown()
+
     def test_generated_cache_bootstraps_server_mode(self):
         manager = self._manager()
 
