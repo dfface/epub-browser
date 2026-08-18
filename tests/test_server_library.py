@@ -94,6 +94,30 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertTrue(manager.staging_dir.is_dir())
         manager.shutdown()
 
+    def test_interrupted_discovery_does_not_mark_unscanned_books_missing(self):
+        manager = self._manager()
+        original = manager.reconcile().active_books[0]
+        real_walk = os.walk
+
+        def interrupted_walk(*args, **kwargs):
+            for item in real_walk(*args, **kwargs):
+                manager.request_stop()
+                yield item
+
+        with mock.patch(
+            "epub_browser.server_library.os.walk",
+            side_effect=interrupted_walk,
+        ):
+            summary = manager.reconcile()
+
+        self.assertEqual([record.book_id for record in summary.active_books], [original.book_id])
+        self.assertEqual(self.store.active_books()[0].book_id, original.book_id)
+        metadata = json.loads(
+            (manager.public_dir / "book-metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual([book["hash"] for book in metadata], [original.book_id])
+        manager.shutdown()
+
     def test_generated_cache_bootstraps_server_mode(self):
         manager = self._manager()
 

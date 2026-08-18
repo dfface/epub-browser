@@ -134,7 +134,24 @@ class ServerLibraryManager:
     def reconcile(self) -> ReconcileSummary:
         self._notify_callback(self.on_reconcile_started)
         with self._reconcile_lock:
-            discovered = self._discover_sources()
+            try:
+                discovered = self._discover_sources()
+            except _ConversionCancelled:
+                return ReconcileSummary(
+                    converted=0,
+                    reused=0,
+                    removed=0,
+                    failures=(),
+                    active_books=self._valid_active_records(),
+                )
+            if self._stop_event.is_set():
+                return ReconcileSummary(
+                    converted=0,
+                    reused=0,
+                    removed=0,
+                    failures=(),
+                    active_books=self._valid_active_records(),
+                )
             discovered_set = {str(path) for path in discovered}
             removed = 0
             for record in self.state_store.active_books():
@@ -341,7 +358,7 @@ class ServerLibraryManager:
         discovered = set()
         for source in self.sources:
             if self._stop_event.is_set():
-                break
+                raise _ConversionCancelled("Server is stopping")
             if source.is_file():
                 if source.suffix.lower() == ".epub":
                     discovered.add(source)
@@ -350,7 +367,7 @@ class ServerLibraryManager:
                 continue
             for root, directories, files in os.walk(source, followlinks=False):
                 if self._stop_event.is_set():
-                    break
+                    raise _ConversionCancelled("Server is stopping")
                 root_path = Path(root)
                 directories[:] = [
                     name
@@ -370,6 +387,8 @@ class ServerLibraryManager:
                         continue
                     if resolved.is_file():
                         discovered.add(resolved)
+        if self._stop_event.is_set():
+            raise _ConversionCancelled("Server is stopping")
         return tuple(sorted(discovered, key=str))
 
     def _legacy_id_matches(self, discovered: Sequence[Path]) -> dict[Path, str]:
