@@ -32,11 +32,15 @@ class EPUBProcessor:
         book_id=None,
         urls=None,
         reporter=None,
+        deployment_mode="ssg",
     ):
         self.epub_path = os.fspath(epub_path)
         self.output_dir = output_dir
         self.urls = urls or SiteURLs()
         self.reporter = reporter or Reporter(False)
+        if deployment_mode not in {"ssg", "server"}:
+            raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
+        self.deployment_mode = deployment_mode
         self._caller_supplied_book_id = book_id is not None
         self.book_hash = book_id or base64.urlsafe_b64encode(
             hashlib.md5(self.epub_path.encode('utf-8')).digest()
@@ -795,6 +799,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 </html>"""
         index_html = rewrite_asset_urls(index_html, self.asset_manifest)
+        index_html = self._inject_deployment_mode(index_html)
         index_html = rewrite_root_urls(index_html, self.urls)
         # kindle 支持，不能压缩 css 和 js
         index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
@@ -1636,11 +1641,22 @@ document.addEventListener('DOMContentLoaded', function() {
 </html>
 """
         chapter_html = rewrite_asset_urls(chapter_html, self.asset_manifest)
+        chapter_html = self._inject_deployment_mode(chapter_html)
         chapter_html = rewrite_root_urls(chapter_html, self.urls)
         # kindle 支持，不能压缩 css 和 js
         # 部分 xhtml 书籍压缩之后会丢失标签，说明压缩算法可能存在问题
         # chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)
         return chapter_html
+
+    def _inject_deployment_mode(self, page_html):
+        marker = '<script>window.EpubBrowserI18n.init();</script>'
+        bootstrap = (
+            marker
+            + '<script>window.EpubBrowserMode='
+            + json.dumps(self.deployment_mode)
+            + '</script>'
+        )
+        return page_html.replace(marker, bootstrap, 1)
     
     def copy_resources(self):
         """复制资源文件"""

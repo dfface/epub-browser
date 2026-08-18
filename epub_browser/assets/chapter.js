@@ -1340,7 +1340,7 @@ function initScript() {
     wrapAllElements('img', 'div');
 
     var readingProgressReporter = null;
-    if (!isKindleMode() && window.EpubReadingProgress) {
+    if (!isKindleMode() && window.EpubReadingProgress && window.EpubReadingProgress.isServerMode()) {
         readingProgressReporter = new window.EpubReadingProgress.ChapterReporter(function(index, keepalive) {
             return window.EpubReadingProgress.request(
                 'PUT', '/api/reading-progress/' + encodeURIComponent(book_hash), index, keepalive

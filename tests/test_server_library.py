@@ -49,6 +49,25 @@ class ServerLibraryManagerTests(unittest.TestCase):
         converter.assert_not_called()
         manager.shutdown()
 
+    def test_generated_cache_bootstraps_server_mode(self):
+        manager = self._manager()
+
+        record = manager.reconcile().active_books[0]
+        library_html = (manager.public_dir / "index.html").read_text(encoding="utf-8")
+        book_html = (
+            manager.public_dir / "book" / record.book_id / "index.html"
+        ).read_text(encoding="utf-8")
+        chapter_html = (
+            manager.public_dir / "book" / record.book_id / "chapter_0.html"
+        ).read_text(encoding="utf-8")
+
+        for html in (library_html, book_html, chapter_html):
+            self.assertRegex(
+                html,
+                r"window\.EpubBrowserMode=(?:[\"'`])server(?:[\"'`])",
+            )
+        manager.shutdown()
+
     def test_cache_deletion_rebuilds_without_changing_book_id(self):
         manager = self._manager()
         original = manager.reconcile().active_books[0]

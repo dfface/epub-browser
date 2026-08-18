@@ -49,6 +49,24 @@ class SitePublicationTests(unittest.TestCase):
             html,
             r"window\.EpubBrowserBasePath=(?:[\"'`])/reader/(?:[\"'`])",
         )
+        self.assertRegex(html, r"window\.EpubBrowserMode=(?:[\"'`])ssg(?:[\"'`])")
+
+    def test_server_library_shell_bootstraps_server_data_clients(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = AssetPublisher(Path("epub_browser/assets"), root).publish()
+
+            publish_library_shell(
+                root,
+                (),
+                assets,
+                SiteURLs(),
+                deployment_mode="server",
+            )
+
+            html = (root / "index.html").read_text(encoding="utf-8")
+
+        self.assertRegex(html, r"window\.EpubBrowserMode=(?:[\"'`])server(?:[\"'`])")
 
     def test_publish_library_shell_atomically_replaces_both_outputs(self):
         with tempfile.TemporaryDirectory() as directory:

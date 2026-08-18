@@ -328,6 +328,7 @@ class ServerLibraryManager:
             book_id=plan.record.book_id,
             urls=self.urls,
             reporter=self.reporter,
+            deployment_mode="server",
         )
         try:
             converted: ConvertedBook = processor.convert()
@@ -441,6 +442,7 @@ class ServerLibraryManager:
             tuple(books),
             self._assets,
             self.urls,
+            deployment_mode="server",
         )
 
     def _write_catalog(

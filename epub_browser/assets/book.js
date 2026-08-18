@@ -120,7 +120,7 @@ function initScript() {
     var readingProgressLoadVersion = 0;
 
     function loadReadingProgress() {
-        if (isKindleMode() || !window.EpubReadingProgress) return;
+        if (isKindleMode() || !window.EpubReadingProgress || !window.EpubReadingProgress.isServerMode()) return;
         var version = ++readingProgressLoadVersion;
         window.EpubReadingProgress.request('GET', '/api/reading-progress/' + encodeURIComponent(book_hash))
             .then(function(progress) {
@@ -187,6 +187,10 @@ function initScript() {
 
                 if (!window.EpubReadingProgress) {
                     reportClearFailure(null);
+                    return;
+                }
+                if (!window.EpubReadingProgress.isServerMode()) {
+                    clearLocalProgress();
                     return;
                 }
                 window.EpubReadingProgress.request(

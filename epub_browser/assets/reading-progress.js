@@ -114,6 +114,7 @@
   }
 
   function request(method, url, chapterIndex, keepalive, includeError) {
+    if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
     var options = { method: method };
     if (keepalive) options.keepalive = true;
     var username = getUsername();
@@ -149,6 +150,7 @@
     showProgressBar: showProgressBar,
     progressBarClass: progressBarClass,
     getUsername: getUsername,
+    isServerMode: function() { return root.EpubBrowserMode === 'server'; },
     request: request
   };
 });

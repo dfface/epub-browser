@@ -126,7 +126,9 @@ test('progress-bar preference defaults to visible and hides only its fixed conta
 
 test('reading progress requests persist only a chapter index', async () => {
   const originalFetch = global.fetch;
+  const originalMode = global.EpubBrowserMode;
   let received;
+  global.EpubBrowserMode = 'server';
   global.fetch = (url, options) => {
     received = { url, options };
     return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ chapter_index: 5 }) });
@@ -134,6 +136,7 @@ test('reading progress requests persist only a chapter index', async () => {
 
   const result = await Progress.request('PUT', '/api/reading-progress/book', 5, true);
   global.fetch = originalFetch;
+  global.EpubBrowserMode = originalMode;
 
   assert.deepEqual(result, { chapter_index: 5 });
   assert.equal(received.url, '/api/reading-progress/book');
@@ -144,7 +147,9 @@ test('reading progress requests persist only a chapter index', async () => {
 test('reading progress requests identify the signed-in sync user', async () => {
   const originalFetch = global.fetch;
   const originalLocalStorage = global.localStorage;
+  const originalMode = global.EpubBrowserMode;
   let received;
+  global.EpubBrowserMode = 'server';
   global.localStorage = { getItem: key => key === 'epub_browser_username' ? 'alice' : null };
   global.fetch = (url, options) => {
     received = { url, options };
@@ -154,12 +159,15 @@ test('reading progress requests identify the signed-in sync user', async () => {
   await Progress.request('GET', '/api/reading-progress/book');
   global.fetch = originalFetch;
   global.localStorage = originalLocalStorage;
+  global.EpubBrowserMode = originalMode;
 
   assert.equal(received.options.headers['X-Username'], 'alice');
 });
 
 test('detailed reading progress requests preserve stable server error codes', async () => {
   const originalFetch = global.fetch;
+  const originalMode = global.EpubBrowserMode;
+  global.EpubBrowserMode = 'server';
   global.fetch = () => Promise.resolve({
     ok: false,
     status: 503,
@@ -168,6 +176,22 @@ test('detailed reading progress requests preserve stable server error codes', as
 
   const result = await Progress.request('DELETE', '/api/reading-progress/book', null, true, true);
   global.fetch = originalFetch;
+  global.EpubBrowserMode = originalMode;
 
   assert.deepEqual(result, { error: { code: 'database_unavailable', message: 'Unavailable' } });
+});
+
+test('SSG reading progress never calls a server API', async () => {
+  const originalFetch = global.fetch;
+  const originalMode = global.EpubBrowserMode;
+  let calls = 0;
+  global.EpubBrowserMode = 'ssg';
+  global.fetch = () => { calls += 1; throw new Error('must not fetch'); };
+
+  const result = await Progress.request('PUT', '/api/reading-progress/book', 5);
+
+  global.fetch = originalFetch;
+  global.EpubBrowserMode = originalMode;
+  assert.equal(result, null);
+  assert.equal(calls, 0);
 });

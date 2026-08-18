@@ -27,6 +27,7 @@ def _render_library_html(
     books: Sequence[LibraryBook],
     assets: PublishedAssets,
     urls: SiteURLs,
+    deployment_mode: str,
 ) -> str:
     self = SimpleNamespace(
         books={
@@ -310,7 +311,8 @@ if (isKindle) {
     library_html = library_html.replace(
         '<script>window.EpubBrowserI18n.init();</script>',
         '<script>window.EpubBrowserI18n.init();</script>'
-        f'<script>window.EpubBrowserBasePath={json.dumps(urls.base_path)}</script>',
+        f'<script>window.EpubBrowserBasePath={json.dumps(urls.base_path)};'
+        f'window.EpubBrowserMode={json.dumps(deployment_mode)}</script>',
         1,
     )
     return minify_html.minify(library_html, minify_css=True, minify_js=True)
@@ -338,7 +340,10 @@ def publish_library_shell(
     books: Sequence[LibraryBook],
     assets: PublishedAssets,
     urls: SiteURLs,
+    deployment_mode: str = "ssg",
 ) -> None:
+    if deployment_mode not in {"ssg", "server"}:
+        raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
     root = Path(output_dir)
     ordered_books = tuple(sorted(books, key=lambda book: book.book_id))
     metadata = [
@@ -352,7 +357,7 @@ def publish_library_shell(
         }
         for book in ordered_books
     ]
-    html = _render_library_html(ordered_books, assets, urls)
+    html = _render_library_html(ordered_books, assets, urls, deployment_mode)
     _atomic_write_text(root / "index.html", html)
     _atomic_write_text(
         root / "book-metadata.json",

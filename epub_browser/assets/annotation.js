@@ -553,6 +553,10 @@
         // 检测后端是否可用（纯健康检查，不耦合登录）
         checkHealth: function() {
             var self = this;
+            if (window.EpubBrowserMode !== 'server') {
+                self.available = false;
+                return Promise.resolve({ available: false });
+            }
             return new Promise(function(resolve) {
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', self.baseUrl + '/health', true);
@@ -740,6 +744,10 @@
         init: function() {
             var self = this;
             return IDBStorage.init().then(function() {
+                if (window.EpubBrowserMode !== 'server') {
+                    self.currentType = 'idb';
+                    return;
+                }
                 // 从 localStorage 加载 storageType
                 var storageType = Utils.getStorage('annotation_storage_type');
                 if (storageType) {
@@ -787,6 +795,9 @@
         
         // 检测后端是否可用
         isBackendAvailable: function() {
+            if (window.EpubBrowserMode !== 'server') {
+                return Promise.resolve({ available: false });
+            }
             return BackendStorage.checkHealth();
         },
         
@@ -841,7 +852,11 @@
             
             if (enabled !== null) this.enabled = enabled === 'true';
             if (color) this.defaultColor = color;
-            if (storageType) this.storageType = storageType;
+            if (window.EpubBrowserMode !== 'server') {
+                this.storageType = 'idb';
+            } else if (storageType) {
+                this.storageType = storageType;
+            }
             if (colorOrder) {
                 try { this.colorOrder = JSON.parse(colorOrder); } catch (e) { this.colorOrder = []; }
             }

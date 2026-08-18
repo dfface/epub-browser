@@ -263,9 +263,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("if (!result || result.error)", script)
         self.assertIn("book.clearReadingProgressFailed", script)
         clear_handler = script.index("window.confirm(bookT('book.clearReadingProgressConfirm'))")
+        server_request = script.index("window.EpubReadingProgress.request(", clear_handler)
+        self.assertIn("if (!window.EpubReadingProgress.isServerMode())", script)
         self.assertLess(
-            script.index("window.EpubReadingProgress.request(", clear_handler),
-            script.index("clearLocalProgress();", clear_handler),
+            server_request,
+            script.index("clearLocalProgress();", server_request),
         )
         self.assertNotIn("matchMedia", script)
         self.assertIn(".continue-reading-control.has-reading-progress:hover #continueReadingBtn", styles)

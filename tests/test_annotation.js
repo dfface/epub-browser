@@ -3,18 +3,22 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function loadBackendStorage(response) {
+function loadBackendStorage(response, mode = 'server') {
   function FakeXMLHttpRequest() {
     this.status = response.status;
     this.responseText = response.body;
   }
   FakeXMLHttpRequest.prototype.open = function() {};
   FakeXMLHttpRequest.prototype.setRequestHeader = function() {};
-  FakeXMLHttpRequest.prototype.send = function() { this.onload(); };
+  FakeXMLHttpRequest.prototype.send = function() {
+    response.sendCount = (response.sendCount || 0) + 1;
+    this.onload();
+  };
 
   const localStorage = { getItem: () => '', setItem: () => {} };
   const window = {
     __EPUB_BROWSER_TESTING__: true,
+    EpubBrowserMode: mode,
     navigator: { userAgent: '' },
     localStorage,
     document: { cookie: '' },
@@ -42,6 +46,16 @@ function loadBackendStorage(response) {
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/annotation.js', 'utf8'), context);
   return window.AnnotationBackendStorage;
 }
+
+test('SSG annotations do not probe the server API', async () => {
+  const response = { status: 200, body: JSON.stringify({ status: 'ok' }) };
+  const storage = loadBackendStorage(response, 'ssg');
+
+  const result = await storage.checkHealth();
+
+  assert.equal(result.available, false);
+  assert.equal(response.sendCount || 0, 0);
+});
 
 test('maps a non-2xx annotation API payload code to localized, non-server error text', async () => {
   const storage = loadBackendStorage({
