@@ -1,7 +1,8 @@
 import threading
 import unittest
+from pathlib import Path
 
-from watchdog.events import FileCreatedEvent
+from watchdog.events import FileCreatedEvent, FileDeletedEvent, FileMovedEvent
 
 from epub_browser.watch import EpubFileHandler
 
@@ -20,6 +21,31 @@ class ImmediateFailureLibrary:
 
 
 class EpubFileHandlerTests(unittest.TestCase):
+    def test_manager_receives_normalized_create_delete_and_move_operations(self):
+        class Manager:
+            def __init__(self):
+                self.queued = []
+                self.deleted = []
+
+            def queue_path(self, path):
+                self.queued.append(Path(path))
+
+            def mark_deleted(self, path):
+                self.deleted.append(Path(path))
+
+        manager = Manager()
+        handler = EpubFileHandler(manager)
+
+        handler.on_created(FileCreatedEvent("/tmp/created.epub"))
+        handler.on_deleted(FileDeletedEvent("/tmp/deleted.epub"))
+        handler.on_moved(FileMovedEvent("/tmp/old.epub", "/tmp/new.epub"))
+        handler.shutdown()
+
+        self.assertIn(Path("/tmp/created.epub"), manager.queued)
+        self.assertIn(Path("/tmp/new.epub"), manager.queued)
+        self.assertIn(Path("/tmp/deleted.epub"), manager.deleted)
+        self.assertIn(Path("/tmp/old.epub"), manager.deleted)
+
     def test_fast_task_completion_does_not_deadlock_event_dispatch(self):
         library = ImmediateFailureLibrary()
         handler = EpubFileHandler(library)

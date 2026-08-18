@@ -1,78 +1,51 @@
 import os
-import sys
-import time
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from datetime import datetime
-from watchdog.observers import Observer
+
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+from .reporting import Reporter
+
 
 class EpubFileHandler(FileSystemEventHandler):
-    """处理 .epub 文件变化的自定义事件处理器"""
+    """Normalize watchdog events into ServerLibraryManager operations."""
 
-    def __init__(self, library):
+    def __init__(self, manager, reporter=None):
         super().__init__()
-        self.library = library
-        # 延迟初始化线程池，避免序列化问题
+        self.manager = manager
+        self.reporter = reporter or Reporter(False)
         self._executor = None
-        self._pending_tasks = {}
-        self._lock = None
-        self._library_lock = None
-    
+        self._pending_tasks_dict = {}
+        self._lock = threading.Lock()
+
     @property
     def executor(self):
-        """延迟初始化线程池执行器"""
         if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=5)
+            self._executor = ThreadPoolExecutor(
+                max_workers=5,
+                thread_name_prefix="epub_watch_events",
+            )
         return self._executor
-    
+
     @property
     def lock(self):
-        """延迟初始化锁"""
-        if self._lock is None:
-            self._lock = threading.Lock()
         return self._lock
 
     @property
-    def library_lock(self):
-        """延迟初始化锁"""
-        if self._library_lock is None:
-            self._library_lock = threading.Lock()
-        return self._library_lock
-    
-    @property
     def pending_tasks(self):
-        """延迟初始化待处理任务字典"""
-        if not hasattr(self, '_pending_tasks_dict'):
-            self._pending_tasks_dict = {}
         return self._pending_tasks_dict
-    
-    def has_hidden_component(self, path_str):
-        """检查路径中间是否有以.开头的隐藏组件"""
-        path = Path(path_str).resolve()  # 转换为绝对路径并解析符号链接
-        parts = path.parts
-        
-        # 跳过根目录（如果是绝对路径）和最后一个组件（如果是文件）
-        # 只检查路径中间的目录组件
-        for part in parts[1:]:  # parts[0] 通常是根目录如 '/' 或 'C:\\'
-            if part.startswith('.'):
-                return True
-        return False
-    
+
     def _submit_task(self, task_id, func, *args, **kwargs):
-        """提交任务到线程池并跟踪状态"""
         with self.lock:
-            if task_id in self.pending_tasks:
-                # 如果相同任务已经在执行，取消它
-                self.pending_tasks[task_id].cancel()
-            
+            previous = self.pending_tasks.get(task_id)
+            if previous is not None:
+                previous.cancel()
             future = self.executor.submit(func, *args, **kwargs)
             self.pending_tasks[task_id] = future
 
-        # A future may finish before add_done_callback() is called. In that case
-        # concurrent.futures invokes the callback synchronously, so registering
-        # it while holding self.lock would deadlock the watchdog dispatch thread.
         def cleanup(completed_future):
             with self.lock:
                 if self.pending_tasks.get(task_id) is completed_future:
@@ -80,299 +53,131 @@ class EpubFileHandler(FileSystemEventHandler):
 
         future.add_done_callback(cleanup)
         return future
-    
-    def _handle_created(self, src_path):
-        """处理文件创建的后台任务"""
-        with self.library_lock:
-            try:
-                print(f"[{str(datetime.now())}][Create] Processing EPUB file: {src_path}")
-                ok, book_info = self.library.add_book(src_path)
-                if ok:
-                    book_hash = book_info['hash']
-                    self.library.move_book(book_hash)
-                    self.library.create_library_home()
-                    print(f"[{str(datetime.now())}][Create] Added book({book_hash}): {book_info['title']}")
-            except Exception as e:
-                print(f"[{str(datetime.now())}][Create] Error processing {src_path}: {e}")
-            finally:
-                sys.stdout.flush()
-                sys.stderr.flush()
-    
+
+    @staticmethod
+    def _is_epub(path):
+        return str(path).lower().endswith(".epub")
+
+    @staticmethod
+    def _is_hidden(path):
+        return Path(path).name.startswith(".")
+
+    def _queue_path(self, path):
+        if hasattr(self.manager, "queue_path"):
+            return self.manager.queue_path(Path(path))
+        # Compatibility for callers still using the old in-memory facade.
+        if hasattr(self.manager, "add_book"):
+            return self.manager.add_book(os.fspath(path))
+        return None
+
+    def _mark_deleted(self, path):
+        if hasattr(self.manager, "mark_deleted"):
+            return self.manager.mark_deleted(Path(path))
+        return None
+
     def on_created(self, event):
-        if not event.is_directory and event.src_path.endswith('.epub'):
-            # if os.path.basename(event.src_path).startswith(".") or self.has_hidden_component(event.src_path):
-            #     return
-            src_path = event.src_path
-            print(f"[{str(datetime.now())}][Create] EPUB file detected: {src_path}")
-            if (os.path.basename(src_path).startswith(".")) or (self.has_hidden_component(src_path)):
-                print(f"[{str(datetime.now())}][Create] Hidden file will not be processed: {src_path}")
-                return
-            # 提交到线程池执行
-            task_id = f"create_{src_path}"
-            self._submit_task(task_id, self._handle_created, src_path)
-    
-    def _handle_modified(self, src_path):
-        """处理文件修改的后台任务"""
-        with self.library_lock:
-            try:
-                print(f"[{str(datetime.now())}][Modify] Processing EPUB file: {src_path}")
-                ok, book_info = self.library.add_book(src_path)
-                if ok:
-                    book_hash = book_info['hash']
-                    self.library.move_book(book_hash)
-                    self.library.create_library_home()
-                    print(f"[{str(datetime.now())}][Modify] Updated book({book_hash}): {book_info['title']}")
-            except Exception as e:
-                print(f"[{str(datetime.now())}][Modify] Error processing {src_path}: {e}")
-            finally:
-                sys.stdout.flush()
-                sys.stderr.flush()
-    
+        if event.is_directory or not self._is_epub(event.src_path):
+            return
+        if self._is_hidden(event.src_path):
+            return
+        self._submit_task(
+            f"queue:{event.src_path}",
+            self._queue_path,
+            event.src_path,
+        )
+
     def on_modified(self, event):
-        if not event.is_directory and event.src_path.endswith('.epub'):
-            # if os.path.basename(event.src_path).startswith(".") or self.has_hidden_component(event.src_path):
-            #     return
-            src_path = event.src_path
-            print(f"[{str(datetime.now())}][Modify] EPUB file detected: {src_path}")
-            if (os.path.basename(src_path).startswith(".")) or (self.has_hidden_component(src_path)):
-                print(f"[{str(datetime.now())}][Modify] Hidden file will not be processed: {src_path}")
-                return
-            # 提交到线程池执行
-            task_id = f"modify_{src_path}"
-            self._submit_task(task_id, self._handle_modified, src_path)
-    
-    def _handle_deleted(self, src_path, book_hash, book_info):
-        """处理文件删除的后台任务"""
-        with self.library_lock:
-            try:
-                print(f"[{str(datetime.now())}][Delete] Processing deletion: {src_path}")
-                self.library.remove_book(book_hash)
-                self.library.create_library_home()
-                print(f"[{str(datetime.now())}][Delete] Deleted book({book_hash}): {book_info['title']}")
-            except Exception as e:
-                print(f"[{str(datetime.now())}][Delete] Error processing {src_path}: {e}")
-            finally:
-                sys.stdout.flush()
-                sys.stderr.flush()
-    
+        self.on_created(event)
+
     def on_deleted(self, event):
-        if not event.is_directory and event.src_path.endswith('.epub'):
-            # if os.path.basename(event.src_path).startswith(".") or self.has_hidden_component(event.src_path):
-            #     return
-            print(f"[{str(datetime.now())}][Delete] EPUB file detected: {event.src_path}")
-            if event.src_path in self.library.file2hash:
-                book_hash = self.library.file2hash[event.src_path]
-                if book_hash in self.library.books:
-                    book_info = self.library.books[book_hash]
-                    # 提交到线程池执行
-                    task_id = f"delete_{event.src_path}"
-                    self._submit_task(task_id, self._handle_deleted, event.src_path, book_hash, book_info)
-    
-    def _handle_move_source(self, src_path, book_hash, book_info):
-        """处理移动操作源文件的后台任务"""
-        with self.library_lock:
-            try:
-                print(f"[{str(datetime.now())}][Move] Processing source deletion: {src_path}")
-                self.library.remove_book(book_hash)
-                self.library.create_library_home()
-                print(f"[{str(datetime.now())}][Move] Deleted book({book_hash}): {book_info['title']}")
-            except Exception as e:
-                print(f"[{str(datetime.now())}][Move] Error processing source {src_path}: {e}")
-            finally:
-                sys.stdout.flush()
-                sys.stderr.flush()
-    
-    def _handle_move_destination(self, dest_path):
-        """处理移动操作目标文件的后台任务"""
-        try:
-            # Wait for the file to stabilize (rclone/WebDAV uploads may need extra time)
-            print(f"[{str(datetime.now())}][Move] Waiting for file to stabilize: {dest_path}")
-            stable = False
-            last_size = -1
-            for attempt in range(10):  # up to ~5 seconds of stabilization
-                if not os.path.exists(dest_path):
-                    print(f"[{str(datetime.now())}][Move] File not found, waiting: {dest_path}")
-                    time.sleep(0.5)
-                    continue
-                current_size = os.path.getsize(dest_path)
-                if current_size == last_size and current_size > 0:
-                    stable = True
-                    break
-                last_size = current_size
-                time.sleep(0.5)
-            
-            if not stable:
-                print(f"[{str(datetime.now())}][Move] File did not stabilize, skipping: {dest_path}")
-                return
-            
-            print(f"[{str(datetime.now())}][Move] File stabilized ({last_size} bytes), processing: {dest_path}")
-            with self.library_lock:
-                ok, book_info = self.library.add_book(dest_path)
-                if ok:
-                    book_hash = book_info['hash']
-                    self.library.move_book(book_hash)
-                    self.library.create_library_home()
-                    print(f"[{str(datetime.now())}][Move] Added book({book_hash}): {book_info['title']}")
-        except Exception as e:
-            print(f"[{str(datetime.now())}][Move] Error processing destination {dest_path}: {e}")
-        finally:
-            sys.stdout.flush()
-            sys.stderr.flush()
-    
+        if event.is_directory or not self._is_epub(event.src_path):
+            return
+        self._submit_task(
+            f"delete:{event.src_path}",
+            self._mark_deleted,
+            event.src_path,
+        )
+
     def on_moved(self, event):
         if event.is_directory:
             return
+        if self._is_epub(event.src_path):
+            self._submit_task(
+                f"delete:{event.src_path}",
+                self._mark_deleted,
+                event.src_path,
+            )
+        if self._is_epub(event.dest_path) and not self._is_hidden(event.dest_path):
+            self._submit_task(
+                f"queue:{event.dest_path}",
+                self._queue_path,
+                event.dest_path,
+            )
 
-        dest_is_epub = event.dest_path.endswith('.epub')
-        src_is_epub = event.src_path.endswith('.epub')
-
-        # Handle .partial → .epub rename (common with rclone/WebDAV uploads)
-        if not src_is_epub and dest_is_epub:
-            # e.g. file.epub..partial → file.epub
-            if not os.path.basename(event.dest_path).startswith(".") and not self.has_hidden_component(event.dest_path):
-                print(f"[{str(datetime.now())}][Move] EPUB file detected (partial rename): from {event.src_path} to {event.dest_path}")
-                task_id = f"move_dest_{event.dest_path}"
-                self._submit_task(task_id, self._handle_move_destination, event.dest_path)
-            return
-
-        if not src_is_epub:
-            return
-
-        print(f"[{str(datetime.now())}][Move] EPUB file detected: from {event.src_path} to {event.dest_path}")
-        # Handle source deletion (if existed)
-        if event.src_path in self.library.file2hash:
-            book_hash = self.library.file2hash[event.src_path]
-            if book_hash in self.library.books:
-                book_info = self.library.books[book_hash]
-                task_id = f"move_src_{event.src_path}"
-                self._submit_task(task_id, self._handle_move_source, event.src_path, book_hash, book_info)
-
-        # Handle destination addition
-        if dest_is_epub:
-            if not os.path.basename(event.dest_path).startswith(".") and not self.has_hidden_component(event.dest_path):
-                task_id = f"move_dest_{event.dest_path}"
-                self._submit_task(task_id, self._handle_move_destination, event.dest_path)
-    
     def shutdown(self):
-        """关闭线程池"""
         if self._executor is not None:
             self._executor.shutdown(wait=True)
-        sys.stdout.flush()
-        sys.stderr.flush()
 
 
 class EPUBWatcher:
-    def __init__(self, paths, library):
-        self.paths = paths
-        self.library = library
-    
-    def normalize_path(self, path):
-        """规范化路径，确保使用绝对路径且没有多余的斜杠"""
+    def __init__(self, paths, manager, reporter=None):
+        self.paths = tuple(paths)
+        self.manager = manager
+        self.reporter = reporter or Reporter(False)
+        self.observer = None
+
+    @staticmethod
+    def normalize_path(path):
         return os.path.abspath(os.path.normpath(path))
 
-    def is_subpath(self, child_path, parent_path):
-        """检查一个路径是否是另一个路径的子路径"""
-        child = self.normalize_path(child_path)
-        parent = self.normalize_path(parent_path)
-        
-        # 如果两个路径相同，返回 True
-        if child == parent:
-            return True
-        
-        # 检查子路径
+    @classmethod
+    def is_subpath(cls, child_path, parent_path):
+        child = cls.normalize_path(child_path)
+        parent = cls.normalize_path(parent_path)
         try:
-            # 使用 commonpath 方法检查路径关系
-            common = os.path.commonpath([child, parent])
-            return common == parent
+            return os.path.commonpath([child, parent]) == parent
         except ValueError:
-            # 在不同驱动器上时可能会出错
             return False
-        
-    def remove_nested_paths(self):
-        """移除嵌套路径，只保留最顶层的父目录"""
-        # 先规范化所有路径
-        normalized_paths = [self.normalize_path(path) for path in self.paths]
-        
-        # 按路径长度排序（短路径在前）
-        sorted_paths = sorted(normalized_paths, key=len)
-        
-        # 找出所有非嵌套路径
-        unique_paths = []
-        for path in sorted_paths:
-            # 检查当前路径是否已经是某个已选路径的子目录
-            is_nested = False
-            for parent in unique_paths:
-                if self.is_subpath(path, parent):
-                    is_nested = True
-                    break
-            
-            # 如果不是嵌套路径，则添加到结果中
-            if not is_nested:
-                unique_paths.append(path)
-        
-        return unique_paths
 
-    def has_no_hidden_component(self, path_str):
-        """检查路径中间是否有以.开头的隐藏组件"""
-        path = Path(path_str).resolve()  # 转换为绝对路径并解析符号链接
-        parts = path.parts
-        
-        # 跳过根目录（如果是绝对路径）和最后一个组件（如果是文件）
-        # 只检查路径中间的目录组件
-        for part in parts[1:]:  # parts[0] 通常是根目录如 '/' 或 'C:\\'
-            if part.startswith('.'):
-                return False
-        return True
+    def remove_nested_paths(self, paths=None):
+        normalized = sorted(
+            {self.normalize_path(path) for path in (paths or self.paths)},
+            key=lambda value: (len(value), value),
+        )
+        selected = []
+        for path in normalized:
+            if not any(self.is_subpath(path, parent) for parent in selected):
+                selected.append(path)
+        return selected
 
     def get_monitor_path(self):
-        # 收集需要监控的文件/目录
-        valid_path = []
-        for filename in self.paths:
-            if os.path.isfile(filename):
-                # 如果输入的是文件，则监控其所在目录
-                watch_path = os.path.dirname(filename)
-                valid_path.append(watch_path)
-                continue
-            else:
-                if os.path.exists(filename):
-                    valid_path.append(filename)
-                    continue
-        # 处理 valid_path 是否有嵌套目录或重复目录
-        valid_path = list(set(valid_path))
-        valid_path = self.remove_nested_paths()
-        valid_path = list(filter(self.has_no_hidden_component, valid_path))
-        return valid_path
+        candidates = []
+        for configured in self.paths:
+            path = Path(configured).expanduser()
+            if path.is_file():
+                candidates.append(path.parent)
+            elif path.is_dir():
+                candidates.append(path)
+        return self.remove_nested_paths(candidates)
 
     def watch(self, stop_event=None):
         valid_paths = self.get_monitor_path()
-        self.valid_paths = valid_paths
-        if len(valid_paths) == 0:
-            print("No valid path to monitor.")
+        if not valid_paths:
+            self.reporter.detail("No valid path to monitor")
             return None
-        # 创建观察者和事件处理器
-        event_handler = EpubFileHandler(self.library)
+        event_handler = EpubFileHandler(self.manager, reporter=self.reporter)
         self.observer = Observer()
         for path in valid_paths:
             self.observer.schedule(event_handler, path, recursive=True)
-            print(f"Monitoring has been added: {path}")
-
-        # 启动监控
+            self.reporter.detail(f"Monitoring EPUB source: {path}")
         self.observer.start()
-        print(f"Start monitoring changes to EPUB files ...")
-        
         try:
-            while True:
-                if stop_event is not None and stop_event.is_set():
-                    break
-                time.sleep(1)
+            while stop_event is None or not stop_event.is_set():
+                time.sleep(0.25)
         except KeyboardInterrupt:
             pass
         finally:
             self.observer.stop()
-            print("Monitoring has been stopped")
-            # 关闭线程池
             event_handler.shutdown()
-        
-        self.observer.join()
-
+            self.observer.join()
         return self.observer
