@@ -19,6 +19,7 @@ from .cli import SSGConfig, ServerConfig, format_legacy_migration_hint, parse_cl
 from .server import EPUBServer
 from .library import EPUBLibrary
 from .reporting import Reporter
+from .ssg import run_ssg
 from .watch import EPUBWatcher
 
 def start_watcher_process(filenames, library, stop_event, log_enabled=False):
@@ -200,10 +201,6 @@ def _run_existing_pipeline(config, reporter):
                     reporter.detail(f"Force terminating {process.name}")
                     process.terminate()
     return 0
-
-
-def run_ssg(config, reporter=None):
-    return _run_existing_pipeline(config, reporter or Reporter(config.log))
 
 
 def run_server(config, reporter=None):

@@ -307,6 +307,12 @@ if (isKindle) {
 </html>"""
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)
     library_html = rewrite_root_urls(library_html, urls)
+    library_html = library_html.replace(
+        '<script>window.EpubBrowserI18n.init();</script>',
+        '<script>window.EpubBrowserI18n.init();</script>'
+        f'<script>window.EpubBrowserBasePath={json.dumps(urls.base_path)}</script>',
+        1,
+    )
     return minify_html.minify(library_html, minify_css=True, minify_js=True)
 
 

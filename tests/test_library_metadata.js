@@ -81,7 +81,8 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
     this.status = 0;
     this.responseText = '';
   }
-  FakeXMLHttpRequest.prototype.open = function() {};
+  let requestedUrl = null;
+  FakeXMLHttpRequest.prototype.open = function(method, url) { requestedUrl = url; };
   FakeXMLHttpRequest.prototype.send = function() {
     this.readyState = 4;
     this.status = 200;
@@ -91,6 +92,7 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   const localStorage = { getItem() { return null; }, setItem() {} };
   const window = {
     navigator: { userAgent: 'Kindle' },
+    EpubBrowserBasePath: '/reader/',
     document,
     localStorage,
     addEventListener() {},
@@ -127,4 +129,5 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.equal(author.textContent, book.authors.join(' & '));
   assert.equal(tag.textContent, book.tags[0]);
   assert.equal(content.children.length, 3);
+  assert.match(requestedUrl, /^\/reader\/book-metadata\.json\?/);
 });

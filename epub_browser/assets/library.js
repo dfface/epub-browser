@@ -71,7 +71,8 @@ function initScript() {
     }
 
     function loadBookMetadata(callback) {
-        var metadataUrl = "/book-metadata.json?" + Date.now();
+        var basePath = window.EpubBrowserBasePath || "/";
+        var metadataUrl = basePath + "book-metadata.json?" + Date.now();
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', metadataUrl, true);

@@ -45,6 +45,10 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r"/reader/assets/immutable/library\.[0-9a-f]{12}\.js")
         self.assertNotIn("function addBasePath", html)
         self.assertIn("window.initScriptLibrary()", html)
+        self.assertRegex(
+            html,
+            r"window\.EpubBrowserBasePath=(?:[\"'`])/reader/(?:[\"'`])",
+        )
 
     def test_publish_library_shell_atomically_replaces_both_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
