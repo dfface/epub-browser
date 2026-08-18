@@ -186,6 +186,8 @@ class ServerLibraryManager:
                 ):
                     try:
                         with self._commit_lock:
+                            if self._stop_event.is_set():
+                                break
                             self._require_source_stat(source, stat)
                             record = self.state_store.resolve_book(
                                 source,
@@ -211,16 +213,21 @@ class ServerLibraryManager:
                     if self._stop_event.is_set():
                         break
                     with self._commit_lock:
+                        if self._stop_event.is_set():
+                            break
                         self._require_source_stat(source, stat)
-                        record = self.state_store.resolve_book(
-                            source,
-                            None if existing else metadata.epub_identifier,
-                            fingerprint,
-                            metadata,
-                            source_size=None if existing else stat.st_size,
-                            source_mtime_ns=None if existing else stat.st_mtime_ns,
-                            preferred_book_id=legacy_ids.get(source),
-                        )
+                        if existing:
+                            record = existing
+                        else:
+                            record = self.state_store.resolve_book(
+                                source,
+                                metadata.epub_identifier,
+                                fingerprint,
+                                metadata,
+                                source_size=stat.st_size,
+                                source_mtime_ns=stat.st_mtime_ns,
+                                preferred_book_id=legacy_ids.get(source),
+                            )
                 except Exception as error:
                     kept = bool(existing and self._cache_valid(existing))
                     failures.append(
@@ -237,14 +244,29 @@ class ServerLibraryManager:
                     record.source_fingerprint == fingerprint
                     and self._cache_valid(record)
                 ):
-                    record = self.state_store.resolve_book(
-                        source,
-                        metadata.epub_identifier,
-                        fingerprint,
-                        metadata,
-                        source_size=stat.st_size,
-                        source_mtime_ns=stat.st_mtime_ns,
-                    )
+                    try:
+                        with self._commit_lock:
+                            if self._stop_event.is_set():
+                                break
+                            self._require_source_stat(source, stat)
+                            record = self.state_store.resolve_book(
+                                source,
+                                metadata.epub_identifier,
+                                fingerprint,
+                                metadata,
+                                source_size=stat.st_size,
+                                source_mtime_ns=stat.st_mtime_ns,
+                            )
+                    except (OSError, _StaleSourceError) as error:
+                        failures.append(
+                            ConversionFailure(
+                                source,
+                                record.book_id,
+                                str(error),
+                                True,
+                            )
+                        )
+                        continue
                     reused_records.append(record)
                     continue
                 plans.append(

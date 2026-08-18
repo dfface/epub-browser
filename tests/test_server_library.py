@@ -153,6 +153,48 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(metadata, [])
         manager.shutdown()
 
+    def test_delete_during_identical_content_reuse_cannot_reactivate_book(self):
+        manager = self._manager()
+        manager.reconcile()
+        stat = self.source.stat()
+        os.utime(
+            self.source,
+            ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000),
+        )
+        reuse_checked = threading.Event()
+        release_reuse = threading.Event()
+        original_cache_valid = manager._cache_valid
+        cache_checks = 0
+
+        def pause_after_reuse_check(record):
+            nonlocal cache_checks
+            valid = original_cache_valid(record)
+            cache_checks += 1
+            if cache_checks == 2:
+                reuse_checked.set()
+                release_reuse.wait(timeout=5)
+            return valid
+
+        manager._cache_valid = pause_after_reuse_check
+        result = []
+        reconcile_thread = threading.Thread(
+            target=lambda: result.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(reuse_checked.wait(timeout=2))
+            self.source.unlink()
+            manager.mark_deleted(self.source)
+        finally:
+            release_reuse.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(result[0].active_books, ())
+        self.assertEqual(self.store.active_books(), ())
+        manager.shutdown()
+
     def test_generated_cache_bootstraps_server_mode(self):
         manager = self._manager()
 
