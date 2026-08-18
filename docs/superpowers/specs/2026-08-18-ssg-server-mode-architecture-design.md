@@ -28,6 +28,7 @@ The current CLI also describes static generation indirectly through `--no-server
 8. Preserve legacy command invocations through a thin compatibility adapter while documenting only the new commands.
 9. Make local-only network access the safe default.
 10. Update the Dockerfile, README, CLI help, upgrade guide, and release notes as part of the change.
+11. Preserve clean command-line progress output: without `--log`, routine diagnostics must not interrupt tqdm progress bars.
 
 ## Non-goals
 
@@ -470,6 +471,9 @@ This project does not add full authentication. Existing username semantics remai
 - Book IDs, resource paths, and `base-path` values are normalized and cannot create `..` traversal.
 - Source symlinks that escape a declared source root are not followed.
 - Log output must not include annotation contents, notes, or other private user data.
+- Without `--log`, routine conversion details, cache hits, watcher events, directory diagnostics, and request logs are silent. The CLI may still emit actionable errors, the one-time legacy migration hint, final command results, and tqdm progress itself.
+- Messages that must be emitted while a tqdm bar is active use a tqdm-compatible writer rather than raw `print`, so progress rendering remains intact.
+- With `--log`, verbose operational messages and Uvicorn informational logs are enabled through the same reporting boundary.
 
 Exit statuses are stable:
 
@@ -597,5 +601,6 @@ Each step must keep one execution path per mode. Compatibility code may translat
 - Current and older database layouts migrate automatically with integrity checks and backups.
 - Legacy commands enter the new implementation through a documented compatibility adapter.
 - Server listens only on localhost unless the user explicitly requests another host.
+- Running without `--log` does not interleave routine diagnostic output with tqdm progress bars.
 - Docker upgrades retain persistent data and use the new command syntax.
 - README, help output, upgrade documentation, Dockerfile, and release notes describe the same behavior.

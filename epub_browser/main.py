@@ -11,21 +11,23 @@ import threading
 import multiprocessing
 import signal
 from concurrent.futures import ThreadPoolExecutor
-import argparse
+from types import SimpleNamespace
 from tqdm import tqdm
 from watchdog.observers import Observer
 
+from .cli import SSGConfig, ServerConfig, format_legacy_migration_hint, parse_cli
 from .server import EPUBServer
 from .library import EPUBLibrary
+from .reporting import Reporter
 from .watch import EPUBWatcher
 
-def start_watcher_process(filenames, library, stop_event):
+def start_watcher_process(filenames, library, stop_event, log_enabled=False):
     """启动文件监控进程"""
     try:
         watcher = EPUBWatcher(filenames, library)
         watcher.watch(stop_event)
     except Exception as e:
-        print(f"Watcher process error: {e}")
+        Reporter(log_enabled).error(f"Watcher process error: {e}")
 
 def start_server_process(base_dir, book_count, port, no_browser, log_enabled, stop_event, sync_dir=None):
     """启动服务器进程"""
@@ -37,27 +39,30 @@ def start_server_process(base_dir, book_count, port, no_browser, log_enabled, st
             stop_event=stop_event
         )
     except Exception as e:
-        print(f"Server process error: {e}")
+        Reporter(log_enabled).error(f"Server process error: {e}")
 
-def main():
-    parser = argparse.ArgumentParser(description='EPUB to Web Converter - Multi-book Support')
-    parser.add_argument('filename', nargs='+', help='EPUB file path(s)')
-    parser.add_argument('--port', '-p', type=int, default=8000, help='Web server port (default: 8000)')
-    parser.add_argument('--no-browser', action='store_true', help='Do not automatically open browser')
-    parser.add_argument('--output-dir', '-o', help='Output directory for converted books')
-    parser.add_argument('--keep-files', action='store_true', help='Keep converted files after server stops. To enable direct deployment, please use the --no-server parameter.')
-    parser.add_argument('--log', action='store_true', help='Enable log messages')
-    parser.add_argument('--no-server', action='store_true', help='Do not start a server, just generate files which can be directly deployed on any web server such as Apache.')
-    parser.add_argument('--watch', '-w', action='store_true', help="Monitor all EPUB files in the directory specified by the user (or the directory where the EPUB file resides). When there are new additions or updates, automatically add them to the library.")
-    parser.add_argument('--sync-dir', help='Directory to store bookshelf sync data (default: same as work directory)')
-    
-    args = parser.parse_args()
+def _run_existing_pipeline(config, reporter):
+    is_ssg = isinstance(config, SSGConfig)
+    args = SimpleNamespace(
+        filename=[str(path) for path in config.sources],
+        port=8000 if is_ssg else config.port,
+        no_browser=True if is_ssg else config.no_browser,
+        output_dir=(str(config.output_dir) if is_ssg and config.output_dir else
+                    str(config.server_dir) if not is_ssg and config.server_dir else None),
+        keep_files=(True if is_ssg else bool(config.server_dir) or config.retain_legacy_temporary_dir),
+        log=config.log,
+        no_server=is_ssg,
+        watch=False if is_ssg else config.watch,
+        sync_dir=None if is_ssg else (
+            str(config.legacy_sync_dir) if config.legacy_sync_dir else None
+        ),
+    )
     
     # 检查文件是否存在
     for filename in args.filename:
         if not os.path.exists(filename):
-            print(f"Error: File '{filename}' does not exist")
-            sys.exit(1)
+            reporter.error(f"Error: File '{filename}' does not exist")
+            return 4 if is_ssg else 5
     
     # 创建图书馆
     library = EPUBLibrary(args.output_dir)
@@ -75,6 +80,7 @@ def main():
     progress_lock = threading.Lock()  # 保证 tqdm 进度条显示正常
 
     # 创建进度条（总任务数为文件数量）
+    reporter.progress_active = True
     pbar = tqdm(total=len(real_epub_files), desc="Processing books")
 
     # 多线程处理函数：添加单本书籍
@@ -99,10 +105,11 @@ def main():
     
     # 关闭进度条
     pbar.close()
+    reporter.progress_active = False
 
     if success_count == 0:
-        print("No books were successfully processed")
-        sys.exit(1)
+        reporter.error("No books were successfully processed")
+        return 4 if is_ssg else 5
     
     # 创建 library home
     library.create_library_home()
@@ -113,15 +120,15 @@ def main():
 
     # 仅生成文件
     if args.no_server:
-        print(f"Files generated in: {library.base_directory}")
-        return
+        reporter.result(f"Files generated in: {library.base_directory}")
+        return 0
 
     # 创建进程停止事件
     stop_event = multiprocessing.Event()
 
     # 信号处理函数
     def signal_handler(sig, frame):
-        print("\nShutting down...")
+        reporter.notice("Shutting down...")
         stop_event.set()
         # 等待进程结束
         if 'server_process' in locals() and server_process.is_alive():
@@ -150,7 +157,7 @@ def main():
     if args.watch:
         watcher_process = multiprocessing.Process(
             target=start_watcher_process,
-            args=(args.filename, library, stop_event),
+            args=(args.filename, library, stop_event, args.log),
             name="WatcherProcess"
         )
         watcher_process.start()
@@ -165,7 +172,7 @@ def main():
             # 检查进程是否存活
             alive_processes = [p for p in processes if p.is_alive()]
             if not alive_processes:
-                print("All processes have terminated")
+                reporter.detail("All processes have terminated")
                 break
                 
             # 检查停止事件
@@ -177,10 +184,10 @@ def main():
             time.sleep(0.1)
                 
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        reporter.notice("Shutting down...")
         stop_event.set()
     except Exception as e:
-        print(f"Error occurred: {e}")
+        reporter.error(f"Error occurred: {e}")
         stop_event.set()
     finally:
         # 等待进程结束
@@ -190,12 +197,32 @@ def main():
             if process.is_alive():
                 process.join(timeout=5)
                 if process.is_alive():
-                    print(f"Force terminating {process.name}")
+                    reporter.detail(f"Force terminating {process.name}")
                     process.terminate()
+    return 0
+
+
+def run_ssg(config, reporter=None):
+    return _run_existing_pipeline(config, reporter or Reporter(config.log))
+
+
+def run_server(config, reporter=None):
+    return _run_existing_pipeline(config, reporter or Reporter(config.log))
+
+
+def main(argv=None):
+    config = parse_cli(sys.argv[1:] if argv is None else argv)
+    reporter = Reporter(config.log)
+    hint = format_legacy_migration_hint(config)
+    if hint:
+        reporter.notice(hint)
+    if isinstance(config, SSGConfig):
+        return run_ssg(config, reporter)
+    return run_server(config, reporter)
 
 
 if __name__ == '__main__':
     # 确保在Windows上正确运行多进程
     if sys.platform.startswith('win'):
         multiprocessing.freeze_support()
-    main()
+    raise SystemExit(main())

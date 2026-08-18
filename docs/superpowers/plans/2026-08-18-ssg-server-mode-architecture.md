@@ -25,6 +25,7 @@
 - A failed SSG build cannot change the previous publication; a failed Server book update cannot replace its previous cache.
 - Docker explicitly binds `0.0.0.0`, preserves `/app/EpubBrowserFiles`, and reads source EPUBs from `/app/Library`.
 - Full authentication, Server subpath hosting, partial SSG publication, and UI redesign are out of scope.
+- Without `--log`, routine conversion, cache, watcher, path, and request diagnostics are silent and cannot disrupt tqdm; only actionable errors, one legacy migration hint, final results, and progress itself remain visible.
 
 ## Planned file structure
 
@@ -34,6 +35,7 @@ New focused modules:
 - `epub_browser/urls.py`: base-path validation and public URL construction/rewriting.
 - `epub_browser/models.py`: shared immutable book metadata and conversion result types.
 - `epub_browser/identity.py`: deterministic SSG IDs, durable Server IDs, and source fingerprints.
+- `epub_browser/reporting.py`: tqdm-safe user notices and `--log`-gated operational diagnostics.
 - `epub_browser/site.py`: library shell and `book-metadata.json` publication independent of orchestration mode.
 - `epub_browser/ssg.py`: complete snapshot staging, validation, activation, and rollback.
 - `epub_browser/state.py`: SQLite schema, schema versioning, durable book registry, and existing state APIs.
@@ -56,11 +58,14 @@ Existing modules retained and narrowed:
 
 **Files:**
 - Create: `epub_browser/cli.py`
+- Create: `epub_browser/reporting.py`
 - Create: `tests/test_cli.py`
+- Create: `tests/test_reporting.py`
 - Modify: `epub_browser/main.py`
 
 **Interfaces:**
 - Produces: `SSGConfig`, `ServerConfig`, `parse_cli(argv: Sequence[str])`, and `format_legacy_migration_hint(config) -> Optional[str]`.
+- Produces: `Reporter(log_enabled: bool)` with `detail`, `notice`, `error`, and `result` methods.
 - Consumes later: `run_ssg(config: SSGConfig) -> int` and `run_server(config: ServerConfig) -> int`.
 
 - [ ] **Step 1: Write failing tests for new SSG and Server commands**
@@ -173,9 +178,27 @@ def main(argv=None):
 
 At this task, `run_ssg` and `run_server` must wrap the existing `EPUBLibrary`/`EPUBServer` behavior, and all later code calls them through the typed configs.
 
-- [ ] **Step 7: Run CLI and existing Python tests**
+- [ ] **Step 7: Add a failing test for quiet and tqdm-safe reporting**
 
-Run: `python -m unittest tests.test_cli -v`
+```python
+def test_detail_is_silent_without_log_but_errors_remain_visible(self):
+    reporter = Reporter(log_enabled=False)
+    with redirect_stdout(StringIO()) as stdout, redirect_stderr(StringIO()) as stderr:
+        reporter.detail("cache hit")
+        reporter.error("conversion failed")
+    self.assertEqual(stdout.getvalue(), "")
+    self.assertEqual(stderr.getvalue(), "conversion failed\n")
+```
+
+Patch `tqdm.tqdm.write` in a second test, call `notice` while `progress_active=True`, and assert the message uses `tqdm.write` rather than built-in `print`.
+
+- [ ] **Step 8: Implement the reporting boundary and route Task 1 output through it**
+
+`detail` emits only when `log_enabled=True`. `notice`, `error`, and `result` are explicit user-facing messages. When `progress_active` is true they call `tqdm.write`; otherwise they write once to the selected standard stream. Pass one Reporter from `main` into mode runners instead of adding new raw `print` calls.
+
+- [ ] **Step 9: Run CLI, reporting, and existing Python tests**
+
+Run: `python -m unittest tests.test_cli tests.test_reporting -v`
 
 Expected: PASS.
 
@@ -183,10 +206,10 @@ Run: `python -m unittest discover -s tests -p 'test_*.py'`
 
 Expected: existing suite PASS.
 
-- [ ] **Step 8: Commit the CLI seam**
+- [ ] **Step 10: Commit the CLI seam**
 
 ```bash
-git add epub_browser/cli.py epub_browser/main.py tests/test_cli.py
+git add epub_browser/cli.py epub_browser/reporting.py epub_browser/main.py tests/test_cli.py tests/test_reporting.py
 git commit -m "feat: add ssg and server command modes"
 ```
 
@@ -813,11 +836,15 @@ Verify the annotation and progress still reference the same legacy ID, the book 
 
 Build SSG and Server from the same EPUB. Assert SSG has no database/data/cache markers, Server has no public files at its root, deleting Server cache leaves StateStore rows, and rebuilding restores the durable Server ID.
 
-- [ ] **Step 4: Add non-root static-host link verification**
+- [ ] **Step 4: Add quiet CLI output assertions**
+
+Run SSG through its real CLI runner with `--log` absent and a captured stdout/stderr. Assert routine strings such as `Library base directory`, per-book processing lines, cache hits, and watcher events are absent while the final result and progress output remain. Repeat with `--log` and assert operational detail is emitted through `Reporter`.
+
+- [ ] **Step 5: Add non-root static-host link verification**
 
 Parse every generated HTML `href`/`src`, Manifest icon/start/scope entry, metadata cover, and Service Worker precache URL. Assert internal URLs begin `/project/`, map to an existing output file after removing the prefix, and contain no runtime repair script.
 
-- [ ] **Step 5: Run the complete Python and JavaScript suites**
+- [ ] **Step 6: Run the complete Python and JavaScript suites**
 
 Run: `python -m unittest discover -s tests -p 'test_*.py'`
 
@@ -827,7 +854,7 @@ Run: `node --test tests/test_*.js`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit integration coverage**
+- [ ] **Step 7: Commit integration coverage**
 
 ```bash
 git add tests/test_mode_integration.py tests/test_migration.py tests/test_ssg.py tests/test_server_library.py tests/test_static_asset_delivery.py
