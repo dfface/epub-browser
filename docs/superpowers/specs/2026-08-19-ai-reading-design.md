@@ -32,7 +32,7 @@ AI 阅读让读者在当前章节内快速建立理解，并在不越过已读�
 
 ## 用户体验
 
-章节阅读页的固定工具栏新增“AI 阅读”入口。首次打开抽屉时，若服务未配置，显示本地化的不可用说明；配置后显示“开始帮读”及简短的隐私提示：当前章节文本会发送至本服务器配置的 AI Provider。生成期间显示可取消的等待状态，不阻塞阅读。
+章节阅读页的固定工具栏新增“AI 阅读”入口；书籍页的书籍操作区新增“AI 导读”入口。两者打开同一套抽屉，但书籍页先让用户选择帮读范围。首次打开抽屉时，若服务未配置，显示本地化的不可用说明；配置后显示“开始帮读”及简短的隐私提示：所选范围的文本会发送至本服务器配置的 AI Provider。生成期间显示可取消的等待状态，不阻塞阅读。
 
 完成后按三层呈现：
 
@@ -42,7 +42,19 @@ AI 阅读让读者在当前章节内快速建立理解，并在不越过已读�
 | 脉络理解 | 看清关系与推进 | 概念、前提、推论图 | 人物、冲突、事件链 | 论点、证据、结构图 |
 | 深入理解 | 形成可迁移理解 | 易错点、应用与自测 | 动机、张力、主题（截至本章） | 推理缺口、关联与反思问题 |
 
-“证据”点击后定位到同章文本；前文章节证据通过书内章节链接打开。脉络图是无脚本 SVG/DOM 渲染的节点与边，节点同样可以跳转到证据。读者可提一个后续问题；回答与问题以当前用户隔离保存，且仍只能使用截止当前章的内容。
+“证据”点击后定位到同章文本；前文章节证据通过书内章节链接打开。脉络图是无脚本 SVG/DOM 渲染的节点与边，节点同样可以跳转到证据。读者可提一个后续问题；回答与问题以当前用户隔离保存，且仍只能使用该结果允许的内容范围。
+
+### 书籍页的三种可选模式
+
+书籍页的“AI 导读”不能默认读取全书。它展示三个互斥选项，并在结果顶部保留当前模式和范围：
+
+| 模式 | 输入范围 | 适用时机 | 剧透规则 |
+| --- | --- | --- | --- |
+| 无剧透导读 | 书籍元数据、当前已读进度之前的桥接摘要；不读取未来章节或未来目录标题 | 开始阅读前或任何时候 | 不透露、推测或暗示后续事件/结论 |
+| 已读脉络 | 从第 0 章到读者保存的当前阅读进度（无进度时仅使用当前书籍元数据） | 阅读过程中 | 仅总结已经读过的章节 |
+| 全书复盘（含剧透） | 全部可提取章节 | 读完后或明确想复盘时 | 点击后先显示本地化确认对话框；确认才入队 |
+
+三种模式都使用同样的“快速掌握 / 脉络理解 / 深入理解”三层结果和证据图，但小说的事件线、技术书的概念依赖、通用书的论述结构均严格限制在所选输入范围。全书复盘确认是每次请求都必须携带的显式布尔值，不能仅由已读进度或前端状态推断。
 
 ## 配置与安全
 
@@ -65,11 +77,11 @@ AI 只在以下环境变量均有效时启用：
 - 当前章节标题、书籍元数据和 UI locale；
 - 用户的后续问题（如有）。
 
-任何 N+1..end 的章节文本、TOC 未来标题、未来缓存结果和模型推测都不进入 prompt。系统提示明确要求“只陈述给定证据支持的内容；不预示、猜测或暗示后续发展”。解析响应时，所有 evidence 的 chapter_index 必须在 0..N，且 excerpt 必须是对应允许文本的规范化子串；否则整个结果作为 provider 协议错误，不缓存。
+章节模式中的任何 N+1..end 文本、TOC 未来标题、未来缓存结果和模型推测都不进入 prompt。书籍模式将 allowed chapter set 固定为无剧透导读的空集合、已读脉络的 0..progress，或已经明确确认的全书集合；服务端绝不接受客户端给出的任意章节范围。系统提示明确要求“只陈述给定证据支持的内容；不预示、猜测或暗示范围外发展”。解析响应时，所有 evidence 的 chapter_index 必须属于允许集合，且 excerpt 必须是对应允许文本的规范化子串；否则整个结果作为 provider 协议错误，不缓存。
 
 ## 架构
 
-    章节页 AI 阅读抽屉
+    章节页 AI 阅读 / 书籍页 AI 导读抽屉
               |
        Starlette /api/ai-reading
               |
@@ -90,7 +102,7 @@ AI 只在以下环境变量均有效时启用：
 
 ### SQLite 模型
 
-ai_reading_results 是共享、可复用的章节结果。唯一键为 (book_id, chapter_index, source_fingerprint, locale, strategy, model, result_version)；保存已验证的结果 JSON、前文桥接摘要、内容哈希、创建时间。书籍更新或章节文本变化自然产生新键，旧记录可保留以便回滚。
+ai_reading_results 是共享、可复用的章节或书籍结果。唯一键为 (book_id, scope, chapter_index_or_null, mode, allowed_through_chapter, source_fingerprint, locale, strategy, model, result_version)；scope 为 chapter 或 book，mode 为 chapter、spoiler_free、read_so_far、full_review。保存已验证的结果 JSON、前文桥接摘要、内容哈希、创建时间。书籍更新、阅读范围或章节文本变化自然产生新键，旧记录可保留以便回滚。
 
 ai_reading_followups 是用户隔离的问答。键含 username、结果 id、问题与回答；用户名语义与现有标注一致。问题和回答均不参与其他读者的缓存。
 
@@ -102,6 +114,7 @@ ai_reading_followups 是用户隔离的问答。键含 username、结果 id、�
 | --- | --- | --- |
 | GET /api/ai-reading/availability | 是否已配置、容量是否可接受 | {enabled, model}，不含 Provider URL |
 | POST /api/ai-reading/books/{book_id}/chapters/{chapter_index} | 获取缓存结果或入队生成 | 200 complete 或 202 queued |
+| POST /api/ai-reading/books/{book_id}/guide | 请求一种书籍页模式 | 200 complete 或 202 queued |
 | GET /api/ai-reading/jobs/{job_id} | 查询调用状态 | queued、running、complete 或 failed |
 | GET /api/ai-reading/books/{book_id}/chapters/{chapter_index} | 读取已缓存当前版本的结果 | result 或 ai_result_not_found |
 | POST /api/ai-reading/results/{result_id}/follow-ups | 为当前用户入队追问 | 202 job_id |
@@ -123,7 +136,7 @@ ai_reading_followups 是用户隔离的问答。键含 username、结果 id、�
       "bridge_summary": ""
     }
 
-服务端限制数组长度、字符串长度、节点唯一性、边端点和 evidence 引用；用 textContent 渲染所有模型与 EPUB 文本。策略只能是 technical、fiction 或 general。策略由标题、元数据和当前文本的模型分类结果决定，但没有通过严格校验即回退 general。
+服务端限制数组长度、字符串长度、节点唯一性、边端点和 evidence 引用；用 textContent 渲染所有模型与 EPUB 文本。策略只能是 technical、fiction 或 general。策略由标题、元数据和允许范围内文本的模型分类结果决定，但没有通过严格校验即回退 general。
 
 ## I18N
 
@@ -131,11 +144,11 @@ ai_reading_followups 是用户隔离的问答。键含 username、结果 id、�
 
 ## 验收标准
 
-- 未配置环境变量时，SSG 没有 AI 资源，Server 页面显示本地化不可用状态，且没有模型网络调用。
+- 未配置环境变量时，SSG 没有 AI 资源，Server 的书籍/章节页面显示本地化不可用状态，且没有模型网络调用。
 - 已配置时，当前章节可生成三层结果；同一输入第二次返回 SQLite 缓存，不新建 Provider 调用。
 - 技术、小说、通用策略分别产生对应字段与可渲染脉络图。
 - 所有证据只能指向当前或更早章节，且 excerpt 在允许文本中逐字存在。
 - 同一缓存键的并发请求合并为一个 job；用户可读取其终态；关闭 Server 不遗留 worker。
 - UI 语言切换影响所有 AI 控件和新生成的模型语言；模型/EPUB 文本不进入 innerHTML。
+- 书籍页提供无剧透导读、已读脉络与全书复盘三个可选模式；只有后者在当前请求中带有明确确认时才能读取未来章节。
 - Python 与 Node focused/full suite 通过；不运行 E2E。
-

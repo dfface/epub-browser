@@ -15,7 +15,7 @@
 - I18N 现有基线是 v2.0.1；所有新增 UI 必须有完整 aiReading.* EN/zh-CN 键。
 - AI 仅在 Server mode 且三项必需环境变量有效时启用；SSG 不包含 AI API 或资源。
 - API key、Provider URL、原始 prompt/response、绝对路径不进入浏览器、SQLite 或日志。
-- 第 N 章仅使用 0..N 的正文和前文 bridge summary，禁止未来章节、未来 TOC 或未来缓存输入。
+- 章节模式第 N 章仅使用 0..N 的正文和前文 bridge summary；书籍模式只能使用服务端从 mode 和阅读进度推导的范围，禁止未来章节、未来 TOC 或未来缓存输入，除非该次 full_review 明确确认。
 - 不运行 E2E；不得修改既有书架、标注、阅读进度、书籍 identity 或 migration 行为。
 - 所有不受信任文本（模型、EPUB、问题）均经 JSON/textContent，不写入 innerHTML。
 
@@ -47,7 +47,7 @@ Expected: FAIL with missing aiReading.open.
 
 - [ ] **Step 3: 添加同构键树**
 
-英文至少新增 open、start、quickGrasp、structure、deepDive、evidence、followUp、providerUnavailable、generating、retry、privacyNotice、questionPlaceholder、error.*。中文使用“AI 阅读”“开始帮读本节”“快速掌握”“脉络理解”“深入理解”“原文证据”“继续追问”“此服务器尚未配置 AI 阅读”等等值含义，不翻译 EPUB/模型原文。
+英文至少新增 open、openBookGuide、start、quickGrasp、structure、deepDive、evidence、followUp、providerUnavailable、generating、retry、privacyNotice、questionPlaceholder、mode.spoilerFree、mode.readSoFar、mode.fullReview、mode.fullReviewWarning、confirmFullReview、error.*。中文使用“AI 阅读”“AI 导读”“开始帮读本节”“快速掌握”“脉络理解”“深入理解”“原文证据”“继续追问”“无剧透导读”“已读脉络”“全书复盘（含剧透）”等等值含义，不翻译 EPUB/模型原文。
 
 - [ ] **Step 4: 运行 I18N 与 coverage 测试**
 
@@ -127,8 +127,8 @@ Expected: PASS.
 - Create: tests/test_ai_reading.py
 
 **Interfaces:**
-- Produces ChapterTextExtractor(book_dir).chapter(index) -> ChapterSource.
-- Produces build_reading_request(source, previous_bridges, locale) -> list[dict].
+- Produces ChapterTextExtractor(book_dir).chapter(index) -> ChapterSource and book_range(indices) -> tuple[ChapterSource, ...].
+- Produces build_reading_request(source, previous_bridges, locale, scope, mode) -> list[dict].
 - Produces validate_reading_result(payload, allowed_sources) -> dict.
 
 - [ ] **Step 1: 写章节范围和 evidence 规则的失败测试**
@@ -148,7 +148,7 @@ Expected: FAIL with ModuleNotFoundError.
 
 - [ ] **Step 3: 实现提取、prompt 和严格 schema**
 
-用 html.parser.HTMLParser 跳过 script/style/nav，合并空白并在 24,000 字符截断。build_reading_request() 只接受小于当前 index 的 bridge summaries，在 system message 中要求 locale、三种 strategy、三层字段和“禁止未来信息”。校验器仅接受 technical|fiction|general，限制节点/边/证据长度，验证 every edge endpoint、evidence ID 与允许章节/子串。
+用 html.parser.HTMLParser 跳过 script/style/nav，合并空白并在每次 Provider 调用的总输入上限 24,000 字符截断。build_reading_request() 只接受服务端已计算的 allowed chapter set 与小于该范围末尾的 bridge summaries，在 system message 中要求 locale、三种 strategy、三层字段和“禁止范围外信息”。校验器仅接受 technical|fiction|general，限制节点/边/证据长度，验证 every edge endpoint、evidence ID 与允许章节/子串。新增 book mode 测试：spoiler_free 不含章节正文，read_so_far 不能接受 progress 后 evidence，full_review 必须持有 confirmed=True。
 
 - [ ] **Step 4: 运行 focused tests**
 
@@ -187,7 +187,7 @@ Expected: FAIL with AttributeError.
 
 - [ ] **Step 3: 递增 schema 并只新增表与索引**
 
-新增 ai_reading_results 和 ai_reading_followups，对共享结果使用完整 cache-key UNIQUE index；JSON 用 ensure_ascii=False、sort_keys=True、紧凑分隔符保存。读取时验证 JSON object，坏缓存返回未命中而不抛出原文。
+新增 ai_reading_results 和 ai_reading_followups，对共享结果使用包含 scope、mode、allowed_through_chapter 的完整 cache-key UNIQUE index；JSON 用 ensure_ascii=False、sort_keys=True、紧凑分隔符保存。读取时验证 JSON object，坏缓存返回未命中而不抛出原文。read_so_far 结果绝不能与 full_review 或不同阅读进度复用。
 
 - [ ] **Step 4: 运行 StateStore 与既有服务端测试**
 
@@ -207,7 +207,7 @@ Expected: PASS.
 - Modify: tests/test_ai_reading.py
 
 **Interfaces:**
-- Produces AIReadingService.request_chapter(...), request_followup(...), get_job(job_id), and shutdown().
+- Produces AIReadingService.request_chapter(...), request_book_guide(...), request_followup(...), get_job(job_id), and shutdown().
 - Returns queued, running, complete, or failed；只有 complete 暴露已验证结果。
 
 - [ ] **Step 1: 写同缓存键只调用一次 Provider 的失败测试**
@@ -227,7 +227,7 @@ Expected: FAIL with AttributeError.
 
 - [ ] **Step 3: 用 ThreadPoolExecutor 实现调度**
 
-使用 max_workers=config.max_concurrency，在锁内按稳定 cache key 存放 in-flight job。worker 在调用 Provider 前再读 SQLite 缓存，完成后只保存经 Task 3 校验的结果；不保留 prompt 或 raw provider JSON。失败状态只保存 ai_provider_failed、ai_timeout、ai_invalid_response 或 ai_queue_full 等稳定 code。
+使用 max_workers=config.max_concurrency，在锁内按稳定 cache key 存放 in-flight job。request_book_guide 仅接受 spoiler_free、read_so_far、full_review；它从 StateStore 的 reading progress 推导 allowed range，full_review 缺少 confirmed=True 时返回 ai_full_review_confirmation_required。worker 在调用 Provider 前再读 SQLite 缓存，完成后只保存经 Task 3 校验的结果；不保留 prompt 或 raw provider JSON。失败状态只保存 ai_provider_failed、ai_timeout、ai_invalid_response 或 ai_queue_full 等稳定 code。
 
 - [ ] **Step 4: 验证并发、超时、缓存命中和 shutdown**
 
@@ -249,7 +249,7 @@ Expected: PASS.
 - Modify: tests/test_runtime.py
 
 **Interfaces:**
-- Produces设计文档中的 /api/ai-reading routes；create_app(..., ai_reading_service=None)。
+- Produces设计文档中的 /api/ai-reading routes，包括 POST /api/ai-reading/books/{book_id}/guide；create_app(..., ai_reading_service=None)。
 - run_server() 从环境创建服务，关闭时总是调用 shutdown()。
 
 - [ ] **Step 1: 写 availability、202 到终态和错误码失败测试**
@@ -267,7 +267,7 @@ Expected: FAIL for missing AI route tests.
 
 - [ ] **Step 3: 挂载固定 route 并映射安全错误**
 
-路由必须在通配 /api/{path:path} 之前注册；从 X-Username 取现有用户语义；GET 永不启动任务；POST body 只允许 schema 中的 question。availability 只能返回 {enabled: false} 或 {enabled: true, model}。未配置 POST 返回 503 ai_not_configured。
+路由必须在通配 /api/{path:path} 之前注册；从 X-Username 取现有用户语义；GET 永不启动任务；章节 POST body 只允许 schema 中的 question；guide body 仅允许 mode 与 full_review 时必需的 confirmed=true。availability 只能返回 {enabled: false} 或 {enabled: true, model}。未配置 POST 返回 503 ai_not_configured。
 
 - [ ] **Step 4: 运行 focused 服务端测试**
 
@@ -291,13 +291,14 @@ Expected: PASS.
 - Modify: tests/test_generated_reader_surfaces.py
 
 **Interfaces:**
-- Produces chapter-page [data-ai-reading] with data-book-id/data-chapter-index.
+- Produces chapter-page [data-ai-reading] with data-book-id/data-chapter-index，及 book-page [data-ai-book-guide] with data-book-id.
 - Only Server renderer emits AI assets after i18n.js；SSG emits none.
 
 - [ ] **Step 1: 写 Server/SSG 生成面差异失败测试**
 
     self.assertIn('ai-reading.js', server_chapter_html)
     self.assertIn('data-ai-reading', server_chapter_html)
+    self.assertIn('data-ai-book-guide', server_book_html)
     self.assertNotIn('ai-reading.js', static_chapter_html)
     self.assertNotIn('data-ai-reading', static_chapter_html)
 
@@ -309,7 +310,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: 生成可访问抽屉**
 
-抽屉使用 button、aria-controls、aria-expanded、dialog focus return 和 data-i18n；资源 URL 必须经 immutable asset publisher。将 book id/chapter index 作为转义过的 data 属性写入，文本节点不拼接模型内容。
+抽屉使用 button、aria-controls、aria-expanded、dialog focus return 和 data-i18n；书籍页先显示三个 radio 模式，full_review 点击后才显示二次本地化确认。资源 URL 必须经 immutable asset publisher。将 book id/chapter index 作为转义过的 data 属性写入，文本节点不拼接模型内容。
 
 - [ ] **Step 4: 运行生成面测试**
 
@@ -331,7 +332,7 @@ Expected: PASS.
 
 **Interfaces:**
 - Consumes only API payloads validated by Task 3.
-- Produces AIReadingController with open, generate, renderResult, focusEvidence, and askFollowup.
+- Produces AIReadingController with open, generate, renderResult, focusEvidence, askFollowup, and selectBookMode.
 
 - [ ] **Step 1: 写 DOM 测试，禁止 HTML sink**
 
@@ -348,7 +349,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: 实现轮询与渲染**
 
-客户端 POST 后每秒 GET job，最多 70 次；离开/关闭时取消定时器。每个文本节点用 textContent，mind map 使用 createElementNS 创建有限 SVG 节点/边，evidence 以书内 fragment 或当前 DOM query 定位。提交 follow-up 时限制输入长度并显示本地化错误/加载状态。
+客户端 POST 后每秒 GET job，最多 70 次；离开/关闭时取消定时器。书籍页的 mode 选项互斥，只有 full_review 经过显式确认才发送 confirmed:true；拒绝或取消不调用 API。每个文本节点用 textContent，mind map 使用 createElementNS 创建有限 SVG 节点/边，evidence 以书内 fragment 或当前 DOM query 定位。提交 follow-up 时限制输入长度并显示本地化错误/加载状态。
 
 - [ ] **Step 4: 运行 JS 测试**
 
@@ -401,7 +402,6 @@ Expected: PASS.
 
 ## 自检
 
-- 需求覆盖：Task 1 覆盖 I18N；Tasks 2–6 覆盖 Provider、提取、调度、SQLite、前文摘要与无剧透；Tasks 7–8 覆盖三类策略、三层结果、脉络图、证据和追问；Task 9 覆盖文档和验证。
+- 需求覆盖：Task 1 覆盖 I18N；Tasks 2–6 覆盖 Provider、提取、调度、SQLite、前文摘要与无剧透及三种书籍模式；Tasks 7–8 覆盖书籍页/章节页、三类策略、三层结果、脉络图、证据和追问；Task 9 覆盖文档和验证。
 - 占位符扫描：本计划没有 TBD/TODO 或“类似前面”的实现指令。
 - 接口一致性：Task 2 的 AIConfig 供 Task 5 使用；Task 3 的验证结果是 Task 4/5 唯一可缓存输入；Task 5 的 jobs 是 Task 6/8 的共同协议。
-
