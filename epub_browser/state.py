@@ -185,6 +185,7 @@ class StateStore:
         metadata,
         source_size: Optional[int] = None,
         source_mtime_ns: Optional[int] = None,
+        preferred_book_id: Optional[str] = None,
     ) -> BookRecord:
         canonical_path = str(Path(source_path).expanduser().resolve())
         identifier = (epub_identifier or "").strip() or None
@@ -249,7 +250,12 @@ class StateStore:
                 )
                 return self._get_book(connection, book_id)
 
-            book_id = new_server_book_id()
+            book_id = (preferred_book_id or "").strip() or new_server_book_id()
+            if connection.execute(
+                "SELECT 1 FROM books WHERE book_id = ?",
+                (book_id,),
+            ).fetchone():
+                book_id = new_server_book_id()
             connection.execute(
                 """
                 INSERT INTO books (

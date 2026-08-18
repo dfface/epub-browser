@@ -54,6 +54,17 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(updated.source_fingerprint, "fingerprint-b")
         self.assertEqual(json.loads(updated.metadata_json)["title"], "Updated")
 
+    def test_new_book_can_preserve_a_correlated_legacy_identity(self):
+        record = self.store.resolve_book(
+            Path(self.temporary.name, "legacy.epub"),
+            "urn:test:legacy",
+            "fingerprint",
+            {"title": "Legacy"},
+            preferred_book_id="legacy-toc-hash",
+        )
+
+        self.assertEqual(record.book_id, "legacy-toc-hash")
+
     def test_unique_inactive_identifier_and_fingerprint_match_preserves_move_identity(self):
         original = Path(self.temporary.name, "old", "book.epub")
         moved = Path(self.temporary.name, "new", "book.epub")
