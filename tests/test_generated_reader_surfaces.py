@@ -27,6 +27,40 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'/assets/immutable/version-check\.[0-9a-f]{12}\.js',
             )
 
+    def test_all_generated_pages_bootstrap_shared_i18n_before_ui_scripts(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertRegex(html, r'/assets/immutable/i18n\.[0-9a-f]{12}\.js')
+            self.assertIn('window.EpubBrowserI18n.init()', html)
+            self.assertLess(html.index('window.EpubBrowserI18n.init()'), html.index('/assets/immutable/theme.'))
+            self.assertNotIn('/assets/manifest.json', html)
+            self.assertRegex(
+                html,
+                r'<noscript><link\b(?=[^>]*\brel=(?:"manifest"|manifest))(?=[^>]*\bhref=(?:"/assets/manifest\.en\.json"|/assets/manifest\.en\.json))[^>]*>',
+            )
+
+    def test_chapter_separates_ui_and_epub_content_languages(self):
+        html = self._chapter_html()
+
+        self.assertIn('<html lang="en"', html)
+        self.assertRegex(html, r'<article[^>]+id="eb-content"[^>]+lang="en"')
+
+    def test_book_and_chapter_keep_epub_language_off_the_ui_shell(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory)
+            processor.book_title = "A Book"
+            processor.description = "Une description"
+            processor.lang = "fr"
+            processor.chapters = [{"title": "One"}]
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            book_html = Path(processor.web_dir, "index.html").read_text(encoding="utf-8")
+            chapter_html = processor.create_chapter_template("<p>Texte</p>", "", 0, "One")
+
+        self.assertRegex(book_html, r'<html\s+lang=(?:"en"|en)(?:\s|>)')
+        self.assertRegex(book_html, r'<div\b(?=[^>]*\bclass=(?:"book-info-desc"|book-info-desc))(?=[^>]*\blang=(?:"fr"|fr))[^>]*>')
+        self.assertIn('<html lang="en"', chapter_html)
+        self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+lang="fr"')
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 

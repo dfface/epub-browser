@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import re
 import hashlib
 import base64
+import html
 import json
 import urllib.parse
 import minify_html
@@ -324,7 +325,7 @@ class EPUBProcessor:
 
             # 获取语言
             lang = root.find('.//dc:language', ns)
-            self.lang = lang.text if lang is not None and lang.text else 'en'
+            self.lang = lang.text.strip() if lang is not None and lang.text and lang.text.strip() else 'en'
                 
             # 获取manifest（所有资源）
             manifest = {}
@@ -423,7 +424,7 @@ class EPUBProcessor:
     def create_index_page(self):
         """创建章节索引页面"""
         index_html = f"""<!DOCTYPE html>
-<html lang="{self.lang}">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -433,6 +434,9 @@ class EPUBProcessor:
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{self.book_title}</title>
+    <script src="/assets/i18n.js"></script>
+    <script>window.EpubBrowserI18n.init();</script>
+    <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
@@ -440,7 +444,6 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
 """
@@ -545,7 +548,7 @@ class EPUBProcessor:
                 <p class="book-info-author">{" & ".join(self.authors) if self.authors else "Unknown"}</p>"""
         if self.description:
             index_html += f""" 
-                <div class="book-info-desc">
+                <div class="book-info-desc" lang="{html.escape(self.lang or 'en', quote=True)}">
                     {self.description}
                 </div>"""
         index_html += """
@@ -1115,7 +1118,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         next_link_mobile = f'<a {next_href} alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(" chapter", "")}</span></div></a>'
         
         chapter_html =  f"""<!DOCTYPE html>
-<html lang="{self.lang}">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1125,6 +1128,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{chapter_title} - {self.book_title}</title>
+    <script src="/assets/i18n.js"></script>
+    <script>window.EpubBrowserI18n.init();</script>
+    <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
     <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
@@ -1137,7 +1143,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
 """
         chapter_html += """
@@ -1286,7 +1291,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
         </div>

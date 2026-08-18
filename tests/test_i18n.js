@@ -128,7 +128,7 @@ test('removes unsubscribed listeners and isolates listener failures', () => {
   assert.equal(warnings.length, 1);
 });
 
-test('translates explicit DOM attributes and updates the localized manifest link', () => {
+test('translates explicit DOM attributes and maintains one localized manifest link', () => {
   const node = {
     attributes: {
       'data-i18n': 'common.version',
@@ -139,21 +139,34 @@ test('translates explicit DOM attributes and updates the localized manifest link
     getAttribute(name) { return this.attributes[name] || null; },
     setAttribute(name, value) { this.attributes[name] = value; }
   };
-  const manifest = { href: '' };
-  const root = fakeRoot('en');
+  const head = {
+    appendChild(node) { this.appended.push(node); },
+    appended: []
+  };
+  const root = fakeRoot('zh-CN');
   root.document = {
     documentElement: { lang: '' },
+    head,
+    createElement() { return { id: '', href: '', rel: '' }; },
     querySelectorAll() { return [node]; },
-    querySelector(selector) { return selector === 'link[rel="manifest"]' ? manifest : null; }
+    querySelector(selector) {
+      if (selector === '#epubBrowserManifest') return head.appended[0] || null;
+      return null;
+    }
   };
   const i18n = createRuntime(root, dictionaries);
 
-  i18n.setLocale('zh-CN');
+  i18n.init();
 
   assert.equal(root.document.documentElement.lang, 'zh-CN');
-  assert.equal(node.textContent, '版本 1.11.1');
-  assert.equal(node.attributes.title, '版本 1.11.1');
-  assert.equal(manifest.href, '/assets/manifest.zh-CN.json');
+  assert.equal(head.appended.length, 1);
+  assert.equal(head.appended[0].id, 'epubBrowserManifest');
+  assert.equal(head.appended[0].href, '/assets/manifest.zh-CN.json');
+  i18n.setLocale('en');
+  assert.equal(node.textContent, 'Version 1.11.1');
+  assert.equal(node.attributes.title, 'Version 1.11.1');
+  assert.equal(head.appended.length, 1);
+  assert.equal(head.appended[0].href, '/assets/manifest.en.json');
 });
 
 test('uses empty parameters when a DOM translation node has invalid parameter JSON', () => {

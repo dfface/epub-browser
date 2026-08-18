@@ -83,6 +83,12 @@
       initialized = true;
       browser = root.navigator && ((root.navigator.languages || [])[0] || root.navigator.language);
       locale = readStoredLocale() || normalizeLocale(browser) || 'en';
+      applyLocaleToDocument();
+      if (root.document && root.document.addEventListener) {
+        root.document.addEventListener('DOMContentLoaded', function() {
+          translateDocument();
+        });
+      }
       return locale;
     }
 
@@ -164,9 +170,21 @@
 
     function updateManifestLink() {
       var link;
-      if (!root.document || !root.document.querySelector) return;
-      link = root.document.querySelector('link[rel="manifest"]');
+      if (!root.document) return;
+      if (root.document.querySelector) link = root.document.querySelector('#epubBrowserManifest');
+      if (!link && root.document.createElement && root.document.head) {
+        link = root.document.createElement('link');
+        link.id = 'epubBrowserManifest';
+        link.rel = 'manifest';
+        root.document.head.appendChild(link);
+      }
       if (link) link.href = '/assets/manifest.' + locale + '.json';
+    }
+
+    function applyLocaleToDocument() {
+      var documentRoot = root.document && root.document.documentElement;
+      if (documentRoot) documentRoot.lang = locale;
+      updateManifestLink();
     }
 
     function notifyListeners() {
@@ -185,14 +203,11 @@
     }
 
     function setLocale(value) {
-      var documentRoot;
       init();
       locale = normalizeLocale(value) || 'en';
       persistLocale(locale);
-      documentRoot = root.document && root.document.documentElement;
-      if (documentRoot) documentRoot.lang = locale;
+      applyLocaleToDocument();
       translateDocument();
-      updateManifestLink();
       notifyListeners();
       return locale;
     }

@@ -145,10 +145,12 @@ class EPUBLibrary:
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="EPUB Browser">
 <title>EPUB Library</title>
+<script src="/assets/i18n.js"></script>
+<script>window.EpubBrowserI18n.init();</script>
+<noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
 <link rel="stylesheet" href="/assets/fa.all.min.css">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
-<link rel="manifest" href="/assets/manifest.json">
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
