@@ -167,17 +167,43 @@ function initScript() {
             clearBtn.addEventListener("click", function() {
                 closeClearMenu();
                 if (!window.confirm(bookT('book.clearReadingProgressConfirm'))) return;
-                readingProgressLoadVersion++;
-                var prefix1 = "scroll_" + book_hash + "_";
-                var prefix2 = "turning_" + book_hash + "_";
-                deleteKeysByPrefix(prefix1);
-                deleteKeysByPrefix(prefix2);
-                deleteKeysByPrefix(book_hash);
-                if (window.EpubReadingProgress) {
-                    window.EpubReadingProgress.request('DELETE', '/api/reading-progress/' + encodeURIComponent(book_hash), null, true);
+                function reportClearFailure(result) {
+                    var code = result && result.error && result.error.code;
+                    var key = code ? 'book.error.' + code : 'book.clearReadingProgressFailed';
+                    var message = bookT(key);
+                    showNotification(message === key ? bookT('book.clearReadingProgressFailed') : message, 'error');
                 }
-                updateContinueReadingButton(book_hash);
-                showNotification(bookT('book.clearReadingProgressSucceeded'), "success");
+
+                function clearLocalProgress() {
+                    var prefix1 = "scroll_" + book_hash + "_";
+                    var prefix2 = "turning_" + book_hash + "_";
+                    readingProgressLoadVersion++;
+                    deleteKeysByPrefix(prefix1);
+                    deleteKeysByPrefix(prefix2);
+                    deleteKeysByPrefix(book_hash);
+                    updateContinueReadingButton(book_hash);
+                    showNotification(bookT('book.clearReadingProgressSucceeded'), "success");
+                }
+
+                if (!window.EpubReadingProgress) {
+                    reportClearFailure(null);
+                    return;
+                }
+                window.EpubReadingProgress.request(
+                    'DELETE',
+                    '/api/reading-progress/' + encodeURIComponent(book_hash),
+                    null,
+                    true,
+                    true
+                ).then(function(result) {
+                    if (!result || result.error) {
+                        reportClearFailure(result);
+                        return;
+                    }
+                    clearLocalProgress();
+                }, function() {
+                    reportClearFailure(null);
+                });
             });
         }
 

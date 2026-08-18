@@ -157,3 +157,17 @@ test('reading progress requests identify the signed-in sync user', async () => {
 
   assert.equal(received.options.headers['X-Username'], 'alice');
 });
+
+test('detailed reading progress requests preserve stable server error codes', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = () => Promise.resolve({
+    ok: false,
+    status: 503,
+    json: () => Promise.resolve({ code: 'database_unavailable', message: 'Unavailable' }),
+  });
+
+  const result = await Progress.request('DELETE', '/api/reading-progress/book', null, true, true);
+  global.fetch = originalFetch;
+
+  assert.deepEqual(result, { error: { code: 'database_unavailable', message: 'Unavailable' } });
+});

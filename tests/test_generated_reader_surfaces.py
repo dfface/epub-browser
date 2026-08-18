@@ -170,6 +170,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
         self.assertIn("window.confirm(bookT('book.clearReadingProgressConfirm'))", script)
+        self.assertIn("'DELETE',", script)
+        self.assertIn("true,\n                    true", script)
+        self.assertIn("if (!result || result.error)", script)
+        self.assertIn("book.clearReadingProgressFailed", script)
+        clear_handler = script.index("window.confirm(bookT('book.clearReadingProgressConfirm'))")
+        self.assertLess(
+            script.index("window.EpubReadingProgress.request(", clear_handler),
+            script.index("clearLocalProgress();", clear_handler),
+        )
         self.assertNotIn("matchMedia", script)
         self.assertIn(".continue-reading-control.has-reading-progress:hover #continueReadingBtn", styles)
         self.assertIn("transform: none;", styles)
