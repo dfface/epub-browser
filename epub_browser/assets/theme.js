@@ -2,13 +2,13 @@
 function initTheme() {
     // 主题列表
     var themes = [
-        { id: 'light', name: 'Light', icon: 'fa-sun' },
-        { id: 'dark', name: 'Dark', icon: 'fa-moon' },
-        { id: 'sepia', name: 'Sepia', icon: 'fa-book' },
-        { id: 'forest', name: 'Forest', icon: 'fa-tree' },
-        { id: 'ocean', name: 'Ocean', icon: 'fa-water' },
-        { id: 'peach', name: 'Peach', icon: 'fa-heart' },
-        { id: 'lavender', name: 'Lavender', icon: 'fa-spa' }
+        { id: 'light', nameKey: 'theme.light', icon: 'fa-sun' },
+        { id: 'dark', nameKey: 'theme.dark', icon: 'fa-moon' },
+        { id: 'sepia', nameKey: 'theme.sepia', icon: 'fa-book' },
+        { id: 'forest', nameKey: 'theme.forest', icon: 'fa-tree' },
+        { id: 'ocean', nameKey: 'theme.ocean', icon: 'fa-water' },
+        { id: 'peach', nameKey: 'theme.peach', icon: 'fa-heart' },
+        { id: 'lavender', nameKey: 'theme.lavender', icon: 'fa-spa' }
     ];
 
     // 检测是否是 Kindle 设备
@@ -116,19 +116,14 @@ function initTheme() {
         }
     }
 
-    // 创建主题选择菜单
-    function createThemeMenu() {
-        var menu = document.createElement('div');
-        menu.className = 'theme-menu';
-        menu.style.display = 'none';
-        menu.style.position = 'fixed';
-        menu.style.zIndex = '10000';
-        
+    function renderThemeMenu(menu) {
+        menu.innerHTML = '';
         for (var i = 0; i < themes.length; i++) {
             var theme = themes[i];
             var item = document.createElement('div');
             item.className = 'theme-menu-item';
-            item.innerHTML = '<i class="fas ' + theme.icon + '"></i>' + theme.name;
+            item.innerHTML = '<i class="fas ' + theme.icon + '"></i>';
+            item.appendChild(document.createTextNode(window.EpubBrowserI18n.t(theme.nameKey)));
             
             item.addEventListener('click', function(themeId) {
                 return function() {
@@ -139,6 +134,16 @@ function initTheme() {
             
             menu.appendChild(item);
         }
+    }
+
+    // 创建主题选择菜单
+    function createThemeMenu() {
+        var menu = document.createElement('div');
+        menu.className = 'theme-menu';
+        menu.style.display = 'none';
+        menu.style.position = 'fixed';
+        menu.style.zIndex = '10000';
+        renderThemeMenu(menu);
         
         return menu;
     }
@@ -177,6 +182,14 @@ function initTheme() {
         // 初始化主题菜单
         var themeMenu = null;
         var currentToggleBtn = null;
+
+        if (window.EpubBrowserI18n && window.EpubBrowserI18n.onLocaleChange) {
+            window.EpubBrowserI18n.onLocaleChange(function() {
+                if (themeMenu) {
+                    renderThemeMenu(themeMenu);
+                }
+            });
+        }
         
         function handleThemeToggle(e) {
             e.stopPropagation();

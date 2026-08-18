@@ -11,13 +11,18 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import errno
 from starlette.applications import Starlette
-from starlette.responses import FileResponse, JSONResponse, PlainTextResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 import uvicorn
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
+
+
+def error_payload(code, message):
+    return {'code': code, 'message': message}
 
 
 def database_path(base_directory):
@@ -123,7 +128,7 @@ def create_app(base_directory, sync_dir=None):
     async def library_index(request):
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
-            return PlainTextResponse('Library index not found', status_code=404)
+            return response(error_payload('not_found', 'Library index not found'), 404)
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
         return response
@@ -134,6 +139,11 @@ def create_app(base_directory, sync_dir=None):
     def response(data, status=200):
         return JSONResponse(data, status_code=status, headers={'Cache-Control': 'no-cache'})
 
+    async def http_exception(request, exc):
+        code = 'not_found' if exc.status_code == 404 else 'server_error'
+        message = exc.detail if isinstance(exc.detail, str) else 'Internal server error'
+        return response(error_payload(code, message), exc.status_code)
+
     def row_data(row):
         data = dict(row)
         for key, target in [('start_meta', 'startMeta'), ('end_meta', 'endMeta')]:
@@ -142,7 +152,7 @@ def create_app(base_directory, sync_dir=None):
 
     async def annotations(request):
         parts = [part for part in request.path_params['path'].split('/') if part]
-        if not parts or parts[0] != 'annotations': return response({'message': 'Not found'}, 404)
+        if not parts or parts[0] != 'annotations': return response(error_payload('not_found', 'Not found'), 404)
         username = request.headers.get('X-Username', '').strip()
         conn = sqlite3.connect(database_path(base_directory))
         conn.row_factory = sqlite3.Row
@@ -150,21 +160,24 @@ def create_app(base_directory, sync_dir=None):
         try:
             tail = parts[1:]
             if request.method == 'GET':
-                if tail[:1] == ['batch']: return response({'message': 'Batch requires POST'}, 400)
+                if tail[:1] == ['batch']: return response(error_payload('batch_requires_post', 'Batch requires POST'), 400)
                 if tail[:1] == ['item'] and len(tail) == 2:
                     sql, args = ('SELECT * FROM annotations WHERE id = ?', [tail[1]]) if not username else ('SELECT * FROM annotations WHERE id = ? AND username = ?', [tail[1], username])
                     row = cursor.execute(sql, args).fetchone()
-                    return response({'data': row_data(row)}, 200) if row else response({'message': 'Annotation not found'}, 404)
+                    return response({'data': row_data(row)}, 200) if row else response(error_payload('annotation_not_found', 'Annotation not found'), 404)
                 where, args = '', []
                 if len(tail) >= 1: where, args = ' WHERE book_hash = ?', [tail[0]]
                 if len(tail) == 2:
                     try: args.append(int(tail[1]))
-                    except ValueError: return response({'message': 'Invalid chapter index'}, 400)
+                    except ValueError: return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
                     where += ' AND chapter_index = ?'
                 if username: where += (' AND ' if where else ' WHERE ') + 'username = ?'; args.append(username)
                 rows = cursor.execute('SELECT * FROM annotations' + where + ' ORDER BY created_at DESC', args).fetchall()
                 return response({'data': [row_data(row) for row in rows]})
-            data = await request.json()
+            try:
+                data = await request.json()
+            except json.JSONDecodeError:
+                return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
             if request.method == 'POST':
                 entries = data.get('annotations', []) if tail == ['batch'] else [data]
                 created = failed = 0
@@ -174,7 +187,7 @@ def create_app(base_directory, sync_dir=None):
                     except Exception: failed += 1
                 conn.commit()
                 return response({'created': created, 'failed': failed}, 201) if tail == ['batch'] else response({'data': data}, 201)
-            if len(tail) != 2 or tail[0] != 'item': return response({'message': 'Not found'}, 404)
+            if len(tail) != 2 or tail[0] != 'item': return response(error_payload('not_found', 'Not found'), 404)
             annotation_id = tail[1]; selector, args = ('id = ?', [annotation_id]) if not username else ('id = ? AND username = ?', [annotation_id, username])
             if request.method == 'DELETE': cursor.execute('DELETE FROM annotations WHERE ' + selector, args); conn.commit(); return response({'message': 'Deleted'})
             if 'chapter_index' in data and (isinstance(data['chapter_index'], bool) or not isinstance(data['chapter_index'], int) or data['chapter_index'] < 0):
@@ -191,22 +204,33 @@ def create_app(base_directory, sync_dir=None):
             assignments.append("updated_at = datetime('now')")
             cursor.execute('UPDATE annotations SET ' + ', '.join(assignments) + ' WHERE ' + selector, values + args); conn.commit()
             row = cursor.execute('SELECT * FROM annotations WHERE ' + selector, args).fetchone()
-            return response({'data': row_data(row)}, 200) if row else response({'message': 'Annotation not found'}, 404)
+            return response({'data': row_data(row)}, 200) if row else response(error_payload('annotation_not_found', 'Annotation not found'), 404)
+        except Exception:
+            return response(error_payload('server_error', 'Internal server error'), 500)
         finally: conn.close()
 
     async def sync(request):
         try:
             data = await request.json()
             username, version, shelf = data.get('username', ''), data.get('version', 1), data.get('data')
-            if not username: return response({'message': 'Username is required'}, 400)
+            if not username: return response(error_payload('username_required', 'Username is required'), 400)
             payload, status = sync_bookshelf(
                 database_path(base_directory), sync_dir or base_directory,
                 username, version, shelf,
             )
+            if status == 400:
+                return response(error_payload('no_sync_data', payload['message']), status)
             return response(payload, status)
-        except json.JSONDecodeError: return response({'message': 'Invalid JSON data'}, 400)
+        except json.JSONDecodeError: return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        except Exception: return response(error_payload('server_error', 'Internal server error'), 500)
 
     async def reading_progress(request):
+        try:
+            return await reading_progress_response(request)
+        except Exception:
+            return response(error_payload('server_error', 'Internal server error'), 500)
+
+    async def reading_progress_response(request):
         book_hash = request.path_params['book_hash']
         username = request.headers.get('X-Username', '')
         database = database_path(base_directory)
@@ -217,16 +241,16 @@ def create_app(base_directory, sync_dir=None):
                     'SELECT chapter_index FROM reading_progress WHERE username = ? AND book_hash = ?',
                     (username, book_hash),
                 ).fetchone()
-            return response({'chapter_index': row[0]}) if row else response({'message': 'Reading progress not found'}, 404)
+            return response({'chapter_index': row[0]}) if row else response(error_payload('reading_progress_not_found', 'Reading progress not found'), 404)
 
         if request.method == 'PUT':
             try:
                 data = await request.json()
             except json.JSONDecodeError:
-                return response({'message': 'Invalid JSON data'}, 400)
+                return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
             chapter_index = data.get('chapter_index') if isinstance(data, dict) else None
             if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
-                return response({'message': 'Invalid chapter index'}, 400)
+                return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
             with sqlite3.connect(database) as connection:
                 connection.execute(
                     '''
@@ -256,7 +280,7 @@ def create_app(base_directory, sync_dir=None):
         Route('/sync', sync, methods=['POST']),
         Mount('/', app=CachedStaticFiles(directory=base_directory, html=False)),
     ]
-    return Starlette(routes=routes)
+    return Starlette(routes=routes, exception_handlers={StarletteHTTPException: http_exception})
 
 # Shared server database path
 DATABASE_PATH = None
@@ -354,13 +378,18 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         except BrokenPipeError:
             # 客户端在写入响应时断开连接，安全忽略
             self.log_message("Client broke pipe during response writing")
+
+    def send_error(self, code, message=None, explain=None):
+        message = message or self.responses.get(code, ('Unknown error',))[0]
+        error_code = 'not_found' if code == 404 else 'server_error'
+        self.send_json_error(code, error_code, message)
         
     def do_GET(self):
         """处理GET请求"""
         try:
             # 检查服务器是否正在关闭
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
                 
             parsed_path = urlparse(self.path)
@@ -392,7 +421,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.log_message(f"Unexpected error in do_GET: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -400,7 +429,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """处理POST请求"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
             
             parsed_path = urlparse(self.path)
@@ -415,14 +444,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.handle_sync_request()
                 return
             
-            self.send_error(404, "Not Found")
+            self.send_json_error(404, 'not_found', 'Not Found')
             
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_POST: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -430,7 +459,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """处理PUT请求"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
             
             parsed_path = urlparse(self.path)
@@ -440,14 +469,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.handle_annotation_api('PUT', path)
                 return
             
-            self.send_error(404, "Not Found")
+            self.send_json_error(404, 'not_found', 'Not Found')
             
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_PUT: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -455,7 +484,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """处理DELETE请求"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
             
             parsed_path = urlparse(self.path)
@@ -465,14 +494,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.handle_annotation_api('DELETE', path)
                 return
             
-            self.send_error(404, "Not Found")
+            self.send_json_error(404, 'not_found', 'Not Found')
             
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_DELETE: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -488,7 +517,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             client_data = data.get('data')
             
             if not username:
-                self.send_json_response(400, {"message": "Username is required"})
+                self.send_json_response(400, error_payload('username_required', 'Username is required'))
                 return
             
             payload, status = sync_bookshelf(
@@ -496,13 +525,16 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.sync_dir or self.base_directory,
                 username, client_version, client_data,
             )
-            self.send_json_response(status, payload)
+            if status == 400:
+                self.send_json_response(status, error_payload('no_sync_data', payload['message']))
+            else:
+                self.send_json_response(status, payload)
             
         except json.JSONDecodeError:
-            self.send_json_response(400, {"message": "Invalid JSON data"})
+            self.send_json_response(400, error_payload('invalid_json', 'Invalid JSON data'))
         except Exception as e:
             self.log_message(f"Error handling sync request: {e}")
-            self.send_json_response(500, {"message": f"Server error: {str(e)}"})
+            self.send_json_response(500, error_payload('server_error', 'Internal server error'))
     
     def send_json_response(self, code, data):
         """发送JSON响应"""
@@ -516,6 +548,9 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(response)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def send_json_error(self, status, code, message):
+        self.send_json_response(status, error_payload(code, message))
     
     def _get_username(self):
         """从请求头中提取用户名"""
@@ -535,11 +570,11 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             # parts = ['', 'api', 'annotations', ...]
             
             if len(parts) < 3 or parts[2] != 'annotations':
-                self.send_json_response(404, {"message": "Not found"})
+                self.send_json_response(404, error_payload('not_found', 'Not found'))
                 return
             
             if not DATABASE_PATH:
-                self.send_json_response(503, {"message": "Database not initialized"})
+                self.send_json_response(503, error_payload('database_unavailable', 'Database not initialized'))
                 return
             
             conn = sqlite3.connect(DATABASE_PATH)
@@ -566,9 +601,11 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             finally:
                 conn.close()
                 
+        except json.JSONDecodeError:
+            self.send_json_response(400, error_payload('invalid_json', 'Invalid JSON data'))
         except Exception as e:
             self.log_message(f"Error handling annotation API: {e}")
-            self.send_json_response(500, {"message": f"Server error: {str(e)}"})
+            self.send_json_response(500, error_payload('server_error', 'Internal server error'))
     
     def _parse_row_meta(self, row_dict):
         """Parse start_meta and end_meta from JSON strings"""
@@ -608,14 +645,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
             row = cursor.fetchone()
             if not row:
-                self.send_json_response(404, {"message": "Annotation not found"})
+                self.send_json_response(404, error_payload('annotation_not_found', 'Annotation not found'))
                 return
             self.send_json_response(200, {"data": self._parse_row_meta(dict(row))})
             return
 
         # /api/annotations/batch
         if len(parts) >= 4 and parts[3] == 'batch':
-            self.send_json_response(400, {"message": "Batch requires POST"})
+            self.send_json_response(400, error_payload('batch_requires_post', 'Batch requires POST'))
             return
 
         # /api/annotations/{book_hash}
@@ -636,7 +673,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             try:
                 chapter_index = int(parts[4])
             except ValueError:
-                self.send_json_response(400, {"message": "Invalid chapter index"})
+                self.send_json_response(400, error_payload('invalid_chapter_index', 'Invalid chapter index'))
                 return
             if username:
                 cursor.execute('SELECT * FROM annotations WHERE book_hash = ? AND chapter_index = ? AND username = ? ORDER BY created_at DESC', (book_hash, chapter_index, username))
@@ -647,7 +684,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.send_json_response(200, {"data": data})
             return
 
-        self.send_json_response(404, {"message": "Not found"})
+        self.send_json_response(404, error_payload('not_found', 'Not found'))
     
     def _handle_annotation_post(self, cursor, parts, conn):
         """处理标注POST请求"""
@@ -704,7 +741,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.send_json_response(201, {"data": data})
             return
 
-        self.send_json_response(404, {"message": "Not found"})
+        self.send_json_response(404, error_payload('not_found', 'Not found'))
     
     def _handle_annotation_put(self, cursor, parts, conn):
         """处理标注PUT请求"""
@@ -723,7 +760,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             else:
                 cursor.execute('SELECT * FROM annotations WHERE id = ?', (ann_id,))
             if not cursor.fetchone():
-                self.send_json_response(404, {"message": "Annotation not found"})
+                self.send_json_response(404, error_payload('annotation_not_found', 'Annotation not found'))
                 return
             
             # 更新
@@ -762,7 +799,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.send_json_response(200, {"data": self._parse_row_meta(dict(row))})
             return
         
-        self.send_json_response(404, {"message": "Not found"})
+        self.send_json_response(404, error_payload('not_found', 'Not found'))
     
     def _handle_annotation_delete(self, cursor, parts, conn):
         """处理标注DELETE请求"""
@@ -780,14 +817,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.send_json_response(200, {"message": "Deleted"})
             return
         
-        self.send_json_response(404, {"message": "Not found"})
+        self.send_json_response(404, error_payload('not_found', 'Not found'))
     
     def send_library_index(self):
         """发送图书馆首页"""
         try:
             index_path = os.path.join(self.base_directory, "index.html")
             if not os.path.exists(index_path):
-                self.send_error(404, "Library index not found")
+                self.send_json_error(404, 'not_found', 'Library index not found')
                 return
                 
             with open(index_path, 'rb') as f:
@@ -801,10 +838,10 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(content)
             
         except FileNotFoundError:
-            self.send_error(404, "Index page not found")
+            self.send_json_error(404, 'not_found', 'Index page not found')
         except Exception as e:
             self.log_message(f"Error sending library index: {e}")
-            self.send_error(500, f"Error reading index: {str(e)}")
+            self.send_json_error(500, 'server_error', 'Internal server error')
     
     def serve_book(self, path):
         """服务书籍内容"""
@@ -815,14 +852,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             file_path = os.path.normpath(file_path)            
 
             if not os.path.exists(file_path):
-                self.send_error(404, f"File not found: {file_path}")
+                self.send_json_error(404, 'not_found', f'File not found: {file_path}')
                 return
             
             self.send_file_safely(file_path)
         except Exception as e:
             self.log_message(f"Error serving book content: {e}")
             try:
-                self.send_error(500, f"Error serving content: {str(e)}")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -830,7 +867,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """安全地发送文件"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
                 
             file_size = os.path.getsize(file_path)
@@ -860,12 +897,12 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                         break
             
         except FileNotFoundError:
-            self.send_error(404, "File not found")
+            self.send_json_error(404, 'not_found', 'File not found')
         except PermissionError:
-            self.send_error(403, "Permission denied")
+            self.send_json_error(403, 'server_error', 'Permission denied')
         except Exception as e:
             self.log_message(f"Error reading file {file_path}: {e}")
-            self.send_error(500, f"Error reading file: {str(e)}")
+            self.send_json_error(500, 'server_error', 'Internal server error')
     
     def should_cache_file(self, file_path):
         """判断文件是否应该被缓存"""

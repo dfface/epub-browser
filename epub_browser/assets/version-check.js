@@ -49,7 +49,7 @@
         };
     }
 
-    function render(footer, update) {
+    function render(footer, update, i18n) {
         var container;
         var link;
         if (!update) return;
@@ -57,7 +57,10 @@
         if (!container) return;
         link = container.querySelector('a');
         if (!link) return;
-        link.textContent = 'Update available: v' + update.version;
+        if (!i18n || !i18n.t) return;
+        link.setAttribute('data-i18n', 'version.updateAvailable');
+        link.setAttribute('data-i18n-params', JSON.stringify({ version: update.version }));
+        link.textContent = i18n.t('version.updateAvailable', { version: update.version });
         link.setAttribute('href', update.url);
         container.hidden = false;
     }
@@ -112,11 +115,12 @@
         xhr.send();
     }
 
-    function check(doc, requester) {
+    function check(doc, requester, i18n) {
         var footers;
         var apiUrl;
         var request = requester || requestRelease;
         var i;
+        var runtime = i18n || (root && root.EpubBrowserI18n);
         if (!doc || !doc.querySelectorAll) return;
         footers = doc.querySelectorAll('[data-version-check]');
         if (!footers.length) return;
@@ -127,7 +131,7 @@
                 render(footers[i], updateFor(
                     footers[i].getAttribute('data-current-version'),
                     release
-                ));
+                ), runtime);
             }
         });
     }

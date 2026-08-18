@@ -1,14 +1,18 @@
+from functools import partial
+from http.client import HTTPConnection
+from http.server import HTTPServer
 import json
 import os
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
 from starlette.testclient import TestClient
 
-from epub_browser.server import create_app
+from epub_browser.server import EPUBHTTPRequestHandler, create_app
 
 
 class ServerCacheTests(unittest.TestCase):
@@ -24,6 +28,10 @@ class ServerCacheTests(unittest.TestCase):
             app.write("console.log('app')")
         with open(os.path.join(self.directory.name, "assets", "manifest.json"), "w", encoding="utf-8") as manifest:
             manifest.write("{}")
+        with open(os.path.join(self.directory.name, "assets", "manifest.en.json"), "w", encoding="utf-8") as manifest:
+            manifest.write("{}")
+        with open(os.path.join(self.directory.name, "assets", "manifest.zh-CN.json"), "w", encoding="utf-8") as manifest:
+            manifest.write("{}")
         with open(os.path.join(self.directory.name, "sw.js"), "w", encoding="utf-8") as worker:
             worker.write("self.addEventListener('fetch', () => {})")
         os.makedirs(os.path.join(self.directory.name, "book", "demo", "resources"))
@@ -38,6 +46,29 @@ class ServerCacheTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
+    def legacy_request(self, method, path, body=None, headers=None, base_directory=None, shutting_down=False):
+        handler = partial(
+            EPUBHTTPRequestHandler,
+            base_directory=base_directory or self.directory.name,
+            enableLog=False,
+            sync_dir=self.directory.name,
+        )
+        server = HTTPServer(("127.0.0.1", 0), handler)
+        server._is_shutting_down = shutting_down
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            connection = HTTPConnection("127.0.0.1", server.server_port)
+            connection.request(method, path, body=body, headers=headers or {})
+            response = connection.getresponse()
+            result = response.status, response.read()
+            connection.close()
+            return result
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
     def test_immutable_assets_are_long_lived_and_validate_with_etag(self):
         response = self.client.get("/assets/immutable/app.0123456789ab.js")
 
@@ -49,7 +80,13 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(cached.status_code, 304)
 
     def test_mutable_assets_and_worker_revalidate(self):
-        for path in ("/assets/cover.webp", "/assets/manifest.json", "/sw.js"):
+        for path in (
+            "/assets/cover.webp",
+            "/assets/manifest.json",
+            "/assets/manifest.en.json",
+            "/assets/manifest.zh-CN.json",
+            "/sw.js",
+        ):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
@@ -60,6 +97,12 @@ class ServerCacheTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "no-cache")
+
+    def test_starlette_static_errors_return_stable_json_codes(self):
+        response = self.client.get("/missing-static-file")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"code": "not_found", "message": "Not Found"})
 
     def test_book_resources_are_cached_while_book_pages_revalidate(self):
         book_page = self.client.get("/book/demo/index.html")
@@ -111,6 +154,47 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(repaired["startMeta"]["parentIndex"], 0)
         self.assertEqual(self.client.get("/api/annotations/book/1", headers=headers).json()["data"], [])
         self.assertEqual(self.client.get("/api/annotations/book/3", headers=headers).json()["data"][0]["id"], "misplaced")
+
+    def test_browser_api_errors_include_stable_codes_and_compatible_messages(self):
+        with TestClient(create_app(self.directory.name), raise_server_exceptions=False) as client:
+            with mock.patch("epub_browser.server.sqlite3.connect", side_effect=sqlite3.OperationalError("offline")):
+                server_error = client.get("/api/reading-progress/book")
+
+        cases = [
+            (self.client.post("/sync", json={}), 400, "username_required"),
+            (self.client.put("/api/reading-progress/book", json={"chapter_index": -1}), 400, "invalid_chapter_index"),
+            (self.client.get("/api/annotations/item/missing"), 404, "annotation_not_found"),
+            (self.client.post("/sync", content=b"{", headers={"Content-Type": "application/json"}), 400, "invalid_json"),
+            (server_error, 500, "server_error"),
+        ]
+        for response, status, code in cases:
+            with self.subTest(code=code):
+                self.assertEqual(response.status_code, status)
+                self.assertEqual(response.json()["code"], code)
+                self.assertIsInstance(response.json()["message"], str)
+
+    def test_legacy_browser_errors_return_stable_json_codes(self):
+        with tempfile.TemporaryDirectory() as missing_library:
+            cases = [
+                (self.legacy_request("GET", "/api/missing"), 404, "not_found", "Not found"),
+                (self.legacy_request("POST", "/missing"), 404, "not_found", "Not Found"),
+                (self.legacy_request("GET", "/api/annotations", shutting_down=True), 503, "server_error", "Server is shutting down"),
+                (self.legacy_request("GET", "/", base_directory=missing_library), 404, "not_found", "Library index not found"),
+                (self.legacy_request("GET", "/missing-static-file"), 404, "not_found", "File not found"),
+            ]
+        for result, status, code, message in cases:
+            with self.subTest(code=code, message=message):
+                actual_status, body = result
+                self.assertEqual(actual_status, status)
+                self.assertEqual(json.loads(body), {"code": code, "message": message})
+
+    def test_legacy_server_errors_are_sanitized(self):
+        with mock.patch.object(EPUBHTTPRequestHandler, "send_file_safely", side_effect=RuntimeError("legacy raw secret")):
+            status, body = self.legacy_request("GET", "/book/demo/index.html")
+
+        self.assertEqual(status, 500)
+        self.assertEqual(json.loads(body), {"code": "server_error", "message": "Internal server error"})
+        self.assertNotIn(b"legacy raw secret", body)
 
     def test_sync_route_preserves_new_shelf_response(self):
         response = self.client.post("/sync", json={"username": "reader", "version": 1, "data": {"items": []}})

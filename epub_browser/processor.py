@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import re
 import hashlib
 import base64
+import html
 import json
 import urllib.parse
 import minify_html
@@ -324,7 +325,7 @@ class EPUBProcessor:
 
             # 获取语言
             lang = root.find('.//dc:language', ns)
-            self.lang = lang.text if lang is not None and lang.text else 'en'
+            self.lang = lang.text.strip() if lang is not None and lang.text and lang.text.strip() else 'en'
                 
             # 获取manifest（所有资源）
             manifest = {}
@@ -422,8 +423,13 @@ class EPUBProcessor:
     
     def create_index_page(self):
         """创建章节索引页面"""
+        book_language = html.escape(self.lang or 'en', quote=True)
+        if self.authors:
+            authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
+        else:
+            authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         index_html = f"""<!DOCTYPE html>
-<html lang="{self.lang}">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -433,6 +439,9 @@ class EPUBProcessor:
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{self.book_title}</title>
+    <script src="/assets/i18n.js"></script>
+    <script>window.EpubBrowserI18n.init();</script>
+    <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
@@ -440,7 +449,6 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
 """
@@ -522,34 +530,34 @@ class EPUBProcessor:
 <div class="top-controls">
     <div class="theme-toggle" id="themeToggle">
         <i class="fas fa-moon"></i>
-        <span class="control-name">Theme</span>
+        <span class="control-name" data-i18n="book.theme">Theme</span>
     </div>
 </div>
 """
         index_html += f"""
 <div class="breadcrumb-container">
-    <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-        <a href="/" aria-label="Library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label">Library</span></a>
+    <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="book.breadcrumb" data-id="breadcrumb">
+        <a href="/" aria-label="Library" data-i18n-aria-label="book.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="book.library">Library</span></a>
         <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
+        <span class="breadcrumb-current" id="book_home" aria-current="page" lang="{book_language}">{self.book_title}</span>
     </nav>
 </div>
 <div class="container">
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
-                <img src="{self.get_book_info()['cover']}" alt="cover">
+                <img src="{self.get_book_info()['cover']}" alt="">
             </div>
             <div class="book-info-content">
-                <h2 class="book-info-title">{self.book_title}</h2>
-                <p class="book-info-author">{" & ".join(self.authors) if self.authors else "Unknown"}</p>"""
+                <h2 class="book-info-title" lang="{book_language}">{self.book_title}</h2>
+                {authors_html}"""
         if self.description:
             index_html += f""" 
-                <div class="book-info-desc">
+                <div class="book-info-desc" lang="{book_language}">
                     {self.description}
                 </div>"""
-        index_html += """
-                <div class="book-info-tags">"""
+        index_html += f"""
+                <div class="book-info-tags" lang="{book_language}">"""
         if self.tags:
             for tag in self.tags:
                 index_html += f"""<span class="book-tag">{tag}</span>"""        
@@ -557,22 +565,22 @@ class EPUBProcessor:
                 </div>
                 <div class="css-controls clearReadingProgress">
                     <div class="continue-reading-control" id="continueReadingControl">
-                        <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
-                        <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                        <a class="css-btn primary" id="continueReadingBtn" href="#" aria-label="Start reading" data-i18n-aria-label="book.startReading"><i class="fas fa-book-open"></i><span id="continueReadingBtnText" data-i18n="book.startReading">Start reading</span></a>
+                        <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" data-i18n-aria-label="book.moreReadingActions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                         <div class="continue-reading-menu" id="clearReadingProgressMenu" hidden>
-                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" hidden><i class="fas fa-eraser" aria-hidden="true"></i>Clear</button>
+                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                         </div>
                     </div>
-                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i>Annotations</button>
-                    <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
+                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i><span data-i18n="book.annotations">Annotations</span></button>
+                    <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
             </div>
         </div>
     
     <div class="toc-container" data-id="toc-container">
         <div class="toc-header">
-            <h2>Table of contents</h2>
-            <div class="chapter-count">total: {len(self.chapters)}</div>
+            <h2 data-i18n="book.tableOfContents">Table of contents</h2>
+            <div class="chapter-count" data-i18n="book.totalChapters" data-i18n-params='{{"count": {len(self.chapters)}}}'>Total: {len(self.chapters)}</div>
         </div>
         <ul class="chapter-list">
 """
@@ -591,16 +599,16 @@ class EPUBProcessor:
                 
                 if chapter_index is not None:
                     if chapter_anchor is not None:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="eb_ci_{chapter_index}#{chapter_anchor}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="eb_ci_{chapter_index}#{chapter_anchor}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
                 else:
                     print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
-                index_html += f'        <li><a class="chapter-link" href="/book/{self.book_hash}/chapter_{i}.html" id="eb_ci_{i}">{chapter["title"]}</a></li>\n'
+                index_html += f'        <li><a class="chapter-link" href="/book/{self.book_hash}/chapter_{i}.html" id="eb_ci_{i}"><span class="chapter-title" lang="{book_language}">{chapter["title"]}</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
@@ -608,16 +616,16 @@ class EPUBProcessor:
 <div class="reading-controls" data-id="reading-controls">
     <div class="control-btn" id="scrollToTopBtn">
         <i class="fas fa-arrow-up"></i>
-        <span class="control-name">Top</span>
+        <span class="control-name" data-i18n="book.top">Top</span>
     </div>
     <button class="control-btn" id="bookshelfBtn" style="display: none;">
         <i class="fas fa-bookmark"></i>
-        <span class="control-name">Shelf</span>
+        <span class="control-name" data-i18n="book.shelf">Shelf</span>
     </button>
-    <a href="/" alt="Home">
+    <a href="/" aria-label="Home" data-i18n-aria-label="book.home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
-            <span class="control-name">Home</span>
+            <span class="control-name" data-i18n="book.home">Home</span>
         </div>
     </a>
 </div>
@@ -627,30 +635,30 @@ class EPUBProcessor:
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addShelfGroupBtn">
-                    <i class="fas fa-folder-plus"></i> Add Group
+                    <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                 </button>
                 <button class="bookshelf-action-btn" id="syncShelfBtn">
-                    <i class="fas fa-sync"></i> Sync
+                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
                 </button>
                 <button class="bookshelf-action-btn" id="exportShelfBtn">
-                    <i class="fas fa-upload"></i> Export
+                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
                 </button>
                 <button class="bookshelf-action-btn" id="importShelfBtn">
-                    <i class="fas fa-download"></i> Import
+                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                 </button>
                 <input type="file" id="importShelfFile" accept=".json" style="display: none;">
             </div>
-            <h2 class="bookshelf-title"><i class="fas fa-home"></i> Bookshelf</h2>
+            <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
             <div class="bookshelf-header-right">
-                <button class="bookshelf-close-btn" id="bookshelfCloseBtn">
+                <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         </div>
         <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-            <span class="bookshelf-tag active" data-tag="All">All</span>
+            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
         </div>
-        <div class="bookshelf-loading" id="bookshelfLoading">
+        <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
         </div>
         <div class="bookshelf-body" id="bookshelfBody">
@@ -667,29 +675,29 @@ class EPUBProcessor:
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
-                    <i class="fas fa-folder-plus"></i> Add Group
+                    <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                 </button>
                 <button class="bookshelf-action-btn" id="renameGroupBtn">
-                    <i class="fas fa-edit"></i> Rename
+                    <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
                 </button>
                 <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
-                    <i class="fas fa-trash"></i> Delete Group
+                    <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
                 </button>
             </div>
-            <h2 class="bookshelf-title" id="groupModalTitle">Group</h2>
+            <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
             <div class="bookshelf-header-right">
-                <button class="bookshelf-close-btn" id="groupCloseBtn">
+                <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
                     <i class="fas fa-home"></i>
                 </button>
-                <button class="bookshelf-close-btn" id="groupCloseAllBtn">
+                <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         </div>
         <div class="bookshelf-tag-filter" id="groupTagFilter">
-            <span class="bookshelf-tag active" data-tag="All">All</span>
+            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
         </div>
-        <div class="bookshelf-loading" id="groupLoading">
+        <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
         </div>
         <div class="bookshelf-body" id="groupBody">
@@ -1107,15 +1115,13 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         """创建章节页面模板"""
         prev_href = f'href="/book/{self.book_hash}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{self.book_hash}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
-        prev_chapter = f'Perv chapter' if chapter_index > 0 else 'First chapter'
-        next_chapter = f'Next chapter' if chapter_index < len(self.chapters) - 1 else 'Last chapter'
-        prev_link = f'<a {prev_href} alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">{prev_chapter}</span></div></a>'
-        next_link = f'<a {next_href} alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">{next_chapter}</span></div></a>'
-        prev_link_mobile = f'<a {prev_href} alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(" chapter", "")}</span></div></a>'
-        next_link_mobile = f'<a {next_href} alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(" chapter", "")}</span></div></a>'
+        prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
+        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
         
         chapter_html =  f"""<!DOCTYPE html>
-<html lang="{self.lang}">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1125,6 +1131,9 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{chapter_title} - {self.book_title}</title>
+    <script src="/assets/i18n.js"></script>
+    <script>window.EpubBrowserI18n.init();</script>
+    <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
     <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
@@ -1137,7 +1146,6 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="manifest" href="/assets/manifest.json">
     <link rel="stylesheet" href="/assets/bookshelf.css">
 """
         chapter_html += """
@@ -1224,33 +1232,33 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="top-controls">
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
-            <span class="control-name">Theme</span>
+            <span class="control-name" data-i18n="reader.theme">Theme</span>
         </div>
 
         <div class="control-btn" id="togglePagination">
             <i class="fas fa-book-open"></i>
-            <span class="control-name">Turning</span>
+            <span class="control-name" data-i18n="reader.turning">Turning</span>
         </div>
 
-        <div class="control-btn" id="bookHomeToggle">
+        <div class="control-btn" id="bookHomeToggle" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
             <i class="fas fa-book"></i>
-            <span class="control-name">Book</span>
+            <span class="control-name" data-i18n="reader.book">Book</span>
         </div>
 
         <div class="control-btn" id="tocToggle">
             <i class="fas fa-list"></i>
-            <span class="control-name">Toc</span>
+            <span class="control-name" data-i18n="reader.tableOfContents">Table of contents</span>
         </div>
     </div>
 
     <div class="toc-floating" id="bookHomeFloating">
         <div class="toc-header">
-            <h3>Toc</h3>
+            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
             <div class="toc-header-actions">
-                <a class="toc-book-home" href="index.html" aria-label="Open book home">
-                    <i class="fas fa-book" aria-hidden="true"></i><span>Book home</span>
+                <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+                    <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
                 </a>
-                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close table of contents">
+                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close book home" data-i18n-aria-label="reader.closeBookHome">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
@@ -1262,8 +1270,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
     <div class="toc-floating" id="tocFloating">
         <div class="toc-header">
-            <h3>Toc</h3>
-            <button class="toc-close" id="tocClose">
+            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
+            <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -1273,8 +1281,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
 
     <div class="chapter-top-bar">
-        <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-            <a href="/" aria-label="Library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label">Library</span></a>
+        <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
+            <a href="/" aria-label="Library" data-i18n-aria-label="reader.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="reader.library">Library</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
@@ -1283,64 +1291,64 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
     <div class="container">
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
-            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content">
+            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
         </div>
 
         <div class="navigation" data-id="navigation">
             {prev_link}
-            <a href="/" alt="home" id="navigationHomeBtn">
+            <a href="/" aria-label="Home" data-i18n-aria-label="reader.home" id="navigationHomeBtn">
                 <div class="control-btn">
                     <i class="fas fa-home"></i>
-                    <span class="control-name">Home</span>
+                    <span class="control-name" data-i18n="reader.home">Home</span>
                 </div>
             </a>
 
             <div id="paginationInfo" style="display: none;">
                 <div class="control-btn" id="prevPage" style="padding-right: 40px;">
                     <i class="fas fa-chevron-left"></i>
-                    <span class="control-name">Prev page</span>
+                    <span class="control-name" data-i18n="reader.previousPage">Previous page</span>
                 </div>
                 <div style="display: flex; flex-direction: row;">
                     <span class="page-indicator">
                         <span id="currentPage" style="display:none;"></span>
-                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1" aria-label="Current page" data-i18n-aria-label="reader.currentPage"> / <span id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
                     </span>
-                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump" data-i18n-title="reader.jump">
                         <i class="fas fa-arrow-right-to-bracket"></i>
-                        <span class="control-name">Jump</span>
+                        <span class="control-name" data-i18n="reader.jump">Jump</span>
                     </div>
-                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page" data-i18n-title="reader.clickToTurn">
                         <i class="fas fa-hand-pointer"></i>
-                        <span class="control-name">Click</span>
+                        <span class="control-name" data-i18n="reader.clickToTurn">Click to turn page</span>
                     </div>
                     <!-- Pure button only for desktop -->
-                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode" data-i18n-title="reader.pureReading">
                         <i class="fas fa-book-open"></i>
-                        <span class="control-name">Pure</span>
+                        <span class="control-name" data-i18n="reader.pureReading">Pure reading mode</span>
                     </div>
                     <!-- Reload button for pagination mode -->
-                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                    <div class="control-btn" id="reloadPages" title="Reload pages" data-i18n-title="reader.reloadPages">
                         <i class="fas fa-rotate-right"></i>
-                        <span class="control-name">Reload</span>
+                        <span class="control-name" data-i18n="reader.reloadPages">Reload pages</span>
                     </div>
                 </div>
                 <div style="display: none; flex-direction: row;" class="page-height-adjustment">
                     <span>
-                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1" aria-label="Page height" data-i18n-aria-label="reader.pageHeight">
                     </span>
-                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height" data-i18n-title="reader.setPageHeight">
                         <i class="fas fa-ruler-vertical"></i>
-                        <span class="control-name">Set page height</span>
+                        <span class="control-name" data-i18n="reader.setPageHeight">Set page height</span>
                     </div>
                 </div>
                 <div class="control-btn" id="nextPage" style="padding-left: 40px;">
                     <i class="fas fa-chevron-right"></i>
-                    <span class="control-name">Next page</span>
+                    <span class="control-name" data-i18n="reader.nextPage">Next page</span>
                 </div>
             </div>
             {next_link}
@@ -1351,42 +1359,42 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="settings-modal" id="settingsModal" data-id="settingsModal">
         <div class="settings-header">
             <i class="fas fa-cog"></i>
-            <span>Settings</span>
-            <button class="settings-close-btn" id="settingsCloseBtn">
+            <span data-i18n="reader.settings">Settings</span>
+            <button class="settings-close-btn" id="settingsCloseBtn" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="settings-tabs">
             <button class="settings-tab active" data-tab="font">
                 <i class="fas fa-font"></i>
-                <span>Font</span>
+                <span data-i18n="settings.appearance">Appearance</span>
             </button>
             <button class="settings-tab" data-tab="reading">
                 <i class="fas fa-book-reader"></i>
-                <span>Reading</span>
+                <span data-i18n="settings.reading">Reading</span>
             </button>
         </div>
         <div class="settings-content">
             <div class="settings-tab-panel active" id="font-tab">
                 <div class="settings-group">
-                    <label class="settings-label">Font Family</label>
+                    <label class="settings-label" data-i18n="settings.fontFamily">Font family</label>
         <div class="font-family-selector">
             <select id="fontFamilySelect">
-                <option value="ebook-default" selected>Book default</option>
-                <option value="system-ui, -apple-system, sans-serif">System default</option>
-                <option value="custom">Custom by input</option>
+                <option value="ebook-default" selected data-i18n="settings.bookDefault">Book default</option>
+                <option value="system-ui, -apple-system, sans-serif" data-i18n="settings.systemDefault">System default</option>
+                <option value="custom" data-i18n="settings.customByInput">Custom by input</option>
             </select>
         </div>
         <div class="custom-font-input" id="customFontInput" style="display: none;">
-            <input type="text" id="customFontFamily" placeholder="Input font name here">
-            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <input type="text" id="customFontFamily" placeholder="Input font name here" data-i18n-placeholder="settings.customFontPlaceholder">
+            <small data-i18n="settings.customFontTip">Tip: Font family applies globally. Ensure it’s installed in the system.</small>
             <button class="css-btn primary" id="applyFontSettings">
-                <i class="fas fa-check"></i> Apply
+                <i class="fas fa-check"></i> <span data-i18n="settings.apply">Apply</span>
             </button>
         </div>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label">Font Size</label>
+                    <label class="settings-label" data-i18n="settings.fontSize">Font size</label>
                     <div class="font-size-control">
                         <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
                         <div class="font-size-scale">
@@ -1403,48 +1411,48 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
-                    <label class="settings-label">Reading mode</label>
+                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
                     <label class="settings-switch">
                         <input type="checkbox" id="showReadingProgressBarToggle" checked>
                         <span class="switch-slider"></span>
-                        <span class="switch-text">Show reading progress bar</span>
+                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
                     </label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
-                        <span class="switch-text">Enable Continuous Scroll</span>
-                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off.">
+                        <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip">
                             <i class="fas fa-info-circle"></i>
                         </span>
                     </label>
                 </div>
                 <div class="settings-group settings-group-custom-css">
                     <div class="settings-section-heading">
-                        <span class="settings-section-title">Custom styles</span>
-                        <span class="settings-section-optional">Optional</span>
+                        <span class="settings-section-title" data-i18n="settings.customStyles">Custom styles</span>
+                        <span class="settings-section-optional" data-i18n="settings.optional">Optional</span>
                     </div>
-                    <p class="settings-section-description">Use CSS to fine-tune this book’s typography and layout.</p>
+                    <p class="settings-section-description" data-i18n="settings.customStylesDescription">Use CSS to fine-tune this book’s typography and layout.</p>
                     <div class="css-editor">
-                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
+                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}" data-i18n-placeholder="settings.customCssPlaceholder"></textarea>
                         <div class="css-controls">
                             <button class="css-btn primary" id="saveCssBtn">
-                                <i class="fas fa-save"></i> Save
+                                <i class="fas fa-save"></i> <span data-i18n="settings.save">Save</span>
                             </button>
                             <button class="css-btn primary" id="saveAsDefaultBtn">
-                                <i class="fas fa-star"></i> Save as default
+                                <i class="fas fa-star"></i> <span data-i18n="settings.saveAsDefault">Save as default</span>
                             </button>
                             <button class="css-btn secondary" id="resetCssBtn">
-                                <i class="fas fa-undo"></i> Reset
+                                <i class="fas fa-undo"></i> <span data-i18n="settings.reset">Reset</span>
                             </button>
                             <button class="css-btn secondary" id="loadDefaultBtn">
-                                <i class="fas fa-download"></i> Load default
+                                <i class="fas fa-download"></i> <span data-i18n="settings.loadDefault">Load default</span>
                             </button>
                             <button class="css-btn secondary" id="previewCssBtn">
-                                <i class="fas fa-eye"></i> Preview
+                                <i class="fas fa-eye"></i> <span data-i18n="settings.preview">Preview</span>
                             </button>
                         </div>
                         <div class="css-info">
-                            <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                            <p><i class="fas fa-info-circle"></i> <span data-i18n="settings.defaultStyleTip">Tip: The default style will be applied to all books unless a custom style is set for specific books.</span></p>
                         </div>
                     </div>
                 </div>
@@ -1455,20 +1463,20 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="reading-controls" data-id="reading-controls">
         <div class="control-btn" id="scrollToTopBtn">
             <i class="fas fa-arrow-up"></i>
-            <span class="control-name">Top</span>
+            <span class="control-name" data-i18n="reader.top">Top</span>
         </div>
         <div class="control-btn" id="settingsControlBtn">
             <i class="fas fa-cog"></i>
-            <span class="control-name">Settings</span>
+            <span class="control-name" data-i18n="reader.settings">Settings</span>
         </div>
         <button class="control-btn" id="bookshelfBtn" style="display: none;">
             <i class="fas fa-bookmark"></i>
-            <span class="control-name">Shelf</span>
+            <span class="control-name" data-i18n="reader.shelf">Shelf</span>
         </button>
-        <a href="/" alt="Home">
+        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
-                <span class="control-name">Home</span>
+                <span class="control-name" data-i18n="reader.home">Home</span>
             </div>
         </a>
     </div>
@@ -1477,35 +1485,35 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="mobile-controls" data-id="mobile-controls">
         <div class="control-btn" id="mobileTocBtn">
             <i class="fas fa-list"></i>
-            <span>Toc</span>
+            <span data-i18n="reader.tableOfContents">Table of contents</span>
         </div>
         <div class="control-btn" id="mobileThemeBtn">
             <i class="fas fa-moon"></i>
-            <span>Theme</span>
+            <span data-i18n="reader.theme">Theme</span>
         </div>
         <div class="control-btn" id="mobileTogglePagination">
             <i class="fas fa-book-open"></i>
-            <span class="control-name">Turning</span>
+            <span class="control-name" data-i18n="reader.turning">Turning</span>
         </div>
         {prev_link_mobile}
-        <a href="/" alt="Home">
+        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
-                <span>Home</span>
+                <span data-i18n="reader.home">Home</span>
             </div>
         </a>
         {next_link_mobile}
-        <div class="control-btn" id="mobileBookHomeBtn">
+        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
             <i class="fas fa-book"></i>
-            <span>Book</span>
+            <span data-i18n="reader.book">Book</span>
         </div>
         <div class="control-btn" id="mobileSettingsBtn">
             <i class="fas fa-cog"></i>
-            <span>Settings</span>
+            <span data-i18n="reader.settings">Settings</span>
         </div>
         <div class="control-btn" id="mobileTopBtn">
             <i class="fas fa-arrow-up"></i>
-            <span>Top</span>
+            <span data-i18n="reader.top">Top</span>
         </div>
     </div>
 
@@ -1515,30 +1523,30 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addShelfGroupBtn">
-                        <i class="fas fa-folder-plus"></i> Add Group
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                     </button>
                     <button class="bookshelf-action-btn" id="syncShelfBtn">
-                        <i class="fas fa-sync"></i> Sync
+                        <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
                     </button>
                     <button class="bookshelf-action-btn" id="exportShelfBtn">
-                        <i class="fas fa-upload"></i> Export
+                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
                     </button>
                     <button class="bookshelf-action-btn" id="importShelfBtn">
-                        <i class="fas fa-download"></i> Import
+                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                     </button>
                     <input type="file" id="importShelfFile" accept=".json" style="display: none;">
                 </div>
-                <h2 class="bookshelf-title"><i class="fas fa-home"></i> Bookshelf</h2>
+                <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
                 <div class="bookshelf-header-right">
-                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn">
+                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
             <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-                <span class="bookshelf-tag active" data-tag="All">All</span>
+                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
             </div>
-            <div class="bookshelf-loading" id="bookshelfLoading">
+            <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
             </div>
             <div class="bookshelf-body" id="bookshelfBody">
@@ -1555,29 +1563,29 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
-                        <i class="fas fa-folder-plus"></i> Add Group
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                     </button>
                     <button class="bookshelf-action-btn" id="renameGroupBtn">
-                        <i class="fas fa-edit"></i> Rename
+                        <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
                     </button>
                     <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
-                        <i class="fas fa-trash"></i> Delete Group
+                        <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
                     </button>
                 </div>
-                <h2 class="bookshelf-title" id="groupModalTitle">Group</h2>
+                <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
                 <div class="bookshelf-header-right">
-                    <button class="bookshelf-close-btn" id="groupCloseBtn">
+                    <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
                         <i class="fas fa-home"></i>
                     </button>
-                    <button class="bookshelf-close-btn" id="groupCloseAllBtn">
+                    <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
             <div class="bookshelf-tag-filter" id="groupTagFilter">
-                <span class="bookshelf-tag active" data-tag="All">All</span>
+                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
             </div>
-            <div class="bookshelf-loading" id="groupLoading">
+            <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
             </div>
             <div class="bookshelf-body" id="groupBody">

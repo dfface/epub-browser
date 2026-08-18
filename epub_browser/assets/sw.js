@@ -1,5 +1,10 @@
 const CACHE_NAME = 'epub-browser-__EPUB_BROWSER_RELEASE_ID__';
 const PRECACHE_URLS = __EPUB_BROWSER_PRECACHE_URLS__;
+const MUTABLE_MANIFEST_URLS = new Set([
+    '/assets/manifest.json',
+    '/assets/manifest.en.json',
+    '/assets/manifest.zh-CN.json',
+]);
 
 self.addEventListener('install', (event) => {
     event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
@@ -20,6 +25,10 @@ function isPrecachedAsset(request) {
     return PRECACHE_URLS.includes(new URL(request.url).pathname);
 }
 
+function isMutableManifest(request) {
+    return MUTABLE_MANIFEST_URLS.has(new URL(request.url).pathname);
+}
+
 async function networkFirst(request, fallbackUrl) {
     try {
         const response = await fetch(request);
@@ -37,6 +46,11 @@ async function networkFirst(request, fallbackUrl) {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) return;
+
+    if (isMutableManifest(event.request)) {
+        event.respondWith(networkFirst(event.request));
+        return;
+    }
 
     if (isPrecachedAsset(event.request)) {
         event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));

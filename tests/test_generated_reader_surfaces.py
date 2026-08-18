@@ -28,6 +28,72 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'/assets/immutable/version-check\.[0-9a-f]{12}\.js',
             )
 
+    def test_all_generated_pages_bootstrap_shared_i18n_before_ui_scripts(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertRegex(html, r'/assets/immutable/i18n\.[0-9a-f]{12}\.js')
+            self.assertIn('window.EpubBrowserI18n.init()', html)
+            self.assertLess(html.index('window.EpubBrowserI18n.init()'), html.index('/assets/immutable/theme.'))
+            self.assertNotIn('/assets/manifest.json', html)
+            self.assertRegex(
+                html,
+                r'<noscript><link\b(?=[^>]*\brel=(?:"manifest"|manifest))(?=[^>]*\bhref=(?:"/assets/manifest\.en\.json"|/assets/manifest\.en\.json))[^>]*>',
+            )
+
+    def test_chapter_separates_ui_and_epub_content_languages(self):
+        html = self._chapter_html()
+
+        self.assertIn('<html lang="en"', html)
+        self.assertRegex(html, r'<article[^>]+id="eb-content"[^>]+lang="en"')
+
+    def test_book_and_chapter_keep_epub_language_off_the_ui_shell(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory)
+            processor.book_title = "A Book"
+            processor.description = "Une description"
+            processor.lang = "fr"
+            processor.chapters = [{"title": "One"}]
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            book_html = Path(processor.web_dir, "index.html").read_text(encoding="utf-8")
+            chapter_html = processor.create_chapter_template("<p>Texte</p>", "", 0, "One")
+
+        self.assertRegex(book_html, r'<html\s+lang=(?:"en"|en)(?:\s|>)')
+        self.assertRegex(book_html, r'<div\b(?=[^>]*\bclass=(?:"book-info-desc"|book-info-desc))(?=[^>]*\blang=(?:"fr"|fr))[^>]*>')
+        self.assertIn('<html lang="en"', chapter_html)
+        self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+lang="fr"')
+
+    def test_book_page_localizes_shell_but_marks_metadata_as_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory)
+            processor.book_title = 'A Book'
+            processor.lang = 'fr'
+            processor.description = '<p>Texte original</p>'
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            html = Path(processor.web_dir, 'index.html').read_text(encoding='utf-8')
+
+        self.assertRegex(html, r'data-i18n=(?:["\'])?book\.startReading')
+        self.assertRegex(html, r'data-i18n=(?:["\'])?book\.tableOfContents')
+        self.assertRegex(html, r'class=(?:["\'])?book-info-desc(?=[^>]*\blang=(?:["\'])?fr)')
+        self.assertIn('A Book', html)
+        self.assertIn('Texte original', html)
+
+    def test_book_script_has_no_literal_user_notifications_or_confirmations(self):
+        script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+
+    def test_chapter_script_routes_notifications_and_confirmations_through_i18n(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+        self.assertIn("i18n.t('reader.loadingNextChapter'", script)
+        self.assertIn("i18n.t('settings.saved'", script)
+        self.assertIn("i18n.t('reader.chapterNumber'", script)
+        self.assertIn("i18n.t('settings.continuousScrollTip'", script)
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 
@@ -61,9 +127,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn("Utils.showNotification('Annotation added', 'success')", script)
         self.assertNotIn("Utils.showNotification('Annotation updated', 'success')", script)
         self.assertNotIn("Utils.showNotification('Annotation deleted', 'info')", script)
-        self.assertIn("Utils.showNotification('Failed to add: ' + err.message, 'error')", script)
-        self.assertIn("Utils.showNotification('Failed to update: ' + err.message, 'error')", script)
-        self.assertIn("Utils.showNotification('Failed to delete: ' + err.message, 'error')", script)
+        self.assertIn("Utils.showNotification(tr('addFailed', { error: err.message }), 'error')", script)
+        self.assertIn("Utils.showNotification(tr('updateFailed', { error: err.message }), 'error')", script)
+        self.assertIn("Utils.showNotification(tr('deleteFailed', { error: err.message }), 'error')", script)
+
+    def test_annotation_editor_routes_user_copy_through_i18n(self):
+        script = Path('epub_browser/assets/annotation.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"Utils\.showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+        self.assertIn("i18n.t('annotations.noteOptional'", script)
+        self.assertIn("i18n.t('annotations.storageLocationChanged'", script)
 
     def test_reader_does_not_append_an_emoji_to_noted_highlights(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
@@ -89,7 +163,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('if (renderVersion !== self.renderVersion) return;', script)
         self.assertIn('return false;', script)
         self.assertIn('self.renderAll(true);', script)
-        self.assertIn("Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error')", script)
+        self.assertIn("Utils.showNotification(tr('restoreFailed'), 'error')", script)
 
     def test_continuous_reader_loads_chapter_relative_annotation_positioning(self):
         html = self._chapter_html()
@@ -121,13 +195,22 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(html, r'id=(?:["\'])?continueReadingMenuToggle')
         self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressMenu')
         self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressBtn')
-        self.assertIn('aria-label="Clear reading progress"', html)
-        self.assertIn('>Clear</button>', html)
+        self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?book\.clearReadingProgress')
+        self.assertRegex(html, r'data-i18n=(?:["\'])?book\.clear')
         self.assertIn("updateContinueReadingButton(book_hash);", script)
         self.assertIn("setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());", script)
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
-        self.assertIn('window.confirm("Clear reading progress for this book?")', script)
+        self.assertIn("window.confirm(bookT('book.clearReadingProgressConfirm'))", script)
+        self.assertIn("'DELETE',", script)
+        self.assertIn("true,\n                    true", script)
+        self.assertIn("if (!result || result.error)", script)
+        self.assertIn("book.clearReadingProgressFailed", script)
+        clear_handler = script.index("window.confirm(bookT('book.clearReadingProgressConfirm'))")
+        self.assertLess(
+            script.index("window.EpubReadingProgress.request(", clear_handler),
+            script.index("clearLocalProgress();", clear_handler),
+        )
         self.assertNotIn("matchMedia", script)
         self.assertIn(".continue-reading-control.has-reading-progress:hover #continueReadingBtn", styles)
         self.assertIn("transform: none;", styles)
@@ -137,8 +220,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("overflow: visible;", styles)
         self.assertIn("document.getElementById(readKey)", script)
         self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
-        self.assertIn("Continue reading", script)
-        self.assertIn("Start reading", script)
+        self.assertIn("bookT('book.continueReading')", script)
+        self.assertIn("bookT('book.startReading')", script)
 
     def test_book_toc_marks_server_synced_reading_progress_with_the_reader_identity(self):
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
@@ -150,7 +233,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("if (username) {", script)
         self.assertIn("chapter-sync-tag", script)
         self.assertIn("chapter-title-with-sync", script)
-        self.assertIn("'Cloud sync · ' + username", script)
+        self.assertIn("bookT('book.cloudSyncUser'", script)
+        self.assertIn("bookT('book.cloudSyncUserAria'", script)
         self.assertIn(".chapter-sync-tag", css)
         self.assertIn(".chapter-title-with-sync", css)
         self.assertIn(".chapter-page", css)
@@ -201,7 +285,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("margin: 0;", css)
         self.assertIn(".library-breadcrumb", css)
         for html in (book_html, chapter_html):
-            self.assertRegex(html, r'aria-label=(?:["\'])?Library')
+            self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?(?:book|reader)\.library')
             self.assertRegex(html, r'class=(?:["\'])?breadcrumb-library-label')
 
     def test_reader_chrome_uses_one_default_font_stack(self):
@@ -270,7 +354,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
 
         self.assertRegex(html, r'<a\b[^>]*\bclass="toc-book-home"[^>]*\bhref="index\.html"')
-        self.assertIn('aria-label="Open book home"', html)
+        self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
         self.assertIn('id="bookHomeClose"', html)
         self.assertIn('.toc-header-actions', css)
         self.assertIn('min-width: 44px;', css)
@@ -318,8 +402,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_library_places_its_summary_inside_the_current_location_breadcrumb(self):
         html = self._library_html()
 
-        self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\baria-label=(?:["\'])?Breadcrumb(?:["\'])?)[^>]*>')
-        self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>.*Library.*</span>')
+        self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\bdata-i18n-aria-label=(?:["\'])?reader\.breadcrumb(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<span\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
         self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertIn('breadcrumb-brand-mark', breadcrumb)
@@ -327,6 +412,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
+
+    def test_locale_selector_exists_only_in_library_breadcrumb(self):
+        library = self._library_html()
+        self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
+        breadcrumb = library[
+            library.index('class="breadcrumb library-breadcrumb"'):library.index('</nav>')
+        ]
+        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-CN(?:["\' >])')
+        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')
+        self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
+        self.assertNotRegex(self._chapter_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
+        self.assertRegex(library, r'localeSelect\.value=i18n\.getLocale\(\)')
+        self.assertRegex(library, r'localeSelect\.addEventListener\(["\'`]change')
+        self.assertRegex(library, r'i18n\.setLocale\(localeSelect\.value\)')
 
     def test_library_and_book_open_annotation_center_as_a_modal(self):
         library_html = self._library_html()
@@ -377,6 +476,22 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('@keyframes annotation-hub-spin', css)
         self.assertIn('.annotation-hub-spinner { animation: none;', css)
 
+    def test_annotation_hub_routes_state_copy_through_i18n(self):
+        script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
+
+        self.assertIn("function tr(key, params)", script)
+        self.assertIn("tr('loading')", script)
+        self.assertIn("tr('loadHubFailed')", script)
+        self.assertIn("tr('noAnnotationsTitle')", script)
+        self.assertIn("tr('noBookAnnotationsTitle')", script)
+        self.assertIn('function translateChrome()', script)
+        self.assertIn('function renderCurrentView()', script)
+        self.assertIn('i18n().onLocaleChange(function()', script)
+        self.assertNotIn("'Unable to load annotations'", script)
+        self.assertNotIn("'Please try again.'", script)
+        self.assertNotIn("'No annotations yet'", script)
+        self.assertNotIn("'No annotations in this book'", script)
+
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()
 
@@ -388,6 +503,49 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('Reading appearance (advanced)', html)
         self.assertNotIn('id="cssPanelToggle"', html)
 
+    def test_reader_template_marks_static_ui_and_preserves_chapter_content(self):
+        html = self._chapter_html()
+
+        for key in (
+            'reader.tableOfContents', 'reader.previous', 'reader.next',
+            'settings.appearance', 'settings.readingMode', 'settings.customStyles',
+        ):
+            self.assertIn('data-i18n="' + key + '"', html)
+        article = html[html.index('<article'):html.index('</article>')]
+        self.assertIn('<p>Text</p>', article)
+        self.assertNotIn('data-i18n', article)
+
+    def test_reader_mobile_controls_use_translatable_accessible_labels(self):
+        html = self._chapter_html()
+
+        self.assertIn('data-i18n="reader.theme"', html)
+        self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
+
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
+
+    def test_bookshelf_templates_localize_labels_without_translating_business_values(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.addGroup')
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.sync')
+            self.assertRegex(html, r'data-tag=(?:["\'])?All(?:["\'])?')
+
+    def test_bookshelf_script_routes_user_messages_through_i18n(self):
+        script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+        self.assertIn("i18n.t('bookshelf.currentStats'", script)
+
+    def test_bookshelf_renders_adversarial_group_and_book_metadata_as_text(self):
+        script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
+
+        self.assertIn('titleElement.textContent = group.name;', script)
+        self.assertIn('titleElement.textContent = bookInfo.title;', script)
+        self.assertIn('authorElement.textContent = bookInfo.author;', script)
+        self.assertIn('pathItem.textContent = name;', script)
+        self.assertNotRegex(
+            script,
+            r'innerHTML\s*=\s*[\s\S]{0,300}(?:group\.name|bookInfo\.(?:title|author))',
+        )

@@ -113,7 +113,7 @@
     }
   }
 
-  function request(method, url, chapterIndex, keepalive) {
+  function request(method, url, chapterIndex, keepalive, includeError) {
     var options = { method: method };
     if (keepalive) options.keepalive = true;
     var username = getUsername();
@@ -125,13 +125,21 @@
     }
     try {
       return Promise.resolve(fetch(url, options)).then(function(response) {
-        if (!response.ok || response.status === 204) return null;
+        if (!response.ok) {
+          if (!includeError) return null;
+          return response.json().then(function(payload) {
+            return { error: payload && typeof payload === 'object' ? payload : {} };
+          }, function() {
+            return { error: {} };
+          });
+        }
+        if (response.status === 204) return null;
         return response.json();
       }, function() {
-        return null;
+        return includeError ? { error: {} } : null;
       });
     } catch (error) {
-      return Promise.resolve(null);
+      return Promise.resolve(includeError ? { error: {} } : null);
     }
   }
 

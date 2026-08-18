@@ -7,6 +7,12 @@
 
     var modalState = { modal: null, opener: null, scrollY: 0, bookHash: '', data: null, loadVersion: 0 };
 
+    function i18n() { return root.EpubBrowserI18n; }
+    function tr(key, params) {
+        var runtime = i18n();
+        return runtime && runtime.t ? runtime.t('annotations.' + key, params) : 'annotations.' + key;
+    }
+
     function annotationTime(annotation) {
         var value = annotation && (annotation.updated_at || annotation.created_at);
         var time = value ? Date.parse(value) : 0;
@@ -58,7 +64,7 @@
         (annotations || []).forEach(function(annotation) {
             var index = Number(annotation.chapter_index);
             if (isNaN(index)) index = 0;
-            if (!groups[index]) groups[index] = { index: index, title: titles[index] || 'Chapter ' + (index + 1), annotations: [] };
+            if (!groups[index]) groups[index] = { index: index, title: titles[index] || tr('chapterNumber', { number: index + 1 }), annotations: [] };
             groups[index].annotations.push(annotation);
         });
         return Object.keys(groups).map(function(key) { return groups[key]; }).sort(function(a, b) {
@@ -97,11 +103,31 @@
         if (!time) return '';
         var date = new Date(time);
         if (isNaN(date.getTime())) return '';
-        function pad(value) { return String(value).padStart(2, '0'); }
-        return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
-            ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+        var runtime = i18n();
+        return runtime && runtime.formatDate ? runtime.formatDate(date, { dateStyle: 'short', timeStyle: 'medium' }) : '';
     }
-    function labelCount(count) { return count + ' annotation' + (count === 1 ? '' : 's'); }
+    function labelCount(count) { return tr('annotationCount', { count: count }); }
+
+    function translateChrome() {
+        if (!modalState.modal) return;
+        modalState.back.querySelector('span').textContent = tr('allAnnotatedBooks');
+        modalState.modal.querySelector('.annotation-hub-header-label').textContent = tr('hubTitle');
+        modalState.closeButton.setAttribute('aria-label', tr('closeHub'));
+    }
+
+    function renderCurrentView() {
+        if (!modalState.data) return;
+        if (!modalState.bookHash) {
+            renderBookCards(aggregateBooks(modalState.data.annotations, modalState.data.metadata));
+            return;
+        }
+        renderBookAnnotations(
+            modalState.bookHash,
+            modalState.data.annotations.filter(function(annotation) { return annotation.book_hash === modalState.bookHash; }),
+            modalState.data.metadata,
+            modalState.data.toc || []
+        );
+    }
 
     function ensureModal() {
         if (modalState.modal || !root.document || !document.body) return modalState.modal;
@@ -113,9 +139,9 @@
         modal.setAttribute('aria-labelledby', 'annotationHubTitle');
         modal.innerHTML = '<div class="annotation-hub-backdrop" data-annotation-hub-close></div>' +
             '<section class="annotation-hub-dialog"><header class="annotation-hub-modal-header">' +
-            '<button type="button" class="annotation-hub-header-button" id="annotationHubBack" hidden><i class="fas fa-arrow-left" aria-hidden="true"></i><span>All annotated books</span></button>' +
-            '<span class="annotation-hub-header-label">Annotations</span>' +
-            '<button type="button" class="annotation-hub-icon-button" id="annotationHubClose" aria-label="Close annotations"><i class="fas fa-times" aria-hidden="true"></i></button>' +
+            '<button type="button" class="annotation-hub-header-button" id="annotationHubBack" hidden><i class="fas fa-arrow-left" aria-hidden="true"></i><span></span></button>' +
+            '<span class="annotation-hub-header-label"></span>' +
+            '<button type="button" class="annotation-hub-icon-button" id="annotationHubClose"><i class="fas fa-times" aria-hidden="true"></i></button>' +
             '</header><main class="annotation-hub-container" id="annotationHub" tabindex="-1" aria-live="polite"></main></section>';
         document.body.appendChild(modal);
         modalState.modal = modal;
@@ -126,6 +152,7 @@
         modalState.closeButton.addEventListener('click', close);
         modal.querySelector('[data-annotation-hub-close]').addEventListener('click', close);
         modal.addEventListener('keydown', trapFocus);
+        translateChrome();
         return modal;
     }
 
@@ -149,7 +176,7 @@
         box.appendChild(heading);
         box.appendChild(element('p', '', detail));
         if (retry) {
-            var button = element('button', 'annotation-hub-retry', 'Retry');
+            var button = element('button', 'annotation-hub-retry', tr('retry'));
             button.type = 'button'; button.addEventListener('click', retry); box.appendChild(button);
         }
         container.appendChild(box);
@@ -162,7 +189,7 @@
         var loading = element('section', 'annotation-hub-loading');
         loading.setAttribute('role', 'status');
         loading.appendChild(element('span', 'annotation-hub-spinner'));
-        loading.appendChild(element('p', '', 'Loading annotations…'));
+        loading.appendChild(element('p', '', tr('loading')));
         container.appendChild(loading);
     }
 
@@ -171,12 +198,12 @@
         clear(container);
         container.removeAttribute('aria-busy');
         var heading = element('header', 'annotation-hub-heading');
-        var title = element('h1', 'annotation-hub-title', 'Annotated books');
+        var title = element('h1', 'annotation-hub-title', tr('annotatedBooks'));
         title.id = 'annotationHubTitle';
         heading.appendChild(title);
-        heading.appendChild(element('p', '', labelCount(books.reduce(function(sum, book) { return sum + book.count; }, 0)) + ' across ' + books.length + ' book' + (books.length === 1 ? '' : 's')));
+        heading.appendChild(element('p', '', labelCount(books.reduce(function(sum, book) { return sum + book.count; }, 0)) + tr('bylineSeparator') + tr('bookCount', { count: books.length })));
         container.appendChild(heading);
-        if (!books.length) { renderState('No annotations yet', 'Select text while reading to save your first annotation.'); return; }
+        if (!books.length) { renderState(tr('noAnnotationsTitle'), tr('noAnnotationsDescription')); return; }
         var list = element('div', 'annotation-book-list');
         books.forEach(function(book) {
             var card = element('button', 'annotation-book-card');
@@ -185,11 +212,11 @@
                 var image = document.createElement('img');
                 image.src = '/book/' + encodeURIComponent(book.hash) + '/' + book.cover;
                 image.alt = ''; image.className = 'annotation-book-cover'; card.appendChild(image);
-            } else card.appendChild(element('div', 'annotation-book-cover annotation-book-cover-fallback', 'Book'));
+            } else card.appendChild(element('div', 'annotation-book-cover annotation-book-cover-fallback', tr('bookFallback')));
             var content = element('div', 'annotation-book-card-content');
             content.appendChild(element('h2', '', book.title));
-            if (book.authors.length) content.appendChild(element('p', 'annotation-book-author', book.authors.join(' & ')));
-            content.appendChild(element('p', 'annotation-book-meta', labelCount(book.count) + (book.latestAt ? ' · updated ' + formatTimestamp(book.latestAt) : '')));
+            if (book.authors.length) content.appendChild(element('p', 'annotation-book-author', book.authors.join(tr('authorSeparator'))));
+            content.appendChild(element('p', 'annotation-book-meta', labelCount(book.count) + (book.latestAt ? tr('bylineSeparator') + tr('updatedAt', { date: formatTimestamp(book.latestAt) }) : '')));
             card.appendChild(content); list.appendChild(card);
         });
         container.appendChild(list);
@@ -205,7 +232,7 @@
         heading.appendChild(title);
         heading.appendChild(element('p', '', labelCount(annotations.length)));
         container.appendChild(heading);
-        if (!annotations.length) { renderState('No annotations in this book', 'This book may have been removed or its annotations were deleted.'); return; }
+        if (!annotations.length) { renderState(tr('noBookAnnotationsTitle'), tr('noBookAnnotationsDescription')); return; }
         groupByChapter(annotations, toc).forEach(function(group) {
             var section = element('section', 'annotation-chapter-group');
             section.appendChild(element('h2', '', group.title));
@@ -228,26 +255,30 @@
         if (!ensureModal() || !root.AnnotationStorage) return;
         var loadVersion = ++modalState.loadVersion;
         modalState.bookHash = bookHash || '';
+        modalState.data = null;
         modalState.back.hidden = !modalState.bookHash;
         renderLoading();
         Promise.resolve(root.AnnotationStorage.init()).then(function() {
             if (loadVersion !== modalState.loadVersion) return null;
             if (root.AnnotationStorage.getStorageType() === 'backend') return root.AnnotationStorage.isBackendAvailable().then(function(result) {
-                if (!result.available) throw new Error('Cloud annotations are unavailable on this static site.');
+                if (!result.available) throw new Error('annotation_hub_cloud_unavailable');
             });
         }).then(function() {
             if (loadVersion !== modalState.loadVersion) return null;
             return Promise.all([root.AnnotationStorage.getAll(), requestJson('/book-metadata.json')]);
         }).then(function(data) {
             if (!data || loadVersion !== modalState.loadVersion || modalState.bookHash !== (bookHash || '')) return;
-            modalState.data = { annotations: data[0] || [], metadata: data[1] || [] };
+            modalState.data = { annotations: data[0] || [], metadata: data[1] || [], toc: [] };
             if (!modalState.bookHash) { renderBookCards(aggregateBooks(modalState.data.annotations, modalState.data.metadata)); return; }
             requestJson('/book/' + encodeURIComponent(modalState.bookHash) + '/toc.json').catch(function() { return []; }).then(function(toc) {
-                if (loadVersion === modalState.loadVersion && modalState.bookHash === bookHash) renderBookAnnotations(bookHash, modalState.data.annotations.filter(function(annotation) { return annotation.book_hash === bookHash; }), modalState.data.metadata, toc);
+                if (loadVersion === modalState.loadVersion && modalState.bookHash === bookHash) {
+                    modalState.data.toc = toc || [];
+                    renderCurrentView();
+                }
             });
         }).catch(function(error) {
             if (loadVersion !== modalState.loadVersion) return;
-            renderState('Unable to load annotations', error.message || 'Please try again.', function() { load(modalState.bookHash); });
+            renderState(tr('loadHubFailed'), tr('loadHubFailedDetail'), function() { load(modalState.bookHash); });
         });
     }
 
@@ -276,6 +307,14 @@
 
     function bind() {
         if (!root.document) return;
+        if (!modalState.localeBound && i18n() && typeof i18n().onLocaleChange === 'function') {
+            modalState.localeBound = true;
+            i18n().onLocaleChange(function() {
+                if (!modalState.modal) return;
+                translateChrome();
+                if (!modalState.modal.hidden && modalState.data) renderCurrentView();
+            });
+        }
         var triggers = document.querySelectorAll('[data-annotation-hub]');
         Array.prototype.forEach.call(triggers, function(trigger) {
             if (trigger.getAttribute('data-annotation-hub-bound')) return;

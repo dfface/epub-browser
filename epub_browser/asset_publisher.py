@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+WEB_MANIFEST_SOURCES = {
+    'manifest.json': 'manifest.json',
+    'manifest.en.json': 'manifest.json',
+    'manifest.zh-CN.json': 'manifest.zh-CN.json',
+}
+
+
 @dataclass(frozen=True)
 class PublishedAssets:
     """The logical-to-public URL map for one generated library release."""
@@ -31,7 +38,7 @@ class AssetPublisher:
         assets = self._copy_immutable_assets()
         published = PublishedAssets(assets)
         self._write_lookup_manifest(published)
-        self._write_web_manifest(published)
+        self._write_web_manifests(published)
         self._write_service_worker(published)
         return published
 
@@ -39,7 +46,11 @@ class AssetPublisher:
         source_contents = {
             path.relative_to(self.source_dir).as_posix(): path.read_bytes()
             for path in sorted(path for path in self.source_dir.rglob('*') if path.is_file())
-            if path.relative_to(self.source_dir).as_posix() not in {'sw.js', 'manifest.json'}
+            if path.relative_to(self.source_dir).as_posix() not in {
+                'sw.js',
+                'manifest.json',
+                'manifest.zh-CN.json',
+            }
         }
         preliminary_assets = {
             logical_path: self._immutable_url(logical_path, contents)
@@ -91,15 +102,16 @@ class AssetPublisher:
             encoding='utf-8',
         )
 
-    def _write_web_manifest(self, published: PublishedAssets) -> None:
-        source = self.source_dir / 'manifest.json'
-        if not source.is_file():
-            return
-        manifest = json.loads(source.read_text(encoding='utf-8'))
-        rewritten = self._rewrite_asset_urls(manifest, published)
-        target = self.output_dir / 'assets' / 'manifest.json'
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(rewritten, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    def _write_web_manifests(self, published: PublishedAssets) -> None:
+        for output_name, source_name in WEB_MANIFEST_SOURCES.items():
+            source = self.source_dir / source_name
+            manifest = self._rewrite_asset_urls(
+                json.loads(source.read_text(encoding='utf-8')),
+                published,
+            )
+            target = self.output_dir / 'assets' / output_name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
     def _rewrite_asset_urls(self, value, published: PublishedAssets):
         if isinstance(value, list):
@@ -118,7 +130,7 @@ class AssetPublisher:
         release_id = hashlib.sha256(
             json.dumps(published.assets, sort_keys=True, separators=(',', ':')).encode('utf-8')
         ).hexdigest()[:12]
-        precache_urls = ['/index.html', *published.assets.values()]
+        precache_urls = ['/index.html', *published.assets.values(), *(f'/assets/{name}' for name in WEB_MANIFEST_SOURCES)]
         worker = source.read_text(encoding='utf-8')
         worker = worker.replace('__EPUB_BROWSER_RELEASE_ID__', release_id)
         worker = worker.replace('__EPUB_BROWSER_PRECACHE_URLS__', json.dumps(precache_urls, separators=(',', ':')))
