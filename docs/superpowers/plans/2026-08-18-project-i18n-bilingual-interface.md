@@ -1092,26 +1092,9 @@ git diff --check
 
 Expected: every command exits 0.
 
-- [ ] **Step 5: Manually smoke-test both deployment paths with the example EPUBs**
+- [ ] **Step 5: Hand off browser acceptance to the user**
 
-Server terminal:
-
-```bash
-i18n_server_output=$(mktemp -d)
-python -m epub_browser.main "examples/Mao Ze Dong Xuan Ji - Mao Ze Dong.epub" --output-dir "$i18n_server_output" --keep-files --no-browser --port 8123
-```
-
-Open `http://127.0.0.1:8123/`, set the browser language to Chinese before the first load, verify initial Chinese UI, switch to English from the library breadcrumb, open a book/chapter, and verify the setting persists while content remains original. Exercise bookshelf, annotation editor, annotation center, reader settings, and page/continuous modes. Stop the process with Ctrl-C.
-
-Static terminal:
-
-```bash
-i18n_static_output=$(mktemp -d)
-python -m epub_browser.main "examples/Mao Ze Dong Xuan Ji - Mao Ze Dong.epub" --output-dir "$i18n_static_output" --no-server
-python -m http.server 8124 --directory "$i18n_static_output"
-```
-
-Open `http://127.0.0.1:8124/` and repeat locale, localized manifest, bookshelf, annotation, and reader checks. In browser developer tools, block `localStorage`, clear `epub_browser_locale`, reload once, and verify Cookie/page-memory fallback leaves library navigation and reading usable.
+Do not run E2E tests or agent-operated browser smoke tests. The user will manually accept the server and static deployment paths, including locale selection and persistence, original EPUB content language, localized manifests, bookshelf, annotations, reader settings, navigation modes, and storage fallback. Automated coverage remains limited to the unit, integration, generated-page, syntax, compilation, and diff checks in Step 4.
 
 - [ ] **Step 6: Commit the guard and final compatibility fixes**
 
@@ -1127,4 +1110,4 @@ git commit -m "test: enforce complete browser ui localization"
 
 ## Completion Gate
 
-Before declaring the I18N sub-project complete, verify all twelve task commits are present, the commands in Task 12 Step 4 pass from a clean checkout, and the smoke test confirms the selector exists only in the library breadcrumb. Then proceed to the separately approved design cycle for the AI server foundation; do not begin AI implementation under this plan.
+Before declaring the I18N sub-project complete, verify all twelve task commits are present and the commands in Task 12 Step 4 pass from a clean checkout. Hand browser acceptance to the user; the selector-placement requirement is covered by generated-page tests. Then proceed to the separately approved design cycle for the AI server foundation; do not begin AI implementation under this plan.
