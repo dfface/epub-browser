@@ -240,6 +240,29 @@ class ServerCacheTests(unittest.TestCase):
             400,
         )
 
+    def test_two_apps_keep_state_in_their_injected_database(self):
+        with tempfile.TemporaryDirectory() as second_directory:
+            Path(second_directory, "index.html").write_text(
+                "second library",
+                encoding="utf-8",
+            )
+            first_client = TestClient(create_app(self.directory.name))
+            second_client = TestClient(create_app(second_directory))
+
+            first_client.put(
+                "/api/reading-progress/shared-book",
+                json={"chapter_index": 2},
+            )
+
+            self.assertEqual(
+                first_client.get("/api/reading-progress/shared-book").json(),
+                {"chapter_index": 2},
+            )
+            self.assertEqual(
+                second_client.get("/api/reading-progress/shared-book").status_code,
+                404,
+            )
+
     def test_sync_persists_the_shelf_in_sqlite(self):
         payload = {"username": "reader", "version": 2, "data": {"items": ["book-a"], "groups": {}}}
 

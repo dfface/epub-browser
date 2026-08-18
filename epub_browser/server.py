@@ -17,6 +17,8 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 import uvicorn
 
+from .state import StateStore
+
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
 
@@ -65,50 +67,50 @@ def load_legacy_bookshelf(directory, username):
     return max(records, key=lambda record: record[0]) if records else None
 
 
-def sync_bookshelf(database_path, legacy_directory, username, client_version, client_data):
+def sync_bookshelf(
+    database_path,
+    legacy_directory,
+    username,
+    client_version,
+    client_data,
+    store=None,
+):
     """Synchronize one bookshelf document and return its response payload and status."""
-    with sqlite3.connect(database_path) as connection:
-        row = connection.execute(
-            'SELECT version, data FROM bookshelves WHERE username = ?', (username,)
-        ).fetchone()
-        if row is None:
-            legacy = load_legacy_bookshelf(legacy_directory, username)
-            if legacy is not None:
-                legacy_version, legacy_data = legacy
-                connection.execute(
-                    'INSERT INTO bookshelves (username, version, data) VALUES (?, ?, ?)',
-                    (username, legacy_version, json.dumps(legacy_data, ensure_ascii=False)),
-                )
-                row = (legacy_version, json.dumps(legacy_data, ensure_ascii=False))
-
-        if row is not None:
-            stored_version, stored_data = row
-            if stored_version == client_version:
-                return {}, 304
-            if stored_version > client_version:
-                return {
-                    'message': 'Server has newer or same version',
-                    'version': stored_version,
-                    'data': json.loads(stored_data),
-                }, 200
-
-        if client_data is None:
-            return {'message': 'No data provided for update'}, 400
-
-        new_version = max(client_version, 1)
-        serialized_data = json.dumps(client_data, ensure_ascii=False)
-        if row is None:
-            connection.execute(
-                'INSERT INTO bookshelves (username, version, data) VALUES (?, ?, ?)',
-                (username, new_version, serialized_data),
+    active_store = store or StateStore(database_path)
+    if store is None:
+        active_store.initialize()
+    row = active_store.get_bookshelf(username)
+    if row is None:
+        legacy = load_legacy_bookshelf(legacy_directory, username)
+        if legacy is not None:
+            legacy_version, legacy_data = legacy
+            active_store.create_bookshelf(username, legacy_version, legacy_data)
+            row = (
+                legacy_version,
+                json.dumps(legacy_data, ensure_ascii=False),
             )
-            return {'message': 'New user created', 'version': new_version}, 404
 
-        connection.execute(
-            'UPDATE bookshelves SET version = ?, data = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?',
-            (new_version, serialized_data, username),
-        )
-        return {'message': 'Data updated', 'version': new_version}, 201
+    if row is not None:
+        stored_version, stored_data = row
+        if stored_version == client_version:
+            return {}, 304
+        if stored_version > client_version:
+            return {
+                'message': 'Server has newer or same version',
+                'version': stored_version,
+                'data': json.loads(stored_data),
+            }, 200
+
+    if client_data is None:
+        return {'message': 'No data provided for update'}, 400
+
+    new_version = max(client_version, 1)
+    if row is None:
+        active_store.create_bookshelf(username, new_version, client_data)
+        return {'message': 'New user created', 'version': new_version}, 404
+
+    active_store.update_bookshelf(username, new_version, client_data)
+    return {'message': 'Data updated', 'version': new_version}, 201
 
 
 class CachedStaticFiles(StaticFiles):
@@ -120,10 +122,19 @@ class CachedStaticFiles(StaticFiles):
         return response
 
 
-def create_app(base_directory, sync_dir=None):
+def create_app(base_directory, sync_dir=None, state_store=None):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
+    global DATABASE_PATH
     base_directory = os.path.abspath(base_directory)
-    init_annotation_db(base_directory)
+    database = migrate_legacy_database(base_directory)
+    store = state_store or StateStore(
+        database,
+        connection_factory=lambda path: sqlite3.connect(path),
+    )
+    store.initialize()
+    # The legacy HTTPRequestHandler still reads this compatibility pointer.
+    # Starlette handlers above use their injected store and remain isolated.
+    DATABASE_PATH = os.fspath(store.database_path)
 
     async def library_index(request):
         index_path = os.path.join(base_directory, 'index.html')
@@ -152,63 +163,105 @@ def create_app(base_directory, sync_dir=None):
 
     async def annotations(request):
         parts = [part for part in request.path_params['path'].split('/') if part]
-        if not parts or parts[0] != 'annotations': return response(error_payload('not_found', 'Not found'), 404)
+        if not parts or parts[0] != 'annotations':
+            return response(error_payload('not_found', 'Not found'), 404)
         username = request.headers.get('X-Username', '').strip()
-        conn = sqlite3.connect(database_path(base_directory))
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        tail = parts[1:]
         try:
-            tail = parts[1:]
             if request.method == 'GET':
-                if tail[:1] == ['batch']: return response(error_payload('batch_requires_post', 'Batch requires POST'), 400)
+                if tail[:1] == ['batch']:
+                    return response(
+                        error_payload('batch_requires_post', 'Batch requires POST'),
+                        400,
+                    )
                 if tail[:1] == ['item'] and len(tail) == 2:
-                    sql, args = ('SELECT * FROM annotations WHERE id = ?', [tail[1]]) if not username else ('SELECT * FROM annotations WHERE id = ? AND username = ?', [tail[1], username])
-                    row = cursor.execute(sql, args).fetchone()
-                    return response({'data': row_data(row)}, 200) if row else response(error_payload('annotation_not_found', 'Annotation not found'), 404)
-                where, args = '', []
-                if len(tail) >= 1: where, args = ' WHERE book_hash = ?', [tail[0]]
+                    row = store.get_annotation(tail[1], username=username)
+                    return (
+                        response({'data': row}, 200)
+                        if row
+                        else response(
+                            error_payload(
+                                'annotation_not_found',
+                                'Annotation not found',
+                            ),
+                            404,
+                        )
+                    )
+                if len(tail) > 2:
+                    return response(error_payload('not_found', 'Not found'), 404)
+                chapter_index = None
                 if len(tail) == 2:
-                    try: args.append(int(tail[1]))
-                    except ValueError: return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
-                    where += ' AND chapter_index = ?'
-                if username: where += (' AND ' if where else ' WHERE ') + 'username = ?'; args.append(username)
-                rows = cursor.execute('SELECT * FROM annotations' + where + ' ORDER BY created_at DESC', args).fetchall()
-                return response({'data': [row_data(row) for row in rows]})
+                    try:
+                        chapter_index = int(tail[1])
+                    except ValueError:
+                        return response(
+                            error_payload(
+                                'invalid_chapter_index',
+                                'Invalid chapter index',
+                            ),
+                            400,
+                        )
+                rows = store.list_annotations(
+                    book_hash=tail[0] if tail else None,
+                    chapter_index=chapter_index,
+                    username=username,
+                )
+                return response({'data': rows})
+
             try:
                 data = await request.json()
             except json.JSONDecodeError:
                 return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+
             if request.method == 'POST':
                 entries = data.get('annotations', []) if tail == ['batch'] else [data]
                 created = failed = 0
                 for entry in entries:
                     try:
-                        cursor.execute('INSERT OR REPLACE INTO annotations (id,book_hash,chapter_index,text,note,start_meta,end_meta,color,created_at,updated_at,username) VALUES (?,?,?,?,?,?,?,?,?,?,?)', (entry['id'], entry['book_hash'], entry['chapter_index'], entry['text'], entry.get('note',''), json.dumps(entry.get('startMeta')) if entry.get('startMeta') else None, json.dumps(entry.get('endMeta')) if entry.get('endMeta') else None, entry['color'], entry['created_at'], entry['updated_at'], username)); created += 1
-                    except Exception: failed += 1
-                conn.commit()
-                return response({'created': created, 'failed': failed}, 201) if tail == ['batch'] else response({'data': data}, 201)
-            if len(tail) != 2 or tail[0] != 'item': return response(error_payload('not_found', 'Not found'), 404)
-            annotation_id = tail[1]; selector, args = ('id = ?', [annotation_id]) if not username else ('id = ? AND username = ?', [annotation_id, username])
-            if request.method == 'DELETE': cursor.execute('DELETE FROM annotations WHERE ' + selector, args); conn.commit(); return response({'message': 'Deleted'})
-            if 'chapter_index' in data and (isinstance(data['chapter_index'], bool) or not isinstance(data['chapter_index'], int) or data['chapter_index'] < 0):
+                        store.upsert_annotation(
+                            entry,
+                            username=username,
+                            replace_existing=tail == ['batch'],
+                        )
+                        created += 1
+                    except Exception:
+                        failed += 1
+                if tail == ['batch']:
+                    return response({'created': created, 'failed': failed}, 201)
+                if failed:
+                    raise RuntimeError('annotation insert failed')
+                return response({'data': data}, 201)
+
+            if len(tail) != 2 or tail[0] != 'item':
+                return response(error_payload('not_found', 'Not found'), 404)
+            annotation_id = tail[1]
+            if request.method == 'DELETE':
+                store.delete_annotation(annotation_id, username=username)
+                return response({'message': 'Deleted'})
+            if 'chapter_index' in data and (
+                isinstance(data['chapter_index'], bool)
+                or not isinstance(data['chapter_index'], int)
+                or data['chapter_index'] < 0
+            ):
                 return response({'message': 'Invalid chapter index'}, 400)
-            assignments, values = [], []
-            for field in ('note', 'color', 'chapter_index'):
-                if field in data:
-                    assignments.append(field + ' = ?')
-                    values.append(data[field])
-            for field, column in (('startMeta', 'start_meta'), ('endMeta', 'end_meta')):
-                if field in data:
-                    assignments.append(column + ' = ?')
-                    values.append(json.dumps(data[field]) if data[field] else None)
-            assignments.append("updated_at = datetime('now')")
-            cursor.execute('UPDATE annotations SET ' + ', '.join(assignments) + ' WHERE ' + selector, values + args); conn.commit()
-            row = cursor.execute('SELECT * FROM annotations WHERE ' + selector, args).fetchone()
-            return response({'data': row_data(row)}, 200) if row else response(error_payload('annotation_not_found', 'Annotation not found'), 404)
+            row = store.update_annotation(
+                annotation_id,
+                data,
+                username=username,
+            )
+            return (
+                response({'data': row}, 200)
+                if row
+                else response(
+                    error_payload(
+                        'annotation_not_found',
+                        'Annotation not found',
+                    ),
+                    404,
+                )
+            )
         except Exception:
             return response(error_payload('server_error', 'Internal server error'), 500)
-        finally: conn.close()
-
     async def sync(request):
         try:
             data = await request.json()
@@ -216,7 +269,7 @@ def create_app(base_directory, sync_dir=None):
             if not username: return response(error_payload('username_required', 'Username is required'), 400)
             payload, status = sync_bookshelf(
                 database_path(base_directory), sync_dir or base_directory,
-                username, version, shelf,
+                username, version, shelf, store=store,
             )
             if status == 400:
                 return response(error_payload('no_sync_data', payload['message']), status)
@@ -233,15 +286,20 @@ def create_app(base_directory, sync_dir=None):
     async def reading_progress_response(request):
         book_hash = request.path_params['book_hash']
         username = request.headers.get('X-Username', '')
-        database = database_path(base_directory)
 
         if request.method == 'GET':
-            with sqlite3.connect(database) as connection:
-                row = connection.execute(
-                    'SELECT chapter_index FROM reading_progress WHERE username = ? AND book_hash = ?',
-                    (username, book_hash),
-                ).fetchone()
-            return response({'chapter_index': row[0]}) if row else response(error_payload('reading_progress_not_found', 'Reading progress not found'), 404)
+            chapter_index = store.get_reading_progress(username, book_hash)
+            return (
+                response({'chapter_index': chapter_index})
+                if chapter_index is not None
+                else response(
+                    error_payload(
+                        'reading_progress_not_found',
+                        'Reading progress not found',
+                    ),
+                    404,
+                )
+            )
 
         if request.method == 'PUT':
             try:
@@ -251,24 +309,10 @@ def create_app(base_directory, sync_dir=None):
             chapter_index = data.get('chapter_index') if isinstance(data, dict) else None
             if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
                 return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
-            with sqlite3.connect(database) as connection:
-                connection.execute(
-                    '''
-                    INSERT INTO reading_progress(username, book_hash, chapter_index, updated_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(username, book_hash) DO UPDATE SET
-                        chapter_index = excluded.chapter_index,
-                        updated_at = CURRENT_TIMESTAMP
-                    ''',
-                    (username, book_hash, chapter_index),
-                )
+            store.set_reading_progress(username, book_hash, chapter_index)
             return response({'chapter_index': chapter_index})
 
-        with sqlite3.connect(database) as connection:
-            connection.execute(
-                'DELETE FROM reading_progress WHERE username = ? AND book_hash = ?',
-                (username, book_hash),
-            )
+        store.delete_reading_progress(username, book_hash)
         return response({'message': 'Deleted'})
 
     routes = [
@@ -286,54 +330,13 @@ def create_app(base_directory, sync_dir=None):
 DATABASE_PATH = None
 
 def init_annotation_db(base_dir):
-    """Initialize the shared server database."""
+    """Initialize the legacy handler's shared database through StateStore."""
     global DATABASE_PATH
     DATABASE_PATH = migrate_legacy_database(base_dir)
-    
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    # Create annotations table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS annotations (
-            id TEXT PRIMARY KEY,
-            username TEXT NOT NULL DEFAULT '',
-            book_hash TEXT NOT NULL,
-            chapter_index INTEGER NOT NULL,
-            text TEXT NOT NULL,
-            note TEXT,
-            start_meta TEXT,
-            end_meta TEXT,
-            color TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    ''')
-    # Create indexes
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_chapter_username ON annotations(book_hash, chapter_index, username)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_book_username ON annotations(book_hash, username)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_username ON annotations(username)')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bookshelves (
-            username TEXT PRIMARY KEY,
-            version INTEGER NOT NULL,
-            data TEXT NOT NULL,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS reading_progress (
-            username TEXT NOT NULL DEFAULT '',
-            book_hash TEXT NOT NULL,
-            chapter_index INTEGER NOT NULL,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (username, book_hash)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
+    StateStore(
+        DATABASE_PATH,
+        connection_factory=lambda path: sqlite3.connect(path),
+    ).initialize()
 class StoppableThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """可停止的多线程HTTP服务器"""
     daemon_threads = True
