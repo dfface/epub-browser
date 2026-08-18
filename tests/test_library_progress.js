@@ -96,7 +96,7 @@ test('only an observed successful generation auto-collapses', () => {
   });
   controller.accept(snapshot({ phase: 'processing' }));
   controller.accept(snapshot({ revision: 2, phase: 'complete', completed: 2, converted: 2 }));
-  assert.equal(scheduled[0].delay, 3000);
+  assert.equal(scheduled[0].delay, 10000);
   scheduled[0].fn();
   assert.equal(controller.state.hiddenGeneration, 1);
 });

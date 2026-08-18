@@ -140,7 +140,7 @@
             render();
           }
           controller.timer = null;
-        }, 3000);
+        }, 10000);
       }
       return true;
     }
