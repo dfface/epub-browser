@@ -121,6 +121,30 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(fetched.json()["data"][0]["id"], "a1")
 
+    def test_annotation_delete_accepts_an_empty_json_request_body(self):
+        annotation = {
+            "id": "delete-me",
+            "book_hash": "book",
+            "chapter_index": 1,
+            "text": "note",
+            "color": "#fff",
+            "created_at": "2026-01-01",
+            "updated_at": "2026-01-01",
+        }
+        headers = {"X-Username": "reader"}
+        self.assertEqual(self.client.post("/api/annotations", json=annotation, headers=headers).status_code, 201)
+
+        deleted = self.client.request(
+            "DELETE",
+            "/api/annotations/item/delete-me",
+            content=b"",
+            headers={"Content-Type": "application/json", **headers},
+        )
+
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json(), {"message": "Deleted"})
+        self.assertEqual(self.client.get("/api/annotations/item/delete-me", headers=headers).status_code, 404)
+
     def test_annotation_position_repair_can_move_a_cloud_annotation_to_its_real_chapter(self):
         annotation = {
             "id": "misplaced",

@@ -174,6 +174,14 @@ def create_app(base_directory, sync_dir=None):
                 if username: where += (' AND ' if where else ' WHERE ') + 'username = ?'; args.append(username)
                 rows = cursor.execute('SELECT * FROM annotations' + where + ' ORDER BY created_at DESC', args).fetchall()
                 return response({'data': [row_data(row) for row in rows]})
+            if request.method == 'DELETE':
+                if len(tail) != 2 or tail[0] != 'item':
+                    return response(error_payload('not_found', 'Not found'), 404)
+                annotation_id = tail[1]
+                selector, args = ('id = ?', [annotation_id]) if not username else ('id = ? AND username = ?', [annotation_id, username])
+                cursor.execute('DELETE FROM annotations WHERE ' + selector, args)
+                conn.commit()
+                return response({'message': 'Deleted'})
             try:
                 data = await request.json()
             except json.JSONDecodeError:
@@ -189,7 +197,6 @@ def create_app(base_directory, sync_dir=None):
                 return response({'created': created, 'failed': failed}, 201) if tail == ['batch'] else response({'data': data}, 201)
             if len(tail) != 2 or tail[0] != 'item': return response(error_payload('not_found', 'Not found'), 404)
             annotation_id = tail[1]; selector, args = ('id = ?', [annotation_id]) if not username else ('id = ? AND username = ?', [annotation_id, username])
-            if request.method == 'DELETE': cursor.execute('DELETE FROM annotations WHERE ' + selector, args); conn.commit(); return response({'message': 'Deleted'})
             if 'chapter_index' in data and (isinstance(data['chapter_index'], bool) or not isinstance(data['chapter_index'], int) or data['chapter_index'] < 0):
                 return response({'message': 'Invalid chapter index'}, 400)
             assignments, values = [], []
