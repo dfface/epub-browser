@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const { createRuntime, dictionaries } = require('../epub_browser/assets/i18n.js');
 
 function fakeRoot(language) {
@@ -194,4 +196,58 @@ test('uses empty parameters when a DOM translation node has invalid parameter JS
   createRuntime(root, dictionaries).translateDocument();
 
   assert.equal(node.textContent, 'Version {version}');
+});
+
+test('rerenders an open theme menu after the locale changes', () => {
+  let locale = 'en';
+  let localeChangeListener;
+
+  function element() {
+    const result = {
+      style: {}, children: [], listeners: {}, className: '',
+      appendChild(child) { this.children.push(child); return child; },
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+      querySelector(selector) { return selector === 'i' ? { className: '' } : null; },
+      contains() { return false; },
+      getBoundingClientRect() { return { bottom: 10, right: 10 }; },
+    };
+    Object.defineProperty(result, 'innerHTML', {
+      get() { return this._innerHTML || ''; },
+      set(value) { this._innerHTML = value; this.children = []; },
+    });
+    return result;
+  }
+
+  const themeToggle = element();
+  const body = element();
+  const document = {
+    cookie: '', body,
+    documentElement: { classList: { add() {}, remove() {} } },
+    getElementById(id) { return id === 'themeToggle' ? themeToggle : null; },
+    createElement: element,
+    createTextNode(textContent) { return { textContent }; },
+    querySelector() { return null; },
+    addEventListener() {},
+  };
+  const window = {
+    document, navigator: { userAgent: '' }, innerWidth: 1024,
+    localStorage: { getItem() { return null; }, setItem() {} },
+    getComputedStyle() { return { display: 'none' }; },
+    addEventListener() {},
+    EpubBrowserI18n: {
+      t(key) { return locale + ':' + key; },
+      onLocaleChange(listener) { localeChangeListener = listener; },
+    },
+  };
+  const source = fs.readFileSync('epub_browser/assets/theme.js', 'utf8');
+
+  vm.runInNewContext(source, { window, document, navigator: window.navigator, localStorage: window.localStorage, Date, decodeURIComponent });
+  window.initTheme();
+  themeToggle.listeners.click({ stopPropagation() {} });
+
+  assert.equal(body.children[0].children[0].children[0].textContent, 'en:theme.light');
+  locale = 'zh-CN';
+  localeChangeListener();
+  assert.equal(body.children[0].children[0].children[0].textContent, 'zh-CN:theme.light');
+  assert.equal(body.children[0].style.display, 'block');
 });

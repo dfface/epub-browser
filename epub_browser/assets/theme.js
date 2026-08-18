@@ -116,14 +116,8 @@ function initTheme() {
         }
     }
 
-    // 创建主题选择菜单
-    function createThemeMenu() {
-        var menu = document.createElement('div');
-        menu.className = 'theme-menu';
-        menu.style.display = 'none';
-        menu.style.position = 'fixed';
-        menu.style.zIndex = '10000';
-        
+    function renderThemeMenu(menu) {
+        menu.innerHTML = '';
         for (var i = 0; i < themes.length; i++) {
             var theme = themes[i];
             var item = document.createElement('div');
@@ -140,6 +134,16 @@ function initTheme() {
             
             menu.appendChild(item);
         }
+    }
+
+    // 创建主题选择菜单
+    function createThemeMenu() {
+        var menu = document.createElement('div');
+        menu.className = 'theme-menu';
+        menu.style.display = 'none';
+        menu.style.position = 'fixed';
+        menu.style.zIndex = '10000';
+        renderThemeMenu(menu);
         
         return menu;
     }
@@ -178,6 +182,14 @@ function initTheme() {
         // 初始化主题菜单
         var themeMenu = null;
         var currentToggleBtn = null;
+
+        if (window.EpubBrowserI18n && window.EpubBrowserI18n.onLocaleChange) {
+            window.EpubBrowserI18n.onLocaleChange(function() {
+                if (themeMenu) {
+                    renderThemeMenu(themeMenu);
+                }
+            });
+        }
         
         function handleThemeToggle(e) {
             e.stopPropagation();
