@@ -127,9 +127,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn("Utils.showNotification('Annotation added', 'success')", script)
         self.assertNotIn("Utils.showNotification('Annotation updated', 'success')", script)
         self.assertNotIn("Utils.showNotification('Annotation deleted', 'info')", script)
-        self.assertIn("Utils.showNotification('Failed to add: ' + err.message, 'error')", script)
-        self.assertIn("Utils.showNotification('Failed to update: ' + err.message, 'error')", script)
-        self.assertIn("Utils.showNotification('Failed to delete: ' + err.message, 'error')", script)
+        self.assertIn("Utils.showNotification(tr('addFailed', { error: err.message }), 'error')", script)
+        self.assertIn("Utils.showNotification(tr('updateFailed', { error: err.message }), 'error')", script)
+        self.assertIn("Utils.showNotification(tr('deleteFailed', { error: err.message }), 'error')", script)
+
+    def test_annotation_editor_routes_user_copy_through_i18n(self):
+        script = Path('epub_browser/assets/annotation.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"Utils\.showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+        self.assertIn("i18n.t('annotations.noteOptional'", script)
+        self.assertIn("i18n.t('annotations.storageLocationChanged'", script)
 
     def test_reader_does_not_append_an_emoji_to_noted_highlights(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
@@ -155,7 +163,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('if (renderVersion !== self.renderVersion) return;', script)
         self.assertIn('return false;', script)
         self.assertIn('self.renderAll(true);', script)
-        self.assertIn("Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error')", script)
+        self.assertIn("Utils.showNotification(tr('restoreFailed'), 'error')", script)
 
     def test_library_does_not_offer_a_manual_cache_update_button(self):
         script = Path("epub_browser/assets/library.js").read_text(encoding="utf-8")

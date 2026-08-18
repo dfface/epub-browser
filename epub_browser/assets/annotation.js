@@ -87,6 +87,22 @@
     // Current book and chapter info (set by external code)
     var currentBookHash = '';
     var currentChapterIndex = -1;
+
+    function tr(key, params) {
+        var i18n = window.EpubBrowserI18n;
+        return i18n && i18n.t ? i18n.t('annotations.' + key, params) : key;
+    }
+
+    function formatAnnotationDate(value) {
+        var i18n = window.EpubBrowserI18n;
+        if (i18n && i18n.formatDate) {
+            return i18n.formatDate(value, {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+        return Utils.formatDateTime(value);
+    }
     
     // ========== Utility Functions ==========
     var Utils = {
@@ -1022,20 +1038,22 @@
             dialog.innerHTML = '\
                 <div class="annotation-compact-header">\
                     <div class="color-options-compact"></div>\
-                    <button class="annotation-dialog-close"><i class="fas fa-times"></i></button>\
+                    <button class="annotation-dialog-close" title="' + tr('close') + '" aria-label="' + tr('close') + '"><i class="fas fa-times"></i></button>\
                 </div>\
                 <div class="annotation-compact-body">\
-                    <textarea class="annotation-compact-note" placeholder="Note (optional)..."></textarea>\
+                    <textarea class="annotation-compact-note"></textarea>\
                 </div>\
                 <div class="annotation-compact-footer">\
-                    <button class="annotation-btn annotation-btn-cancel">Cancel</button>\
-                    <button class="annotation-btn annotation-btn-copy">Copy</button>\
-                    <button class="annotation-btn annotation-btn-confirm">Add</button>\
+                    <button class="annotation-btn annotation-btn-cancel">' + tr('cancel') + '</button>\
+                    <button class="annotation-btn annotation-btn-copy">' + tr('copy') + '</button>\
+                    <button class="annotation-btn annotation-btn-confirm">' + tr('add') + '</button>\
                 </div>';
 
             var colorOptions = dialog.querySelector('.color-options-compact');
             var noteInput = dialog.querySelector('textarea');
             var colors = CONFIG.getColors();
+            var i18n = window.EpubBrowserI18n;
+            noteInput.setAttribute('placeholder', i18n && i18n.t ? i18n.t('annotations.noteOptional') : tr('noteOptional'));
 
             colors.slice(0, 4).forEach(function(color) {
                 var btn = document.createElement('button');
@@ -1089,9 +1107,9 @@
             });
             dialog.querySelector('.annotation-btn-copy').addEventListener('click', function() {
                 Utils.copyText(source.text).then(function() {
-                    Utils.showNotification('Copied', 'success');
+                    Utils.showNotification(tr('copied'), 'success');
                 }).catch(function() {
-                    Utils.showNotification('Unable to copy', 'error');
+                    Utils.showNotification(tr('unableToCopy'), 'error');
                 });
             });
             dialog.querySelector('.annotation-btn-confirm').addEventListener('click', function() {
@@ -1116,7 +1134,7 @@
             StorageManager.getById(id).then(function(annotation) {
                 annotation = self.normalizeAnnotation(annotation);
                 if (!annotation) {
-                    Utils.showNotification('Annotation not found', 'warning');
+                    Utils.showNotification(tr('notFound'), 'warning');
                     return;
                 }
 
@@ -1125,31 +1143,31 @@
                 dialog.className = 'annotation-dialog';
                 dialog.innerHTML = '\
                     <div class="annotation-dialog-header">\
-                        <span><i class="fas fa-highlighter"></i> Annotation Details</span>\
-                        <button class="annotation-dialog-close"><i class="fas fa-times"></i></button>\
+                        <span><i class="fas fa-highlighter"></i> ' + tr('details') + '</span>\
+                        <button class="annotation-dialog-close" title="' + tr('close') + '" aria-label="' + tr('close') + '"><i class="fas fa-times"></i></button>\
                     </div>\
                     <div class="annotation-dialog-body">\
                         <div class="annotation-dialog-text">' + Utils.escapeHtml(textPreview) + '</div>\
                         <div class="annotation-color-picker">\
-                            <label>Color:</label>\
+                            <label>' + tr('color') + '</label>\
                             <div class="color-options"></div>\
                         </div>\
                         <div class="annotation-note-input">\
-                            <label>Note:</label>\
-                            <textarea placeholder="Add description...">' + Utils.escapeHtml(annotation.note) + '</textarea>\
+                            <label>' + tr('note') + '</label>\
+                            <textarea placeholder="' + tr('addDescription') + '">' + Utils.escapeHtml(annotation.note) + '</textarea>\
                         </div>\
                         <div class="annotation-meta">\
-                            <span>Created: ' + Utils.formatDateTime(annotation.created_at) + '</span>\
+                            <span>' + tr('created', { date: formatAnnotationDate(annotation.created_at) }) + '</span>\
                             <span class="annotation-updated"></span>\
                         </div>\
                     </div>\
                     <div class="annotation-dialog-footer">\
-                        <button class="annotation-btn annotation-btn-delete"><i class="fas fa-trash"></i> Delete</button>\
-                        <button class="annotation-btn annotation-btn-confirm">Save</button>\
+                        <button class="annotation-btn annotation-btn-delete"><i class="fas fa-trash"></i> ' + tr('delete') + '</button>\
+                        <button class="annotation-btn annotation-btn-confirm">' + tr('save') + '</button>\
                     </div>';
 
                 if (annotation.updated_at && annotation.updated_at !== annotation.created_at) {
-                    dialog.querySelector('.annotation-updated').textContent = 'Updated: ' + Utils.formatDateTime(annotation.updated_at);
+                    dialog.querySelector('.annotation-updated').textContent = tr('updated', { date: formatAnnotationDate(annotation.updated_at) });
                 }
 
                 var colorOptions = dialog.querySelector('.color-options');
@@ -1177,7 +1195,7 @@
                 var textEl = dialog.querySelector('.annotation-dialog-text');
 
                 textEl.style.cursor = 'pointer';
-                textEl.title = 'Click to copy';
+                textEl.title = tr('clickToCopy');
                 textEl.addEventListener('click', function() {
                     var textarea = document.createElement('textarea');
                     textarea.value = annotation.text;
@@ -1187,14 +1205,14 @@
                     textarea.select();
                     document.execCommand('copy');
                     document.body.removeChild(textarea);
-                    Utils.showNotification('Text copied', 'success');
+                    Utils.showNotification(tr('textCopied'), 'success');
                 });
 
                 dialog.querySelector('.annotation-dialog-close').addEventListener('click', function() {
                     self.closeDialog();
                 });
                 dialog.querySelector('.annotation-btn-delete').addEventListener('click', function() {
-                    if (confirm('Delete this annotation?')) {
+                    if (confirm(tr('confirmDelete'))) {
                         self.deleteAnnotation(annotation.id);
                         self.closeDialog();
                     }
@@ -1209,7 +1227,7 @@
                     self.closeDialog();
                 });
             }).catch(function(err) {
-                Utils.showNotification('Failed to load annotation: ' + err.message, 'error');
+                Utils.showNotification(tr('loadFailed', { error: err.message }), 'error');
             });
         },
 
@@ -1223,7 +1241,7 @@
                 self.closeDialog();
             }).catch(function(err) {
                 self.cancelPendingDraft();
-                Utils.showNotification('Failed to add: ' + err.message, 'error');
+                Utils.showNotification(tr('addFailed', { error: err.message }), 'error');
             });
         },
 
@@ -1248,7 +1266,7 @@
                     self.applyHighlightStyles(updatedAnnotation, self.getHighlightNodesByAnnotationId(id));
                 }
             }).catch(function(err) {
-                Utils.showNotification('Failed to update: ' + err.message, 'error');
+                Utils.showNotification(tr('updateFailed', { error: err.message }), 'error');
             });
         },
 
@@ -1262,7 +1280,7 @@
                     highlighter.remove(id);
                 }
             }).catch(function(err) {
-                Utils.showNotification('Failed to delete: ' + err.message, 'error');
+                Utils.showNotification(tr('deleteFailed', { error: err.message }), 'error');
             });
         },
 
@@ -1325,11 +1343,11 @@
                     });
                     return;
                 }
-                Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error');
+                Utils.showNotification(tr('restoreFailed'), 'error');
             }).catch(function(err) {
                 console.error('Failed to load annotations:', err);
                 if (renderVersion === self.renderVersion) {
-                    Utils.showNotification('Failed to load annotations: ' + err.message, 'error');
+                    Utils.showNotification(tr('loadAllFailed', { error: err.message }), 'error');
                 }
             }).finally(function() {
                 if (renderVersion === self.renderVersion) self.isRendering = false;
@@ -1350,7 +1368,7 @@
             var tabBtn = document.createElement('button');
             tabBtn.className = 'settings-tab';
             tabBtn.setAttribute('data-tab', 'annotation');
-            tabBtn.innerHTML = '<i class="fas fa-highlighter"></i><span>Annotation</span>';
+            tabBtn.innerHTML = '<i class="fas fa-highlighter"></i><span>' + tr('tab') + '</span>';
             
             // Create tab panel
             var tabPanel = document.createElement('div');
@@ -1361,38 +1379,38 @@
                     <label class="settings-switch">\
                         <input type="checkbox" id="annotationEnabled" ' + (Settings.enabled ? 'checked' : '') + '>\
                         <span class="switch-slider"></span>\
-                        <span class="switch-text">Enable Annotation</span>\
+                        <span class="switch-text">' + tr('enabled') + '</span>\
                     </label>\
                 </div>\
                 <div class="settings-group">\
-                    <label class="settings-label">Storage Location</label>\
+                    <label class="settings-label">' + tr('storageLocation') + '</label>\
                     <div class="storage-options">\
                         <label class="storage-option" id="storageOptionIdb">\
                             <input type="radio" name="annotationStorage" value="idb" ' + (Settings.storageType === 'idb' ? 'checked' : '') + '>\
-                            <span class="storage-option-text">Local Storage</span>\
+                            <span class="storage-option-text">' + tr('localStorage') + '</span>\
                         </label>\
                         <label class="storage-option" id="storageOptionBackend">\
                             <input type="radio" name="annotationStorage" value="backend" ' + (Settings.storageType === 'backend' ? 'checked' : '') + '>\
-                            <span class="storage-option-text">Cloud Storage</span>\
-                            <span class="storage-option-status" id="backendStatus">Checking...</span>\
+                            <span class="storage-option-text">' + tr('cloudStorage') + '</span>\
+                            <span class="storage-option-status" id="backendStatus">' + tr('checking') + '</span>\
                         </label>\
                     </div>\
                 </div>\
                 <div class="settings-group">\
                     <label class="settings-label">\
-                        Default Color\
+                        ' + tr('defaultColor') + '\
                         <span class="color-tip-default"><i class="fas fa-info-circle"></i></span>\
                     </label>\
                     <div class="color-picker-default"></div>\
                 </div>\
                 <div class="settings-group">\
-                    <label class="settings-label">Export Data</label>\
+                    <label class="settings-label">' + tr('exportData') + '</label>\
                     <div class="export-buttons">\
                         <button class="annotation-btn annotation-btn-secondary" id="exportBookBtn">\
-                            <i class="fas fa-download"></i> Export Book\
+                            <i class="fas fa-download"></i> ' + tr('exportBook') + '\
                         </button>\
                         <button class="annotation-btn annotation-btn-secondary" id="exportAllBtn">\
-                            <i class="fas fa-download"></i> Export All\
+                            <i class="fas fa-download"></i> ' + tr('exportAll') + '\
                         </button>\
                     </div>\
                 </div>';
@@ -1476,7 +1494,7 @@
                 } else {
                     HighlightInteraction.clearHighlights();
                 }
-                Utils.showNotification(Settings.enabled ? 'Annotation enabled' : 'Annotation disabled', 'info');
+                Utils.showNotification(tr(Settings.enabled ? 'enabledNotice' : 'disabledNotice'), 'info');
             });
             
             // Storage toggle
@@ -1491,7 +1509,7 @@
                     // 切换到云端存储
                     if (targetType === 'backend') {
                         if (!Settings.backendAvailable) {
-                            Utils.showNotification('Cloud storage unavailable', 'warning');
+                            Utils.showNotification(tr('cloudUnavailable'), 'warning');
                             self.revertStorageRadio(Settings.storageType);
                             return;
                         }
@@ -1499,21 +1517,19 @@
                         // 检查是否已登录，提示用户
                         var currentUsername = Utils.getAnnotationUsername();
                         if (!currentUsername) {
-                            var msg = 'You are not logged in.\n\n' +
-                                '- Click OK to enter a username (annotations will be isolated by user)\n' +
-                                '- Click Cancel to use shared mode (all users share the same annotations)';
+                            var msg = tr('usernamePrompt');
                             var username = prompt(msg, '');
                             if (username === null) {
                                 // 用户取消 → 使用共享模式
-                                Utils.showNotification('Using shared cloud storage (no user isolation)', 'info');
+                                Utils.showNotification(tr('usingSharedStorage'), 'info');
                             } else {
                                 username = username.trim();
                                 if (username) {
                                     Utils.setAnnotationUsername(username);
-                                    Utils.showNotification('Logged in as: ' + username + ' (annotations isolated)', 'success');
+                                    Utils.showNotification(tr('loggedInAs', { username: username }), 'success');
                                     self.checkBackendStatus();
                                 } else {
-                                    Utils.showNotification('Using shared cloud storage (no user isolation)', 'info');
+                                    Utils.showNotification(tr('usingSharedStorage'), 'info');
                                 }
                             }
                         }
@@ -1555,10 +1571,10 @@
             header.className = 'color-picker-header';
             header.innerHTML = '\
                 <span class="color-header-label">\
-                    Colors\
+                    ' + tr('colors') + '\
                     <span class="color-tip-reorder"><i class="fas fa-info-circle"></i></span>\
                 </span>\
-                <button class="color-add-btn" title="Add color"><i class="fas fa-plus"></i></button>';
+                <button class="color-add-btn" title="' + tr('addColor') + '"><i class="fas fa-plus"></i></button>';
             picker.appendChild(header);
             
             // Create colors container
@@ -1580,7 +1596,7 @@
                     btn.setAttribute('data-color', color);
                     btn.innerHTML = '\
                         <button class="color-option' + (color === Settings.defaultColor ? ' selected' : '') + '" style="background-color: ' + color + '"></button>\
-                        <button class="color-delete-btn" title="Delete"><i class="fas fa-times"></i></button>';
+                        <button class="color-delete-btn" title="' + tr('deleteColor') + '"><i class="fas fa-times"></i></button>';
                     
                     var colorBtn = btn.querySelector('.color-option');
                     colorBtn.addEventListener('click', function(e) {
@@ -1678,13 +1694,13 @@
             dialog.className = 'annotation-dialog annotation-add-color-dialog';
             dialog.innerHTML = '\
                 <div class="annotation-dialog-header">\
-                    <span><i class="fas fa-palette"></i> Add Color</span>\
-                    <button class="annotation-dialog-close"><i class="fas fa-times"></i></button>\
+                    <span><i class="fas fa-palette"></i> ' + tr('addColor') + '</span>\
+                    <button class="annotation-dialog-close" title="' + tr('close') + '" aria-label="' + tr('close') + '"><i class="fas fa-times"></i></button>\
                 </div>\
                 <div class="annotation-dialog-body">\
                     <div class="color-input-row">\
                         <input type="color" id="colorPickerInput" value="#FF5722">\
-                        <input type="text" id="colorHexInput" value="#FF5722" maxlength="7" placeholder="#RRGGBB">\
+                        <input type="text" id="colorHexInput" value="#FF5722" maxlength="7" placeholder="' + tr('hexPlaceholder') + '" aria-label="' + tr('hexColor') + '">\
                     </div>\
                     <div class="preset-colors">\
                         <button class="preset-color" style="background:#FF5722"></button>\
@@ -1698,8 +1714,8 @@
                     </div>\
                 </div>\
                 <div class="annotation-dialog-footer">\
-                    <button class="annotation-btn annotation-btn-cancel">Cancel</button>\
-                    <button class="annotation-btn annotation-btn-confirm">Add</button>\
+                    <button class="annotation-btn annotation-btn-cancel">' + tr('cancel') + '</button>\
+                    <button class="annotation-btn annotation-btn-confirm">' + tr('add') + '</button>\
                 </div>';
             
             document.body.appendChild(dialog);
@@ -1756,7 +1772,12 @@
             closeBtn.addEventListener('click', closeDialog);
             cancelBtn.addEventListener('click', closeDialog);
             confirmBtn.addEventListener('click', function() {
-                var color = colorInput.value.toUpperCase();
+                var color = hexInput.value.toUpperCase();
+                if (!/^#[0-9A-F]{6}$/.test(color)) {
+                    Utils.showNotification(tr('invalidHex'), 'warning');
+                    return;
+                }
+                colorInput.value = color;
                 
                 // Add to custom colors
                 if (Settings.customColors.indexOf(color) === -1) {
@@ -1790,7 +1811,7 @@
             if (!statusEl || !backendOption) return;
             
             this.backendChecking = true;
-            statusEl.textContent = 'Checking...';
+            statusEl.textContent = tr('checking');
             
             StorageManager.isBackendAvailable().then(function(result) {
                 var available = result.available;
@@ -1800,14 +1821,14 @@
                 if (available) {
                     var username = Utils.getAnnotationUsername();
                     if (username) {
-                        statusEl.textContent = 'Connected (' + username + ')';
+                        statusEl.textContent = tr('connectedUser', { username: username });
                     } else {
-                        statusEl.textContent = 'Connected (shared)';
+                        statusEl.textContent = tr('connectedShared');
                     }
                     statusEl.className = 'storage-option-status connected';
                     backendOption.classList.remove('disabled');
                 } else {
-                    statusEl.textContent = 'Disconnected';
+                    statusEl.textContent = tr('disconnected');
                     statusEl.className = 'storage-option-status disconnected';
                     backendOption.classList.add('disabled');
                 }
@@ -1831,16 +1852,16 @@
             dialog.className = 'annotation-dialog annotation-migration-dialog';
             dialog.innerHTML = '\
                 <div class="annotation-dialog-header">\
-                    <span><i class="fas fa-exchange-alt"></i> Data Migration</span>\
+                    <span><i class="fas fa-exchange-alt"></i> ' + tr('dataMigration') + '</span>\
                 </div>\
                 <div class="annotation-dialog-body">\
-                    <p>Switching storage location requires data migration</p>\
-                    <p id="migrationStatus">Counting data...</p>\
+                    <p>' + tr('migrationDescription') + '</p>\
+                    <p id="migrationStatus">' + tr('countingData') + '</p>\
                 </div>\
                 <div class="annotation-dialog-footer">\
-                    <button class="annotation-btn annotation-btn-secondary" id="migrationCancel">Cancel</button>\
-                    <button class="annotation-btn annotation-btn-secondary" id="migrationSkip">Skip</button>\
-                    <button class="annotation-btn annotation-btn-confirm" id="migrationConfirm">Migrate</button>\
+                    <button class="annotation-btn annotation-btn-secondary" id="migrationCancel">' + tr('cancel') + '</button>\
+                    <button class="annotation-btn annotation-btn-secondary" id="migrationSkip">' + tr('skip') + '</button>\
+                    <button class="annotation-btn annotation-btn-confirm" id="migrationConfirm">' + tr('migrate') + '</button>\
                 </div>';
             
             document.body.appendChild(dialog);
@@ -1854,7 +1875,7 @@
             StorageManager.getAll().then(function(data) {
                 var count = data ? data.length : 0;
                 var statusEl = dialog.querySelector('#migrationStatus');
-                statusEl.textContent = 'Current data: ' + count + ' annotations';
+                statusEl.textContent = tr('currentData', { count: count });
             });
             
             // Bind events
@@ -1875,13 +1896,13 @@
             
             confirmBtn.addEventListener('click', function() {
                 var statusEl = dialog.querySelector('#migrationStatus');
-                statusEl.innerHTML = '<div class="migration-progress"><div class="migration-progress-bar"><div class="migration-progress-fill" style="width:0%"></div></div><span>Migrating...</span></div>';
+                statusEl.innerHTML = '<div class="migration-progress"><div class="migration-progress-bar"><div class="migration-progress-fill" style="width:0%"></div></div><span>' + tr('migrating') + '</span></div>';
                 
                 self.finishStorageChange(toType, true, function(current, total) {
                     var fill = dialog.querySelector('.migration-progress-fill');
                     var text = dialog.querySelector('.migration-progress span');
                     if (fill) fill.style.width = Math.round(current / total * 100) + '%';
-                    if (text) text.textContent = 'Migrating... ' + current + '/' + total;
+                    if (text) text.textContent = tr('migratingProgress', { current: current, total: total });
                 }).then(function() {
                     dialog.remove();
                 });
@@ -1899,7 +1920,8 @@
                 // Refresh backend status display
                 self.checkBackendStatus();
                 
-                Utils.showNotification('Storage location changed', 'success');
+                var i18n = window.EpubBrowserI18n;
+                Utils.showNotification(i18n && i18n.t ? i18n.t('annotations.storageLocationChanged') : tr('storageLocationChanged'), 'success');
                 
                 // Re-render annotations
                 HighlightInteraction.renderAll();
@@ -1924,9 +1946,9 @@
                 };
                 
                 self.downloadJSON(data, 'annotations_' + bookHash + '_' + Date.now() + '.json');
-                Utils.showNotification('Exported ' + (annotations ? annotations.length : 0) + ' annotations', 'success');
+                Utils.showNotification(tr('exported', { count: annotations ? annotations.length : 0 }), 'success');
             }).catch(function(err) {
-                Utils.showNotification('Export failed: ' + err.message, 'error');
+                Utils.showNotification(tr('exportFailed', { error: err.message }), 'error');
             });
         },
         
@@ -1944,9 +1966,9 @@
                 };
                 
                 self.downloadJSON(data, 'annotations_all_' + Date.now() + '.json');
-                Utils.showNotification('Exported ' + (annotations ? annotations.length : 0) + ' annotations', 'success');
+                Utils.showNotification(tr('exported', { count: annotations ? annotations.length : 0 }), 'success');
             }).catch(function(err) {
-                Utils.showNotification('Export failed: ' + err.message, 'error');
+                Utils.showNotification(tr('exportFailed', { error: err.message }), 'error');
             });
         },
         
