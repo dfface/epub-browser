@@ -1,12 +1,17 @@
 # epub_browser/setup.py
+import re
+
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+with open("epub_browser/version.py", "r", encoding="utf-8") as fh:
+    version = re.search(r'^VERSION = ["\']([^"\']+)', fh.read(), re.MULTILINE).group(1)
+
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
-    version="1.11.0",      # 初始版本号
+    version=version,
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     keywords="epub reader html export browser convert calibre-web calibre kindle web server local",

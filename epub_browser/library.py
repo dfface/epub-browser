@@ -7,6 +7,7 @@ from datetime import datetime
 
 from .asset_publisher import AssetPublisher, rewrite_asset_urls
 from .processor import EPUBProcessor
+from .version import render_footer
 
 class EPUBLibrary:
     """EPUB图书馆类，管理多本书籍"""
@@ -369,12 +370,11 @@ if (isKindle) {
         </div>
     </div>
 </div>
-<footer class="eb-footer" data-id="eb-footer">
-    <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
-</footer>
+{render_footer(datetime.now().year)}
 """
         library_html += """
         <script src="/assets/theme.js" defer></script>
+        <script src="/assets/version-check.js" defer></script>
         <script src="/assets/pinyin-pro.min.js" defer></script>
         <script src="/assets/library.js?v=13" defer></script>
         <script src="/assets/sortable.min.js" defer></script>

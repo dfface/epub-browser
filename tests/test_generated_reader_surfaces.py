@@ -1,5 +1,7 @@
 import tempfile
 import unittest
+import subprocess
+import sys
 from pathlib import Path
 
 from epub_browser.library import EPUBLibrary
@@ -7,6 +9,24 @@ from epub_browser.processor import EPUBProcessor
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_generated_footers_show_the_package_version_and_load_the_update_checker(self):
+        package_version = subprocess.check_output(
+            [sys.executable, "setup.py", "--version"],
+            text=True,
+        ).strip()
+
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            footer = html[html.index('<footer'):html.index('</footer>')]
+            self.assertRegex(
+                footer,
+                rf'data-current-version=(?:["\'])?{package_version}(?:["\' >])',
+            )
+            self.assertIn(f'v{package_version}', footer)
+            self.assertRegex(
+                html,
+                r'/assets/immutable/version-check\.[0-9a-f]{12}\.js',
+            )
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 

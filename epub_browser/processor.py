@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from .asset_publisher import AssetPublisher, rewrite_asset_urls
+from .version import render_footer
 
 class EPUBProcessor:
     """处理EPUB文件的类"""
@@ -698,12 +699,11 @@ class EPUBProcessor:
         </div>
     </div>
 </div>
-<footer class="eb-footer" data-id="eb-footer">
-    <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
-</footer>"""
+{render_footer(datetime.now().year)}"""
 
         index_html += """
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
@@ -1587,9 +1587,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
         </div>
     </div>
-    <footer class="eb-footer" data-id="eb-footer">
-        <p>EPUB Library &copy; {datetime.now().year} | Powered by <a href="https://github.com/dfface/epub-browser" target="_blank">epub-browser</a></p>
-    </footer>
+    {render_footer(datetime.now().year)}
 """
         chapter_html += """
     <script>
@@ -1657,6 +1655,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     });
     </script>
     <script src="/assets/theme.js" defer></script>
+    <script src="/assets/version-check.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>
     <script src="/assets/chapter-window.js" defer></script>

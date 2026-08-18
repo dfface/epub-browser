@@ -1,0 +1,11 @@
+VERSION = "1.11.1"
+
+REPOSITORY_URL = "https://github.com/dfface/epub-browser"
+LATEST_RELEASE_API_URL = "https://api.github.com/repos/dfface/epub-browser/releases/latest"
+
+
+def render_footer(year):
+    """Render the shared application footer for every generated page."""
+    return f"""<footer class="eb-footer" data-id="eb-footer" data-version-check data-current-version="{VERSION}" data-release-api="{LATEST_RELEASE_API_URL}">
+    <p>EPUB Library &copy; {year} | Powered by <a href="{REPOSITORY_URL}" target="_blank" rel="noopener noreferrer">epub-browser</a> <span aria-hidden="true">&middot;</span> <span class="eb-footer-version" aria-label="Version {VERSION}">v{VERSION}</span><span class="eb-footer-update" data-version-update hidden><span aria-hidden="true"> &middot; </span><a target="_blank" rel="noopener noreferrer"></a></span></p>
+</footer>"""
