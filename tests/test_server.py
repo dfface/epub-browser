@@ -88,6 +88,24 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(fetched.json()["data"][0]["id"], "a1")
 
+    def test_browser_api_errors_include_stable_codes_and_compatible_messages(self):
+        with TestClient(create_app(self.directory.name), raise_server_exceptions=False) as client:
+            with mock.patch("epub_browser.server.sqlite3.connect", side_effect=sqlite3.OperationalError("offline")):
+                server_error = client.get("/api/reading-progress/book")
+
+        cases = [
+            (self.client.post("/sync", json={}), 400, "username_required"),
+            (self.client.put("/api/reading-progress/book", json={"chapter_index": -1}), 400, "invalid_chapter_index"),
+            (self.client.get("/api/annotations/item/missing"), 404, "annotation_not_found"),
+            (self.client.post("/sync", content=b"{", headers={"Content-Type": "application/json"}), 400, "invalid_json"),
+            (server_error, 500, "server_error"),
+        ]
+        for response, status, code in cases:
+            with self.subTest(code=code):
+                self.assertEqual(response.status_code, status)
+                self.assertEqual(response.json()["code"], code)
+                self.assertIsInstance(response.json()["message"], str)
+
     def test_sync_route_preserves_new_shelf_response(self):
         response = self.client.post("/sync", json={"username": "reader", "version": 1, "data": {"items": []}})
 
