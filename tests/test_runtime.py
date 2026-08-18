@@ -136,6 +136,27 @@ class ServerRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(stderr.getvalue(), "")
 
+    def test_keyboard_interrupt_is_a_clean_normal_shutdown(self):
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+        )
+
+        with (
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            status = run_server(config, server_factory=_InterruptingServer)
+
+        self.assertEqual(status, 0)
+        self.assertEqual(
+            stdout.getvalue(),
+            "Server available at: http://127.0.0.1:8000/\n",
+        )
+        self.assertEqual(stderr.getvalue(), "")
+
     def test_ephemeral_shutdown_removes_only_created_temporary_root(self):
         ephemeral_root = self.root / "ephemeral-runtime"
         config = ServerConfig(
@@ -204,6 +225,11 @@ class _ReturningServer:
 
     def run(self):
         return None
+
+
+class _InterruptingServer(_ReturningServer):
+    def run(self):
+        raise KeyboardInterrupt()
 
 
 class _BlockingLibrary:

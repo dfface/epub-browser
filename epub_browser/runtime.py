@@ -342,6 +342,8 @@ def run_server(
     except (ServerLockError, PermissionError, OSError, ValueError) as error:
         active_reporter.error(f"Server startup failed: {error}")
         return 5
+    except KeyboardInterrupt:
+        return 0
     except SystemExit as error:
         if not error.code:
             return 0
