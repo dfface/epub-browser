@@ -255,6 +255,8 @@ test('starts EventSource at the normalized server events URL and wires progress,
   assert.equal(harness.nodes['[data-progress-summary]'].textContent, 'zh-CN:library.progress.summary');
   source.onerror();
   assert.equal(started.controller.state.connected, false);
+  source.onopen();
+  assert.equal(started.controller.state.connected, true);
   harness.nodes['[data-progress-close]'].listener();
   assert.equal(started.controller.state.visible, true);
   source.listeners.progress({ data: JSON.stringify(snapshot({ generation: 2, phase: 'degraded', failed: 1 })) });

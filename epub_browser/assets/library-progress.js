@@ -62,6 +62,7 @@
       state: initialState(),
       accept: accept,
       dismiss: dismiss,
+      connected: connected,
       disconnected: disconnected,
       render: render
     };
@@ -92,10 +93,7 @@
     function accept(snapshot) {
       var previous = controller.state;
       if (!isNewer(previous.snapshot, snapshot)) {
-        if (!previous.connected) {
-          controller.state = stateWith(previous, { connected: true, announceDegraded: false });
-          render();
-        }
+        connected();
         return false;
       }
       controller.state = reduce(previous, snapshot);
@@ -121,6 +119,12 @@
     function disconnected() {
       if (!controller.state.connected) return;
       controller.state = stateWith(controller.state, { connected: false, announceDegraded: false });
+      render();
+    }
+
+    function connected() {
+      if (controller.state.connected) return;
+      controller.state = stateWith(controller.state, { connected: true, announceDegraded: false });
       render();
     }
 
@@ -259,6 +263,7 @@
     source.addEventListener('progress', function(event) {
       try { controller.accept(JSON.parse(event.data)); } catch (error) {}
     });
+    source.onopen = function() { controller.connected(); };
     source.onerror = function() { controller.disconnected(); };
     mount.querySelector('[data-progress-close]').addEventListener('click', function() { controller.dismiss(); });
     return { controller: controller, source: source };
