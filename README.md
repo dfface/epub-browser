@@ -110,7 +110,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:ro \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.0.0
+  epub-browser:2.0.1
 ```
 
 `/app/EpubBrowserFiles` must be writable and persistent. `/app/Library` is read-only input. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
