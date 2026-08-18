@@ -259,6 +259,14 @@ def run_server(
             except Exception as error:
                 active_reporter.detail(f"Unable to open browser: {error}")
         server.run()
+        if (
+            created_ephemeral_root
+            and ephemeral_root is not None
+            and config.retain_legacy_temporary_dir
+        ):
+            active_reporter.result(
+                f"Server files retained at: {ephemeral_root.resolve()}"
+            )
         return 0
     except MigrationError as error:
         active_reporter.error(f"Server data migration failed: {error}")

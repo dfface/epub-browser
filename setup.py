@@ -19,7 +19,7 @@ setup(
     long_description=long_description,  # 详细描述，从README.md读取
     long_description_content_type="text/markdown",  # 详细描述格式
     url="https://github.com/dfface/epub-browser",  # 项目主页，如GitHub仓库地址
-    packages=find_packages(),  # 自动发现包
+    packages=find_packages(exclude=("tests", "tests.*")),
     package_data={'epub_browser': ['assets/*']},
     classifiers=[  # 项目分类器，帮助用户找到你的项目
         "Programming Language :: Python :: 3",

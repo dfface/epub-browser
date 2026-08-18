@@ -149,14 +149,16 @@ class ServerRuntimeTests(unittest.TestCase):
             legacy_invocation=True,
         )
 
-        status = run_server(
-            config,
-            server_factory=_ReturningServer,
-            ephemeral_root_factory=lambda: ephemeral_root,
-        )
+        with contextlib.redirect_stdout(io.StringIO()) as stdout:
+            status = run_server(
+                config,
+                server_factory=_ReturningServer,
+                ephemeral_root_factory=lambda: ephemeral_root,
+            )
 
         self.assertEqual(status, 0)
         self.assertTrue((ephemeral_root / "cache" / "public" / "index.html").is_file())
+        self.assertIn(f"Server files retained at: {ephemeral_root.resolve()}", stdout.getvalue())
 
 
 class _ReturningServer:

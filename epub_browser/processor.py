@@ -1652,7 +1652,9 @@ document.addEventListener('DOMContentLoaded', function() {
         marker = '<script>window.EpubBrowserI18n.init();</script>'
         bootstrap = (
             marker
-            + '<script>window.EpubBrowserMode='
+            + '<script>window.EpubBrowserBasePath='
+            + json.dumps(self.urls.base_path)
+            + ';window.EpubBrowserMode='
             + json.dumps(self.deployment_mode)
             + '</script>'
         )

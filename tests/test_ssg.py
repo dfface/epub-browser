@@ -49,6 +49,15 @@ class SSGPublicationTests(unittest.TestCase):
                     encoding="utf-8"
                 ),
             )
+            for page in (
+                output / "index.html",
+                output / "book" / book_id / "index.html",
+                output / "book" / book_id / "chapter_0.html",
+            ):
+                self.assertRegex(
+                    page.read_text(encoding="utf-8"),
+                    r"window\.EpubBrowserBasePath=(?:[\"'`])/reader/(?:[\"'`])",
+                )
 
     def test_non_root_snapshot_has_only_resolvable_base_path_urls(self):
         with tempfile.TemporaryDirectory() as directory:

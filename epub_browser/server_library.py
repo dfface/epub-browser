@@ -165,11 +165,11 @@ class ServerLibraryManager:
                     metadata = self._probe_metadata(source)
                     record = self.state_store.resolve_book(
                         source,
-                        metadata.epub_identifier,
+                        None if existing else metadata.epub_identifier,
                         fingerprint,
                         metadata,
-                        source_size=stat.st_size,
-                        source_mtime_ns=stat.st_mtime_ns,
+                        source_size=None if existing else stat.st_size,
+                        source_mtime_ns=None if existing else stat.st_mtime_ns,
                         preferred_book_id=legacy_ids.get(source),
                     )
                 except Exception as error:

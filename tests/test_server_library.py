@@ -116,6 +116,13 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(summary.failed, 1)
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
         self.assertEqual(self.store.active_books()[0].book_id, first.book_id)
+
+        manager.converter_factory = EPUBProcessor
+        retried = manager.reconcile()
+
+        self.assertEqual(retried.converted, 1)
+        self.assertFalse(retried.degraded)
+        self.assertIn("Changed", chapter_path.read_text(encoding="utf-8"))
         manager.shutdown()
 
     def test_delete_hides_book_but_preserves_data_and_restore_reuses_id(self):

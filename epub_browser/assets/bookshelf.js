@@ -1,3 +1,13 @@
+function bookshelfMetadataUrl(basePath) {
+    var prefix = basePath || '/';
+    if (prefix.charAt(prefix.length - 1) !== '/') prefix += '/';
+    return prefix + 'book-metadata.json';
+}
+
+function bookshelfCoverUrl(book) {
+    return book && book.cover ? book.cover : null;
+}
+
 function initBookshelf() {
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
@@ -26,7 +36,7 @@ function initBookshelf() {
             return;
         }
         
-        var metadataUrl = "/book-metadata.json";
+        var metadataUrl = bookshelfMetadataUrl(window.EpubBrowserBasePath);
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', metadataUrl, true);
@@ -163,15 +173,11 @@ function initBookshelf() {
                 if (book.authors && book.authors.length > 0) {
                     authors = book.authors.join(' & ');
                 }
-                var cover = null;
-                if (book.cover) {
-                    cover = '/book/' + bookHash + '/' + book.cover;
-                }
                 return {
                     hash: bookHash,
                     title: book.title,
                     author: authors,
-                    cover: cover,
+                    cover: bookshelfCoverUrl(book),
                     tags: book.tags || []
                 };
             }
@@ -1119,4 +1125,10 @@ function initBookshelf() {
     }
 }
 
-window.initBookShelf = initBookshelf;
+if (typeof window !== 'undefined') window.initBookShelf = initBookshelf;
+if (typeof module === 'object' && module.exports) {
+    module.exports = {
+        metadataUrl: bookshelfMetadataUrl,
+        coverUrl: bookshelfCoverUrl
+    };
+}
