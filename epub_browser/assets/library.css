@@ -36,7 +36,19 @@ body {
     padding: 20px 0 0;
 }
 
-.library-breadcrumb { justify-content: space-between; gap: 20px; }
+.library-breadcrumb {
+    justify-content: space-between;
+    gap: 24px;
+    min-height: 76px;
+    padding: 18px 24px;
+}
+
+.library-breadcrumb .breadcrumb-current {
+    flex: 0 0 auto;
+    gap: 10px;
+    font-size: 1.2rem;
+    letter-spacing: -0.01em;
+}
 
 .library-meta,
 .library-meta-item,
@@ -45,15 +57,35 @@ body {
     align-items: center;
 }
 
-.library-meta { gap: 14px; color: var(--text-secondary); font-size: 0.9rem; }
+.library-meta {
+    gap: 12px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1;
+}
 
-.library-meta-item { gap: 5px; white-space: nowrap; }
+.library-meta-item {
+    gap: 6px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
 .library-meta-item i,
 .library-meta-action i { color: var(--button-bg); }
 
+.library-meta-item + .library-meta-item::before,
+.library-meta-action::before,
+.library-language::before {
+    content: '';
+    width: 1px;
+    height: 18px;
+    margin-right: 12px;
+    background: var(--border);
+}
+
 .library-meta-action {
     gap: 5px;
-    padding: 0;
+    min-height: 36px;
+    padding: 0 2px;
     border: 0;
     background: transparent;
     color: inherit;
@@ -67,19 +99,19 @@ body {
 .library-language {
     display: inline-flex;
     align-items: center;
-    min-height: 44px;
-    gap: 5px;
+    min-height: 36px;
+    gap: 6px;
     color: var(--text-secondary);
 }
 
 .library-language i { color: var(--button-bg); }
 
 .library-language select {
-    min-height: 44px;
-    padding: 0 28px 0 9px;
+    min-height: 36px;
+    padding: 0 26px 0 7px;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--card-bg);
+    border-radius: 6px;
+    background: transparent;
     color: var(--text);
     font: inherit;
 }
@@ -128,8 +160,19 @@ body {
 }
 
 @media (max-width: 700px) {
-    .library-breadcrumb { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+    .library-breadcrumb {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 12px;
+        min-height: 0;
+        padding: 16px;
+    }
+
     .library-meta { width: 100%; flex-wrap: wrap; gap: 8px 12px; }
+
+    .library-meta-item + .library-meta-item::before,
+    .library-meta-action::before,
+    .library-language::before { display: none; }
 }
 
 .theme-toggle {
