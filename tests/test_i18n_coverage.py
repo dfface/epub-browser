@@ -31,7 +31,9 @@ PROPERTY_ASSIGNMENT = re.compile(
 )
 SET_ATTRIBUTE_START = re.compile(r"\.\s*setAttribute\s*\(")
 VISIBLE_LITERAL = re.compile(r"(?P<quote>['\"])(?P<text>[A-Za-z][^'\"\r\n]*)(?P=quote)")
-TRANSLATION_KEY_ARGUMENT = re.compile(r"(?P<function>i18n\s*\.\s*t|bookT|tr|t)\s*\(\s*$")
+TRANSLATION_KEY_ARGUMENT = re.compile(
+    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t))\s*\(\s*$"
+)
 DICTIONARY_KEY = re.compile(r"^\s*'(?P<key>[^']+)':", re.MULTILINE)
 KNOWN_TRANSLATION_KEYS = {
     match.group('key')
@@ -284,6 +286,16 @@ class I18nCoverageTests(unittest.TestCase):
         failures = find_literal_ui_sinks_text(source, Path('epub_browser/assets/library.js'))
         self.assertEqual(len(failures), 1)
         self.assertIn('literal UI sink', failures[0])
+
+    def test_only_project_translation_wrappers_are_trusted(self):
+        source = '''
+            element.textContent = rogue.t('library.login');
+            element.textContent = rogue.tr('close');
+            element.textContent = rogue.bookT('book.confirm');
+        '''
+        failures = find_literal_ui_sinks_text(source, Path('epub_browser/assets/annotation.js'))
+        self.assertEqual(len(failures), 3)
+        self.assertTrue(all('literal UI sink' in failure for failure in failures))
 
     def test_exceptions_require_an_approved_reason_on_the_same_line(self):
         valid = '<span>epub-browser</span><!-- i18n-allow-literal: product name -->'
