@@ -5,9 +5,52 @@ import unittest
 from pathlib import Path
 
 from epub_browser.asset_publisher import AssetPublisher
+from epub_browser.urls import SiteURLs
 
 
 class AssetPublisherTests(unittest.TestCase):
+    def test_publish_uses_base_path_without_writing_the_prefix_to_disk(self):
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
+            self._write_source_assets(source)
+
+            published = AssetPublisher(
+                source,
+                output,
+                SiteURLs("/reader/"),
+            ).publish()
+
+            public_url = published.url_for("app.js")
+            self.assertRegex(
+                public_url,
+                r"^/reader/assets/immutable/app\.[0-9a-f]{12}\.js$",
+            )
+            filename = public_url.rsplit("/", 1)[1]
+            self.assertTrue(Path(output, "assets", "immutable", filename).is_file())
+            self.assertFalse(Path(output, "reader").exists())
+
+    def test_non_root_manifests_and_worker_use_the_base_path(self):
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
+            self._write_source_assets(source)
+            manifest_path = Path(source, "manifest.json")
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest.update({"start_url": "/index.html", "scope": "/"})
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            AssetPublisher(source, output, SiteURLs("/reader/")).publish()
+
+            published_manifest = json.loads(
+                Path(output, "assets", "manifest.json").read_text(encoding="utf-8")
+            )
+            worker = Path(output, "sw.js").read_text(encoding="utf-8")
+            self.assertEqual(published_manifest["start_url"], "/reader/index.html")
+            self.assertEqual(published_manifest["scope"], "/reader/")
+            self.assertRegex(
+                published_manifest["icons"][0]["src"],
+                r"^/reader/assets/immutable/icon-192\.[0-9a-f]{12}\.png$",
+            )
+            self.assertIn(json.dumps("/reader/index.html"), worker)
+            self.assertIn(json.dumps("/reader/assets/manifest.json"), worker)
+
     def test_publish_writes_content_addressed_assets_and_a_lookup_manifest(self):
         with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
             self._write_source_assets(source)

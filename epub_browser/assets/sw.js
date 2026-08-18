@@ -1,10 +1,7 @@
 const CACHE_NAME = 'epub-browser-__EPUB_BROWSER_RELEASE_ID__';
 const PRECACHE_URLS = __EPUB_BROWSER_PRECACHE_URLS__;
-const MUTABLE_MANIFEST_URLS = new Set([
-    '/assets/manifest.json',
-    '/assets/manifest.en.json',
-    '/assets/manifest.zh-CN.json',
-]);
+const MUTABLE_MANIFEST_URLS = new Set(__EPUB_BROWSER_MUTABLE_MANIFEST_URLS__);
+const INDEX_URL = __EPUB_BROWSER_INDEX_URL__;
 
 self.addEventListener('install', (event) => {
     event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
@@ -57,5 +54,5 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    event.respondWith(networkFirst(event.request, event.request.mode === 'navigate' ? '/index.html' : null));
+    event.respondWith(networkFirst(event.request, event.request.mode === 'navigate' ? INDEX_URL : null));
 });

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence, Tuple, Union
 
+from .urls import normalize_base_path
+
 
 @dataclass(frozen=True)
 class SSGConfig:
@@ -86,7 +88,7 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
             return SSGConfig(
                 sources=sources,
                 output_dir=Path(values.output_dir),
-                base_path=values.base_path,
+                base_path=normalize_base_path(values.base_path),
                 log=values.log,
             )
         return ServerConfig(

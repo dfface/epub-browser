@@ -19,6 +19,24 @@ class NewCommandTests(unittest.TestCase):
             ["ssg", "books", "--output-dir", "dist", "--base-path", "/reader/"]
         )
 
+    def test_ssg_normalizes_and_validates_base_path_at_the_cli_boundary(self):
+        config = parse_cli(
+            ["ssg", "books", "--output-dir", "dist", "--base-path", "reader"]
+        )
+        self.assertEqual(config.base_path, "/reader/")
+
+        with self.assertRaises(ValueError):
+            parse_cli(
+                [
+                    "ssg",
+                    "books",
+                    "--output-dir",
+                    "dist",
+                    "--base-path",
+                    "https://example.com/reader/",
+                ]
+            )
+
         self.assertEqual(
             config,
             SSGConfig(

@@ -9,6 +9,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .urls import SiteURLs
+
 
 WEB_MANIFEST_SOURCES = {
     'manifest.json': 'manifest.json',
@@ -30,9 +32,10 @@ class PublishedAssets:
 class AssetPublisher:
     """Publish app assets with immutable URLs and render stable update entry points."""
 
-    def __init__(self, source_dir, output_dir):
+    def __init__(self, source_dir, output_dir, urls=None):
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
+        self.urls = urls or SiteURLs()
 
     def publish(self) -> PublishedAssets:
         assets = self._copy_immutable_assets()
@@ -66,7 +69,7 @@ class AssetPublisher:
             for logical_path, contents in published_contents.items()
         }
         for logical_path, contents in published_contents.items():
-            target = self.output_dir / assets[logical_path].lstrip('/')
+            target = self.output_dir / self.urls.filesystem_relative(assets[logical_path])
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(contents)
         return assets
@@ -75,7 +78,9 @@ class AssetPublisher:
         digest = hashlib.sha256(contents).hexdigest()[:12]
         relative = Path(logical_path)
         filename = f'{relative.stem}.{digest}{relative.suffix}'
-        return '/assets/immutable/' + (relative.parent / filename).as_posix()
+        return self.urls.public(
+            '/assets/immutable/' + (relative.parent / filename).as_posix()
+        )
 
     def _rewrite_css_urls(self, logical_path: str, contents: bytes, assets: dict[str, str]) -> bytes:
         try:
@@ -120,7 +125,9 @@ class AssetPublisher:
             return {key: self._rewrite_asset_urls(item, published) for key, item in value.items()}
         if isinstance(value, str) and value.startswith('/assets/'):
             logical_name = value.removeprefix('/assets/')
-            return published.assets.get(logical_name, value)
+            return published.assets.get(logical_name, self.urls.public(value))
+        if isinstance(value, str) and value.startswith('/') and not value.startswith('//'):
+            return self.urls.public(value)
         return value
 
     def _write_service_worker(self, published: PublishedAssets) -> None:
@@ -130,10 +137,16 @@ class AssetPublisher:
         release_id = hashlib.sha256(
             json.dumps(published.assets, sort_keys=True, separators=(',', ':')).encode('utf-8')
         ).hexdigest()[:12]
-        precache_urls = ['/index.html', *published.assets.values(), *(f'/assets/{name}' for name in WEB_MANIFEST_SOURCES)]
+        mutable_manifests = [
+            self.urls.public(f'/assets/{name}') for name in WEB_MANIFEST_SOURCES
+        ]
+        index_url = self.urls.public('/index.html')
+        precache_urls = [index_url, *published.assets.values(), *mutable_manifests]
         worker = source.read_text(encoding='utf-8')
         worker = worker.replace('__EPUB_BROWSER_RELEASE_ID__', release_id)
         worker = worker.replace('__EPUB_BROWSER_PRECACHE_URLS__', json.dumps(precache_urls, separators=(',', ':')))
+        worker = worker.replace('__EPUB_BROWSER_MUTABLE_MANIFEST_URLS__', json.dumps(mutable_manifests, separators=(',', ':')))
+        worker = worker.replace('__EPUB_BROWSER_INDEX_URL__', json.dumps(index_url))
         target = self.output_dir / 'sw.js'
         target.write_text(worker, encoding='utf-8')
 
