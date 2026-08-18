@@ -36,6 +36,7 @@ class ReconcileSummary:
     removed: int
     failures: tuple[ConversionFailure, ...]
     active_books: tuple[BookRecord, ...]
+    cancelled: bool = False
 
     @property
     def failed(self) -> int:
@@ -382,6 +383,7 @@ class ServerLibraryManager:
                 sorted(failures, key=lambda failure: str(failure.source))
             ),
             active_books=self._valid_active_records(),
+            cancelled=True,
         )
 
     def _conversion_outcomes(self, plans):

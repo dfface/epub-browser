@@ -276,7 +276,8 @@ def run_server(
             try:
                 summary: ReconcileSummary = manager.reconcile()
                 if (
-                    not summary.degraded
+                    not summary.cancelled
+                    and not summary.degraded
                     and migration_manager
                     and initial_layout_phase == "retired"
                 ):

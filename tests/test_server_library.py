@@ -242,6 +242,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
             BlockingProcessor.cleaned.wait(timeout=5)
 
         self.assertEqual(result[0].active_books, ())
+        self.assertTrue(result[0].cancelled)
         manager.migration_manager.record_cache_reconciled.assert_not_called()
         manager.on_reconciled.assert_not_called()
         manager.shutdown()

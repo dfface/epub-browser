@@ -12,6 +12,7 @@ from pathlib import Path
 from starlette.testclient import TestClient
 
 from epub_browser.cli import ServerConfig
+from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.runtime import RuntimeStatus, ServerLock, run_server
 from epub_browser.server import create_app
@@ -199,6 +200,40 @@ class ServerRuntimeTests(unittest.TestCase):
 
         self.assertEqual(status, 0)
         self.assertLess(elapsed, 1.0)
+
+    def test_interrupted_initial_scan_does_not_retire_legacy_public_backup(self):
+        source = self.sources / "slow.epub"
+        _write_runtime_epub(source)
+        migration = MigrationManager(self.server_dir, None)
+        result = migration.prepare_data()
+        state = json.loads(result.state_path.read_text(encoding="utf-8"))
+        state["layout_phase"] = "retired"
+        result.state_path.write_text(json.dumps(state), encoding="utf-8")
+        legacy_public = self.server_dir / "cache" / "legacy-public"
+        legacy_public.mkdir(parents=True)
+        (legacy_public / "index.html").write_text("legacy", encoding="utf-8")
+        _BlockingProcessor.reset()
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+        )
+
+        try:
+            status = run_server(
+                config,
+                server_factory=_InterruptWhenConversionStarts,
+                library_factory=_blocking_library_factory,
+            )
+        finally:
+            _BlockingProcessor.release.set()
+            _BlockingProcessor.cleaned.wait(timeout=5)
+
+        final_state = json.loads(result.state_path.read_text(encoding="utf-8"))
+        self.assertEqual(status, 0)
+        self.assertEqual(final_state["layout_phase"], "retired")
+        self.assertTrue((legacy_public / "index.html").is_file())
 
     def test_bind_failure_does_not_report_availability_or_open_browser(self):
         opened = []
