@@ -70,6 +70,12 @@ function findAll(node, selector) {
   return matchesFound;
 }
 
+function assertValidSelector(selector) {
+  if (selector.indexOf('[data-id="') === 0 && !/^\[data-id="[^"]*"\]$/.test(selector)) {
+    throw new SyntaxError('Invalid selector');
+  }
+}
+
 function createLibraryHarness(responses) {
   const bookGrid = element('div');
   bookGrid.className = 'book-grid';
@@ -114,6 +120,7 @@ function createLibraryHarness(responses) {
       }[id] || null;
     },
     querySelector(selector) {
+      assertValidSelector(selector);
       return {
         '.book-grid': bookGrid,
         '.search-box': searchBox,
@@ -123,6 +130,7 @@ function createLibraryHarness(responses) {
       }[selector] || findAll({ children: [bookGrid, searchBox, tagCloud, container, bookshelfModal] }, selector)[0] || null;
     },
     querySelectorAll(selector) {
+      assertValidSelector(selector);
       return findAll({ children: [bookGrid, searchBox, tagCloud, container, bookshelfModal] }, selector);
     },
   };
@@ -140,7 +148,11 @@ function createLibraryHarness(responses) {
     this.responseText = JSON.stringify(response.books || response);
     this.onreadystatechange();
   };
-  const localStorage = { getItem() { return null; }, setItem() {} };
+  const storageValues = {};
+  const localStorage = {
+    getItem(key) { return storageValues[key] || null; },
+    setItem(key, value) { storageValues[key] = String(value); },
+  };
   const window = {
     navigator: { userAgent: 'Kindle' },
     EpubBrowserBasePath: '/reader/',
@@ -157,7 +169,10 @@ function createLibraryHarness(responses) {
   return {
     window, searchBox, bookshelfModal,
     cardIds() { return bookGrid.querySelectorAll('.book-card').map((card) => card.getAttribute('data-id')); },
-    card(id) { return bookGrid.querySelector('[data-id="' + id + '"]'); },
+    card(id) { return bookGrid.children.find((card) => card.getAttribute('data-id') === id) || null; },
+    tag(id) { return tagCloud.children.find((tagItem) => tagItem.getAttribute('data-id') === id) || null; },
+    tagIds() { return tagCloud.children.map((tagItem) => tagItem.getAttribute('data-id')); },
+    setSavedOrder(key, order) { localStorage.setItem(key, order); },
   };
 }
 
@@ -281,6 +296,53 @@ test('incremental metadata refresh leaves existing cards after a failed request'
   harness.window.initScriptLibrary();
 
   await assert.rejects(harness.window.refreshLibraryMetadata());
+
+  assert.deepEqual(harness.cardIds(), ['one']);
+});
+
+test('incremental metadata refresh preserves quoted saved card and tag order with an active tag', async () => {
+  const quotedHash = 'book"quoted';
+  const quotedTag = 'tag "quoted"';
+  const books = [
+    { hash: quotedHash, title: 'Quoted', authors: [], tags: [quotedTag], url: '/book/quoted/', cover: null },
+    { hash: 'other', title: 'Other', authors: [], tags: ['Other'], url: '/book/other/', cover: null },
+  ];
+  const harness = createLibraryHarness([books, books]);
+  harness.window.initScriptLibrary();
+  harness.setSavedOrder('book-grid-sortable-order', JSON.stringify(['other', quotedHash]));
+  harness.setSavedOrder('tag-cloud-sortable-order', JSON.stringify(['Other', quotedTag, 'All', 'NoTag']));
+  harness.tag('All').classList.remove('active');
+  harness.tag(quotedTag).classList.add('active');
+
+  await harness.window.refreshLibraryMetadata();
+
+  assert.deepEqual(harness.cardIds(), ['other', quotedHash]);
+  assert.deepEqual(harness.tagIds(), ['Other', quotedTag, 'All', 'NoTag']);
+  assert.equal(harness.tag(quotedTag).classList.contains('active'), true);
+  assert.equal(harness.card(quotedHash).style.display, 'block');
+  assert.equal(harness.card('other').style.display, 'none');
+});
+
+test('incremental metadata refresh rejects a valid JSON non-array without replacing cards', async () => {
+  const harness = createLibraryHarness([
+    [{ hash: 'one', title: 'One', authors: [], tags: [], url: '/book/one/', cover: null }],
+    { hash: 'two', title: 'Two', authors: [], tags: [], url: '/book/two/', cover: null },
+  ]);
+  harness.window.initScriptLibrary();
+
+  await assert.rejects(harness.window.refreshLibraryMetadata());
+
+  assert.deepEqual(harness.cardIds(), ['one']);
+});
+
+test('incremental metadata refresh ignores malformed saved order JSON', async () => {
+  const books = [{ hash: 'one', title: 'One', authors: [], tags: ['A'], url: '/book/one/', cover: null }];
+  const harness = createLibraryHarness([books, books]);
+  harness.window.initScriptLibrary();
+  harness.setSavedOrder('book-grid-sortable-order', '{not JSON');
+  harness.setSavedOrder('tag-cloud-sortable-order', '{not JSON');
+
+  await harness.window.refreshLibraryMetadata();
 
   assert.deepEqual(harness.cardIds(), ['one']);
 });

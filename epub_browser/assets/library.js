@@ -81,6 +81,9 @@ function initScript() {
                 if (xhr.status === 200) {
                     try {
                         var books = JSON.parse(xhr.responseText);
+                        if (!Array.isArray(books)) {
+                            throw new Error('Book metadata must be an array');
+                        }
                         callback(books);
                     } catch (e) {
                         console.error('Failed to parse book metadata:', e);
@@ -180,17 +183,20 @@ function initScript() {
         }
     }
 
-    function rebuildTagItems(books, activeTagId) {
-        var tagCloud = document.querySelector('.tag-cloud');
+    function collectTagNames(books) {
         var tags = {};
-        var tagItems;
-        if (!tagCloud) return;
-
         books.forEach(function(book) {
             (book.tags || []).forEach(function(tag) {
                 if (typeof tag === 'string' && tag.trim()) tags[tag.trim()] = true;
             });
         });
+        return Object.keys(tags).sort();
+    }
+
+    function rebuildTagItems(tagNames, activeTagId) {
+        var tagCloud = document.querySelector('.tag-cloud');
+        var tagItems;
+        if (!tagCloud) return 0;
 
         tagItems = Array.prototype.slice.call(tagCloud.querySelectorAll('.tag-cloud-item'));
         tagItems.forEach(function(tagItem) {
@@ -198,7 +204,7 @@ function initScript() {
             if (id !== 'All' && id !== 'NoTag') tagCloud.removeChild(tagItem);
         });
 
-        Object.keys(tags).sort().forEach(function(tag) {
+        tagNames.forEach(function(tag) {
             var tagItem = document.createElement('div');
             tagItem.className = 'tag-cloud-item';
             tagItem.setAttribute('data-id', tag);
@@ -221,18 +227,20 @@ function initScript() {
                 if (tagItem.getAttribute('data-id') === 'All') tagItem.classList.add('active');
             });
         }
-        return Object.keys(tags).length;
+        return tagNames.length;
     }
 
     function replaceBookCards(books) {
         var bookGrid = document.querySelector('.book-grid');
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var activeTagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
+        var cards = books.map(createBookCard);
+        var tagNames = collectTagNames(books);
         if (!bookGrid) return;
 
         hideBookGridLoading();
         removeLibraryCardsAndStates(bookGrid);
-        var tagCount = rebuildTagItems(books, activeTagId);
+        var tagCount = rebuildTagItems(tagNames, activeTagId);
         updateLibraryCounts(books, tagCount);
 
         if (!books.length) {
@@ -243,8 +251,8 @@ function initScript() {
             return;
         }
 
-        books.forEach(function(book) {
-            bookGrid.appendChild(createBookCard(book));
+        cards.forEach(function(card) {
+            bookGrid.appendChild(card);
         });
 
         restoreOrder(storageKeySortableBook, 'book-grid');
@@ -255,17 +263,27 @@ function initScript() {
     // 页面加载时恢复顺序
     function restoreOrder(storageKey, elementClass) {
         var savedOrder = localStorage.getItem(storageKey);
-        if (savedOrder) {
-            var itemIds = JSON.parse(savedOrder);
-            var container = document.querySelector('.' + elementClass);
-            
-            itemIds.forEach(function(id) {
-                var element = document.querySelector('[data-id="' + id + '"]');
-                if (element) {
-                    container.appendChild(element);
-                }
-            });
+        var itemIds;
+        var container;
+        var children;
+        if (!savedOrder) return;
+        try {
+            itemIds = JSON.parse(savedOrder);
+        } catch (e) {
+            return;
         }
+        if (!Array.isArray(itemIds)) return;
+        container = document.querySelector('.' + elementClass);
+        if (!container) return;
+        children = Array.prototype.slice.call(container.children);
+        itemIds.forEach(function(id) {
+            var matchingElement;
+            if (typeof id !== 'string') return;
+            children.forEach(function(child) {
+                if (!matchingElement && child.getAttribute('data-id') === id) matchingElement = child;
+            });
+            if (matchingElement) container.appendChild(matchingElement);
+        });
     }
 
     function updateFontFamily(fontFamily, fontFamilyInput) {
