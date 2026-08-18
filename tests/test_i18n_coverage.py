@@ -29,12 +29,21 @@ DIRECT_SINKS = [
 PROPERTY_ASSIGNMENT = re.compile(
     r"\.\s*(?:textContent|placeholder|title)\s*=\s*(?P<value>[^;]+);", re.DOTALL
 )
-SET_ATTRIBUTE = re.compile(
-    r"\.\s*setAttribute\s*\(\s*['\"](?:aria-label|placeholder|title)['\"]\s*,\s*(?P<value>[^)]*)\)",
-    re.DOTALL,
-)
-VISIBLE_LITERAL = re.compile(r"['\"][A-Za-z]")
-TRANSLATION_KEY_ARGUMENT = re.compile(r"(?:\b(?:i18n\s*\.\s*t|bookT|tr|t))\s*\(\s*$")
+SET_ATTRIBUTE_START = re.compile(r"\.\s*setAttribute\s*\(")
+VISIBLE_LITERAL = re.compile(r"(?P<quote>['\"])(?P<text>[A-Za-z][^'\"\r\n]*)(?P=quote)")
+TRANSLATION_KEY_ARGUMENT = re.compile(r"(?P<function>i18n\s*\.\s*t|bookT|tr|t)\s*\(\s*$")
+DICTIONARY_KEY = re.compile(r"^\s*'(?P<key>[^']+)':", re.MULTILINE)
+KNOWN_TRANSLATION_KEYS = {
+    match.group('key')
+    for match in DICTIONARY_KEY.finditer(
+        Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+    )
+}
+TR_NAMESPACES = {
+    'bookshelf.js': 'bookshelf.',
+    'annotation.js': 'annotations.',
+    'annotation-hub.js': 'annotations.',
+}
 HTML_TAG = re.compile(r"<(?P<name>[A-Za-z][\w:-]*)\b(?P<attributes>[^>]*)>", re.DOTALL)
 HTML_ATTRIBUTE = re.compile(
     r"\b(?P<attribute>placeholder|aria-label|title)\s*=\s*(?P<quote>['\"])[A-Za-z][^'{]*?(?P=quote)",
@@ -70,11 +79,94 @@ def add_failure(failures, source, path, position, reason):
         failures.append(f'{path}:{number}: {reason}: {source_line(source, position).strip()}')
 
 
-def first_visible_literal(value):
+def is_known_translation_key(value, literal, path):
+    call = TRANSLATION_KEY_ARGUMENT.search(value[:literal.start()])
+    if not call:
+        return False
+    key = literal.group('text')
+    function = call.group('function').replace(' ', '')
+    if function == 'tr':
+        namespace = TR_NAMESPACES.get(path.name)
+        return namespace is not None and namespace + key in KNOWN_TRANSLATION_KEYS
+    return key in KNOWN_TRANSLATION_KEYS
+
+
+def first_visible_literal(value, path):
     for literal in VISIBLE_LITERAL.finditer(value):
-        if not TRANSLATION_KEY_ARGUMENT.search(value[:literal.start()]):
+        if not is_known_translation_key(value, literal, path):
             return literal
     return None
+
+
+def closing_parenthesis(source, opening):
+    depth = 0
+    quote = None
+    escaped = False
+    for position in range(opening, len(source)):
+        character = source[position]
+        if quote:
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in "'\"`":
+            quote = character
+        elif character == '(':
+            depth += 1
+        elif character == ')':
+            depth -= 1
+            if depth == 0:
+                return position
+    return None
+
+
+def split_top_level_arguments(source, start, end):
+    arguments = []
+    argument_start = start
+    depth = 0
+    quote = None
+    escaped = False
+    for position in range(start, end):
+        character = source[position]
+        if quote:
+            if escaped:
+                escaped = False
+            elif character == '\\':
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in "'\"`":
+            quote = character
+        elif character in '([{':
+            depth += 1
+        elif character in ')]}':
+            depth -= 1
+        elif character == ',' and depth == 0:
+            arguments.append((argument_start, position))
+            argument_start = position + 1
+    arguments.append((argument_start, end))
+    return arguments
+
+
+def iter_set_attribute_values(source):
+    for call in SET_ATTRIBUTE_START.finditer(source):
+        opening = call.end() - 1
+        closing = closing_parenthesis(source, opening)
+        if closing is None:
+            continue
+        arguments = split_top_level_arguments(source, opening + 1, closing)
+        if len(arguments) < 2:
+            continue
+        attribute_start, attribute_end = arguments[0]
+        attribute = source[attribute_start:attribute_end].strip().strip("'\"")
+        if attribute not in {'aria-label', 'placeholder', 'title'}:
+            continue
+        value_start, value_end = arguments[1]
+        yield source[value_start:value_end], value_start
 
 
 def find_literal_ui_sinks_text(source, path):
@@ -87,17 +179,21 @@ def find_literal_ui_sinks_text(source, path):
         for match in pattern.finditer(source):
             add_failure(failures, source, path, match.start(), 'literal UI sink')
 
-    for pattern in (PROPERTY_ASSIGNMENT, SET_ATTRIBUTE):
-        for assignment in pattern.finditer(source):
-            literal = first_visible_literal(assignment.group('value'))
-            if literal:
-                add_failure(
-                    failures,
-                    source,
-                    path,
-                    assignment.start('value') + literal.start(),
-                    'literal UI sink',
-                )
+    for assignment in PROPERTY_ASSIGNMENT.finditer(source):
+        literal = first_visible_literal(assignment.group('value'), path)
+        if literal:
+            add_failure(
+                failures,
+                source,
+                path,
+                assignment.start('value') + literal.start(),
+                'literal UI sink',
+            )
+
+    for value, value_start in iter_set_attribute_values(source):
+        literal = first_visible_literal(value, path)
+        if literal:
+            add_failure(failures, source, path, value_start + literal.start(), 'literal UI sink')
 
     for tag in HTML_TAG.finditer(source):
         attributes = tag.group('attributes')
@@ -168,11 +264,11 @@ class I18nCoverageTests(unittest.TestCase):
             element . textContent = isLoading ? 'Loading' : 'Ready';
             element.setAttribute(
               'aria-label',
-              isLoading ? 'Loading' : 'Ready'
+              isLoading ? i18n.t('reader.loadingContent') : 'Ready'
             );
-            element.setAttribute('title', 'Open menu');
+            element.setAttribute('title', ready ? i18n.t('reader.loadingContent') : 'Loading');
             element.textContent = i18n.t('reader.loadingContent');
-            element.setAttribute('aria-label', tr('close'));
+            element.setAttribute('aria-label', t('library.login'));
             <button>Save</button>
         '''
         failures = find_literal_ui_sinks_text(source, Path('fixture.js'))
@@ -182,6 +278,12 @@ class I18nCoverageTests(unittest.TestCase):
         self.assertIn('literal UI sink', failures[2])
         self.assertIn('literal UI sink', failures[3])
         self.assertIn('unlocalized visible HTML text', failures[4])
+
+    def test_translation_keys_must_be_known_for_the_current_wrapper(self):
+        source = "element.textContent = t('Loading');"
+        failures = find_literal_ui_sinks_text(source, Path('epub_browser/assets/library.js'))
+        self.assertEqual(len(failures), 1)
+        self.assertIn('literal UI sink', failures[0])
 
     def test_exceptions_require_an_approved_reason_on_the_same_line(self):
         valid = '<span>epub-browser</span><!-- i18n-allow-literal: product name -->'
