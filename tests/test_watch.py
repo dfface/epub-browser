@@ -24,7 +24,7 @@ class ImmediateFailureLibrary:
 
 
 class EpubFileHandlerTests(unittest.TestCase):
-    def test_logged_watch_dispatch_describes_reconcile_and_direct_delete_while_normal_mode_is_silent(self):
+    def test_logged_watch_dispatch_describes_reconcile_for_changes_and_deletions_while_normal_mode_is_silent(self):
         class Manager:
             def queue_path(self, path):
                 return None
@@ -38,7 +38,7 @@ class EpubFileHandlerTests(unittest.TestCase):
             logged._mark_deleted("/tmp/deleted.epub")
         output = stderr.getvalue()
         self.assertIn("Watch reconciliation queued: source=/tmp/changed.epub", output)
-        self.assertIn("Watch direct-delete queued: source=/tmp/deleted.epub", output)
+        self.assertIn("Watch reconciliation queued for deletion: source=/tmp/deleted.epub", output)
         logged.shutdown()
 
         quiet = EpubFileHandler(Manager(), reporter=Reporter(False))
@@ -52,13 +52,9 @@ class EpubFileHandlerTests(unittest.TestCase):
         class Manager:
             def __init__(self):
                 self.queued = []
-                self.deleted = []
 
             def queue_path(self, path):
                 self.queued.append(Path(path))
-
-            def mark_deleted(self, path):
-                self.deleted.append(Path(path))
 
         manager = Manager()
         handler = EpubFileHandler(manager)
@@ -70,8 +66,8 @@ class EpubFileHandlerTests(unittest.TestCase):
 
         self.assertIn(Path("/tmp/created.epub"), manager.queued)
         self.assertIn(Path("/tmp/new.epub"), manager.queued)
-        self.assertIn(Path("/tmp/deleted.epub"), manager.deleted)
-        self.assertIn(Path("/tmp/old.epub"), manager.deleted)
+        self.assertIn(Path("/tmp/deleted.epub"), manager.queued)
+        self.assertIn(Path("/tmp/old.epub"), manager.queued)
 
     def test_fast_task_completion_does_not_deadlock_event_dispatch(self):
         library = ImmediateFailureLibrary()

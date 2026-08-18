@@ -124,6 +124,28 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(snapshot.trigger, "watch")
         manager.shutdown()
 
+    def test_batched_watch_deletions_publish_the_total_removed(self):
+        broker = LibraryProgressBroker()
+        second_source = self.source_dir / "second.epub"
+        self._write_epub(second_source, "Second")
+        third_source = self.source_dir / "third.epub"
+        self._write_epub(third_source, "Third")
+        manager = self._manager(progress_broker=broker)
+        manager.reconcile()
+        self.source.unlink()
+        second_source.unlink()
+
+        first = manager.queue_path(self.source)
+        second = manager.queue_path(second_source)
+        first.result(timeout=3)
+        second.result(timeout=3)
+
+        snapshot = broker.snapshot()
+        self.assertEqual(snapshot.trigger, "watch")
+        self.assertEqual(snapshot.removed, 2)
+        self.assertEqual(snapshot.total, 1)
+        manager.shutdown()
+
     def test_cancelled_reconcile_does_not_publish_terminal_success(self):
         broker = LibraryProgressBroker()
         manager = self._manager(progress_broker=broker)

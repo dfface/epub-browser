@@ -72,7 +72,9 @@ class EpubFileHandler(FileSystemEventHandler):
         return None
 
     def _mark_deleted(self, path):
-        self.reporter.detail(f"Watch direct-delete queued: source={Path(path)}")
+        self.reporter.detail(f"Watch reconciliation queued for deletion: source={Path(path)}")
+        if hasattr(self.manager, "queue_path"):
+            return self.manager.queue_path(Path(path))
         if hasattr(self.manager, "mark_deleted"):
             return self.manager.mark_deleted(Path(path))
         return None

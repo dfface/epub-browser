@@ -67,6 +67,8 @@ class _ConversionCancelled(RuntimeError):
 
 
 class ServerLibraryManager:
+    _EVENT_DEBOUNCE_SECONDS = 0.1
+
     def __init__(
         self,
         server_dir: Path,
@@ -847,8 +849,12 @@ class ServerLibraryManager:
 
     def _drain_queued_events(self):
         while True:
+            if self._stop_event.wait(self._EVENT_DEBOUNCE_SECONDS):
+                return
             with self._event_lock:
                 snapshot = dict(self._queued_generations)
+            if not snapshot:
+                return
             self.reconcile(trigger="watch")
             with self._event_lock:
                 for path, generation in snapshot.items():
