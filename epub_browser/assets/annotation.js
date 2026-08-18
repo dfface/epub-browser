@@ -1689,7 +1689,7 @@
                 <div class="settings-group">\
                     <label class="settings-label">\
                         ' + tr('defaultColor') + '\
-                        <span class="color-tip-default"><i class="fas fa-info-circle"></i></span>\
+                        <span class="color-tip-default" data-tooltip="' + tr('defaultColorTip') + '" aria-label="' + tr('defaultColorTip') + '"><i class="fas fa-info-circle"></i></span>\
                     </label>\
                     <div class="color-picker-default"></div>\
                 </div>\
@@ -1862,7 +1862,7 @@
             header.innerHTML = '\
                 <span class="color-header-label">\
                     ' + tr('colors') + '\
-                    <span class="color-tip-reorder"><i class="fas fa-info-circle"></i></span>\
+                    <span class="color-tip-reorder" data-tooltip="' + tr('colorReorderTip') + '" aria-label="' + tr('colorReorderTip') + '"><i class="fas fa-info-circle"></i></span>\
                 </span>\
                 <button class="color-add-btn" title="' + tr('addColor') + '"><i class="fas fa-plus"></i></button>';
             picker.appendChild(header);

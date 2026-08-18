@@ -223,6 +223,11 @@ def create_app(public_dir, state_store=None, status=None, sync_dir=None):
                 )
                 return response({'data': rows})
 
+            if request.method == 'DELETE':
+                if len(tail) != 2 or tail[0] != 'item':
+                    return response(error_payload('not_found', 'Not found'), 404)
+                store.delete_annotation(tail[1], username=username)
+                return response({'message': 'Deleted'})
             try:
                 data = await request.json()
             except json.JSONDecodeError:
@@ -250,9 +255,6 @@ def create_app(public_dir, state_store=None, status=None, sync_dir=None):
             if len(tail) != 2 or tail[0] != 'item':
                 return response(error_payload('not_found', 'Not found'), 404)
             annotation_id = tail[1]
-            if request.method == 'DELETE':
-                store.delete_annotation(annotation_id, username=username)
-                return response({'message': 'Deleted'})
             if 'chapter_index' in data and (
                 isinstance(data['chapter_index'], bool)
                 or not isinstance(data['chapter_index'], int)
@@ -277,6 +279,7 @@ def create_app(public_dir, state_store=None, status=None, sync_dir=None):
             )
         except Exception:
             return response(error_payload('server_error', 'Internal server error'), 500)
+
     async def sync(request):
         if not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)

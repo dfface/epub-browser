@@ -549,11 +549,11 @@
 }
 
 .color-tip-default:hover::after {
-    content: 'Click a color to set as default.';
+    content: attr(data-tooltip);
 }
 
 .color-tip-reorder:hover::after {
-    content: 'Drag to reorder.';
+    content: attr(data-tooltip);
 }
 
 .continuous-scroll-tooltip {
