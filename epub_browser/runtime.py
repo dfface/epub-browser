@@ -2,6 +2,7 @@ import errno
 import json
 import os
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -347,7 +348,11 @@ def run_server(
             with availability_lock:
                 if availability_reported.is_set():
                     return
-                active_reporter.result(f"Server available at: {local_url}")
+                message = f"Server available at: {local_url}"
+                if config.log:
+                    active_reporter.notice(message)
+                elif sys.stdout.isatty():
+                    active_reporter.result(message)
                 if not config.no_browser:
                     try:
                         browser_opener(local_url)

@@ -2,6 +2,7 @@ import json
 import contextlib
 import io
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -16,6 +17,7 @@ from epub_browser.cli import ServerConfig
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
+from epub_browser.reporting import Reporter
 from epub_browser.runtime import RuntimeStatus, ServerLock, run_server
 from epub_browser.server import create_app
 from epub_browser.server_library import ReconcileSummary, ServerLibraryManager
@@ -135,7 +137,7 @@ class ServerRuntimeTests(unittest.TestCase):
         self.assertTrue((self.server_dir / "cache" / "public" / "index.html").is_file())
         self.assertTrue((self.server_dir / ".server.lock").is_file())
 
-    def test_success_without_log_prints_only_server_url(self):
+    def test_non_tty_server_does_not_print_internal_url(self):
         config = ServerConfig(
             sources=(self.sources,),
             server_dir=self.server_dir,
@@ -146,6 +148,26 @@ class ServerRuntimeTests(unittest.TestCase):
         with (
             contextlib.redirect_stdout(io.StringIO()) as stdout,
             contextlib.redirect_stderr(io.StringIO()) as stderr,
+            mock.patch.object(sys.stdout, "isatty", return_value=False),
+        ):
+            status = run_server(config, server_factory=_ReturningServer)
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_tty_server_prints_bound_url_once(self):
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+        )
+
+        with (
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+            mock.patch.object(sys.stdout, "isatty", return_value=True),
         ):
             status = run_server(config, server_factory=_ReturningServer)
 
@@ -155,6 +177,30 @@ class ServerRuntimeTests(unittest.TestCase):
             "Server available at: http://127.0.0.1:8000/\n",
         )
         self.assertEqual(stderr.getvalue(), "")
+
+    def test_log_mode_reports_bound_url_to_stderr_in_non_tty(self):
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+            log=True,
+        )
+
+        with (
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+            mock.patch.object(sys.stdout, "isatty", return_value=False),
+        ):
+            status = run_server(
+                config,
+                reporter=Reporter(True),
+                server_factory=_ReturningServer,
+            )
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("Server available at: http://127.0.0.1:8000/", stderr.getvalue())
 
     def test_keyboard_interrupt_is_a_clean_normal_shutdown(self):
         config = ServerConfig(
@@ -171,10 +217,7 @@ class ServerRuntimeTests(unittest.TestCase):
             status = run_server(config, server_factory=_InterruptingServer)
 
         self.assertEqual(status, 0)
-        self.assertEqual(
-            stdout.getvalue(),
-            "Server available at: http://127.0.0.1:8000/\n",
-        )
+        self.assertEqual(stdout.getvalue(), "")
         self.assertEqual(stderr.getvalue(), "")
 
     def test_keyboard_interrupt_does_not_wait_for_slow_initial_conversion(self):

@@ -77,7 +77,9 @@ For a disposable session, use `--ephemeral` instead of `--server-dir`:
 epub-browser server book.epub --ephemeral
 ```
 
-The Server prints only its URL during a normal run. Operational details are silent unless `--log` is present; errors remain visible. When a tqdm progress display is active, enabled logs use a progress-safe writer.
+- Initial and watch scans appear in the Server library page; Server mode does not use terminal tqdm.
+- Interactive terminals print the bound URL once. Docker/systemd runs stay quiet unless `--log` is enabled.
+- A successful scan summary closes automatically; failures remain visible until dismissed. Fixing or replacing the EPUB lets `--watch` start the next scan—there is no manual retry endpoint.
 
 ### Server storage contract
 
