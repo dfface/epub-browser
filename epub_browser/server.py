@@ -1,14 +1,17 @@
+import asyncio
 import os
 import json
 import glob
 import sqlite3
+from typing import Optional
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from .state import StateStore
+from .library_progress import LibraryProgressBroker
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -125,7 +128,13 @@ class _CompatibilityRuntimeStatus:
         }
 
 
-def create_app(public_dir, state_store=None, status=None, sync_dir=None):
+def create_app(
+    public_dir,
+    state_store=None,
+    status=None,
+    sync_dir=None,
+    progress_broker: Optional[LibraryProgressBroker] = None,
+):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
     if state_store is None:
@@ -158,6 +167,37 @@ def create_app(public_dir, state_store=None, status=None, sync_dir=None):
             payload,
             status_code=200 if runtime_status.is_ready() else 503,
             headers={'Cache-Control': 'no-cache'},
+        )
+
+    async def library_events(request):
+        if progress_broker is None:
+            return response(error_payload('not_found', 'Not found'), 404)
+
+        async def events():
+            subscription = progress_broker.subscribe(asyncio.get_running_loop())
+            try:
+                while True:
+                    try:
+                        snapshot = await asyncio.wait_for(subscription.next(), 15.0)
+                    except asyncio.TimeoutError:
+                        yield ': heartbeat\n\n'
+                    else:
+                        payload = json.dumps(
+                            snapshot.as_dict(),
+                            ensure_ascii=False,
+                            separators=(',', ':'),
+                        )
+                        yield 'event: progress\ndata: ' + payload + '\n\n'
+            finally:
+                subscription.close()
+
+        return StreamingResponse(
+            events(),
+            media_type='text/event-stream',
+            headers={
+                'Cache-Control': 'no-store',
+                'X-Accel-Buffering': 'no',
+            },
         )
 
     def response(data, status=200):
@@ -343,6 +383,7 @@ def create_app(public_dir, state_store=None, status=None, sync_dir=None):
         Route('/index.html', library_index),
         Route('/api/health', health),
         Route('/api/ready', ready),
+        Route('/api/library-events', library_events),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
         Route('/sync', sync, methods=['POST']),

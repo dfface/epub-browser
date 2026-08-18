@@ -1,13 +1,17 @@
+import asyncio
 import json
 import os
 from pathlib import Path
 import sqlite3
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
 from starlette.testclient import TestClient
 
+from epub_browser.library_progress import LibraryProgressBroker
+from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import create_app
 
 
@@ -41,6 +45,61 @@ class ServerCacheTests(unittest.TestCase):
 
     def tearDown(self):
         self.directory.cleanup()
+
+    def _library_event_chunks(self, app, after_initial=None):
+        async def collect():
+            headers = {}
+            chunks = asyncio.Queue()
+            response_started = asyncio.Event()
+            disconnected = asyncio.Event()
+
+            async def receive():
+                await disconnected.wait()
+                return {"type": "http.disconnect"}
+
+            async def send(message):
+                if message["type"] == "http.response.start":
+                    headers["status"] = message["status"]
+                    headers.update(
+                        {
+                            name.decode().lower(): value.decode()
+                            for name, value in message["headers"]
+                        }
+                    )
+                    response_started.set()
+                elif message["type"] == "http.response.body" and message.get("body"):
+                    await chunks.put(message["body"].decode())
+
+            task = asyncio.create_task(
+                app(
+                    {
+                        "type": "http",
+                        "asgi": {"version": "3.0"},
+                        "http_version": "1.1",
+                        "method": "GET",
+                        "scheme": "http",
+                        "path": "/api/library-events",
+                        "raw_path": b"/api/library-events",
+                        "query_string": b"",
+                        "headers": [],
+                        "client": ("testclient", 50000),
+                        "server": ("testserver", 80),
+                    },
+                    receive,
+                    send,
+                )
+            )
+            await asyncio.wait_for(response_started.wait(), 1)
+            first = await asyncio.wait_for(chunks.get(), 1)
+            second = None
+            if after_initial is not None:
+                after_initial()
+                second = await asyncio.wait_for(chunks.get(), 1)
+            disconnected.set()
+            await asyncio.wait_for(task, 1)
+            return headers, first, second
+
+        return asyncio.run(collect())
 
     def test_immutable_assets_are_long_lived_and_validate_with_etag(self):
         response = self.client.get("/assets/immutable/app.0123456789ab.js")
@@ -212,6 +271,63 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(
             self.client.put("/api/reading-progress/book", json={"chapter_index": -1}).status_code,
             400,
+        )
+
+    def test_library_events_streams_initial_progress_snapshot_with_sse_headers(self):
+        broker = LibraryProgressBroker()
+        broker.start_generation("startup")
+        broker.mark_discovered(2, 0)
+        app = create_app(self.directory.name, progress_broker=broker)
+
+        headers, chunk, _ = self._library_event_chunks(app)
+        lines = chunk.splitlines()
+        self.assertEqual(headers["status"], 200)
+        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertEqual(headers["x-accel-buffering"], "no")
+        self.assertEqual(lines[0], "event: progress")
+        payload = json.loads(lines[1].removeprefix("data: "))
+        self.assertEqual(payload["phase"], "processing")
+        self.assertEqual(payload["total"], 2)
+
+        self.assertEqual(broker.subscriber_count, 0)
+
+    def test_library_events_receive_worker_thread_updates(self):
+        broker = LibraryProgressBroker()
+        app = create_app(self.directory.name, progress_broker=broker)
+
+        worker = threading.Thread(target=broker.conversion_started)
+
+        def start_worker():
+            worker.start()
+            worker.join(timeout=1)
+
+        _, _, chunk = self._library_event_chunks(app, after_initial=start_worker)
+        self.assertFalse(worker.is_alive())
+        lines = chunk.splitlines()
+        self.assertEqual(lines[0], "event: progress")
+        payload = json.loads(lines[1].removeprefix("data: "))
+        self.assertEqual(payload["in_flight"], 1)
+
+    def test_scanning_progress_does_not_block_ready_or_reading_progress(self):
+        status = RuntimeStatus()
+        status.mark_available()
+        status.mark_scanning()
+        broker = LibraryProgressBroker()
+        client = TestClient(
+            create_app(
+                self.directory.name,
+                status=status,
+                progress_broker=broker,
+            )
+        )
+
+        self.assertEqual(client.get("/api/ready").status_code, 200)
+        self.assertEqual(
+            client.put(
+                "/api/reading-progress/book",
+                json={"chapter_index": 1},
+            ).status_code,
+            200,
         )
 
     def test_two_apps_keep_state_in_their_injected_database(self):

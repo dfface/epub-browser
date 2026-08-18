@@ -6,12 +6,14 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 import zipfile
 from pathlib import Path
 
 from starlette.testclient import TestClient
 
 from epub_browser.cli import ServerConfig
+from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.runtime import RuntimeStatus, ServerLock, run_server
@@ -318,6 +320,50 @@ class ServerRuntimeTests(unittest.TestCase):
 
         self.assertEqual(status, 0)
         self.assertEqual(_InspectingServer.states, ["scanning", "ready"])
+
+    def test_runtime_shares_progress_broker_between_library_and_app(self):
+        captured = {}
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+        )
+
+        class Library:
+            def __init__(self, *, server_dir, progress_broker, **kwargs):
+                captured["library_broker"] = progress_broker
+                self.public_dir = Path(server_dir) / "cache" / "public"
+                self.on_reconcile_started = None
+                self.on_reconciled = None
+
+            def prepare_public_shell(self):
+                self.public_dir.mkdir(parents=True, exist_ok=True)
+                (self.public_dir / "index.html").write_text("library", encoding="utf-8")
+
+            def reconcile(self):
+                return ReconcileSummary(0, 0, 0, (), ())
+
+            def request_stop(self):
+                return None
+
+            def shutdown(self):
+                return None
+
+        def fake_create_app(*args, progress_broker, **kwargs):
+            captured["app_broker"] = progress_broker
+            return create_app(*args, **kwargs)
+
+        with mock.patch("epub_browser.runtime.create_app", side_effect=fake_create_app):
+            status = run_server(
+                config,
+                server_factory=_ReturningServer,
+                library_factory=Library,
+            )
+
+        self.assertEqual(status, 0)
+        self.assertIsInstance(captured["library_broker"], LibraryProgressBroker)
+        self.assertIs(captured["library_broker"], captured["app_broker"])
 
 
 class _ReturningServer:

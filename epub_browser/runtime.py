@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - exercised on POSIX
     msvcrt = None
 
 from .cli import ServerConfig
+from .library_progress import LibraryProgressBroker
 from .migration import MigrationError, MigrationManager
 from .reporting import Reporter
 from .server import create_app
@@ -211,6 +212,7 @@ def run_server(
     lock = None
     ephemeral_root = None
     created_ephemeral_root = False
+    progress_broker = LibraryProgressBroker()
 
     try:
         if config.ephemeral:
@@ -263,6 +265,7 @@ def run_server(
             state_store=state_store,
             migration_manager=migration_manager,
             reporter=active_reporter,
+            progress_broker=progress_broker,
         )
         manager.on_reconcile_started = status.mark_scanning
         manager.on_reconciled = lambda summary: _update_runtime_status(
@@ -325,6 +328,7 @@ def run_server(
             state_store=state_store,
             status=status,
             sync_dir=config.legacy_sync_dir or server_dir,
+            progress_broker=progress_broker,
         )
         uvicorn_config = uvicorn.Config(
             app,
