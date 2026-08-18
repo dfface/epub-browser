@@ -9,6 +9,8 @@
   var dictionaries = {
     en: {
       'common.language': 'Language',
+      'common.chinese': 'Chinese',
+      'common.english': 'English',
       'common.version': 'Version {version}',
       'theme.light': 'Light',
       'theme.dark': 'Dark',
@@ -309,6 +311,8 @@
     },
     'zh-CN': {
       'common.language': '语言',
+      'common.chinese': '中文',
+      'common.english': 'English',
       'common.version': '版本 {version}',
       'theme.light': '浅色',
       'theme.dark': '深色',
