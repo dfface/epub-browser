@@ -630,30 +630,30 @@ class EPUBProcessor:
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addShelfGroupBtn">
-                    <i class="fas fa-folder-plus"></i> Add Group
+                    <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                 </button>
                 <button class="bookshelf-action-btn" id="syncShelfBtn">
-                    <i class="fas fa-sync"></i> Sync
+                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
                 </button>
                 <button class="bookshelf-action-btn" id="exportShelfBtn">
-                    <i class="fas fa-upload"></i> Export
+                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
                 </button>
                 <button class="bookshelf-action-btn" id="importShelfBtn">
-                    <i class="fas fa-download"></i> Import
+                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                 </button>
                 <input type="file" id="importShelfFile" accept=".json" style="display: none;">
             </div>
-            <h2 class="bookshelf-title"><i class="fas fa-home"></i> Bookshelf</h2>
+            <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
             <div class="bookshelf-header-right">
-                <button class="bookshelf-close-btn" id="bookshelfCloseBtn">
+                <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         </div>
         <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-            <span class="bookshelf-tag active" data-tag="All">All</span>
+            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
         </div>
-        <div class="bookshelf-loading" id="bookshelfLoading">
+        <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
         </div>
         <div class="bookshelf-body" id="bookshelfBody">
@@ -670,29 +670,29 @@ class EPUBProcessor:
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
-                    <i class="fas fa-folder-plus"></i> Add Group
+                    <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                 </button>
                 <button class="bookshelf-action-btn" id="renameGroupBtn">
-                    <i class="fas fa-edit"></i> Rename
+                    <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
                 </button>
                 <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
-                    <i class="fas fa-trash"></i> Delete Group
+                    <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
                 </button>
             </div>
-            <h2 class="bookshelf-title" id="groupModalTitle">Group</h2>
+            <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
             <div class="bookshelf-header-right">
-                <button class="bookshelf-close-btn" id="groupCloseBtn">
+                <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
                     <i class="fas fa-home"></i>
                 </button>
-                <button class="bookshelf-close-btn" id="groupCloseAllBtn">
+                <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         </div>
         <div class="bookshelf-tag-filter" id="groupTagFilter">
-            <span class="bookshelf-tag active" data-tag="All">All</span>
+            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
         </div>
-        <div class="bookshelf-loading" id="groupLoading">
+        <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
         </div>
         <div class="bookshelf-body" id="groupBody">
@@ -1520,30 +1520,30 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addShelfGroupBtn">
-                        <i class="fas fa-folder-plus"></i> Add Group
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                     </button>
                     <button class="bookshelf-action-btn" id="syncShelfBtn">
-                        <i class="fas fa-sync"></i> Sync
+                        <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
                     </button>
                     <button class="bookshelf-action-btn" id="exportShelfBtn">
-                        <i class="fas fa-upload"></i> Export
+                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
                     </button>
                     <button class="bookshelf-action-btn" id="importShelfBtn">
-                        <i class="fas fa-download"></i> Import
+                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                     </button>
                     <input type="file" id="importShelfFile" accept=".json" style="display: none;">
                 </div>
-                <h2 class="bookshelf-title"><i class="fas fa-home"></i> Bookshelf</h2>
+                <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
                 <div class="bookshelf-header-right">
-                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn">
+                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
             <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-                <span class="bookshelf-tag active" data-tag="All">All</span>
+                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
             </div>
-            <div class="bookshelf-loading" id="bookshelfLoading">
+            <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
             </div>
             <div class="bookshelf-body" id="bookshelfBody">
@@ -1560,29 +1560,29 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
-                        <i class="fas fa-folder-plus"></i> Add Group
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                     </button>
                     <button class="bookshelf-action-btn" id="renameGroupBtn">
-                        <i class="fas fa-edit"></i> Rename
+                        <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
                     </button>
                     <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
-                        <i class="fas fa-trash"></i> Delete Group
+                        <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
                     </button>
                 </div>
-                <h2 class="bookshelf-title" id="groupModalTitle">Group</h2>
+                <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
                 <div class="bookshelf-header-right">
-                    <button class="bookshelf-close-btn" id="groupCloseBtn">
+                    <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
                         <i class="fas fa-home"></i>
                     </button>
-                    <button class="bookshelf-close-btn" id="groupCloseAllBtn">
+                    <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
             <div class="bookshelf-tag-filter" id="groupTagFilter">
-                <span class="bookshelf-tag active" data-tag="All">All</span>
+                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
             </div>
-            <div class="bookshelf-loading" id="groupLoading">
+            <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
             </div>
             <div class="bookshelf-body" id="groupBody">

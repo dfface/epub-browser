@@ -425,3 +425,16 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
+
+    def test_bookshelf_templates_localize_labels_without_translating_business_values(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.addGroup')
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.sync')
+            self.assertRegex(html, r'data-tag=(?:["\'])?All(?:["\'])?')
+
+    def test_bookshelf_script_routes_user_messages_through_i18n(self):
+        script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+        self.assertIn("i18n.t('bookshelf.currentStats'", script)

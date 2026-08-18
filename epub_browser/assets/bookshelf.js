@@ -77,6 +77,36 @@ function initBookshelf() {
     var currentTag = 'All';
     var bookshelfSortableInstance = null;
     var groupSortableInstance = null;
+    var i18n = window.EpubBrowserI18n;
+
+    function tr(key, params) {
+        return i18n ? i18n.t('bookshelf.' + key, params) : key;
+    }
+
+    function syncErrorMessage(code) {
+        var knownCodes = {
+            username_required: true,
+            invalid_json: true,
+            no_sync_data: true,
+            not_found: true,
+            annotation_not_found: true,
+            invalid_chapter_index: true,
+            batch_requires_post: true,
+            database_unavailable: true,
+            reading_progress_not_found: true,
+            server_error: true
+        };
+        return tr('error.' + (knownCodes[code] ? code : 'unknown'));
+    }
+
+    function getCurrentGroup() {
+        var shelfData = getBookshelf();
+        var group = shelfData.groups[currentGroupId];
+        for (var i = 0; group && i < currentGroupPath.length; i++) {
+            group = group.groups[currentGroupPath[i]];
+        }
+        return group;
+    }
     
     // 获取书架版本号
     function getBookshelfVersion() {
@@ -206,8 +236,8 @@ function initBookshelf() {
     
     // 渲染标签过滤器
     function renderTagFilter(container, tags, activeTag) {
-        container.innerHTML = '<span class="bookshelf-tag ' + (activeTag === 'All' ? 'active' : '') + '" data-tag="All">All</span>';
-        container.innerHTML += '<span class="bookshelf-tag ' + (activeTag === 'NoTag' ? 'active' : '') + '" data-tag="NoTag">NoTag</span>';
+        container.innerHTML = '<span class="bookshelf-tag ' + (activeTag === 'All' ? 'active' : '') + '" data-tag="All" data-i18n="bookshelf.all">' + tr('all') + '</span>';
+        container.innerHTML += '<span class="bookshelf-tag ' + (activeTag === 'NoTag' ? 'active' : '') + '" data-tag="NoTag" data-i18n="bookshelf.noTag">' + tr('noTag') + '</span>';
         tags.forEach(function(tag) {
             var tagEl = document.createElement('span');
             tagEl.className = 'bookshelf-tag' + (activeTag === tag ? ' active' : '');
@@ -306,12 +336,22 @@ function initBookshelf() {
                 bookshelfBody.innerHTML = 
                     '<div class="bookshelf-empty">' +
                         '<i class="fas fa-bookmark"></i>' +
-                        '<p>Your bookshelf is empty</p>' +
+                        '<p data-i18n="bookshelf.empty">' + tr('empty') + '</p>' +
                     '</div>';
             }
             
             var total = countAllItems(shelfData);
-            bookshelfStats.textContent = 'Current: ' + bookCount + ' book(s), ' + groupCount + ' group(s) | Total: ' + total.books + ' book(s), ' + total.groups + ' group(s)';
+            bookshelfStats.textContent = i18n ? i18n.t('bookshelf.currentStats', {
+                books: bookCount,
+                groups: groupCount,
+                totalBooks: total.books,
+                totalGroups: total.groups
+            }) : tr('currentStats', {
+                books: bookCount,
+                groups: groupCount,
+                totalBooks: total.books,
+                totalGroups: total.groups
+            });
             
             // 初始化拖拽排序
             initBookshelfSortable();
@@ -402,13 +442,13 @@ function initBookshelf() {
         var groupCount = group.groups ? Object.keys(group.groups).length : 0;
         
         if (bookCount > 0 && groupCount > 0) {
-            return bookCount + ' books, ' + groupCount + ' subgroups';
+            return tr('groupItems', { books: bookCount, groups: groupCount });
         } else if (bookCount > 0) {
-            return bookCount + ' books';
+            return tr('groupBooks', { books: bookCount });
         } else if (groupCount > 0) {
-            return groupCount + ' subgroups';
+            return tr('groupSubgroups', { groups: groupCount });
         } else {
-            return 'Empty group';
+            return tr('emptyGroup');
         }
     }
     
@@ -459,6 +499,7 @@ function initBookshelf() {
     function openGroup(groupId, path) {
         currentGroupId = groupId;
         currentGroupPath = path || [];
+        currentTag = 'All';
         
         var shelfData = getBookshelf();
         var group = shelfData.groups[groupId];
@@ -595,12 +636,22 @@ function initBookshelf() {
             groupBody.innerHTML = 
                 '<div class="bookshelf-empty">' +
                     '<i class="fas fa-folder-open"></i>' +
-                    '<p>This group is empty</p>' +
+                        '<p data-i18n="bookshelf.groupEmpty">' + tr('groupEmpty') + '</p>' +
                 '</div>';
         }
         
         var total = countAllGroupItems(group);
-        groupStats.textContent = 'Current: ' + bookCount + ' book(s), ' + subGroupCount + ' group(s) | Total: ' + total.books + ' book(s), ' + total.groups + ' group(s)';
+        groupStats.textContent = i18n ? i18n.t('bookshelf.currentStats', {
+            books: bookCount,
+            groups: subGroupCount,
+            totalBooks: total.books,
+            totalGroups: total.groups
+        }) : tr('currentStats', {
+            books: bookCount,
+            groups: subGroupCount,
+            totalBooks: total.books,
+            totalGroups: total.groups
+        });
         
         // 初始化拖拽排序
         initGroupSortable();
@@ -691,7 +742,7 @@ function initBookshelf() {
     
     // 添加分组
     addShelfGroupBtn.addEventListener('click', function() {
-        var groupName = prompt('Enter group name:');
+        var groupName = prompt(tr('groupNamePrompt'));
         if (groupName && groupName.trim()) {
             var shelfData = getBookshelf();
             var groupId = generateId();
@@ -713,7 +764,7 @@ function initBookshelf() {
     
     // 添加子分组
     addGroupSubGroupBtn.addEventListener('click', function() {
-        var groupName = prompt('Enter group name:');
+        var groupName = prompt(tr('groupNamePrompt'));
         if (groupName && groupName.trim()) {
             var shelfData = getBookshelf();
             var targetGroup = shelfData.groups[currentGroupId];
@@ -775,11 +826,11 @@ function initBookshelf() {
         
         // 检查是否有嵌套分组
         if (targetGroup.groups && Object.keys(targetGroup.groups).length > 0) {
-            showNotification('Please delete all nested groups first before deleting this group.', 'warning');
+            showNotification(tr('nestedGroupWarning'), 'warning');
             return;
         }
         
-        if (confirm('Are you sure you want to delete the group "' + targetGroup.name + '"?')) {
+        if (confirm(tr('confirmDeleteGroup', { name: targetGroup.name }))) {
             delete parentGroups[targetId];
             
             if (currentGroupPath.length > 0) {
@@ -808,7 +859,7 @@ function initBookshelf() {
             targetGroup = targetGroup.groups[pathId];
         }
         
-        var newName = prompt('Enter new group name:', targetGroup.name);
+        var newName = prompt(tr('renameGroupPrompt'), targetGroup.name);
         if (newName && newName.trim() && newName.trim() !== targetGroup.name) {
             targetGroup.name = newName.trim();
             saveBookshelf(shelfData);
@@ -865,12 +916,13 @@ function initBookshelf() {
                     if (data.items && data.groups !== undefined) {
                         saveBookshelf(data);
                         renderBookshelf('All');
-                        showNotification('Bookshelf data imported successfully!', 'success');
+                        showNotification(tr('importSucceeded'), 'success');
                     } else {
-                        showNotification('Invalid bookshelf data format.', 'warning');
+                        showNotification(tr('importInvalid'), 'warning');
                     }
                 } catch (err) {
-                    showNotification('Failed to parse JSON file: ' + err.message, 'warning');
+                    console.warn('Failed to parse bookshelf import:', err);
+                    showNotification(tr('importParseFailed'), 'warning');
                 }
             };
             reader.readAsText(file);
@@ -884,7 +936,7 @@ function initBookshelf() {
             var username = getUsername();
             
             if (!username) {
-                username = prompt('Please enter your username for sync:');
+                username = prompt(tr('usernamePrompt'));
                 if (!username || !username.trim()) {
                     return;
                 }
@@ -897,7 +949,7 @@ function initBookshelf() {
             
             try {
                 syncShelfBtn.disabled = true;
-                syncShelfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+                syncShelfBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> <span data-i18n="bookshelf.syncing">' + tr('syncing') + '</span>';
                 
                 var response = await fetch('/sync', {
                     method: 'POST',
@@ -913,31 +965,38 @@ function initBookshelf() {
                 
                 if (response.status === 404) {
                     var result = await response.json();
-                    setBookshelfVersion(result.version || 1);
-                    showNotification('Sync (' + username + '): New user created, data uploaded successfully!', 'success');
+                    if (result.code) {
+                        console.warn('Bookshelf sync failed:', result.message);
+                        showNotification(syncErrorMessage(result.code), 'warning');
+                    } else {
+                        setBookshelfVersion(result.version || 1);
+                        showNotification(tr('syncNewUser', { username: username }), 'success');
+                    }
                 } else if (response.status === 200) {
                     var result = await response.json();
                     localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(result.data));
                     setBookshelfVersion(result.version);
-                    renderBookshelf('All');
-                    showNotification('Sync (' + username + '): Data updated from server!', 'success');
+                    renderBookshelf(currentTag);
+                    showNotification(tr('syncUpdated', { username: username }), 'success');
                 } else if (response.status === 304) {
-                    showNotification('Sync (' + username + '): No changes, already up to date!', 'info');
+                    showNotification(tr('syncCurrent', { username: username }), 'info');
                 } else if (response.status === 405) {
-                    showNotification('Sync (' + username + '): Not allowed to sync, check your configuration!', 'warning');
+                    showNotification(tr('syncUnavailable', { username: username }), 'warning');
                 } else if (response.status === 201) {
                     var result = await response.json();
                     setBookshelfVersion(result.version);
-                    showNotification('Sync (' + username + '): Data uploaded successfully!', 'success');
+                    showNotification(tr('syncUploaded', { username: username }), 'success');
                 } else {
                     var result = await response.json();
-                    showNotification('Sync (' + username + ') error: ' + (result.message || 'Unknown error'), 'warning');
+                    console.warn('Bookshelf sync failed:', result.message);
+                    showNotification(syncErrorMessage(result.code), 'warning');
                 }
             } catch (err) {
-                showNotification('Sync (' + username + ') failed: ' + err.message, 'warning');
+                console.warn('Bookshelf sync failed:', err);
+                showNotification(tr('syncFailed', { username: username }), 'warning');
             } finally {
                 syncShelfBtn.disabled = false;
-                syncShelfBtn.innerHTML = '<i class="fas fa-sync"></i> Sync';
+                syncShelfBtn.innerHTML = '<i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">' + tr('sync') + '</span>';
             }
         });
     }
@@ -1016,6 +1075,18 @@ function initBookshelf() {
             currentGroupPath = [];
         }
     });
+
+    if (i18n && i18n.onLocaleChange) {
+        i18n.onLocaleChange(function() {
+            if (bookshelfModal && bookshelfModal.classList.contains('active')) {
+                renderBookshelf(currentTag);
+            }
+            if (groupModal && groupModal.classList.contains('active') && currentGroupId) {
+                var group = getCurrentGroup();
+                if (group) renderGroupContent(group, currentTag);
+            }
+        });
+    }
 }
 
 window.initBookShelf = initBookshelf;
