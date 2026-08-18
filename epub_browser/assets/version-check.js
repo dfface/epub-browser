@@ -57,9 +57,10 @@
         if (!container) return;
         link = container.querySelector('a');
         if (!link) return;
+        if (!i18n || !i18n.t) return;
         link.setAttribute('data-i18n', 'version.updateAvailable');
         link.setAttribute('data-i18n-params', JSON.stringify({ version: update.version }));
-        link.textContent = i18n && i18n.t ? i18n.t('version.updateAvailable', { version: update.version }) : 'Update available: v' + update.version;
+        link.textContent = i18n.t('version.updateAvailable', { version: update.version });
         link.setAttribute('href', update.url);
         container.hidden = false;
     }

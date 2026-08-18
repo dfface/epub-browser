@@ -23,10 +23,18 @@ FIRST_PARTY = [
     ],
 ]
 
-SINKS = [
+DIRECT_SINKS = [
     re.compile(r"(?:showNotification|confirm|alert|prompt)\s*\(\s*['\"][A-Za-z]", re.DOTALL),
-    re.compile(r"\.\s*(?:textContent|placeholder|title)\s*=\s*['\"][A-Za-z]", re.DOTALL),
 ]
+PROPERTY_ASSIGNMENT = re.compile(
+    r"\.\s*(?:textContent|placeholder|title)\s*=\s*(?P<value>[^;]+);", re.DOTALL
+)
+SET_ATTRIBUTE = re.compile(
+    r"\.\s*setAttribute\s*\(\s*['\"](?:aria-label|placeholder|title)['\"]\s*,\s*(?P<value>[^)]*)\)",
+    re.DOTALL,
+)
+VISIBLE_LITERAL = re.compile(r"['\"][A-Za-z]")
+TRANSLATION_KEY_ARGUMENT = re.compile(r"(?:\b(?:i18n\s*\.\s*t|bookT|tr|t))\s*\(\s*$")
 HTML_TAG = re.compile(r"<(?P<name>[A-Za-z][\w:-]*)\b(?P<attributes>[^>]*)>", re.DOTALL)
 HTML_ATTRIBUTE = re.compile(
     r"\b(?P<attribute>placeholder|aria-label|title)\s*=\s*(?P<quote>['\"])[A-Za-z][^'{]*?(?P=quote)",
@@ -62,15 +70,34 @@ def add_failure(failures, source, path, position, reason):
         failures.append(f'{path}:{number}: {reason}: {source_line(source, position).strip()}')
 
 
+def first_visible_literal(value):
+    for literal in VISIBLE_LITERAL.finditer(value):
+        if not TRANSLATION_KEY_ARGUMENT.search(value[:literal.start()]):
+            return literal
+    return None
+
+
 def find_literal_ui_sinks_text(source, path):
     failures = []
     for number, line in enumerate(source.splitlines(), 1):
         if 'i18n-allow-literal' in line and not VALID_LITERAL_EXCEPTION.search(line):
             failures.append(f'{path}:{number}: invalid i18n literal exception: {line.strip()}')
 
-    for pattern in SINKS:
+    for pattern in DIRECT_SINKS:
         for match in pattern.finditer(source):
             add_failure(failures, source, path, match.start(), 'literal UI sink')
+
+    for pattern in (PROPERTY_ASSIGNMENT, SET_ATTRIBUTE):
+        for assignment in pattern.finditer(source):
+            literal = first_visible_literal(assignment.group('value'))
+            if literal:
+                add_failure(
+                    failures,
+                    source,
+                    path,
+                    assignment.start('value') + literal.start(),
+                    'literal UI sink',
+                )
 
     for tag in HTML_TAG.finditer(source):
         attributes = tag.group('attributes')
@@ -133,19 +160,28 @@ class I18nCoverageTests(unittest.TestCase):
             1,
         )
 
-    def test_catches_multiline_calls_whitespace_properties_and_visible_html(self):
+    def test_catches_multiline_calls_dynamic_attributes_and_visible_html(self):
         source = '''
             showNotification(
               'Network failed'
             );
-            element . textContent = 'Loading';
+            element . textContent = isLoading ? 'Loading' : 'Ready';
+            element.setAttribute(
+              'aria-label',
+              isLoading ? 'Loading' : 'Ready'
+            );
+            element.setAttribute('title', 'Open menu');
+            element.textContent = i18n.t('reader.loadingContent');
+            element.setAttribute('aria-label', tr('close'));
             <button>Save</button>
         '''
         failures = find_literal_ui_sinks_text(source, Path('fixture.js'))
-        self.assertEqual(len(failures), 3)
+        self.assertEqual(len(failures), 5)
         self.assertIn('literal UI sink', failures[0])
         self.assertIn('literal UI sink', failures[1])
-        self.assertIn('unlocalized visible HTML text', failures[2])
+        self.assertIn('literal UI sink', failures[2])
+        self.assertIn('literal UI sink', failures[3])
+        self.assertIn('unlocalized visible HTML text', failures[4])
 
     def test_exceptions_require_an_approved_reason_on_the_same_line(self):
         valid = '<span>epub-browser</span><!-- i18n-allow-literal: product name -->'
