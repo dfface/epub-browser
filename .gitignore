@@ -11,3 +11,5 @@ epub_browser/__pycache__/
 __pycache__/
 *.py[cod]
 *.egg-info/
+.opencode/
+.superpowers/
