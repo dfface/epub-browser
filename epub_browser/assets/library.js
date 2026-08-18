@@ -137,10 +137,10 @@ function initScript() {
 
             link.className = 'book-link';
             link.setAttribute('id', book.hash);
-            link.setAttribute('href', '/book/' + book.hash + '/index.html');
+            link.setAttribute('href', book.url);
 
             cover.className = 'book-cover';
-            cover.setAttribute('src', '/book/' + book.hash + '/' + book.cover);
+            cover.setAttribute('src', book.cover);
             cover.setAttribute('alt', t('library.cover'));
 
             content.className = 'book-card-content';

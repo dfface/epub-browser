@@ -1,40 +1,38 @@
 import os
 import tempfile
-import minify_html
 import shutil
 from pathlib import Path
-from datetime import datetime
 
-from .asset_publisher import AssetPublisher, rewrite_asset_urls
+from .asset_publisher import AssetPublisher
 from .processor import EPUBProcessor
-from .version import render_footer
+from .reporting import Reporter
+from .site import LibraryBook, publish_library_shell
+from .urls import SiteURLs
 
 class EPUBLibrary:
     """EPUB图书馆类，管理多本书籍"""
     
-    def __init__(self, output_dir=None):
+    def __init__(self, output_dir=None, urls=None, reporter=None):
         self.books = {}  # 存储所有书籍信息，使用哈希作为键
         self.file2hash = {} # 原书籍epub的 path -> book_hash
         self.output_dir = output_dir
+        self.urls = urls or SiteURLs()
+        self.reporter = reporter or Reporter(False)
         
         # 创建基础目录
         if output_dir is not None:
-            if os.path.exists(output_dir):
-                # 如果存在 那就存在
-                self.base_directory = output_dir
-            else:
-                try:
-                    os.mkdir(output_dir)
-                    self.base_directory = output_dir
-                except Exception:
-                    print(f"output_dir {output_dir} not exists, try to create failed, please check.")
-                    return
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            self.base_directory = os.fspath(output_dir)
         else:
             self.base_directory = tempfile.mkdtemp(prefix='epub_library_')
 
         assets_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets')
-        self.asset_manifest = AssetPublisher(assets_dir, self.base_directory).publish()
-        print(f"Library base directory: {self.base_directory}")
+        self.asset_manifest = AssetPublisher(
+            assets_dir,
+            self.base_directory,
+            urls=self.urls,
+        ).publish()
+        self.reporter.detail(f"Library base directory: {self.base_directory}")
     
     def is_epub_file(self, filename):
         suffix = filename[-5:]
@@ -69,7 +67,13 @@ class EPUBLibrary:
         """添加一本书籍到图书馆"""
         try:
             # print(f"Adding book: {epub_path}")
-            processor = EPUBProcessor(epub_path, self.base_directory, self.asset_manifest)
+            processor = EPUBProcessor(
+                epub_path,
+                self.base_directory,
+                self.asset_manifest,
+                urls=self.urls,
+                reporter=self.reporter,
+            )
             
             # 解压EPUB
             if not processor.extract_epub():
@@ -79,7 +83,7 @@ class EPUBLibrary:
             # 解析容器文件
             opf_path = processor.parse_container()
             if not opf_path:
-                print(f"Unable to parse EPUB container file: {epub_path}")
+                self.reporter.detail(f"Unable to parse EPUB container file: {epub_path}")
                 processor.cleanup()
                 return False, None
             
@@ -104,7 +108,10 @@ class EPUBLibrary:
                 old_hash = self.file2hash[origin_path]
                 new_hash = book_info['hash']
                 if old_hash != new_hash and old_hash in self.books:
-                    print(f"[Add] Replacing old version: {self.books[old_hash]['title']} (hash: {old_hash})")
+                    self.reporter.detail(
+                        f"[Add] Replacing old version: "
+                        f"{self.books[old_hash]['title']} (hash: {old_hash})"
+                    )
                     self.remove_book(old_hash)
             
             self.books[book_info['hash']] = {
@@ -123,371 +130,53 @@ class EPUBLibrary:
             return True, book_info
             
         except Exception as e:
-            print(f"Failed to add book {epub_path}: {e}")
+            self.reporter.detail(f"Failed to add book {epub_path}: {e}")
             return False, None
     
     def add_assets(self):
         """Publish immutable app assets and stable update entry points."""
         assets_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'assets')
-        self.asset_manifest = AssetPublisher(assets_dir, self.base_directory).publish()
+        self.asset_manifest = AssetPublisher(
+            assets_dir,
+            self.base_directory,
+            urls=self.urls,
+        ).publish()
             
     
     def create_library_home(self):
-        """图书馆首页"""
-        library_html = """<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#244548">
-<meta name="description" content="EPUB Library - A web-based EPUB reader" data-i18n-content="library.description">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="EPUB Browser">
-<title data-i18n="library.pageTitle">EPUB Library</title>
-<script src="/assets/i18n.js"></script>
-<script>window.EpubBrowserI18n.init();</script>
-<noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
-<link rel="stylesheet" href="/assets/fa.all.min.css">
-<link rel="icon" type="image/png" href="/assets/favicon.png">
-<link rel="apple-touch-icon" href="/assets/icon-192.png">
-<link rel="stylesheet" href="/assets/theme.css">
-<link rel="stylesheet" href="/assets/library.css?v=13">
-<link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
-<link rel="stylesheet" href="/assets/loading.css?v=15">
-<link rel="stylesheet" href="/assets/bookshelf.css">
-<link rel="stylesheet" href="/assets/annotation-hub.css">
-<script>
-// 立即应用主题，避免闪现 —— Kindle 兼容版
-function isKindleDevice() {
-  // 优先从 window 缓存读取
-  if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-    return window.epubBrowserCache.kindle_mode === "true";
-  }
-  // 检测设备
-  var ua = navigator.userAgent.toLowerCase();
-  var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
-  
-  if (!window.epubBrowserCache) {
-    window.epubBrowserCache = {};
-  }
-  window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
-  return isKindle;
-}
+        """Publish the shared library shell and deterministic metadata."""
+        books = tuple(
+            LibraryBook(
+                book_id=book_hash,
+                title=book_info['title'],
+                authors=tuple(book_info.get('authors') or ()),
+                tags=tuple(book_info.get('tags') or ()),
+                cover=(
+                    f"/book/{book_hash}/{book_info['cover']}"
+                    if book_info.get('cover')
+                    else None
+                ),
+            )
+            for book_hash, book_info in self.books.items()
+        )
+        publish_library_shell(
+            Path(self.base_directory),
+            books,
+            self.asset_manifest,
+            self.urls,
+        )
 
-// 通用 Cookie 方法（只定义一次）
-function getCookie(key) {
-  var cookies = document.cookie.split("; ");
-  for (var i = 0; i < cookies.length; i++) {
-    var parts = cookies[i].split("=");
-    var cookieKey = parts[0];
-    var cookieValue = parts.slice(1).join("=");
-    if (cookieKey === key) {
-      return decodeURIComponent(cookieValue);
-    }
-  }
-  return null;
-}
-
-var theme = "light";
-var isKindle = false;
-
-try {
-  // 优先从 window 缓存读取
-  var storedTheme = null;
-  if (window.epubBrowserCache && window.epubBrowserCache.theme) {
-    storedTheme = window.epubBrowserCache.theme;
-  } else {
-    storedTheme = localStorage.getItem("theme");
-    if (storedTheme) {
-      if (!window.epubBrowserCache) {
-        window.epubBrowserCache = {};
-      }
-      window.epubBrowserCache.theme = storedTheme;
-    }
-  }
-
-  if (storedTheme) {
-    theme = storedTheme;
-  } else if (isKindleDevice()) {
-    isKindle = true;
-    theme = getCookie("theme") || "light";
-  }
-} catch (e) {
-  // 捕获异常，兼容 Kindle
-  if (isKindleDevice()) {
-    isKindle = true;
-    theme = getCookie("theme") || "light";
-  }
-}
-
-// 使用 html 元素添加类名
-var htmlElement = document.documentElement;
-htmlElement.classList.add(theme + "-mode");
-if (isKindle) {
-  htmlElement.classList.add("kindle-mode");
-}
-</script>
-</head>
-<body>
-    <div class="top-controls" data-id="top-controls">
-        <div class="theme-toggle" id="themeToggle">
-            <i class="fas fa-moon"></i>
-            <span class="control-name" data-i18n="library.theme">Theme</span>
-        </div>
-    </div>
-"""
-        all_tags = set()
-        for book_hash, book_info in self.books.items():
-            cur_tags = book_info['tags']
-            if cur_tags:
-                for cur_tag in cur_tags:
-                    if isinstance(cur_tag, str) and cur_tag.strip():
-                        all_tags.add(cur_tag.strip())
-
-        library_html += f"""
-    <div class="breadcrumb-container">
-        <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb">
-            <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="library.title">Library</span></span>
-            <div class="library-meta" aria-label="Library information" data-i18n-aria-label="library.information">
-                <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="library.bookCount" data-i18n-params='{{"count": {len(self.books)}}}'>{len(self.books)} book(s)</span></span>
-                <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i><span data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
-                <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
-                <label class="library-language" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select></label>
-                <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue" data-i18n="library.login">Login</span></button>
-            </div>
-        </nav>
-    </div>
-    <div class="container">
-        <div class="controls" data-id="controls">
-            <div class="search-container">
-                <input type="text" class="search-box" placeholder="Search by book title, author, or tag..." data-i18n-placeholder="library.searchPlaceholder">
-                <i class="fas fa-search search-icon"></i>
-            </div>
-            <br/>
-            <div class="tag-cloud">
-                <div class="tag-cloud-item active" data-id="All" data-i18n="library.all">All</div>
-                <div class="tag-cloud-item" data-id="NoTag" data-i18n="library.noTag">No tag</div>
-"""
-        for tag in sorted(t for t in all_tags if isinstance(t, str) and t.strip()):
-            library_html += f"""<div class="tag-cloud-item" data-id="{tag}">{tag}</div>"""
-        library_html += """
-            </div>
-        </div>"""
-
-        library_html += """
-        <div class="book-grid" data-id="book-grid">
-            <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading" role="status" aria-label="Loading library" data-i18n-aria-label="library.loading">
-                <div class="loading-spinner"></div>
-            </div>
-"""      
-        library_html += f"""
-    </div>
-    <div class="reading-controls" data-id="reading-controls">
-        <button class="control-btn" id="scrollToTopBtn">
-            <i class="fas fa-arrow-up"></i>
-            <span class="control-name" data-i18n="library.top">Top</span>
-        </button>
-        <button class="control-btn" id="bookshelfBtn" style="display: none;">
-            <i class="fas fa-bookmark"></i>
-            <span class="control-name" data-i18n="library.shelf">Shelf</span>
-        </button>
-    </div>
-</div>
-
-<!-- 书架弹窗 -->
-<div class="bookshelf-modal" id="bookshelfModal">
-    <div class="bookshelf-content">
-        <div class="bookshelf-header">
-            <div class="bookshelf-header-left">
-                <button class="bookshelf-action-btn" id="addShelfGroupBtn">
-                    <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
-                </button>
-                <button class="bookshelf-action-btn" id="syncShelfBtn">
-                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
-                </button>
-                <button class="bookshelf-action-btn" id="exportShelfBtn">
-                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
-                </button>
-                <button class="bookshelf-action-btn" id="importShelfBtn">
-                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
-                </button>
-                <input type="file" id="importShelfFile" accept=".json" style="display: none;">
-            </div>
-            <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
-            <div class="bookshelf-header-right">
-                <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        </div>
-        <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
-        </div>
-        <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
-            <div class="loading-spinner"></div>
-        </div>
-        <div class="bookshelf-body" id="bookshelfBody">
-        </div>
-        <div class="bookshelf-footer" id="bookshelfFooter">
-            <span id="bookshelfStats"></span>
-        </div>
-    </div>
-</div>
-
-<!-- 分组弹窗 -->
-<div class="bookshelf-modal" id="groupModal">
-    <div class="bookshelf-content">
-        <div class="bookshelf-header">
-            <div class="bookshelf-header-left">
-                <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
-                    <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
-                </button>
-                <button class="bookshelf-action-btn" id="renameGroupBtn">
-                    <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
-                </button>
-                <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
-                    <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
-                </button>
-            </div>
-            <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
-            <div class="bookshelf-header-right">
-                <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
-                    <i class="fas fa-home"></i>
-                </button>
-                <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        </div>
-        <div class="bookshelf-tag-filter" id="groupTagFilter">
-            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
-        </div>
-        <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
-            <div class="loading-spinner"></div>
-        </div>
-        <div class="bookshelf-body" id="groupBody">
-        </div>
-        <div class="bookshelf-footer" id="groupFooter">
-            <span id="groupStats"></span>
-        </div>
-    </div>
-</div>
-{render_footer(datetime.now().year)}
-"""
-        library_html += """
-        <script src="/assets/theme.js" defer></script>
-        <script src="/assets/version-check.js" defer></script>
-        <script src="/assets/pinyin-pro.min.js" defer></script>
-        <script src="/assets/library.js?v=13" defer></script>
-        <script src="/assets/sortable.min.js" defer></script>
-        <script src="/assets/bookshelf.js" defer></script>
-        <script src="/assets/annotation.js" defer></script>
-        <script src="/assets/annotation-hub.js" defer></script>
-        <script>
-        let base_path = window.location.pathname;
-        if (base_path.endsWith("index.html")) {
-            base_path = base_path.replace(/index.html$/, '');
-        }
-        if (base_path !== "/") {
-            // 处理所有资源，都要加上基路径
-            addBasePath(base_path);
-        }
-
-        function addBasePath(basePath) {
-            // 处理所有链接、图片和样式表
-            const resources = document.querySelectorAll('a[href^="/"], script[src^="/"], img[src^="/"], link[href^="/"]');
-            resources.forEach(resource => {
-                const src = resource.getAttribute('src');
-                const href = resource.getAttribute('href');
-                if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith(basePath)) {
-                    resource.setAttribute('src', basePath.substr(0, basePath.length - 1) + src);
-                }
-                if (href && !href.startsWith('http') && !href.startsWith('//') && !href.startsWith(basePath)) {
-                    resource.setAttribute('href', basePath.substr(0, basePath.length - 1) + href);
-                }
-            });
-        }
-
-
-        document.addEventListener('DOMContentLoaded', function() {
-        var i18n = window.EpubBrowserI18n;
-        var localeSelect = document.getElementById('localeSelect');
-        if (i18n && localeSelect) {
-            localeSelect.value = i18n.getLocale();
-            localeSelect.addEventListener('change', function() {
-                i18n.setLocale(localeSelect.value);
-            });
-        }
-        // 检查当前的基路径
-        let base_path = window.location.pathname;
-        if (base_path.endsWith("index.html")) {
-            base_path = base_path.replace(/index.html$/, '');
-        }
-        // 单独处理 js 资源，无论如何都要重新加载，因为那个脚本不再监听 DOMContentLoaded 事件了
-        js_resource = document.querySelector('script[src="/assets/library.js?v=13"]');
-        if (window.initScriptLibrary && window.initTheme) {
-            window.initScriptLibrary();
-            console.log("init")
-            return;
-        } else {
-            const src = js_resource.getAttribute('src');
-            newScript = reloadScriptByReplacement(js_resource, base_path.substr(0, base_path.length - 1) + src);
-            newScript.onload = () => {
-                if (window.initScriptLibrary && window.initTheme) {
-                    console.log("reinit")
-                    window.initScriptLibrary();
-                }
-            };
-        }
-        
-
-        function reloadScriptByReplacement(scriptElement, newSrc) {
-            const newScript = document.createElement('script');
-            newScript.src = newSrc;
-            
-            // 复制原script的所有属性（除了src）
-            Array.from(scriptElement.attributes).forEach(attr => {
-                if (attr.name !== 'src') {
-                    newScript.setAttribute(attr.name, attr.value);
-                }
-            });
-            scriptElement.parentNode.replaceChild(newScript, scriptElement);
-            return newScript;
-        }
-        });
-        </script>
-    </body>
-</html>"""
-        library_html = rewrite_asset_urls(library_html, self.asset_manifest)
-        library_html = minify_html.minify(library_html, minify_css=True, minify_js=True)
-        with open(os.path.join(self.base_directory, 'index.html'), 'w', encoding='utf-8') as f:
-            f.write(library_html)
-        
-        self.generate_book_metadata()
-    
     def generate_book_metadata(self):
-        import json
-        books_data = []
-        for book_hash, book_info in self.books.items():
-            books_data.append({
-                'hash': book_hash,
-                'title': book_info['title'],
-                'authors': book_info['authors'],
-                'tags': book_info['tags'],
-                'cover': book_info['cover']
-            })
-        
-        metadata_path = os.path.join(self.base_directory, 'book-metadata.json')
-        with open(metadata_path, 'w', encoding='utf-8') as f:
-            json.dump(books_data, f, ensure_ascii=False, separators=(',', ':'))
+        self.create_library_home()
     
     def move_book(self, book_hash):
         """按 href 的格式组织目录"""
         book_path = os.path.join(self.base_directory, "book")
         book_info = self.books[book_hash]
         if not book_info:
-            print(f"move {book_hash} failed, err: not exists such book info")
+            self.reporter.detail(
+                f"move {book_hash} failed, err: not exists such book info"
+            )
         old_path = book_info['web_dir']
         old_temp_dir = book_info['temp_dir']
         cur_path = os.path.join(book_path, book_hash)
@@ -498,7 +187,7 @@ if (isKindle) {
         try:
             shutil.move(old_path, cur_path)
         except Exception as e:
-            print(f"move {old_path} to {cur_path} failed, err: {e}")
+            self.reporter.detail(f"move {old_path} to {cur_path} failed, err: {e}")
         try:
             # 删除原来的 temp_dir 目录
             shutil.rmtree(old_temp_dir)
@@ -519,7 +208,7 @@ if (isKindle) {
             try:
                 shutil.rmtree(cur_path)
             except Exception as e:
-                print(f"remove {cur_path} failed, err: {e}")
+                self.reporter.detail(f"remove {cur_path} failed, err: {e}")
         
         self.books.pop(book_hash, None)
 
@@ -532,7 +221,9 @@ if (isKindle) {
                 shutil.rmtree(book_path)
                 os.mkdir(book_path)
             except Exception as e:
-                print(f"book_path {book_path} exists, try to recreate failed, err: {e}")
+                self.reporter.detail(
+                    f"book_path {book_path} exists, try to recreate failed, err: {e}"
+                )
         else:
             os.mkdir(book_path)
         # 把所有书籍移动到对应目录
@@ -545,7 +236,9 @@ if (isKindle) {
                 # 删除原来的 temp_dir 目录
                 shutil.rmtree(old_temp_dir)
             except Exception as e:
-                print(f"move {old_path} to {cur_path} failed, err: {e}")
+                self.reporter.detail(
+                    f"move {old_path} to {cur_path} failed, err: {e}"
+                )
     
     def cleanup(self):
         """清理所有文件"""
@@ -555,11 +248,15 @@ if (isKindle) {
                 temp_dir = book_info['temp_dir']
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                    print(f"Cleaned up book: {book_info['title']}, path: {temp_dir}")
+                    self.reporter.detail(
+                        f"Cleaned up book: {book_info['title']}, path: {temp_dir}"
+                    )
                 middle_dir = os.path.join(self.output_dir,f"epub_{book_hash}") # 可能存在的中间文件
                 if os.path.exists(middle_dir):
                     shutil.rmtree(middle_dir, ignore_errors=True)
-                    print(f"Cleaned up book: {book_info['title']}, path: {middle_dir}")
+                    self.reporter.detail(
+                        f"Cleaned up book: {book_info['title']}, path: {middle_dir}"
+                    )
             if os.path.exists(os.path.join(self.output_dir, "index.html")):
                 os.remove(os.path.join(self.output_dir, "index.html"))
             if os.path.exists(os.path.join(self.output_dir, "sw.js")):
@@ -568,10 +265,14 @@ if (isKindle) {
                 shutil.rmtree(os.path.join(self.output_dir, "assets"), ignore_errors=True)
             if os.path.exists(os.path.join(self.output_dir, "book")):
                 shutil.rmtree(os.path.join(self.output_dir, "book"), ignore_errors=True)
-            print(f"Cleaned up files inside library base directory: {self.base_directory}")
+            self.reporter.detail(
+                f"Cleaned up files inside library base directory: {self.base_directory}"
+            )
             return
         else:
             # 清理基础目录
             if os.path.exists(self.base_directory):
                 shutil.rmtree(self.base_directory, ignore_errors=True)
-                print(f"Cleaned up library base directory: {self.base_directory}")
+                self.reporter.detail(
+                    f"Cleaned up library base directory: {self.base_directory}"
+                )

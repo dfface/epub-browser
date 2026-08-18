@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 
 from .asset_publisher import AssetPublisher, rewrite_asset_urls
 from .models import BookMetadata, ConvertedBook
+from .reporting import Reporter
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
@@ -30,10 +31,12 @@ class EPUBProcessor:
         asset_manifest=None,
         book_id=None,
         urls=None,
+        reporter=None,
     ):
         self.epub_path = os.fspath(epub_path)
         self.output_dir = output_dir
         self.urls = urls or SiteURLs()
+        self.reporter = reporter or Reporter(False)
         self._caller_supplied_book_id = book_id is not None
         self.book_hash = book_id or base64.urlsafe_b64encode(
             hashlib.md5(self.epub_path.encode('utf-8')).digest()
@@ -171,7 +174,7 @@ class EPUBProcessor:
         """解析container.xml获取内容文件路径"""
         container_path = os.path.join(self.extract_dir, 'META-INF', 'container.xml')
         if not os.path.exists(container_path):
-            print("container.xml file not found")
+            self.reporter.detail("container.xml file not found")
             return None
             
         try:
@@ -183,7 +186,7 @@ class EPUBProcessor:
             if rootfile is not None:
                 return rootfile.get('full-path')
         except Exception as e:
-            print(f"Failed to parse container.xml: {e}")
+            self.reporter.detail(f"Failed to parse container.xml: {e}")
             
         return None
     
@@ -258,7 +261,7 @@ class EPUBProcessor:
                     if os.path.exists(os.path.join(self.extract_dir, ncx_path)):
                         return ncx_path
         except Exception as e:
-            print(f"Failed to find toc attribute: {e}")
+            self.reporter.detail(f"Failed to find toc attribute: {e}")
         
         # 如果没有明确指定，查找media-type为application/x-dtbncx+xml的文件
         for item_id, item in manifest.items():
@@ -280,7 +283,7 @@ class EPUBProcessor:
         """解析NCX文件获取目录结构"""
         ncx_full_path = os.path.join(self.extract_dir, ncx_path)
         if not os.path.exists(ncx_full_path):
-            print(f"NCX file not found: {ncx_full_path}")
+            self.reporter.detail(f"NCX file not found: {ncx_full_path}")
             return []
             
         try:
@@ -347,16 +350,14 @@ class EPUBProcessor:
             return toc
             
         except Exception as e:
-            print(f"Failed to parse NCX file: {e}")
-            import traceback
-            traceback.print_exc()
+            self.reporter.detail(f"Failed to parse NCX file: {e}")
             return []
     
     def parse_opf(self, opf_path):
         """解析OPF文件获取书籍信息和章节列表"""
         opf_full_path = os.path.join(self.extract_dir, opf_path)
         if not os.path.exists(opf_full_path):
-            print(f"OPF file not found: {opf_full_path}")
+            self.reporter.detail(f"OPF file not found: {opf_full_path}")
             return False
             
         try:
@@ -443,7 +444,7 @@ class EPUBProcessor:
             return True
             
         except Exception as e:
-            print(f"Failed to parse OPF file: {e}")
+            self.reporter.detail(f"Failed to parse OPF file: {e}")
             return False
     
     def find_chapter_title(self, chapter_path):
@@ -669,7 +670,10 @@ class EPUBProcessor:
                         index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
                 else:
-                    print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
+                    self.reporter.detail(
+                        f"Chapter index not found for toc item: "
+                        f"{toc_item['title']} (src: {toc_src})"
+                    )
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
@@ -875,7 +879,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         chapter_data['anchor'] = chapter_anchor
                     toc_data.append(chapter_data)
                 else:
-                    print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
+                    self.reporter.detail(
+                        f"Chapter index not found for toc item: "
+                        f"{toc_item['title']} (src: {toc_src})"
+                    )
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
@@ -911,7 +918,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     f.write(chapter_html)
                     
             except Exception as e:
-                print(f"Failed to process chapter {chapter['path']}: {e}")
+                self.reporter.detail(
+                    f"Failed to process chapter {chapter['path']}: {e}"
+                )
         
         # 创建并启动线程
         with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程

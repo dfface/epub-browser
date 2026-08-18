@@ -43,7 +43,8 @@ function findByClass(node, className) {
 test('renders adversarial book metadata as text and attributes, never HTML', () => {
   const book = {
     hash: 'book\"><img src=x onerror=alert(1)>',
-    cover: 'cover.jpg\"><script>alert(1)</script>',
+    url: '/reader/book/safe/index.html',
+    cover: '/reader/book/safe/cover.jpg\"><script>alert(1)</script>',
     title: '<img src=x onerror=alert(1)>',
     authors: ['Ada <script>alert(1)</script>', 'Bob'],
     tags: ['<svg onload=alert(1)>'],
@@ -120,8 +121,8 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   const tag = content.children[2].children[0];
 
   assert.equal(link.attributes.id, book.hash);
-  assert.equal(link.attributes.href, '/book/' + book.hash + '/index.html');
-  assert.equal(cover.attributes.src, '/book/' + book.hash + '/' + book.cover);
+  assert.equal(link.attributes.href, book.url);
+  assert.equal(cover.attributes.src, book.cover);
   assert.equal(title.textContent, book.title);
   assert.equal(author.textContent, book.authors.join(' & '));
   assert.equal(tag.textContent, book.tags[0]);
