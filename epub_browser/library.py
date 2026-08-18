@@ -247,7 +247,7 @@ if (isKindle) {
 
         library_html += f"""
     <div class="breadcrumb-container">
-        <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb">
+        <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb">
             <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="library.title">Library</span></span>
             <div class="library-meta" aria-label="Library information" data-i18n-aria-label="library.information">
                 <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="library.bookCount" data-i18n-params='{{"count": {len(self.books)}}}'>{len(self.books)} book(s)</span></span>

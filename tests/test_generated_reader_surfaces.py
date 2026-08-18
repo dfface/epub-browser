@@ -271,7 +271,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("margin: 0;", css)
         self.assertIn(".library-breadcrumb", css)
         for html in (book_html, chapter_html):
-            self.assertRegex(html, r'aria-label=(?:["\'])?Library')
+            self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?(?:book|reader)\.library')
             self.assertRegex(html, r'class=(?:["\'])?breadcrumb-library-label')
 
     def test_reader_chrome_uses_one_default_font_stack(self):
@@ -340,7 +340,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
 
         self.assertRegex(html, r'<a\b[^>]*\bclass="toc-book-home"[^>]*\bhref="index\.html"')
-        self.assertIn('aria-label="Open book home"', html)
+        self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
         self.assertIn('id="bookHomeClose"', html)
         self.assertIn('.toc-header-actions', css)
         self.assertIn('min-width: 44px;', css)
@@ -388,8 +388,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_library_places_its_summary_inside_the_current_location_breadcrumb(self):
         html = self._library_html()
 
-        self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\baria-label=(?:["\'])?Breadcrumb(?:["\'])?)[^>]*>')
-        self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>.*Library.*</span>')
+        self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\bdata-i18n-aria-label=(?:["\'])?reader\.breadcrumb(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<span\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
         self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertIn('breadcrumb-brand-mark', breadcrumb)
