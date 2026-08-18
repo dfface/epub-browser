@@ -44,6 +44,25 @@ class AssetPublisherTests(unittest.TestCase):
             self.assertRegex(worker, r"epub-browser-[0-9a-f]{12}")
             self.assertIn(json.dumps(published.url_for("app.js")), worker)
             self.assertNotIn("/assets/app.js", worker)
+            for manifest_path in (
+                "/assets/manifest.json",
+                "/assets/manifest.en.json",
+                "/assets/manifest.zh-CN.json",
+            ):
+                self.assertIn(json.dumps(manifest_path), worker)
+
+    def test_publish_writes_localized_stable_web_manifests(self):
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
+            self._write_source_assets(source)
+
+            AssetPublisher(source, output).publish()
+
+            english = json.loads(Path(output, "assets", "manifest.en.json").read_text(encoding="utf-8"))
+            chinese = json.loads(Path(output, "assets", "manifest.zh-CN.json").read_text(encoding="utf-8"))
+            self.assertEqual(english["lang"], "en")
+            self.assertEqual(chinese["lang"], "zh-CN")
+            self.assertEqual(chinese["description"], "私人 EPUB 阅读器与静态站点生成器")
+            self.assertRegex(english["icons"][0]["src"], r"^/assets/immutable/icon-192\.[0-9a-f]{12}\.png$")
 
     def test_real_worker_only_uses_cache_first_for_content_addressed_assets(self):
         with tempfile.TemporaryDirectory() as output:
@@ -73,7 +92,18 @@ class AssetPublisherTests(unittest.TestCase):
         (root / "app.js").write_text("console.log('v1')", encoding="utf-8")
         (root / "icon-192.png").write_bytes(b"icon")
         (root / "manifest.json").write_text(
-            json.dumps({"icons": [{"src": "/assets/icon-192.png"}]}), encoding="utf-8"
+            json.dumps({"lang": "en", "icons": [{"src": "/assets/icon-192.png"}]}), encoding="utf-8"
+        )
+        (root / "manifest.zh-CN.json").write_text(
+            json.dumps(
+                {
+                    "lang": "zh-CN",
+                    "description": "私人 EPUB 阅读器与静态站点生成器",
+                    "icons": [{"src": "/assets/icon-192.png"}],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
         )
         (root / "sw.js").write_text(
             "const CACHE_NAME = 'epub-browser-__EPUB_BROWSER_RELEASE_ID__';\n"

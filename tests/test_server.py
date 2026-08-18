@@ -24,6 +24,10 @@ class ServerCacheTests(unittest.TestCase):
             app.write("console.log('app')")
         with open(os.path.join(self.directory.name, "assets", "manifest.json"), "w", encoding="utf-8") as manifest:
             manifest.write("{}")
+        with open(os.path.join(self.directory.name, "assets", "manifest.en.json"), "w", encoding="utf-8") as manifest:
+            manifest.write("{}")
+        with open(os.path.join(self.directory.name, "assets", "manifest.zh-CN.json"), "w", encoding="utf-8") as manifest:
+            manifest.write("{}")
         with open(os.path.join(self.directory.name, "sw.js"), "w", encoding="utf-8") as worker:
             worker.write("self.addEventListener('fetch', () => {})")
         os.makedirs(os.path.join(self.directory.name, "book", "demo", "resources"))
@@ -49,7 +53,13 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(cached.status_code, 304)
 
     def test_mutable_assets_and_worker_revalidate(self):
-        for path in ("/assets/cover.webp", "/assets/manifest.json", "/sw.js"):
+        for path in (
+            "/assets/cover.webp",
+            "/assets/manifest.json",
+            "/assets/manifest.en.json",
+            "/assets/manifest.zh-CN.json",
+            "/sw.js",
+        ):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
