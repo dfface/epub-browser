@@ -305,6 +305,7 @@
       'annotations.error.timeout': 'The annotation request timed out.',
       'footer.product': 'EPUB Library',
       'footer.poweredBy': 'Powered by',
+      'footer.poweredBySuffix': '·',
       'version.updateAvailable': 'Update available: v{version}',
       'errors.generic': 'Something went wrong.',
       'errors.network': 'A network error occurred.'
@@ -606,7 +607,8 @@
       'annotations.error.network': '连接标注服务时发生网络错误。',
       'annotations.error.timeout': '标注请求超时。',
       'footer.product': 'EPUB 书库',
-      'footer.poweredBy': '由以下项目驱动',
+      'footer.poweredBy': '由',
+      'footer.poweredBySuffix': '强力驱动 ·',
       'version.updateAvailable': '有可用更新：v{version}',
       'errors.generic': '发生了错误。',
       'errors.network': '发生网络错误。'
