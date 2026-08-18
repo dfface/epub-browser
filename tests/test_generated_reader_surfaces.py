@@ -216,6 +216,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("transform: none;", styles)
         self.assertIn(".continue-reading-control.has-reading-progress:focus-within", styles)
         self.assertIn(".continue-reading-menu-toggle[aria-expanded=\"true\"] i", styles)
+        self.assertRegex(
+            styles,
+            r"\.continue-reading-menu\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;",
+        )
         self.assertIn("@media (prefers-reduced-motion: reduce)", styles)
         self.assertIn("overflow: visible;", styles)
         self.assertIn("document.getElementById(readKey)", script)
