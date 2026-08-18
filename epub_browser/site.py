@@ -54,7 +54,7 @@ def _render_library_html(
           <h2 id="libraryProgressTitle" data-progress-title></h2>
           <p data-progress-summary aria-live="polite"></p>
         </div>
-        <button type="button" data-progress-close aria-label="Close" data-i18n-aria-label="library.progress.close">×</button>
+        <button type="button" data-progress-close aria-label="Close" data-i18n-aria-label="library.progress.close" hidden disabled>×</button>
       </div>
       <div class="library-progress-track" data-progress-track><span data-progress-bar></span></div>
       <p class="library-progress-latest" data-progress-latest></p>

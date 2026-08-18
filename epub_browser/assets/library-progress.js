@@ -68,6 +68,9 @@
 
   function createController(options) {
     options = options || {};
+    var refreshActive = false;
+    var requestedRefreshRevision = 0;
+    var completedRefreshRevision = 0;
     var controller = {
       state: initialState(),
       timer: null,
@@ -75,6 +78,25 @@
       dismiss: dismiss,
       disconnected: disconnected
     };
+
+    function requestMetadataRefresh(revision) {
+      requestedRefreshRevision = Math.max(requestedRefreshRevision, revision);
+      if (refreshActive || requestedRefreshRevision <= completedRefreshRevision || !options.refreshMetadata) return;
+
+      var targetRevision = requestedRefreshRevision;
+      refreshActive = true;
+      Promise.resolve().then(function() {
+        return options.refreshMetadata(targetRevision);
+      }).then(refreshSettled, refreshSettled);
+
+      function refreshSettled() {
+        completedRefreshRevision = Math.max(completedRefreshRevision, targetRevision);
+        refreshActive = false;
+        if (requestedRefreshRevision > completedRefreshRevision) {
+          requestMetadataRefresh(requestedRefreshRevision);
+        }
+      }
+    }
 
     function render() {
       if (options.render) options.render(controller.state);
@@ -102,7 +124,7 @@
       render();
 
       if ((snapshot.catalog_revision || 0) > previous.catalogRevision && options.refreshMetadata) {
-        Promise.resolve(options.refreshMetadata()).catch(function() {});
+        requestMetadataRefresh(snapshot.catalog_revision || 0);
       }
       if (controller.state.autoCollapseGeneration !== null) {
         var generation = controller.state.autoCollapseGeneration;
@@ -124,7 +146,7 @@
     }
 
     function dismiss() {
-      if (!controller.state.snapshot) return;
+      if (!controller.state.snapshot || controller.state.snapshot.phase !== 'degraded') return;
       cancelAutoCollapse();
       controller.state = stateWith(controller.state, {
         hiddenGeneration: controller.state.snapshot.generation,
@@ -174,6 +196,7 @@
     var latest = mount.querySelector('[data-progress-latest]');
     var failures = mount.querySelector('[data-progress-failures]');
     var failureList = mount.querySelector('[data-progress-failure-list]');
+    var close = mount.querySelector('[data-progress-close]');
 
     function t(key, params) {
       return translate(root, key, params);
@@ -191,6 +214,8 @@
       if (!snapshot) return;
 
       setPhase(snapshot.phase);
+      close.hidden = snapshot.phase !== 'degraded';
+      close.disabled = snapshot.phase !== 'degraded';
       title.textContent = t(phaseTitleKey(snapshot.phase));
       summary.removeAttribute('role');
       summary.setAttribute('aria-live', 'polite');
@@ -212,7 +237,7 @@
         track.setAttribute('role', 'progressbar');
         track.setAttribute('aria-labelledby', 'libraryProgressTitle');
         track.setAttribute('aria-valuemin', '0');
-        track.setAttribute('aria-valuemax', String(snapshot.total));
+        track.removeAttribute('aria-valuemax');
         track.removeAttribute('aria-valuenow');
         bar.style.width = '';
       } else {
@@ -238,7 +263,7 @@
     return {
       render: render,
       refreshMetadata: function() {
-        return root.refreshLibraryMetadata ? root.refreshLibraryMetadata() : Promise.resolve();
+        return root.refreshLibraryMetadata ? root.refreshLibraryMetadata.apply(root, arguments) : Promise.resolve();
       },
       schedule: function(callback, delay) { return root.setTimeout(callback, delay); },
       cancelSchedule: function(identifier) { root.clearTimeout(identifier); }

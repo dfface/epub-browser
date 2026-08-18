@@ -61,6 +61,32 @@ test('rejects stale snapshots and deduplicates catalog refresh', async () => {
   assert.equal(refreshes, 1);
 });
 
+test('serializes metadata refreshes and coalesces pending snapshots to the newest revision', async () => {
+  const calls = [];
+  const pending = [];
+  const controller = Progress.createController({
+    render() {},
+    refreshMetadata(revision) {
+      calls.push(revision);
+      return new Promise((resolve) => pending.push(resolve));
+    },
+    schedule() { return 1; },
+    cancelSchedule() {}
+  });
+
+  controller.accept(snapshot({ catalog_revision: 1 }));
+  controller.accept(snapshot({ revision: 2, catalog_revision: 3 }));
+  controller.accept(snapshot({ revision: 3, catalog_revision: 2 }));
+  await Promise.resolve();
+  assert.deepEqual(calls, [1]);
+
+  pending.shift()();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, [1, 3]);
+  pending.shift()();
+  await Promise.resolve();
+});
+
 test('only an observed successful generation auto-collapses', () => {
   const scheduled = [];
   const controller = Progress.createController({
@@ -139,7 +165,7 @@ test('keeps a named progressbar during discovery and announces a meaningful degr
   assert.equal(track.getAttribute('role'), 'progressbar');
   assert.equal(track.getAttribute('aria-labelledby'), 'libraryProgressTitle');
   assert.equal(track.getAttribute('aria-valuemin'), '0');
-  assert.equal(track.getAttribute('aria-valuemax'), '5');
+  assert.equal(track.getAttribute('aria-valuemax'), null);
   assert.equal(track.getAttribute('aria-valuenow'), null);
 
   controller.accept(snapshot({ revision: 3, total: 5, phase: 'degraded', failed: 1, failures: [{ filename: 'broken.epub', message: 'invalid file' }] }));
@@ -150,6 +176,36 @@ test('keeps a named progressbar during discovery and announces a meaningful degr
   controller.accept(snapshot({ revision: 4, total: 5, phase: 'degraded', failed: 1, failures: [{ filename: 'broken.epub', message: 'invalid file' }] }));
   assert.equal(summary.getAttribute('role'), null);
   assert.equal(summary.getAttribute('aria-live'), 'polite');
+});
+
+test('only exposes and honors the close action for degraded generations', () => {
+  const harness = progressMount();
+  const root = {
+    document: { createElement: harness.createElement },
+    EpubBrowserI18n: { t(key) { return key; } },
+    setTimeout() { return 1; },
+    clearTimeout() {},
+  };
+  const controller = Progress.createController(Progress.createDomOptions(root, harness.mount));
+  const close = harness.nodes['[data-progress-close]'];
+
+  controller.accept(snapshot({ phase: 'processing' }));
+  assert.equal(close.hidden, true);
+  assert.equal(close.disabled, true);
+  controller.dismiss();
+  assert.equal(controller.state.visible, true);
+
+  controller.accept(snapshot({ revision: 2, phase: 'complete', completed: 2 }));
+  assert.equal(close.hidden, true);
+  assert.equal(close.disabled, true);
+  controller.dismiss();
+  assert.equal(controller.state.visible, true);
+
+  controller.accept(snapshot({ generation: 2, revision: 1, phase: 'degraded', failed: 1 }));
+  assert.equal(close.hidden, false);
+  assert.equal(close.disabled, false);
+  controller.dismiss();
+  assert.equal(controller.state.visible, false);
 });
 
 test('starts EventSource at the normalized server events URL and wires progress, reconnect, and close', () => {
@@ -180,6 +236,9 @@ test('starts EventSource at the normalized server events URL and wires progress,
   assert.equal(started.controller.state.snapshot.completed, 1);
   source.onerror();
   assert.equal(started.controller.state.connected, false);
+  harness.nodes['[data-progress-close]'].listener();
+  assert.equal(started.controller.state.visible, true);
+  source.listeners.progress({ data: JSON.stringify(snapshot({ generation: 2, phase: 'degraded', failed: 1 })) });
   harness.nodes['[data-progress-close]'].listener();
   assert.equal(started.controller.state.visible, false);
 });

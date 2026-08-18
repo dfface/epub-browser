@@ -156,6 +156,9 @@ class ServerLibraryManager:
             if self._stop_event.is_set():
                 return self._stopped_summary()
             self.progress_broker.start_generation(trigger)
+            self.reporter.detail(
+                f"Library reconciliation started: trigger={trigger}"
+            )
             try:
                 discovered = self._discover_sources()
             except _ConversionCancelled:
@@ -173,6 +176,10 @@ class ServerLibraryManager:
                         removed += 1
 
             self.progress_broker.mark_discovered(len(discovered), removed)
+            self.reporter.detail(
+                "Library discovery complete: "
+                f"trigger={trigger}, total={len(discovered)}, removed={removed}"
+            )
 
             if self._stop_event.is_set():
                 return self._stopped_summary(removed=removed)
@@ -406,6 +413,14 @@ class ServerLibraryManager:
                         and len(active_records) == len(discovered)
                     )
                 self.progress_broker.finish(len(active_records))
+                outcome = "degraded" if summary.degraded else "complete"
+                self.reporter.detail(
+                    "Library reconciliation "
+                    f"{outcome}: trigger={trigger}, total={len(discovered)}, "
+                    f"converted={summary.converted}, reused={summary.reused}, "
+                    f"failed={summary.failed}, removed={summary.removed}, "
+                    f"active={len(summary.active_books)}"
+                )
                 self._notify_callback(self.on_reconciled, summary)
             return summary
 
@@ -860,6 +875,9 @@ class ServerLibraryManager:
                 record = self.state_store.book_by_source(Path(path))
                 if not record or not record.active:
                     return
+                self.reporter.detail(
+                    f"Watch direct-delete batch started: source={Path(path)}"
+                )
                 self.progress_broker.start_generation("watch")
                 self.progress_broker.mark_discovered(total=0, removed=1)
                 self.state_store.mark_missing(record.book_id)
@@ -871,6 +889,10 @@ class ServerLibraryManager:
                     self.progress_broker.catalog_published(len(active_records))
                 if not self._stop_event.is_set():
                     self.progress_broker.finish(len(active_records))
+                    self.reporter.detail(
+                        "Watch direct-delete batch complete: "
+                        f"removed=1, active={len(active_records)}"
+                    )
 
     def request_stop(self) -> None:
         self._stop_event.set()

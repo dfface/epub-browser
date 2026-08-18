@@ -134,6 +134,7 @@ def create_app(
     status=None,
     sync_dir=None,
     progress_broker: Optional[LibraryProgressBroker] = None,
+    library_event_heartbeat_seconds: float = 15.0,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
@@ -178,7 +179,10 @@ def create_app(
             try:
                 while True:
                     try:
-                        snapshot = await asyncio.wait_for(subscription.next(), 15.0)
+                        snapshot = await asyncio.wait_for(
+                            subscription.next(),
+                            library_event_heartbeat_seconds,
+                        )
                     except asyncio.TimeoutError:
                         yield ': heartbeat\n\n'
                     else:

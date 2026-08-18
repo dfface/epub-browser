@@ -1,4 +1,6 @@
 import asyncio
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -14,6 +16,7 @@ from epub_browser.identity import source_sha256
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
+from epub_browser.reporting import Reporter
 from epub_browser.server_library import ServerLibraryManager
 from epub_browser.state import StateStore
 
@@ -66,6 +69,48 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(snapshot.completed, 2)
         self.assertEqual(snapshot.active_books, 2)
         self.assertGreaterEqual(snapshot.catalog_revision, 1)
+        manager.shutdown()
+
+    def test_reconcile_log_reports_trigger_discovery_and_completion_while_normal_mode_is_silent(self):
+        logged_manager = self._manager(reporter=Reporter(True))
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            logged_manager.reconcile(trigger="watch")
+        output = stderr.getvalue()
+        self.assertIn("Library reconciliation started: trigger=watch", output)
+        self.assertIn("Library discovery complete: trigger=watch, total=1", output)
+        self.assertIn("Library reconciliation complete: trigger=watch, total=1", output)
+        logged_manager.shutdown()
+
+        quiet_manager = self._manager(reporter=Reporter(False))
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            quiet_manager.reconcile(trigger="watch")
+        self.assertEqual(stderr.getvalue(), "")
+        quiet_manager.shutdown()
+
+    def test_degraded_reconcile_and_direct_delete_have_logged_summaries(self):
+        class FailingProcessor:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def convert(self):
+                raise RuntimeError("conversion failed")
+
+        manager = self._manager(FailingProcessor, reporter=Reporter(True))
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            manager.reconcile()
+        self.assertIn("Library reconciliation degraded: trigger=startup", stderr.getvalue())
+        self.assertIn("failed=1", stderr.getvalue())
+        manager.shutdown()
+
+        self._write_epub(self.source, "Restored")
+        manager = self._manager(reporter=Reporter(False))
+        manager.reconcile()
+        manager.reporter = Reporter(True)
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            manager.mark_deleted(self.source)
+        output = stderr.getvalue()
+        self.assertIn("Watch direct-delete batch started:", output)
+        self.assertIn("Watch direct-delete batch complete: removed=1", output)
         manager.shutdown()
 
     def test_watch_reconcile_creates_watch_generation(self):
@@ -484,6 +529,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
         asyncio.set_event_loop(None)
         self.addCleanup(subscription.close)
         manager = self._manager(IncrementalProcessor, progress_broker=broker)
+        manager.prepare_public_shell()
+        baseline_revision = broker.snapshot().catalog_revision
         result = []
         reconcile_thread = threading.Thread(
             target=lambda: result.append(manager.reconcile()),
@@ -507,7 +554,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
             self.assertEqual(len(published), 1)
             self.assertTrue(reconcile_thread.is_alive())
             snapshot = self._latest_subscription_snapshot(loop, subscription)
-            self.assertGreaterEqual(snapshot.catalog_revision, 1)
+            self.assertGreater(snapshot.catalog_revision, baseline_revision)
         finally:
             IncrementalProcessor.release_slow.set()
             reconcile_thread.join(timeout=5)

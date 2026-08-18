@@ -1,3 +1,5 @@
+import contextlib
+import io
 import threading
 import unittest
 from pathlib import Path
@@ -5,6 +7,7 @@ from pathlib import Path
 from watchdog.events import FileCreatedEvent, FileDeletedEvent, FileMovedEvent
 
 from epub_browser.watch import EpubFileHandler
+from epub_browser.reporting import Reporter
 
 
 class ImmediateFailureLibrary:
@@ -21,6 +24,30 @@ class ImmediateFailureLibrary:
 
 
 class EpubFileHandlerTests(unittest.TestCase):
+    def test_logged_watch_dispatch_describes_reconcile_and_direct_delete_while_normal_mode_is_silent(self):
+        class Manager:
+            def queue_path(self, path):
+                return None
+
+            def mark_deleted(self, path):
+                return None
+
+        logged = EpubFileHandler(Manager(), reporter=Reporter(True))
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            logged._queue_path("/tmp/changed.epub")
+            logged._mark_deleted("/tmp/deleted.epub")
+        output = stderr.getvalue()
+        self.assertIn("Watch reconciliation queued: source=/tmp/changed.epub", output)
+        self.assertIn("Watch direct-delete queued: source=/tmp/deleted.epub", output)
+        logged.shutdown()
+
+        quiet = EpubFileHandler(Manager(), reporter=Reporter(False))
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            quiet._queue_path("/tmp/changed.epub")
+            quiet._mark_deleted("/tmp/deleted.epub")
+        self.assertEqual(stderr.getvalue(), "")
+        quiet.shutdown()
+
     def test_manager_receives_normalized_create_delete_and_move_operations(self):
         class Manager:
             def __init__(self):

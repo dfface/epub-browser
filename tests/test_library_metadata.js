@@ -135,6 +135,7 @@ function createLibraryHarness(responses) {
     },
   };
   let responseIndex = 0;
+  const pendingResponses = [];
   function FakeXMLHttpRequest() {
     this.readyState = 0;
     this.status = 0;
@@ -143,11 +144,18 @@ function createLibraryHarness(responses) {
   FakeXMLHttpRequest.prototype.open = function() {};
   FakeXMLHttpRequest.prototype.send = function() {
     const response = responses[responseIndex++];
-    this.readyState = 4;
-    this.status = response.status || 200;
-    this.responseText = JSON.stringify(response.books || response);
-    this.onreadystatechange();
+    if (response && response.deferred) {
+      pendingResponses.push({ xhr: this, response });
+      return;
+    }
+    completeResponse(this, response);
   };
+  function completeResponse(xhr, response) {
+    xhr.readyState = 4;
+    xhr.status = response.status || 200;
+    xhr.responseText = JSON.stringify(response.books || response);
+    xhr.onreadystatechange();
+  }
   const storageValues = {};
   const localStorage = {
     getItem(key) { return storageValues[key] || null; },
@@ -173,6 +181,11 @@ function createLibraryHarness(responses) {
     tag(id) { return tagCloud.children.find((tagItem) => tagItem.getAttribute('data-id') === id) || null; },
     tagIds() { return tagCloud.children.map((tagItem) => tagItem.getAttribute('data-id')); },
     setSavedOrder(key, order) { localStorage.setItem(key, order); },
+    pendingResponseCount() { return pendingResponses.length; },
+    resolveNextResponse() {
+      const pending = pendingResponses.shift();
+      completeResponse(pending.xhr, pending.response);
+    },
   };
 }
 
@@ -286,6 +299,26 @@ test('incremental metadata refresh replaces cards and preserves filters', async 
   assert.equal(harness.card('one').style.display, 'none');
   assert.equal(harness.card('two').style.display, 'block');
   assert.equal(harness.bookshelfModal.classList.contains('active'), true);
+});
+
+test('coalesces out-of-order revision requests so the final grid uses the newest metadata', async () => {
+  const harness = createLibraryHarness([
+    { deferred: true, books: [{ hash: 'old', title: 'Old', authors: [], tags: [], url: '/book/old/', cover: null }] },
+    { deferred: true, books: [{ hash: 'newest', title: 'Newest', authors: [], tags: [], url: '/book/newest/', cover: null }] },
+  ]);
+  harness.window.initScriptLibrary();
+
+  const newest = harness.window.refreshLibraryMetadata(3);
+  const older = harness.window.refreshLibraryMetadata(2);
+  assert.equal(harness.pendingResponseCount(), 1);
+
+  harness.resolveNextResponse();
+  await Promise.resolve();
+  assert.equal(harness.pendingResponseCount(), 1);
+  harness.resolveNextResponse();
+  await Promise.all([newest, older]);
+
+  assert.deepEqual(harness.cardIds(), ['newest']);
 });
 
 test('incremental metadata refresh leaves existing cards after a failed request', async () => {

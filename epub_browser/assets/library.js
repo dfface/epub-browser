@@ -97,6 +97,73 @@ function initScript() {
         };
         xhr.send();
     }
+
+    var metadataActiveRevision = null;
+    var metadataQueuedRevision = null;
+    var metadataCompletedRevision = -1;
+    var metadataWaiters = [];
+    var lastMetadataBooks = [];
+
+    function settleMetadataWaiters(revision, error, books) {
+        var remaining = [];
+        metadataWaiters.forEach(function(waiter) {
+            if (waiter.revision <= revision) {
+                if (error) waiter.reject(error);
+                else waiter.resolve(books);
+            } else {
+                remaining.push(waiter);
+            }
+        });
+        metadataWaiters = remaining;
+    }
+
+    function startMetadataRefresh(revision) {
+        metadataActiveRevision = revision;
+        if (metadataQueuedRevision === revision) metadataQueuedRevision = null;
+        loadBookMetadata(function(books) {
+            replaceBookCards(books);
+            lastMetadataBooks = books;
+            metadataCompletedRevision = Math.max(metadataCompletedRevision, revision);
+            metadataActiveRevision = null;
+            settleMetadataWaiters(revision, null, books);
+            if (metadataQueuedRevision !== null && metadataQueuedRevision > metadataCompletedRevision) {
+                var nextRevision = metadataQueuedRevision;
+                metadataQueuedRevision = null;
+                startMetadataRefresh(nextRevision);
+            }
+        }, function(error) {
+            metadataCompletedRevision = Math.max(metadataCompletedRevision, revision);
+            metadataActiveRevision = null;
+            settleMetadataWaiters(revision, error);
+            if (metadataQueuedRevision !== null && metadataQueuedRevision > metadataCompletedRevision) {
+                var nextRevision = metadataQueuedRevision;
+                metadataQueuedRevision = null;
+                startMetadataRefresh(nextRevision);
+            }
+        });
+    }
+
+    function requestMetadataRefresh(revision) {
+        var targetRevision = typeof revision === 'number' && isFinite(revision)
+            ? revision
+            : Math.max(
+                metadataCompletedRevision,
+                metadataActiveRevision === null ? -1 : metadataActiveRevision,
+                metadataQueuedRevision === null ? -1 : metadataQueuedRevision
+            ) + 1;
+
+        if (targetRevision <= metadataCompletedRevision) {
+            return Promise.resolve(lastMetadataBooks);
+        }
+        return new Promise(function(resolve, reject) {
+            metadataWaiters.push({ revision: targetRevision, resolve: resolve, reject: reject });
+            if (metadataActiveRevision === null) {
+                startMetadataRefresh(targetRevision);
+            } else if (targetRevision > metadataActiveRevision) {
+                metadataQueuedRevision = Math.max(metadataQueuedRevision === null ? -1 : metadataQueuedRevision, targetRevision);
+            }
+        });
+    }
     
     function hideBookGridLoading() {
         var loading = document.getElementById('bookGridLoading');
@@ -527,17 +594,11 @@ function initScript() {
     }
     window.initBookCardsEvents = applyLibraryFilters;
 
-    window.refreshLibraryMetadata = function() {
-        return new Promise(function(resolve, reject) {
-            loadBookMetadata(function(books) {
-                replaceBookCards(books);
-                resolve(books);
-            }, reject);
-        });
+    window.refreshLibraryMetadata = function(catalogRevision) {
+        return requestMetadataRefresh(catalogRevision);
     };
 
-    loadBookMetadata(function(books) {
-        replaceBookCards(books);
+    requestMetadataRefresh(0).then(function() {
         if (window.onBookCardsLoaded) window.onBookCardsLoaded();
     }, function() {
         hideBookGridLoading();

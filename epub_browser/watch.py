@@ -63,6 +63,7 @@ class EpubFileHandler(FileSystemEventHandler):
         return Path(path).name.startswith(".")
 
     def _queue_path(self, path):
+        self.reporter.detail(f"Watch reconciliation queued: source={Path(path)}")
         if hasattr(self.manager, "queue_path"):
             return self.manager.queue_path(Path(path))
         # Compatibility for callers still using the old in-memory facade.
@@ -71,6 +72,7 @@ class EpubFileHandler(FileSystemEventHandler):
         return None
 
     def _mark_deleted(self, path):
+        self.reporter.detail(f"Watch direct-delete queued: source={Path(path)}")
         if hasattr(self.manager, "mark_deleted"):
             return self.manager.mark_deleted(Path(path))
         return None

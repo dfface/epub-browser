@@ -73,6 +73,9 @@ class SitePublicationTests(unittest.TestCase):
         self.assertIn('id=libraryTagCount', html)
         self.assertIn('id=libraryProgress', html)
         self.assertIn('library-progress', html)
+        self.assertIn('data-progress-close', html)
+        self.assertRegex(html, r'data-progress-close[^>]*disabled')
+        self.assertRegex(html, r'data-progress-close[^>]*hidden')
         self.assertIn('window.EpubLibraryProgress.start(window)', html)
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):

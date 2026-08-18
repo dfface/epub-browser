@@ -308,6 +308,18 @@ class ServerCacheTests(unittest.TestCase):
         payload = json.loads(lines[1].removeprefix("data: "))
         self.assertEqual(payload["in_flight"], 1)
 
+    def test_library_events_emit_heartbeat_without_waiting_for_production_timeout(self):
+        broker = LibraryProgressBroker()
+        app = create_app(
+            self.directory.name,
+            progress_broker=broker,
+            library_event_heartbeat_seconds=0.01,
+        )
+
+        _, _, heartbeat = self._library_event_chunks(app, after_initial=lambda: None)
+
+        self.assertEqual(heartbeat, ": heartbeat\n\n")
+
     def test_scanning_progress_does_not_block_ready_or_reading_progress(self):
         status = RuntimeStatus()
         status.mark_available()
