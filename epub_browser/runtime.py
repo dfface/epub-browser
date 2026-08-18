@@ -37,28 +37,41 @@ class RuntimeStatus:
         self._state = "starting"
         self._failed_books = 0
         self._queued_tasks = 0
+        self._available = False
 
     def mark_migrating(self):
-        self._set("migrating", 0, 0)
+        self._set("migrating", 0, 0, available=False)
 
     def mark_scanning(self):
         self._set("scanning", 0, 0)
 
+    def mark_available(self):
+        with self._lock:
+            self._available = True
+
     def mark_ready(self):
-        self._set("ready", 0, 0)
+        self._set("ready", 0, 0, available=True)
 
     def mark_degraded(self, failed_books: int, queued_tasks: int = 0):
-        self._set("degraded", failed_books, queued_tasks)
+        self._set("degraded", failed_books, queued_tasks, available=True)
 
-    def _set(self, state: str, failed_books: int, queued_tasks: int):
+    def _set(
+        self,
+        state: str,
+        failed_books: int,
+        queued_tasks: int,
+        available: Optional[bool] = None,
+    ):
         with self._lock:
             self._state = state
             self._failed_books = max(0, int(failed_books))
             self._queued_tasks = max(0, int(queued_tasks))
+            if available is not None:
+                self._available = available
 
     def is_ready(self) -> bool:
         with self._lock:
-            return self._state in {"ready", "degraded"}
+            return self._available
 
     def snapshot(self):
         with self._lock:
@@ -257,6 +270,7 @@ def run_server(
             summary,
         )
         manager.prepare_public_shell()
+        status.mark_available()
 
         def initial_reconcile():
             try:
@@ -320,13 +334,41 @@ def run_server(
         )
         server = server_factory(uvicorn_config)
         local_url = _local_url(config.host, config.port)
-        active_reporter.result(f"Server available at: {local_url}")
-        if not config.no_browser:
-            try:
-                browser_opener(local_url)
-            except Exception as error:
-                active_reporter.detail(f"Unable to open browser: {error}")
-        server.run()
+        availability_reported = threading.Event()
+        availability_lock = threading.Lock()
+        startup_monitor_stop = threading.Event()
+
+        def report_availability():
+            with availability_lock:
+                if availability_reported.is_set():
+                    return
+                active_reporter.result(f"Server available at: {local_url}")
+                if not config.no_browser:
+                    try:
+                        browser_opener(local_url)
+                    except Exception as error:
+                        active_reporter.detail(f"Unable to open browser: {error}")
+                availability_reported.set()
+
+        def monitor_startup():
+            while not startup_monitor_stop.wait(0.01):
+                if getattr(server, "started", False):
+                    report_availability()
+                    return
+
+        startup_monitor = threading.Thread(
+            target=monitor_startup,
+            name="UvicornStartupMonitor",
+            daemon=True,
+        )
+        startup_monitor.start()
+        try:
+            server.run()
+        finally:
+            if getattr(server, "started", False):
+                report_availability()
+            startup_monitor_stop.set()
+            startup_monitor.join(timeout=1)
         if (
             created_ephemeral_root
             and ephemeral_root is not None
@@ -354,8 +396,12 @@ def run_server(
         return 5
     finally:
         watcher_stop.set()
+        if manager is not None:
+            request_stop = getattr(manager, "request_stop", None)
+            if request_stop is not None:
+                request_stop()
         if initial_reconcile_thread is not None:
-            initial_reconcile_thread.join()
+            initial_reconcile_thread.join(timeout=1)
         if watcher_thread is not None:
             watcher_thread.join(timeout=5)
         if manager is not None:

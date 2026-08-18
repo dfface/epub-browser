@@ -1,10 +1,11 @@
 import json
 import os
+import queue
 import shutil
 import tempfile
 import threading
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Sequence
@@ -59,6 +60,10 @@ class _StaleSourceError(RuntimeError):
     pass
 
 
+class _ConversionCancelled(RuntimeError):
+    pass
+
+
 class ServerLibraryManager:
     def __init__(
         self,
@@ -86,7 +91,10 @@ class ServerLibraryManager:
         self.staging_dir = self.cache_dir / "staging"
         self.catalog_path = self.cache_dir / "catalog.json"
         self._assets = None
+        self._staging_prepared = False
         self._reconcile_lock = threading.Lock()
+        self._commit_lock = threading.Lock()
+        self._stop_event = threading.Event()
         self._event_lock = threading.Lock()
         self._event_executor = ThreadPoolExecutor(
             max_workers=1,
@@ -109,6 +117,10 @@ class ServerLibraryManager:
                 )
 
     def prepare_public_shell(self) -> Path:
+        if not self._staging_prepared:
+            shutil.rmtree(self.staging_dir, ignore_errors=True)
+            self.staging_dir.mkdir(parents=True, exist_ok=True)
+            self._staging_prepared = True
         self.public_dir.mkdir(parents=True, exist_ok=True)
         assets_dir = Path(__file__).with_name("assets")
         self._assets = AssetPublisher(
@@ -137,6 +149,8 @@ class ServerLibraryManager:
             failures = []
 
             for source in discovered:
+                if self._stop_event.is_set():
+                    break
                 existing = self.state_store.book_by_source(source)
                 try:
                     stat = source.stat()
@@ -165,7 +179,11 @@ class ServerLibraryManager:
 
                 try:
                     fingerprint = source_sha256(source)
+                    if self._stop_event.is_set():
+                        break
                     metadata = self._probe_metadata(source)
+                    if self._stop_event.is_set():
+                        break
                     record = self.state_store.resolve_book(
                         source,
                         None if existing else metadata.epub_identifier,
@@ -191,6 +209,14 @@ class ServerLibraryManager:
                     record.source_fingerprint == fingerprint
                     and self._cache_valid(record)
                 ):
+                    record = self.state_store.resolve_book(
+                        source,
+                        metadata.epub_identifier,
+                        fingerprint,
+                        metadata,
+                        source_size=stat.st_size,
+                        source_mtime_ns=stat.st_mtime_ns,
+                    )
                     reused_records.append(record)
                     continue
                 plans.append(
@@ -204,35 +230,39 @@ class ServerLibraryManager:
                     )
                 )
 
+            if self._stop_event.is_set():
+                return ReconcileSummary(
+                    converted=0,
+                    reused=len(reused_records),
+                    removed=removed,
+                    failures=tuple(failures),
+                    active_books=self._valid_active_records(),
+                )
+
             converted_records = []
+            self._refresh_public_shell()
+            self._write_catalog(self._valid_active_records(), failures)
             if plans:
-                with ThreadPoolExecutor(
-                    max_workers=min(self.max_workers, len(plans)),
-                    thread_name_prefix="epub_server_convert",
-                ) as executor:
-                    futures = {
-                        executor.submit(self._convert_plan, plan): plan
-                        for plan in plans
-                    }
-                    for future in as_completed(futures):
-                        plan = futures[future]
-                        try:
-                            converted_records.append(future.result())
-                        except Exception as error:
-                            kept = self._cache_valid(plan.record)
-                            if not kept:
-                                self.state_store.mark_missing(plan.record.book_id)
-                            failures.append(
-                                ConversionFailure(
-                                    plan.source,
-                                    plan.record.book_id,
-                                    str(error),
-                                    kept,
-                                )
+                for plan, converted, error in self._conversion_outcomes(plans):
+                    if error is None:
+                        converted_records.append(converted)
+                    elif not isinstance(error, _ConversionCancelled):
+                        kept = self._cache_valid(plan.record)
+                        if not kept:
+                            self.state_store.mark_missing(plan.record.book_id)
+                        failures.append(
+                            ConversionFailure(
+                                plan.source,
+                                plan.record.book_id,
+                                str(error),
+                                kept,
                             )
-                            self.reporter.detail(
-                                f"Failed to convert {plan.source}: {error}"
-                            )
+                        )
+                        self.reporter.detail(
+                            f"Failed to convert {plan.source}: {error}"
+                        )
+                    self._refresh_public_shell()
+                    self._write_catalog(self._valid_active_records(), failures)
 
             self._refresh_public_shell()
             active_records = self._valid_active_records()
@@ -254,6 +284,51 @@ class ServerLibraryManager:
             self._notify_callback(self.on_reconciled, summary)
             return summary
 
+    def _conversion_outcomes(self, plans):
+        pending = queue.Queue()
+        completed = queue.Queue()
+        for plan in plans:
+            pending.put(plan)
+
+        def worker():
+            while not self._stop_event.is_set():
+                try:
+                    plan = pending.get_nowait()
+                except queue.Empty:
+                    return
+                if self._stop_event.is_set():
+                    return
+                try:
+                    converted = self._convert_plan(plan)
+                except BaseException as error:
+                    completed.put((plan, None, error))
+                else:
+                    completed.put((plan, converted, None))
+
+        workers = [
+            threading.Thread(
+                target=worker,
+                name=f"epub_server_convert_{index}",
+                daemon=True,
+            )
+            for index in range(min(self.max_workers, len(plans)))
+        ]
+        for thread in workers:
+            thread.start()
+
+        remaining = len(plans)
+        while remaining and not self._stop_event.is_set():
+            try:
+                outcome = completed.get(timeout=0.05)
+            except queue.Empty:
+                continue
+            remaining -= 1
+            yield outcome
+
+        if not self._stop_event.is_set():
+            for thread in workers:
+                thread.join()
+
     def _notify_callback(self, callback, *args) -> None:
         if callback is None:
             return
@@ -265,6 +340,8 @@ class ServerLibraryManager:
     def _discover_sources(self) -> tuple[Path, ...]:
         discovered = set()
         for source in self.sources:
+            if self._stop_event.is_set():
+                break
             if source.is_file():
                 if source.suffix.lower() == ".epub":
                     discovered.add(source)
@@ -272,6 +349,8 @@ class ServerLibraryManager:
             if not source.is_dir():
                 continue
             for root, directories, files in os.walk(source, followlinks=False):
+                if self._stop_event.is_set():
+                    break
                 root_path = Path(root)
                 directories[:] = [
                     name
@@ -351,6 +430,8 @@ class ServerLibraryManager:
                 processor.cleanup()
 
     def _convert_plan(self, plan: _ConversionPlan) -> BookRecord:
+        if self._stop_event.is_set():
+            raise _ConversionCancelled("Server is stopping")
         self.staging_dir.mkdir(parents=True, exist_ok=True)
         job_root = Path(
             tempfile.mkdtemp(
@@ -369,39 +450,44 @@ class ServerLibraryManager:
         )
         try:
             converted: ConvertedBook = processor.convert()
+            if self._stop_event.is_set():
+                raise _ConversionCancelled("Server is stopping")
             if source_sha256(plan.source) != plan.fingerprint:
                 raise _StaleSourceError(
                     "source changed while conversion was in progress"
                 )
             self._validate_converted_book(converted)
-            destination = self.public_dir / "book" / plan.record.book_id
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            rollback = self.staging_dir / (
-                f".rollback-{plan.record.book_id}-{uuid.uuid4().hex}"
-            )
-            had_previous = destination.exists()
-            if had_previous:
-                os.replace(destination, rollback)
-            try:
-                os.replace(converted.output_dir, destination)
-                updated = self.state_store.update_book_version(
-                    plan.record.book_id,
-                    plan.fingerprint,
-                    converted.metadata,
-                    source_size=plan.source_size,
-                    source_mtime_ns=plan.source_mtime_ns,
-                    epub_identifier=converted.metadata.epub_identifier,
+            with self._commit_lock:
+                if self._stop_event.is_set():
+                    raise _ConversionCancelled("Server is stopping")
+                destination = self.public_dir / "book" / plan.record.book_id
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                rollback = self.staging_dir / (
+                    f".rollback-{plan.record.book_id}-{uuid.uuid4().hex}"
                 )
-            except Exception:
-                if destination.exists():
-                    shutil.rmtree(destination, ignore_errors=True)
-                if had_previous and rollback.exists():
-                    os.replace(rollback, destination)
-                raise
-            else:
-                if rollback.exists():
-                    shutil.rmtree(rollback, ignore_errors=True)
-                return updated
+                had_previous = destination.exists()
+                if had_previous:
+                    os.replace(destination, rollback)
+                try:
+                    os.replace(converted.output_dir, destination)
+                    updated = self.state_store.update_book_version(
+                        plan.record.book_id,
+                        plan.fingerprint,
+                        converted.metadata,
+                        source_size=plan.source_size,
+                        source_mtime_ns=plan.source_mtime_ns,
+                        epub_identifier=converted.metadata.epub_identifier,
+                    )
+                except Exception:
+                    if destination.exists():
+                        shutil.rmtree(destination, ignore_errors=True)
+                    if had_previous and rollback.exists():
+                        os.replace(rollback, destination)
+                    raise
+                else:
+                    if rollback.exists():
+                        shutil.rmtree(rollback, ignore_errors=True)
+                    return updated
         finally:
             cleanup = getattr(processor, "cleanup", None)
             if cleanup:
@@ -523,6 +609,8 @@ class ServerLibraryManager:
         os.replace(temporary_path, self.catalog_path)
 
     def queue_path(self, path: Path):
+        if self._stop_event.is_set():
+            return None
         canonical = Path(path).expanduser().resolve()
         with self._event_lock:
             self._queued_generations[canonical] = (
@@ -547,6 +635,8 @@ class ServerLibraryManager:
                     return
 
     def mark_deleted(self, path: Path) -> None:
+        if self._stop_event.is_set():
+            return
         record = self.state_store.book_by_source(Path(path))
         if record:
             self.state_store.mark_missing(record.book_id)
@@ -556,5 +646,13 @@ class ServerLibraryManager:
                 self._refresh_public_shell()
             self._write_catalog(self._valid_active_records(), ())
 
+    def request_stop(self) -> None:
+        self._stop_event.set()
+        with self._event_lock:
+            self._queued_generations.clear()
+        with self._commit_lock:
+            pass
+
     def shutdown(self) -> None:
-        self._event_executor.shutdown(wait=True)
+        self.request_stop()
+        self._event_executor.shutdown(wait=True, cancel_futures=True)

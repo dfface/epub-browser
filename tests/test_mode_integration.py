@@ -4,10 +4,14 @@ import json
 import shutil
 import sqlite3
 import tempfile
+import time
 import unittest
+import warnings
 import zipfile
 from pathlib import Path
 from unittest import mock
+
+from starlette.testclient import TestClient
 
 from epub_browser.cli import SSGConfig, parse_cli
 from epub_browser.migration import MigrationManager
@@ -88,9 +92,11 @@ class ModeIntegrationTests(unittest.TestCase):
             ]
         )
         with (
+            warnings.catch_warnings(),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
+            warnings.simplefilter("ignore", ResourceWarning)
             first_status = run_server(
                 legacy_config,
                 server_factory=_ReturningServer,
@@ -283,9 +289,16 @@ class ModeIntegrationTests(unittest.TestCase):
 class _ReturningServer:
     def __init__(self, config):
         self.config = config
+        self.started = True
 
     def run(self):
-        return None
+        client = TestClient(self.config.app)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if client.get("/api/health").json()["state"] in {"ready", "degraded"}:
+                return None
+            time.sleep(0.01)
+        raise RuntimeError("initial Server reconciliation did not finish")
 
 
 if __name__ == "__main__":

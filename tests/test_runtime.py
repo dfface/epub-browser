@@ -4,15 +4,18 @@ import io
 import os
 import tempfile
 import threading
+import time
 import unittest
+import zipfile
 from pathlib import Path
 
 from starlette.testclient import TestClient
 
 from epub_browser.cli import ServerConfig
+from epub_browser.processor import EPUBProcessor
 from epub_browser.runtime import RuntimeStatus, ServerLock, run_server
 from epub_browser.server import create_app
-from epub_browser.server_library import ReconcileSummary
+from epub_browser.server_library import ReconcileSummary, ServerLibraryManager
 from epub_browser.state import StateStore
 
 
@@ -59,6 +62,20 @@ class RuntimeStatusTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["code"], "not_ready")
+
+    def test_scanning_remains_available_after_base_shell_is_ready(self):
+        status = RuntimeStatus()
+        status.mark_scanning()
+        status.mark_available()
+        client = TestClient(create_app(self.public, self.store, status))
+
+        self.assertEqual(client.get("/api/ready").status_code, 200)
+        self.assertEqual(client.get("/api/ready").json()["state"], "scanning")
+        response = client.put(
+            "/api/reading-progress/book",
+            json={"chapter_index": 1},
+        )
+        self.assertEqual(response.status_code, 200)
 
 
 class ServerRuntimeTests(unittest.TestCase):
@@ -157,6 +174,56 @@ class ServerRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(stderr.getvalue(), "")
 
+    def test_keyboard_interrupt_does_not_wait_for_slow_initial_conversion(self):
+        source = self.sources / "slow.epub"
+        _write_runtime_epub(source)
+        _BlockingProcessor.reset()
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+        )
+
+        started_at = time.monotonic()
+        try:
+            status = run_server(
+                config,
+                server_factory=_InterruptWhenConversionStarts,
+                library_factory=_blocking_library_factory,
+            )
+            elapsed = time.monotonic() - started_at
+        finally:
+            _BlockingProcessor.release.set()
+            _BlockingProcessor.cleaned.wait(timeout=5)
+
+        self.assertEqual(status, 0)
+        self.assertLess(elapsed, 1.0)
+
+    def test_bind_failure_does_not_report_availability_or_open_browser(self):
+        opened = []
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=False,
+        )
+
+        with (
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            status = run_server(
+                config,
+                server_factory=_BindFailingServer,
+                browser_opener=opened.append,
+            )
+
+        self.assertEqual(status, 5)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(opened, [])
+        self.assertIn("failed to bind or start", stderr.getvalue())
+
     def test_ephemeral_shutdown_removes_only_created_temporary_root(self):
         ephemeral_root = self.root / "ephemeral-runtime"
         config = ServerConfig(
@@ -222,6 +289,7 @@ class _ReturningServer:
     def __init__(self, config):
         self.config = config
         self.should_exit = False
+        self.started = True
 
     def run(self):
         return None
@@ -230,6 +298,53 @@ class _ReturningServer:
 class _InterruptingServer(_ReturningServer):
     def run(self):
         raise KeyboardInterrupt()
+
+
+class _BindFailingServer(_ReturningServer):
+    def __init__(self, config):
+        super().__init__(config)
+        self.started = False
+
+    def run(self):
+        raise SystemExit(1)
+
+
+class _InterruptWhenConversionStarts(_ReturningServer):
+    def run(self):
+        if not _BlockingProcessor.started.wait(timeout=5):
+            raise RuntimeError("slow conversion did not start")
+        raise KeyboardInterrupt()
+
+
+class _BlockingProcessor(EPUBProcessor):
+    started = threading.Event()
+    release = threading.Event()
+    cleaned = threading.Event()
+
+    @classmethod
+    def reset(cls):
+        cls.started.clear()
+        cls.release.clear()
+        cls.cleaned.clear()
+
+    def convert(self):
+        self.started.set()
+        self.release.wait(timeout=2)
+        return super().convert()
+
+    def cleanup(self):
+        try:
+            super().cleanup()
+        finally:
+            self.cleaned.set()
+
+
+def _blocking_library_factory(**kwargs):
+    return ServerLibraryManager(
+        converter_factory=_BlockingProcessor,
+        max_workers=1,
+        **kwargs,
+    )
 
 
 class _BlockingLibrary:
@@ -278,6 +393,7 @@ class _InspectingServer:
     def __init__(self, config):
         self.config = config
         self.should_exit = False
+        self.started = True
 
     def run(self):
         self.assert_started()
@@ -292,6 +408,32 @@ class _InspectingServer:
     def assert_started():
         if not _BlockingLibrary.started.wait(timeout=5):
             raise RuntimeError("server started before reconciliation worker")
+
+
+def _write_runtime_epub(path):
+    container = """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>
+"""
+    package = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="book-id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="book-id">urn:test:runtime-slow</dc:identifier>
+    <dc:title>Slow Book</dc:title><dc:creator>Author</dc:creator><dc:language>en</dc:language>
+  </metadata>
+  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <spine><itemref idref="chapter"/></spine>
+</package>
+"""
+    chapter = """<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Slow</p></body></html>
+"""
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr("META-INF/container.xml", container)
+        archive.writestr("OEBPS/content.opf", package)
+        archive.writestr("OEBPS/chapter.xhtml", chapter)
 
 
 if __name__ == "__main__":

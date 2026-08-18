@@ -1,11 +1,15 @@
 import json
+import os
 import shutil
 import tempfile
+import threading
+import time
 import unittest
 import zipfile
 from pathlib import Path
 from unittest import mock
 
+from epub_browser.identity import source_sha256
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.server_library import ServerLibraryManager
@@ -47,6 +51,47 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(first.converted, 1)
         self.assertEqual(second.reused, 1)
         converter.assert_not_called()
+        manager.shutdown()
+
+    def test_metadata_only_stat_change_is_recorded_after_one_recheck(self):
+        manager = self._manager()
+        manager.reconcile()
+        stat = self.source.stat()
+        os.utime(
+            self.source,
+            ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000),
+        )
+
+        with (
+            mock.patch(
+                "epub_browser.server_library.source_sha256",
+                wraps=source_sha256,
+            ) as fingerprint,
+            mock.patch.object(
+                manager,
+                "_probe_metadata",
+                wraps=manager._probe_metadata,
+            ) as probe,
+        ):
+            manager.reconcile()
+            fingerprint.reset_mock()
+            probe.reset_mock()
+            manager.reconcile()
+
+        fingerprint.assert_not_called()
+        probe.assert_not_called()
+        manager.shutdown()
+
+    def test_prepare_public_shell_removes_abandoned_staging_jobs_once(self):
+        manager = self._manager()
+        abandoned = manager.staging_dir / "abandoned-job"
+        abandoned.mkdir(parents=True)
+        (abandoned / "partial.txt").write_text("partial", encoding="utf-8")
+
+        manager.prepare_public_shell()
+
+        self.assertFalse(abandoned.exists())
+        self.assertTrue(manager.staging_dir.is_dir())
         manager.shutdown()
 
     def test_generated_cache_bootstraps_server_mode(self):
@@ -147,6 +192,49 @@ class ServerLibraryManagerTests(unittest.TestCase):
         manager.reconcile()
 
         self.assertEqual(events, ["scanning", "ready", "scanning", "degraded"])
+        manager.shutdown()
+
+    def test_successful_books_are_published_while_other_conversions_continue(self):
+        slow_source = self.source_dir / "slow.epub"
+        self._write_epub(slow_source, "Slow")
+
+        class IncrementalProcessor(EPUBProcessor):
+            slow_started = threading.Event()
+            release_slow = threading.Event()
+
+            def convert(self):
+                if Path(self.epub_path).name == "slow.epub":
+                    self.slow_started.set()
+                    self.release_slow.wait(timeout=5)
+                return super().convert()
+
+        manager = self._manager(IncrementalProcessor)
+        result = []
+        reconcile_thread = threading.Thread(
+            target=lambda: result.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(IncrementalProcessor.slow_started.wait(timeout=2))
+            deadline = time.monotonic() + 2
+            published = []
+            while time.monotonic() < deadline:
+                metadata_path = manager.public_dir / "book-metadata.json"
+                if metadata_path.is_file():
+                    published = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    if published:
+                        break
+                time.sleep(0.02)
+
+            self.assertEqual(len(published), 1)
+            self.assertTrue(reconcile_thread.is_alive())
+        finally:
+            IncrementalProcessor.release_slow.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(len(result[0].active_books), 2)
         manager.shutdown()
 
     def test_delete_hides_book_but_preserves_data_and_restore_reuses_id(self):
