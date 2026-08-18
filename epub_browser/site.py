@@ -41,6 +41,30 @@ def _render_library_html(
         },
         asset_manifest=assets,
     )
+    server_progress_stylesheet = ""
+    server_progress_panel = ""
+    server_progress_script = ""
+    server_progress_start = ""
+    if deployment_mode == "server":
+        server_progress_stylesheet = '<link rel="stylesheet" href="/assets/library-progress.css">'
+        server_progress_panel = """
+    <section id="libraryProgress" class="library-progress" hidden aria-labelledby="libraryProgressTitle">
+      <div class="library-progress-heading">
+        <div>
+          <h2 id="libraryProgressTitle" data-progress-title></h2>
+          <p data-progress-summary aria-live="polite"></p>
+        </div>
+        <button type="button" data-progress-close aria-label="Close" data-i18n-aria-label="library.progress.close">×</button>
+      </div>
+      <div class="library-progress-track" data-progress-track><span data-progress-bar></span></div>
+      <p class="library-progress-latest" data-progress-latest></p>
+      <details data-progress-failures hidden>
+        <summary data-i18n="library.progress.failureDetails">Failure details</summary>
+        <ul data-progress-failure-list></ul>
+      </details>
+    </section>"""
+        server_progress_script = '<script src="/assets/library-progress.js" defer></script>'
+        server_progress_start = 'if (window.EpubLibraryProgress) window.EpubLibraryProgress.start(window);'
     library_html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,8 +86,9 @@ def _render_library_html(
 <link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
 <link rel="stylesheet" href="/assets/loading.css?v=15">
-<link rel="stylesheet" href="/assets/bookshelf.css">
-<link rel="stylesheet" href="/assets/annotation-hub.css">
+    <link rel="stylesheet" href="/assets/bookshelf.css">
+    <link rel="stylesheet" href="/assets/annotation-hub.css">
+{server_progress_stylesheet}
 <script>
 // 立即应用主题，避免闪现 —— Kindle 兼容版
 function isKindleDevice() {
@@ -166,6 +191,7 @@ if (isKindle) {
     </nav>
     </div>
     <div class="container">
+{server_progress_panel}
     <div class="controls" data-id="controls">
         <div class="search-container">
             <input type="text" class="search-box" placeholder="Search by book title, author, or tag..." data-i18n-placeholder="library.searchPlaceholder">
@@ -291,6 +317,7 @@ if (isKindle) {
     <script src="/assets/bookshelf.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/annotation-hub.js" defer></script>
+{server_progress_script}
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         var i18n = window.EpubBrowserI18n;
@@ -302,10 +329,15 @@ if (isKindle) {
             });
         }
         if (window.initScriptLibrary) window.initScriptLibrary();
+        {server_progress_start}
     });
     </script>
     </body>
 </html>"""
+    library_html = library_html.replace("{server_progress_stylesheet}", server_progress_stylesheet)
+    library_html = library_html.replace("{server_progress_panel}", server_progress_panel)
+    library_html = library_html.replace("{server_progress_script}", server_progress_script)
+    library_html = library_html.replace("{server_progress_start}", server_progress_start)
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)
     library_html = rewrite_root_urls(library_html, urls)
     library_html = library_html.replace(

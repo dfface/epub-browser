@@ -71,6 +71,19 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r"window\.EpubBrowserMode=(?:[\"'`])server(?:[\"'`])")
         self.assertIn('id=libraryBookCount', html)
         self.assertIn('id=libraryTagCount', html)
+        self.assertIn('id=libraryProgress', html)
+        self.assertIn('library-progress', html)
+        self.assertIn('window.EpubLibraryProgress.start(window)', html)
+
+    def test_static_library_shell_omits_server_progress_panel_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = AssetPublisher(Path("epub_browser/assets"), root).publish()
+            publish_library_shell(root, (), assets, SiteURLs())
+            html = (root / "index.html").read_text(encoding="utf-8")
+
+        self.assertNotIn('id=libraryProgress', html)
+        self.assertNotIn('library-progress', html)
 
     def test_publish_library_shell_atomically_replaces_both_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
