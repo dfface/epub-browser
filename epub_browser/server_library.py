@@ -94,6 +94,8 @@ class ServerLibraryManager:
         )
         self._queued_generations = {}
         self._event_future = None
+        self.on_reconcile_started = None
+        self.on_reconciled = None
         self._validate_source_boundaries()
 
     def _validate_source_boundaries(self) -> None:
@@ -118,6 +120,7 @@ class ServerLibraryManager:
         return self.public_dir
 
     def reconcile(self) -> ReconcileSummary:
+        self._notify_callback(self.on_reconcile_started)
         with self._reconcile_lock:
             discovered = self._discover_sources()
             discovered_set = {str(path) for path in discovered}
@@ -239,7 +242,7 @@ class ServerLibraryManager:
                     successful=not failures
                     and len(active_records) == len(discovered)
                 )
-            return ReconcileSummary(
+            summary = ReconcileSummary(
                 converted=len(converted_records),
                 reused=len(reused_records),
                 removed=removed,
@@ -248,6 +251,16 @@ class ServerLibraryManager:
                 ),
                 active_books=active_records,
             )
+            self._notify_callback(self.on_reconciled, summary)
+            return summary
+
+    def _notify_callback(self, callback, *args) -> None:
+        if callback is None:
+            return
+        try:
+            callback(*args)
+        except Exception as error:
+            self.reporter.detail(f"Server reconciliation callback failed: {error}")
 
     def _discover_sources(self) -> tuple[Path, ...]:
         discovered = set()

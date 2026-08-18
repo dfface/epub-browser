@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const { createRuntime, dictionaries } = require('../epub_browser/assets/i18n.js');
+const { createRuntime, dictionaries, publicPath } = require('../epub_browser/assets/i18n.js');
 
 function fakeRoot(language) {
   const values = {};
@@ -21,6 +21,17 @@ function fakeRoot(language) {
 test('detects Simplified Chinese regions and falls back unsupported locales to English', () => {
   assert.equal(createRuntime(fakeRoot('zh-SG'), dictionaries).init(), 'zh-CN');
   assert.equal(createRuntime(fakeRoot('fr-FR'), dictionaries).init(), 'en');
+});
+
+test('builds browser URLs from the generated base path', () => {
+  assert.equal(publicPath('/project/', '/book/demo/index.html'), '/project/book/demo/index.html');
+  assert.equal(publicPath('/project/', '/project/sw.js'), '/project/sw.js');
+  assert.equal(publicPath('/', '/sw.js'), '/sw.js');
+
+  const root = fakeRoot('en');
+  root.EpubBrowserBasePath = '/project/';
+  createRuntime(root, dictionaries);
+  assert.equal(root.EpubBrowserURL.publicPath('/assets/manifest.en.json'), '/project/assets/manifest.en.json');
 });
 
 test('persists an explicit locale and interpolates text parameters', () => {
@@ -158,6 +169,7 @@ test('translates explicit DOM attributes and maintains one localized manifest li
     appended: []
   };
   const root = fakeRoot('zh-CN');
+  root.EpubBrowserBasePath = '/reader/';
   root.document = {
     documentElement: { lang: '' },
     head,
@@ -175,12 +187,12 @@ test('translates explicit DOM attributes and maintains one localized manifest li
   assert.equal(root.document.documentElement.lang, 'zh-CN');
   assert.equal(head.appended.length, 1);
   assert.equal(head.appended[0].id, 'epubBrowserManifest');
-  assert.equal(head.appended[0].href, '/assets/manifest.zh-CN.json');
+  assert.equal(head.appended[0].href, '/reader/assets/manifest.zh-CN.json');
   i18n.setLocale('en');
   assert.equal(node.textContent, 'Version 1.11.1');
   assert.equal(node.attributes.title, 'Version 1.11.1');
   assert.equal(head.appended.length, 1);
-  assert.equal(head.appended[0].href, '/assets/manifest.en.json');
+  assert.equal(head.appended[0].href, '/reader/assets/manifest.en.json');
 });
 
 test('uses empty parameters when a DOM translation node has invalid parameter JSON', () => {

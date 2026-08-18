@@ -83,6 +83,7 @@ The Server prints only its URL during a normal run. Operational details are sile
 
 ```text
 <server-dir>/
+├── .server.lock                 # reusable process-lock metadata
 ├── data/
 │   ├── epub-browser.db          # durable books, annotations, bookshelf sync, progress
 │   ├── migration-state.json     # restart-safe v2 migration state
@@ -93,7 +94,7 @@ The Server prints only its URL during a normal run. Operational details are sile
     └── staging/                 # replaceable conversion work
 ```
 
-Only `data/` is authoritative. `cache/` can be deleted: the next start rebuilds it while retaining durable book IDs and user data. Public files are never written at the Server root in the v2 layout.
+Only `data/` is authoritative. `cache/` can be deleted: the next start rebuilds it while retaining durable book IDs and user data. `.server.lock` remains as harmless diagnostic metadata after shutdown; an operating-system lock, rather than its recorded PID, controls exclusivity. Public files are never written at the Server root in the v2 layout.
 
 The bookshelf continues to use browser-local state and the existing manual **Sync** action. Therefore an untouched Server database can legitimately have no bookshelf row until a user performs Sync. This behavior is unchanged in v2.
 

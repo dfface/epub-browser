@@ -72,6 +72,7 @@ class StateStore:
             connection.close()
 
     def _create_compatible_schema(self, connection) -> None:
+        self._migrate_historical_annotations(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS annotations (
@@ -159,6 +160,117 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_books_package_identity "
             "ON books(epub_identifier, source_fingerprint, active)"
+        )
+
+    def _migrate_historical_annotations(self, connection) -> None:
+        table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'annotations'"
+        ).fetchone()
+        if table is None:
+            return
+
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(annotations)").fetchall()
+        }
+        if {"start_meta", "end_meta"} <= columns:
+            return
+
+        legacy_position_columns = {
+            "start_xpath",
+            "end_xpath",
+            "start_offset",
+            "end_offset",
+        }
+        required_columns = {
+            "id",
+            "book_hash",
+            "chapter_index",
+            "text",
+            "note",
+            "color",
+            "created_at",
+            "updated_at",
+        }
+        if not legacy_position_columns <= columns or not required_columns <= columns:
+            raise RuntimeError(
+                "Unsupported historical annotations schema; expected either "
+                "start_meta/end_meta or XPath position columns"
+            )
+
+        temporary_table = "annotations_v2_migrating"
+        if connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (temporary_table,),
+        ).fetchone():
+            raise RuntimeError(
+                f"Temporary annotation migration table already exists: {temporary_table}"
+            )
+        connection.execute(
+            f"""
+            CREATE TABLE {temporary_table} (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL DEFAULT '',
+                book_hash TEXT NOT NULL,
+                chapter_index INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                note TEXT,
+                start_meta TEXT,
+                end_meta TEXT,
+                color TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        rows = connection.execute("SELECT * FROM annotations").fetchall()
+        for row in rows:
+            start_meta = self._legacy_position_meta(
+                row["start_xpath"],
+                row["start_offset"],
+            )
+            end_meta = self._legacy_position_meta(
+                row["end_xpath"],
+                row["end_offset"],
+            )
+            connection.execute(
+                f"""
+                INSERT INTO {temporary_table} (
+                    id, username, book_hash, chapter_index, text, note,
+                    start_meta, end_meta, color, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    row["username"] if "username" in columns else "",
+                    row["book_hash"],
+                    row["chapter_index"],
+                    row["text"],
+                    row["note"],
+                    start_meta,
+                    end_meta,
+                    row["color"],
+                    row["created_at"],
+                    row["updated_at"],
+                ),
+            )
+        connection.execute("DROP TABLE annotations")
+        connection.execute(
+            f"ALTER TABLE {temporary_table} RENAME TO annotations"
+        )
+
+    @staticmethod
+    def _legacy_position_meta(xpath, offset) -> Optional[str]:
+        if not xpath:
+            return None
+        return json.dumps(
+            {
+                "legacyXPath": xpath,
+                "legacyOffset": int(offset or 0),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
         )
 
     @staticmethod

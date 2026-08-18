@@ -330,14 +330,17 @@ class SSGPublisher:
                 if not (staging / self.urls.filesystem_relative(public_url)).is_file():
                     raise SSGBuildError(f"Book metadata target is missing: {public_url}")
 
-        forbidden_names = {
+        forbidden_root_names = {
             "epub-browser.db",
             "annotations.db",
             "migration-state.json",
             "catalog.json",
+            "data",
+            "cache",
         }
         for path in staging.rglob("*"):
-            if path.name in forbidden_names or "data" in path.relative_to(staging).parts:
+            relative = path.relative_to(staging)
+            if relative.parts and relative.parts[0] in forbidden_root_names:
                 raise SSGBuildError(f"Server state leaked into SSG snapshot: {path}")
 
         forbidden_text = (
@@ -409,7 +412,7 @@ def run_ssg(config: SSGConfig, reporter: Optional[Reporter] = None) -> int:
         active_config = replace(config, output_dir=temporary_output)
     try:
         output = SSGPublisher(active_config, reporter=active_reporter).build()
-    except SSGBuildError as error:
+    except (SSGBuildError, OSError) as error:
         active_reporter.error(str(error))
         return 4
     active_reporter.result(f"Files generated in: {output.resolve()}")

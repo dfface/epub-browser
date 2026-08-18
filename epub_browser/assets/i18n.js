@@ -635,11 +635,25 @@
     try { return decodeURIComponent(match[1]); } catch (error) { return match[1]; }
   }
 
+  function publicPath(basePath, path) {
+    var base = basePath || '/';
+    var value = path || '/';
+    if (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(value) || /^(?:data|mailto|tel):/i.test(value)) return value;
+    if (base.charAt(0) !== '/') base = '/' + base;
+    if (base.charAt(base.length - 1) !== '/') base += '/';
+    if (base !== '/' && value.indexOf(base) === 0) return value;
+    return base + value.replace(/^\/+/, '');
+  }
+
   function createRuntime(root, messages) {
     var locale = '';
     var initialized = false;
     var listeners = [];
     var pageMemoryLocale = '';
+    root.EpubBrowserURL = root.EpubBrowserURL || {};
+    root.EpubBrowserURL.publicPath = function(path) {
+      return publicPath(root.EpubBrowserBasePath || '/', path);
+    };
 
     function readStoredLocale() {
       var stored = '';
@@ -782,7 +796,7 @@
         link.rel = 'manifest';
         root.document.head.appendChild(link);
       }
-      if (link) link.href = '/assets/manifest.' + locale + '.json';
+      if (link) link.href = root.EpubBrowserURL.publicPath('/assets/manifest.' + locale + '.json');
     }
 
     function applyLocaleToDocument() {
@@ -837,5 +851,5 @@
     };
   }
 
-  return { createRuntime: createRuntime, dictionaries: dictionaries };
+  return { createRuntime: createRuntime, dictionaries: dictionaries, publicPath: publicPath };
 });

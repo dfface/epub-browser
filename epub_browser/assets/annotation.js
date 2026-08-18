@@ -1439,6 +1439,31 @@
             return null;
         },
 
+        resolveLegacyPointMeta: function(meta, chapterRoot) {
+            if (!meta || !meta.legacyXPath || !chapterRoot || !document.evaluate) return null;
+            try {
+                var expression = meta.legacyXPath.charAt(0) === '/'
+                    ? '.' + meta.legacyXPath
+                    : meta.legacyXPath;
+                var result = document.evaluate(
+                    expression,
+                    chapterRoot,
+                    null,
+                    global.XPathResult ? global.XPathResult.FIRST_ORDERED_NODE_TYPE : 9,
+                    null
+                );
+                var node = result && result.singleNodeValue;
+                if (!node) return null;
+                return this.getTextPointMeta(
+                    node,
+                    Math.max(0, Number(meta.legacyOffset) || 0),
+                    chapterRoot
+                );
+            } catch (error) {
+                return null;
+            }
+        },
+
         findTextAnchor: function(annotation, chapterRoot) {
             if (!annotation.text || !chapterRoot) return null;
             var walker = document.createTreeWalker(chapterRoot, 4, null, false);
@@ -1532,11 +1557,29 @@
             var positioning = global.EpubAnnotationPosition;
             var startMeta = annotation.startMeta;
             var endMeta = annotation.endMeta;
+            var migratedLegacyPosition = false;
+            var legacyStartMeta = this.resolveLegacyPointMeta(startMeta, preferredSection);
+            var legacyEndMeta = this.resolveLegacyPointMeta(endMeta, preferredSection);
+            if (legacyStartMeta && legacyEndMeta) {
+                startMeta = annotation.startMeta = legacyStartMeta;
+                endMeta = annotation.endMeta = legacyEndMeta;
+                migratedLegacyPosition = true;
+            }
             if (isContinuous && positioning) {
                 startMeta = positioning.toRootMeta(annotation.startMeta, root, preferredSection);
                 endMeta = positioning.toRootMeta(annotation.endMeta, root, preferredSection);
             }
-            if (this.renderWithMetas(annotation, startMeta, endMeta, preferredSection)) return true;
+            if (this.renderWithMetas(annotation, startMeta, endMeta, preferredSection)) {
+                if (migratedLegacyPosition) {
+                    this.repairAnnotationPosition(
+                        annotation,
+                        isContinuous ? this.getChapterIndexFromSection(preferredSection) : currentChapterIndex,
+                        annotation.startMeta,
+                        annotation.endMeta
+                    );
+                }
+                return true;
+            }
 
             // Older continuous-reading annotations used full-root indices. Try
             // those once before falling back to text-based re-anchoring.
@@ -2385,6 +2428,13 @@
     // 导出模块
     global.AnnotationModule = AnnotationModule;
     global.AnnotationStorage = AnnotationStorage;
-    if (global.__EPUB_BROWSER_TESTING__) global.AnnotationBackendStorage = BackendStorage;
+    if (global.__EPUB_BROWSER_TESTING__) {
+        global.AnnotationBackendStorage = BackendStorage;
+        global.AnnotationLegacyPosition = {
+            resolve: function(meta, chapterRoot) {
+                return HighlightInteraction.resolveLegacyPointMeta(meta, chapterRoot);
+            }
+        };
+    }
     
 })(window);

@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 import shutil
@@ -10,6 +11,16 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import uvicorn
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on Windows
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - exercised on POSIX
+    msvcrt = None
 
 from .cli import ServerConfig
 from .migration import MigrationError, MigrationManager
@@ -63,84 +74,108 @@ class ServerLockError(RuntimeError):
     pass
 
 
+class _DescriptorLockUnavailable(RuntimeError):
+    pass
+
+
 class ServerLock:
     def __init__(self, server_dir: Path):
         self.server_dir = Path(server_dir)
         self.path = self.server_dir / ".server.lock"
         self.token = uuid.uuid4().hex
         self._acquired = False
+        self._descriptor = None
 
     def acquire(self) -> None:
         self.server_dir.mkdir(parents=True, exist_ok=True)
-        for _ in range(2):
-            try:
-                descriptor = os.open(
-                    self.path,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                    0o600,
-                )
-            except FileExistsError:
-                payload = self._read_existing()
-                pid = payload.get("pid")
-                if not isinstance(pid, int) or pid <= 0:
-                    raise ServerLockError(
-                        f"Server lock is unreadable; inspect and remove it if stale: {self.path}"
-                    )
-                if self._pid_is_alive(pid):
-                    raise ServerLockError(
-                        f"Server directory is already in use by PID {pid}: {self.server_dir}"
-                    )
-                try:
-                    self.path.unlink()
-                except FileNotFoundError:
-                    pass
-                continue
-            try:
-                payload = json.dumps(
-                    {
-                        "pid": os.getpid(),
-                        "started_at": time.time(),
-                        "token": self.token,
-                    },
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ).encode("utf-8")
-                os.write(descriptor, payload)
-                os.fsync(descriptor)
-            finally:
-                os.close(descriptor)
-            self._acquired = True
-            return
-        raise ServerLockError(f"Unable to acquire Server lock: {self.path}")
+        flags = os.O_RDWR | os.O_CREAT
+        flags |= getattr(os, "O_CLOEXEC", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(self.path, flags, 0o600)
+        try:
+            self._lock_descriptor(descriptor)
+        except _DescriptorLockUnavailable:
+            os.close(descriptor)
+            payload = self._read_existing_safely()
+            pid = payload.get("pid")
+            owner = f" by PID {pid}" if isinstance(pid, int) and pid > 0 else ""
+            raise ServerLockError(
+                f"Server directory is already in use{owner}: {self.server_dir}"
+            ) from None
+
+        try:
+            os.fchmod(descriptor, 0o600)
+            payload = json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "started_at": time.time(),
+                    "token": self.token,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            os.ftruncate(descriptor, 0)
+            offset = 0
+            while offset < len(payload):
+                offset += os.write(descriptor, payload[offset:])
+            os.fsync(descriptor)
+        except Exception:
+            self._unlock_descriptor(descriptor)
+            os.close(descriptor)
+            raise
+        self._descriptor = descriptor
+        self._acquired = True
 
     def release(self) -> None:
         if not self._acquired:
             return
+        descriptor = self._descriptor
         try:
-            payload = self._read_existing()
-            if payload.get("token") == self.token:
-                self.path.unlink(missing_ok=True)
+            if descriptor is not None:
+                self._unlock_descriptor(descriptor)
         finally:
+            if descriptor is not None:
+                os.close(descriptor)
+            self._descriptor = None
             self._acquired = False
 
-    def _read_existing(self):
+    def _read_existing_safely(self):
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise ServerLockError(f"Unable to read Server lock {self.path}: {error}") from error
+        except (OSError, json.JSONDecodeError):
+            return {}
         if not isinstance(payload, dict):
-            raise ServerLockError(f"Invalid Server lock payload: {self.path}")
+            return {}
         return payload
 
     @staticmethod
-    def _pid_is_alive(pid: int) -> bool:
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        return True
+    def _lock_descriptor(descriptor: int) -> None:
+        if fcntl is not None:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as error:
+                raise _DescriptorLockUnavailable() from error
+            return
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        if os.fstat(descriptor).st_size == 0:
+            os.write(descriptor, b"\0")
+            os.fsync(descriptor)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        try:  # pragma: no cover - exercised on Windows
+            msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        except OSError as error:  # pragma: no cover - exercised on Windows
+            if error.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                raise _DescriptorLockUnavailable() from error
+            raise
+
+    @staticmethod
+    def _unlock_descriptor(descriptor: int) -> None:
+        if fcntl is not None:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            return
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)  # pragma: no cover
 
 
 def run_server(
@@ -157,7 +192,9 @@ def run_server(
     status = RuntimeStatus()
     manager = None
     watcher_thread = None
+    initial_reconcile_thread = None
     watcher_stop = threading.Event()
+    initial_reconcile_done = threading.Event()
     lock = None
     ephemeral_root = None
     created_ephemeral_root = False
@@ -214,24 +251,55 @@ def run_server(
             migration_manager=migration_manager,
             reporter=active_reporter,
         )
+        manager.on_reconcile_started = status.mark_scanning
+        manager.on_reconciled = lambda summary: _update_runtime_status(
+            status,
+            summary,
+        )
         manager.prepare_public_shell()
-        summary: ReconcileSummary = manager.reconcile()
-        if summary.degraded:
-            status.mark_degraded(summary.failed, 0)
-        else:
-            status.mark_ready()
-            if migration_manager and initial_layout_phase == "retired":
-                migration_manager.finish_legacy_public_retirement()
+
+        def initial_reconcile():
+            try:
+                summary: ReconcileSummary = manager.reconcile()
+                if (
+                    not summary.degraded
+                    and migration_manager
+                    and initial_layout_phase == "retired"
+                ):
+                    migration_manager.finish_legacy_public_retirement()
+            except Exception as error:
+                status.mark_degraded(1, 0)
+                active_reporter.error(
+                    f"Initial Server library reconciliation failed: {error}"
+                )
+            finally:
+                initial_reconcile_done.set()
+
+        initial_reconcile_thread = threading.Thread(
+            target=initial_reconcile,
+            name="EPUBInitialReconcile",
+            daemon=True,
+        )
+        initial_reconcile_thread.start()
 
         if config.watch:
-            watcher = watcher_factory(
-                config.sources,
-                manager,
-                reporter=active_reporter,
-            )
+            def watch_after_initial_reconcile():
+                initial_reconcile_done.wait()
+                if watcher_stop.is_set():
+                    return
+                try:
+                    watcher = watcher_factory(
+                        config.sources,
+                        manager,
+                        reporter=active_reporter,
+                    )
+                    watcher.watch(watcher_stop)
+                except Exception as error:
+                    status.mark_degraded(1, 0)
+                    active_reporter.error(f"Server source watcher failed: {error}")
+
             watcher_thread = threading.Thread(
-                target=watcher.watch,
-                args=(watcher_stop,),
+                target=watch_after_initial_reconcile,
                 name="EPUBWatcher",
                 daemon=True,
             )
@@ -284,6 +352,8 @@ def run_server(
         return 5
     finally:
         watcher_stop.set()
+        if initial_reconcile_thread is not None:
+            initial_reconcile_thread.join()
         if watcher_thread is not None:
             watcher_thread.join(timeout=5)
         if manager is not None:
@@ -304,6 +374,16 @@ def _migration_layout_phase(state_path: Path) -> Optional[str]:
     except (OSError, json.JSONDecodeError):
         return None
     return payload.get("layout_phase") if isinstance(payload, dict) else None
+
+
+def _update_runtime_status(
+    status: RuntimeStatus,
+    summary: ReconcileSummary,
+) -> None:
+    if summary.degraded:
+        status.mark_degraded(summary.failed, 0)
+    else:
+        status.mark_ready()
 
 
 def _local_url(host: str, port: int) -> str:

@@ -1,5 +1,6 @@
 import os
 import ntpath
+import posixpath
 import zipfile
 import tempfile
 import shutil
@@ -87,6 +88,85 @@ class EPUBProcessor:
         except Exception:
             pass
 
+    def _resolve_internal_path(self, reference, base=""):
+        """Resolve an EPUB URI path without allowing it outside extraction."""
+        if not isinstance(reference, str) or not reference.strip():
+            raise ValueError("Unsafe EPUB internal path: empty reference")
+
+        raw_reference = reference.strip()
+        parsed = urllib.parse.urlsplit(raw_reference)
+        if parsed.scheme or parsed.netloc:
+            raise ValueError(f"Unsafe EPUB internal path: {reference}")
+
+        decoded_path = urllib.parse.unquote(parsed.path)
+        probe = parsed.path
+        for _ in range(4):
+            if "\x00" in probe or "\\" in probe:
+                raise ValueError(f"Unsafe EPUB internal path: {reference}")
+            drive, _ = ntpath.splitdrive(probe)
+            candidate = PurePosixPath(probe)
+            if drive or candidate.is_absolute():
+                raise ValueError(f"Unsafe EPUB internal path: {reference}")
+            decoded_probe = urllib.parse.unquote(probe)
+            if decoded_probe == probe:
+                break
+            decoded_candidate = PurePosixPath(decoded_probe)
+            decoded_drive, _ = ntpath.splitdrive(decoded_probe)
+            if (
+                "\x00" in decoded_probe
+                or "\\" in decoded_probe
+                or decoded_drive
+                or decoded_candidate.is_absolute()
+                or ".." in decoded_candidate.parts
+            ):
+                raise ValueError(f"Unsafe EPUB internal path: {reference}")
+            probe = decoded_probe
+
+        combined = posixpath.normpath(posixpath.join(base or "", decoded_path))
+        drive, _ = ntpath.splitdrive(combined)
+        relative = PurePosixPath(combined)
+        if (
+            not combined
+            or combined == "."
+            or drive
+            or relative.is_absolute()
+            or ".." in relative.parts
+        ):
+            raise ValueError(f"Unsafe EPUB internal path: {reference}")
+
+        extract_root = Path(self.extract_dir).resolve()
+        target = extract_root.joinpath(*relative.parts).resolve()
+        try:
+            target.relative_to(extract_root)
+        except ValueError as error:
+            raise ValueError(f"Unsafe EPUB internal path: {reference}") from error
+        return relative.as_posix()
+
+    def _internal_file(self, reference, base=""):
+        relative = self._resolve_internal_path(reference, base)
+        return Path(self.extract_dir).resolve().joinpath(
+            *PurePosixPath(relative).parts
+        ).resolve()
+
+    @staticmethod
+    def _is_external_reference(reference):
+        parsed = urllib.parse.urlsplit(reference)
+        return (
+            parsed.scheme.lower() in {"http", "https", "data", "mailto", "tel"}
+            or bool(parsed.netloc)
+            or reference.startswith("#")
+        )
+
+    def _resource_reference(self, reference, base):
+        parsed = urllib.parse.urlsplit(reference)
+        relative = self._resolve_internal_path(reference, base)
+        result = f"{self.resources_base}/{relative}"
+        if parsed.query:
+            result += "?" + parsed.query
+        if parsed.fragment:
+            result += "#" + parsed.fragment
+        return result
+
     def generate_hash(self):
         """生成书籍 Hash
         一般来说，用路径受到用户传参影响，每次都是绝对路径则都是一样；
@@ -131,16 +211,23 @@ class EPUBProcessor:
                 extract_root.mkdir(parents=True, exist_ok=True)
                 for member in zip_ref.infolist():
                     member_name = member.filename.replace("\\", "/")
-                    drive, _ = ntpath.splitdrive(member_name)
                     member_path = PurePosixPath(member_name)
-                    if (
-                        drive
-                        or member_path.is_absolute()
-                        or ".." in member_path.parts
+                    for candidate_name in (
+                        member_name,
+                        urllib.parse.unquote(member_name),
                     ):
-                        raise ValueError(
-                            f"Unsafe EPUB archive path: {member.filename}"
-                        )
+                        drive, _ = ntpath.splitdrive(candidate_name)
+                        candidate_path = PurePosixPath(candidate_name)
+                        if (
+                            "\x00" in candidate_name
+                            or "\\" in candidate_name
+                            or drive
+                            or candidate_path.is_absolute()
+                            or ".." in candidate_path.parts
+                        ):
+                            raise ValueError(
+                                f"Unsafe EPUB archive path: {member.filename}"
+                            )
                     destination = extract_root.joinpath(*member_path.parts).resolve()
                     try:
                         destination.relative_to(extract_root)
@@ -188,7 +275,9 @@ class EPUBProcessor:
             ns = {'ns': 'urn:oasis:names:tc:opendocument:xmlns:container'}
             rootfile = root.find('.//ns:rootfile', ns)
             if rootfile is not None:
-                return rootfile.get('full-path')
+                return self._resolve_internal_path(rootfile.get('full-path'))
+        except ValueError:
+            raise
         except Exception as e:
             self.reporter.detail(f"Failed to parse container.xml: {e}")
             
@@ -249,11 +338,11 @@ class EPUBProcessor:
 
     def find_ncx_file(self, opf_path, manifest):
         """查找NCX文件路径"""
-        opf_dir = os.path.dirname(opf_path)
+        opf_dir = posixpath.dirname(opf_path)
         
         # 首先查找OPF中明确指定的toc
         try:
-            tree = ET.parse(os.path.join(self.extract_dir, opf_path))
+            tree = ET.parse(self._internal_file(opf_path))
             root = tree.getroot()
             ns = {'opf': 'http://www.idpf.org/2007/opf'}
             
@@ -261,32 +350,34 @@ class EPUBProcessor:
             if spine is not None:
                 toc_id = spine.get('toc')
                 if toc_id and toc_id in manifest:
-                    ncx_path = os.path.join(opf_dir, manifest[toc_id]['href'])
-                    if os.path.exists(os.path.join(self.extract_dir, ncx_path)):
+                    ncx_path = manifest[toc_id]['full_path']
+                    if ncx_path and self._internal_file(ncx_path).is_file():
                         return ncx_path
+        except ValueError:
+            raise
         except Exception as e:
             self.reporter.detail(f"Failed to find toc attribute: {e}")
         
         # 如果没有明确指定，查找media-type为application/x-dtbncx+xml的文件
         for item_id, item in manifest.items():
             if item['media_type'] == 'application/x-dtbncx+xml':
-                ncx_path = os.path.join(opf_dir, item['href'])
-                if os.path.exists(os.path.join(self.extract_dir, ncx_path)):
+                ncx_path = item['full_path']
+                if ncx_path and self._internal_file(ncx_path).is_file():
                     return ncx_path
         
         # 最后，尝试查找常见的NCX文件名
         common_ncx_names = ['toc.ncx', 'nav.ncx', 'ncx.ncx']
         for name in common_ncx_names:
-            ncx_path = os.path.join(opf_dir, name)
-            if os.path.exists(os.path.join(self.extract_dir, ncx_path)):
+            ncx_path = self._resolve_internal_path(name, opf_dir)
+            if self._internal_file(ncx_path).is_file():
                 return ncx_path
         
         return None
     
     def parse_ncx(self, ncx_path):
         """解析NCX文件获取目录结构"""
-        ncx_full_path = os.path.join(self.extract_dir, ncx_path)
-        if not os.path.exists(ncx_full_path):
+        ncx_full_path = self._internal_file(ncx_path)
+        if not ncx_full_path.is_file():
             self.reporter.detail(f"NCX file not found: {ncx_full_path}")
             return []
             
@@ -319,16 +410,14 @@ class EPUBProcessor:
                     title = nav_label.text
                     src = content.get('src')
                     anchor = None
-                    
-                    # 处理可能的锚点
-                    if '#' in src:
-                        anchor = src.split('#')[1]
-                        src = src.split('#')[0]
+
+                    if src:
+                        src, anchor = urllib.parse.urldefrag(src)
                     
                     if title and src:
                         # 将src路径转换为相对于EPUB根目录的完整路径
-                        ncx_dir = os.path.dirname(ncx_path)
-                        full_src = os.path.normpath(os.path.join(ncx_dir, src))
+                        ncx_dir = posixpath.dirname(ncx_path)
+                        full_src = self._resolve_internal_path(src, ncx_dir)
                         toc_item = {
                             'title': title,
                             'src': full_src,
@@ -337,7 +426,7 @@ class EPUBProcessor:
                         # 处理可能的锚点
                         if anchor:
                             toc_item['anchor'] = anchor
-                        toc_item['old_file_name'] = os.path.basename(src) # 老旧的文件名，只取名字
+                        toc_item['old_file_name'] = posixpath.basename(src) # 老旧的文件名，只取名字
                         toc.append(toc_item)
                 
                 # 处理子navPoint
@@ -353,14 +442,16 @@ class EPUBProcessor:
             # print(f"Parsed NCX table of contents items: {[(t['title'], t['src']) for t in toc]}")
             return toc
             
+        except ValueError:
+            raise
         except Exception as e:
             self.reporter.detail(f"Failed to parse NCX file: {e}")
             return []
     
     def parse_opf(self, opf_path):
         """解析OPF文件获取书籍信息和章节列表"""
-        opf_full_path = os.path.join(self.extract_dir, opf_path)
-        if not os.path.exists(opf_full_path):
+        opf_full_path = self._internal_file(opf_path)
+        if not opf_full_path.is_file():
             self.reporter.detail(f"OPF file not found: {opf_full_path}")
             return False
             
@@ -399,12 +490,14 @@ class EPUBProcessor:
                 
             # 获取manifest（所有资源）
             manifest = {}
-            opf_dir = os.path.dirname(opf_path)
+            opf_dir = posixpath.dirname(opf_path)
             # 获取封面
             cover_info = self.find_cover_info(tree, ns)
             if cover_info:
                 href = cover_info["href"]
-                cover_info["full_path"] = os.path.normpath(os.path.join(opf_dir, href)) if href else None
+                cover_info["full_path"] = (
+                    self._resolve_internal_path(href, opf_dir) if href else None
+                )
             self.cover_info = cover_info
             # 获取其他资源 xhtml、font、css 等
             for item in root.findall('.//opf:item', ns):
@@ -412,7 +505,9 @@ class EPUBProcessor:
                 href = item.get('href')
                 media_type = item.get('media-type', '')
                 # 构建相对于EPUB根目录的完整路径
-                full_path = os.path.normpath(os.path.join(opf_dir, href)) if href else None
+                full_path = (
+                    self._resolve_internal_path(href, opf_dir) if href else None
+                )
                 manifest[item_id] = {
                     'href': href,
                     'media_type': media_type,
@@ -447,6 +542,8 @@ class EPUBProcessor:
             # print(f"Chapter list: {[(c['title'], c['path']) for c in self.chapters]}")
             return True
             
+        except ValueError:
+            raise
         except Exception as e:
             self.reporter.detail(f"Failed to parse OPF file: {e}")
             return False
@@ -459,16 +556,16 @@ class EPUBProcessor:
                 return toc_item['title']
         
         # 如果直接匹配失败，尝试基于文件名匹配
-        chapter_filename = os.path.basename(chapter_path)
+        chapter_filename = posixpath.basename(chapter_path)
         for toc_item in self.toc:
-            toc_filename = os.path.basename(toc_item['src'])
+            toc_filename = posixpath.basename(toc_item['src'])
             if toc_filename == chapter_filename:
                 return toc_item['title']
         
         # 尝试规范化路径后再匹配
-        normalized_chapter_path = os.path.normpath(chapter_path)
+        normalized_chapter_path = posixpath.normpath(chapter_path)
         for toc_item in self.toc:
-            normalized_toc_path = os.path.normpath(toc_item['src'])
+            normalized_toc_path = posixpath.normpath(toc_item['src'])
             if normalized_toc_path == normalized_chapter_path:
                 return toc_item['title']
         
@@ -824,7 +921,7 @@ document.addEventListener('DOMContentLoaded', function() {
             normalized_path = chapter['path'].lstrip('./').lstrip('/')
             chapter_index_map[normalized_path] = i
             # 文件名匹配
-            chapter_filename = os.path.basename(chapter['path'])
+            chapter_filename = posixpath.basename(chapter['path'])
             chapter_filename_map[chapter_filename] = i
         return chapter_index_map, chapter_filename_map
     
@@ -851,11 +948,11 @@ document.addEventListener('DOMContentLoaded', function() {
         elif urllib.parse.unquote(toc_src).lstrip('./').lstrip('/') in chapter_index_map:
             return chapter_index_map[urllib.parse.unquote(toc_src).lstrip('./').lstrip('/')]
         # 4. 文件名匹配
-        elif os.path.basename(toc_src) in chapter_filename_map:
-            return chapter_filename_map[os.path.basename(toc_src)]
+        elif posixpath.basename(toc_src) in chapter_filename_map:
+            return chapter_filename_map[posixpath.basename(toc_src)]
         # 5. URL解码后的文件名匹配
-        elif os.path.basename(urllib.parse.unquote(toc_src)) in chapter_filename_map:
-            return chapter_filename_map[os.path.basename(urllib.parse.unquote(toc_src))]
+        elif posixpath.basename(urllib.parse.unquote(toc_src)) in chapter_filename_map:
+            return chapter_filename_map[posixpath.basename(urllib.parse.unquote(toc_src))]
         return None
     
     def create_toc_json(self):
@@ -926,16 +1023,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 self.reporter.detail(
                     f"Failed to process chapter {chapter['path']}: {e}"
                 )
+                raise
         
         # 创建并启动线程
         with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程
             futures = []
             for i, chapter in enumerate(self.chapters):
-                chapter_path = os.path.join(self.extract_dir, chapter['path'])
-                if os.path.exists(chapter_path):
+                chapter_path = self._internal_file(chapter['path'])
+                if chapter_path.is_file():
                     # 使用线程池提交任务
                     future = executor.submit(create_chapter_page, chapter_path, chapter, i)
                     futures.append(future)
+            for future in futures:
+                future.result()
                 
     
     def process_html_content(self, content, chapter_path):
@@ -999,16 +1099,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 href_match = re.search(r'href=["\']([^"\']+)["\']', link)
                 if href_match:
                     href = href_match.group(1)
-                    # 如果已经是绝对路径，则不处理
-                    if href.startswith(('http://', 'https://', '/')):
+                    # 外部网络资源不复制到 EPUB 资源目录。
+                    if self._is_external_reference(href):
                         style_links.append(link)
                     else:
-                        # 计算相对于EPUB根目录的完整路径
-                        chapter_dir = os.path.dirname(chapter_path)
-                        full_href = os.path.normpath(os.path.join(chapter_dir, href))
-                        
-                        # 转换为web资源路径
-                        web_href = f"{self.resources_base}/{full_href}"
+                        chapter_dir = posixpath.dirname(chapter_path)
+                        web_href = self._resource_reference(href, chapter_dir)
                         
                         # 替换href属性
                         fixed_link = link.replace(f'href="{href}"', f'href="{web_href}"')
@@ -1048,15 +1144,11 @@ document.addEventListener('DOMContentLoaded', function() {
             src = match.group(1)
 
             # 如果已经是绝对路径或数据URI，则不处理
-            if src.startswith(('http://', 'https://', 'data:', '/')):
+            if self._is_external_reference(src):
                 return match.group(0)
-            
-            # 计算相对于EPUB根目录的完整路径
-            chapter_dir = os.path.dirname(chapter_path)
-            full_src = os.path.normpath(os.path.join(chapter_dir, src))
-            
-            # 转换为web资源路径
-            web_src = f"{self.resources_base}/{full_src}"
+
+            chapter_dir = posixpath.dirname(chapter_path)
+            web_src = self._resource_reference(src, chapter_dir)
             return match.group(0).replace(f'"{src}"', f'"{web_src}"')
 
         replaced_content = re.sub(img_pattern1, replace_img_link, content)
@@ -1071,9 +1163,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if 'old_file_name' in toc_item and 'new_file_name' in toc_item:
                 old_file2new_file[toc_item['old_file_name']] = toc_item['new_file_name']
 
-        if not old_file2new_file:
-            return content
-        
         # 匹配a标签的href属性
         a_pattern = r'<a[^>]+href="([^"]+)"[^>]*>'
 
@@ -1081,8 +1170,11 @@ document.addEventListener('DOMContentLoaded', function() {
             src = match.group(1)
 
             # 如果已经是绝对路径或数据URI，则不处理
-            if src.startswith(('http://', 'https://', 'data:', '/')):
+            if self._is_external_reference(src):
                 return match.group(0)
+
+            chapter_dir = posixpath.dirname(chapter_path)
+            self._resolve_internal_path(src, chapter_dir)
             
             # 如果有 old_file_name 则替换
             new_src = None
@@ -1116,15 +1208,11 @@ document.addEventListener('DOMContentLoaded', function() {
             def replace_other_link(match):
                 url = match.group(1)
                 # 如果已经是绝对路径或数据URI，则不处理
-                if url.startswith(('http://', 'https://', 'data:', '/')):
+                if self._is_external_reference(url):
                     return match.group(0)
-                
-                # 计算相对于EPUB根目录的完整路径
-                chapter_dir = os.path.dirname(chapter_path)
-                full_url = os.path.normpath(os.path.join(chapter_dir, url))
-                
-                # 转换为web资源路径
-                web_url = f"{self.resources_base}/{full_url}"
+
+                chapter_dir = posixpath.dirname(chapter_path)
+                web_url = self._resource_reference(url, chapter_dir)
                 return match.group(0).replace(url, web_url)
             
             content = re.sub(pattern, replace_other_link, content)
@@ -1651,12 +1739,12 @@ document.addEventListener('DOMContentLoaded', function() {
     def _inject_deployment_mode(self, page_html):
         marker = '<script>window.EpubBrowserI18n.init();</script>'
         bootstrap = (
-            marker
-            + '<script>window.EpubBrowserBasePath='
+            '<script>window.EpubBrowserBasePath='
             + json.dumps(self.urls.base_path)
             + ';window.EpubBrowserMode='
             + json.dumps(self.deployment_mode)
             + '</script>'
+            + marker
         )
         return page_html.replace(marker, bootstrap, 1)
     

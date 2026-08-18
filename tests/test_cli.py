@@ -25,7 +25,9 @@ class NewCommandTests(unittest.TestCase):
         )
         self.assertEqual(config.base_path, "/reader/")
 
-        with self.assertRaises(ValueError):
+        with contextlib.redirect_stderr(io.StringIO()) as stderr, self.assertRaises(
+            SystemExit
+        ):
             parse_cli(
                 [
                     "ssg",
@@ -36,6 +38,7 @@ class NewCommandTests(unittest.TestCase):
                     "https://example.com/reader/",
                 ]
             )
+        self.assertIn("Base path must be a URL path", stderr.getvalue())
 
         self.assertEqual(
             config,
@@ -77,6 +80,16 @@ class NewCommandTests(unittest.TestCase):
             parse_cli(
                 ["server", "books", "--server-dir", "state", "--base-path", "/reader/"]
             )
+
+    def test_top_level_help_discovers_the_two_v2_modes(self):
+        with contextlib.redirect_stdout(io.StringIO()) as stdout, self.assertRaises(
+            SystemExit
+        ) as raised:
+            parse_cli(["--help"])
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("{ssg,server}", stdout.getvalue())
+        self.assertIn("static-site generator", stdout.getvalue())
 
 
 class LegacyCommandTests(unittest.TestCase):

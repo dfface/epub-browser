@@ -13,6 +13,10 @@
         return runtime && runtime.t ? runtime.t('annotations.' + key, params) : 'annotations.' + key;
     }
 
+    function publicPath(path) {
+        return root.EpubBrowserURL ? root.EpubBrowserURL.publicPath(path) : path;
+    }
+
     function annotationTime(annotation) {
         var value = annotation && (annotation.updated_at || annotation.created_at);
         var time = value ? Date.parse(value) : 0;
@@ -76,7 +80,7 @@
     }
 
     function annotationHref(annotation) {
-        return '/book/' + encodeURIComponent(annotation.book_hash) + '/chapter_' + Number(annotation.chapter_index) + '.html?annotation=' + encodeURIComponent(annotation.id);
+        return publicPath('/book/' + encodeURIComponent(annotation.book_hash) + '/chapter_' + Number(annotation.chapter_index) + '.html?annotation=' + encodeURIComponent(annotation.id));
     }
 
     function requestJson(url) {
@@ -210,7 +214,7 @@
             card.type = 'button'; card.addEventListener('click', function() { load(book.hash); });
             if (book.cover) {
                 var image = document.createElement('img');
-                image.src = '/book/' + encodeURIComponent(book.hash) + '/' + book.cover;
+                image.src = book.cover;
                 image.alt = ''; image.className = 'annotation-book-cover'; card.appendChild(image);
             } else card.appendChild(element('div', 'annotation-book-cover annotation-book-cover-fallback', tr('bookFallback')));
             var content = element('div', 'annotation-book-card-content');
@@ -265,12 +269,12 @@
             });
         }).then(function() {
             if (loadVersion !== modalState.loadVersion) return null;
-            return Promise.all([root.AnnotationStorage.getAll(), requestJson('/book-metadata.json')]);
+            return Promise.all([root.AnnotationStorage.getAll(), requestJson(publicPath('/book-metadata.json'))]);
         }).then(function(data) {
             if (!data || loadVersion !== modalState.loadVersion || modalState.bookHash !== (bookHash || '')) return;
             modalState.data = { annotations: data[0] || [], metadata: data[1] || [], toc: [] };
             if (!modalState.bookHash) { renderBookCards(aggregateBooks(modalState.data.annotations, modalState.data.metadata)); return; }
-            requestJson('/book/' + encodeURIComponent(modalState.bookHash) + '/toc.json').catch(function() { return []; }).then(function(toc) {
+            requestJson(publicPath('/book/' + encodeURIComponent(modalState.bookHash) + '/toc.json')).catch(function() { return []; }).then(function(toc) {
                 if (loadVersion === modalState.loadVersion && modalState.bookHash === bookHash) {
                     modalState.data.toc = toc || [];
                     renderCurrentView();

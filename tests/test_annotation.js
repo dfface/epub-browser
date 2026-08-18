@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function loadBackendStorage(response, mode = 'server') {
+function loadAnnotationWindow(response, mode = 'server', documentOverride) {
   function FakeXMLHttpRequest() {
     this.status = response.status;
     this.responseText = response.body;
@@ -21,7 +21,7 @@ function loadBackendStorage(response, mode = 'server') {
     EpubBrowserMode: mode,
     navigator: { userAgent: '' },
     localStorage,
-    document: { cookie: '' },
+    document: documentOverride || { cookie: '' },
     EpubBrowserI18n: {
       t(key) {
         return {
@@ -44,7 +44,11 @@ function loadBackendStorage(response, mode = 'server') {
   };
 
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/annotation.js', 'utf8'), context);
-  return window.AnnotationBackendStorage;
+  return window;
+}
+
+function loadBackendStorage(response, mode = 'server') {
+  return loadAnnotationWindow(response, mode).AnnotationBackendStorage;
 }
 
 test('SSG annotations do not probe the server API', async () => {
@@ -69,4 +73,52 @@ test('maps a non-2xx annotation API payload code to localized, non-server error 
       && error.message === '未找到标注。'
       && !error.message.includes('Raw server detail'),
   );
+});
+
+test('converts migrated XPath positions into current annotation metadata', () => {
+  const textNode = { nodeValue: 'Saved text' };
+  const parent = {
+    tagName: 'P',
+    classList: { contains() { return false; } },
+  };
+  const root = {
+    contains(node) { return node === parent; },
+    getElementsByTagName(name) { return name === 'P' ? [parent] : []; },
+  };
+  parent.parentElement = root;
+  textNode.parentElement = parent;
+  const expressions = [];
+  const document = {
+    cookie: '',
+    evaluate(expression) {
+      expressions.push(expression);
+      return { singleNodeValue: textNode };
+    },
+    createTreeWalker() {
+      let returned = false;
+      return {
+        nextNode() {
+          if (returned) return null;
+          returned = true;
+          return textNode;
+        },
+      };
+    },
+  };
+  const window = loadAnnotationWindow(
+    { status: 200, body: '{}' },
+    'server',
+    document,
+  );
+
+  const meta = window.AnnotationLegacyPosition.resolve(
+    { legacyXPath: '/p[1]/text()[1]', legacyOffset: 4 },
+    root,
+  );
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(meta)),
+    { parentTagName: 'P', parentIndex: 0, textOffset: 4 },
+  );
+  assert.deepEqual(expressions, ['./p[1]/text()[1]']);
 });

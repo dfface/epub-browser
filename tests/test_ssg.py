@@ -185,32 +185,87 @@ class SSGPublicationTests(unittest.TestCase):
 
             self.assertTrue(source.exists())
 
+    def test_epub_resource_directory_named_data_is_not_server_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(
+                source,
+                identifier="urn:test:data-resource",
+                resource_path="data/p.png",
+            )
+
+            SSGPublisher(
+                SSGConfig((source,), output),
+                show_progress=False,
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book_id = metadata[0]["hash"]
+            self.assertTrue(
+                (
+                    output
+                    / "book"
+                    / book_id
+                    / "resources"
+                    / "OEBPS"
+                    / "data"
+                    / "p.png"
+                ).is_file()
+            )
+
+    def test_operational_filesystem_failure_returns_stable_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            blocker = root / "not-a-directory"
+            blocker.write_text("file", encoding="utf-8")
+            self._write_minimal_epub(source, identifier="urn:test:io-error")
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                status = run_ssg(SSGConfig((source,), blocker / "dist"))
+
+            self.assertEqual(status, 4)
+            self.assertIn("not-a-directory", stderr.getvalue())
+
     @staticmethod
-    def _write_minimal_epub(path, identifier):
+    def _write_minimal_epub(path, identifier, resource_path=None):
         container = """<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
 </container>
 """
+        resource_manifest = (
+            f'<item id="image" href="{resource_path}" media-type="image/png"/>'
+            if resource_path
+            else ""
+        )
         package = f"""<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="book-id">{identifier}</dc:identifier>
     <dc:title>SSG Book</dc:title><dc:creator>Author</dc:creator><dc:language>en</dc:language>
   </metadata>
-  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>{resource_manifest}</manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
 """
-        chapter = """<?xml version="1.0" encoding="UTF-8"?>
+        resource_html = f'<img src="{resource_path}" alt="">' if resource_path else ""
+        chapter = f"""<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>One</title></head>
-<body><h1>One</h1><p>Text</p></body></html>
+<body><h1>One</h1><p>Text</p>{resource_html}</body></html>
 """
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("mimetype", "application/epub+zip")
             archive.writestr("META-INF/container.xml", container)
             archive.writestr("OEBPS/content.opf", package)
             archive.writestr("OEBPS/chapter.xhtml", chapter)
+            if resource_path:
+                archive.writestr("OEBPS/" + resource_path, b"png")
 
 
 if __name__ == "__main__":

@@ -47,6 +47,81 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertFalse(Path(processor.temp_dir, "outside.txt").exists())
             self.assertFalse((root / "outside.txt").exists())
 
+    def test_processor_rejects_manifest_paths_that_escape_extraction_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "unsafe-manifest.epub"
+            container = """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>
+"""
+            package = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Unsafe</dc:title></metadata>
+  <manifest><item id="chapter" href="../../../secret.html" media-type="application/xhtml+xml"/></manifest>
+  <spine><itemref idref="chapter"/></spine>
+</package>
+"""
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("mimetype", "application/epub+zip")
+                archive.writestr("META-INF/container.xml", container)
+                archive.writestr("OEBPS/content.opf", package)
+
+            processor = EPUBProcessor(str(source), str(root / "staging"))
+            secret = Path(processor.temp_dir).parent / "secret.html"
+            secret.write_text("LOCAL-SECRET-MUST-NOT-BE-PUBLISHED", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "Unsafe EPUB internal path"):
+                processor.convert()
+
+            generated = Path(processor.web_dir)
+            if generated.exists():
+                for page in generated.rglob("*.html"):
+                    self.assertNotIn(
+                        "LOCAL-SECRET-MUST-NOT-BE-PUBLISHED",
+                        page.read_text(encoding="utf-8"),
+                    )
+
+    def test_epub_internal_path_resolver_rejects_absolute_and_encoded_traversal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory)
+
+            self.assertEqual(
+                processor._resolve_internal_path("chapter%201.xhtml", "OEBPS"),
+                "OEBPS/chapter 1.xhtml",
+            )
+            self.assertEqual(
+                processor._resolve_internal_path("../Images/cover.jpg", "OEBPS/Text"),
+                "OEBPS/Images/cover.jpg",
+            )
+            for reference in (
+                "../../secret.html",
+                "%2e%2e/secret.html",
+                "%252e%252e/secret.html",
+                "/etc/passwd",
+                "C:\\secret.html",
+                "file:///etc/passwd",
+            ):
+                with self.subTest(reference=reference), self.assertRaisesRegex(
+                    ValueError,
+                    "Unsafe EPUB internal path",
+                ):
+                    processor._resolve_internal_path(reference, "OEBPS")
+
+    def test_processor_rejects_traversal_in_chapter_resource_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "unsafe-link.epub"
+            self._write_minimal_epub(
+                source,
+                chapter_body='<img src="../../../secret.png" alt="">',
+            )
+            processor = EPUBProcessor(str(source), str(root / "staging"))
+
+            with self.assertRaisesRegex(ValueError, "Unsafe EPUB internal path"):
+                processor.convert()
+
     def test_generated_book_pages_apply_base_path_without_runtime_url_repair(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor(
@@ -65,6 +140,36 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotIn("function addBasePath", html)
         self.assertIn("window.initScriptBook()", book_html)
         self.assertIn("window.initScriptChapter()", chapter_html)
+
+    def test_dynamic_browser_urls_use_the_generated_base_path_runtime(self):
+        scripts = {
+            name: Path("epub_browser", "assets", name).read_text(encoding="utf-8")
+            for name in (
+                "library.js",
+                "i18n.js",
+                "bookshelf.js",
+                "chapter.js",
+                "annotation-hub.js",
+            )
+        }
+
+        self.assertIn("EpubBrowserURL.publicPath('/sw.js')", scripts["library.js"])
+        self.assertIn("publicPath('/assets/manifest.'", scripts["i18n.js"])
+        self.assertGreaterEqual(
+            scripts["bookshelf.js"].count("EpubBrowserURL.publicPath('/book/"),
+            2,
+        )
+        self.assertGreaterEqual(
+            scripts["chapter.js"].count("EpubBrowserURL.publicPath('/book/"),
+            3,
+        )
+        self.assertIn("publicPath('/book-metadata.json')", scripts["annotation-hub.js"])
+        self.assertIn("publicPath('/book/'", scripts["annotation-hub.js"])
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertLess(
+                html.index("window.EpubBrowserBasePath"),
+                html.index("window.EpubBrowserI18n.init()"),
+            )
 
     def test_generated_footers_show_the_package_version_and_load_the_update_checker(self):
         package_version = subprocess.check_output(
@@ -466,7 +571,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             return Path(processor.web_dir, "index.html").read_text(encoding="utf-8")
 
     @staticmethod
-    def _write_minimal_epub(path):
+    def _write_minimal_epub(path, chapter_body="<h1>One</h1><p>Text</p>"):
         container = """<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles>
@@ -490,9 +595,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
   </spine>
 </package>
 """
-        chapter = """<?xml version="1.0" encoding="UTF-8"?>
+        chapter = f"""<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>One</title></head>
-<body><h1>One</h1><p>Text</p></body></html>
+<body>{chapter_body}</body></html>
 """
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("mimetype", "application/epub+zip")

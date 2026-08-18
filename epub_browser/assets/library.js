@@ -478,7 +478,7 @@ function initScript() {
     function pwaSupport() {
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js')
+                navigator.serviceWorker.register(window.EpubBrowserURL.publicPath('/sw.js'))
                     .then(function(registration) {
                         console.log('ServiceWorker registration successful');
                     })

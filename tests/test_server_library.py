@@ -125,6 +125,30 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertIn("Changed", chapter_path.read_text(encoding="utf-8"))
         manager.shutdown()
 
+    def test_reconciliation_callbacks_report_each_scan_result(self):
+        manager = self._manager()
+        events = []
+        manager.on_reconcile_started = lambda: events.append("scanning")
+        manager.on_reconciled = lambda summary: events.append(
+            "degraded" if summary.degraded else "ready"
+        )
+
+        manager.reconcile()
+        self._write_epub(self.source, "Changed")
+
+        class FailingProcessor:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def convert(self):
+                raise RuntimeError("conversion failed")
+
+        manager.converter_factory = FailingProcessor
+        manager.reconcile()
+
+        self.assertEqual(events, ["scanning", "ready", "scanning", "degraded"])
+        manager.shutdown()
+
     def test_delete_hides_book_but_preserves_data_and_restore_reuses_id(self):
         manager = self._manager()
         record = manager.reconcile().active_books[0]

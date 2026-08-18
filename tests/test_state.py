@@ -149,6 +149,74 @@ class StateStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "newer schema"):
             StateStore(future).initialize()
 
+    def test_initialize_rebuilds_historical_xpath_annotation_schema(self):
+        historical = Path(self.temporary.name, "historical.db")
+        with sqlite3.connect(historical) as connection:
+            connection.execute(
+                """
+                CREATE TABLE annotations (
+                    id TEXT PRIMARY KEY,
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    note TEXT,
+                    start_xpath TEXT NOT NULL,
+                    end_xpath TEXT NOT NULL,
+                    start_offset INTEGER NOT NULL,
+                    end_offset INTEGER NOT NULL,
+                    color TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO annotations VALUES (
+                    'legacy', 'book', 2, 'Saved text', 'note',
+                    '/p[1]/text()[1]', '/p[1]/text()[1]', 3, 8,
+                    '#ffee00', '2025-01-01', '2025-01-02'
+                )
+                """
+            )
+
+        store = StateStore(historical)
+        store.initialize()
+        legacy = store.get_annotation("legacy")
+
+        self.assertEqual(
+            legacy["startMeta"],
+            {"legacyXPath": "/p[1]/text()[1]", "legacyOffset": 3},
+        )
+        self.assertEqual(
+            legacy["endMeta"],
+            {"legacyXPath": "/p[1]/text()[1]", "legacyOffset": 8},
+        )
+        with sqlite3.connect(historical) as connection:
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(annotations)")
+            }
+        self.assertIn("start_meta", columns)
+        self.assertIn("end_meta", columns)
+        self.assertIn("username", columns)
+        self.assertNotIn("start_xpath", columns)
+
+        store.upsert_annotation(
+            {
+                "id": "new",
+                "book_hash": "book",
+                "chapter_index": 2,
+                "text": "New",
+                "color": "#fff",
+                "created_at": "2026",
+                "updated_at": "2026",
+                "startMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 0},
+                "endMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 3},
+            }
+        )
+        self.assertEqual(store.get_annotation("new")["text"], "New")
+
 
 if __name__ == "__main__":
     unittest.main()

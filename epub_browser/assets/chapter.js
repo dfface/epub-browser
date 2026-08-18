@@ -1255,7 +1255,7 @@ function initScript() {
         var list = document.getElementById('bookHomeTocList');
         var path = window.location.pathname;
         var hash = path.split('/book/')[1].split('/')[0];
-        var url = '/book/' + hash + '/toc.json';
+        var url = window.EpubBrowserURL.publicPath('/book/' + hash + '/toc.json');
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -1268,7 +1268,7 @@ function initScript() {
                     var li = document.createElement('li');
                     li.className = 'toc-item toc-level-' + Math.min(item.level, 3);
                     var a = document.createElement('a');
-                    var href = '/book/' + hash + '/' + item.chapter_file;
+                    var href = window.EpubBrowserURL.publicPath('/book/' + hash + '/' + item.chapter_file);
                     if (item.anchor) href += '#' + item.anchor;
                     a.href = href;
                     a.textContent = item.title;
@@ -1784,7 +1784,7 @@ function initScript() {
     }
     
     function updateContinuousScrollUrl(chapterIdx) {
-        var newUrl = '/book/' + book_hash + '/chapter_' + chapterIdx + '.html';
+        var newUrl = window.EpubBrowserURL.publicPath('/book/' + book_hash + '/chapter_' + chapterIdx + '.html');
         if (window.location.pathname !== newUrl) {
             try {
                 window.history.replaceState({chapterIndex: chapterIdx}, '', newUrl);
@@ -1812,7 +1812,7 @@ function initScript() {
     }
     
     function getChapterUrl(idx) {
-        return '/book/' + book_hash + '/chapter_' + idx + '.html';
+        return window.EpubBrowserURL.publicPath('/book/' + book_hash + '/chapter_' + idx + '.html');
     }
     
     function loadNextChapter() {

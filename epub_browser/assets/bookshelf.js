@@ -394,7 +394,7 @@ function initBookshelf() {
                     
                     (function(bookHash) {
                         bookEl.addEventListener('click', function() {
-                            window.location.href = '/book/' + bookHash + '/index.html';
+                            window.location.href = window.EpubBrowserURL.publicPath('/book/' + bookHash + '/index.html');
                         });
                     })(id);
                     
@@ -660,7 +660,7 @@ function initBookshelf() {
                     
                     (function(bookHash) {
                         bookEl.addEventListener('click', function() {
-                            window.location.href = '/book/' + bookHash + '/index.html';
+                            window.location.href = window.EpubBrowserURL.publicPath('/book/' + bookHash + '/index.html');
                         });
                     })(id);
                     

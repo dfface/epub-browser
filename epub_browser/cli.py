@@ -35,6 +35,13 @@ class ServerConfig:
 CommandConfig = Union[SSGConfig, ServerConfig]
 
 
+def _parse_base_path(value: str) -> str:
+    try:
+        return normalize_base_path(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
 def _new_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="epub-browser",
@@ -45,7 +52,7 @@ def _new_parser() -> argparse.ArgumentParser:
     ssg = modes.add_parser("ssg", help="Generate a standalone static site")
     ssg.add_argument("sources", nargs="+", metavar="SOURCE")
     ssg.add_argument("--output-dir", "-o", required=True)
-    ssg.add_argument("--base-path", default="/")
+    ssg.add_argument("--base-path", default="/", type=_parse_base_path)
     ssg.add_argument("--log", action="store_true")
 
     server = modes.add_parser("server", help="Run the stateful reading server")
@@ -81,14 +88,14 @@ def _legacy_parser() -> argparse.ArgumentParser:
 
 def parse_cli(argv: Sequence[str]) -> CommandConfig:
     arguments = list(argv)
-    if arguments and arguments[0] in {"ssg", "server"}:
+    if not arguments or arguments[0] in {"ssg", "server", "-h", "--help"}:
         values = _new_parser().parse_args(arguments)
         sources = tuple(Path(source) for source in values.sources)
         if values.mode == "ssg":
             return SSGConfig(
                 sources=sources,
                 output_dir=Path(values.output_dir),
-                base_path=normalize_base_path(values.base_path),
+                base_path=values.base_path,
                 log=values.log,
             )
         return ServerConfig(

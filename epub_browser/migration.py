@@ -98,7 +98,7 @@ class MigrationManager:
 
         if self.database_path.is_file():
             self._check_integrity(self.database_path)
-            StateStore(self.database_path).initialize()
+            self._initialize_database(self.database_path)
             self._check_integrity(self.database_path)
             if root_candidates:
                 warnings.append(
@@ -109,7 +109,7 @@ class MigrationManager:
         else:
             candidate = root_candidates[0] if root_candidates else None
             if candidate is None:
-                StateStore(self.database_path).initialize()
+                self._initialize_database(self.database_path)
             else:
                 backup_path = self._migrate_candidate(candidate)
 
@@ -172,13 +172,22 @@ class MigrationManager:
         )
         try:
             shutil.copy2(candidate, temporary_database)
-            StateStore(temporary_database).initialize()
+            self._initialize_database(temporary_database)
             self._check_integrity(temporary_database)
             os.replace(temporary_database, self.database_path)
         finally:
             if temporary_database.exists():
                 temporary_database.unlink()
         return backup_path
+
+    @staticmethod
+    def _initialize_database(path: Path) -> None:
+        try:
+            StateStore(path).initialize()
+        except (RuntimeError, sqlite3.DatabaseError) as error:
+            raise MigrationError(
+                f"Database schema migration failed for {path}: {error}"
+            ) from error
 
     def _import_legacy_bookshelves(self) -> int:
         selected = {}
