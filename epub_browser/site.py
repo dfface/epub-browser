@@ -74,7 +74,7 @@ function isKindleDevice() {
   // 检测设备
   var ua = navigator.userAgent.toLowerCase();
   var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
-  
+
   if (!window.epubBrowserCache) {
     window.epubBrowserCache = {};
   }
@@ -187,7 +187,7 @@ if (isKindle) {
         <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading" role="status" aria-label="Loading library" data-i18n-aria-label="library.loading">
             <div class="loading-spinner"></div>
         </div>
-"""      
+"""
     library_html += f"""
     </div>
     <div class="reading-controls" data-id="reading-controls">
