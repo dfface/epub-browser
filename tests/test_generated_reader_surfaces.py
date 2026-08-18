@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 from epub_browser.library import EPUBLibrary
@@ -89,6 +90,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('return false;', script)
         self.assertIn('self.renderAll(true);', script)
         self.assertIn("Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error')", script)
+
+    def test_continuous_reader_loads_chapter_relative_annotation_positioning(self):
+        html = self._chapter_html()
+        chapter_script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
+        annotation_script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+
+        positioning = re.search(r'/assets/immutable/annotation-position\.[0-9a-f]{12}\.js', html)
+        annotations = re.search(r'/assets/immutable/annotation\.[0-9a-f]{12}\.js', html)
+        self.assertIsNotNone(positioning)
+        self.assertIsNotNone(annotations)
+        self.assertLess(positioning.start(), annotations.start())
+        self.assertIn('getChapterIndexFromSource: function(source)', annotation_script)
+        self.assertIn('StorageManager.getByBook(currentBookHash)', annotation_script)
+        self.assertIn('refreshContinuousAnnotations();', chapter_script)
 
     def test_library_does_not_offer_a_manual_cache_update_button(self):
         script = Path("epub_browser/assets/library.js").read_text(encoding="utf-8")

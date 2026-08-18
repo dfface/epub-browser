@@ -867,6 +867,46 @@
             return this.renderAll();
         },
 
+        getContentRoot: function() {
+            return document.getElementById('eb-content') || document.documentElement;
+        },
+
+        getContinuousChapterSections: function() {
+            return Array.prototype.slice.call(this.getContentRoot().querySelectorAll('.continuous-chapter'));
+        },
+
+        getChapterSection: function(chapterIndex) {
+            var sections = this.getContinuousChapterSections();
+            for (var i = 0; i < sections.length; i++) {
+                if (parseInt(sections[i].getAttribute('data-chapter-index'), 10) === chapterIndex) {
+                    return sections[i];
+                }
+            }
+            return null;
+        },
+
+        getChapterIndexFromSource: function(source) {
+            var nodes = this.getHighlightNodesByAnnotationId(source && source.id);
+            if (global.EpubAnnotationPosition) {
+                return global.EpubAnnotationPosition.chapterIndexForNodes(nodes, currentChapterIndex);
+            }
+            return currentChapterIndex;
+        },
+
+        getCanonicalSourceMetas: function(source, chapterIndex) {
+            var startMeta = Utils.deepClone(source.startMeta);
+            var endMeta = Utils.deepClone(source.endMeta);
+            var section = this.getChapterSection(chapterIndex);
+            var positioning = global.EpubAnnotationPosition;
+            if (!section || !positioning) return { startMeta: startMeta, endMeta: endMeta };
+
+            var root = this.getContentRoot();
+            return {
+                startMeta: positioning.toChapterMeta(startMeta, root, section) || startMeta,
+                endMeta: positioning.toChapterMeta(endMeta, root, section) || endMeta
+            };
+        },
+
         normalizeAnnotation: function(raw) {
             if (!raw || !raw.id || !raw.startMeta || !raw.endMeta) return null;
             return {
@@ -884,14 +924,16 @@
         },
 
         buildAnnotationFromSource: function(source, color, note) {
+            var chapterIndex = this.getChapterIndexFromSource(source);
+            var metas = this.getCanonicalSourceMetas(source, chapterIndex);
             return {
                 id: source.id || Utils.generateUUID(),
                 book_hash: currentBookHash,
-                chapter_index: currentChapterIndex,
+                chapter_index: chapterIndex,
                 text: source.text || '',
                 note: note || '',
-                startMeta: Utils.deepClone(source.startMeta),
-                endMeta: Utils.deepClone(source.endMeta),
+                startMeta: metas.startMeta,
+                endMeta: metas.endMeta,
                 color: color,
                 created_at: Utils.getISOTime(),
                 updated_at: Utils.getISOTime()
@@ -1266,22 +1308,212 @@
             });
         },
 
+        normalizedHighlightText: function(text) {
+            return (text || '').replace(/\s+/g, ' ').trim();
+        },
+
+        renderWithMetas: function(annotation, startMeta, endMeta, expectedSection) {
+            if (!startMeta || !endMeta) return null;
+            try {
+                var source = highlighter.fromStore(startMeta, endMeta, annotation.text, annotation.id);
+                var nodes = source ? this.getHighlightNodesByAnnotationId(annotation.id) : [];
+                var renderedText = nodes.map(function(node) { return node.textContent || ''; }).join('');
+                var isExpectedText = this.normalizedHighlightText(renderedText) === this.normalizedHighlightText(annotation.text);
+                var isExpectedSection = !expectedSection || nodes.every(function(node) {
+                    return expectedSection.contains(node);
+                });
+                if (!nodes.length || !isExpectedText || !isExpectedSection) {
+                    if (highlighter) highlighter.remove(annotation.id);
+                    return null;
+                }
+                this.applyHighlightStyles(annotation, nodes);
+                return nodes;
+            } catch (e) {
+                if (highlighter) {
+                    try { highlighter.remove(annotation.id); } catch (removeError) {}
+                }
+                return null;
+            }
+        },
+
+        getTextPointMeta: function(node, offset, chapterRoot) {
+            var parent = node && node.parentElement;
+            if (!parent || !chapterRoot.contains(parent)) return null;
+            while (parent !== chapterRoot && parent.classList && parent.classList.contains(CONFIG.ANNOTATION_CLASS)) {
+                parent = parent.parentElement;
+            }
+
+            var parentIndex = -2;
+            if (parent !== chapterRoot) {
+                parentIndex = Array.prototype.indexOf.call(
+                    chapterRoot.getElementsByTagName(parent.tagName),
+                    parent
+                );
+                if (parentIndex === -1) return null;
+            }
+
+            var textOffset = 0;
+            var walker = document.createTreeWalker(parent, 4, null, false);
+            var current;
+            while ((current = walker.nextNode())) {
+                if (current === node) {
+                    textOffset += offset;
+                    return {
+                        parentTagName: parent.tagName,
+                        parentIndex: parentIndex,
+                        textOffset: textOffset
+                    };
+                }
+                textOffset += (current.nodeValue || '').length;
+            }
+            return null;
+        },
+
+        findTextAnchor: function(annotation, chapterRoot) {
+            if (!annotation.text || !chapterRoot) return null;
+            var walker = document.createTreeWalker(chapterRoot, 4, null, false);
+            var segments = [];
+            var fullText = '';
+            var node;
+            while ((node = walker.nextNode())) {
+                var parent = node.parentElement;
+                if (!parent) continue;
+                var excluded = parent.closest && parent.closest('pre, code, a, .chapter-separator, script, style');
+                if (excluded) continue;
+                var value = node.nodeValue || '';
+                if (!value) continue;
+                segments.push({ node: node, start: fullText.length, end: fullText.length + value.length });
+                fullText += value;
+            }
+
+            var matches = [];
+            var from = 0;
+            while (matches.length < 100) {
+                var match = fullText.indexOf(annotation.text, from);
+                if (match === -1) break;
+                matches.push(match);
+                from = match + Math.max(annotation.text.length, 1);
+            }
+            if (!matches.length) return null;
+
+            var pointAt = function(position, isEnd) {
+                for (var i = 0; i < segments.length; i++) {
+                    var segment = segments[i];
+                    if ((!isEnd && position >= segment.start && position < segment.end) ||
+                        (isEnd && position > segment.start && position <= segment.end)) {
+                        return { node: segment.node, offset: position - segment.start };
+                    }
+                }
+                return null;
+            };
+            var candidates = [];
+            for (var i = 0; i < matches.length; i++) {
+                var startPoint = pointAt(matches[i], false);
+                var endPoint = pointAt(matches[i] + annotation.text.length, true);
+                if (!startPoint || !endPoint) continue;
+                var startMeta = this.getTextPointMeta(startPoint.node, startPoint.offset, chapterRoot);
+                var endMeta = this.getTextPointMeta(endPoint.node, endPoint.offset, chapterRoot);
+                if (!startMeta || !endMeta) continue;
+                var score = 0;
+                if (annotation.startMeta && annotation.startMeta.parentTagName === startMeta.parentTagName) {
+                    score += Math.abs(annotation.startMeta.parentIndex - startMeta.parentIndex);
+                } else {
+                    score += 10000;
+                }
+                if (annotation.endMeta && annotation.endMeta.parentTagName === endMeta.parentTagName) {
+                    score += Math.abs(annotation.endMeta.parentIndex - endMeta.parentIndex);
+                } else {
+                    score += 10000;
+                }
+                candidates.push({ startMeta: startMeta, endMeta: endMeta, score: score });
+            }
+            candidates.sort(function(a, b) { return a.score - b.score; });
+            if (!candidates.length || (candidates[1] && candidates[1].score === candidates[0].score)) return null;
+            return candidates[0];
+        },
+
+        getChapterIndexFromSection: function(section) {
+            if (!section || !section.getAttribute) return currentChapterIndex;
+            var index = parseInt(section.getAttribute('data-chapter-index'), 10);
+            return isNaN(index) ? currentChapterIndex : index;
+        },
+
+        repairAnnotationPosition: function(annotation, chapterIndex, startMeta, endMeta) {
+            annotation.chapter_index = chapterIndex;
+            annotation.startMeta = Utils.deepClone(startMeta);
+            annotation.endMeta = Utils.deepClone(endMeta);
+            StorageManager.update(annotation.id, {
+                chapter_index: chapterIndex,
+                startMeta: startMeta,
+                endMeta: endMeta
+            }).catch(function(err) {
+                console.warn('Could not persist repaired annotation position:', err);
+            });
+        },
+
         renderHighlight: function(annotation) {
             if (!highlighter || !annotation) return false;
-            try {
-                var source = highlighter.fromStore(
-                    annotation.startMeta,
-                    annotation.endMeta,
-                    annotation.text,
-                    annotation.id
-                );
-                if (!source) return false;
-                this.applyHighlightStyles(annotation, this.getHighlightNodesByAnnotationId(annotation.id));
-                return true;
-            } catch (e) {
-                console.error('Failed to render highlight:', e);
-                return false;
+            var root = this.getContentRoot();
+            var sections = this.getContinuousChapterSections();
+            var isContinuous = sections.length > 0;
+            var preferredSection = isContinuous ? this.getChapterSection(annotation.chapter_index) : root;
+            if (!preferredSection) return null;
+
+            var positioning = global.EpubAnnotationPosition;
+            var startMeta = annotation.startMeta;
+            var endMeta = annotation.endMeta;
+            if (isContinuous && positioning) {
+                startMeta = positioning.toRootMeta(annotation.startMeta, root, preferredSection);
+                endMeta = positioning.toRootMeta(annotation.endMeta, root, preferredSection);
             }
+            if (this.renderWithMetas(annotation, startMeta, endMeta, preferredSection)) return true;
+
+            // Older continuous-reading annotations used full-root indices. Try
+            // those once before falling back to text-based re-anchoring.
+            if (isContinuous && positioning) {
+                var legacyNodes = this.renderWithMetas(annotation, annotation.startMeta, annotation.endMeta, null);
+                if (legacyNodes) {
+                    var actualSection = legacyNodes[0].closest && legacyNodes[0].closest('.continuous-chapter');
+                    var repairedStart = actualSection && positioning.toChapterMeta(annotation.startMeta, root, actualSection);
+                    var repairedEnd = actualSection && positioning.toChapterMeta(annotation.endMeta, root, actualSection);
+                    if (actualSection && repairedStart && repairedEnd) {
+                        this.repairAnnotationPosition(
+                            annotation,
+                            this.getChapterIndexFromSection(actualSection),
+                            repairedStart,
+                            repairedEnd
+                        );
+                    }
+                    return true;
+                }
+            }
+
+            var candidateSections = [preferredSection];
+            if (isContinuous) {
+                sections.forEach(function(section) {
+                    if (section !== preferredSection) candidateSections.push(section);
+                });
+            }
+            for (var i = 0; i < candidateSections.length; i++) {
+                var section = candidateSections[i];
+                var anchor = this.findTextAnchor(annotation, section);
+                if (!anchor) continue;
+                var renderStart = anchor.startMeta;
+                var renderEnd = anchor.endMeta;
+                if (isContinuous && positioning) {
+                    renderStart = positioning.toRootMeta(anchor.startMeta, root, section);
+                    renderEnd = positioning.toRootMeta(anchor.endMeta, root, section);
+                }
+                if (!this.renderWithMetas(annotation, renderStart, renderEnd, section)) continue;
+                this.repairAnnotationPosition(
+                    annotation,
+                    isContinuous ? this.getChapterIndexFromSection(section) : currentChapterIndex,
+                    anchor.startMeta,
+                    anchor.endMeta
+                );
+                return true;
+            }
+            return false;
         },
 
         clearHighlights: function() {
@@ -1302,10 +1534,14 @@
             var self = this;
             if (!highlighter) return Promise.resolve();
             var renderVersion = ++this.renderVersion;
+            var isContinuous = this.getContinuousChapterSections().length > 0;
             this.isRendering = true;
             this.cancelPendingDraft();
             this.clearHighlights();
-            return StorageManager.getByChapter(currentBookHash, currentChapterIndex).then(function(annotations) {
+            var loadAnnotations = isContinuous
+                ? StorageManager.getByBook(currentBookHash)
+                : StorageManager.getByChapter(currentBookHash, currentChapterIndex);
+            return loadAnnotations.then(function(annotations) {
                 if (renderVersion !== self.renderVersion) return;
                 self.annotations = (annotations || []).map(function(annotation) {
                     return self.normalizeAnnotation(annotation);
@@ -1314,7 +1550,7 @@
                 });
                 var failedToRestore = false;
                 self.annotations.forEach(function(annotation) {
-                    if (!self.renderHighlight(annotation)) failedToRestore = true;
+                    if (self.renderHighlight(annotation) === false) failedToRestore = true;
                 });
                 if (!failedToRestore) return;
                 if (!isRetry) {
@@ -1325,7 +1561,9 @@
                     });
                     return;
                 }
-                Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error');
+                if (!isContinuous) {
+                    Utils.showNotification('Some annotations could not be restored. Please reload the chapter.', 'error');
+                }
             }).catch(function(err) {
                 console.error('Failed to load annotations:', err);
                 if (renderVersion === self.renderVersion) {
@@ -2017,12 +2255,12 @@
         
         // Refresh
         refresh: function() {
-            HighlightInteraction.renderAll();
+            return HighlightInteraction.renderAll();
         },
         
         // Set book info
         setBookInfo: function(bookHash, chapterIndex) {
-            HighlightInteraction.setContext(bookHash, chapterIndex);
+            return HighlightInteraction.setContext(bookHash, chapterIndex);
         },
         
         // Get annotation count

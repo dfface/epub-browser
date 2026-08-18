@@ -1663,6 +1663,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <script src="/assets/continuous-buffer.js" defer></script>
     <script src="/assets/reading-progress.js" defer></script>
     <script src="/assets/chapter.js?v=17" defer></script>
+    <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>

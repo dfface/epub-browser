@@ -1694,19 +1694,36 @@ function initScript() {
         var match = window.location.search.match(/[?&]annotation=([^&]*)/);
         return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
     }
+    var pendingAnnotationId = requestedAnnotationId();
+    function focusRequestedAnnotation(showWarning) {
+        if (!pendingAnnotationId || !window.AnnotationModule) return Promise.resolve(false);
+        var annotationId = pendingAnnotationId;
+        return window.AnnotationModule.focusAnnotation(annotationId).then(function(found) {
+            if (found) {
+                pendingAnnotationId = '';
+            } else if (showWarning) {
+                showNotification('Could not locate this annotation. Opened its chapter instead.', 'warning');
+            }
+            return found;
+        });
+    }
+    function refreshContinuousAnnotations() {
+        if (!window.AnnotationModule || !window.AnnotationModule.initialized) return Promise.resolve();
+        return window.AnnotationModule.refresh().then(function() {
+            return focusRequestedAnnotation(false);
+        });
+    }
     function initAnnotationModule() {
         if (window.AnnotationModule) {
             window.AnnotationModule.init({
                 bookHash: book_hash,
                 chapterIndex: parseInt(chapter_index, 10)
             }).then(function() {
-                var annotationId = requestedAnnotationId();
-                if (!annotationId) return;
-                return window.AnnotationModule.focusAnnotation(annotationId).then(function(found) {
-                    if (!found) showNotification('Could not locate this annotation. Opened its chapter instead.', 'warning');
-                });
+                return focusRequestedAnnotation(!isContinuousScroll);
             }).catch(function() {
-                if (requestedAnnotationId()) showNotification('Could not load this annotation. Opened its chapter instead.', 'warning');
+                if (pendingAnnotationId && !isContinuousScroll) {
+                    showNotification('Could not load this annotation. Opened its chapter instead.', 'warning');
+                }
             });
         } else {
             // Wait for annotation.js to load
@@ -1869,7 +1886,10 @@ function initScript() {
                 }
             }
             isLoadingChapter = false;
-            if (appendedChapter) ensureContinuousScrollBuffer();
+            if (appendedChapter) {
+                refreshContinuousAnnotations();
+                ensureContinuousScrollBuffer();
+            }
         };
         xhr.onerror = function() {
             var loaderEl = document.getElementById('scrollLoader');
@@ -1910,6 +1930,7 @@ function initScript() {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', getChapterUrl(prevIdx), true);
         xhr.onload = function() {
+            var appendedChapter = false;
             if (xhr.status >= 200 && xhr.status < 300) {
                 var html = xhr.responseText;
                 var tempDiv = document.createElement('div');
@@ -1958,9 +1979,11 @@ function initScript() {
                     pruneContinuousWindow('previous', prevIdx);
                     EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
                     EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
+                    appendedChapter = true;
                 }
             }
             isLoadingChapter = false;
+            if (appendedChapter) refreshContinuousAnnotations();
         };
         xhr.onerror = function() {
             var loaderEl = document.getElementById('scrollLoaderTop');

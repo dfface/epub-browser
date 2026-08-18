@@ -177,7 +177,19 @@ def create_app(base_directory, sync_dir=None):
             if len(tail) != 2 or tail[0] != 'item': return response({'message': 'Not found'}, 404)
             annotation_id = tail[1]; selector, args = ('id = ?', [annotation_id]) if not username else ('id = ? AND username = ?', [annotation_id, username])
             if request.method == 'DELETE': cursor.execute('DELETE FROM annotations WHERE ' + selector, args); conn.commit(); return response({'message': 'Deleted'})
-            cursor.execute('UPDATE annotations SET note = ?, color = ?, updated_at = datetime(\'now\') WHERE ' + selector, [data.get('note',''), data.get('color','#FFEB3B')] + args); conn.commit()
+            if 'chapter_index' in data and (isinstance(data['chapter_index'], bool) or not isinstance(data['chapter_index'], int) or data['chapter_index'] < 0):
+                return response({'message': 'Invalid chapter index'}, 400)
+            assignments, values = [], []
+            for field in ('note', 'color', 'chapter_index'):
+                if field in data:
+                    assignments.append(field + ' = ?')
+                    values.append(data[field])
+            for field, column in (('startMeta', 'start_meta'), ('endMeta', 'end_meta')):
+                if field in data:
+                    assignments.append(column + ' = ?')
+                    values.append(json.dumps(data[field]) if data[field] else None)
+            assignments.append("updated_at = datetime('now')")
+            cursor.execute('UPDATE annotations SET ' + ', '.join(assignments) + ' WHERE ' + selector, values + args); conn.commit()
             row = cursor.execute('SELECT * FROM annotations WHERE ' + selector, args).fetchone()
             return response({'data': row_data(row)}, 200) if row else response({'message': 'Annotation not found'}, 404)
         finally: conn.close()
@@ -717,19 +729,28 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             # 更新
             import datetime
             updated_at = datetime.datetime.now().isoformat()
-            
-            if username:
-                cursor.execute('''
-                    UPDATE annotations 
-                    SET note = ?, color = ?, updated_at = ?
-                    WHERE id = ? AND username = ?
-                ''', (data.get('note', ''), data.get('color', '#FFEB3B'), updated_at, ann_id, username))
-            else:
-                cursor.execute('''
-                    UPDATE annotations 
-                    SET note = ?, color = ?, updated_at = ?
-                    WHERE id = ?
-                ''', (data.get('note', ''), data.get('color', '#FFEB3B'), updated_at, ann_id))
+            if 'chapter_index' in data and (isinstance(data['chapter_index'], bool) or not isinstance(data['chapter_index'], int) or data['chapter_index'] < 0):
+                self.send_json_response(400, {"message": "Invalid chapter index"})
+                return
+
+            assignments = []
+            values = []
+            for field in ('note', 'color', 'chapter_index'):
+                if field in data:
+                    assignments.append(field + ' = ?')
+                    values.append(data[field])
+            for field, column in (('startMeta', 'start_meta'), ('endMeta', 'end_meta')):
+                if field in data:
+                    assignments.append(column + ' = ?')
+                    values.append(json.dumps(data[field]) if data[field] else None)
+            assignments.append('updated_at = ?')
+            values.append(updated_at)
+            selector = 'id = ? AND username = ?' if username else 'id = ?'
+            selector_values = [ann_id, username] if username else [ann_id]
+            cursor.execute(
+                'UPDATE annotations SET ' + ', '.join(assignments) + ' WHERE ' + selector,
+                values + selector_values,
+            )
             
             conn.commit()
             

@@ -78,6 +78,40 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertEqual(fetched.json()["data"][0]["id"], "a1")
 
+    def test_annotation_position_repair_can_move_a_cloud_annotation_to_its_real_chapter(self):
+        annotation = {
+            "id": "misplaced",
+            "book_hash": "book",
+            "chapter_index": 1,
+            "text": "note",
+            "note": "keep me",
+            "color": "#fff",
+            "startMeta": {"parentTagName": "P", "parentIndex": 8, "textOffset": 1},
+            "endMeta": {"parentTagName": "P", "parentIndex": 8, "textOffset": 5},
+            "created_at": "2026-01-01",
+            "updated_at": "2026-01-01",
+        }
+        headers = {"X-Username": "reader"}
+        self.client.post("/api/annotations", json=annotation, headers=headers)
+
+        response = self.client.put(
+            "/api/annotations/item/misplaced",
+            json={
+                "chapter_index": 3,
+                "startMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 1},
+                "endMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 5},
+            },
+            headers=headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        repaired = response.json()["data"]
+        self.assertEqual(repaired["chapter_index"], 3)
+        self.assertEqual(repaired["note"], "keep me")
+        self.assertEqual(repaired["startMeta"]["parentIndex"], 0)
+        self.assertEqual(self.client.get("/api/annotations/book/1", headers=headers).json()["data"], [])
+        self.assertEqual(self.client.get("/api/annotations/book/3", headers=headers).json()["data"][0]["id"], "misplaced")
+
     def test_sync_route_preserves_new_shelf_response(self):
         response = self.client.post("/sync", json={"username": "reader", "version": 1, "data": {"items": []}})
 
