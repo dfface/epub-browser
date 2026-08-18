@@ -791,15 +791,23 @@ class ServerLibraryManager:
         failures: Sequence[ConversionFailure],
     ) -> tuple[tuple[BookRecord, ...], bool]:
         with self._commit_lock:
-            if self._stop_event.is_set():
-                return self._valid_active_records(), False
-            active_records = self._valid_active_records()
-            signature = self._library_signature(active_records)
-            visible_changed = signature != self._published_library_signature
-            self._refresh_public_shell()
-            self._write_catalog(active_records, failures)
-            self._published_library_signature = signature
-            return active_records, visible_changed
+            return self._publish_current_state_locked(failures)
+
+    def _publish_current_state_locked(
+        self,
+        failures: Sequence[ConversionFailure],
+        *,
+        allow_stopped: bool = False,
+    ) -> tuple[tuple[BookRecord, ...], bool]:
+        if self._stop_event.is_set() and not allow_stopped:
+            return self._valid_active_records(), False
+        active_records = self._valid_active_records()
+        signature = self._library_signature(active_records)
+        visible_changed = signature != self._published_library_signature
+        self._refresh_public_shell()
+        self._write_catalog(active_records, failures)
+        self._published_library_signature = signature
+        return active_records, visible_changed
 
     @staticmethod
     def _library_signature(records: Sequence[BookRecord]):
@@ -849,13 +857,20 @@ class ServerLibraryManager:
             with self._commit_lock:
                 if self._stop_event.is_set():
                     return
+                record = self.state_store.book_by_source(Path(path))
+                if not record or not record.active:
+                    return
+                self.progress_broker.start_generation("watch")
+                self.progress_broker.mark_discovered(total=0, removed=1)
                 self.state_store.mark_missing(record.book_id)
-            self.progress_broker.start_generation("watch")
-            self.progress_broker.mark_discovered(total=0, removed=1)
-            active_records, visible_changed = self._publish_current_state(())
-            if visible_changed:
-                self.progress_broker.catalog_published(len(active_records))
-            self.progress_broker.finish(len(active_records))
+                active_records, visible_changed = self._publish_current_state_locked(
+                    (),
+                    allow_stopped=True,
+                )
+                if visible_changed:
+                    self.progress_broker.catalog_published(len(active_records))
+                if not self._stop_event.is_set():
+                    self.progress_broker.finish(len(active_records))
 
     def request_stop(self) -> None:
         self._stop_event.set()

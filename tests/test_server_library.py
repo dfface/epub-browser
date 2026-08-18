@@ -101,6 +101,49 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(snapshot.catalog_revision, 0)
         manager.shutdown()
 
+    def test_stop_during_direct_delete_keeps_catalog_and_progress_consistent(self):
+        broker = LibraryProgressBroker()
+        manager = self._manager(progress_broker=broker)
+        manager.reconcile()
+        marked_missing = threading.Event()
+        release_delete = threading.Event()
+        original_mark_missing = self.store.mark_missing
+
+        def pause_after_mark_missing(book_id):
+            original_mark_missing(book_id)
+            marked_missing.set()
+            release_delete.wait(timeout=5)
+
+        self.store.mark_missing = pause_after_mark_missing
+        delete_thread = threading.Thread(
+            target=lambda: manager.mark_deleted(self.source),
+            daemon=True,
+        )
+        delete_thread.start()
+        try:
+            self.assertTrue(marked_missing.wait(timeout=2))
+            stop_thread = threading.Thread(target=manager.request_stop, daemon=True)
+            stop_thread.start()
+            deadline = time.monotonic() + 2
+            while not manager._stop_event.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(manager._stop_event.is_set())
+            release_delete.set()
+            delete_thread.join(timeout=5)
+            stop_thread.join(timeout=5)
+        finally:
+            release_delete.set()
+            delete_thread.join(timeout=5)
+
+        self.assertFalse(delete_thread.is_alive())
+        self.assertEqual(self.store.active_books(), ())
+        metadata = json.loads(
+            (manager.public_dir / "book-metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(metadata, [])
+        self.assertNotIn(broker.snapshot().phase, {"complete", "degraded"})
+        manager.shutdown()
+
     def test_second_reconcile_reuses_unchanged_book_cache(self):
         converter = mock.Mock(side_effect=EPUBProcessor)
         manager = self._manager(converter)
