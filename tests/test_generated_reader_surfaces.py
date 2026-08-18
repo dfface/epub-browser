@@ -84,6 +84,16 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(script, r"showNotification\(\s*['\"]")
         self.assertNotRegex(script, r"confirm\(\s*['\"]")
 
+    def test_chapter_script_routes_notifications_and_confirmations_through_i18n(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+        self.assertIn("i18n.t('reader.loadingNextChapter'", script)
+        self.assertIn("i18n.t('settings.saved'", script)
+        self.assertIn("i18n.t('reader.chapterNumber'", script)
+        self.assertIn("i18n.t('settings.continuousScrollTip'", script)
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 

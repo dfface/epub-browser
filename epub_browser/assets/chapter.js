@@ -298,6 +298,7 @@ function scopeEBStyles(scopeSelector) {
 }
 
 function initScript() {
+    var i18n = window.EpubBrowserI18n;
     function showLoading() {
         var overlay = document.getElementById('contentLoading');
         if (overlay) overlay.classList.add('is-visible');
@@ -333,6 +334,15 @@ function initScript() {
     var pageHeightSetBtn = document.querySelector("#setPageHeight");
     var pageHeightInput = document.querySelector("#pageHeightInput");
     var toggleClickPageBtn = document.getElementById('toggleClickPage');
+
+    function setPaginationToggleLabel() {
+        var buttons = [togglePaginationBtn, mobileTogglePaginationBtn];
+        for (var i = 0; i < buttons.length; i++) {
+            if (!buttons[i]) continue;
+            buttons[i].innerHTML = '<i class="fas fa-scroll"></i><span class="control-name"></span>';
+            buttons[i].querySelector('.control-name').textContent = i18n.t('reader.scrolling');
+        }
+    }
 
     function getStorageKey(mode) {
         return mode + '_' + book_hash + '_' + chapter_index;
@@ -511,8 +521,7 @@ function initScript() {
                 item.removeAttribute('href');
             }
         });
-        togglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
-        mobileTogglePaginationBtn.innerHTML = '<i class="fas fa-scroll"></i><span class="control-name">Scrolling</span>';
+        setPaginationToggleLabel();
         
         content.addEventListener('scroll', function() {
             var sl = content.scrollLeft;
@@ -580,7 +589,7 @@ function initScript() {
         updateNavButtons();
         
         if (isKindleMode()) {
-            showNotification('Page turning mode enabled', 'info');
+            showNotification(i18n.t('reader.turningModeEnabled'), 'info');
         }
     }
 
@@ -724,7 +733,7 @@ function initScript() {
         var mtoc = document.getElementById('mobileTocBtn');
         if (mtoc) mtoc.style.display = 'flex';
         
-        if (isKindleMode() || confirm('Exit page turning mode?')) {
+        if (isKindleMode() || confirm(i18n.t('reader.exitTurningConfirm'))) {
             location.reload();
         } else {
             enablePaginationMode();
@@ -751,7 +760,7 @@ function initScript() {
                 var pi = parseInt(sp,10);
                 if (pi >=0 && pi < totalPages) {
                     showPage(pi);
-                    showNotification('Progress loaded: Page '+(pi+1), 'info');
+                    showNotification(i18n.t('reader.progressLoadedPage', { page: pi + 1 }), 'info');
                 }
             } else {
                 showPage(0);
@@ -767,7 +776,7 @@ function initScript() {
                         window.scrollTo(0, parseInt(pos));
                         var total = document.documentElement.scrollHeight - wh;
                         var pct = Math.round((parseInt(pos)/total)*100);
-                        showNotification('Progress loaded: '+pct+'%', 'info');
+                        showNotification(i18n.t('reader.progressLoadedPercent', { percent: pct }), 'info');
                     }
                 }, 1000);
                 // 用户在恢复前手动滚动则取消自动恢复
@@ -794,7 +803,7 @@ function initScript() {
         if (n >=1 && n <= totalPages) {
             showPage(n-1);
         } else {
-            showNotification('1-'+totalPages, 'warning');
+            showNotification(i18n.t('reader.pageRange', { total: totalPages }), 'warning');
             pageJumpInput.value = currentPage+1;
         }
     });
@@ -820,7 +829,7 @@ function initScript() {
             else localStorage.setItem('page_height', h);
             location.reload();
         } else {
-            showNotification('Valid number', 'warning');
+            showNotification(i18n.t('reader.validNumber'), 'warning');
         }
     });
     
@@ -833,7 +842,7 @@ function initScript() {
                     if (currentPage>0) showPage(currentPage-1);
                     else {
                         var prev = document.querySelector(".prev-chapter").href;
-                        if (prev === location.href) showNotification('First chapter', 'warning');
+                        if (prev === location.href) showNotification(i18n.t('reader.firstChapter'), 'warning');
                         else location.href=prev;
                     }
                     break;
@@ -844,7 +853,7 @@ function initScript() {
                     if (currentPage < totalPages-1) showPage(currentPage+1);
                     else {
                         var next = document.querySelector(".next-chapter").href;
-                        if (next === location.href) showNotification('Last chapter', 'warning');
+                        if (next === location.href) showNotification(i18n.t('reader.lastChapter'), 'warning');
                         else location.href=next;
                     }
                     break;
@@ -862,7 +871,7 @@ function initScript() {
                         window.history.back();
                     } else {
                         var prev = document.querySelector(".prev-chapter").href;
-                        if (prev === location.href) showNotification('First', 'warning');
+                        if (prev === location.href) showNotification(i18n.t('reader.first'), 'warning');
                         else location.href=prev;
                     }
                     break;
@@ -880,7 +889,7 @@ function initScript() {
                         window.history.forward();
                     } else {
                         var next = document.querySelector(".next-chapter").href;
-                        if (next === location.href) showNotification('Last', 'warning');
+                        if (next === location.href) showNotification(i18n.t('reader.last'), 'warning');
                         else location.href=next;
                     }
                     break;
@@ -892,7 +901,7 @@ function initScript() {
         if (currentPage>0) showPage(currentPage-1);
         else {
             var prev = document.querySelector(".prev-chapter").href;
-            if (prev === location.href) showNotification('First', 'warning');
+            if (prev === location.href) showNotification(i18n.t('reader.first'), 'warning');
             else location.href=prev;
         }
     });
@@ -901,7 +910,7 @@ function initScript() {
         if (currentPage < totalPages-1) showPage(currentPage+1);
         else {
             var next = document.querySelector(".next-chapter").href;
-            if (next === location.href) showNotification('Last', 'warning');
+            if (next === location.href) showNotification(i18n.t('reader.last'), 'warning');
             else location.href=next;
         }
     });
@@ -1038,7 +1047,7 @@ function initScript() {
     
     function togglePureMode() {
         if (!isPaginationMode) {
-            showNotification('Only in page mode', 'info');
+            showNotification(i18n.t('reader.onlyPageMode'), 'info');
             return;
         }
         isPureModeEnabled = !isPureModeEnabled;
@@ -1061,7 +1070,7 @@ function initScript() {
             cc.style.marginTop = '0';
             cc.style.marginBottom = '0';
             eb.style.minHeight = 'calc(100vh - 80px)';
-            showNotification('Pure mode on', 'info');
+            showNotification(i18n.t('reader.pureModeOn'), 'info');
         } else {
             nav.style.display = 'flex';
             if (isMobile()) {
@@ -1076,7 +1085,7 @@ function initScript() {
             cc.style.marginTop = '';
             cc.style.marginBottom = '';
             eb.style.minHeight = '';
-            showNotification('Pure mode off', 'info');
+            showNotification(i18n.t('reader.pureModeOff'), 'info');
         }
     }
     
@@ -1129,11 +1138,11 @@ function initScript() {
                     setTimeout(function() {
                         showPage(save);
                         hideLoading();
-                        showNotification('Reloaded', 'info');
+                        showNotification(i18n.t('reader.reloaded'), 'info');
                     }, 500);
                 }, 200);
             } else {
-                showNotification('Only page mode', 'info');
+                showNotification(i18n.t('reader.onlyPageMode'), 'info');
             }
         });
     }
@@ -1144,7 +1153,7 @@ function initScript() {
         isClickPageEnabled = !isClickPageEnabled;
         saveClickPageState();
         updateClickPageButton();
-        showNotification(isClickPageEnabled ? 'Click page on' : 'Click page off', 'info');
+        showNotification(i18n.t(isClickPageEnabled ? 'reader.clickPageOn' : 'reader.clickPageOff'), 'info');
     });
     
     function customCssFunc() {
@@ -1187,31 +1196,31 @@ function initScript() {
             var v = cssInput.value;
             localStorage.setItem(key, v);
             apply(v);
-            showNotification('Saved', 'success');
+            showNotification(i18n.t('settings.saved'), 'success');
         });
         
         saveDefaultBtn.addEventListener('click', function() {
-            if (confirm('Save as default?')) {
+            if (confirm(i18n.t('settings.saveAsDefaultConfirm'))) {
                 localStorage.setItem(defKey, cssInput.value);
-                showNotification('Default saved', 'success');
+                showNotification(i18n.t('settings.defaultSaved'), 'success');
             }
         });
         
         loadDefaultBtn.addEventListener('click', function() {
             var d = localStorage.getItem(defKey);
             if (!d) {
-                showNotification('No default', 'warning');
+                showNotification(i18n.t('settings.noDefault'), 'warning');
                 return;
             }
-            if (confirm('Load default?')) {
+            if (confirm(i18n.t('settings.loadDefaultConfirm'))) {
                 cssInput.value = d;
                 apply(d);
-                showNotification('Loaded', 'success');
+                showNotification(i18n.t('settings.loaded'), 'success');
             }
         });
         
         resetBtn.addEventListener('click', function() {
-            if (confirm('Reset?')) {
+            if (confirm(i18n.t('settings.resetConfirm'))) {
                 cssInput.value = '';
                 localStorage.removeItem(key);
                 apply('');
@@ -1220,13 +1229,13 @@ function initScript() {
                     cssInput.value = d;
                     apply(d);
                 }
-                showNotification('Reset', 'info');
+                showNotification(i18n.t('settings.resetDone'), 'info');
             }
         });
         
         previewBtn.addEventListener('click', function() {
             apply(cssInput.value);
-            showNotification('Applied', 'info');
+            showNotification(i18n.t('settings.applied'), 'info');
         });
         
         load();
@@ -1278,11 +1287,13 @@ function initScript() {
                     list.scrollTop = p.offsetTop - 150;
                 }
             } else {
-                list.innerHTML = '<li class="toc-item">Load failed</li>';
+                list.innerHTML = '<li class="toc-item"></li>';
+                list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
             }
         };
         xhr.onerror = function() {
-            list.innerHTML = '<li class="toc-item">Load failed</li>';
+            list.innerHTML = '<li class="toc-item"></li>';
+            list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
         };
         xhr.send();
     }
@@ -1454,7 +1465,8 @@ function initScript() {
         var c = document.getElementById('eb-content');
         var heads = c.querySelectorAll('h2, h3, h4');
         if (heads.length === 0) {
-            tocList.innerHTML = '<li class="toc-item">no title</li>';
+            tocList.innerHTML = '<li class="toc-item"></li>';
+            tocList.firstChild.textContent = i18n.t('reader.tocNoTitle');
             return;
         }
         for (var i = 0; i < heads.length; i++) {
@@ -1703,10 +1715,10 @@ function initScript() {
                 var annotationId = requestedAnnotationId();
                 if (!annotationId) return;
                 return window.AnnotationModule.focusAnnotation(annotationId).then(function(found) {
-                    if (!found) showNotification('Could not locate this annotation. Opened its chapter instead.', 'warning');
+                    if (!found) showNotification(i18n.t('reader.annotationNotFound'), 'warning');
                 });
             }).catch(function() {
-                if (requestedAnnotationId()) showNotification('Could not load this annotation. Opened its chapter instead.', 'warning');
+                if (requestedAnnotationId()) showNotification(i18n.t('reader.annotationLoadFailed'), 'warning');
             });
         } else {
             // Wait for annotation.js to load
@@ -1809,7 +1821,8 @@ function initScript() {
         var loader = document.createElement('div');
         loader.className = 'continuous-scroll-loader';
         loader.id = 'scrollLoader';
-        loader.innerHTML = '<span>Loading next chapter</span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+        loader.innerHTML = '<span class="chapter-loading-label"></span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+        loader.querySelector('.chapter-loading-label').textContent = i18n.t('reader.loadingNextChapter');
         content.appendChild(loader);
         
         var xhr = new XMLHttpRequest();
@@ -1845,7 +1858,9 @@ function initScript() {
                     chapterSection.setAttribute('data-chapter-index', nextIdx);
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
-                    separator.innerHTML = '<div class="chapter-sep-title">' + escapeHtml(chapterTitle || ('Chapter ' + (nextIdx + 1))) + '</div><div class="chapter-sep-index">Chapter ' + (nextIdx + 1) + '</div>';
+                    separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
+                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: nextIdx + 1 });
+                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: nextIdx + 1 });
                     chapterSection.appendChild(separator);
                     
                     // 追加章节内容
@@ -1900,7 +1915,8 @@ function initScript() {
         var loader = document.createElement('div');
         loader.className = 'continuous-scroll-loader';
         loader.id = 'scrollLoaderTop';
-        loader.innerHTML = '<span>Loading previous chapter</span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+        loader.innerHTML = '<span class="chapter-loading-label"></span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
+        loader.querySelector('.chapter-loading-label').textContent = i18n.t('reader.loadingPreviousChapter');
         if (content.firstChild) {
             content.insertBefore(loader, content.firstChild);
         } else {
@@ -1938,7 +1954,9 @@ function initScript() {
                     // 章节分隔符放在新内容的末尾
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
-                    separator.innerHTML = '<div class="chapter-sep-title">' + escapeHtml(chapterTitle || ('Chapter ' + (prevIdx + 1))) + '</div><div class="chapter-sep-index">Chapter ' + (prevIdx + 1) + '</div>';
+                    separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
+                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: prevIdx + 1 });
+                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: prevIdx + 1 });
                     
                     var childNodes = chapterContent.childNodes;
                     for (var i = 0; i < childNodes.length; i++) {
@@ -2007,7 +2025,7 @@ function initScript() {
                         window.scrollTo(0, data.scrollY);
                         var total = document.documentElement.scrollHeight - window.innerHeight;
                         var pct = Math.round((data.scrollY / total) * 100);
-                        showNotification('Progress loaded: ' + pct + '%', 'info');
+                        showNotification(i18n.t('reader.progressLoadedPercent', { percent: pct }), 'info');
                     }, 1000);
                 }
             } catch(e) {}
@@ -2038,13 +2056,13 @@ function initScript() {
             continuousScrollToggle.disabled = true;
             continuousScrollToggle.checked = false;
             if (continuousScrollTip) {
-                continuousScrollTip.setAttribute('data-tip', 'Continuous scroll is only available in Scrolling mode. Switch to Scrolling mode first to enable this feature.');
+                continuousScrollTip.setAttribute('data-tip', i18n.t('settings.continuousScrollUnavailable'));
             }
         } else {
             continuousScrollToggle.disabled = false;
             continuousScrollToggle.checked = isContinuousScroll;
             if (continuousScrollTip) {
-                continuousScrollTip.setAttribute('data-tip', 'Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off.');
+                continuousScrollTip.setAttribute('data-tip', i18n.t('settings.continuousScrollTip'));
             }
         }
         
@@ -2052,7 +2070,7 @@ function initScript() {
             // 翻页模式下不允许切换
             if (isPaginationMode) {
                 this.checked = false;
-                showNotification('Continuous scroll requires Scrolling mode', 'warning');
+                showNotification(i18n.t('reader.continuousScrollRequiresScrolling'), 'warning');
                 return;
             }
             
@@ -2066,9 +2084,9 @@ function initScript() {
             window.epubBrowserCache.continuousScroll = isContinuousScroll ? 'true' : 'false';
             
             if (isContinuousScroll) {
-                showNotification('Continuous scroll enabled - reloading...', 'info');
+                showNotification(i18n.t('reader.continuousScrollEnabledReloading'), 'info');
             } else {
-                showNotification('Continuous scroll disabled - reloading...', 'info');
+                showNotification(i18n.t('reader.continuousScrollDisabledReloading'), 'info');
             }
             // 重新加载以应用/取消连续滚动模式
             setTimeout(function() { location.reload(); }, 500);
