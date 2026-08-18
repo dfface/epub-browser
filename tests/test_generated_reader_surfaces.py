@@ -138,6 +138,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(script, r"confirm\(\s*['\"]")
         self.assertIn("i18n.t('annotations.noteOptional'", script)
         self.assertIn("i18n.t('annotations.storageLocationChanged'", script)
+        self.assertIn("tr('defaultColorTip')", script)
+        self.assertIn("tr('colorReorderTip')", script)
+        color_css = Path('epub_browser/assets/annotation.css').read_text(encoding='utf-8')
+        self.assertIn('content: attr(data-tooltip);', color_css)
 
     def test_reader_does_not_append_an_emoji_to_noted_highlights(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
