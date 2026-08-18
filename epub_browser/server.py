@@ -11,7 +11,8 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 import errno
 from starlette.applications import Starlette
-from starlette.responses import FileResponse, JSONResponse, PlainTextResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 import uvicorn
@@ -127,7 +128,7 @@ def create_app(base_directory, sync_dir=None):
     async def library_index(request):
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
-            return PlainTextResponse('Library index not found', status_code=404)
+            return response(error_payload('not_found', 'Library index not found'), 404)
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
         return response
@@ -137,6 +138,11 @@ def create_app(base_directory, sync_dir=None):
 
     def response(data, status=200):
         return JSONResponse(data, status_code=status, headers={'Cache-Control': 'no-cache'})
+
+    async def http_exception(request, exc):
+        code = 'not_found' if exc.status_code == 404 else 'server_error'
+        message = exc.detail if isinstance(exc.detail, str) else 'Internal server error'
+        return response(error_payload(code, message), exc.status_code)
 
     def row_data(row):
         data = dict(row)
@@ -262,7 +268,7 @@ def create_app(base_directory, sync_dir=None):
         Route('/sync', sync, methods=['POST']),
         Mount('/', app=CachedStaticFiles(directory=base_directory, html=False)),
     ]
-    return Starlette(routes=routes)
+    return Starlette(routes=routes, exception_handlers={StarletteHTTPException: http_exception})
 
 # Shared server database path
 DATABASE_PATH = None
@@ -360,13 +366,18 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         except BrokenPipeError:
             # 客户端在写入响应时断开连接，安全忽略
             self.log_message("Client broke pipe during response writing")
+
+    def send_error(self, code, message=None, explain=None):
+        message = message or self.responses.get(code, ('Unknown error',))[0]
+        error_code = 'not_found' if code == 404 else 'server_error'
+        self.send_json_error(code, error_code, message)
         
     def do_GET(self):
         """处理GET请求"""
         try:
             # 检查服务器是否正在关闭
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
                 
             parsed_path = urlparse(self.path)
@@ -398,7 +409,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.log_message(f"Unexpected error in do_GET: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -406,7 +417,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """处理POST请求"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
             
             parsed_path = urlparse(self.path)
@@ -421,14 +432,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.handle_sync_request()
                 return
             
-            self.send_error(404, "Not Found")
+            self.send_json_error(404, 'not_found', 'Not Found')
             
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_POST: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -436,7 +447,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """处理PUT请求"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
             
             parsed_path = urlparse(self.path)
@@ -446,14 +457,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.handle_annotation_api('PUT', path)
                 return
             
-            self.send_error(404, "Not Found")
+            self.send_json_error(404, 'not_found', 'Not Found')
             
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_PUT: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -461,7 +472,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """处理DELETE请求"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
             
             parsed_path = urlparse(self.path)
@@ -471,14 +482,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                 self.handle_annotation_api('DELETE', path)
                 return
             
-            self.send_error(404, "Not Found")
+            self.send_json_error(404, 'not_found', 'Not Found')
             
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
             self.log_message(f"Unexpected error in do_DELETE: {e}")
             try:
-                self.send_error(500, "Internal Server Error")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -525,6 +536,9 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(response)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    def send_json_error(self, status, code, message):
+        self.send_json_response(status, error_payload(code, message))
     
     def _get_username(self):
         """从请求头中提取用户名"""
@@ -789,7 +803,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         try:
             index_path = os.path.join(self.base_directory, "index.html")
             if not os.path.exists(index_path):
-                self.send_error(404, "Library index not found")
+                self.send_json_error(404, 'not_found', 'Library index not found')
                 return
                 
             with open(index_path, 'rb') as f:
@@ -803,10 +817,10 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(content)
             
         except FileNotFoundError:
-            self.send_error(404, "Index page not found")
+            self.send_json_error(404, 'not_found', 'Index page not found')
         except Exception as e:
             self.log_message(f"Error sending library index: {e}")
-            self.send_error(500, f"Error reading index: {str(e)}")
+            self.send_json_error(500, 'server_error', 'Internal server error')
     
     def serve_book(self, path):
         """服务书籍内容"""
@@ -817,14 +831,14 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
             file_path = os.path.normpath(file_path)            
 
             if not os.path.exists(file_path):
-                self.send_error(404, f"File not found: {file_path}")
+                self.send_json_error(404, 'not_found', f'File not found: {file_path}')
                 return
             
             self.send_file_safely(file_path)
         except Exception as e:
             self.log_message(f"Error serving book content: {e}")
             try:
-                self.send_error(500, f"Error serving content: {str(e)}")
+                self.send_json_error(500, 'server_error', 'Internal server error')
             except (BrokenPipeError, ConnectionResetError):
                 pass
     
@@ -832,7 +846,7 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
         """安全地发送文件"""
         try:
             if getattr(self.server, '_is_shutting_down', False):
-                self.send_error(503, "Server is shutting down")
+                self.send_json_error(503, 'server_error', 'Server is shutting down')
                 return
                 
             file_size = os.path.getsize(file_path)
@@ -862,12 +876,12 @@ class EPUBHTTPRequestHandler(SimpleHTTPRequestHandler):
                         break
             
         except FileNotFoundError:
-            self.send_error(404, "File not found")
+            self.send_json_error(404, 'not_found', 'File not found')
         except PermissionError:
-            self.send_error(403, "Permission denied")
+            self.send_json_error(403, 'server_error', 'Permission denied')
         except Exception as e:
             self.log_message(f"Error reading file {file_path}: {e}")
-            self.send_error(500, f"Error reading file: {str(e)}")
+            self.send_json_error(500, 'server_error', 'Internal server error')
     
     def should_cache_file(self, file_path):
         """判断文件是否应该被缓存"""
