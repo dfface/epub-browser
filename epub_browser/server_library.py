@@ -71,9 +71,10 @@ class ServerLibraryManager:
         max_workers: int = 4,
     ):
         self.server_dir = Path(server_dir).expanduser().resolve()
-        self.sources = tuple(
-            Path(source).expanduser().resolve() for source in sources
+        self._source_inputs = tuple(
+            Path(source).expanduser().absolute() for source in sources
         )
+        self.sources = tuple(path.resolve() for path in self._source_inputs)
         self.state_store = state_store
         self.migration_manager = migration_manager
         self.reporter = reporter or Reporter(False)
@@ -289,7 +290,30 @@ class ServerLibraryManager:
         ]
         if not unresolved:
             return {}
-        return self.migration_manager.correlate_legacy_book_ids(unresolved)
+        return self.migration_manager.correlate_legacy_book_ids(
+            unresolved,
+            self._legacy_source_aliases(unresolved),
+        )
+
+    def _legacy_source_aliases(self, discovered: Sequence[Path]):
+        aliases = {}
+        for source in discovered:
+            source_aliases = []
+            for original, canonical in zip(self._source_inputs, self.sources):
+                if canonical.is_file():
+                    if source == canonical and original != canonical:
+                        source_aliases.append(original)
+                    continue
+                try:
+                    relative = source.relative_to(canonical)
+                except ValueError:
+                    continue
+                alias = original / relative
+                if alias != source:
+                    source_aliases.append(alias)
+            if source_aliases:
+                aliases[source] = tuple(source_aliases)
+        return aliases
 
     def _probe_metadata(self, source: Path) -> BookMetadata:
         with tempfile.TemporaryDirectory(

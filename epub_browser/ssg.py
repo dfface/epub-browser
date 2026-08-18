@@ -236,6 +236,7 @@ class SSGPublisher:
         staging: Path,
         assets: PublishedAssets,
     ) -> LibraryBook:
+        self.reporter.detail(f"Converting EPUB: {prepared.source}")
         processor = self.converter_factory(
             prepared.source,
             staging,

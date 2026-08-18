@@ -202,7 +202,7 @@ class MigrationManagerTests(unittest.TestCase):
             unique = manager.correlate_legacy_book_ids((first,))
             ambiguous = manager.correlate_legacy_book_ids((first, second))
 
-        self.assertEqual(unique, {first.absolute(): "legacy-hash"})
+        self.assertEqual(unique, {first.resolve(): "legacy-hash"})
         self.assertEqual(ambiguous, {})
 
     @staticmethod

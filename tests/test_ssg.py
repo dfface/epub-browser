@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import re
 import tempfile
 import unittest
 import zipfile
@@ -42,6 +43,72 @@ class SSGPublicationTests(unittest.TestCase):
                 str(source.resolve()),
                 (output / "index.html").read_text(encoding="utf-8"),
             )
+            self.assertIn(
+                'window.EpubBrowserMode="ssg"',
+                (output / "book" / book_id / "chapter_0.html").read_text(
+                    encoding="utf-8"
+                ),
+            )
+
+    def test_non_root_snapshot_has_only_resolvable_base_path_urls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:base-path")
+
+            SSGPublisher(
+                SSGConfig((source,), output, "/project/"),
+                show_progress=False,
+            ).build()
+
+            root_urls = []
+            for page in output.rglob("*.html"):
+                html = page.read_text(encoding="utf-8")
+                self.assertNotIn("function addBasePath", html)
+                for match in re.finditer(
+                    r"(?:href|src)=(?:\"([^\"]+)\"|'([^']+)'|([^\s>]+))",
+                    html,
+                ):
+                    url = next(value for value in match.groups() if value is not None)
+                    if url.startswith("/") and not url.startswith("//"):
+                        root_urls.append(url)
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            for book in metadata:
+                root_urls.extend(
+                    value for value in (book.get("url"), book.get("cover")) if value
+                )
+            for manifest_name in (
+                "manifest.json",
+                "manifest.en.json",
+                "manifest.zh-CN.json",
+            ):
+                manifest = json.loads(
+                    (output / "assets" / manifest_name).read_text(encoding="utf-8")
+                )
+                root_urls.extend(
+                    [manifest["start_url"], manifest["scope"]]
+                    + [icon["src"] for icon in manifest["icons"]]
+                )
+
+            self.assertTrue(root_urls)
+            for url in root_urls:
+                self.assertTrue(url.startswith("/project/"), url)
+                path = url.split("?", 1)[0].split("#", 1)[0].removeprefix(
+                    "/project/"
+                )
+                target = output / path
+                if not path or url.split("?", 1)[0].endswith("/"):
+                    target = target / "index.html"
+                self.assertTrue(target.is_file(), url)
+
+            worker = (output / "sw.js").read_text(encoding="utf-8")
+            self.assertNotIn('"/assets/', worker)
+            self.assertNotIn('"/index.html"', worker)
+            self.assertIn('"/project/index.html"', worker)
 
     def test_failed_build_preserves_previous_snapshot_and_removes_staging(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -234,16 +234,28 @@ class MigrationManager:
             identifiers.update(path.name for path in book_root.iterdir() if path.is_dir())
         return tuple(sorted(identifiers))
 
-    def correlate_legacy_book_ids(self, sources) -> dict[Path, str]:
+    def correlate_legacy_book_ids(
+        self,
+        sources,
+        source_aliases=None,
+    ) -> dict[Path, str]:
         state = self._require_state()
         known_ids = set(state.get("legacy_book_ids", ()))
+        aliases = source_aliases or {}
         matches = {}
         for source in sorted(
-            (Path(path).expanduser().absolute() for path in sources),
+            (Path(path).expanduser().resolve() for path in sources),
             key=str,
         ):
-            legacy_id = self._derive_legacy_book_id(source)
-            if legacy_id in known_ids:
+            candidates = (source, *(aliases.get(source, ())))
+            legacy_ids = {
+                legacy_id
+                for candidate in candidates
+                for legacy_id in (self._derive_legacy_book_id(Path(candidate)),)
+                if legacy_id in known_ids
+            }
+            if len(legacy_ids) == 1:
+                legacy_id = next(iter(legacy_ids))
                 matches.setdefault(legacy_id, []).append(source)
         return {
             paths[0]: legacy_id
