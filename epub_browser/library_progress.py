@@ -37,7 +37,7 @@ class LibraryProgressSnapshot:
 def safe_progress_message(error) -> str:
     message = str(error).splitlines()[0].strip() or "Unable to process EPUB"
     message = re.sub(
-        r"(?:[A-Za-z]:[\\/]|/)[^\s:'\"]+(?:[\\/][^\s:'\"]*)*",
+        r"(?:[A-Za-z]:[\\/]|/|\\\\)[^\s:'\"]+(?:[\\/][^\s:'\"]*)*",
         "source file",
         message,
     )

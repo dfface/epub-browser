@@ -63,3 +63,17 @@ class LibraryProgressBrokerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(latest.in_flight, 1)
         subscription.close()
         self.assertEqual(broker.subscriber_count, 0)
+
+    async def test_failure_message_sanitizes_windows_unc_paths(self):
+        broker = LibraryProgressBroker()
+        broker.start_generation("startup")
+        broker.mark_discovered(1, 0)
+        broker.record_failure(
+            Path("/private/library/broken.epub"),
+            r"unable to parse \\server\share\staging\package.opf",
+        )
+
+        snapshot = broker.snapshot().as_dict()
+
+        self.assertNotIn(r"\\server\share\staging\package.opf", str(snapshot))
+        self.assertEqual(snapshot["failures"][0]["message"], "unable to parse source file")
