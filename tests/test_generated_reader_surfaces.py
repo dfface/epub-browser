@@ -454,6 +454,24 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('Reading appearance (advanced)', html)
         self.assertNotIn('id="cssPanelToggle"', html)
 
+    def test_reader_template_marks_static_ui_and_preserves_chapter_content(self):
+        html = self._chapter_html()
+
+        for key in (
+            'reader.tableOfContents', 'reader.previous', 'reader.next',
+            'settings.appearance', 'settings.readingMode', 'settings.customStyles',
+        ):
+            self.assertIn('data-i18n="' + key + '"', html)
+        article = html[html.index('<article'):html.index('</article>')]
+        self.assertIn('<p>Text</p>', article)
+        self.assertNotIn('data-i18n', article)
+
+    def test_reader_mobile_controls_use_translatable_accessible_labels(self):
+        html = self._chapter_html()
+
+        self.assertIn('data-i18n="reader.theme"', html)
+        self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
+
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

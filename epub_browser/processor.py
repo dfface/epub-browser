@@ -1115,12 +1115,10 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
         """创建章节页面模板"""
         prev_href = f'href="/book/{self.book_hash}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{self.book_hash}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
-        prev_chapter = f'Perv chapter' if chapter_index > 0 else 'First chapter'
-        next_chapter = f'Next chapter' if chapter_index < len(self.chapters) - 1 else 'Last chapter'
-        prev_link = f'<a {prev_href} alt="previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name">{prev_chapter}</span></div></a>'
-        next_link = f'<a {next_href} alt="next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name">{next_chapter}</span></div></a>'
-        prev_link_mobile = f'<a {prev_href} alt="previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span>{prev_chapter.replace(" chapter", "")}</span></div></a>'
-        next_link_mobile = f'<a {next_href} alt="next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span>{next_chapter.replace(" chapter", "")}</span></div></a>'
+        prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
+        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="en">
@@ -1234,33 +1232,33 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="top-controls">
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
-            <span class="control-name">Theme</span>
+            <span class="control-name" data-i18n="reader.theme">Theme</span>
         </div>
 
         <div class="control-btn" id="togglePagination">
             <i class="fas fa-book-open"></i>
-            <span class="control-name">Turning</span>
+            <span class="control-name" data-i18n="reader.turning">Turning</span>
         </div>
 
-        <div class="control-btn" id="bookHomeToggle">
+        <div class="control-btn" id="bookHomeToggle" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
             <i class="fas fa-book"></i>
-            <span class="control-name">Book</span>
+            <span class="control-name" data-i18n="reader.book">Book</span>
         </div>
 
         <div class="control-btn" id="tocToggle">
             <i class="fas fa-list"></i>
-            <span class="control-name">Toc</span>
+            <span class="control-name" data-i18n="reader.tableOfContents">Table of contents</span>
         </div>
     </div>
 
     <div class="toc-floating" id="bookHomeFloating">
         <div class="toc-header">
-            <h3>Toc</h3>
+            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
             <div class="toc-header-actions">
-                <a class="toc-book-home" href="index.html" aria-label="Open book home">
-                    <i class="fas fa-book" aria-hidden="true"></i><span>Book home</span>
+                <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+                    <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
                 </a>
-                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close table of contents">
+                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close book home" data-i18n-aria-label="reader.closeBookHome">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
@@ -1272,8 +1270,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
     <div class="toc-floating" id="tocFloating">
         <div class="toc-header">
-            <h3>Toc</h3>
-            <button class="toc-close" id="tocClose">
+            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
+            <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -1283,8 +1281,8 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
 
     <div class="chapter-top-bar">
-        <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-            <a href="/" aria-label="Library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label">Library</span></a>
+        <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
+            <a href="/" aria-label="Library" data-i18n-aria-label="reader.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="reader.library">Library</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
             <span class="breadcrumb-separator">/</span>
@@ -1293,7 +1291,7 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     </div>
     <div class="container">
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
-            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content">
+            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
             <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
@@ -1303,54 +1301,54 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
 
         <div class="navigation" data-id="navigation">
             {prev_link}
-            <a href="/" alt="home" id="navigationHomeBtn">
+            <a href="/" aria-label="Home" data-i18n-aria-label="reader.home" id="navigationHomeBtn">
                 <div class="control-btn">
                     <i class="fas fa-home"></i>
-                    <span class="control-name">Home</span>
+                    <span class="control-name" data-i18n="reader.home">Home</span>
                 </div>
             </a>
 
             <div id="paginationInfo" style="display: none;">
                 <div class="control-btn" id="prevPage" style="padding-right: 40px;">
                     <i class="fas fa-chevron-left"></i>
-                    <span class="control-name">Prev page</span>
+                    <span class="control-name" data-i18n="reader.previousPage">Previous page</span>
                 </div>
                 <div style="display: flex; flex-direction: row;">
                     <span class="page-indicator">
                         <span id="currentPage" style="display:none;"></span>
-                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1"> / <span id="totalPages">1</span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1" aria-label="Current page" data-i18n-aria-label="reader.currentPage"> / <span id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
                     </span>
-                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump">
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump" data-i18n-title="reader.jump">
                         <i class="fas fa-arrow-right-to-bracket"></i>
-                        <span class="control-name">Jump</span>
+                        <span class="control-name" data-i18n="reader.jump">Jump</span>
                     </div>
-                    <div class="control-btn" id="toggleClickPage" title="Click to turn page">
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page" data-i18n-title="reader.clickToTurn">
                         <i class="fas fa-hand-pointer"></i>
-                        <span class="control-name">Click</span>
+                        <span class="control-name" data-i18n="reader.clickToTurn">Click to turn page</span>
                     </div>
                     <!-- Pure button only for desktop -->
-                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode">
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode" data-i18n-title="reader.pureReading">
                         <i class="fas fa-book-open"></i>
-                        <span class="control-name">Pure</span>
+                        <span class="control-name" data-i18n="reader.pureReading">Pure reading mode</span>
                     </div>
                     <!-- Reload button for pagination mode -->
-                    <div class="control-btn" id="reloadPages" title="Reload pages">
+                    <div class="control-btn" id="reloadPages" title="Reload pages" data-i18n-title="reader.reloadPages">
                         <i class="fas fa-rotate-right"></i>
-                        <span class="control-name">Reload</span>
+                        <span class="control-name" data-i18n="reader.reloadPages">Reload pages</span>
                     </div>
                 </div>
                 <div style="display: none; flex-direction: row;" class="page-height-adjustment">
                     <span>
-                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1">
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1" aria-label="Page height" data-i18n-aria-label="reader.pageHeight">
                     </span>
-                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height">
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height" data-i18n-title="reader.setPageHeight">
                         <i class="fas fa-ruler-vertical"></i>
-                        <span class="control-name">Set page height</span>
+                        <span class="control-name" data-i18n="reader.setPageHeight">Set page height</span>
                     </div>
                 </div>
                 <div class="control-btn" id="nextPage" style="padding-left: 40px;">
                     <i class="fas fa-chevron-right"></i>
-                    <span class="control-name">Next page</span>
+                    <span class="control-name" data-i18n="reader.nextPage">Next page</span>
                 </div>
             </div>
             {next_link}
@@ -1361,42 +1359,42 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="settings-modal" id="settingsModal" data-id="settingsModal">
         <div class="settings-header">
             <i class="fas fa-cog"></i>
-            <span>Settings</span>
-            <button class="settings-close-btn" id="settingsCloseBtn">
+            <span data-i18n="reader.settings">Settings</span>
+            <button class="settings-close-btn" id="settingsCloseBtn" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="settings-tabs">
             <button class="settings-tab active" data-tab="font">
                 <i class="fas fa-font"></i>
-                <span>Font</span>
+                <span data-i18n="settings.appearance">Appearance</span>
             </button>
             <button class="settings-tab" data-tab="reading">
                 <i class="fas fa-book-reader"></i>
-                <span>Reading</span>
+                <span data-i18n="settings.reading">Reading</span>
             </button>
         </div>
         <div class="settings-content">
             <div class="settings-tab-panel active" id="font-tab">
                 <div class="settings-group">
-                    <label class="settings-label">Font Family</label>
+                    <label class="settings-label" data-i18n="settings.fontFamily">Font family</label>
         <div class="font-family-selector">
             <select id="fontFamilySelect">
-                <option value="ebook-default" selected>Book default</option>
-                <option value="system-ui, -apple-system, sans-serif">System default</option>
-                <option value="custom">Custom by input</option>
+                <option value="ebook-default" selected data-i18n="settings.bookDefault">Book default</option>
+                <option value="system-ui, -apple-system, sans-serif" data-i18n="settings.systemDefault">System default</option>
+                <option value="custom" data-i18n="settings.customByInput">Custom by input</option>
             </select>
         </div>
         <div class="custom-font-input" id="customFontInput" style="display: none;">
-            <input type="text" id="customFontFamily" placeholder="Input font name here">
-            <small>Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <input type="text" id="customFontFamily" placeholder="Input font name here" data-i18n-placeholder="settings.customFontPlaceholder">
+            <small data-i18n="settings.customFontTip">Tip: Font family applies globally. Ensure it’s installed in the system.</small>
             <button class="css-btn primary" id="applyFontSettings">
-                <i class="fas fa-check"></i> Apply
+                <i class="fas fa-check"></i> <span data-i18n="settings.apply">Apply</span>
             </button>
         </div>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label">Font Size</label>
+                    <label class="settings-label" data-i18n="settings.fontSize">Font size</label>
                     <div class="font-size-control">
                         <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
                         <div class="font-size-scale">
@@ -1413,48 +1411,48 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
             </div>
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
-                    <label class="settings-label">Reading mode</label>
+                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
                     <label class="settings-switch">
                         <input type="checkbox" id="showReadingProgressBarToggle" checked>
                         <span class="switch-slider"></span>
-                        <span class="switch-text">Show reading progress bar</span>
+                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
                     </label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
-                        <span class="switch-text">Enable Continuous Scroll</span>
-                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off.">
+                        <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip">
                             <i class="fas fa-info-circle"></i>
                         </span>
                     </label>
                 </div>
                 <div class="settings-group settings-group-custom-css">
                     <div class="settings-section-heading">
-                        <span class="settings-section-title">Custom styles</span>
-                        <span class="settings-section-optional">Optional</span>
+                        <span class="settings-section-title" data-i18n="settings.customStyles">Custom styles</span>
+                        <span class="settings-section-optional" data-i18n="settings.optional">Optional</span>
                     </div>
-                    <p class="settings-section-description">Use CSS to fine-tune this book’s typography and layout.</p>
+                    <p class="settings-section-description" data-i18n="settings.customStylesDescription">Use CSS to fine-tune this book’s typography and layout.</p>
                     <div class="css-editor">
-                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}"></textarea>
+                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{{background: inherit; box-shadow:inherit;}} #eb-content{{margin: 50px; width: auto}} #eb-content p {{margin-bottom: 0.8rem; line-height: 1.7;}}" data-i18n-placeholder="settings.customCssPlaceholder"></textarea>
                         <div class="css-controls">
                             <button class="css-btn primary" id="saveCssBtn">
-                                <i class="fas fa-save"></i> Save
+                                <i class="fas fa-save"></i> <span data-i18n="settings.save">Save</span>
                             </button>
                             <button class="css-btn primary" id="saveAsDefaultBtn">
-                                <i class="fas fa-star"></i> Save as default
+                                <i class="fas fa-star"></i> <span data-i18n="settings.saveAsDefault">Save as default</span>
                             </button>
                             <button class="css-btn secondary" id="resetCssBtn">
-                                <i class="fas fa-undo"></i> Reset
+                                <i class="fas fa-undo"></i> <span data-i18n="settings.reset">Reset</span>
                             </button>
                             <button class="css-btn secondary" id="loadDefaultBtn">
-                                <i class="fas fa-download"></i> Load default
+                                <i class="fas fa-download"></i> <span data-i18n="settings.loadDefault">Load default</span>
                             </button>
                             <button class="css-btn secondary" id="previewCssBtn">
-                                <i class="fas fa-eye"></i> Preview
+                                <i class="fas fa-eye"></i> <span data-i18n="settings.preview">Preview</span>
                             </button>
                         </div>
                         <div class="css-info">
-                            <p><i class="fas fa-info-circle"></i> Tip: The default style will be applied to all books unless a custom style is set for specific books.</p>
+                            <p><i class="fas fa-info-circle"></i> <span data-i18n="settings.defaultStyleTip">Tip: The default style will be applied to all books unless a custom style is set for specific books.</span></p>
                         </div>
                     </div>
                 </div>
@@ -1465,20 +1463,20 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="reading-controls" data-id="reading-controls">
         <div class="control-btn" id="scrollToTopBtn">
             <i class="fas fa-arrow-up"></i>
-            <span class="control-name">Top</span>
+            <span class="control-name" data-i18n="reader.top">Top</span>
         </div>
         <div class="control-btn" id="settingsControlBtn">
             <i class="fas fa-cog"></i>
-            <span class="control-name">Settings</span>
+            <span class="control-name" data-i18n="reader.settings">Settings</span>
         </div>
         <button class="control-btn" id="bookshelfBtn" style="display: none;">
             <i class="fas fa-bookmark"></i>
-            <span class="control-name">Shelf</span>
+            <span class="control-name" data-i18n="reader.shelf">Shelf</span>
         </button>
-        <a href="/" alt="Home">
+        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
-                <span class="control-name">Home</span>
+                <span class="control-name" data-i18n="reader.home">Home</span>
             </div>
         </a>
     </div>
@@ -1487,35 +1485,35 @@ function reloadScriptByReplacement(scriptElement, newSrc) {
     <div class="mobile-controls" data-id="mobile-controls">
         <div class="control-btn" id="mobileTocBtn">
             <i class="fas fa-list"></i>
-            <span>Toc</span>
+            <span data-i18n="reader.tableOfContents">Table of contents</span>
         </div>
         <div class="control-btn" id="mobileThemeBtn">
             <i class="fas fa-moon"></i>
-            <span>Theme</span>
+            <span data-i18n="reader.theme">Theme</span>
         </div>
         <div class="control-btn" id="mobileTogglePagination">
             <i class="fas fa-book-open"></i>
-            <span class="control-name">Turning</span>
+            <span class="control-name" data-i18n="reader.turning">Turning</span>
         </div>
         {prev_link_mobile}
-        <a href="/" alt="Home">
+        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
             <div class="control-btn">
                 <i class="fas fa-home"></i>
-                <span>Home</span>
+                <span data-i18n="reader.home">Home</span>
             </div>
         </a>
         {next_link_mobile}
-        <div class="control-btn" id="mobileBookHomeBtn">
+        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
             <i class="fas fa-book"></i>
-            <span>Book</span>
+            <span data-i18n="reader.book">Book</span>
         </div>
         <div class="control-btn" id="mobileSettingsBtn">
             <i class="fas fa-cog"></i>
-            <span>Settings</span>
+            <span data-i18n="reader.settings">Settings</span>
         </div>
         <div class="control-btn" id="mobileTopBtn">
             <i class="fas fa-arrow-up"></i>
-            <span>Top</span>
+            <span data-i18n="reader.top">Top</span>
         </div>
     </div>
 
