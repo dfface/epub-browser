@@ -117,50 +117,51 @@ class ServerLibraryManager:
                 )
 
     def prepare_public_shell(self) -> Path:
-        if not self._staging_prepared:
-            shutil.rmtree(self.staging_dir, ignore_errors=True)
-            self.staging_dir.mkdir(parents=True, exist_ok=True)
-            self._staging_prepared = True
-        self.public_dir.mkdir(parents=True, exist_ok=True)
-        assets_dir = Path(__file__).with_name("assets")
-        self._assets = AssetPublisher(
-            assets_dir,
-            self.public_dir,
-            urls=self.urls,
-        ).publish()
         with self._commit_lock:
+            if self._stop_event.is_set():
+                return self.public_dir
+            if not self._staging_prepared:
+                shutil.rmtree(self.staging_dir, ignore_errors=True)
+                self.staging_dir.mkdir(parents=True, exist_ok=True)
+                self._staging_prepared = True
+            self.public_dir.mkdir(parents=True, exist_ok=True)
+            assets_dir = Path(__file__).with_name("assets")
+            self._assets = AssetPublisher(
+                assets_dir,
+                self.public_dir,
+                urls=self.urls,
+            ).publish()
             self._refresh_public_shell()
         return self.public_dir
 
     def reconcile(self) -> ReconcileSummary:
-        self._notify_callback(self.on_reconcile_started)
+        with self._commit_lock:
+            if self._stop_event.is_set():
+                return self._stopped_summary()
+            self._notify_callback(self.on_reconcile_started)
         with self._reconcile_lock:
             try:
                 discovered = self._discover_sources()
             except _ConversionCancelled:
-                return ReconcileSummary(
-                    converted=0,
-                    reused=0,
-                    removed=0,
-                    failures=(),
-                    active_books=self._valid_active_records(),
-                )
+                return self._stopped_summary()
             if self._stop_event.is_set():
-                return ReconcileSummary(
-                    converted=0,
-                    reused=0,
-                    removed=0,
-                    failures=(),
-                    active_books=self._valid_active_records(),
-                )
+                return self._stopped_summary()
             discovered_set = {str(path) for path in discovered}
             removed = 0
-            for record in self.state_store.active_books():
-                if record.source_path not in discovered_set:
-                    self.state_store.mark_missing(record.book_id)
-                    removed += 1
+            with self._commit_lock:
+                if self._stop_event.is_set():
+                    return self._stopped_summary()
+                for record in self.state_store.active_books():
+                    if record.source_path not in discovered_set:
+                        self.state_store.mark_missing(record.book_id)
+                        removed += 1
+
+            if self._stop_event.is_set():
+                return self._stopped_summary(removed=removed)
 
             self.prepare_public_shell()
+            if self._stop_event.is_set():
+                return self._stopped_summary(removed=removed)
             legacy_ids = self._legacy_id_matches(discovered)
             reused_records = []
             plans = []
@@ -281,24 +282,36 @@ class ServerLibraryManager:
                 )
 
             if self._stop_event.is_set():
-                return ReconcileSummary(
-                    converted=0,
+                return self._stopped_summary(
                     reused=len(reused_records),
                     removed=removed,
-                    failures=tuple(failures),
-                    active_books=self._valid_active_records(),
+                    failures=failures,
                 )
 
             converted_records = []
             self._publish_current_state(failures)
             if plans:
                 for plan, converted, error in self._conversion_outcomes(plans):
+                    if self._stop_event.is_set():
+                        return self._stopped_summary(
+                            converted=len(converted_records),
+                            reused=len(reused_records),
+                            removed=removed,
+                            failures=failures,
+                        )
                     if error is None:
                         converted_records.append(converted)
                     elif not isinstance(error, _ConversionCancelled):
                         kept = self._cache_valid(plan.record)
                         if not kept:
                             with self._commit_lock:
+                                if self._stop_event.is_set():
+                                    return self._stopped_summary(
+                                        converted=len(converted_records),
+                                        reused=len(reused_records),
+                                        removed=removed,
+                                        failures=failures,
+                                    )
                                 self.state_store.mark_missing(plan.record.book_id)
                         failures.append(
                             ConversionFailure(
@@ -311,14 +324,23 @@ class ServerLibraryManager:
                         self.reporter.detail(
                             f"Failed to convert {plan.source}: {error}"
                         )
+                    if self._stop_event.is_set():
+                        return self._stopped_summary(
+                            converted=len(converted_records),
+                            reused=len(reused_records),
+                            removed=removed,
+                            failures=failures,
+                        )
                     self._publish_current_state(failures)
 
-            active_records = self._publish_current_state(failures)
-            if self.migration_manager:
-                self.migration_manager.record_cache_reconciled(
-                    successful=not failures
-                    and len(active_records) == len(discovered)
+            if self._stop_event.is_set():
+                return self._stopped_summary(
+                    converted=len(converted_records),
+                    reused=len(reused_records),
+                    removed=removed,
+                    failures=failures,
                 )
+            active_records = self._publish_current_state(failures)
             summary = ReconcileSummary(
                 converted=len(converted_records),
                 reused=len(reused_records),
@@ -328,8 +350,39 @@ class ServerLibraryManager:
                 ),
                 active_books=active_records,
             )
-            self._notify_callback(self.on_reconciled, summary)
+            with self._commit_lock:
+                if self._stop_event.is_set():
+                    return self._stopped_summary(
+                        converted=len(converted_records),
+                        reused=len(reused_records),
+                        removed=removed,
+                        failures=failures,
+                    )
+                if self.migration_manager:
+                    self.migration_manager.record_cache_reconciled(
+                        successful=not failures
+                        and len(active_records) == len(discovered)
+                    )
+                self._notify_callback(self.on_reconciled, summary)
             return summary
+
+    def _stopped_summary(
+        self,
+        *,
+        converted: int = 0,
+        reused: int = 0,
+        removed: int = 0,
+        failures: Sequence[ConversionFailure] = (),
+    ) -> ReconcileSummary:
+        return ReconcileSummary(
+            converted=converted,
+            reused=reused,
+            removed=removed,
+            failures=tuple(
+                sorted(failures, key=lambda failure: str(failure.source))
+            ),
+            active_books=self._valid_active_records(),
+        )
 
     def _conversion_outcomes(self, plans):
         pending = queue.Queue()
@@ -682,6 +735,8 @@ class ServerLibraryManager:
         failures: Sequence[ConversionFailure],
     ) -> tuple[BookRecord, ...]:
         with self._commit_lock:
+            if self._stop_event.is_set():
+                return self._valid_active_records()
             self._refresh_public_shell()
             active_records = self._valid_active_records()
             self._write_catalog(active_records, failures)
@@ -719,6 +774,8 @@ class ServerLibraryManager:
         if self._assets is None:
             self.prepare_public_shell()
         with self._commit_lock:
+            if self._stop_event.is_set():
+                return
             record = self.state_store.book_by_source(Path(path))
             if record:
                 self.state_store.mark_missing(record.book_id)

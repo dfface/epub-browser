@@ -195,6 +195,57 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(self.store.active_books(), ())
         manager.shutdown()
 
+    def test_request_stop_does_not_start_a_final_publication(self):
+        class BlockingProcessor(EPUBProcessor):
+            started = threading.Event()
+            release = threading.Event()
+            cleaned = threading.Event()
+
+            def convert(self):
+                self.started.set()
+                self.release.wait(timeout=5)
+                return super().convert()
+
+            def cleanup(self):
+                try:
+                    super().cleanup()
+                finally:
+                    self.cleaned.set()
+
+        manager = self._manager(BlockingProcessor)
+        manager.migration_manager.record_cache_reconciled = mock.Mock(
+            wraps=manager.migration_manager.record_cache_reconciled
+        )
+        manager.on_reconciled = mock.Mock()
+        publications = []
+        original_publish = manager._publish_current_state
+
+        def record_publication(failures):
+            publications.append(tuple(failures))
+            return original_publish(failures)
+
+        manager._publish_current_state = record_publication
+        result = []
+        reconcile_thread = threading.Thread(
+            target=lambda: result.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(BlockingProcessor.started.wait(timeout=2))
+            manager.request_stop()
+            reconcile_thread.join(timeout=1)
+            self.assertFalse(reconcile_thread.is_alive())
+            self.assertEqual(len(publications), 1)
+        finally:
+            BlockingProcessor.release.set()
+            BlockingProcessor.cleaned.wait(timeout=5)
+
+        self.assertEqual(result[0].active_books, ())
+        manager.migration_manager.record_cache_reconciled.assert_not_called()
+        manager.on_reconciled.assert_not_called()
+        manager.shutdown()
+
     def test_generated_cache_bootstraps_server_mode(self):
         manager = self._manager()
 
