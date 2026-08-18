@@ -12,6 +12,7 @@ from typing import Callable, Optional, Sequence
 
 from .asset_publisher import AssetPublisher, PublishedAssets
 from .identity import source_sha256
+from .library_progress import LibraryProgressBroker
 from .migration import MigrationManager
 from .models import BookMetadata, ConvertedBook
 from .processor import EPUBProcessor
@@ -75,6 +76,7 @@ class ServerLibraryManager:
         reporter: Optional[Reporter] = None,
         converter_factory: Callable = EPUBProcessor,
         max_workers: int = 4,
+        progress_broker: Optional[LibraryProgressBroker] = None,
     ):
         self.server_dir = Path(server_dir).expanduser().resolve()
         self._source_inputs = tuple(
@@ -86,12 +88,14 @@ class ServerLibraryManager:
         self.reporter = reporter or Reporter(False)
         self.converter_factory = converter_factory
         self.max_workers = max(1, max_workers)
+        self.progress_broker = progress_broker or LibraryProgressBroker()
         self.urls = SiteURLs()
         self.cache_dir = self.server_dir / "cache"
         self.public_dir = self.cache_dir / "public"
         self.staging_dir = self.cache_dir / "staging"
         self.catalog_path = self.cache_dir / "catalog.json"
         self._assets = None
+        self._published_library_signature = None
         self._staging_prepared = False
         self._reconcile_lock = threading.Lock()
         self._commit_lock = threading.Lock()
@@ -118,6 +122,8 @@ class ServerLibraryManager:
                 )
 
     def prepare_public_shell(self) -> Path:
+        visible_changed = False
+        active_records = ()
         with self._commit_lock:
             if self._stop_event.is_set():
                 return self.public_dir
@@ -133,14 +139,23 @@ class ServerLibraryManager:
                 urls=self.urls,
             ).publish()
             self._refresh_public_shell()
+            active_records = self._valid_active_records()
+            signature = self._library_signature(active_records)
+            visible_changed = signature != self._published_library_signature
+            self._published_library_signature = signature
+        if visible_changed:
+            self.progress_broker.catalog_published(len(active_records))
         return self.public_dir
 
-    def reconcile(self) -> ReconcileSummary:
+    def reconcile(self, trigger: str = "startup") -> ReconcileSummary:
         with self._commit_lock:
             if self._stop_event.is_set():
                 return self._stopped_summary()
             self._notify_callback(self.on_reconcile_started)
         with self._reconcile_lock:
+            if self._stop_event.is_set():
+                return self._stopped_summary()
+            self.progress_broker.start_generation(trigger)
             try:
                 discovered = self._discover_sources()
             except _ConversionCancelled:
@@ -156,6 +171,8 @@ class ServerLibraryManager:
                     if record.source_path not in discovered_set:
                         self.state_store.mark_missing(record.book_id)
                         removed += 1
+
+            self.progress_broker.mark_discovered(len(discovered), removed)
 
             if self._stop_event.is_set():
                 return self._stopped_summary(removed=removed)
@@ -178,6 +195,8 @@ class ServerLibraryManager:
                     failures.append(
                         ConversionFailure(source, None, str(error), False)
                     )
+                    self._mark_missing_if_deleted(source, existing)
+                    self.progress_broker.record_failure(source, error)
                     continue
 
                 if (
@@ -203,8 +222,11 @@ class ServerLibraryManager:
                         failures.append(
                             ConversionFailure(source, existing.book_id, str(error), True)
                         )
+                        self._mark_missing_if_deleted(source, existing)
+                        self.progress_broker.record_failure(source, error)
                         continue
                     reused_records.append(record)
+                    self.progress_broker.record_reused(source)
                     continue
 
                 try:
@@ -240,6 +262,8 @@ class ServerLibraryManager:
                             kept,
                         )
                     )
+                    self._mark_missing_if_deleted(source, existing)
+                    self.progress_broker.record_failure(source, error)
                     continue
 
                 if (
@@ -268,8 +292,11 @@ class ServerLibraryManager:
                                 True,
                             )
                         )
+                        self._mark_missing_if_deleted(source, record)
+                        self.progress_broker.record_failure(source, error)
                         continue
                     reused_records.append(record)
+                    self.progress_broker.record_reused(source)
                     continue
                 plans.append(
                     _ConversionPlan(
@@ -290,7 +317,9 @@ class ServerLibraryManager:
                 )
 
             converted_records = []
-            self._publish_current_state(failures)
+            active_records, visible_changed = self._publish_current_state(failures)
+            if visible_changed:
+                self.progress_broker.catalog_published(len(active_records))
             if plans:
                 for plan, converted, error in self._conversion_outcomes(plans):
                     if self._stop_event.is_set():
@@ -332,7 +361,17 @@ class ServerLibraryManager:
                             removed=removed,
                             failures=failures,
                         )
-                    self._publish_current_state(failures)
+                    active_records, visible_changed = self._publish_current_state(failures)
+                    if visible_changed:
+                        self.progress_broker.catalog_published(len(active_records))
+                    if error is None:
+                        self.progress_broker.record_converted(plan.source)
+                    elif not isinstance(error, _ConversionCancelled):
+                        self.progress_broker.record_failure(
+                            plan.source,
+                            error,
+                            in_flight=True,
+                        )
 
             if self._stop_event.is_set():
                 return self._stopped_summary(
@@ -341,7 +380,9 @@ class ServerLibraryManager:
                     removed=removed,
                     failures=failures,
                 )
-            active_records = self._publish_current_state(failures)
+            active_records, visible_changed = self._publish_current_state(failures)
+            if visible_changed:
+                self.progress_broker.catalog_published(len(active_records))
             summary = ReconcileSummary(
                 converted=len(converted_records),
                 reused=len(reused_records),
@@ -364,6 +405,7 @@ class ServerLibraryManager:
                         successful=not failures
                         and len(active_records) == len(discovered)
                     )
+                self.progress_broker.finish(len(active_records))
                 self._notify_callback(self.on_reconciled, summary)
             return summary
 
@@ -401,6 +443,7 @@ class ServerLibraryManager:
                 if self._stop_event.is_set():
                     return
                 try:
+                    self.progress_broker.conversion_started()
                     converted = self._convert_plan(plan)
                 except BaseException as error:
                     completed.put((plan, None, error))
@@ -661,6 +704,17 @@ class ServerLibraryManager:
             if self._cache_valid(record)
         )
 
+    def _mark_missing_if_deleted(
+        self,
+        source: Path,
+        record: Optional[BookRecord],
+    ) -> None:
+        if record is None or source.exists():
+            return
+        with self._commit_lock:
+            if not self._stop_event.is_set():
+                self.state_store.mark_missing(record.book_id)
+
     def _refresh_public_shell(self) -> None:
         if self._assets is None:
             return
@@ -735,14 +789,24 @@ class ServerLibraryManager:
     def _publish_current_state(
         self,
         failures: Sequence[ConversionFailure],
-    ) -> tuple[BookRecord, ...]:
+    ) -> tuple[tuple[BookRecord, ...], bool]:
         with self._commit_lock:
             if self._stop_event.is_set():
-                return self._valid_active_records()
-            self._refresh_public_shell()
+                return self._valid_active_records(), False
             active_records = self._valid_active_records()
+            signature = self._library_signature(active_records)
+            visible_changed = signature != self._published_library_signature
+            self._refresh_public_shell()
             self._write_catalog(active_records, failures)
-            return active_records
+            self._published_library_signature = signature
+            return active_records, visible_changed
+
+    @staticmethod
+    def _library_signature(records: Sequence[BookRecord]):
+        return tuple(
+            (record.book_id, record.metadata_json)
+            for record in records
+        )
 
     def queue_path(self, path: Path):
         if self._stop_event.is_set():
@@ -762,7 +826,7 @@ class ServerLibraryManager:
         while True:
             with self._event_lock:
                 snapshot = dict(self._queued_generations)
-            self.reconcile()
+            self.reconcile(trigger="watch")
             with self._event_lock:
                 for path, generation in snapshot.items():
                     if self._queued_generations.get(path) == generation:
@@ -773,16 +837,25 @@ class ServerLibraryManager:
     def mark_deleted(self, path: Path) -> None:
         if self._stop_event.is_set():
             return
-        if self._assets is None:
-            self.prepare_public_shell()
-        with self._commit_lock:
-            if self._stop_event.is_set():
-                return
-            record = self.state_store.book_by_source(Path(path))
-            if record:
+        with self._reconcile_lock:
+            with self._commit_lock:
+                if self._stop_event.is_set():
+                    return
+                record = self.state_store.book_by_source(Path(path))
+                if not record or not record.active:
+                    return
+            if self._assets is None:
+                self.prepare_public_shell()
+            with self._commit_lock:
+                if self._stop_event.is_set():
+                    return
                 self.state_store.mark_missing(record.book_id)
-                self._refresh_public_shell()
-                self._write_catalog(self._valid_active_records(), ())
+            self.progress_broker.start_generation("watch")
+            self.progress_broker.mark_discovered(total=0, removed=1)
+            active_records, visible_changed = self._publish_current_state(())
+            if visible_changed:
+                self.progress_broker.catalog_published(len(active_records))
+            self.progress_broker.finish(len(active_records))
 
     def request_stop(self) -> None:
         self._stop_event.set()

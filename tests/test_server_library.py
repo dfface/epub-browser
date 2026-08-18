@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import shutil
@@ -10,6 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from epub_browser.identity import source_sha256
+from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.server_library import ServerLibraryManager
@@ -30,7 +32,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         result = self.migration.prepare_data()
         self.store = StateStore(result.database_path)
 
-    def _manager(self, converter_factory=EPUBProcessor):
+    def _manager(self, converter_factory=EPUBProcessor, **kwargs):
         return ServerLibraryManager(
             server_dir=self.server_dir,
             sources=(self.source_dir,),
@@ -38,7 +40,66 @@ class ServerLibraryManagerTests(unittest.TestCase):
             migration_manager=self.migration,
             converter_factory=converter_factory,
             max_workers=2,
+            **kwargs,
         )
+
+    @staticmethod
+    def _latest_subscription_snapshot(loop, subscription):
+        loop.run_until_complete(asyncio.sleep(0))
+        latest = None
+        while not subscription.queue.empty():
+            latest = subscription.queue.get_nowait()
+        return latest
+
+    def test_reconcile_reports_incremental_progress_and_catalog_publication(self):
+        broker = LibraryProgressBroker()
+        second_source = self.source_dir / "second.epub"
+        self._write_epub(second_source, "Second")
+        manager = self._manager(progress_broker=broker)
+
+        summary = manager.reconcile()
+        snapshot = broker.snapshot()
+
+        self.assertFalse(summary.cancelled)
+        self.assertEqual(snapshot.phase, "complete")
+        self.assertEqual(snapshot.total, 2)
+        self.assertEqual(snapshot.completed, 2)
+        self.assertEqual(snapshot.active_books, 2)
+        self.assertGreaterEqual(snapshot.catalog_revision, 1)
+        manager.shutdown()
+
+    def test_watch_reconcile_creates_watch_generation(self):
+        broker = LibraryProgressBroker()
+        manager = self._manager(progress_broker=broker)
+        manager.reconcile()
+        manager.reconcile(trigger="watch")
+
+        snapshot = broker.snapshot()
+        self.assertEqual(snapshot.generation, 2)
+        self.assertEqual(snapshot.trigger, "watch")
+        manager.shutdown()
+
+    def test_cancelled_reconcile_does_not_publish_terminal_success(self):
+        broker = LibraryProgressBroker()
+        manager = self._manager(progress_broker=broker)
+        manager.request_stop()
+
+        summary = manager.reconcile()
+
+        self.assertTrue(summary.cancelled)
+        self.assertNotIn(broker.snapshot().phase, {"complete", "degraded"})
+        manager.shutdown()
+
+    def test_unknown_delete_does_not_start_a_watch_generation(self):
+        broker = LibraryProgressBroker()
+        manager = self._manager(progress_broker=broker)
+
+        manager.mark_deleted(self.source_dir / "unknown.epub")
+
+        snapshot = broker.snapshot()
+        self.assertEqual(snapshot.generation, 0)
+        self.assertEqual(snapshot.catalog_revision, 0)
+        manager.shutdown()
 
     def test_second_reconcile_reuses_unchanged_book_cache(self):
         converter = mock.Mock(side_effect=EPUBProcessor)
@@ -287,7 +348,14 @@ class ServerLibraryManagerTests(unittest.TestCase):
         manager.shutdown()
 
     def test_failed_update_keeps_previous_cache_and_reports_degraded(self):
-        manager = self._manager()
+        broker = LibraryProgressBroker()
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        asyncio.set_event_loop(loop)
+        subscription = broker.subscribe(loop)
+        asyncio.set_event_loop(None)
+        self.addCleanup(subscription.close)
+        manager = self._manager(progress_broker=broker)
         first = manager.reconcile().active_books[0]
         chapter_path = (
             self.server_dir
@@ -301,11 +369,11 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self._write_epub(self.source, "Changed")
 
         class FailingProcessor:
-            def __init__(self, *args, **kwargs):
-                pass
+            def __init__(self, epub_path, *args, **kwargs):
+                self.epub_path = epub_path
 
             def convert(self):
-                raise RuntimeError("conversion failed")
+                raise RuntimeError(f"conversion failed {self.epub_path}")
 
         manager.converter_factory = FailingProcessor
         summary = manager.reconcile()
@@ -314,6 +382,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(summary.failed, 1)
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
         self.assertEqual(self.store.active_books()[0].book_id, first.book_id)
+        snapshot = self._latest_subscription_snapshot(loop, subscription)
+        self.assertEqual(snapshot.phase, "degraded")
+        self.assertEqual(snapshot.failures[0].filename, self.source.name)
+        self.assertNotIn(self.temporary.name, str(snapshot.failures))
 
         manager.converter_factory = EPUBProcessor
         retried = manager.reconcile()
@@ -361,7 +433,14 @@ class ServerLibraryManagerTests(unittest.TestCase):
                     self.release_slow.wait(timeout=5)
                 return super().convert()
 
-        manager = self._manager(IncrementalProcessor)
+        broker = LibraryProgressBroker()
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        asyncio.set_event_loop(loop)
+        subscription = broker.subscribe(loop)
+        asyncio.set_event_loop(None)
+        self.addCleanup(subscription.close)
+        manager = self._manager(IncrementalProcessor, progress_broker=broker)
         result = []
         reconcile_thread = threading.Thread(
             target=lambda: result.append(manager.reconcile()),
@@ -370,6 +449,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
         reconcile_thread.start()
         try:
             self.assertTrue(IncrementalProcessor.slow_started.wait(timeout=2))
+            snapshot = self._latest_subscription_snapshot(loop, subscription)
+            self.assertGreater(snapshot.in_flight, 0)
             deadline = time.monotonic() + 2
             published = []
             while time.monotonic() < deadline:
@@ -382,6 +463,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
 
             self.assertEqual(len(published), 1)
             self.assertTrue(reconcile_thread.is_alive())
+            snapshot = self._latest_subscription_snapshot(loop, subscription)
+            self.assertGreaterEqual(snapshot.catalog_revision, 1)
         finally:
             IncrementalProcessor.release_slow.set()
             reconcile_thread.join(timeout=5)
