@@ -62,7 +62,8 @@
       state: initialState(),
       accept: accept,
       dismiss: dismiss,
-      disconnected: disconnected
+      disconnected: disconnected,
+      render: render
     };
 
     function requestMetadataRefresh(revision) {
@@ -251,6 +252,9 @@
     var mount = root.document.getElementById('libraryProgress');
     if (root.EpubBrowserMode !== 'server' || !mount || !root.EventSource) return null;
     var controller = createController(createDomOptions(root, mount));
+    if (root.EpubBrowserI18n && root.EpubBrowserI18n.onLocaleChange) {
+      root.EpubBrowserI18n.onLocaleChange(function() { controller.render(); });
+    }
     var source = new root.EventSource(eventUrl(root));
     source.addEventListener('progress', function(event) {
       try { controller.accept(JSON.parse(event.data)); } catch (error) {}

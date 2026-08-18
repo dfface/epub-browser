@@ -221,6 +221,8 @@ test('only exposes and honors the close action for completed generations', () =>
 test('starts EventSource at the normalized server events URL and wires progress, reconnect, and close', () => {
   const harness = progressMount();
   let source;
+  let localeChangeListener;
+  let locale = 'en';
   function FakeEventSource(url) {
     this.url = url;
     this.listeners = {};
@@ -231,7 +233,10 @@ test('starts EventSource at the normalized server events URL and wires progress,
     EpubBrowserMode: 'server',
     EpubBrowserBasePath: '/reader/',
     EventSource: FakeEventSource,
-    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserI18n: {
+      t(key) { return locale + ':' + key; },
+      onLocaleChange(listener) { localeChangeListener = listener; },
+    },
     document: {
       getElementById(id) { return id === 'libraryProgress' ? harness.mount : null; },
       createElement: harness.createElement,
@@ -244,6 +249,10 @@ test('starts EventSource at the normalized server events URL and wires progress,
   assert.equal(source.url, '/reader/api/library-events');
   source.listeners.progress({ data: JSON.stringify(snapshot({ completed: 1 })) });
   assert.equal(started.controller.state.snapshot.completed, 1);
+  assert.equal(harness.nodes['[data-progress-summary]'].textContent, 'en:library.progress.summary');
+  locale = 'zh-CN';
+  localeChangeListener();
+  assert.equal(harness.nodes['[data-progress-summary]'].textContent, 'zh-CN:library.progress.summary');
   source.onerror();
   assert.equal(started.controller.state.connected, false);
   harness.nodes['[data-progress-close]'].listener();
