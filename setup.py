@@ -26,7 +26,7 @@ setup(
         "Operating System :: OS Independent",
     ],
     license="MIT",
-    python_requires='>=3.8',  # 指定Python版本要求
+    python_requires='>=3.9',  # Path and type syntax used by the v2 runtime
     install_requires=[  # 项目依赖的第三方包
         # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []
         "tqdm",

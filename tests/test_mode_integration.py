@@ -233,6 +233,25 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertEqual(logged_status, 0)
         self.assertIn(str(self.source.resolve()), logged_stderr.getvalue())
 
+    def test_v2_documentation_matches_the_public_mode_contract(self):
+        dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+        readme = Path("README.md").read_text(encoding="utf-8")
+        migration = Path("docs/migration-v2.md")
+        release = Path("docs/releases/v2.0.0.md")
+
+        self.assertIn('"server"', dockerfile)
+        self.assertIn('"--server-dir=/app/EpubBrowserFiles"', dockerfile)
+        self.assertIn('"--host=0.0.0.0"', dockerfile)
+        self.assertNotIn("--keep-files", dockerfile)
+        self.assertIn("epub-browser ssg", readme)
+        self.assertIn("epub-browser server", readme)
+        self.assertIn("--base-path", readme)
+        self.assertIn("127.0.0.1", readme)
+        self.assertIn("reverse proxy", readme.lower())
+        self.assertTrue(migration.is_file())
+        self.assertTrue(release.is_file())
+        self.assertIn('VERSION = "2.0.0"', Path("epub_browser/version.py").read_text())
+
     @staticmethod
     def _write_epub(path):
         container = """<?xml version="1.0"?>

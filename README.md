@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> **A personal EPUB reader and static-site generator. Read privately. Publish anywhere.**
+> A personal EPUB reader and static-site generator. Read privately. Publish anywhere.
 
 <p align="center">
   <img src="https://github.com/dfface/epub-browser/blob/aff1def01252481f74c25ebf5b17d142b7db3c5e/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
@@ -9,179 +9,169 @@
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
-[![GitHub stars](https://img.shields.io/github/stars/dfface/epub-browser)](https://github.com/dfface/epub-browser)
 
-EPUB Browser turns an EPUB collection into a polished reading library for any modern browser. Use it in two equally first-class ways: run a private library for yourself, or generate a complete static reading site and deploy it directly to Pages and other static hosts. Keep your books where you choose, read on the devices you already own, and shape the experience around your habits.
+EPUB Browser v2 has two explicit product modes:
 
-[Try the demo](https://epub-browser-test.yuhan.tech) · [Install from PyPI](https://pypi.org/project/epub-browser/) · [Report an issue](https://github.com/dfface/epub-browser/issues)
+- `ssg` generates a complete static-site snapshot for Pages, object storage, Nginx, or any other static host.
+- `server` runs a stateful reading service with durable SQLite data, an incremental generated cache, optional file watching, and browser APIs.
 
-## Read privately. Publish simply.
+Choose the mode from what you are deploying—not from whether a build step happens internally.
 
-Most reading tools ask you to adapt to their library, account, and interface. EPUB Browser takes the opposite view: your collection is the center of the product.
-
-- **Your library stays yours.** Run it locally or on your own server. No account is required to start reading.
-- **Your library is ready to publish.** Generate a self-contained static site, then deploy it directly to Cloudflare Pages, GitHub Pages, or any static host.
-- **Your reading can be personal.** Choose a theme, font, font size, page-turning or scrolling, and optional custom styles.
-- **Your attention stays with the book.** Use pure reading mode, resume where you left off, and keep notes close to the passage that matters.
-
-It is designed as both a dependable reading companion and a practical publishing tool: quiet when you are immersed, capable when you need to organise, annotate, or turn a collection into a shareable website.
-
-## What you can do
-
-### Build a library that feels familiar
-
-- Import one EPUB, a folder, or an entire Calibre library.
-- Search titles, authors, and tags — including pinyin search for Chinese metadata.
-- Read Calibre tags and descriptions directly from EPUB metadata.
-- Sort library surfaces and organise a personal bookshelf with nested groups, tags, import/export, and optional sync.
-- Keep the library current with `--watch` when files are added or updated.
-
-### Settle into the page
-
-- Switch between scrolling and page-turning reading modes.
-- Resume the last chapter and reading location.
-- Adjust font family and size, use one of several themes, or add per-book custom CSS.
-- Use continuous scroll for books with many short sections.
-- Enter pure reading mode when you want the interface to disappear.
-- Zoom images, highlight code, and use keyboard navigation.
-- Read comfortably on phones, tablets, desktops, and Kindle/Silk browsers.
-
-### Keep what you notice
-
-- Highlight selected text, add notes, and copy the original selected passage.
-- Choose highlight colours and manage them in Settings.
-- Store annotations locally or use a compatible cloud API; export annotations as JSON whenever you need them.
-
-### Take it where you read
-
-- Install the generated library as a Progressive Web App on supported browsers.
-- Run the included local server, or generate static files for Cloudflare Pages, GitHub Pages, Apache, Nginx, and similar hosts.
-- Receive refreshed reader code automatically after a normal reload.
-
-## Start reading in two minutes
-
-### Install
+## Install
 
 ```bash
 pip install epub-browser
 ```
 
-### Open a book or library
+Python 3.9 or newer is required.
+
+## SSG: generate a static site
+
+Generate a site for a domain root:
 
 ```bash
-# One book
-epub-browser path/to/book.epub
-
-# A few books
-epub-browser book1.epub book2.epub book3.epub
-
-# Every EPUB in a folder (including a Calibre library)
-epub-browser /path/to/books
+epub-browser ssg /path/to/books \
+  --output-dir /path/to/dist
 ```
 
-EPUB Browser creates a library and opens it in your browser. By default, the local server listens on port `8000` and is available to devices on your local network.
-
-## Common workflows
-
-### Keep a local library running
-
-Use a fixed output directory when you want generated files and bookshelf data to persist between runs:
+For GitHub Pages or another project subpath, set the public URL prefix explicitly:
 
 ```bash
-epub-browser /path/to/books \
-  --output-dir /path/to/epub-browser-library \
-  --sync-dir /path/to/epub-browser-sync \
-  --keep-files \
+epub-browser ssg /path/to/books \
+  --output-dir /path/to/dist \
+  --base-path /my-repository/
+```
+
+`--base-path` changes generated browser URLs; it does not change the output directory. For example, `--base-path /my-repository/` makes links, manifests, icons, book metadata, and Service Worker entries start with `/my-repository/` while files are still written directly inside `dist/`.
+
+SSG activation is transactional: EPUB Browser builds and validates a sibling staging snapshot, then replaces the destination. A failed conversion leaves the previous output untouched. SSG output contains no Server database, migration state, or runtime cache metadata.
+
+Browser-local bookshelf data remains local unless you use the existing manual Sync action against a compatible endpoint. Static reading progress and annotations stay in browser storage and do not probe EPUB Browser Server APIs.
+
+## Server: run a persistent reading library
+
+For a private local library:
+
+```bash
+epub-browser server /path/to/books \
+  --server-dir /path/to/epub-browser-state \
+  --watch
+```
+
+Server binds to `127.0.0.1` by default. This is the safe default for one machine. To make it reachable on a trusted LAN, opt in explicitly:
+
+```bash
+epub-browser server /path/to/books \
+  --server-dir /path/to/epub-browser-state \
+  --watch \
+  --host 0.0.0.0 \
+  --port 8080 \
   --no-browser
 ```
 
-Add `--watch` to monitor the source folder and add or update books automatically:
+Do not expose the built-in Server directly to the public internet. Put it behind a TLS reverse proxy with authentication and appropriate network controls.
+
+For a disposable session, use `--ephemeral` instead of `--server-dir`:
 
 ```bash
-epub-browser /path/to/books --watch --output-dir /path/to/epub-browser-library --keep-files
+epub-browser server book.epub --ephemeral
 ```
 
-### Generate a static site for Pages
+The Server prints only its URL during a normal run. Operational details are silent unless `--log` is present; errors remain visible. When a tqdm progress display is active, enabled logs use a progress-safe writer.
 
-Use `--no-server` when the output will be served by your own web server or static host:
+### Server storage contract
 
-```bash
-epub-browser /path/to/books \
-  --output-dir /path/to/public-library \
-  --no-server
+```text
+<server-dir>/
+├── data/
+│   ├── epub-browser.db          # durable books, annotations, bookshelf sync, progress
+│   ├── migration-state.json     # restart-safe v2 migration state
+│   └── backups/                 # verified pre-migration database copies
+└── cache/
+    ├── catalog.json             # generated-cache status
+    ├── public/                  # served HTML, assets, and converted books
+    └── staging/                 # replaceable conversion work
 ```
 
-Upload the contents of `/path/to/public-library` to your preferred static host. This is the direct deployment path for Cloudflare Pages, GitHub Pages, Apache, Nginx, and similar platforms—no application server is required.
+Only `data/` is authoritative. `cache/` can be deleted: the next start rebuilds it while retaining durable book IDs and user data. Public files are never written at the Server root in the v2 layout.
 
-### Deploy updates without stale browser assets
+The bookshelf continues to use browser-local state and the existing manual **Sync** action. Therefore an untouched Server database can legitimately have no bookshelf row until a user performs Sync. This behavior is unchanged in v2.
 
-Each generated library publishes its CSS, JavaScript, icons, and fonts with a content-addressed filename. Those files can be cached indefinitely because a changed file always receives a new URL. The library HTML, PWA manifest, and Service Worker remain revalidated entry points, so a regular refresh discovers the new release without asking readers to clear their browser cache.
+## Docker
 
-Publish the complete generated directory in one deployment whenever your host supports it. If a CDN or reverse proxy overrides origin cache headers, configure it to revalidate `index.html`, `sw.js`, and `assets/manifest.json`, while allowing `assets/immutable/` to use long-lived immutable caching.
-
-### Useful options
-
-```bash
-# Choose a port and do not launch a browser
-epub-browser book.epub --port 8080 --no-browser
-
-# Keep generated files after a temporary local reading session
-epub-browser book.epub --keep-files
-
-# See every available option
-epub-browser --help
-```
-
-| Option | Purpose |
-| --- | --- |
-| `--output-dir`, `-o` | Directory for generated library files. |
-| `--no-server` | Generate deployable static files without starting the local server. |
-| `--keep-files` | Preserve generated files after the local server stops. |
-| `--watch`, `-w` | Watch the input directory for EPUB additions and changes. |
-| `--sync-dir` | Directory used by the optional bookshelf sync data. |
-| `--port`, `-p` | Local server port; defaults to `8000`. |
-| `--no-browser` | Do not open a browser automatically. |
-
-## Reading controls
-
-| Need | Where to find it |
-| --- | --- |
-| Change font, size, or reading mode | **Settings** in a chapter |
-| Add custom styles | **Settings → Reading → Custom styles** |
-| Turn pages | Left/Right Arrow or Space; use the page controls in page-turning mode |
-| Read continuously | **Settings → Reading**; scrolling mode only |
-| Focus on the book | **Pure** in the navigation controls, or click the page centre on supported devices |
-| Highlight, annotate, or copy | Select original text in the reading area |
-
-Kindle/Silk browsers are detected automatically and receive an e-reader-friendly mode. Some browser-heavy features, such as code highlighting and the bookshelf, are intentionally reduced there.
-
-## Deploy as a static site or run continuously
-
-The `--no-server` output is a complete static reading site, ready to deploy wherever static files are hosted. For a self-hosted always-on library, run the command above with a persistent output directory and supervise it with your platform's service manager.
-
-### Docker
+The image runs persistent Server mode. Mount EPUB input read-only and Server state read-write:
 
 ```bash
 docker run -d \
   --name epub-browser \
-  -p 8080:80 \
-  -v /path/to/your-books:/app/Library \
-  -v /path/to/generated-library:/app/EpubBrowserFiles \
-  -v /path/to/sync-data:/app/SyncData \
-  epub-browser:latest
+  -p 127.0.0.1:8080:80 \
+  -v /path/to/books:/app/Library:ro \
+  -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
+  epub-browser:2.0.0
 ```
 
-Mount paths and ownership should match the user running the container.
+`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library` is read-only input. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
 
-## A note on EPUB metadata
+```bash
+-v /path/to/legacy-sync:/app/SyncData:ro
+```
 
-EPUB Browser reads standard EPUB metadata, including title, author, `dc:subject` tags, and descriptions. For Calibre-managed libraries, edit metadata in Calibre and save the book after editing so the EPUB file itself is updated.
+The container intentionally binds the process to `0.0.0.0`; control exposure with the published Docker port, firewall, and reverse proxy.
 
-If a book has a broken table of contents or malformed markup, opening and reconverting it with [Calibre](https://calibre-ebook.com/) often produces a standards-compliant EPUB that reads correctly.
+## Legacy v1 command compatibility
+
+v2 accepts the v1 syntax for the full v2 major line and maps it to one of the new modes:
+
+| v1 command shape | v2 equivalent |
+| --- | --- |
+| `epub-browser BOOKS` | `epub-browser server BOOKS --ephemeral` |
+| `epub-browser BOOKS --output-dir STATE` | `epub-browser server BOOKS --server-dir STATE` |
+| `epub-browser BOOKS --no-server --output-dir DIST` | `epub-browser ssg BOOKS --output-dir DIST` |
+| `--sync-dir DIR` | `server --legacy-sync-dir DIR` |
+
+With `--log`, legacy invocation prints the equivalent v2 command. Without `--log`, the adapter stays quiet. Legacy temporary `--keep-files` is retained; persistent Server directories are already permanent.
+
+See [Migrating to v2](docs/migration-v2.md) for backup, automatic data migration, conflict recovery, and rollback details.
+
+## Useful options
+
+```bash
+epub-browser ssg --help
+epub-browser server --help
+```
+
+| Mode | Option | Purpose |
+| --- | --- | --- |
+| SSG | `--output-dir`, `-o` | Required static snapshot destination. |
+| SSG | `--base-path` | Public URL prefix, default `/`. |
+| Server | `--server-dir` | Persistent data and cache root. |
+| Server | `--ephemeral` | Disposable Server root; mutually exclusive with `--server-dir`. |
+| Server | `--watch`, `-w` | Reconcile source changes automatically. |
+| Server | `--host` | Bind address, default `127.0.0.1`. |
+| Server | `--port`, `-p` | Bind port, default `8000`. |
+| Server | `--legacy-sync-dir` | Read legacy bookshelf JSON during migration. |
+| Both | `--log` | Show operational detail without corrupting progress output. |
+
+## Reading features
+
+- Recursive EPUB and Calibre-library discovery, metadata tags, search, and pinyin search.
+- Scrolling, page turning, continuous reading, custom fonts and CSS, themes, and pure reading mode.
+- Highlights and notes with browser or Server-backed annotation storage where available.
+- Nested bookshelf groups, tags, JSON import/export, and the existing optional manual sync.
+- PWA manifests and content-addressed static assets.
+- English and Simplified Chinese browser UI.
+
+Kindle/Silk browsers receive an e-reader-friendly mode; browser-heavy features may be reduced.
+
+## Data safety and migration
+
+Persistent Server startup automatically checks for the v1 root database, verifies it, creates a backup, upgrades a copied database, imports eligible legacy bookshelf JSON, and only then removes the migrated root database. Legacy public files are retired in two successful startup phases and are never treated as authoritative data.
+
+If both `epub-browser.db` and `annotations.db` exist at the legacy root, startup stops with a conflict instead of guessing. Corrupt databases are also left untouched. See [docs/migration-v2.md](docs/migration-v2.md).
 
 ## Contributing
 
-Issues, bug reports, and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the EPUB source when it can be shared, the browser/device, the reading mode, and clear reproduction steps.
+Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the EPUB when it can be shared, the exact command, browser/device, and reproduction steps.
 
 ## License
 
