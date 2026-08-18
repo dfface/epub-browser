@@ -127,33 +127,46 @@ function initScript() {
         
         books.forEach(function(book) {
             var card = document.createElement('div');
+            var link = document.createElement('a');
+            var cover = document.createElement('img');
+            var content = document.createElement('div');
+            var title = document.createElement('h3');
+            var author = document.createElement('div');
             card.className = 'book-card';
             card.setAttribute('data-id', book.hash);
-            
-            var authors = '';
-            if (book.authors && book.authors.length > 0) {
-                authors = book.authors.join(' & ');
-            }
-            
-            var tagsHtml = '';
+
+            link.className = 'book-link';
+            link.setAttribute('id', book.hash);
+            link.setAttribute('href', '/book/' + book.hash + '/index.html');
+
+            cover.className = 'book-cover';
+            cover.setAttribute('src', '/book/' + book.hash + '/' + book.cover);
+            cover.setAttribute('alt', t('library.cover'));
+
+            content.className = 'book-card-content';
+            title.className = 'book-title';
+            title.textContent = book.title;
+            author.className = 'book-author';
+            author.textContent = book.authors && book.authors.length > 0 ? book.authors.join(' & ') : '';
+
+            content.appendChild(title);
+            content.appendChild(author);
+
             if (book.tags && book.tags.length > 0) {
-                tagsHtml = '<div class="book-tags">';
+                var tags = document.createElement('div');
+                tags.className = 'book-tags';
                 book.tags.forEach(function(tag) {
-                    tagsHtml += '<span class="book-tag">' + tag + '</span>';
+                    var tagElement = document.createElement('span');
+                    tagElement.className = 'book-tag';
+                    tagElement.textContent = tag;
+                    tags.appendChild(tagElement);
                 });
-                tagsHtml += '</div>';
+                content.appendChild(tags);
             }
-            
-            card.innerHTML = 
-                '<a href="/book/' + book.hash + '/index.html" class="book-link" id="' + book.hash + '">' +
-                '<img src="/book/' + book.hash + '/' + book.cover + '" alt="' + t('library.cover') + '" class="book-cover"/>' +
-                '<div class="book-card-content">' +
-                '<h3 class="book-title">' + book.title + '</h3>' +
-                '<div class="book-author">' + authors + '</div>' +
-                tagsHtml +
-                '</div>' +
-                '</a>';
-            
+
+            link.appendChild(cover);
+            link.appendChild(content);
+            card.appendChild(link);
             bookGrid.appendChild(card);
         });
         
