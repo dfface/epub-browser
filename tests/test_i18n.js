@@ -38,6 +38,18 @@ test('English and Chinese dictionaries have identical non-empty key trees', () =
   });
 });
 
+test('provides the library and shared-chrome copy used by the first bilingual surface', () => {
+  [
+    'common.language', 'common.version', 'theme.light', 'theme.dark',
+    'library.title', 'library.bookCount', 'library.searchPlaceholder',
+    'library.usernamePrompt', 'library.install', 'footer.product',
+    'footer.poweredBy', 'version.updateAvailable', 'errors.generic'
+  ].forEach(key => {
+    assert.ok(dictionaries.en[key]);
+    assert.ok(dictionaries['zh-CN'][key]);
+  });
+});
+
 test('falls back to English messages and warns when no language contains a key', () => {
   const warnings = [];
   const root = fakeRoot('zh-CN');

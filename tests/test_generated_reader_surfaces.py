@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 from epub_browser.library import EPUBLibrary
@@ -346,6 +347,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
+
+    def test_locale_selector_exists_only_in_library_breadcrumb(self):
+        library = self._library_html()
+        self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
+        breadcrumb = library[
+            library.index('class="breadcrumb library-breadcrumb"'):library.index('</nav>')
+        ]
+        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-CN(?:["\' >])')
+        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')
+        self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
+        self.assertNotRegex(self._chapter_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
+        self.assertRegex(library, r'localeSelect\.value=i18n\.getLocale\(\)')
+        self.assertRegex(library, r'localeSelect\.addEventListener\(["\'`]change')
+        self.assertRegex(library, r'i18n\.setLocale\(localeSelect\.value\)')
 
     def test_library_and_book_open_annotation_center_as_a_modal(self):
         library_html = self._library_html()

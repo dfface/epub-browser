@@ -140,11 +140,11 @@ class EPUBLibrary:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#244548">
-<meta name="description" content="EPUB Library - A web-based EPUB reader">
+<meta name="description" content="EPUB Library - A web-based EPUB reader" data-i18n-content="library.description">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="EPUB Browser">
-<title>EPUB Library</title>
+<title data-i18n="library.pageTitle">EPUB Library</title>
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserI18n.init();</script>
 <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
@@ -233,7 +233,7 @@ if (isKindle) {
     <div class="top-controls" data-id="top-controls">
         <div class="theme-toggle" id="themeToggle">
             <i class="fas fa-moon"></i>
-            <span class="control-name">Theme</span>
+            <span class="control-name" data-i18n="library.theme">Theme</span>
         </div>
     </div>
 """
@@ -248,25 +248,26 @@ if (isKindle) {
         library_html += f"""
     <div class="breadcrumb-container">
         <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb">
-            <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span>Library</span></span>
-            <div class="library-meta" aria-label="Library information">
-                <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i>{len(self.books)} book(s)</span>
-                <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i>{len(all_tags)} tag(s)</span>
-                <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span>Annotations</span></button>
-                <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue">Login</span></button>
+            <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="library.title">Library</span></span>
+            <div class="library-meta" aria-label="Library information" data-i18n-aria-label="library.information">
+                <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="library.bookCount" data-i18n-params='{{"count": {len(self.books)}}}'>{len(self.books)} book(s)</span></span>
+                <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i><span data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
+                <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+                <label class="library-language" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN">中文</option><option value="en">English</option></select></label>
+                <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue" data-i18n="library.login">Login</span></button>
             </div>
         </nav>
     </div>
     <div class="container">
         <div class="controls" data-id="controls">
             <div class="search-container">
-                <input type="text" class="search-box" placeholder="Search by book title, author, or tag...">
+                <input type="text" class="search-box" placeholder="Search by book title, author, or tag..." data-i18n-placeholder="library.searchPlaceholder">
                 <i class="fas fa-search search-icon"></i>
             </div>
             <br/>
             <div class="tag-cloud">
-                <div class="tag-cloud-item active" data-id="All">All</div>
-                <div class="tag-cloud-item" data-id="NoTag">NoTag</div>
+                <div class="tag-cloud-item active" data-id="All" data-i18n="library.all">All</div>
+                <div class="tag-cloud-item" data-id="NoTag" data-i18n="library.noTag">No tag</div>
 """
         for tag in sorted(t for t in all_tags if isinstance(t, str) and t.strip()):
             library_html += f"""<div class="tag-cloud-item" data-id="{tag}">{tag}</div>"""
@@ -276,7 +277,7 @@ if (isKindle) {
 
         library_html += """
         <div class="book-grid" data-id="book-grid">
-            <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading">
+            <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading" role="status" aria-label="Loading library" data-i18n-aria-label="library.loading">
                 <div class="loading-spinner"></div>
             </div>
 """      
@@ -285,11 +286,11 @@ if (isKindle) {
     <div class="reading-controls" data-id="reading-controls">
         <button class="control-btn" id="scrollToTopBtn">
             <i class="fas fa-arrow-up"></i>
-            <span class="control-name">Top</span>
+            <span class="control-name" data-i18n="library.top">Top</span>
         </button>
         <button class="control-btn" id="bookshelfBtn" style="display: none;">
             <i class="fas fa-bookmark"></i>
-            <span class="control-name">Shelf</span>
+            <span class="control-name" data-i18n="library.shelf">Shelf</span>
         </button>
     </div>
 </div>
@@ -410,6 +411,14 @@ if (isKindle) {
 
 
         document.addEventListener('DOMContentLoaded', function() {
+        var i18n = window.EpubBrowserI18n;
+        var localeSelect = document.getElementById('localeSelect');
+        if (i18n && localeSelect) {
+            localeSelect.value = i18n.getLocale();
+            localeSelect.addEventListener('change', function() {
+                i18n.setLocale(localeSelect.value);
+            });
+        }
         // 检查当前的基路径
         let base_path = window.location.pathname;
         if (base_path.endsWith("index.html")) {

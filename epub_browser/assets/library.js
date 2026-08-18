@@ -64,6 +64,12 @@ function isKindleMode() {
 }
 
 function initScript() {
+    var i18n = window.EpubBrowserI18n;
+
+    function t(key, params) {
+        return i18n ? i18n.t(key, params) : key;
+    }
+
     function loadBookMetadata(callback) {
         var metadataUrl = "/book-metadata.json?" + Date.now();
         
@@ -78,10 +84,12 @@ function initScript() {
                     } catch (e) {
                         console.error('Failed to parse book metadata:', e);
                         hideBookGridLoading();
+                        showLibraryState('library.loadError');
                     }
                 } else {
                     console.error('Failed to load book metadata:', xhr.status);
                     hideBookGridLoading();
+                    showLibraryState('library.loadError');
                 }
             }
         };
@@ -94,12 +102,28 @@ function initScript() {
             loading.style.display = 'none';
         }
     }
+
+    function showLibraryState(key) {
+        var bookGrid = document.querySelector('.book-grid');
+        var state;
+        if (!bookGrid || bookGrid.querySelector('.library-state')) return;
+        state = document.createElement('div');
+        state.className = 'empty-state library-state';
+        state.setAttribute('data-i18n', key);
+        state.textContent = t(key);
+        bookGrid.appendChild(state);
+    }
     
     function generateBookCards(books) {
         var bookGrid = document.querySelector('.book-grid');
         if (!bookGrid) return;
         
         hideBookGridLoading();
+
+        if (!books.length) {
+            showLibraryState('library.empty');
+            return;
+        }
         
         books.forEach(function(book) {
             var card = document.createElement('div');
@@ -122,7 +146,7 @@ function initScript() {
             
             card.innerHTML = 
                 '<a href="/book/' + book.hash + '/index.html" class="book-link" id="' + book.hash + '">' +
-                '<img src="/book/' + book.hash + '/' + book.cover + '" alt="cover" class="book-cover"/>' +
+                '<img src="/book/' + book.hash + '/' + book.cover + '" alt="' + t('library.cover') + '" class="book-cover"/>' +
                 '<div class="book-card-content">' +
                 '<h3 class="book-title">' + book.title + '</h3>' +
                 '<div class="book-author">' + authors + '</div>' +
@@ -195,7 +219,7 @@ function initScript() {
             if (username) {
                 loginValue.textContent = username;
             } else {
-                loginValue.textContent = 'Login';
+                loginValue.textContent = t('library.login');
             }
         }
     }
@@ -209,17 +233,29 @@ function initScript() {
     if (loginCard) {
         loginCard.addEventListener('click', function() {
             var currentUsername = getUsername();
-            var username = prompt('Please enter your username:', currentUsername || '');
+            var username = prompt(t('library.usernamePrompt'), currentUsername || '');
             if (username !== null) {
                 if (username.trim()) {
                     setUsername(username.trim());
                     updateLoginDisplay();
-                    showNotification('Username saved: ' + username.trim(), 'success');
+                    showNotification(t('library.usernameSaved', { username: username.trim() }), 'success');
                 } else if (username === '') {
                     setUsername('');
                     updateLoginDisplay();
-                    showNotification('Username cleared', 'info');
+                    showNotification(t('library.usernameCleared'), 'info');
                 }
+            }
+        });
+    }
+
+    if (i18n && document.documentElement.getAttribute('data-library-locale-listener') !== 'true') {
+        document.documentElement.setAttribute('data-library-locale-listener', 'true');
+        i18n.onLocaleChange(function() {
+            var covers = document.querySelectorAll('.book-cover');
+            var i;
+            updateLoginDisplay();
+            for (i = 0; i < covers.length; i++) {
+                covers[i].setAttribute('alt', t('library.cover'));
             }
         });
     }
@@ -364,7 +400,7 @@ function initScript() {
                 tagCloudItems.forEach(function(t) { t.classList.remove('active'); });
                 this.classList.add('active');
                 
-                var tagText = this.textContent.trim();
+                var tagText = this.getAttribute('data-id');
                 
                 if (tagText === 'All') {
                     bookCards.forEach(function(card) { card.style.display = 'block'; });
@@ -399,7 +435,7 @@ function initScript() {
                 
                 tagCloudItems.forEach(function(t) { t.classList.remove('active'); });
                 tagCloudItems.forEach(function(t) {
-                    if (t.textContent === tagText) t.classList.add('active');
+                    if (t.getAttribute('data-id') === tagText) t.classList.add('active');
                 });
                 
                 bookCards.forEach(function(card) {
@@ -443,7 +479,7 @@ function initScript() {
         var installBtn = document.createElement('button');
         installBtn.id = 'pwa-install-btn';
         installBtn.className = 'control-btn';
-        installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name">Install</div>';
+        installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name" data-i18n="library.install">' + t('library.install') + '</div>';
         installBtn.style.display = 'none';
         if (readingControls) {
             readingControls.appendChild(installBtn);
@@ -459,14 +495,14 @@ function initScript() {
             installBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 if (deferredPrompt) {
-                    showNotification('Installing app...', 'info');
+                    showNotification(t('library.installing'), 'info');
                     installBtn.style.display = 'none';
                     deferredPrompt.prompt();
                     deferredPrompt.userChoice.then(function(choiceResult) {
                         if (choiceResult.outcome === 'accepted') {
-                            showNotification('App installed successfully!', 'success');
+                            showNotification(t('library.installSucceeded'), 'success');
                         } else {
-                            showNotification('Install cancelled', 'info');
+                            showNotification(t('library.installCancelled'), 'info');
                         }
                         deferredPrompt = null;
                     });

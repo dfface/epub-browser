@@ -40,7 +40,7 @@ function documentFixture(footer) {
   };
 }
 
-test('shows a newer stable GitHub release in the footer', () => {
+test('shows a newer stable GitHub release in the footer with localized link text', () => {
   assert.equal(typeof VersionCheck.check, 'function');
   const fixture = footerFixture('1.11.9');
   let requestedUrl = '';
@@ -53,11 +53,16 @@ test('shows a newer stable GitHub release in the footer', () => {
       draft: false,
       prerelease: false,
     });
+  }, {
+    t(key, params) {
+      assert.equal(key, 'version.updateAvailable');
+      return '\u53ef\u7528\u66f4\u65b0\uff1av' + params.version;
+    },
   });
 
   assert.equal(requestedUrl, 'https://api.github.com/repos/dfface/epub-browser/releases/latest');
   assert.equal(fixture.update.hidden, false);
-  assert.equal(fixture.link.textContent, 'Update available: v1.11.10');
+  assert.equal(fixture.link.textContent, '\u53ef\u7528\u66f4\u65b0\uff1av1.11.10');
   assert.equal(fixture.link.href, 'https://github.com/dfface/epub-browser/releases/tag/v1.11.10');
 });
 
