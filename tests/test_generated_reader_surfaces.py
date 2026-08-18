@@ -461,6 +461,22 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('@keyframes annotation-hub-spin', css)
         self.assertIn('.annotation-hub-spinner { animation: none;', css)
 
+    def test_annotation_hub_routes_state_copy_through_i18n(self):
+        script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
+
+        self.assertIn("function tr(key, params)", script)
+        self.assertIn("tr('loading')", script)
+        self.assertIn("tr('loadHubFailed')", script)
+        self.assertIn("tr('noAnnotationsTitle')", script)
+        self.assertIn("tr('noBookAnnotationsTitle')", script)
+        self.assertIn('function translateChrome()', script)
+        self.assertIn('function renderCurrentView()', script)
+        self.assertIn('i18n().onLocaleChange(function()', script)
+        self.assertNotIn("'Unable to load annotations'", script)
+        self.assertNotIn("'Please try again.'", script)
+        self.assertNotIn("'No annotations yet'", script)
+        self.assertNotIn("'No annotations in this book'", script)
+
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()
 
