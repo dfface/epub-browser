@@ -14,7 +14,8 @@ class Reporter:
             self._write(message, sys.stderr)
 
     def notice(self, message: str) -> None:
-        self._write(message, sys.stderr)
+        if self.log_enabled:
+            self._write(message, sys.stderr)
 
     def error(self, message: str) -> None:
         self._write(message, sys.stderr)

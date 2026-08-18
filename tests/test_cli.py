@@ -155,12 +155,22 @@ class MainDispatchTests(unittest.TestCase):
         config = run_ssg.call_args.args[0]
         self.assertEqual(config.output_dir, Path("dist"))
 
-    def test_main_prints_one_legacy_hint_before_dispatch(self):
+    def test_main_keeps_legacy_hint_silent_without_log(self):
         with (
             mock.patch("epub_browser.main.run_server", return_value=0),
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
             status = main(["books", "--output-dir", "state"])
+
+        self.assertEqual(status, 0)
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_main_prints_one_legacy_hint_with_log(self):
+        with (
+            mock.patch("epub_browser.main.run_server", return_value=0),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            status = main(["books", "--output-dir", "state", "--log"])
 
         self.assertEqual(status, 0)
         self.assertEqual(stderr.getvalue().count("Legacy command syntax is deprecated"), 1)

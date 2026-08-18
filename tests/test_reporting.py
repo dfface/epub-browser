@@ -28,15 +28,24 @@ class ReporterTests(unittest.TestCase):
 
         self.assertEqual(stderr.getvalue(), "cache hit\n")
 
-    def test_active_progress_uses_tqdm_writer(self):
+    def test_notice_is_silent_without_log(self):
         reporter = Reporter(log_enabled=False)
         reporter.progress_active = True
 
         with mock.patch("epub_browser.reporting.tqdm.write") as write:
             reporter.notice("legacy syntax")
 
+        write.assert_not_called()
+
+    def test_active_progress_log_uses_tqdm_writer(self):
+        reporter = Reporter(log_enabled=True)
+        reporter.progress_active = True
+
+        with mock.patch("epub_browser.reporting.tqdm.write") as write:
+            reporter.notice("migration warning")
+
         write.assert_called_once()
-        self.assertEqual(write.call_args.args[0], "legacy syntax")
+        self.assertEqual(write.call_args.args[0], "migration warning")
 
     def test_result_uses_stdout_when_progress_is_inactive(self):
         reporter = Reporter(log_enabled=False)
