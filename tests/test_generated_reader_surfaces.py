@@ -62,6 +62,28 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('<html lang="en"', chapter_html)
         self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+lang="fr"')
 
+    def test_book_page_localizes_shell_but_marks_metadata_as_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory)
+            processor.book_title = 'A Book'
+            processor.lang = 'fr'
+            processor.description = '<p>Texte original</p>'
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            html = Path(processor.web_dir, 'index.html').read_text(encoding='utf-8')
+
+        self.assertRegex(html, r'data-i18n=(?:["\'])?book\.startReading')
+        self.assertRegex(html, r'data-i18n=(?:["\'])?book\.tableOfContents')
+        self.assertRegex(html, r'class=(?:["\'])?book-info-desc(?=[^>]*\blang=(?:["\'])?fr)')
+        self.assertIn('A Book', html)
+        self.assertIn('Texte original', html)
+
+    def test_book_script_has_no_literal_user_notifications_or_confirmations(self):
+        script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
+
+        self.assertNotRegex(script, r"showNotification\(\s*['\"]")
+        self.assertNotRegex(script, r"confirm\(\s*['\"]")
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 
@@ -141,13 +163,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(html, r'id=(?:["\'])?continueReadingMenuToggle')
         self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressMenu')
         self.assertRegex(html, r'id=(?:["\'])?clearReadingProgressBtn')
-        self.assertIn('aria-label="Clear reading progress"', html)
-        self.assertIn('>Clear</button>', html)
+        self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?book\.clearReadingProgress')
+        self.assertRegex(html, r'data-i18n=(?:["\'])?book\.clear')
         self.assertIn("updateContinueReadingButton(book_hash);", script)
         self.assertIn("setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());", script)
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
-        self.assertIn('window.confirm("Clear reading progress for this book?")', script)
+        self.assertIn("window.confirm(bookT('book.clearReadingProgressConfirm'))", script)
         self.assertNotIn("matchMedia", script)
         self.assertIn(".continue-reading-control.has-reading-progress:hover #continueReadingBtn", styles)
         self.assertIn("transform: none;", styles)
@@ -157,8 +179,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("overflow: visible;", styles)
         self.assertIn("document.getElementById(readKey)", script)
         self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
-        self.assertIn("Continue reading", script)
-        self.assertIn("Start reading", script)
+        self.assertIn("bookT('book.continueReading')", script)
+        self.assertIn("bookT('book.startReading')", script)
 
     def test_book_toc_marks_server_synced_reading_progress_with_the_reader_identity(self):
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
@@ -170,7 +192,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("if (username) {", script)
         self.assertIn("chapter-sync-tag", script)
         self.assertIn("chapter-title-with-sync", script)
-        self.assertIn("'Cloud sync · ' + username", script)
+        self.assertIn("bookT('book.cloudSyncUser'", script)
+        self.assertIn("bookT('book.cloudSyncUserAria'", script)
         self.assertIn(".chapter-sync-tag", css)
         self.assertIn(".chapter-title-with-sync", css)
         self.assertIn(".chapter-page", css)

@@ -423,6 +423,11 @@ class EPUBProcessor:
     
     def create_index_page(self):
         """创建章节索引页面"""
+        book_language = html.escape(self.lang or 'en', quote=True)
+        if self.authors:
+            authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
+        else:
+            authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         index_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -525,34 +530,34 @@ class EPUBProcessor:
 <div class="top-controls">
     <div class="theme-toggle" id="themeToggle">
         <i class="fas fa-moon"></i>
-        <span class="control-name">Theme</span>
+        <span class="control-name" data-i18n="book.theme">Theme</span>
     </div>
 </div>
 """
         index_html += f"""
 <div class="breadcrumb-container">
-    <nav class="breadcrumb" aria-label="Breadcrumb" data-id="breadcrumb">
-        <a href="/" aria-label="Library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label">Library</span></a>
+    <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="book.breadcrumb" data-id="breadcrumb">
+        <a href="/" aria-label="Library" data-i18n-aria-label="book.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="book.library">Library</span></a>
         <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current" id="book_home" aria-current="page">{self.book_title}</span>
+        <span class="breadcrumb-current" id="book_home" aria-current="page" lang="{book_language}">{self.book_title}</span>
     </nav>
 </div>
 <div class="container">
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
-                <img src="{self.get_book_info()['cover']}" alt="cover">
+                <img src="{self.get_book_info()['cover']}" alt="">
             </div>
             <div class="book-info-content">
-                <h2 class="book-info-title">{self.book_title}</h2>
-                <p class="book-info-author">{" & ".join(self.authors) if self.authors else "Unknown"}</p>"""
+                <h2 class="book-info-title" lang="{book_language}">{self.book_title}</h2>
+                {authors_html}"""
         if self.description:
             index_html += f""" 
-                <div class="book-info-desc" lang="{html.escape(self.lang or 'en', quote=True)}">
+                <div class="book-info-desc" lang="{book_language}">
                     {self.description}
                 </div>"""
-        index_html += """
-                <div class="book-info-tags">"""
+        index_html += f"""
+                <div class="book-info-tags" lang="{book_language}">"""
         if self.tags:
             for tag in self.tags:
                 index_html += f"""<span class="book-tag">{tag}</span>"""        
@@ -560,22 +565,22 @@ class EPUBProcessor:
                 </div>
                 <div class="css-controls clearReadingProgress">
                     <div class="continue-reading-control" id="continueReadingControl">
-                        <a class="css-btn primary" id="continueReadingBtn" href="#"><i class="fas fa-book-open"></i><span id="continueReadingBtnText">Start reading</span></a>
-                        <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                        <a class="css-btn primary" id="continueReadingBtn" href="#" aria-label="Start reading" data-i18n-aria-label="book.startReading"><i class="fas fa-book-open"></i><span id="continueReadingBtnText" data-i18n="book.startReading">Start reading</span></a>
+                        <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" data-i18n-aria-label="book.moreReadingActions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
                         <div class="continue-reading-menu" id="clearReadingProgressMenu" hidden>
-                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" hidden><i class="fas fa-eraser" aria-hidden="true"></i>Clear</button>
+                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                         </div>
                     </div>
-                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i>Annotations</button>
-                    <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText">Add to Shelf</span></button>
+                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i><span data-i18n="book.annotations">Annotations</span></button>
+                    <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
             </div>
         </div>
     
     <div class="toc-container" data-id="toc-container">
         <div class="toc-header">
-            <h2>Table of contents</h2>
-            <div class="chapter-count">total: {len(self.chapters)}</div>
+            <h2 data-i18n="book.tableOfContents">Table of contents</h2>
+            <div class="chapter-count" data-i18n="book.totalChapters" data-i18n-params='{{"count": {len(self.chapters)}}}'>Total: {len(self.chapters)}</div>
         </div>
         <ul class="chapter-list">
 """
@@ -594,16 +599,16 @@ class EPUBProcessor:
                 
                 if chapter_index is not None:
                     if chapter_anchor is not None:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="eb_ci_{chapter_index}#{chapter_anchor}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="eb_ci_{chapter_index}#{chapter_anchor}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
                 else:
                     print(f"Chapter index not found for toc item: {toc_item['title']} (src: {toc_src})")
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
-                index_html += f'        <li><a class="chapter-link" href="/book/{self.book_hash}/chapter_{i}.html" id="eb_ci_{i}">{chapter["title"]}</a></li>\n'
+                index_html += f'        <li><a class="chapter-link" href="/book/{self.book_hash}/chapter_{i}.html" id="eb_ci_{i}"><span class="chapter-title" lang="{book_language}">{chapter["title"]}</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
@@ -611,16 +616,16 @@ class EPUBProcessor:
 <div class="reading-controls" data-id="reading-controls">
     <div class="control-btn" id="scrollToTopBtn">
         <i class="fas fa-arrow-up"></i>
-        <span class="control-name">Top</span>
+        <span class="control-name" data-i18n="book.top">Top</span>
     </div>
     <button class="control-btn" id="bookshelfBtn" style="display: none;">
         <i class="fas fa-bookmark"></i>
-        <span class="control-name">Shelf</span>
+        <span class="control-name" data-i18n="book.shelf">Shelf</span>
     </button>
-    <a href="/" alt="Home">
+    <a href="/" aria-label="Home" data-i18n-aria-label="book.home">
         <div class="control-btn">
             <i class="fas fa-home"></i>
-            <span class="control-name">Home</span>
+            <span class="control-name" data-i18n="book.home">Home</span>
         </div>
     </a>
 </div>

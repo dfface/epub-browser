@@ -50,6 +50,11 @@ function updateFontFamily(fontFamily, fontFamilyInput) {
     }
 }
 
+function bookT(key, params) {
+    var i18n = window.EpubBrowserI18n;
+    return i18n && i18n.t ? i18n.t(key, params) : key;
+}
+
 // 显示通知
 function showNotification(message, type) {
     var existingNotification = document.querySelector('.custom-css-notification');
@@ -161,7 +166,7 @@ function initScript() {
             clearBtn.dataset.bound = 'true';
             clearBtn.addEventListener("click", function() {
                 closeClearMenu();
-                if (!window.confirm("Clear reading progress for this book?")) return;
+                if (!window.confirm(bookT('book.clearReadingProgressConfirm'))) return;
                 readingProgressLoadVersion++;
                 var prefix1 = "scroll_" + book_hash + "_";
                 var prefix2 = "turning_" + book_hash + "_";
@@ -172,7 +177,7 @@ function initScript() {
                     window.EpubReadingProgress.request('DELETE', '/api/reading-progress/' + encodeURIComponent(book_hash), null, true);
                 }
                 updateContinueReadingButton(book_hash);
-                showNotification("All reading progress for this book has been deleted!", "success");
+                showNotification(bookT('book.clearReadingProgressSucceeded'), "success");
             });
         }
 
@@ -266,6 +271,18 @@ function initScript() {
     }
     updateFontFamily(fontFamily, fontFamilyInput);
 
+    if (window.EpubBrowserI18n && window.EpubBrowserI18n.onLocaleChange && !document.documentElement.dataset.bookI18nBound) {
+        document.documentElement.dataset.bookI18nBound = 'true';
+        window.EpubBrowserI18n.onLocaleChange(function() {
+            var activeChapter = document.querySelector('.chapter-link.active');
+            updateContinueReadingButton(book_hash);
+            if (activeChapter) {
+                markReadingChapter(activeChapter.id, activeChapter.getAttribute('data-sync-username') || '');
+            }
+            if (window.refreshBookShelfButton) window.refreshBookShelfButton();
+        });
+    }
+
     var scrollToTopBtn = document.getElementById('scrollToTopBtn');
     scrollToTopBtn.addEventListener('click', function() {
         window.scrollTo({
@@ -313,11 +330,13 @@ function markReadingChapter(readKey, username) {
 
     if (!chapterElement) return;
     chapterElement.classList.add('active');
+    chapterElement.setAttribute('data-sync-username', username || '');
     if (username) {
+        var displayUsername = username === 'shared' ? bookT('book.sharedUser') : username;
         var syncTag = document.createElement('span');
         syncTag.className = 'chapter-sync-tag';
-        syncTag.textContent = 'Cloud sync · ' + username;
-        syncTag.setAttribute('aria-label', 'Cloud-synced reading position for ' + username);
+        syncTag.textContent = bookT('book.cloudSyncUser', { username: displayUsername });
+        syncTag.setAttribute('aria-label', bookT('book.cloudSyncUserAria', { username: displayUsername }));
         var title = chapterElement.querySelector('.chapter-title');
         if (title) {
             var titleWithSync = document.createElement('span');
@@ -358,12 +377,12 @@ function updateContinueReadingButton(bookHash) {
     }
     if (resumeChapter && resumeChapter.href) {
         continueButton.href = resumeChapter.href;
-        continueButtonText.textContent = 'Continue reading';
-        continueButton.setAttribute('aria-label', 'Continue reading');
+        continueButtonText.textContent = bookT('book.continueReading');
+        continueButton.setAttribute('aria-label', bookT('book.continueReading'));
     } else {
         continueButton.href = firstChapter.href;
-        continueButtonText.textContent = 'Start reading';
-        continueButton.setAttribute('aria-label', 'Start reading');
+        continueButtonText.textContent = bookT('book.startReading');
+        continueButton.setAttribute('aria-label', bookT('book.startReading'));
     }
     setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());
 }
@@ -442,10 +461,12 @@ function initBookShelfButton(bookHash) {
         var inShelf = isBookInShelf(bookHash, shelfData);
 
         if (inShelf) {
-            toggleShelfBtnText.textContent = 'Remove from Shelf';
+            toggleShelfBtnText.textContent = bookT('book.removeFromShelf');
+            toggleShelfBtn.setAttribute('aria-label', bookT('book.removeFromShelf'));
             toggleShelfBtn.classList.add('in-shelf');
         } else {
-            toggleShelfBtnText.textContent = 'Add to Shelf';
+            toggleShelfBtnText.textContent = bookT('book.addToShelf');
+            toggleShelfBtn.setAttribute('aria-label', bookT('book.addToShelf'));
             toggleShelfBtn.classList.remove('in-shelf');
         }
     }
@@ -502,12 +523,19 @@ function initBookShelfButton(bookHash) {
             var group = groups[groupId];
             var fullPath = parentPath ? parentPath + " → " + group.name : group.name;
             var itemEl = document.createElement('div');
+            var iconEl = document.createElement('span');
+            var icon = document.createElement('i');
+            var nameEl = document.createElement('span');
             itemEl.className = 'select-group-item';
             itemEl.dataset.id = groupId;
             itemEl.dataset.level = level;
-            itemEl.innerHTML =
-                '<span class="select-group-item-icon"><i class="fas fa-folder"></i></span>' +
-                '<span class="select-group-item-name">' + fullPath + '</span>';
+            iconEl.className = 'select-group-item-icon';
+            icon.className = 'fas fa-folder';
+            nameEl.className = 'select-group-item-name';
+            nameEl.textContent = fullPath;
+            iconEl.appendChild(icon);
+            itemEl.appendChild(iconEl);
+            itemEl.appendChild(nameEl);
             itemEl.addEventListener('click', function() {
                 container.querySelectorAll('.select-group-item').forEach(function(i) {
                     i.classList.remove('selected');
@@ -522,6 +550,33 @@ function initBookShelfButton(bookHash) {
         }
     }
 
+    function addRootGroup(tree) {
+        var item = document.createElement('div');
+        var iconEl = document.createElement('span');
+        var icon = document.createElement('i');
+        var nameEl = document.createElement('span');
+        item.className = 'select-group-item selected';
+        item.dataset.id = 'root';
+        item.dataset.level = '-1';
+        iconEl.className = 'select-group-item-icon';
+        icon.className = 'fas fa-home';
+        nameEl.className = 'select-group-item-name';
+        nameEl.textContent = bookT('book.shelfHome');
+        iconEl.appendChild(icon);
+        item.appendChild(iconEl);
+        item.appendChild(nameEl);
+        tree.appendChild(item);
+    }
+
+    function updateSelectGroupModalCopy(modal) {
+        var title = modal.querySelector('#selectGroupModalTitle');
+        var close = modal.querySelector('#selectGroupCloseBtn');
+        var confirmButton = modal.querySelector('#selectGroupConfirmBtn');
+        if (title) title.textContent = bookT('book.addToShelfTitle');
+        if (close) close.setAttribute('aria-label', bookT('book.closeGroupChooser'));
+        if (confirmButton) confirmButton.lastChild.textContent = ' ' + bookT('book.confirm');
+    }
+
     function showSelectGroupModal() {
         var modal = document.getElementById('selectGroupModal');
         if (!modal) {
@@ -531,26 +586,22 @@ function initBookShelfButton(bookHash) {
             modal.innerHTML =
                 '<div class="select-group-content">' +
                     '<div class="select-group-header">' +
-                        '<h3>Add to Shelf</h3>' +
+                        '<h3 id="selectGroupModalTitle"></h3>' +
                         '<button class="select-group-close-btn" id="selectGroupCloseBtn">' +
                             '<i class="fas fa-times"></i>' +
                         '</button>' +
                     '</div>' +
                     '<div class="select-group-body">' +
-                        '<div class="select-group-tree" id="selectGroupTree">' +
-                            '<div class="select-group-item selected" data-id="root" data-level="-1">' +
-                                '<span class="select-group-item-icon"><i class="fas fa-home"></i></span>' +
-                                '<span class="select-group-item-name">Shelf Home</span>' +
-                            '</div>' +
-                        '</div>' +
+                        '<div class="select-group-tree" id="selectGroupTree"></div>' +
                     '</div>' +
                     '<div class="select-group-footer">' +
                         '<button class="select-group-confirm-btn" id="selectGroupConfirmBtn">' +
-                            '<i class="fas fa-check"></i> Confirm' +
+                            '<i class="fas fa-check"></i><span></span>' +
                         '</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
+            updateSelectGroupModalCopy(modal);
 
             modal.querySelector('#selectGroupCloseBtn').addEventListener('click', function() {
                 modal.classList.remove('active');
@@ -580,7 +631,7 @@ function initBookShelfButton(bookHash) {
                     }
 
                     saveBookshelf(shelfData);
-                    showNotification('Book added to shelf!', 'success');
+                    showNotification(bookT('book.addedToShelf'), 'success');
                     updateButtonState();
                     modal.classList.remove('active');
                 }
@@ -593,12 +644,10 @@ function initBookShelfButton(bookHash) {
             });
         }
 
+        updateSelectGroupModalCopy(modal);
         var tree = modal.querySelector('#selectGroupTree');
-        tree.innerHTML =
-            '<div class="select-group-item selected" data-id="root" data-level="-1">' +
-                '<span class="select-group-item-icon"><i class="fas fa-home"></i></span>' +
-                '<span class="select-group-item-name">Shelf Home</span>' +
-            '</div>';
+        tree.innerHTML = '';
+        addRootGroup(tree);
 
         var shelfData = getBookshelf();
         renderGroupTree(tree, shelfData.groups, 0);
@@ -639,6 +688,12 @@ function initBookShelfButton(bookHash) {
         return null;
     }
 
+    if (toggleShelfBtn.dataset.bookShelfBound) {
+        window.refreshBookShelfButton = updateButtonState;
+        updateButtonState();
+        return;
+    }
+    toggleShelfBtn.dataset.bookShelfBound = 'true';
     toggleShelfBtn.addEventListener('click', function() {
         var shelfData = getBookshelf();
         var inShelf = isBookInShelf(bookHash, shelfData);
@@ -646,13 +701,14 @@ function initBookShelfButton(bookHash) {
         if (inShelf) {
             removeBookFromShelf(bookHash, shelfData);
             saveBookshelf(shelfData);
-            showNotification('Book removed from shelf!', 'success');
+            showNotification(bookT('book.removedFromShelf'), 'success');
             updateButtonState();
         } else {
             showSelectGroupModal();
         }
     });
 
+    window.refreshBookShelfButton = updateButtonState;
     updateButtonState();
 }
 
