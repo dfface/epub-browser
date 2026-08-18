@@ -16,10 +16,8 @@
       visible: false,
       connected: true,
       hiddenGeneration: null,
-      observed: {},
       catalogRevision: 0,
-      announceDegraded: false,
-      autoCollapseGeneration: null
+      announceDegraded: false
     };
   }
 
@@ -41,15 +39,6 @@
 
     var previous = state.snapshot;
     var firstSnapshot = !previous;
-    var observed = {};
-    var key;
-    for (key in state.observed) {
-      if (Object.prototype.hasOwnProperty.call(state.observed, key)) observed[key] = state.observed[key];
-    }
-    if (snapshot.phase === 'discovering' || snapshot.phase === 'processing') observed[snapshot.generation] = true;
-
-    var becameComplete = snapshot.phase === 'complete' &&
-      (!previous || previous.generation !== snapshot.generation || previous.phase !== 'complete');
     var visible = snapshot.phase !== 'idle' &&
       !(firstSnapshot && snapshot.phase === 'complete') &&
       state.hiddenGeneration !== snapshot.generation;
@@ -59,10 +48,8 @@
       visible: visible,
       connected: true,
       hiddenGeneration: state.hiddenGeneration,
-      observed: observed,
       catalogRevision: Math.max(state.catalogRevision, snapshot.catalog_revision || 0),
-      announceDegraded: snapshot.phase === 'degraded' && (!previous || previous.phase !== 'degraded' || previous.generation !== snapshot.generation),
-      autoCollapseGeneration: becameComplete && observed[snapshot.generation] ? snapshot.generation : null
+      announceDegraded: snapshot.phase === 'degraded' && (!previous || previous.phase !== 'degraded' || previous.generation !== snapshot.generation)
     };
   }
 
@@ -73,7 +60,6 @@
     var completedRefreshRevision = 0;
     var controller = {
       state: initialState(),
-      timer: null,
       accept: accept,
       dismiss: dismiss,
       disconnected: disconnected
@@ -102,13 +88,6 @@
       if (options.render) options.render(controller.state);
     }
 
-    function cancelAutoCollapse() {
-      if (controller.timer !== null) {
-        if (options.cancelSchedule) options.cancelSchedule(controller.timer);
-        controller.timer = null;
-      }
-    }
-
     function accept(snapshot) {
       var previous = controller.state;
       if (!isNewer(previous.snapshot, snapshot)) {
@@ -119,39 +98,20 @@
         return false;
       }
       controller.state = reduce(previous, snapshot);
-      if (previous.snapshot && previous.snapshot.phase === 'complete' && snapshot.phase !== 'complete') cancelAutoCollapse();
-      if (snapshot.phase === 'degraded') cancelAutoCollapse();
       render();
 
       if ((snapshot.catalog_revision || 0) > previous.catalogRevision && options.refreshMetadata) {
         requestMetadataRefresh(snapshot.catalog_revision || 0);
       }
-      if (controller.state.autoCollapseGeneration !== null) {
-        var generation = controller.state.autoCollapseGeneration;
-        cancelAutoCollapse();
-        controller.timer = (options.schedule || setTimeout)(function() {
-          if (controller.state.snapshot && controller.state.snapshot.generation === generation &&
-              controller.state.snapshot.phase === 'complete') {
-            controller.state = stateWith(controller.state, {
-              hiddenGeneration: generation,
-              visible: false,
-              autoCollapseGeneration: null
-            });
-            render();
-          }
-          controller.timer = null;
-        }, 10000);
-      }
       return true;
     }
 
     function dismiss() {
-      if (!controller.state.snapshot || controller.state.snapshot.phase !== 'degraded') return;
-      cancelAutoCollapse();
+      if (!controller.state.snapshot ||
+          (controller.state.snapshot.phase !== 'complete' && controller.state.snapshot.phase !== 'degraded')) return;
       controller.state = stateWith(controller.state, {
         hiddenGeneration: controller.state.snapshot.generation,
         visible: false,
-        autoCollapseGeneration: null,
         announceDegraded: false
       });
       render();
@@ -176,6 +136,7 @@
       'library.progress.degraded': 'Library updated with failures',
       'library.progress.reconnecting': 'Reconnecting to library updates…',
       'library.progress.summary': 'Processed {completed} of {total} books',
+      'library.progress.removed': 'Removed {count} books',
       'library.progress.latest': 'Latest: {book}'
     }[key] || key;
     return fallback.replace(/\{([^}]+)\}/g, function(_, name) { return params && params[name] !== undefined ? params[name] : ''; });
@@ -186,6 +147,20 @@
     if (phase === 'processing') return 'library.progress.processing';
     if (phase === 'complete') return 'library.progress.complete';
     return 'library.progress.degraded';
+  }
+
+  function summaryText(root, snapshot) {
+    var parts = [];
+    if (snapshot.total) {
+      parts.push(translate(root, 'library.progress.summary', {
+        completed: snapshot.completed,
+        total: snapshot.total
+      }));
+    }
+    if (snapshot.removed) {
+      parts.push(translate(root, 'library.progress.removed', { count: snapshot.removed }));
+    }
+    return parts.join(' · ');
   }
 
   function createDomOptions(root, mount) {
@@ -214,8 +189,8 @@
       if (!snapshot) return;
 
       setPhase(snapshot.phase);
-      close.hidden = snapshot.phase !== 'degraded';
-      close.disabled = snapshot.phase !== 'degraded';
+      close.hidden = snapshot.phase !== 'complete' && snapshot.phase !== 'degraded';
+      close.disabled = snapshot.phase !== 'complete' && snapshot.phase !== 'degraded';
       title.textContent = t(phaseTitleKey(snapshot.phase));
       summary.removeAttribute('role');
       summary.setAttribute('aria-live', 'polite');
@@ -227,9 +202,9 @@
         summary.textContent = t('library.progress.reconnecting');
       } else if (state.announceDegraded) {
         summary.textContent = t('library.progress.degraded') + ' ' +
-          t('library.progress.summary', { completed: snapshot.completed, total: snapshot.total });
+          summaryText(root, snapshot);
       } else {
-        summary.textContent = t('library.progress.summary', { completed: snapshot.completed, total: snapshot.total });
+        summary.textContent = summaryText(root, snapshot);
       }
 
       if (snapshot.phase === 'discovering') {
@@ -264,9 +239,7 @@
       render: render,
       refreshMetadata: function() {
         return root.refreshLibraryMetadata ? root.refreshLibraryMetadata.apply(root, arguments) : Promise.resolve();
-      },
-      schedule: function(callback, delay) { return root.setTimeout(callback, delay); },
-      cancelSchedule: function(identifier) { root.clearTimeout(identifier); }
+      }
     };
   }
 
@@ -292,6 +265,7 @@
     reduce: reduce,
     createController: createController,
     createDomOptions: createDomOptions,
+    summaryText: summaryText,
     start: start
   };
 });

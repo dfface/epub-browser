@@ -87,17 +87,14 @@ test('serializes metadata refreshes and coalesces pending snapshots to the newes
   await Promise.resolve();
 });
 
-test('only an observed successful generation auto-collapses', () => {
-  const scheduled = [];
+test('an observed successful generation remains visible until dismissed', () => {
   const controller = Progress.createController({
-    render() {}, refreshMetadata() { return Promise.resolve(); },
-    schedule(fn, delay) { scheduled.push({ fn, delay }); return scheduled.length; },
-    cancelSchedule() {}
+    render() {}, refreshMetadata() { return Promise.resolve(); }
   });
   controller.accept(snapshot({ phase: 'processing' }));
   controller.accept(snapshot({ revision: 2, phase: 'complete', completed: 2, converted: 2 }));
-  assert.equal(scheduled[0].delay, 10000);
-  scheduled[0].fn();
+  assert.equal(controller.state.visible, true);
+  controller.dismiss();
   assert.equal(controller.state.hiddenGeneration, 1);
 });
 
@@ -105,6 +102,19 @@ test('an initial complete snapshot stays quiet', () => {
   const controller = Progress.createController({ render() {}, refreshMetadata() { return Promise.resolve(); }, schedule() { throw new Error('must not schedule'); }, cancelSchedule() {} });
   controller.accept(snapshot({ phase: 'complete', completed: 2, converted: 2 }));
   assert.equal(controller.state.visible, false);
+});
+
+test('reports a direct deletion without a misleading zero-book conversion count', () => {
+  const harness = progressMount();
+  const root = {
+    document: { createElement: harness.createElement },
+    EpubBrowserI18n: { t(key, params) { return key === 'library.progress.removed' ? 'Removed ' + params.count + ' book' : key; } },
+  };
+  const controller = Progress.createController(Progress.createDomOptions(root, harness.mount));
+
+  controller.accept(snapshot({ phase: 'processing', total: 0, removed: 1 }));
+
+  assert.equal(harness.nodes['[data-progress-summary]'].textContent, 'Removed 1 book');
 });
 
 test('an initial degraded snapshot remains visible', () => {
@@ -178,7 +188,7 @@ test('keeps a named progressbar during discovery and announces a meaningful degr
   assert.equal(summary.getAttribute('aria-live'), 'polite');
 });
 
-test('only exposes and honors the close action for degraded generations', () => {
+test('only exposes and honors the close action for completed generations', () => {
   const harness = progressMount();
   const root = {
     document: { createElement: harness.createElement },
@@ -196,10 +206,10 @@ test('only exposes and honors the close action for degraded generations', () => 
   assert.equal(controller.state.visible, true);
 
   controller.accept(snapshot({ revision: 2, phase: 'complete', completed: 2 }));
-  assert.equal(close.hidden, true);
-  assert.equal(close.disabled, true);
+  assert.equal(close.hidden, false);
+  assert.equal(close.disabled, false);
   controller.dismiss();
-  assert.equal(controller.state.visible, true);
+  assert.equal(controller.state.visible, false);
 
   controller.accept(snapshot({ generation: 2, revision: 1, phase: 'degraded', failed: 1 }));
   assert.equal(close.hidden, false);
