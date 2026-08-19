@@ -90,7 +90,11 @@ class StateStore:
             connection.execute("BEGIN IMMEDIATE")
             self._create_compatible_schema(connection)
             administrator = self._administrator(connection)
-            if administrator is None and bootstrap is not None:
+            if administrator is None:
+                if bootstrap is None:
+                    raise RuntimeError(
+                        "Server administrator credentials are required for first startup"
+                    )
                 administrator = self._bootstrap_admin(
                     connection,
                     bootstrap.username,
@@ -120,7 +124,8 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS annotations (
                 id TEXT PRIMARY KEY,
                 username TEXT NOT NULL DEFAULT '',
-                user_id TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
                 text TEXT NOT NULL,
@@ -142,7 +147,8 @@ class StateStore:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS bookshelves (
-                user_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL PRIMARY KEY CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
                 username TEXT NOT NULL DEFAULT '',
                 version INTEGER NOT NULL,
                 data TEXT NOT NULL,
@@ -163,7 +169,8 @@ class StateStore:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS reading_progress (
-                user_id TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
                 username TEXT NOT NULL DEFAULT '',
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
@@ -406,25 +413,57 @@ class StateStore:
     def _migrate_user_owned_data(
         self,
         connection,
-        administrator_id: Optional[str],
+        administrator_id: str,
     ) -> None:
-        if self._add_column_if_missing(
-            connection,
-            "annotations",
-            "user_id",
-            "TEXT NOT NULL DEFAULT ''",
-        ):
-            if administrator_id is None:
-                connection.execute(
-                    "UPDATE annotations SET user_id = username"
-                )
-            else:
-                connection.execute(
-                    "UPDATE annotations SET user_id = ?",
-                    (administrator_id,),
-                )
+        self._get_user(connection, administrator_id)
+        self._migrate_annotations(connection, administrator_id)
         self._migrate_bookshelves(connection, administrator_id)
         self._migrate_reading_progress(connection, administrator_id)
+
+    def _migrate_annotations(self, connection, administrator_id: str) -> None:
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(annotations)").fetchall()
+        }
+        if "user_id" in columns:
+            return
+        temporary_table = "annotations_ownership_v2_migrating"
+        self._reject_migration_table(connection, temporary_table)
+        connection.execute(
+            f"""
+            CREATE TABLE {temporary_table} (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
+                book_hash TEXT NOT NULL,
+                chapter_index INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                note TEXT,
+                start_meta TEXT,
+                end_meta TEXT,
+                color TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            INSERT INTO {temporary_table} (
+                id, username, user_id, book_hash, chapter_index, text, note,
+                start_meta, end_meta, color, created_at, updated_at
+            )
+            SELECT id, username, ?, book_hash, chapter_index, text, note,
+                   start_meta, end_meta, color, created_at, updated_at
+            FROM annotations
+            """,
+            (administrator_id,),
+        )
+        connection.execute("DROP TABLE annotations")
+        connection.execute(
+            f"ALTER TABLE {temporary_table} RENAME TO annotations"
+        )
 
     @staticmethod
     def _create_user_owned_indexes(connection) -> None:
@@ -455,7 +494,7 @@ class StateStore:
     def _migrate_bookshelves(
         self,
         connection,
-        administrator_id: Optional[str],
+        administrator_id: str,
     ) -> None:
         columns = {
             row["name"]
@@ -468,7 +507,8 @@ class StateStore:
         connection.execute(
             f"""
             CREATE TABLE {temporary_table} (
-                user_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL PRIMARY KEY CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
                 username TEXT NOT NULL DEFAULT '',
                 version INTEGER NOT NULL,
                 data TEXT NOT NULL,
@@ -476,18 +516,18 @@ class StateStore:
             )
             """
         )
-        owner = "username" if administrator_id is None else "?"
-        values = () if administrator_id is None else (administrator_id,)
         connection.execute(
             f"""
             INSERT INTO {temporary_table} (
                 user_id, username, version, data, updated_at
             )
-            SELECT {owner}, username, version, data,
+            SELECT ?, username, version, data,
                    COALESCE(updated_at, CURRENT_TIMESTAMP)
             FROM bookshelves
+            ORDER BY version DESC, updated_at DESC, username ASC
+            LIMIT 1
             """,
-            values,
+            (administrator_id,),
         )
         connection.execute("DROP TABLE bookshelves")
         connection.execute(
@@ -497,7 +537,7 @@ class StateStore:
     def _migrate_reading_progress(
         self,
         connection,
-        administrator_id: Optional[str],
+        administrator_id: str,
     ) -> None:
         columns = {
             row["name"]
@@ -512,7 +552,8 @@ class StateStore:
         connection.execute(
             f"""
             CREATE TABLE {temporary_table} (
-                user_id TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
                 username TEXT NOT NULL DEFAULT '',
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
@@ -521,18 +562,29 @@ class StateStore:
             )
             """
         )
-        owner = "username" if administrator_id is None else "?"
-        values = () if administrator_id is None else (administrator_id,)
         connection.execute(
             f"""
             INSERT INTO {temporary_table} (
                 user_id, username, book_hash, chapter_index, updated_at
             )
-            SELECT {owner}, username, book_hash, chapter_index,
-                   COALESCE(updated_at, CURRENT_TIMESTAMP)
-            FROM reading_progress
+            SELECT ?, current.username, current.book_hash,
+                   current.chapter_index,
+                   COALESCE(current.updated_at, CURRENT_TIMESTAMP)
+            FROM reading_progress AS current
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM reading_progress AS preferred
+                WHERE preferred.book_hash = current.book_hash
+                  AND (
+                    preferred.updated_at > current.updated_at
+                    OR (
+                        preferred.updated_at = current.updated_at
+                        AND preferred.username < current.username
+                    )
+                  )
+            )
             """,
-            values,
+            (administrator_id,),
         )
         connection.execute("DROP TABLE reading_progress")
         connection.execute(
@@ -607,6 +659,16 @@ class StateStore:
         if not normalized:
             raise ValueError("Username must not be empty")
         return normalized
+
+    @staticmethod
+    def _require_user(connection, user_id: str) -> None:
+        if not isinstance(user_id, str) or not user_id.strip():
+            raise ValueError("User ID must not be empty")
+        if connection.execute(
+            "SELECT 1 FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone() is None:
+            raise KeyError(f"Unknown user ID: {user_id}")
 
     def create_user(
         self,
@@ -998,8 +1060,9 @@ class StateStore:
             ).fetchone()
         return self._book_record(row) if row else None
 
-    def get_annotation(self, annotation_id: str, user_id: str = ""):
+    def get_annotation(self, annotation_id: str, user_id: str):
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             row = connection.execute(
                 "SELECT * FROM annotations WHERE id = ? AND user_id = ?",
                 (annotation_id, user_id),
@@ -1010,7 +1073,8 @@ class StateStore:
         self,
         book_hash: Optional[str] = None,
         chapter_index: Optional[int] = None,
-        user_id: str = "",
+        *,
+        user_id: str,
     ):
         clauses = []
         values = []
@@ -1024,6 +1088,7 @@ class StateStore:
         values.append(user_id)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             rows = connection.execute(
                 "SELECT * FROM annotations" + where + " ORDER BY created_at DESC",
                 values,
@@ -1033,11 +1098,12 @@ class StateStore:
     def upsert_annotation(
         self,
         annotation,
-        user_id: str = "",
+        user_id: str,
         replace_existing: bool = False,
     ) -> None:
         operation = "INSERT OR REPLACE" if replace_existing else "INSERT"
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 f"""
                 {operation} INTO annotations (
@@ -1061,7 +1127,7 @@ class StateStore:
                 ),
             )
 
-    def update_annotation(self, annotation_id: str, data, user_id: str = ""):
+    def update_annotation(self, annotation_id: str, data, user_id: str):
         assignments = []
         values = []
         for field in ("note", "color", "chapter_index"):
@@ -1074,6 +1140,7 @@ class StateStore:
                 values.append(self._optional_json(data[field]))
         assignments.append("updated_at = CURRENT_TIMESTAMP")
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 "UPDATE annotations SET "
                 + ", ".join(assignments)
@@ -1082,8 +1149,9 @@ class StateStore:
             )
         return self.get_annotation(annotation_id, user_id=user_id)
 
-    def delete_annotation(self, annotation_id: str, user_id: str = "") -> None:
+    def delete_annotation(self, annotation_id: str, user_id: str) -> None:
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 "DELETE FROM annotations WHERE id = ? AND user_id = ?",
                 (annotation_id, user_id),
@@ -1091,6 +1159,7 @@ class StateStore:
 
     def get_bookshelf(self, user_id: str):
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             row = connection.execute(
                 "SELECT version, data FROM bookshelves WHERE user_id = ?",
                 (user_id,),
@@ -1100,6 +1169,7 @@ class StateStore:
     def create_bookshelf(self, user_id: str, version: int, data) -> None:
         serialized = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 """
                 INSERT INTO bookshelves (
@@ -1112,6 +1182,7 @@ class StateStore:
     def update_bookshelf(self, user_id: str, version: int, data) -> None:
         serialized = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 """
                 UPDATE bookshelves
@@ -1123,6 +1194,7 @@ class StateStore:
 
     def get_reading_progress(self, user_id: str, book_hash: str):
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             row = connection.execute(
                 """
                 SELECT chapter_index FROM reading_progress
@@ -1139,6 +1211,7 @@ class StateStore:
         chapter_index: int,
     ) -> None:
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 """
                 INSERT INTO reading_progress(
@@ -1153,6 +1226,7 @@ class StateStore:
 
     def delete_reading_progress(self, user_id: str, book_hash: str) -> None:
         with self._connection() as connection:
+            self._require_user(connection, user_id)
             connection.execute(
                 "DELETE FROM reading_progress WHERE user_id = ? AND book_hash = ?",
                 (user_id, book_hash),

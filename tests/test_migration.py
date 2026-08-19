@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from epub_browser.auth import BootstrapCredentials
 from epub_browser.cli import ServerConfig
 from epub_browser.migration import (
     MigrationConflictError,
@@ -20,12 +21,13 @@ class MigrationManagerTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.server_dir = Path(self.temporary.name)
+        self.bootstrap = BootstrapCredentials("admin", "secret")
 
     def test_migrates_root_database_with_backup_and_schema_upgrade(self):
         source = self.server_dir / "epub-browser.db"
         self._create_legacy_database(source)
 
-        result = MigrationManager(self.server_dir, None).prepare_data()
+        result = self._manager().prepare_data()
 
         self.assertEqual(
             result.database_path,
@@ -49,7 +51,7 @@ class MigrationManagerTests(unittest.TestCase):
         source = self.server_dir / "annotations.db"
         self._create_legacy_database(source)
 
-        result = MigrationManager(self.server_dir, None).prepare_data()
+        result = self._manager().prepare_data()
 
         self.assertTrue(result.database_path.is_file())
         self.assertFalse(source.exists())
@@ -58,9 +60,13 @@ class MigrationManagerTests(unittest.TestCase):
         source = self.server_dir / "annotations.db"
         self._create_xpath_annotation_database(source)
 
-        result = MigrationManager(self.server_dir, None).prepare_data()
+        result = self._manager().prepare_data()
         migrated = StateStore(result.database_path)
-        annotation = migrated.get_annotation("legacy")
+        administrator = migrated.get_user_by_username("admin")
+        annotation = migrated.get_annotation(
+            "legacy",
+            user_id=administrator.user_id,
+        )
 
         self.assertEqual(annotation["text"], "Saved from v1")
         self.assertEqual(
@@ -85,7 +91,7 @@ class MigrationManagerTests(unittest.TestCase):
         self._create_legacy_database(second)
 
         with self.assertRaises(MigrationConflictError) as raised:
-            MigrationManager(self.server_dir, None).prepare_data()
+            self._manager().prepare_data()
 
         self.assertIn(str(first), str(raised.exception))
         self.assertIn(str(second), str(raised.exception))
@@ -98,7 +104,7 @@ class MigrationManagerTests(unittest.TestCase):
         source.write_bytes(b"not sqlite")
 
         with self.assertRaisesRegex(MigrationError, "integrity"):
-            MigrationManager(self.server_dir, None).prepare_data()
+            self._manager().prepare_data()
 
         self.assertEqual(source.read_bytes(), b"not sqlite")
         self.assertFalse((self.server_dir / "data").exists())
@@ -106,7 +112,7 @@ class MigrationManagerTests(unittest.TestCase):
     def test_prepare_data_is_idempotent(self):
         source = self.server_dir / "epub-browser.db"
         self._create_legacy_database(source)
-        manager = MigrationManager(self.server_dir, None)
+        manager = self._manager()
 
         first = manager.prepare_data()
         second = manager.prepare_data()
@@ -123,7 +129,7 @@ class MigrationManagerTests(unittest.TestCase):
                 1,
             )
 
-    def test_imports_only_the_highest_bookshelf_version_per_user(self):
+    def test_imports_only_highest_legacy_bookshelf_for_administrator(self):
         source = self.server_dir / "epub-browser.db"
         self._create_legacy_database(source, shelf_version=3)
         legacy_dir = self.server_dir / "legacy-sync"
@@ -145,21 +151,24 @@ class MigrationManagerTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        result = MigrationManager(self.server_dir, legacy_dir).prepare_data()
+        result = self._manager(legacy_dir).prepare_data()
 
+        store = StateStore(result.database_path)
+        administrator = store.get_user_by_username("admin")
         with sqlite3.connect(result.database_path) as connection:
-            reader = connection.execute(
-                "SELECT version, data FROM bookshelves WHERE user_id = 'reader'"
-            ).fetchone()
-            other = connection.execute(
-                "SELECT version, data FROM bookshelves WHERE user_id = 'other'"
+            administrator_shelf = connection.execute(
+                """
+                SELECT version, data FROM bookshelves
+                WHERE user_id = ?
+                """,
+                (administrator.user_id,),
             ).fetchone()
             bad = connection.execute(
-                "SELECT version FROM bookshelves WHERE user_id = 'bad'"
+                "SELECT COUNT(*) FROM bookshelves WHERE user_id != ?",
+                (administrator.user_id,),
             ).fetchone()
-        self.assertEqual(reader, (5, '{"items": ["new"]}'))
-        self.assertEqual(other, (4, '{"items": ["other"]}'))
-        self.assertIsNone(bad)
+        self.assertEqual(administrator_shelf, (5, '{"items": ["new"]}'))
+        self.assertEqual(bad, (0,))
 
     def test_retires_only_known_public_artifacts_in_two_successful_phases(self):
         self._create_legacy_database(self.server_dir / "epub-browser.db")
@@ -169,7 +178,7 @@ class MigrationManagerTests(unittest.TestCase):
         (self.server_dir / "book").mkdir()
         user_file = self.server_dir / "keep-me.txt"
         user_file.write_text("user", encoding="utf-8")
-        manager = MigrationManager(self.server_dir, None)
+        manager = self._manager()
         manager.prepare_data()
 
         manager.record_cache_reconciled()
@@ -229,7 +238,7 @@ class MigrationManagerTests(unittest.TestCase):
         self.assertIn("newer schema", stderr.getvalue())
 
     def test_legacy_identity_correlation_reuses_only_unique_matches(self):
-        manager = MigrationManager(self.server_dir, None)
+        manager = self._manager()
         manager.prepare_data()
         state_path = self.server_dir / "data" / "migration-state.json"
         state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -291,6 +300,13 @@ class MigrationManagerTests(unittest.TestCase):
                     "INSERT INTO bookshelves VALUES (?, ?, ?)",
                     ("reader", shelf_version, '{"items":["database"]}'),
                 )
+
+    def _manager(self, legacy_sync_dir=None):
+        return MigrationManager(
+            self.server_dir,
+            legacy_sync_dir,
+            bootstrap=self.bootstrap,
+        )
 
     @staticmethod
     def _create_xpath_annotation_database(path):

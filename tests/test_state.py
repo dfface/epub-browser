@@ -15,7 +15,9 @@ class StateStoreTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.database = Path(self.temporary.name, "data", "epub-browser.db")
         self.store = StateStore(self.database)
-        self.store.initialize()
+        self.owner = self.store.initialize(
+            bootstrap=BootstrapCredentials("owner", "secret")
+        )
 
     def test_initialize_creates_versioned_existing_and_books_tables(self):
         with sqlite3.connect(self.database) as connection:
@@ -51,6 +53,7 @@ class StateStoreTests(unittest.TestCase):
         self._create_v1_database_with_annotation_bookshelf_and_progress(
             "legacy-name"
         )
+        before = self._database_snapshot()
         with mock.patch.object(
             StateStore,
             "_migrate_bookshelves",
@@ -60,7 +63,121 @@ class StateStoreTests(unittest.TestCase):
                 StateStore(self.database).initialize(
                     bootstrap=BootstrapCredentials("admin", "secret")
                 )
-        self.assertEqual(self._user_version(), 1)
+        self.assertEqual(self._database_snapshot(), before)
+
+    def test_initialize_without_bootstrap_leaves_v1_database_unchanged(self):
+        self._create_v1_database_with_annotation_bookshelf_and_progress(
+            "legacy-name"
+        )
+        before = self._database_snapshot()
+
+        with self.assertRaisesRegex(RuntimeError, "administrator credentials"):
+            StateStore(self.database).initialize()
+
+        self.assertEqual(self._database_snapshot(), before)
+
+    def test_initialize_without_bootstrap_leaves_new_database_uninitialized(self):
+        database = Path(self.temporary.name, "fresh", "state.db")
+
+        with self.assertRaisesRegex(RuntimeError, "administrator credentials"):
+            StateStore(database).initialize()
+
+        with sqlite3.connect(database) as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                0,
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+                ).fetchone()[0],
+                0,
+            )
+
+    def test_initialize_without_bootstrap_reuses_existing_administrator(self):
+        self.assertEqual(self.store.initialize(), self.owner)
+
+    def test_v1_colliding_bookshelves_keep_highest_version_newest_deterministically(self):
+        self._create_v1_database_with_annotation_bookshelf_and_progress("zeta")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """
+                UPDATE bookshelves
+                SET version = 6, data = '{"owner":"zeta"}',
+                    updated_at = '2027-01-01'
+                WHERE username = 'zeta'
+                """
+            )
+            connection.executemany(
+                """
+                INSERT INTO bookshelves (
+                    username, version, data, updated_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    ("beta", 7, '{"owner":"beta"}', "2026-01-01"),
+                    ("alpha", 7, '{"owner":"alpha"}', "2026-01-01"),
+                ),
+            )
+
+        store = StateStore(self.database)
+        admin = store.initialize(BootstrapCredentials("admin", "secret"))
+
+        self.assertEqual(
+            store.get_bookshelf(admin.user_id),
+            (7, '{"owner":"alpha"}'),
+        )
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT username FROM bookshelves WHERE user_id = ?",
+                    (admin.user_id,),
+                ).fetchone()[0],
+                "alpha",
+            )
+
+    def test_v1_colliding_progress_keeps_newest_with_deterministic_tie_break(self):
+        self._create_v1_database_with_annotation_bookshelf_and_progress("zeta")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """
+                UPDATE reading_progress
+                SET chapter_index = 3, updated_at = '2025-01-01'
+                WHERE username = 'zeta' AND book_hash = 'book'
+                """
+            )
+            connection.executemany(
+                """
+                INSERT INTO reading_progress (
+                    username, book_hash, chapter_index, updated_at
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    ("beta", "book", 8, "2026-01-01"),
+                    ("alpha", "book", 4, "2026-01-01"),
+                    ("beta", "other-book", 9, "2024-01-01"),
+                ),
+            )
+
+        store = StateStore(self.database)
+        admin = store.initialize(BootstrapCredentials("admin", "secret"))
+
+        self.assertEqual(store.get_reading_progress(admin.user_id, "book"), 4)
+        self.assertEqual(
+            store.get_reading_progress(admin.user_id, "other-book"),
+            9,
+        )
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    """
+                    SELECT username FROM reading_progress
+                    WHERE user_id = ? AND book_hash = 'book'
+                    """,
+                    (admin.user_id,),
+                ).fetchone()[0],
+                "alpha",
+            )
 
     def test_content_update_keeps_book_id(self):
         source = Path(self.temporary.name, "books", "one.epub")
@@ -212,16 +329,50 @@ class StateStoreTests(unittest.TestCase):
                 "created_at": "2026-01-01",
                 "updated_at": "2026-01-01",
             },
-            user_id="reader",
+            user_id=self.owner.user_id,
         )
 
         self.store.mark_missing(record.book_id)
 
         self.assertEqual(self.store.active_books(), ())
         self.assertEqual(
-            self.store.get_annotation("annotation", user_id="reader")["book_hash"],
+            self.store.get_annotation(
+                "annotation",
+                user_id=self.owner.user_id,
+            )["book_hash"],
             record.book_id,
         )
+
+    def test_annotations_require_an_existing_nonempty_owner(self):
+        annotation = {
+            "id": "owned",
+            "book_hash": "book",
+            "chapter_index": 0,
+            "text": "Text",
+            "color": "#fff",
+            "created_at": "2026",
+            "updated_at": "2026",
+        }
+
+        with self.assertRaises(TypeError):
+            self.store.upsert_annotation(annotation)
+        with self.assertRaises(ValueError):
+            self.store.upsert_annotation(annotation, user_id="")
+        with self.assertRaises(KeyError):
+            self.store.upsert_annotation(annotation, user_id="missing")
+
+        with sqlite3.connect(self.database) as connection:
+            user_id = next(
+                row
+                for row in connection.execute("PRAGMA table_info(annotations)")
+                if row[1] == "user_id"
+            )
+            foreign_keys = connection.execute(
+                "PRAGMA foreign_key_list(annotations)"
+            ).fetchall()
+        self.assertEqual(user_id[3], 1)
+        self.assertIsNone(user_id[4])
+        self.assertIn("users", {row[2] for row in foreign_keys})
 
     def test_initialize_rejects_a_database_from_a_newer_schema(self):
         future = Path(self.temporary.name, "future.db")
@@ -263,8 +414,8 @@ class StateStoreTests(unittest.TestCase):
             )
 
         store = StateStore(historical)
-        store.initialize()
-        legacy = store.get_annotation("legacy")
+        admin = store.initialize(BootstrapCredentials("admin", "secret"))
+        legacy = store.get_annotation("legacy", user_id=admin.user_id)
 
         self.assertEqual(
             legacy["startMeta"],
@@ -295,9 +446,13 @@ class StateStoreTests(unittest.TestCase):
                 "updated_at": "2026",
                 "startMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 0},
                 "endMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 3},
-            }
+            },
+            user_id=admin.user_id,
         )
-        self.assertEqual(store.get_annotation("new")["text"], "New")
+        self.assertEqual(
+            store.get_annotation("new", user_id=admin.user_id)["text"],
+            "New",
+        )
 
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,
@@ -328,7 +483,10 @@ class StateStoreTests(unittest.TestCase):
                 INSERT INTO annotations (
                     id, username, book_hash, chapter_index, text, color,
                     created_at, updated_at
-                ) VALUES ('old', ?, 'book', 3, 'old note', '#fff', '2025', '2025')
+                ) VALUES (
+                    'old', ?, 'book', 3, 'old note', '#fff',
+                    '2025', '2025-01-01'
+                )
                 """,
                 (username,),
             )
@@ -343,7 +501,10 @@ class StateStoreTests(unittest.TestCase):
                 """
             )
             connection.execute(
-                "INSERT INTO bookshelves (username, version, data) VALUES (?, 7, '{}')",
+                """
+                INSERT INTO bookshelves (username, version, data, updated_at)
+                VALUES (?, 7, '{}', '2025-01-01')
+                """,
                 (username,),
             )
             connection.execute(
@@ -365,9 +526,12 @@ class StateStoreTests(unittest.TestCase):
                 (username,),
             )
 
-    def _user_version(self):
+    def _database_snapshot(self):
         with sqlite3.connect(self.database) as connection:
-            return connection.execute("PRAGMA user_version").fetchone()[0]
+            return (
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                tuple(connection.iterdump()),
+            )
 
 
 if __name__ == "__main__":

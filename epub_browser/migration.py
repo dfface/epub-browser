@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from .auth import BootstrapCredentials
 from .asset_publisher import PublishedAssets
 from .processor import EPUBProcessor
 from .reporting import Reporter
@@ -55,6 +56,7 @@ class MigrationManager:
         self,
         server_dir: Path,
         legacy_sync_dir: Optional[Path],
+        bootstrap: Optional[BootstrapCredentials] = None,
     ):
         self.server_dir = Path(server_dir).expanduser().absolute()
         self.legacy_sync_dir = (
@@ -67,6 +69,8 @@ class MigrationManager:
         self.state_path = self.data_dir / "migration-state.json"
         self.backups_dir = self.data_dir / "backups"
         self.cache_dir = self.server_dir / "cache"
+        self.bootstrap = bootstrap
+        self._administrator_id = None
 
     def prepare_data(self) -> MigrationResult:
         root_candidates = tuple(
@@ -180,17 +184,17 @@ class MigrationManager:
                 temporary_database.unlink()
         return backup_path
 
-    @staticmethod
-    def _initialize_database(path: Path) -> None:
+    def _initialize_database(self, path: Path) -> None:
         try:
-            StateStore(path).initialize()
+            administrator = StateStore(path).initialize(bootstrap=self.bootstrap)
         except (RuntimeError, sqlite3.DatabaseError) as error:
             raise MigrationError(
                 f"Database schema migration failed for {path}: {error}"
             ) from error
+        self._administrator_id = administrator.user_id
 
     def _import_legacy_bookshelves(self) -> int:
-        selected = {}
+        selected = None
         directories = {self.server_dir}
         if self.legacy_sync_dir:
             directories.add(self.legacy_sync_dir)
@@ -201,7 +205,7 @@ class MigrationManager:
                 match = BOOKSHELF_PATTERN.match(path.name)
                 if not match or not path.is_file():
                     continue
-                username, version_text = match.groups()
+                _, version_text = match.groups()
                 try:
                     payload = json.loads(path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
@@ -209,22 +213,28 @@ class MigrationManager:
                 if not isinstance(payload, dict):
                     continue
                 version = int(version_text)
-                existing = selected.get(username)
-                if existing is None or version > existing[0]:
-                    selected[username] = (version, payload)
+                candidate = (version, str(path), payload)
+                if (
+                    selected is None
+                    or version > selected[0]
+                    or (version == selected[0] and str(path) < selected[1])
+                ):
+                    selected = candidate
 
+        if selected is None:
+            return 0
+        if self._administrator_id is None:
+            raise MigrationError("Bootstrap administrator is unavailable")
+        version, _, payload = selected
         store = StateStore(self.database_path)
-        imported = 0
-        for username, (version, payload) in sorted(selected.items()):
-            current = store.get_bookshelf(username)
-            if current is not None and current[0] >= version:
-                continue
-            if current is None:
-                store.create_bookshelf(username, version, payload)
-            else:
-                store.update_bookshelf(username, version, payload)
-            imported += 1
-        return imported
+        current = store.get_bookshelf(self._administrator_id)
+        if current is not None and current[0] >= version:
+            return 0
+        if current is None:
+            store.create_bookshelf(self._administrator_id, version, payload)
+        else:
+            store.update_bookshelf(self._administrator_id, version, payload)
+        return 1
 
     def _legacy_book_ids(self) -> tuple[str, ...]:
         identifiers = set()
