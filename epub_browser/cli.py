@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence, Tuple, Union
 
+from .auth import AuthConfig, ServerAuthOptions
 from .book_identity import (
     BOOK_ID_STORAGE_CHOICES,
     BOOK_ID_STORAGE_SIDECAR,
@@ -36,6 +37,7 @@ class ServerConfig:
     retain_legacy_temporary_dir: bool = False
     legacy_invocation: bool = False
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
+    auth: ServerAuthOptions = ServerAuthOptions()
 
 
 CommandConfig = Union[SSGConfig, ServerConfig]
@@ -83,6 +85,13 @@ def _new_parser() -> argparse.ArgumentParser:
     server.add_argument("--log", action="store_true")
     server.add_argument("--legacy-sync-dir")
     _add_book_id_storage(server)
+    server.add_argument("--admin-username")
+    server.add_argument("--admin-password-file")
+    server.add_argument("--trusted-proxy-cidr", action="append", default=[])
+    server.add_argument("--proxy-subject-header")
+    server.add_argument("--proxy-display-name-header")
+    server.add_argument("--proxy-issuer")
+    server.add_argument("--cookie-secure", action="store_true", default=None)
     return parser
 
 
@@ -107,7 +116,8 @@ def _legacy_parser() -> argparse.ArgumentParser:
 def parse_cli(argv: Sequence[str]) -> CommandConfig:
     arguments = list(argv)
     if not arguments or arguments[0] in {"ssg", "server", "-h", "--help"}:
-        values = _new_parser().parse_args(arguments)
+        parser = _new_parser()
+        values = parser.parse_args(arguments)
         sources = tuple(Path(source) for source in values.sources)
         if values.mode == "ssg":
             return SSGConfig(
@@ -117,6 +127,10 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
                 log=values.log,
                 book_id_storage=values.book_id_storage,
             )
+        try:
+            auth = _server_auth_options(values)
+        except ValueError as error:
+            parser.error(str(error))
         return ServerConfig(
             sources=sources,
             server_dir=Path(values.server_dir) if values.server_dir else None,
@@ -130,6 +144,7 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
                 Path(values.legacy_sync_dir) if values.legacy_sync_dir else None
             ),
             book_id_storage=values.book_id_storage,
+            auth=auth,
         )
 
     values = _legacy_parser().parse_args(arguments)
@@ -156,6 +171,28 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
         legacy_invocation=True,
         book_id_storage=values.book_id_storage,
     )
+
+
+def _server_auth_options(values: argparse.Namespace) -> ServerAuthOptions:
+    auth = ServerAuthOptions(
+        admin_username=values.admin_username,
+        admin_password_file=(
+            Path(values.admin_password_file) if values.admin_password_file else None
+        ),
+        trusted_proxy_cidrs=tuple(values.trusted_proxy_cidr),
+        proxy_subject_header=values.proxy_subject_header,
+        proxy_display_name_header=values.proxy_display_name_header,
+        proxy_issuer=values.proxy_issuer,
+        cookie_secure=values.cookie_secure,
+    )
+    AuthConfig.from_values(
+        auth.trusted_proxy_cidrs,
+        auth.proxy_subject_header,
+        auth.proxy_issuer,
+        auth.proxy_display_name_header,
+        cookie_secure=bool(auth.cookie_secure),
+    )
+    return auth
 
 
 def format_legacy_migration_hint(config: CommandConfig) -> Optional[str]:

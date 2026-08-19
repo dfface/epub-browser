@@ -125,6 +125,43 @@ class NewCommandTests(unittest.TestCase):
                 ["server", "books", "--server-dir", "state", "--base-path", "/reader/"]
             )
 
+    def test_server_parses_auth_proxy_options_without_affecting_ssg(self):
+        config = parse_cli(
+            [
+                "server",
+                "library",
+                "--server-dir",
+                "data",
+                "--trusted-proxy-cidr",
+                "10.0.0.0/8",
+                "--proxy-subject-header",
+                "X-Remote-User",
+                "--proxy-issuer",
+                "https://sso.example",
+                "--cookie-secure",
+            ]
+        )
+
+        self.assertEqual(config.auth.proxy_issuer, "https://sso.example")
+        self.assertEqual(config.auth.trusted_proxy_cidrs, ("10.0.0.0/8",))
+        self.assertTrue(config.auth.cookie_secure)
+
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parse_cli(["ssg", "books", "--output-dir", "dist", "--cookie-secure"])
+
+    def test_server_rejects_partial_proxy_configuration(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parse_cli(
+                [
+                    "server",
+                    "books",
+                    "--server-dir",
+                    "state",
+                    "--trusted-proxy-cidr",
+                    "10.0.0.0/8",
+                ]
+            )
+
     def test_top_level_help_discovers_the_two_v2_modes(self):
         with contextlib.redirect_stdout(io.StringIO()) as stdout, self.assertRaises(
             SystemExit
