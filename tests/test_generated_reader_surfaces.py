@@ -399,6 +399,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         css = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
 
         self.assertIn("markReadingChapter(readKey, getProgressIdentity())", script)
+        self.assertIn("if (window.EpubBrowserMode !== 'server') return '';", script)
         self.assertIn("return window.EpubReadingProgress.getUsername() || 'shared';", script)
         self.assertIn("markReadingChapter(currentChapter);", script)
         self.assertIn("if (username) {", script)

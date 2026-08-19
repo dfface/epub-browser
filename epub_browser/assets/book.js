@@ -334,6 +334,9 @@ function initScript() {
 }
 
 function getProgressIdentity() {
+    // Static builds persist progress locally.  A username left in localStorage
+    // by a server deployment must not make that local state look cloud-synced.
+    if (window.EpubBrowserMode !== 'server') return '';
     if (!window.EpubReadingProgress || !window.EpubReadingProgress.getUsername) return 'shared';
     return window.EpubReadingProgress.getUsername() || 'shared';
 }
