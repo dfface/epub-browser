@@ -32,17 +32,25 @@ class PublishedAssets:
 class AssetPublisher:
     """Publish app assets with immutable URLs and render stable update entry points."""
 
-    def __init__(self, source_dir, output_dir, urls=None):
+    def __init__(
+        self,
+        source_dir,
+        output_dir,
+        urls=None,
+        publish_service_worker=True,
+    ):
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
         self.urls = urls or SiteURLs()
+        self.publish_service_worker = publish_service_worker
 
     def publish(self) -> PublishedAssets:
         assets = self._copy_immutable_assets()
         published = PublishedAssets(assets)
         self._write_lookup_manifest(published)
         self._write_web_manifests(published)
-        self._write_service_worker(published)
+        if self.publish_service_worker:
+            self._write_service_worker(published)
         return published
 
     def _copy_immutable_assets(self) -> dict[str, str]:

@@ -879,7 +879,23 @@ class EPUBProcessor:
 </div>
 {render_footer(datetime.now().year)}"""
 
-        index_html += """
+        cache_boundary_script = (
+            '<script src="/assets/cache-boundary.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        startup = (
+            """function startBookClients() {
+    if (window.initScriptBook) window.initScriptBook();
+}
+if (window.EpubBrowserCacheBoundary) {
+    window.EpubBrowserCacheBoundary.start(startBookClients);
+}"""
+            if self.deployment_mode == "server"
+            else "if (window.initScriptBook) window.initScriptBook();"
+        )
+        index_html += f"""
+{cache_boundary_script}
 <script src="/assets/theme.js" defer></script>
 <script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
@@ -890,9 +906,9 @@ class EPUBProcessor:
 <script src="/assets/annotation-hub.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.initScriptBook) window.initScriptBook();
-});
+document.addEventListener('DOMContentLoaded', function() {{
+    {startup}
+}});
 </script>
 </body>
 </html>"""
@@ -1711,7 +1727,23 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     {render_footer(datetime.now().year)}
 """
-        chapter_html += """
+        cache_boundary_script = (
+            '<script src="/assets/cache-boundary.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        startup = (
+            """function startChapterClients() {
+        if (window.initScriptChapter) window.initScriptChapter();
+    }
+    if (window.EpubBrowserCacheBoundary) {
+        window.EpubBrowserCacheBoundary.start(startChapterClients);
+    }"""
+            if self.deployment_mode == "server"
+            else "if (window.initScriptChapter) window.initScriptChapter();"
+        )
+        chapter_html += f"""
+    {cache_boundary_script}
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
@@ -1728,9 +1760,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <script src="/assets/highlight.min.js"></script>
     <script src="/assets/bookshelf.js" defer></script>
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        if (window.initScriptChapter) window.initScriptChapter();
-    });
+    document.addEventListener('DOMContentLoaded', function() {{
+        {startup}
+    }});
     </script>
 </body>
 </html>

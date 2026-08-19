@@ -179,6 +179,7 @@ class ServerLibraryManager:
                 assets_dir,
                 self.public_dir,
                 urls=self.urls,
+                publish_service_worker=False,
             ).publish()
             (self.public_dir / "sw.js").unlink(missing_ok=True)
             self._refresh_public_shell()

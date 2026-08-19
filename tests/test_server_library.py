@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.auth import BootstrapCredentials
 from epub_browser.epub_identity import (
     ensure_embedded_book_id,
@@ -572,10 +573,25 @@ class ServerLibraryManagerTests(unittest.TestCase):
 
     def test_generated_server_cache_does_not_publish_a_service_worker(self):
         manager = self._manager()
+        stale_worker = manager.public_dir / "sw.js"
+        stale_worker.parent.mkdir(parents=True, exist_ok=True)
+        stale_worker.write_text("stale worker", encoding="utf-8")
 
         manager.prepare_public_shell()
 
-        self.assertFalse((manager.public_dir / "sw.js").exists())
+        self.assertFalse(stale_worker.exists())
+        manager.shutdown()
+
+    def test_server_asset_publication_never_invokes_the_worker_writer(self):
+        manager = self._manager()
+
+        with mock.patch.object(
+            AssetPublisher,
+            "_write_service_worker",
+            side_effect=AssertionError("Server attempted to write sw.js"),
+        ):
+            manager.reconcile()
+
         manager.shutdown()
 
     def test_cache_deletion_rebuilds_without_changing_book_id(self):

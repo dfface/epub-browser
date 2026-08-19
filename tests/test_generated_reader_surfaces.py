@@ -141,10 +141,54 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("window.initScriptBook()", book_html)
         self.assertIn("window.initScriptChapter()", chapter_html)
 
+    def test_server_reader_pages_gate_protected_startup_behind_cache_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            book_html = Path(processor.web_dir, "index.html").read_text(
+                encoding="utf-8"
+            )
+            chapter_html = processor.create_chapter_template(
+                "<p>Text</p>",
+                "",
+                0,
+                "One",
+            )
+
+        for html, client_name, init_name in (
+            (book_html, "startBookClients", "initScriptBook"),
+            (chapter_html, "startChapterClients", "initScriptChapter"),
+        ):
+            self.assertRegex(
+                html,
+                r'/assets/immutable/cache-boundary\.[0-9a-f]{12}\.js',
+            )
+            self.assertIn(
+                f"window.EpubBrowserCacheBoundary.start({client_name})",
+                html,
+            )
+            self.assertIn(f"function {client_name}()", html)
+            self.assertIn(f"window.{init_name}()", html)
+            self.assertLess(
+                html.index("cache-boundary."),
+                html.index("reading-progress."),
+            )
+
+        for html in (self._book_html(), self._chapter_html()):
+            self.assertNotIn("EpubBrowserCacheBoundary.start", html)
+
     def test_dynamic_browser_urls_use_the_generated_base_path_runtime(self):
         scripts = {
             name: Path("epub_browser", "assets", name).read_text(encoding="utf-8")
             for name in (
+                "cache-boundary.js",
                 "library.js",
                 "i18n.js",
                 "bookshelf.js",
@@ -153,7 +197,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             )
         }
 
-        self.assertIn("EpubBrowserURL.publicPath('/sw.js')", scripts["library.js"])
+        self.assertIn(
+            "EpubBrowserURL.publicPath('/sw.js')",
+            scripts["cache-boundary.js"],
+        )
         self.assertIn("publicPath('/assets/manifest.'", scripts["i18n.js"])
         self.assertGreaterEqual(
             scripts["bookshelf.js"].count("EpubBrowserURL.publicPath('/book/"),

@@ -4,7 +4,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 function loadBoundary(root) {
-  vm.runInNewContext(fs.readFileSync('epub_browser/assets/library.js', 'utf8'), {
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/cache-boundary.js', 'utf8'), {
     window: root,
     document: root.document,
     navigator: root.navigator,

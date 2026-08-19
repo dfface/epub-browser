@@ -311,6 +311,7 @@ if (isKindle) {
 {render_footer(datetime.now().year)}
 """
     library_html += """
+    <script src="/assets/cache-boundary.js" defer></script>
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
