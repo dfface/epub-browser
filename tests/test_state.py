@@ -454,6 +454,114 @@ class StateStoreTests(unittest.TestCase):
             "New",
         )
 
+    def test_last_enabled_administrator_is_protected_in_the_store(self):
+        with self.assertRaisesRegex(RuntimeError, "last enabled administrator"):
+            self.store.set_user_enabled(self.owner.user_id, False)
+        with self.assertRaisesRegex(RuntimeError, "last enabled administrator"):
+            self.store.update_user(self.owner.user_id, role="member")
+
+        self.assertTrue(self.store.get_user_by_username("owner").enabled)
+        self.assertEqual(self.store.get_user_by_username("owner").role, "admin")
+
+    def test_disabling_an_account_and_revoking_its_sessions_are_atomic(self):
+        member = self.store.create_user("member", "old-hash")
+        self.store.create_session("a" * 64, member.user_id, 200, now=100)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """
+                CREATE TRIGGER block_disable_session_revoke
+                BEFORE UPDATE OF revoked_at ON sessions
+                BEGIN
+                    SELECT RAISE(ABORT, 'blocked');
+                END
+                """
+            )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.set_user_enabled(member.user_id, False)
+
+        self.assertTrue(self.store.get_user_by_username("member").enabled)
+        with sqlite3.connect(self.database) as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT revoked_at FROM sessions WHERE user_id = ?",
+                    (member.user_id,),
+                ).fetchone()[0]
+            )
+
+    def test_password_reset_and_session_revocation_are_atomic(self):
+        member = self.store.create_user("member", "old-hash")
+        self.store.create_session("b" * 64, member.user_id, 200, now=100)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                """
+                CREATE TRIGGER block_password_session_revoke
+                BEFORE UPDATE OF revoked_at ON sessions
+                BEGIN
+                    SELECT RAISE(ABORT, 'blocked');
+                END
+                """
+            )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.set_password_hash_and_revoke_sessions(
+                member.user_id,
+                "new-hash",
+            )
+
+        self.assertEqual(
+            self.store.get_user_by_username("member").password_hash,
+            "old-hash",
+        )
+        with sqlite3.connect(self.database) as connection:
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT revoked_at FROM sessions WHERE user_id = ?",
+                    (member.user_id,),
+                ).fetchone()[0]
+            )
+
+    def test_store_lists_and_revokes_only_sessions_owned_by_the_user(self):
+        member = self.store.create_user("member", "hash")
+        owner_session = self.store.create_session(
+            "c" * 64,
+            self.owner.user_id,
+            200,
+            now=100,
+        )
+        member_session = self.store.create_session(
+            "d" * 64,
+            member.user_id,
+            200,
+            now=100,
+        )
+
+        self.assertEqual(
+            {session.session_id for session in self.store.list_sessions(member.user_id)},
+            {member_session},
+        )
+        self.assertFalse(
+            self.store.revoke_user_session(member.user_id, owner_session)
+        )
+        self.assertTrue(
+            self.store.revoke_user_session(member.user_id, member_session)
+        )
+
+    def test_second_enabled_admin_allows_first_to_be_disabled_and_revokes_sessions(self):
+        self.store.create_user("second-admin", "hash", role="admin")
+        self.store.create_session("e" * 64, self.owner.user_id, 200, now=100)
+
+        disabled = self.store.set_user_enabled(self.owner.user_id, False)
+
+        self.assertFalse(disabled.enabled)
+        with sqlite3.connect(self.database) as connection:
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT revoked_at FROM sessions WHERE user_id = ?",
+                    (self.owner.user_id,),
+                ).fetchone()[0]
+            )
+
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,
         username,

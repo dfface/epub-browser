@@ -61,6 +61,16 @@ class UserIdentityRecord:
     updated_at: str
 
 
+@dataclass(frozen=True)
+class SessionRecord:
+    session_id: str
+    user_id: str
+    expires_at: str
+    last_used_at: str
+    revoked_at: Optional[str]
+    created_at: str
+
+
 class StateStore:
     def __init__(
         self,
@@ -733,17 +743,87 @@ class StateStore:
             return self._get_user(connection, user_id)
 
     def set_user_enabled(self, user_id: str, enabled: bool) -> UserRecord:
+        return self.update_user(user_id, enabled=enabled)
+
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        enabled: Optional[bool] = None,
+        role: Optional[str] = None,
+        revoke_sessions: bool = False,
+    ) -> UserRecord:
+        if enabled is not None and not isinstance(enabled, bool):
+            raise ValueError("Enabled must be a boolean")
+        if role is not None and role not in {"admin", "member"}:
+            raise ValueError(f"Unsupported user role: {role}")
+        if not isinstance(revoke_sessions, bool):
+            raise ValueError("Revoke sessions must be a boolean")
+        timestamp = str(self._timestamp())
         with self._connection() as connection:
-            cursor = connection.execute(
+            connection.execute("BEGIN IMMEDIATE")
+            user = self._get_user(connection, user_id)
+            next_enabled = user.enabled if enabled is None else enabled
+            next_role = user.role if role is None else role
+            if (
+                user.enabled
+                and user.role == "admin"
+                and (not next_enabled or next_role != "admin")
+            ):
+                other_enabled_admin = connection.execute(
+                    """
+                    SELECT 1 FROM users
+                    WHERE id != ? AND role = 'admin' AND enabled = 1
+                    LIMIT 1
+                    """,
+                    (user_id,),
+                ).fetchone()
+                if other_enabled_admin is None:
+                    raise RuntimeError(
+                        "The last enabled administrator cannot be disabled or demoted"
+                    )
+            connection.execute(
                 """
                 UPDATE users
-                SET enabled = ?, updated_at = CURRENT_TIMESTAMP
+                SET enabled = ?, role = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (int(enabled), user_id),
+                (int(next_enabled), next_role, user_id),
             )
-            if cursor.rowcount != 1:
-                raise KeyError(f"Unknown user ID: {user_id}")
+            if (enabled is False) or revoke_sessions:
+                connection.execute(
+                    """
+                    UPDATE sessions SET revoked_at = ?
+                    WHERE user_id = ? AND revoked_at IS NULL
+                    """,
+                    (timestamp, user_id),
+                )
+            return self._get_user(connection, user_id)
+
+    def set_password_hash_and_revoke_sessions(
+        self,
+        user_id: str,
+        password_hash: str,
+    ) -> UserRecord:
+        timestamp = str(self._timestamp())
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, user_id)
+            connection.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (password_hash, user_id),
+            )
+            connection.execute(
+                """
+                UPDATE sessions SET revoked_at = ?
+                WHERE user_id = ? AND revoked_at IS NULL
+                """,
+                (timestamp, user_id),
+            )
             return self._get_user(connection, user_id)
 
     def list_users(self) -> tuple[UserRecord, ...]:
@@ -1029,6 +1109,88 @@ class StateStore:
                 (str(timestamp), user_id),
             )
         return cursor.rowcount
+
+    @staticmethod
+    def _session_record(row) -> SessionRecord:
+        return SessionRecord(
+            session_id=row["session_id"],
+            user_id=row["user_id"],
+            expires_at=row["expires_at"],
+            last_used_at=row["last_used_at"],
+            revoked_at=row["revoked_at"],
+            created_at=row["created_at"],
+        )
+
+    def list_sessions(
+        self,
+        user_id: str,
+        *,
+        active_only: bool = False,
+        now=None,
+    ) -> tuple[SessionRecord, ...]:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            conditions = ["user_id = ?"]
+            parameters = [user_id]
+            if active_only:
+                conditions.extend(["revoked_at IS NULL", "CAST(expires_at AS REAL) > ?"])
+                parameters.append(self._timestamp(now))
+            rows = connection.execute(
+                """
+                SELECT session_id, user_id, expires_at, last_used_at,
+                       revoked_at, created_at
+                FROM sessions
+                WHERE """
+                + " AND ".join(conditions)
+                + " ORDER BY created_at DESC, session_id",
+                tuple(parameters),
+            ).fetchall()
+        return tuple(self._session_record(row) for row in rows)
+
+    def session_id_from_token(
+        self,
+        raw_token: Optional[str],
+        *,
+        user_id: Optional[str] = None,
+    ) -> Optional[str]:
+        if not isinstance(raw_token, str) or not raw_token:
+            return None
+        digest = token_digest(raw_token)
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT session_id, token_digest, user_id
+                FROM sessions
+                WHERE token_digest = ?
+                """,
+                (digest,),
+            ).fetchone()
+        if row is None or not hmac.compare_digest(row["token_digest"], digest):
+            return None
+        if user_id is not None and row["user_id"] != user_id:
+            return None
+        return row["session_id"]
+
+    def revoke_user_session(
+        self,
+        user_id: str,
+        session_id: str,
+        *,
+        revoked_at=None,
+    ) -> bool:
+        if not isinstance(session_id, str) or not session_id:
+            return False
+        timestamp = self._timestamp(revoked_at)
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            cursor = connection.execute(
+                """
+                UPDATE sessions SET revoked_at = ?
+                WHERE session_id = ? AND user_id = ? AND revoked_at IS NULL
+                """,
+                (str(timestamp), session_id, user_id),
+            )
+        return cursor.rowcount == 1
 
     def raw_session_rows(self) -> tuple[str, ...]:
         """Expose persisted scalar values for security inspection tests."""

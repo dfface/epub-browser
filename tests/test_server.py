@@ -257,6 +257,288 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertNotIn("sensitive runtime detail", failed.text)
 
 
+class ProxyAssociationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        self.store = StateStore(public / "epub-browser.db")
+        self.alice = self.store.initialize(
+            bootstrap=BootstrapCredentials("alice", "secret")
+        )
+        config = AuthConfig.from_values(
+            ["10.0.0.0/8"],
+            "X-Remote-User",
+            "https://sso.example",
+            "X-Remote-Name",
+        )
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, config),
+        )
+        self.proxy_client = TestClient(
+            self.app,
+            client=("10.1.2.3", 50000),
+            headers={
+                "X-Remote-User": "subject-alice",
+                "X-Remote-Name": "Alice Example",
+            },
+            follow_redirects=False,
+        )
+        self.addCleanup(self.proxy_client.close)
+
+    def test_unknown_trusted_proxy_identity_must_prove_existing_password_before_linking(self):
+        response = self.proxy_client.get("/")
+        self.assertEqual(response.status_code, 303)
+
+        rejected = self.proxy_client.post(
+            "/api/identity/link",
+            json={"username": "alice", "password": "wrong"},
+        )
+        self.assertEqual(rejected.status_code, 401)
+        self.assertIsNone(
+            self.store.get_identity("https://sso.example", "subject-alice")
+        )
+
+        linked = self.proxy_client.post(
+            "/api/identity/link",
+            json={"username": "alice", "password": "secret"},
+        )
+
+        self.assertEqual(linked.status_code, 201)
+        self.assertEqual(
+            self.store.get_identity(
+                "https://sso.example",
+                "subject-alice",
+            ).user_id,
+            self.alice.user_id,
+        )
+        self.assertEqual(
+            self.proxy_client.get("/api/session").json()["user"]["username"],
+            "alice",
+        )
+
+    def test_link_requires_an_unrecognized_assertion_from_a_trusted_peer(self):
+        untrusted = TestClient(
+            self.app,
+            client=("203.0.113.8", 50000),
+            headers={"X-Remote-User": "forged-subject"},
+        )
+        self.addCleanup(untrusted.close)
+
+        response = untrusted.post(
+            "/api/identity/link",
+            json={"username": "alice", "password": "secret"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIsNone(
+            self.store.get_identity("https://sso.example", "forged-subject")
+        )
+
+    def test_linked_trusted_proxy_identity_creates_a_local_session(self):
+        self.store.create_identity(
+            "https://sso.example",
+            "subject-alice",
+            self.alice.user_id,
+            "Alice Example",
+        )
+
+        response = self.proxy_client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("epub_browser_session=", response.headers["set-cookie"])
+        self.assertEqual(
+            self.proxy_client.get("/api/session").json()["user"]["username"],
+            "alice",
+        )
+
+
+class AdminAccountTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        self.store = StateStore(public / "epub-browser.db")
+        self.admin = self.store.initialize(
+            bootstrap=BootstrapCredentials("admin", "admin-secret")
+        )
+        self.member = self.store.create_user(
+            "member",
+            hash_password("member-secret"),
+        )
+        config = AuthConfig.from_values([], None, None)
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, config),
+        )
+        self.admin_client = self._login("admin", "admin-secret")
+        self.member_client = self._login("member", "member-secret")
+
+    def _login(self, username, password):
+        client = TestClient(self.app, follow_redirects=False)
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": username, "password": password},
+        )
+        self.assertEqual(login.status_code, 303)
+        session = client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
+        return client
+
+    def test_admin_disables_member_and_revokes_all_member_sessions(self):
+        second_member_client = self._login("member", "member-secret")
+
+        response = self.admin_client.put(
+            "/api/admin/users/member",
+            json={"enabled": False},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["user"]["enabled"])
+        self.assertEqual(self.member_client.get("/api/session").status_code, 401)
+        self.assertEqual(
+            second_member_client.get("/api/session").status_code,
+            401,
+        )
+
+    def test_last_enabled_admin_cannot_be_disabled_or_demoted(self):
+        disabled = self.admin_client.put(
+            "/api/admin/users/admin",
+            json={"enabled": False},
+        )
+        demoted = self.admin_client.put(
+            "/api/admin/users/admin",
+            json={"role": "member"},
+        )
+
+        self.assertEqual(disabled.status_code, 409)
+        self.assertEqual(demoted.status_code, 409)
+        self.assertTrue(self.store.get_user_by_username("admin").enabled)
+        self.assertEqual(self.store.get_user_by_username("admin").role, "admin")
+
+    def test_member_cannot_call_administrator_routes(self):
+        for method, path, body in (
+            ("get", "/api/admin/users", None),
+            (
+                "post",
+                "/api/admin/users",
+                {"username": "other", "password": "secret"},
+            ),
+            ("put", "/api/admin/users/member", {"enabled": False}),
+            (
+                "put",
+                "/api/admin/users/member/password",
+                {"password": "new-secret"},
+            ),
+        ):
+            with self.subTest(method=method, path=path):
+                if body is None:
+                    response = getattr(self.member_client, method)(path)
+                else:
+                    response = getattr(self.member_client, method)(path, json=body)
+                self.assertEqual(response.status_code, 403)
+
+    def test_admin_creates_lists_and_resets_a_member_password(self):
+        created = self.admin_client.post(
+            "/api/admin/users",
+            json={
+                "username": "reader",
+                "password": "initial-secret",
+                "role": "member",
+            },
+        )
+        listed = self.admin_client.get("/api/admin/users")
+        reader = self._login("reader", "initial-secret")
+
+        reset = self.admin_client.put(
+            "/api/admin/users/reader/password",
+            json={"password": "replacement-secret"},
+        )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["user"]["username"], "reader")
+        self.assertIn(
+            "reader",
+            {user["username"] for user in listed.json()["users"]},
+        )
+        self.assertEqual(reset.status_code, 200)
+        self.assertEqual(reader.get("/api/session").status_code, 401)
+        self._login("reader", "replacement-secret")
+
+    def test_admin_can_revoke_all_sessions_without_disabling_the_account(self):
+        response = self.admin_client.put(
+            "/api/admin/users/member",
+            json={"revoke_sessions": True},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["user"]["enabled"])
+        self.assertEqual(self.member_client.get("/api/session").status_code, 401)
+        self._login("member", "member-secret")
+
+    def test_user_changes_password_and_all_existing_sessions_are_revoked(self):
+        second_admin_client = self._login("admin", "admin-secret")
+
+        wrong = self.admin_client.put(
+            "/api/account/password",
+            json={
+                "current_password": "wrong",
+                "new_password": "replacement-secret",
+            },
+        )
+        changed = self.admin_client.put(
+            "/api/account/password",
+            json={
+                "current_password": "admin-secret",
+                "new_password": "replacement-secret",
+            },
+        )
+
+        self.assertEqual(wrong.status_code, 401)
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(self.admin_client.get("/api/session").status_code, 401)
+        self.assertEqual(
+            second_admin_client.get("/api/session").status_code,
+            401,
+        )
+        self._login("admin", "replacement-secret")
+
+    def test_user_lists_and_revokes_only_owned_sessions(self):
+        second_admin_client = self._login("admin", "admin-secret")
+        sessions = self.admin_client.get("/api/account/sessions")
+        member_sessions = self.member_client.get("/api/account/sessions")
+
+        self.assertEqual(sessions.status_code, 200)
+        self.assertEqual(member_sessions.status_code, 200)
+        member_session = member_sessions.json()["sessions"][0]
+
+        denied = self.admin_client.delete(
+            "/api/account/sessions/" + member_session["id"]
+        )
+        other_admin_session = next(
+            session for session in sessions.json()["sessions"]
+            if not session["current"]
+        )
+        revoked = self.admin_client.delete(
+            "/api/account/sessions/" + other_admin_session["id"]
+        )
+
+        self.assertEqual(denied.status_code, 404)
+        self.assertEqual(revoked.status_code, 200)
+        self.assertEqual(
+            second_admin_client.get("/api/session").status_code,
+            401,
+        )
+        self.assertEqual(self.member_client.get("/api/session").status_code, 200)
+
+
 class ServerCacheTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

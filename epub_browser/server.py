@@ -3,6 +3,7 @@ import html
 import json
 import glob
 import os
+import sqlite3
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
@@ -23,6 +24,7 @@ from .auth import (
     AuthService,
     Principal,
     SESSION_COOKIE,
+    hash_password,
     session_cookie_options,
 )
 from .state import StateStore
@@ -31,6 +33,8 @@ from .library_progress import LibraryProgressBroker
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
 PRINCIPAL_SCOPE_KEY = 'epub_browser.principal'
+PENDING_IDENTITY_SCOPE_KEY = 'epub_browser.pending_identity'
+SESSION_TOKEN_SCOPE_KEY = 'epub_browser.session_token'
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
 PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/login',
@@ -55,6 +59,13 @@ def require_principal(request) -> Principal:
             status_code=401,
             detail='Authentication required',
         )
+    return principal
+
+
+def require_admin(request) -> Principal:
+    principal = require_principal(request)
+    if principal.role != 'admin':
+        raise StarletteHTTPException(status_code=403, detail='Forbidden')
     return principal
 
 
@@ -255,6 +266,57 @@ def create_app(
             headers={'Cache-Control': cache_control},
         )
 
+    def request_session_token(request):
+        return request.scope.get(
+            SESSION_TOKEN_SCOPE_KEY,
+            request.cookies.get(SESSION_COOKIE),
+        )
+
+    def set_session_cookie(target_response, raw_session):
+        target_response.set_cookie(
+            SESSION_COOKIE,
+            raw_session,
+            max_age=auth_service.config.session_ttl_seconds,
+            **session_cookie_options(auth_service.config),
+        )
+
+    def delete_session_cookie(target_response):
+        cookie_options = session_cookie_options(auth_service.config)
+        target_response.delete_cookie(
+            SESSION_COOKIE,
+            path=cookie_options['path'],
+            secure=cookie_options['secure'],
+            httponly=cookie_options['httponly'],
+            samesite=cookie_options['samesite'],
+        )
+
+    async def json_object(request):
+        try:
+            data = await request.json()
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def user_data(user):
+        return {
+            'id': user.user_id,
+            'username': user.username,
+            'role': user.role,
+            'enabled': user.enabled,
+        }
+
+    def session_data(record, current_session_id):
+        return {
+            'id': record.session_id,
+            'created_at': record.created_at,
+            'last_used_at': record.last_used_at,
+            'expires_at': record.expires_at,
+            'current': record.session_id == current_session_id,
+        }
+
+    def client_key(request):
+        return request.client.host if request.client is not None else 'unknown'
+
     def login_form(next_path='/', error=None, status_code=200):
         safe_next = html.escape(_safe_relative_path(next_path), quote=True)
         error_markup = (
@@ -321,12 +383,7 @@ def create_app(
             status_code=303,
             headers={'Cache-Control': 'no-store'},
         )
-        redirect.set_cookie(
-            SESSION_COOKIE,
-            raw_session,
-            max_age=auth_service.config.session_ttl_seconds,
-            **session_cookie_options(auth_service.config),
-        )
+        set_session_cookie(redirect, raw_session)
         return redirect
 
     async def logout(request):
@@ -336,19 +393,12 @@ def create_app(
             status_code=303,
             headers={'Cache-Control': 'no-store'},
         )
-        cookie_options = session_cookie_options(auth_service.config)
-        redirect.delete_cookie(
-            SESSION_COOKIE,
-            path=cookie_options['path'],
-            secure=cookie_options['secure'],
-            httponly=cookie_options['httponly'],
-            samesite=cookie_options['samesite'],
-        )
+        delete_session_cookie(redirect)
         return redirect
 
     async def session(request):
         principal = require_principal(request)
-        raw_session = request.cookies.get(SESSION_COOKIE)
+        raw_session = request_session_token(request)
         return response(
             {
                 'user': {
@@ -370,11 +420,253 @@ def create_app(
             {
                 'csrf_token': auth_service.issue_csrf_token(
                     principal,
-                    request.cookies.get(SESSION_COOKIE),
+                    request_session_token(request),
                 )
             },
             cache_control='no-store',
         )
+
+    async def link_proxy_identity(request):
+        pending_identity = request.scope.get(PENDING_IDENTITY_SCOPE_KEY)
+        if pending_identity is None:
+            return response(
+                error_payload(
+                    'proxy_identity_required',
+                    'An unrecognized trusted proxy identity is required',
+                ),
+                400,
+                cache_control='no-store',
+            )
+        data = await json_object(request)
+        if data is None:
+            return response(
+                error_payload('invalid_json', 'Invalid JSON data'),
+                400,
+                cache_control='no-store',
+            )
+        username = data.get('username')
+        password = data.get('password')
+        if not isinstance(username, str) or not isinstance(password, str):
+            return response(
+                error_payload('invalid_credentials', 'Invalid username or password'),
+                401,
+                cache_control='no-store',
+            )
+        principal = auth_service.authenticate_password(
+            username,
+            password,
+            client_key(request),
+        )
+        if principal is None:
+            return response(
+                error_payload('invalid_credentials', 'Invalid username or password'),
+                401,
+                cache_control='no-store',
+            )
+        try:
+            identity = store.create_identity(
+                pending_identity.issuer,
+                pending_identity.subject,
+                principal.user_id,
+                pending_identity.display_name,
+            )
+        except sqlite3.IntegrityError:
+            return response(
+                error_payload(
+                    'identity_already_linked',
+                    'External identity is already linked',
+                ),
+                409,
+                cache_control='no-store',
+            )
+        raw_session, _ = auth_service.create_session(principal)
+        linked = response(
+            {
+                'user': {
+                    'id': principal.user_id,
+                    'username': principal.username,
+                    'role': principal.role,
+                },
+                'identity': {
+                    'issuer': identity.issuer,
+                    'subject': identity.subject,
+                    'display_name': identity.display_name,
+                },
+            },
+            201,
+            cache_control='no-store',
+        )
+        set_session_cookie(linked, raw_session)
+        return linked
+
+    async def change_password(request):
+        principal = require_principal(request)
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        current_password = data.get('current_password')
+        new_password = data.get('new_password', data.get('password'))
+        if (
+            not isinstance(current_password, str)
+            or not isinstance(new_password, str)
+            or not new_password
+        ):
+            return response(
+                error_payload('invalid_password', 'Invalid password'),
+                400,
+            )
+        authenticated = auth_service.authenticate_password(
+            principal.username,
+            current_password,
+            client_key(request),
+        )
+        if authenticated is None or authenticated.user_id != principal.user_id:
+            return response(
+                error_payload('invalid_credentials', 'Invalid username or password'),
+                401,
+            )
+        store.set_password_hash_and_revoke_sessions(
+            principal.user_id,
+            hash_password(new_password),
+        )
+        changed = response({'message': 'Password changed'})
+        delete_session_cookie(changed)
+        return changed
+
+    async def list_own_sessions(request):
+        principal = require_principal(request)
+        current_session_id = store.session_id_from_token(
+            request_session_token(request),
+            user_id=principal.user_id,
+        )
+        sessions = store.list_sessions(
+            principal.user_id,
+            active_only=True,
+        )
+        return response(
+            {
+                'sessions': [
+                    session_data(record, current_session_id)
+                    for record in sessions
+                ]
+            }
+        )
+
+    async def revoke_own_session(request):
+        principal = require_principal(request)
+        session_id = request.path_params['session_id']
+        current_session_id = store.session_id_from_token(
+            request_session_token(request),
+            user_id=principal.user_id,
+        )
+        if not store.revoke_user_session(principal.user_id, session_id):
+            return response(error_payload('not_found', 'Session not found'), 404)
+        revoked = response({'message': 'Session revoked'})
+        if session_id == current_session_id:
+            delete_session_cookie(revoked)
+        return revoked
+
+    async def admin_users(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response(
+                {'users': [user_data(user) for user in store.list_users()]}
+            )
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        username = data.get('username')
+        password = data.get('password')
+        role = data.get('role', 'member')
+        if (
+            not isinstance(username, str)
+            or not username.strip()
+            or not isinstance(password, str)
+            or not password
+            or role not in {'admin', 'member'}
+        ):
+            return response(
+                error_payload('invalid_user', 'Invalid user data'),
+                400,
+            )
+        try:
+            principal = store.create_user(
+                username,
+                hash_password(password),
+                role=role,
+            )
+        except (ValueError, sqlite3.IntegrityError):
+            return response(
+                error_payload('username_unavailable', 'Username is unavailable'),
+                409,
+            )
+        return response(
+            {'user': user_data(store.get_user_by_username(principal.username))},
+            201,
+        )
+
+    async def admin_user(request):
+        require_admin(request)
+        username = request.path_params['username']
+        try:
+            user = store.get_user_by_username(username)
+        except ValueError:
+            user = None
+        if user is None:
+            return response(error_payload('not_found', 'User not found'), 404)
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        supported = {'enabled', 'role', 'revoke_sessions'}
+        if not supported.intersection(data):
+            return response(error_payload('invalid_user', 'Invalid user data'), 400)
+        enabled = data.get('enabled')
+        role = data.get('role')
+        revoke_sessions = data.get('revoke_sessions', False)
+        if (
+            ('enabled' in data and not isinstance(enabled, bool))
+            or ('role' in data and role not in {'admin', 'member'})
+            or not isinstance(revoke_sessions, bool)
+        ):
+            return response(error_payload('invalid_user', 'Invalid user data'), 400)
+        try:
+            updated = store.update_user(
+                user.user_id,
+                enabled=enabled if 'enabled' in data else None,
+                role=role if 'role' in data else None,
+                revoke_sessions=revoke_sessions,
+            )
+        except RuntimeError:
+            return response(
+                error_payload(
+                    'last_enabled_admin',
+                    'The last enabled administrator cannot be disabled or demoted',
+                ),
+                409,
+            )
+        return response({'user': user_data(updated)})
+
+    async def admin_reset_password(request):
+        require_admin(request)
+        username = request.path_params['username']
+        try:
+            user = store.get_user_by_username(username)
+        except ValueError:
+            user = None
+        if user is None:
+            return response(error_payload('not_found', 'User not found'), 404)
+        data = await json_object(request)
+        password = data.get('password') if data is not None else None
+        if not isinstance(password, str) or not password:
+            return response(
+                error_payload('invalid_password', 'Invalid password'),
+                400,
+            )
+        updated = store.set_password_hash_and_revoke_sessions(
+            user.user_id,
+            hash_password(password),
+        )
+        return response({'user': user_data(updated)})
 
     async def library_index(request):
         index_path = os.path.join(base_directory, 'index.html')
@@ -675,8 +967,15 @@ def create_app(
     routes = [
         Route('/login', login, methods=['GET', 'POST']),
         Route('/logout', logout, methods=['POST']),
+        Route('/api/identity/link', link_proxy_identity, methods=['POST']),
         Route('/api/session', session, methods=['GET']),
         Route('/api/csrf', csrf, methods=['GET']),
+        Route('/api/account/password', change_password, methods=['PUT']),
+        Route('/api/account/sessions', list_own_sessions, methods=['GET']),
+        Route('/api/account/sessions/{session_id}', revoke_own_session, methods=['DELETE']),
+        Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
+        Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
+        Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/api/health', health),
@@ -697,10 +996,27 @@ def create_app(
     )
 
     async def auth_middleware(request, call_next):
-        principal = auth_service.principal_from_session(
-            request.cookies.get(SESSION_COOKIE)
+        raw_session = request.cookies.get(SESSION_COOKIE)
+        session_principal = auth_service.principal_from_session(raw_session)
+        host = request.client.host if request.client is not None else ''
+        proxy_identity = auth_service.authenticate_proxy(host, request.headers)
+        proxy_principal = None
+        if proxy_identity is not None:
+            proxy_principal = store.principal_from_identity(
+                proxy_identity.issuer,
+                proxy_identity.subject,
+            )
+        principal = proxy_principal or session_principal
+        pending_identity = (
+            proxy_identity
+            if proxy_identity is not None and proxy_principal is None
+            else None
         )
+        if proxy_principal is not None and proxy_principal != session_principal:
+            raw_session = None
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
+        request.scope[PENDING_IDENTITY_SCOPE_KEY] = pending_identity
+        request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
         path = request.url.path
         is_public_auth = route_is_public_auth_endpoint(path)
         if principal is None:
@@ -716,7 +1032,13 @@ def create_app(
                 )
                 denied.headers['Cache-Control'] = 'private, no-cache'
                 return denied
+        new_proxy_session = None
+        if raw_session is None:
+            new_proxy_session, _ = auth_service.create_session(principal)
+            request.scope[SESSION_TOKEN_SCOPE_KEY] = new_proxy_session
         authorized = await call_next(request)
+        if new_proxy_session is not None:
+            set_session_cookie(authorized, new_proxy_session)
         authorized.headers['Cache-Control'] = 'private, no-cache'
         return authorized
 
