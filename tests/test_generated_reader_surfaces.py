@@ -615,7 +615,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertIn('breadcrumb-brand-mark', breadcrumb)
         self.assertRegex(breadcrumb, r'\bclass=(?:["\'])?library-meta(?:["\'])?')
-        self.assertRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
+        self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
 
@@ -732,10 +732,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
 
     def test_bookshelf_templates_localize_labels_without_translating_business_values(self):
-        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+        for html in (self._book_html(), self._chapter_html()):
             self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.addGroup')
             self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.sync')
             self.assertRegex(html, r'data-tag=(?:["\'])?All(?:["\'])?')
+        self.assertRegex(self._library_html(), r'data-i18n=(?:["\'])?bookshelf\.addGroup')
+        self.assertNotRegex(self._library_html(), r'data-i18n=(?:["\'])?bookshelf\.sync')
 
     def test_bookshelf_script_routes_user_messages_through_i18n(self):
         script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')

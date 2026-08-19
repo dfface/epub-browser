@@ -45,6 +45,8 @@ def _render_library_html(
     server_progress_panel = ""
     server_progress_script = ""
     server_progress_start = ""
+    server_login_control = ""
+    server_sync_button = ""
     if deployment_mode == "server":
         server_progress_stylesheet = '<link rel="stylesheet" href="/assets/library-progress.css">'
         server_progress_panel = """
@@ -65,6 +67,10 @@ def _render_library_html(
     </section>"""
         server_progress_script = '<script src="/assets/library-progress.js" defer></script>'
         server_progress_start = 'if (window.EpubLibraryProgress) window.EpubLibraryProgress.start(window);'
+        server_login_control = '<button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue" data-i18n="library.login">Login</span></button>'
+        server_sync_button = '''<button class="bookshelf-action-btn" id="syncShelfBtn">
+                <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+            </button>'''
     library_html = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -186,7 +192,7 @@ if (isKindle) {
             <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i><span id="libraryTagCount" data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
             <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
             <label class="library-language" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select></label>
-            <button type="button" class="library-meta-action" id="loginCard"><i class="fas fa-user" aria-hidden="true"></i><span id="loginValue" data-i18n="library.login">Login</span></button>
+            {server_login_control}
         </div>
     </nav>
     </div>
@@ -236,9 +242,7 @@ if (isKindle) {
             <button class="bookshelf-action-btn" id="addShelfGroupBtn">
                 <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
             </button>
-            <button class="bookshelf-action-btn" id="syncShelfBtn">
-                <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
-            </button>
+            {server_sync_button}
             <button class="bookshelf-action-btn" id="exportShelfBtn">
                 <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
             </button>
