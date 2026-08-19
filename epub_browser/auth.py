@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import ipaddress
 import secrets
+import threading
 import time
 from collections import OrderedDict, deque
 from dataclasses import dataclass
@@ -182,11 +183,13 @@ class AuthService:
         self.throttle_window_seconds = throttle_window_seconds
         self.throttle_capacity = throttle_capacity
         self._login_failures = OrderedDict()
+        self._throttle_lock = threading.RLock()
 
     @property
     def tracked_login_keys(self) -> int:
-        self._purge_login_failures(self._now())
-        return len(self._login_failures)
+        with self._throttle_lock:
+            self._purge_login_failures(self._now())
+            return len(self._login_failures)
 
     def _now(self) -> float:
         return _clock_seconds(self.clock())
@@ -202,27 +205,27 @@ class AuthService:
         return (str(client_key), normalized_username)
 
     def _purge_login_failures(self, now: float) -> None:
-        cutoff = now - self.throttle_window_seconds
-        empty_keys = []
-        for key, failures in self._login_failures.items():
-            while failures and failures[0] <= cutoff:
-                failures.popleft()
-            if not failures:
-                empty_keys.append(key)
-        for key in empty_keys:
-            del self._login_failures[key]
+        with self._throttle_lock:
+            cutoff = now - self.throttle_window_seconds
+            empty_keys = []
+            for key, failures in self._login_failures.items():
+                while failures and failures[0] <= cutoff:
+                    failures.popleft()
+                if not failures:
+                    empty_keys.append(key)
+            for key in empty_keys:
+                del self._login_failures[key]
 
     def _record_login_failure(self, key: tuple, now: float) -> None:
-        self._purge_login_failures(now)
-        failures = self._login_failures.get(key)
-        if failures is None:
-            if len(self._login_failures) >= self.throttle_capacity:
-                self._login_failures.popitem(last=False)
-            failures = deque(maxlen=self.throttle_limit)
-            self._login_failures[key] = failures
-        else:
-            self._login_failures.move_to_end(key)
-        failures.append(now)
+        with self._throttle_lock:
+            self._purge_login_failures(now)
+            failures = self._login_failures.get(key)
+            if failures is None:
+                if len(self._login_failures) >= self.throttle_capacity:
+                    return
+                failures = deque(maxlen=self.throttle_limit)
+                self._login_failures[key] = failures
+            failures.append(now)
 
     def login_is_throttled(
         self,
@@ -230,18 +233,22 @@ class AuthService:
         username: Optional[str] = None,
     ) -> bool:
         now = self._now()
-        self._purge_login_failures(now)
-        if username is not None:
-            key = self._login_key(
-                client_key,
-                self._normalize_login_username(username),
+        with self._throttle_lock:
+            self._purge_login_failures(now)
+            if username is not None:
+                key = self._login_key(
+                    client_key,
+                    self._normalize_login_username(username),
+                )
+                return (
+                    len(self._login_failures.get(key, ()))
+                    >= self.throttle_limit
+                )
+            client = str(client_key)
+            return any(
+                key_client == client and len(failures) >= self.throttle_limit
+                for (key_client, _), failures in self._login_failures.items()
             )
-            return len(self._login_failures.get(key, ())) >= self.throttle_limit
-        client = str(client_key)
-        return any(
-            key_client == client and len(failures) >= self.throttle_limit
-            for (key_client, _), failures in self._login_failures.items()
-        )
 
     def authenticate_password(
         self,
@@ -252,9 +259,10 @@ class AuthService:
         now = self._now()
         normalized = self._normalize_login_username(username)
         key = self._login_key(client_key, normalized)
-        self._purge_login_failures(now)
-        if len(self._login_failures.get(key, ())) >= self.throttle_limit:
-            return None
+        with self._throttle_lock:
+            self._purge_login_failures(now)
+            if len(self._login_failures.get(key, ())) >= self.throttle_limit:
+                return None
 
         user = None
         if normalized:
@@ -271,7 +279,8 @@ class AuthService:
             and user.password_hash
             and password_matches
         ):
-            self._login_failures.pop(key, None)
+            with self._throttle_lock:
+                self._login_failures.pop(key, None)
             return user.principal
 
         self._record_login_failure(key, now)

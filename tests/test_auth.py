@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from epub_browser.auth import (
@@ -126,6 +127,14 @@ class SessionAndProxyTests(unittest.TestCase):
         self.assertEqual(self.store.revoke_all_sessions(principal.user_id), 1)
         self.assertIsNone(self.service.principal_from_session(second))
 
+    def test_disabling_account_immediately_rejects_its_existing_session(self):
+        principal = self._principal("alice")
+        token, _ = self.service.create_session(principal)
+
+        self.store.set_user_enabled(principal.user_id, False)
+
+        self.assertIsNone(self.service.principal_from_session(token))
+
     def test_csrf_token_is_bound_to_both_principal_and_session(self):
         alice = self._principal("alice")
         bob = self._principal("bob")
@@ -180,7 +189,7 @@ class SessionAndProxyTests(unittest.TestCase):
         self.assertTrue(self.service.login_is_throttled("other-ip"))
         self.assertTrue(self.service.login_is_throttled("other-ip", "MISSING"))
 
-    def test_throttle_normalizes_username_expires_and_stays_bounded(self):
+    def test_throttle_normalizes_username_and_expires_without_capacity_churn(self):
         service = AuthService(
             self.store,
             self.config,
@@ -193,14 +202,64 @@ class SessionAndProxyTests(unittest.TestCase):
         self.assertTrue(service.login_is_throttled("ip", "ALICE"))
         self.assertFalse(service.login_is_throttled("ip", "bob"))
 
-        for index in range(service.throttle_capacity + 2):
-            service.authenticate_password("user{}".format(index), "bad", "ip")
-        self.assertLessEqual(
-            service.tracked_login_keys, service.throttle_capacity
-        )
-
         self.clock.advance(service.throttle_window_seconds + 1)
         self.assertFalse(service.login_is_throttled("ip", "alice"))
+
+    def test_active_throttle_survives_new_key_churn_at_capacity(self):
+        service = AuthService(
+            self.store,
+            self.config,
+            clock=self.clock,
+            throttle_limit=1,
+            throttle_capacity=2,
+        )
+        self.assertIsNone(
+            service.authenticate_password("target", "bad", "203.0.113.8")
+        )
+        self.assertTrue(
+            service.login_is_throttled("203.0.113.8", "target")
+        )
+
+        for index in range(6):
+            self.assertIsNone(
+                service.authenticate_password(
+                    "churn{}".format(index), "bad", "203.0.113.8"
+                )
+            )
+
+        self.assertTrue(
+            service.login_is_throttled("203.0.113.8", "target")
+        )
+        self.assertLessEqual(service.tracked_login_keys, 2)
+
+    def test_concurrent_failures_are_counted_and_throttle_state_stays_bounded(self):
+        service = AuthService(
+            self.store,
+            self.config,
+            clock=self.clock,
+            throttle_limit=2,
+            throttle_capacity=8,
+        )
+        usernames = ["user{}".format(index % 8) for index in range(32)]
+
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            results = tuple(
+                executor.map(
+                    lambda username: service.authenticate_password(
+                        username, "bad", "203.0.113.8"
+                    ),
+                    usernames,
+                )
+            )
+
+        self.assertEqual(results, (None,) * len(usernames))
+        self.assertLessEqual(service.tracked_login_keys, 8)
+        for index in range(8):
+            self.assertTrue(
+                service.login_is_throttled(
+                    "203.0.113.8", "user{}".format(index)
+                )
+            )
 
     def test_successful_password_authentication_clears_prior_failures(self):
         principal = self._principal("Alice", "correct")
