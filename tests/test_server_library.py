@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from epub_browser.auth import BootstrapCredentials
 from epub_browser.epub_identity import (
     ensure_embedded_book_id,
     read_embedded_book_id,
@@ -36,7 +37,11 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.source_dir.mkdir()
         self.source = self.source_dir / "book.epub"
         self._write_epub(self.source, "Original")
-        self.migration = MigrationManager(self.server_dir, None)
+        self.migration = MigrationManager(
+            self.server_dir,
+            None,
+            bootstrap=BootstrapCredentials("admin", "secret"),
+        )
         result = self.migration.prepare_data()
         self.store = StateStore(result.database_path)
 
@@ -400,7 +405,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         metadata = json.loads(
             (manager.public_dir / "book-metadata.json").read_text(encoding="utf-8")
         )
-        self.assertEqual([book["hash"] for book in metadata], [original.book_id])
+        self.assertEqual(metadata, [])
         manager.shutdown()
 
     def test_delete_between_validation_and_commit_cannot_reactivate_book(self):
@@ -551,6 +556,20 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )
         manager.shutdown()
 
+    def test_generated_server_shell_contains_no_shared_book_catalog(self):
+        manager = self._manager()
+
+        record = manager.reconcile().active_books[0]
+        metadata_path = manager.public_dir / "book-metadata.json"
+        library_html = (manager.public_dir / "index.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertEqual(json.loads(metadata_path.read_text(encoding="utf-8")), [])
+        self.assertNotIn(record.book_id, library_html)
+        self.assertNotIn("Server Book", library_html)
+        manager.shutdown()
+
     def test_cache_deletion_rebuilds_without_changing_book_id(self):
         manager = self._manager()
         original = manager.reconcile().active_books[0]
@@ -678,16 +697,31 @@ class ServerLibraryManagerTests(unittest.TestCase):
             snapshot = self._latest_subscription_snapshot(loop, subscription)
             self.assertGreater(snapshot.in_flight, 0)
             deadline = time.monotonic() + 2
-            published = []
+            published_books = []
             while time.monotonic() < deadline:
-                metadata_path = manager.public_dir / "book-metadata.json"
-                if metadata_path.is_file():
-                    published = json.loads(metadata_path.read_text(encoding="utf-8"))
-                    if published:
-                        break
+                book_root = manager.public_dir / "book"
+                published_books = (
+                    [
+                        path
+                        for path in book_root.iterdir()
+                        if (path / "index.html").is_file()
+                    ]
+                    if book_root.is_dir()
+                    else []
+                )
+                if published_books:
+                    break
                 time.sleep(0.02)
 
-            self.assertEqual(len(published), 1)
+            self.assertEqual(len(published_books), 1)
+            self.assertEqual(
+                json.loads(
+                    (manager.public_dir / "book-metadata.json").read_text(
+                        encoding="utf-8"
+                    )
+                ),
+                [],
+            )
             self.assertTrue(reconcile_thread.is_alive())
             snapshot = self._latest_subscription_snapshot(loop, subscription)
             self.assertGreater(snapshot.catalog_revision, baseline_revision)
@@ -702,6 +736,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
     def test_delete_hides_book_but_preserves_data_and_restore_reuses_id(self):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
+        administrator = self.store.list_users()[0]
         self.store.upsert_annotation(
             {
                 "id": "saved",
@@ -711,7 +746,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 "color": "#fff",
                 "created_at": "2026",
                 "updated_at": "2026",
-            }
+            },
+            user_id=administrator.user_id,
         )
         self.source.unlink()
 
@@ -726,7 +762,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(metadata, [])
         self.assertEqual(self.store.active_books(), ())
         self.assertEqual(
-            self.store.get_annotation("saved")["book_hash"],
+            self.store.get_annotation(
+                "saved",
+                user_id=administrator.user_id,
+            )["book_hash"],
             record.book_id,
         )
 

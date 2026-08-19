@@ -1254,7 +1254,15 @@ class StateStore:
             if value is not None
         )
 
-    def set_book_visibility(self, book_id: str, visibility: str) -> None:
+    def get_user(self, user_id: str) -> UserRecord:
+        with self._connection() as connection:
+            return self._get_user(connection, user_id)
+
+    def get_book(self, book_id: str) -> BookRecord:
+        with self._connection() as connection:
+            return self._get_book(connection, book_id)
+
+    def set_book_visibility(self, book_id: str, visibility: str) -> BookRecord:
         if visibility not in {"authenticated", "restricted"}:
             raise ValueError(f"Unsupported book visibility: {visibility}")
         with self._connection() as connection:
@@ -1268,9 +1276,14 @@ class StateStore:
             )
             if cursor.rowcount != 1:
                 raise KeyError(f"Unknown book ID: {book_id}")
+            return self._get_book(connection, book_id)
 
     def grant_book_access(self, book_id: str, user_id: str) -> None:
         with self._connection() as connection:
+            self._get_book(connection, book_id)
+            user = self._get_user(connection, user_id)
+            if not user.enabled:
+                raise ValueError("Book access cannot be granted to a disabled user")
             connection.execute(
                 """
                 INSERT INTO book_access (book_id, user_id)
@@ -1279,6 +1292,16 @@ class StateStore:
                 """,
                 (book_id, user_id),
             )
+
+    def book_grants(self, book_id: str) -> tuple[str, ...]:
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            rows = connection.execute(
+                "SELECT user_id FROM book_access WHERE book_id = ? "
+                "ORDER BY user_id",
+                (book_id,),
+            ).fetchall()
+        return tuple(row["user_id"] for row in rows)
 
     def revoke_book_access(self, book_id: str, user_id: str) -> None:
         with self._connection() as connection:

@@ -3,6 +3,7 @@ import html
 import json
 import glob
 import os
+import posixpath
 import sqlite3
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, urlsplit
@@ -17,7 +18,7 @@ from starlette.responses import (
     RedirectResponse,
     StreamingResponse,
 )
-from starlette.routing import Mount, Route
+from starlette.routing import Route
 from starlette.staticfiles import StaticFiles
 
 from .auth import (
@@ -29,6 +30,7 @@ from .auth import (
 )
 from .state import StateStore
 from .library_progress import LibraryProgressBroker
+from .server_library import library_metadata
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -161,6 +163,36 @@ def cache_control_for_path(path):
     return 'no-cache'
 
 
+def normalize_public_path(path):
+    """Return one traversal-safe POSIX path for authorization and file lookup."""
+    if not isinstance(path, str):
+        raise ValueError('Invalid public path')
+    candidate = path.lstrip('/')
+    for _ in range(3):
+        decoded = unquote(candidate)
+        if decoded == candidate:
+            break
+        candidate = decoded
+    if '\\' in candidate or '\x00' in candidate:
+        raise ValueError('Invalid public path')
+    parts = candidate.split('/')
+    if any(part in {'.', '..'} for part in parts):
+        raise ValueError('Invalid public path')
+    normalized = posixpath.normpath(candidate)
+    if normalized == '.':
+        return ''
+    if normalized == '..' or normalized.startswith('../'):
+        raise ValueError('Invalid public path')
+    return normalized
+
+
+def extract_book_id_from_public_path(path):
+    parts = path.split('/')
+    if len(parts) >= 2 and parts[0] == 'book' and parts[1]:
+        return parts[1]
+    return None
+
+
 def load_legacy_bookshelf(directory, username):
     """Return the newest readable legacy bookshelf JSON record, if any."""
     pattern = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-*.json')
@@ -258,6 +290,7 @@ def create_app(
         raise RuntimeError('An initialized StateStore and AuthService are required')
     store = state_store
     runtime_status = status or _CompatibilityRuntimeStatus()
+    public_files = CachedStaticFiles(directory=base_directory, html=False)
 
     def response(data, status=200, cache_control='no-cache'):
         return JSONResponse(
@@ -303,6 +336,18 @@ def create_app(
             'username': user.username,
             'role': user.role,
             'enabled': user.enabled,
+        }
+
+    def admin_book_data(book):
+        try:
+            metadata = json.loads(book.metadata_json)
+        except json.JSONDecodeError:
+            metadata = {}
+        return {
+            'id': book.book_id,
+            'title': metadata.get('title') or 'EPUB Book',
+            'visibility': book.visibility,
+            'grants': list(store.book_grants(book.book_id)),
         }
 
     def session_data(record, current_session_id):
@@ -668,6 +713,69 @@ def create_app(
         )
         return response({'user': user_data(updated)})
 
+    async def admin_books(request):
+        require_admin(request)
+        return response(
+            {'books': [admin_book_data(book) for book in store.active_books()]}
+        )
+
+    async def admin_book(request):
+        require_admin(request)
+        book_id = request.path_params['book_id']
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        visibility = data.get('visibility')
+        if visibility not in {'authenticated', 'restricted'}:
+            return response(
+                error_payload('invalid_visibility', 'Invalid book visibility'),
+                400,
+            )
+        try:
+            book = store.set_book_visibility(book_id, visibility)
+        except KeyError:
+            return response(error_payload('not_found', 'Book not found'), 404)
+        return response({'book': admin_book_data(book)})
+
+    async def admin_book_grant(request):
+        require_admin(request)
+        book_id = request.path_params['book_id']
+        user_id = request.path_params['user_id']
+        try:
+            store.get_book(book_id)
+        except KeyError:
+            return response(error_payload('not_found', 'Book not found'), 404)
+        try:
+            user = store.get_user(user_id)
+        except (KeyError, ValueError):
+            return response(error_payload('not_found', 'User not found'), 404)
+        if not user.enabled:
+            return response(
+                error_payload('user_disabled', 'User is disabled'),
+                400,
+            )
+        if request.method == 'PUT':
+            store.grant_book_access(book_id, user_id)
+            granted = True
+        else:
+            store.revoke_book_access(book_id, user_id)
+            granted = False
+        return response(
+            {
+                'grant': {
+                    'book_id': book_id,
+                    'user_id': user_id,
+                    'granted': granted,
+                }
+            }
+        )
+
+    async def filtered_library_metadata(request):
+        principal = require_principal(request)
+        return response(
+            library_metadata(store.visible_books(principal), base_directory)
+        )
+
     async def library_index(request):
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
@@ -675,6 +783,23 @@ def create_app(
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
         return response
+
+    async def protected_public_file(request):
+        try:
+            path = normalize_public_path(request.path_params['path'])
+        except ValueError:
+            return response(error_payload('not_found', 'Not Found'), 404)
+        if '/' + path in PUBLIC_LOGIN_ASSETS:
+            return await public_files.get_response(path, request.scope)
+        principal = require_principal(request)
+        book_id = extract_book_id_from_public_path(path)
+        if book_id and not store.can_read_book(
+            principal.user_id,
+            principal.role,
+            book_id,
+        ):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        return await public_files.get_response(path, request.scope)
 
     async def health(request):
         payload = {'status': 'ok'}
@@ -976,16 +1101,25 @@ def create_app(
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
+        Route('/api/admin/books', admin_books, methods=['GET']),
+        Route('/api/admin/books/{book_id}', admin_book, methods=['PUT']),
+        Route(
+            '/api/admin/books/{book_id}/grants/{user_id}',
+            admin_book_grant,
+            methods=['PUT', 'DELETE'],
+        ),
         Route('/', library_index),
         Route('/index.html', library_index),
+        Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
         Route('/api/health', health),
         Route('/api/ready', ready),
         Route('/api/library-events', library_events),
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
+        Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
         Route('/sync', sync, methods=['POST']),
-        Mount('/', app=CachedStaticFiles(directory=base_directory, html=False)),
+        Route('/{path:path}', protected_public_file, methods=['GET']),
     ]
     app = Starlette(
         routes=routes,

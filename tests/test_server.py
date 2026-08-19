@@ -676,6 +676,250 @@ class SessionOwnershipTests(unittest.TestCase):
         )
 
 
+class BookAuthorizationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        books = [
+            {
+                "hash": "open-id",
+                "url": "/book/open-id/index.html",
+                "title": "Open book",
+                "authors": ["Open author"],
+                "tags": [],
+                "cover": "/book/open-id/resources/image.jpg",
+            },
+            {
+                "hash": "restricted-id",
+                "url": "/book/restricted-id/index.html",
+                "title": "Restricted book",
+                "authors": ["Restricted author"],
+                "tags": ["private"],
+                "cover": "/book/restricted-id/resources/image.jpg",
+            },
+        ]
+        (public / "book-metadata.json").write_text(
+            json.dumps(books),
+            encoding="utf-8",
+        )
+        for book_id in ("open-id", "restricted-id"):
+            book_dir = public / "book" / book_id
+            (book_dir / "resources").mkdir(parents=True)
+            (book_dir / "index.html").write_text("reader", encoding="utf-8")
+            (book_dir / "chapter_0.html").write_text("chapter", encoding="utf-8")
+            (book_dir / "toc.json").write_text("[]", encoding="utf-8")
+            (book_dir / "resources" / "image.jpg").write_bytes(b"image")
+
+        self.store = StateStore(public / "epub-browser.db")
+        self.admin = self.store.initialize(
+            BootstrapCredentials("admin", "admin-secret")
+        )
+        self.member = self.store.create_user(
+            "member",
+            hash_password("member-secret"),
+        )
+        self.disabled_member = self.store.create_user(
+            "disabled",
+            hash_password("disabled-secret"),
+        )
+        self.store.set_user_enabled(self.disabled_member.user_id, False)
+        self.store.resolve_book(
+            public / "open.epub",
+            None,
+            "open-fingerprint",
+            {
+                "title": "Open book",
+                "authors": ["Open author"],
+                "tags": [],
+                "cover": "resources/image.jpg",
+            },
+            preferred_book_id="open-id",
+        )
+        self.store.resolve_book(
+            public / "restricted.epub",
+            None,
+            "restricted-fingerprint",
+            {
+                "title": "Restricted book",
+                "authors": ["Restricted author"],
+                "tags": ["private"],
+                "cover": "resources/image.jpg",
+            },
+            preferred_book_id="restricted-id",
+        )
+        self.store.set_book_visibility("restricted-id", "restricted")
+        self.auth_config = AuthConfig.from_values([], None, None)
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, self.auth_config),
+        )
+        self.admin_client = self._login("admin", "admin-secret")
+        self.member_client = self._login("member", "member-secret")
+
+    def _login(self, username, password):
+        client = TestClient(self.app)
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": username, "password": password},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        session = client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        client.headers[self.auth_config.csrf_header_name] = session.json()[
+            "csrf_token"
+        ]
+        return client
+
+    def test_member_cannot_discover_or_open_restricted_book_by_direct_resource_url(self):
+        metadata = self.member_client.get("/api/library-metadata")
+        legacy_metadata = self.member_client.get("/book-metadata.json")
+
+        self.assertEqual(metadata.status_code, 200)
+        self.assertEqual(
+            {book["hash"] for book in metadata.json()},
+            {"open-id"},
+        )
+        self.assertEqual(legacy_metadata.json(), metadata.json())
+        for path in (
+            "/book/restricted-id/index.html",
+            "/book/restricted-id/chapter_0.html",
+            "/book/restricted-id/toc.json",
+            "/book/restricted-id/resources/image.jpg",
+        ):
+            with self.subTest(path=path):
+                denied = self.member_client.get(path)
+                self.assertEqual(denied.status_code, 403)
+                self.assertEqual(
+                    denied.json(),
+                    {"code": "forbidden", "message": "Forbidden"},
+                )
+
+    def test_grant_allows_member_catalog_and_reader_access(self):
+        self.store.grant_book_access("restricted-id", self.member.user_id)
+
+        metadata = self.member_client.get("/api/library-metadata")
+
+        self.assertEqual(metadata.status_code, 200)
+        self.assertEqual(
+            {book["hash"] for book in metadata.json()},
+            {"open-id", "restricted-id"},
+        )
+        self.assertEqual(
+            self.member_client.get(
+                "/book/restricted-id/chapter_0.html"
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.member_client.get(
+                "/book/restricted-id/resources/image.jpg"
+            ).status_code,
+            200,
+        )
+
+    def test_administrator_can_list_restrict_grant_and_revoke_books(self):
+        listing = self.admin_client.get("/api/admin/books")
+
+        self.assertEqual(listing.status_code, 200)
+        restricted = next(
+            book
+            for book in listing.json()["books"]
+            if book["id"] == "restricted-id"
+        )
+        self.assertEqual(restricted["visibility"], "restricted")
+        self.assertEqual(restricted["grants"], [])
+
+        made_public = self.admin_client.put(
+            "/api/admin/books/restricted-id",
+            json={"visibility": "authenticated"},
+        )
+        self.assertEqual(made_public.status_code, 200)
+        self.assertEqual(made_public.json()["book"]["visibility"], "authenticated")
+        self.assertEqual(
+            self.member_client.get(
+                "/book/restricted-id/chapter_0.html"
+            ).status_code,
+            200,
+        )
+
+        self.admin_client.put(
+            "/api/admin/books/restricted-id",
+            json={"visibility": "restricted"},
+        )
+        granted = self.admin_client.put(
+            f"/api/admin/books/restricted-id/grants/{self.member.user_id}",
+        )
+        self.assertEqual(granted.status_code, 200)
+        self.assertTrue(granted.json()["grant"]["granted"])
+        self.assertEqual(
+            self.member_client.get(
+                "/book/restricted-id/chapter_0.html"
+            ).status_code,
+            200,
+        )
+
+        revoked = self.admin_client.delete(
+            f"/api/admin/books/restricted-id/grants/{self.member.user_id}",
+        )
+        self.assertEqual(revoked.status_code, 200)
+        self.assertFalse(revoked.json()["grant"]["granted"])
+        self.assertEqual(
+            self.member_client.get(
+                "/book/restricted-id/chapter_0.html"
+            ).status_code,
+            403,
+        )
+
+    def test_book_administration_validates_role_book_visibility_and_enabled_user(self):
+        member_denied = self.member_client.put(
+            "/api/admin/books/restricted-id",
+            json={"visibility": "authenticated"},
+        )
+        invalid_visibility = self.admin_client.put(
+            "/api/admin/books/restricted-id",
+            json={"visibility": "secret"},
+        )
+        unknown_book = self.admin_client.put(
+            "/api/admin/books/missing",
+            json={"visibility": "restricted"},
+        )
+        unknown_user = self.admin_client.put(
+            "/api/admin/books/restricted-id/grants/missing",
+        )
+        disabled_user = self.admin_client.put(
+            f"/api/admin/books/restricted-id/grants/{self.disabled_member.user_id}",
+        )
+
+        self.assertEqual(member_denied.status_code, 403)
+        self.assertEqual(invalid_visibility.status_code, 400)
+        self.assertEqual(unknown_book.status_code, 404)
+        self.assertEqual(unknown_user.status_code, 404)
+        self.assertEqual(disabled_user.status_code, 400)
+
+    def test_untracked_book_directory_and_traversal_attempt_are_not_served(self):
+        untracked = Path(self.directory.name) / "book" / "untracked"
+        untracked.mkdir()
+        (untracked / "chapter_0.html").write_text("secret", encoding="utf-8")
+
+        self.assertEqual(
+            self.member_client.get(
+                "/book/untracked/chapter_0.html"
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.member_client.get(
+                "/book/open-id/%252e%252e/restricted-id/chapter_0.html"
+            ).status_code,
+            404,
+        )
+
+
 class ServerCacheTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -704,6 +948,13 @@ class ServerCacheTests(unittest.TestCase):
             cover.write(b"cover")
         self.app, self.store, self.auth_service = self._authenticated_app(
             self.directory.name
+        )
+        self.store.resolve_book(
+            Path(self.directory.name) / "demo.epub",
+            None,
+            "demo-fingerprint",
+            {"title": "Demo", "cover": "resources/cover.webp"},
+            preferred_book_id="demo",
         )
         self.client = self._authenticated_client(self.app)
 

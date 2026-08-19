@@ -31,6 +31,35 @@ from .state import BookRecord, StateStore
 from .urls import SiteURLs
 
 
+def library_metadata(records: Sequence[BookRecord], public_dir: Path) -> list[dict]:
+    """Build the published, principal-filtered catalog without writing it."""
+    public_root = Path(public_dir)
+    books = []
+    for record in records:
+        if not (public_root / "book" / record.book_id / "index.html").is_file():
+            continue
+        try:
+            metadata = json.loads(record.metadata_json)
+        except json.JSONDecodeError:
+            continue
+        cover = metadata.get("cover")
+        books.append(
+            {
+                "hash": record.book_id,
+                "url": f"/book/{record.book_id}/index.html",
+                "title": metadata.get("title") or "EPUB Book",
+                "authors": list(metadata.get("authors") or ()),
+                "tags": list(metadata.get("tags") or ()),
+                "cover": (
+                    f"/book/{record.book_id}/{cover.lstrip('/')}"
+                    if isinstance(cover, str) and cover
+                    else None
+                ),
+            }
+        )
+    return books
+
+
 @dataclass(frozen=True)
 class ConversionFailure:
     source: Path
@@ -800,29 +829,9 @@ class ServerLibraryManager:
     def _refresh_public_shell(self) -> None:
         if self._assets is None:
             return
-        books = []
-        for record in self._valid_active_records():
-            try:
-                metadata = json.loads(record.metadata_json)
-            except json.JSONDecodeError:
-                continue
-            cover = metadata.get("cover")
-            books.append(
-                LibraryBook(
-                    book_id=record.book_id,
-                    title=metadata.get("title") or "EPUB Book",
-                    authors=tuple(metadata.get("authors") or ()),
-                    tags=tuple(metadata.get("tags") or ()),
-                    cover=(
-                        f"/book/{record.book_id}/{cover}"
-                        if cover
-                        else None
-                    ),
-                )
-            )
         publish_library_shell(
             self.public_dir,
-            tuple(books),
+            (),
             self._assets,
             self.urls,
             deployment_mode="server",
