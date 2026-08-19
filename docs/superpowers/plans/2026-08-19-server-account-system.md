@@ -21,6 +21,7 @@
 - Existing Server annotations, bookshelves, and progress migrate to the bootstrap administrator in one rollback-safe SQLite upgrade.
 - Preserve the existing `--log` rule: normal Server operation must not print incidental output that corrupts tqdm progress.
 - Every user-facing Server string is present in English and Simplified Chinese catalogs.
+- Do not add browser end-to-end tests; user acceptance is manual. Automated coverage is limited to unit, in-process ASGI integration, static, and JavaScript tests.
 
 ---
 
@@ -781,7 +782,7 @@ git commit -m "docs: configure secure Server account bootstrap"
 
 **Produces:** a verified account-system branch with no SSG or existing Server lifecycle regressions.
 
-- [ ] **Step 1: Add one end-to-end in-process security matrix test**
+- [ ] **Step 1: Add one in-process ASGI security matrix test**
 
 ```python
 def test_member_lifecycle_from_login_to_restricted_book_revocation(self):
