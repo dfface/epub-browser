@@ -344,6 +344,31 @@ class ServerLibraryManagerTests(unittest.TestCase):
         converter.assert_not_called()
         manager.shutdown()
 
+    def test_reconcile_upgrades_unchanged_legacy_generated_output(self):
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        book_dir = manager.public_dir / "book" / record.book_id
+        toc = json.loads((book_dir / "toc.json").read_text(encoding="utf-8"))
+        generated_pages = [book_dir / "index.html"] + [
+            book_dir / item["chapter_file"]
+            for item in toc
+            if item.get("chapter_file")
+        ]
+        (book_dir / ".server-output-revision").unlink(missing_ok=True)
+        for page in generated_pages:
+            page.write_text("<html><body>legacy reader</body></html>", encoding="utf-8")
+
+        upgraded = manager.reconcile()
+
+        self.assertGreater(upgraded.converted, 0)
+        self.assertEqual(upgraded.reused, 0)
+        for page in generated_pages:
+            self.assertRegex(
+                page.read_text(encoding="utf-8"),
+                r'/assets/immutable/cache-boundary\.[0-9a-f]{12}\.js',
+            )
+        manager.shutdown()
+
     def test_metadata_only_stat_change_is_recorded_after_one_recheck(self):
         manager = self._manager()
         manager.reconcile()

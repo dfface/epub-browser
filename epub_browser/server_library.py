@@ -23,7 +23,11 @@ from .identity import source_sha256
 from .library_progress import LibraryProgressBroker
 from .migration import MigrationManager
 from .models import BookMetadata, ConvertedBook
-from .processor import EPUBProcessor
+from .processor import (
+    EPUBProcessor,
+    SERVER_OUTPUT_REVISION,
+    SERVER_OUTPUT_REVISION_FILE,
+)
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import discover_orphan_sidecars
@@ -777,6 +781,16 @@ class ServerLibraryManager:
     @staticmethod
     def _validate_converted_book(converted: ConvertedBook) -> None:
         directory = Path(converted.output_dir)
+        try:
+            revision = (directory / SERVER_OUTPUT_REVISION_FILE).read_text(
+                encoding="utf-8"
+            ).strip()
+        except OSError as error:
+            raise ValueError(
+                "converted book is missing its Server output revision"
+            ) from error
+        if revision != SERVER_OUTPUT_REVISION:
+            raise ValueError("converted book has an outdated Server output revision")
         for name in ("index.html", "toc.json"):
             if not (directory / name).is_file():
                 raise ValueError(f"converted book is missing {name}")
@@ -794,6 +808,14 @@ class ServerLibraryManager:
 
     def _cache_valid(self, record: BookRecord) -> bool:
         directory = self.public_dir / "book" / record.book_id
+        try:
+            revision = (directory / SERVER_OUTPUT_REVISION_FILE).read_text(
+                encoding="utf-8"
+            ).strip()
+        except OSError:
+            return False
+        if revision != SERVER_OUTPUT_REVISION:
+            return False
         if not (directory / "index.html").is_file() or not (
             directory / "toc.json"
         ).is_file():

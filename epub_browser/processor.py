@@ -22,6 +22,10 @@ from .reporting import Reporter
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
+SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
+SERVER_OUTPUT_REVISION = "cache-boundary-v1"
+
+
 class EPUBProcessor:
     """处理EPUB文件的类"""
     
@@ -253,6 +257,11 @@ class EPUBProcessor:
             raise ValueError(f"Unable to parse EPUB package file: {self.epub_path}")
         self.generate_hash()
         self.create_web_interface()
+        if self.deployment_mode == "server":
+            Path(self.web_dir, SERVER_OUTPUT_REVISION_FILE).write_text(
+                SERVER_OUTPUT_REVISION + "\n",
+                encoding="utf-8",
+            )
         return ConvertedBook(
             book_id=self.book_hash,
             source_path=Path(self.epub_path),
