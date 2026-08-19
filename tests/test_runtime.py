@@ -13,6 +13,11 @@ from pathlib import Path
 
 from starlette.testclient import TestClient
 
+from epub_browser.auth import (
+    AuthConfig,
+    AuthService,
+    BootstrapCredentials,
+)
 from epub_browser.cli import ServerConfig
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
@@ -33,11 +38,36 @@ class RuntimeStatusTests(unittest.TestCase):
         self.public.mkdir()
         (self.public / "index.html").write_text("library", encoding="utf-8")
         self.store = StateStore(self.root / "data" / "epub-browser.db")
-        self.store.initialize()
+        self.store.initialize(bootstrap=BootstrapCredentials("owner", "secret"))
+        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_service = AuthService(self.store, self.auth_config)
+
+    def _client(self, status):
+        client = TestClient(
+            create_app(
+                self.public,
+                self.store,
+                auth_service=self.auth_service,
+                status=status,
+            )
+        )
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": "owner", "password": "secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        session = client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        client.headers[self.auth_config.csrf_header_name] = session.json()[
+            "csrf_token"
+        ]
+        return client
 
     def test_ready_rejects_before_base_shell_and_reports_after_ready(self):
         status = RuntimeStatus()
-        client = TestClient(create_app(self.public, self.store, status))
+        client = self._client(status)
 
         self.assertEqual(client.get("/api/ready").status_code, 503)
         status.mark_ready()
@@ -47,7 +77,7 @@ class RuntimeStatusTests(unittest.TestCase):
     def test_degraded_health_reports_counts_without_private_paths(self):
         status = RuntimeStatus()
         status.mark_degraded(failed_books=2, queued_tasks=1)
-        client = TestClient(create_app(self.public, self.store, status))
+        client = self._client(status)
 
         payload = client.get("/api/health").json()
 
@@ -58,7 +88,7 @@ class RuntimeStatusTests(unittest.TestCase):
 
     def test_state_changes_are_rejected_until_ready(self):
         status = RuntimeStatus()
-        client = TestClient(create_app(self.public, self.store, status))
+        client = self._client(status)
 
         response = client.put(
             "/api/reading-progress/book",
@@ -72,7 +102,7 @@ class RuntimeStatusTests(unittest.TestCase):
         status = RuntimeStatus()
         status.mark_scanning()
         status.mark_available()
-        client = TestClient(create_app(self.public, self.store, status))
+        client = self._client(status)
 
         self.assertEqual(client.get("/api/ready").status_code, 200)
         self.assertEqual(client.get("/api/ready").json()["state"], "scanning")
@@ -91,6 +121,46 @@ class ServerRuntimeTests(unittest.TestCase):
         self.sources = self.root / "sources"
         self.sources.mkdir()
         self.server_dir = self.root / "server"
+        self.bootstrap = BootstrapCredentials("owner", "secret")
+        self.auth_config = AuthConfig.from_values([], None, None)
+        self.runtime_store = mock.patch(
+            "epub_browser.runtime.StateStore",
+            side_effect=self._initialized_store,
+        )
+        self.runtime_migration = mock.patch(
+            "epub_browser.runtime.MigrationManager",
+            side_effect=self._migration_manager,
+        )
+        self.runtime_app = mock.patch(
+            "epub_browser.runtime.create_app",
+            side_effect=self._authenticated_app,
+        )
+        self.runtime_store.start()
+        self.runtime_migration.start()
+        self.runtime_app.start()
+        self.addCleanup(self.runtime_app.stop)
+        self.addCleanup(self.runtime_migration.stop)
+        self.addCleanup(self.runtime_store.stop)
+
+    def _initialized_store(self, database_path):
+        store = StateStore(database_path)
+        store.initialize(bootstrap=self.bootstrap)
+        return store
+
+    def _migration_manager(self, server_dir, legacy_sync_dir):
+        return MigrationManager(
+            server_dir,
+            legacy_sync_dir,
+            bootstrap=self.bootstrap,
+        )
+
+    def _authenticated_app(self, public_dir, *, state_store, **kwargs):
+        return create_app(
+            public_dir,
+            state_store=state_store,
+            auth_service=AuthService(state_store, self.auth_config),
+            **kwargs,
+        )
 
     def test_second_lock_for_same_server_directory_returns_status_five(self):
         self.server_dir.mkdir()
@@ -249,7 +319,11 @@ class ServerRuntimeTests(unittest.TestCase):
     def test_interrupted_initial_scan_does_not_retire_legacy_public_backup(self):
         source = self.sources / "slow.epub"
         _write_runtime_epub(source)
-        migration = MigrationManager(self.server_dir, None)
+        migration = MigrationManager(
+            self.server_dir,
+            None,
+            bootstrap=self.bootstrap,
+        )
         result = migration.prepare_data()
         state = json.loads(result.state_path.read_text(encoding="utf-8"))
         state["layout_phase"] = "retired"
@@ -395,7 +469,12 @@ class ServerRuntimeTests(unittest.TestCase):
 
         def fake_create_app(*args, progress_broker, **kwargs):
             captured["app_broker"] = progress_broker
-            return create_app(*args, **kwargs)
+            state_store = kwargs["state_store"]
+            return create_app(
+                *args,
+                auth_service=AuthService(state_store, self.auth_config),
+                **kwargs,
+            )
 
         with mock.patch("epub_browser.runtime.create_app", side_effect=fake_create_app):
             status = run_server(
@@ -562,6 +641,13 @@ class _InspectingServer:
     def run(self):
         self.assert_started()
         client = TestClient(self.config.app)
+        login = client.post(
+            "/login",
+            data={"username": "owner", "password": "secret"},
+            follow_redirects=False,
+        )
+        if login.status_code != 303:
+            raise RuntimeError("runtime HTTP fixture could not authenticate")
         self.states.append(client.get("/api/health").json()["state"])
         _BlockingLibrary.release.set()
         if not _BlockingLibrary.completed.wait(timeout=5):

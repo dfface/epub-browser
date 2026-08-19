@@ -10,9 +10,172 @@ from unittest import mock
 
 from starlette.testclient import TestClient
 
+from epub_browser.auth import (
+    AuthConfig,
+    AuthService,
+    BootstrapCredentials,
+    hash_password,
+)
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.runtime import RuntimeStatus
-from epub_browser.server import create_app
+from epub_browser.server import create_app, migrate_legacy_database
+from epub_browser.state import StateStore
+
+
+class ServerAuthBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        (public / "assets").mkdir()
+        (public / "assets" / "reader.js").write_text(
+            "console.log('reader')",
+            encoding="utf-8",
+        )
+        (public / "assets" / "auth.js").write_text(
+            "console.log('login')",
+            encoding="utf-8",
+        )
+        (public / "book" / "id").mkdir(parents=True)
+        (public / "book" / "id" / "chapter_0.html").write_text(
+            "chapter",
+            encoding="utf-8",
+        )
+        self.store = StateStore(public / "epub-browser.db")
+        self.principal = self.store.initialize(
+            bootstrap=BootstrapCredentials("alice", "secret")
+        )
+        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_service = AuthService(self.store, self.auth_config)
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=self.auth_service,
+        )
+        self.client = TestClient(self.app, follow_redirects=False)
+        self.annotation = {
+            "id": "a1",
+            "book_hash": "book",
+            "chapter_index": 1,
+            "text": "note",
+            "color": "#fff",
+            "created_at": "2026-01-01",
+            "updated_at": "2026-01-01",
+        }
+
+    def test_server_redirects_unauthenticated_html_and_rejects_api_static_and_sse(self):
+        index = self.client.get("/?language=zh-CN")
+
+        self.assertEqual(index.status_code, 303)
+        self.assertEqual(index.headers["location"], "/login?next=%2F%3Flanguage%3Dzh-CN")
+        api = self.client.get("/api/annotations/book")
+        self.assertEqual(api.status_code, 401)
+        self.assertEqual(
+            api.json(),
+            {"code": "authentication_required", "message": "Authentication required"},
+        )
+        self.assertEqual(self.client.get("/book/id/chapter_0.html").status_code, 403)
+        self.assertEqual(self.client.get("/assets/reader.js").status_code, 403)
+        self.assertEqual(self.client.get("/assets/auth.js").status_code, 200)
+        self.assertEqual(self.client.get("/api/library-events").status_code, 401)
+        self.assertEqual(self.client.get("/api/health").status_code, 401)
+        self.assertEqual(
+            self.client.get(
+                "/api/health",
+                headers={"Accept": "text/html"},
+            ).status_code,
+            401,
+        )
+        self.assertEqual(self.client.get("/api/ready").status_code, 401)
+
+    def test_password_login_sets_session_and_requires_csrf_to_write(self):
+        response = self.client.post(
+            "/login?next=%2Fbook%2Fid%2Fchapter_0.html",
+            data={"username": "alice", "password": "secret"},
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/book/id/chapter_0.html")
+        cookie = response.headers["set-cookie"]
+        self.assertIn("HttpOnly", cookie)
+        self.assertIn("SameSite=lax", cookie)
+        session = self.client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        self.assertEqual(session.json()["user"]["username"], "alice")
+        self.assertEqual(session.json()["user"]["id"], self.principal.user_id)
+        self.assertEqual(
+            self.client.post("/api/annotations/book", json=self.annotation).status_code,
+            403,
+        )
+        csrf = session.json()["csrf_token"]
+        self.assertEqual(
+            self.client.get("/api/csrf").json(),
+            {"csrf_token": csrf},
+        )
+        created = self.client.post(
+            "/api/annotations/book",
+            json=self.annotation,
+            headers={self.auth_config.csrf_header_name: csrf},
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(
+            self.store.list_annotations(user_id=self.principal.user_id)[0]["id"],
+            "a1",
+        )
+
+    def test_login_next_is_relative_and_logout_revokes_the_session(self):
+        login_page = self.client.get("/login?next=https%3A%2F%2Fevil.example")
+        self.assertEqual(login_page.status_code, 200)
+        self.assertIn('id="loginForm"', login_page.text)
+        encoded_backslash = self.client.get(
+            "/login?next=%2F%255C%255Cevil.example"
+        )
+        self.assertIn('name="next" value="/"', encoded_backslash.text)
+
+        logged_in = self.client.post(
+            "/login?next=https%3A%2F%2Fevil.example",
+            data={"username": "alice", "password": "secret"},
+        )
+        self.assertEqual(logged_in.headers["location"], "/")
+        csrf = self.client.get("/api/session").json()["csrf_token"]
+
+        self.assertEqual(self.client.post("/logout").status_code, 403)
+        logout = self.client.post(
+            "/logout",
+            headers={self.auth_config.csrf_header_name: csrf},
+        )
+        self.assertEqual(logout.status_code, 303)
+        self.assertEqual(logout.headers["location"], "/login")
+        self.assertEqual(self.client.get("/api/session").status_code, 401)
+
+    def test_cookie_secure_flag_follows_explicit_auth_configuration(self):
+        secure_config = AuthConfig.from_values(
+            [],
+            None,
+            None,
+            cookie_secure=True,
+        )
+        secure_app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=AuthService(self.store, secure_config),
+        )
+        secure_client = TestClient(
+            secure_app,
+            base_url="https://testserver",
+            follow_redirects=False,
+        )
+        self.addCleanup(secure_client.close)
+
+        response = secure_client.post(
+            "/login",
+            data={"username": "alice", "password": "secret"},
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("Secure", response.headers["set-cookie"])
+        self.assertEqual(secure_client.get("/api/session").status_code, 200)
 
 
 class ServerCacheTests(unittest.TestCase):
@@ -41,10 +204,41 @@ class ServerCacheTests(unittest.TestCase):
             chapter.write("chapter")
         with open(os.path.join(self.directory.name, "book", "demo", "resources", "cover.webp"), "wb") as cover:
             cover.write(b"cover")
-        self.client = TestClient(create_app(self.directory.name))
+        self.app, self.store, self.auth_service = self._authenticated_app(
+            self.directory.name
+        )
+        self.client = self._authenticated_client(self.app)
 
     def tearDown(self):
         self.directory.cleanup()
+
+    def _authenticated_app(self, directory, **kwargs):
+        store = kwargs.pop("state_store", None)
+        if store is None:
+            store = StateStore(Path(directory) / "epub-browser.db")
+            store.initialize(bootstrap=BootstrapCredentials("alice", "secret"))
+        config = AuthConfig.from_values([], None, None)
+        auth_service = AuthService(store, config)
+        app = create_app(
+            directory,
+            state_store=store,
+            auth_service=auth_service,
+            **kwargs,
+        )
+        return app, store, auth_service
+
+    def _authenticated_client(self, app):
+        client = TestClient(app)
+        login = client.post(
+            "/login",
+            data={"username": "alice", "password": "secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        session = client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
+        return client
 
     def _library_event_chunks(self, app, after_initial=None):
         async def collect():
@@ -81,7 +275,15 @@ class ServerCacheTests(unittest.TestCase):
                         "path": "/api/library-events",
                         "raw_path": b"/api/library-events",
                         "query_string": b"",
-                        "headers": [],
+                        "headers": [
+                            (
+                                b"cookie",
+                                (
+                                    "epub_browser_session="
+                                    + self.client.cookies.get("epub_browser_session")
+                                ).encode(),
+                            )
+                        ],
                         "client": ("testclient", 50000),
                         "server": ("testserver", 80),
                     },
@@ -147,8 +349,8 @@ class ServerCacheTests(unittest.TestCase):
 
     def test_annotation_routes_preserve_create_and_read_behavior(self):
         annotation = {"id": "a1", "book_hash": "book", "chapter_index": 1, "text": "note", "color": "#fff", "created_at": "2026-01-01", "updated_at": "2026-01-01"}
-        created = self.client.post("/api/annotations", json=annotation, headers={"X-Username": "reader"})
-        fetched = self.client.get("/api/annotations/book/1", headers={"X-Username": "reader"})
+        created = self.client.post("/api/annotations", json=annotation)
+        fetched = self.client.get("/api/annotations/book/1")
 
         self.assertEqual(created.status_code, 201)
         self.assertEqual(fetched.json()["data"][0]["id"], "a1")
@@ -163,19 +365,18 @@ class ServerCacheTests(unittest.TestCase):
             "created_at": "2026-01-01",
             "updated_at": "2026-01-01",
         }
-        headers = {"X-Username": "reader"}
-        self.assertEqual(self.client.post("/api/annotations", json=annotation, headers=headers).status_code, 201)
+        self.assertEqual(self.client.post("/api/annotations", json=annotation).status_code, 201)
 
         deleted = self.client.request(
             "DELETE",
             "/api/annotations/item/delete-me",
             content=b"",
-            headers={"Content-Type": "application/json", **headers},
+            headers={"Content-Type": "application/json"},
         )
 
         self.assertEqual(deleted.status_code, 200)
         self.assertEqual(deleted.json(), {"message": "Deleted"})
-        self.assertEqual(self.client.get("/api/annotations/item/delete-me", headers=headers).status_code, 404)
+        self.assertEqual(self.client.get("/api/annotations/item/delete-me").status_code, 404)
 
     def test_annotation_position_repair_can_move_a_cloud_annotation_to_its_real_chapter(self):
         annotation = {
@@ -190,8 +391,7 @@ class ServerCacheTests(unittest.TestCase):
             "created_at": "2026-01-01",
             "updated_at": "2026-01-01",
         }
-        headers = {"X-Username": "reader"}
-        self.client.post("/api/annotations", json=annotation, headers=headers)
+        self.client.post("/api/annotations", json=annotation)
 
         response = self.client.put(
             "/api/annotations/item/misplaced",
@@ -200,7 +400,6 @@ class ServerCacheTests(unittest.TestCase):
                 "startMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 1},
                 "endMeta": {"parentTagName": "P", "parentIndex": 0, "textOffset": 5},
             },
-            headers=headers,
         )
 
         self.assertEqual(response.status_code, 200)
@@ -208,16 +407,19 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(repaired["chapter_index"], 3)
         self.assertEqual(repaired["note"], "keep me")
         self.assertEqual(repaired["startMeta"]["parentIndex"], 0)
-        self.assertEqual(self.client.get("/api/annotations/book/1", headers=headers).json()["data"], [])
-        self.assertEqual(self.client.get("/api/annotations/book/3", headers=headers).json()["data"][0]["id"], "misplaced")
+        self.assertEqual(self.client.get("/api/annotations/book/1").json()["data"], [])
+        self.assertEqual(self.client.get("/api/annotations/book/3").json()["data"][0]["id"], "misplaced")
 
     def test_browser_api_errors_include_stable_codes_and_compatible_messages(self):
-        with TestClient(create_app(self.directory.name), raise_server_exceptions=False) as client:
-            with mock.patch("epub_browser.server.sqlite3.connect", side_effect=sqlite3.OperationalError("offline")):
-                server_error = client.get("/api/reading-progress/book")
+        with mock.patch.object(
+            self.store,
+            "get_reading_progress",
+            side_effect=sqlite3.OperationalError("offline"),
+        ):
+            server_error = self.client.get("/api/reading-progress/book")
 
         cases = [
-            (self.client.post("/sync", json={}), 400, "username_required"),
+            (self.client.post("/sync", json={}), 400, "no_sync_data"),
             (self.client.put("/api/reading-progress/book", json={"chapter_index": -1}), 400, "invalid_chapter_index"),
             (self.client.get("/api/annotations/item/missing"), 404, "annotation_not_found"),
             (self.client.post("/sync", content=b"{", headers={"Content-Type": "application/json"}), 400, "invalid_json"),
@@ -254,18 +456,29 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(self.client.delete("/api/reading-progress/book").status_code, 200)
         self.assertEqual(self.client.get("/api/reading-progress/book").status_code, 404)
 
-    def test_reading_progress_isolated_by_username_and_rejects_invalid_chapters(self):
+    def test_reading_progress_isolated_by_session_and_rejects_invalid_chapters(self):
         self.client.put("/api/reading-progress/book", json={"chapter_index": 4})
-        named = self.client.put(
+        self.store.create_user("bob", hash_password("secret"))
+        bob = TestClient(self.app)
+        self.addCleanup(bob.close)
+        self.assertEqual(
+            bob.post(
+                "/login",
+                data={"username": "bob", "password": "secret"},
+                follow_redirects=False,
+            ).status_code,
+            303,
+        )
+        bob.headers["X-CSRF-Token"] = bob.get("/api/session").json()["csrf_token"]
+        named = bob.put(
             "/api/reading-progress/book",
             json={"chapter_index": 7},
-            headers={"X-Username": "reader"},
         )
 
         self.assertEqual(named.json(), {"chapter_index": 7})
         self.assertEqual(self.client.get("/api/reading-progress/book").json(), {"chapter_index": 4})
         self.assertEqual(
-            self.client.get("/api/reading-progress/book", headers={"X-Username": "reader"}).json(),
+            bob.get("/api/reading-progress/book").json(),
             {"chapter_index": 7},
         )
         self.assertEqual(
@@ -277,7 +490,11 @@ class ServerCacheTests(unittest.TestCase):
         broker = LibraryProgressBroker()
         broker.start_generation("startup")
         broker.mark_discovered(2, 0)
-        app = create_app(self.directory.name, progress_broker=broker)
+        app, _, _ = self._authenticated_app(
+            self.directory.name,
+            state_store=self.store,
+            progress_broker=broker,
+        )
 
         headers, chunk, _ = self._library_event_chunks(app)
         lines = chunk.splitlines()
@@ -293,7 +510,11 @@ class ServerCacheTests(unittest.TestCase):
 
     def test_library_events_receive_worker_thread_updates(self):
         broker = LibraryProgressBroker()
-        app = create_app(self.directory.name, progress_broker=broker)
+        app, _, _ = self._authenticated_app(
+            self.directory.name,
+            state_store=self.store,
+            progress_broker=broker,
+        )
 
         worker = threading.Thread(target=broker.conversion_started)
 
@@ -310,8 +531,9 @@ class ServerCacheTests(unittest.TestCase):
 
     def test_library_events_emit_heartbeat_without_waiting_for_production_timeout(self):
         broker = LibraryProgressBroker()
-        app = create_app(
+        app, _, _ = self._authenticated_app(
             self.directory.name,
+            state_store=self.store,
             progress_broker=broker,
             library_event_heartbeat_seconds=0.01,
         )
@@ -325,13 +547,14 @@ class ServerCacheTests(unittest.TestCase):
         status.mark_available()
         status.mark_scanning()
         broker = LibraryProgressBroker()
-        client = TestClient(
-            create_app(
-                self.directory.name,
-                status=status,
-                progress_broker=broker,
-            )
+        app, _, _ = self._authenticated_app(
+            self.directory.name,
+            state_store=self.store,
+            status=status,
+            progress_broker=broker,
         )
+        client = self._authenticated_client(app)
+        self.addCleanup(client.close)
 
         self.assertEqual(client.get("/api/ready").status_code, 200)
         self.assertEqual(
@@ -348,8 +571,10 @@ class ServerCacheTests(unittest.TestCase):
                 "second library",
                 encoding="utf-8",
             )
-            first_client = TestClient(create_app(self.directory.name))
-            second_client = TestClient(create_app(second_directory))
+            first_client = self.client
+            second_app, _, _ = self._authenticated_app(second_directory)
+            second_client = self._authenticated_client(second_app)
+            self.addCleanup(second_client.close)
 
             first_client.put(
                 "/api/reading-progress/shared-book",
@@ -373,7 +598,8 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         with sqlite3.connect(os.path.join(self.directory.name, "epub-browser.db")) as connection:
             row = connection.execute(
-                "SELECT version, data FROM bookshelves WHERE username = ?", ("reader",)
+                "SELECT version, data FROM bookshelves WHERE user_id = ?",
+                (self.store.get_user_by_username("alice").user_id,),
             ).fetchone()
         self.assertEqual(row, (2, json.dumps(payload["data"], ensure_ascii=False)))
 
@@ -434,8 +660,8 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.json(), {"message": "Server has newer or same version", "version": 3, "data": {"items": ["server"], "groups": {}}})
 
     def test_sync_imports_the_highest_version_legacy_shelf_once(self):
-        Path(self.directory.name, "epub-browser-bookshelf-reader-2.json").write_text('{"items":["old"],"groups":{}}', encoding="utf-8")
-        Path(self.directory.name, "epub-browser-bookshelf-reader-4.json").write_text('{"items":["new"],"groups":{}}', encoding="utf-8")
+        Path(self.directory.name, "epub-browser-bookshelf-alice-2.json").write_text('{"items":["old"],"groups":{}}', encoding="utf-8")
+        Path(self.directory.name, "epub-browser-bookshelf-alice-4.json").write_text('{"items":["new"],"groups":{}}', encoding="utf-8")
 
         response = self.client.post("/sync", json={"username": "reader", "version": 1, "data": {"items": [], "groups": {}}})
 
@@ -443,7 +669,10 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.json()["version"], 4)
         self.assertEqual(response.json()["data"]["items"], ["new"])
         with sqlite3.connect(os.path.join(self.directory.name, "epub-browser.db")) as connection:
-            row = connection.execute("SELECT version FROM bookshelves WHERE username = ?", ("reader",)).fetchone()
+            row = connection.execute(
+                "SELECT version FROM bookshelves WHERE user_id = ?",
+                (self.store.get_user_by_username("alice").user_id,),
+            ).fetchone()
         self.assertEqual(row, (4,))
 
     def test_startup_renames_the_legacy_annotation_database_without_losing_data(self):
@@ -465,7 +694,10 @@ class ServerCacheTests(unittest.TestCase):
             connection.execute("CREATE TABLE bookshelves (username TEXT PRIMARY KEY, version INTEGER NOT NULL, data TEXT NOT NULL)")
             connection.execute("INSERT INTO bookshelves (username, version, data) VALUES (?, ?, ?)", ("reader", 3, '{\"items\":[\"book-a\"]}'))
 
-        create_app(legacy_directory.name)
+        migrated = migrate_legacy_database(legacy_directory.name)
+        StateStore(migrated).initialize(
+            bootstrap=BootstrapCredentials("alice", "secret")
+        )
 
         database_path = os.path.join(legacy_directory.name, "epub-browser.db")
         self.assertTrue(os.path.isfile(database_path))
@@ -484,7 +716,10 @@ class ServerCacheTests(unittest.TestCase):
         legacy_connection.close()
 
         with mock.patch("epub_browser.server.os.replace", side_effect=OSError("disk error")):
-            create_app(legacy_directory.name)
+            database = migrate_legacy_database(legacy_directory.name)
+        StateStore(database).initialize(
+            bootstrap=BootstrapCredentials("alice", "secret")
+        )
 
         self.assertTrue(os.path.isfile(legacy_path))
         self.assertTrue(os.path.isfile(os.path.join(legacy_directory.name, "epub-browser.db")))

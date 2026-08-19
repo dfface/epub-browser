@@ -1,24 +1,127 @@
 import asyncio
-import os
+import html
 import json
 import glob
-import sqlite3
+import os
 from typing import Optional
+from urllib.parse import parse_qs, quote, unquote, urlsplit
+
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import FileResponse, JSONResponse, StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from .auth import (
+    AuthService,
+    Principal,
+    SESSION_COOKIE,
+    session_cookie_options,
+)
 from .state import StateStore
 from .library_progress import LibraryProgressBroker
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
+PRINCIPAL_SCOPE_KEY = 'epub_browser.principal'
+SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
+PUBLIC_AUTH_ENDPOINTS = frozenset({
+    '/login',
+    '/logout',
+    '/api/identity/link',
+})
+PUBLIC_LOGIN_ASSETS = frozenset({'/assets/auth.js'})
 
 
 def error_payload(code, message):
     return {'code': code, 'message': message}
+
+
+def route_is_public_auth_endpoint(path):
+    return path in PUBLIC_AUTH_ENDPOINTS or path in PUBLIC_LOGIN_ASSETS
+
+
+def require_principal(request) -> Principal:
+    principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+    if principal is None:
+        raise StarletteHTTPException(
+            status_code=401,
+            detail='Authentication required',
+        )
+    return principal
+
+
+def _safe_relative_path(value, default='/'):
+    if not isinstance(value, str) or not value.startswith('/'):
+        return default
+    candidate = value
+    for _ in range(3):
+        if candidate.startswith('//') or '\\' in candidate or any(
+            character in candidate for character in ('\r', '\n', '\x00')
+        ):
+            return default
+        decoded = unquote(candidate)
+        if decoded == candidate:
+            break
+        candidate = decoded
+    parsed = urlsplit(value)
+    if parsed.scheme or parsed.netloc or parsed.fragment:
+        return default
+    return value
+
+
+def _request_relative_path(request):
+    target = request.url.path
+    query = request.scope.get('query_string', b'').decode('utf-8', errors='replace')
+    if query:
+        target += '?' + query
+    return _safe_relative_path(target)
+
+
+def _request_expects_html(request):
+    if request.method not in {'GET', 'HEAD'}:
+        return False
+    path = request.url.path
+    return (
+        path in {'/', '/index.html'}
+        or path.endswith('.html')
+        or 'text/html' in request.headers.get('accept', '').lower()
+    )
+
+
+def unauthenticated_response(request):
+    path = request.url.path
+    if path == '/book' or path.startswith('/book/'):
+        return JSONResponse(
+            error_payload('forbidden', 'Forbidden'),
+            status_code=403,
+            headers={'Cache-Control': 'no-store'},
+        )
+    if path == '/sync' or path.startswith('/api/'):
+        return JSONResponse(
+            error_payload('authentication_required', 'Authentication required'),
+            status_code=401,
+            headers={'Cache-Control': 'no-store'},
+        )
+    if _request_expects_html(request):
+        target = quote(_request_relative_path(request), safe='')
+        return RedirectResponse(
+            '/login?next=' + target,
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
+    return JSONResponse(
+        error_payload('forbidden', 'Forbidden'),
+        status_code=403,
+        headers={'Cache-Control': 'no-store'},
+    )
 
 
 def database_path(base_directory):
@@ -64,21 +167,22 @@ def load_legacy_bookshelf(directory, username):
 def sync_bookshelf(
     database_path,
     legacy_directory,
-    username,
+    user_id,
     client_version,
     client_data,
     store=None,
+    legacy_username=None,
 ):
     """Synchronize one bookshelf document and return its response payload and status."""
     active_store = store or StateStore(database_path)
     if store is None:
         active_store.initialize()
-    row = active_store.get_bookshelf(username)
+    row = active_store.get_bookshelf(user_id)
     if row is None:
-        legacy = load_legacy_bookshelf(legacy_directory, username)
+        legacy = load_legacy_bookshelf(legacy_directory, legacy_username or '')
         if legacy is not None:
             legacy_version, legacy_data = legacy
-            active_store.create_bookshelf(username, legacy_version, legacy_data)
+            active_store.create_bookshelf(user_id, legacy_version, legacy_data)
             row = (
                 legacy_version,
                 json.dumps(legacy_data, ensure_ascii=False),
@@ -100,10 +204,10 @@ def sync_bookshelf(
 
     new_version = max(client_version, 1)
     if row is None:
-        active_store.create_bookshelf(username, new_version, client_data)
+        active_store.create_bookshelf(user_id, new_version, client_data)
         return {'message': 'New user created', 'version': new_version}, 404
 
-    active_store.update_bookshelf(username, new_version, client_data)
+    active_store.update_bookshelf(user_id, new_version, client_data)
     return {'message': 'Data updated', 'version': new_version}, 201
 
 
@@ -135,19 +239,142 @@ def create_app(
     sync_dir=None,
     progress_broker: Optional[LibraryProgressBroker] = None,
     library_event_heartbeat_seconds: float = 15.0,
+    auth_service: Optional[AuthService] = None,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
-    if state_store is None:
-        database = migrate_legacy_database(base_directory)
-        store = StateStore(
-            database,
-            connection_factory=lambda path: sqlite3.connect(path),
-        )
-        store.initialize()
-    else:
-        store = state_store
+    if state_store is None or auth_service is None:
+        raise RuntimeError('An initialized StateStore and AuthService are required')
+    store = state_store
     runtime_status = status or _CompatibilityRuntimeStatus()
+
+    def response(data, status=200, cache_control='no-cache'):
+        return JSONResponse(
+            data,
+            status_code=status,
+            headers={'Cache-Control': cache_control},
+        )
+
+    def login_form(next_path='/', error=None, status_code=200):
+        safe_next = html.escape(_safe_relative_path(next_path), quote=True)
+        error_markup = (
+            '<p role="alert">Invalid username or password.</p>' if error else ''
+        )
+        markup = (
+            '<!doctype html><html><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>Sign in · EPUB Browser</title></head><body>'
+            '<main><h1>Sign in</h1>'
+            + error_markup
+            + '<form id="loginForm" method="post" action="/login">'
+            '<input type="hidden" name="next" value="'
+            + safe_next
+            + '"><label>Username <input name="username" autocomplete="username" '
+            'required></label><label>Password <input name="password" type="password" '
+            'autocomplete="current-password" required></label>'
+            '<button type="submit">Sign in</button></form></main></body></html>'
+        )
+        return HTMLResponse(
+            markup,
+            status_code=status_code,
+            headers={'Cache-Control': 'no-store'},
+        )
+
+    async def login(request):
+        requested_next = _safe_relative_path(request.query_params.get('next', '/'))
+        if request.method == 'GET':
+            if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None:
+                return RedirectResponse(requested_next, status_code=303)
+            return login_form(requested_next)
+
+        try:
+            content_type = request.headers.get('content-type', '').split(';', 1)[0]
+            if content_type != 'application/x-www-form-urlencoded':
+                raise ValueError('Unsupported login form content type')
+            body = await request.body()
+            if len(body) > 64 * 1024:
+                raise ValueError('Login form is too large')
+            values = parse_qs(
+                body.decode('utf-8'),
+                keep_blank_values=True,
+                strict_parsing=False,
+            )
+            form = {
+                key: entries[-1] if entries else ''
+                for key, entries in values.items()
+            }
+        except (UnicodeDecodeError, ValueError):
+            return login_form(requested_next, error=True, status_code=400)
+        next_path = _safe_relative_path(form.get('next') or requested_next)
+        client_key = request.client.host if request.client is not None else 'unknown'
+        principal = auth_service.authenticate_password(
+            form.get('username', ''),
+            form.get('password', ''),
+            client_key,
+        )
+        if principal is None:
+            return login_form(next_path, error=True, status_code=401)
+
+        raw_session, _ = auth_service.create_session(principal)
+        redirect = RedirectResponse(
+            next_path,
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
+        redirect.set_cookie(
+            SESSION_COOKIE,
+            raw_session,
+            max_age=auth_service.config.session_ttl_seconds,
+            **session_cookie_options(auth_service.config),
+        )
+        return redirect
+
+    async def logout(request):
+        auth_service.revoke_session(request.cookies.get(SESSION_COOKIE))
+        redirect = RedirectResponse(
+            '/login',
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
+        cookie_options = session_cookie_options(auth_service.config)
+        redirect.delete_cookie(
+            SESSION_COOKIE,
+            path=cookie_options['path'],
+            secure=cookie_options['secure'],
+            httponly=cookie_options['httponly'],
+            samesite=cookie_options['samesite'],
+        )
+        return redirect
+
+    async def session(request):
+        principal = require_principal(request)
+        raw_session = request.cookies.get(SESSION_COOKIE)
+        return response(
+            {
+                'user': {
+                    'id': principal.user_id,
+                    'username': principal.username,
+                    'role': principal.role,
+                },
+                'csrf_token': auth_service.issue_csrf_token(
+                    principal,
+                    raw_session,
+                ),
+            },
+            cache_control='no-store',
+        )
+
+    async def csrf(request):
+        principal = require_principal(request)
+        return response(
+            {
+                'csrf_token': auth_service.issue_csrf_token(
+                    principal,
+                    request.cookies.get(SESSION_COOKIE),
+                )
+            },
+            cache_control='no-store',
+        )
 
     async def library_index(request):
         index_path = os.path.join(base_directory, 'index.html')
@@ -204,11 +431,13 @@ def create_app(
             },
         )
 
-    def response(data, status=200):
-        return JSONResponse(data, status_code=status, headers={'Cache-Control': 'no-cache'})
-
     async def http_exception(request, exc):
-        code = 'not_found' if exc.status_code == 404 else 'server_error'
+        codes = {
+            401: 'authentication_required',
+            403: 'forbidden',
+            404: 'not_found',
+        }
+        code = codes.get(exc.status_code, 'server_error')
         message = exc.detail if isinstance(exc.detail, str) else 'Internal server error'
         return response(error_payload(code, message), exc.status_code)
 
@@ -219,10 +448,10 @@ def create_app(
         return data
 
     async def annotations(request):
+        principal = require_principal(request)
         parts = [part for part in request.path_params['path'].split('/') if part]
         if not parts or parts[0] != 'annotations':
             return response(error_payload('not_found', 'Not found'), 404)
-        username = request.headers.get('X-Username', '').strip()
         tail = parts[1:]
         if request.method != 'GET' and not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)
@@ -234,7 +463,7 @@ def create_app(
                         400,
                     )
                 if tail[:1] == ['item'] and len(tail) == 2:
-                    row = store.get_annotation(tail[1], username=username)
+                    row = store.get_annotation(tail[1], user_id=principal.user_id)
                     return (
                         response({'data': row}, 200)
                         if row
@@ -263,14 +492,14 @@ def create_app(
                 rows = store.list_annotations(
                     book_hash=tail[0] if tail else None,
                     chapter_index=chapter_index,
-                    username=username,
+                    user_id=principal.user_id,
                 )
                 return response({'data': rows})
 
             if request.method == 'DELETE':
                 if len(tail) != 2 or tail[0] != 'item':
                     return response(error_payload('not_found', 'Not found'), 404)
-                store.delete_annotation(tail[1], username=username)
+                store.delete_annotation(tail[1], user_id=principal.user_id)
                 return response({'message': 'Deleted'})
             try:
                 data = await request.json()
@@ -284,7 +513,7 @@ def create_app(
                     try:
                         store.upsert_annotation(
                             entry,
-                            username=username,
+                            user_id=principal.user_id,
                             replace_existing=tail == ['batch'],
                         )
                         created += 1
@@ -308,7 +537,7 @@ def create_app(
             row = store.update_annotation(
                 annotation_id,
                 data,
-                username=username,
+                user_id=principal.user_id,
             )
             return (
                 response({'data': row}, 200)
@@ -325,15 +554,16 @@ def create_app(
             return response(error_payload('server_error', 'Internal server error'), 500)
 
     async def sync(request):
+        principal = require_principal(request)
         if not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)
         try:
             data = await request.json()
-            username, version, shelf = data.get('username', ''), data.get('version', 1), data.get('data')
-            if not username: return response(error_payload('username_required', 'Username is required'), 400)
+            version, shelf = data.get('version', 1), data.get('data')
             payload, status = sync_bookshelf(
                 database_path(base_directory), sync_dir or base_directory,
-                username, version, shelf, store=store,
+                principal.user_id, version, shelf, store=store,
+                legacy_username=principal.username,
             )
             if status == 400:
                 return response(error_payload('no_sync_data', payload['message']), status)
@@ -396,14 +626,14 @@ def create_app(
             return response(error_payload('server_error', 'Internal server error'), 500)
 
     async def reading_progress_response(request):
+        principal = require_principal(request)
         book_hash = request.path_params['book_hash']
-        username = request.headers.get('X-Username', '')
 
         if request.method != 'GET' and not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)
 
         if request.method == 'GET':
-            chapter_index = store.get_reading_progress(username, book_hash)
+            chapter_index = store.get_reading_progress(principal.user_id, book_hash)
             return (
                 response({'chapter_index': chapter_index})
                 if chapter_index is not None
@@ -424,13 +654,17 @@ def create_app(
             chapter_index = data.get('chapter_index') if isinstance(data, dict) else None
             if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
                 return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
-            store.set_reading_progress(username, book_hash, chapter_index)
+            store.set_reading_progress(principal.user_id, book_hash, chapter_index)
             return response({'chapter_index': chapter_index})
 
-        store.delete_reading_progress(username, book_hash)
+        store.delete_reading_progress(principal.user_id, book_hash)
         return response({'message': 'Deleted'})
 
     routes = [
+        Route('/login', login, methods=['GET', 'POST']),
+        Route('/logout', logout, methods=['POST']),
+        Route('/api/session', session, methods=['GET']),
+        Route('/api/csrf', csrf, methods=['GET']),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/api/health', health),
@@ -442,4 +676,30 @@ def create_app(
         Route('/sync', sync, methods=['POST']),
         Mount('/', app=CachedStaticFiles(directory=base_directory, html=False)),
     ]
-    return Starlette(routes=routes, exception_handlers={StarletteHTTPException: http_exception})
+    app = Starlette(
+        routes=routes,
+        exception_handlers={StarletteHTTPException: http_exception},
+    )
+
+    async def auth_middleware(request, call_next):
+        principal = auth_service.principal_from_session(
+            request.cookies.get(SESSION_COOKIE)
+        )
+        request.scope[PRINCIPAL_SCOPE_KEY] = principal
+        path = request.url.path
+        is_public_auth = route_is_public_auth_endpoint(path)
+        if principal is None:
+            if is_public_auth:
+                return await call_next(request)
+            return unauthenticated_response(request)
+        if request.method not in SAFE_METHODS and path != '/login':
+            if not auth_service.verify_csrf(request, principal):
+                return response(
+                    error_payload('csrf_required', 'Valid CSRF token required'),
+                    403,
+                    cache_control='no-store',
+                )
+        return await call_next(request)
+
+    app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
+    return app
