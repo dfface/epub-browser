@@ -232,6 +232,39 @@ class SessionAndProxyTests(unittest.TestCase):
         )
         self.assertLessEqual(service.tracked_login_keys, 2)
 
+    def test_saturated_throttle_denies_unseen_valid_login_until_window_expires(self):
+        principal = self._principal("alice", "correct")
+        service = AuthService(
+            self.store,
+            self.config,
+            clock=self.clock,
+            throttle_limit=1,
+            throttle_capacity=2,
+        )
+        for username in ("slot-one", "slot-two"):
+            self.assertIsNone(
+                service.authenticate_password(
+                    username, "bad", "203.0.113.8"
+                )
+            )
+        self.assertEqual(service.tracked_login_keys, 2)
+
+        self.assertIsNone(
+            service.authenticate_password("alice", "correct", "203.0.113.8")
+        )
+        self.assertTrue(
+            service.login_is_throttled("203.0.113.8", "alice")
+        )
+
+        self.clock.advance(service.throttle_window_seconds + 1)
+        self.assertEqual(
+            service.authenticate_password("alice", "correct", "203.0.113.8"),
+            principal,
+        )
+        self.assertFalse(
+            service.login_is_throttled("203.0.113.8", "alice")
+        )
+
     def test_concurrent_failures_are_counted_and_throttle_state_stays_bounded(self):
         service = AuthService(
             self.store,

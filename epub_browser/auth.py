@@ -227,6 +227,13 @@ class AuthService:
                 self._login_failures[key] = failures
             failures.append(now)
 
+    def _login_key_is_throttled(self, key: tuple) -> bool:
+        with self._throttle_lock:
+            failures = self._login_failures.get(key)
+            if failures is not None:
+                return len(failures) >= self.throttle_limit
+            return len(self._login_failures) >= self.throttle_capacity
+
     def login_is_throttled(
         self,
         client_key: str,
@@ -240,14 +247,15 @@ class AuthService:
                     client_key,
                     self._normalize_login_username(username),
                 )
-                return (
-                    len(self._login_failures.get(key, ()))
-                    >= self.throttle_limit
-                )
+                return self._login_key_is_throttled(key)
             client = str(client_key)
-            return any(
-                key_client == client and len(failures) >= self.throttle_limit
-                for (key_client, _), failures in self._login_failures.items()
+            return (
+                len(self._login_failures) >= self.throttle_capacity
+                or any(
+                    key_client == client
+                    and len(failures) >= self.throttle_limit
+                    for (key_client, _), failures in self._login_failures.items()
+                )
             )
 
     def authenticate_password(
@@ -261,7 +269,7 @@ class AuthService:
         key = self._login_key(client_key, normalized)
         with self._throttle_lock:
             self._purge_login_failures(now)
-            if len(self._login_failures.get(key, ())) >= self.throttle_limit:
+            if self._login_key_is_throttled(key):
                 return None
 
         user = None
@@ -280,6 +288,9 @@ class AuthService:
             and password_matches
         ):
             with self._throttle_lock:
+                self._purge_login_failures(self._now())
+                if self._login_key_is_throttled(key):
+                    return None
                 self._login_failures.pop(key, None)
             return user.principal
 
