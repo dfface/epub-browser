@@ -1,13 +1,16 @@
 import dataclasses
+import hmac
 import json
 import sqlite3
+import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-from .auth import BootstrapCredentials, Principal, hash_password
+from .auth import BootstrapCredentials, Principal, hash_password, token_digest
 from .identity import new_server_book_id
 
 
@@ -46,6 +49,16 @@ class UserRecord:
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
+
+
+@dataclass(frozen=True)
+class UserIdentityRecord:
+    issuer: str
+    subject: str
+    user_id: str
+    display_name: Optional[str]
+    created_at: str
+    updated_at: str
 
 
 class StateStore:
@@ -744,6 +757,289 @@ class StateStore:
                 """
             ).fetchall()
         return tuple(self._user_record(row) for row in rows)
+
+    @staticmethod
+    def _timestamp(value=None) -> float:
+        if value is None:
+            return time.time()
+        if isinstance(value, datetime):
+            return value.timestamp()
+        return float(value)
+
+    @staticmethod
+    def _require_identity_key(issuer: str, subject: str) -> None:
+        if not isinstance(issuer, str) or not issuer.strip():
+            raise ValueError("Identity issuer must not be empty")
+        if not isinstance(subject, str) or not subject.strip():
+            raise ValueError("Identity subject must not be empty")
+
+    @staticmethod
+    def _identity_record(row) -> UserIdentityRecord:
+        return UserIdentityRecord(
+            issuer=row["issuer"],
+            subject=row["subject"],
+            user_id=row["user_id"],
+            display_name=row["display_name"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def create_identity(
+        self,
+        issuer: str,
+        subject: str,
+        user_id: str,
+        display_name: Optional[str] = None,
+    ) -> UserIdentityRecord:
+        self._require_identity_key(issuer, subject)
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            connection.execute(
+                """
+                INSERT INTO user_identities (issuer, subject, user_id, display_name)
+                VALUES (?, ?, ?, ?)
+                """,
+                (issuer, subject, user_id, display_name),
+            )
+            row = connection.execute(
+                "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
+                (issuer, subject),
+            ).fetchone()
+        return self._identity_record(row)
+
+    def get_identity(
+        self,
+        issuer: str,
+        subject: str,
+    ) -> Optional[UserIdentityRecord]:
+        self._require_identity_key(issuer, subject)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
+                (issuer, subject),
+            ).fetchone()
+        return self._identity_record(row) if row is not None else None
+
+    def update_identity(
+        self,
+        issuer: str,
+        subject: str,
+        *,
+        display_name: Optional[str],
+    ) -> UserIdentityRecord:
+        self._require_identity_key(issuer, subject)
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE user_identities
+                SET display_name = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE issuer = ? AND subject = ?
+                """,
+                (display_name, issuer, subject),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError("Unknown external identity")
+            row = connection.execute(
+                "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
+                (issuer, subject),
+            ).fetchone()
+        return self._identity_record(row)
+
+    def delete_identity(self, issuer: str, subject: str) -> bool:
+        self._require_identity_key(issuer, subject)
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "DELETE FROM user_identities WHERE issuer = ? AND subject = ?",
+                (issuer, subject),
+            )
+        return cursor.rowcount == 1
+
+    def list_identities(self, user_id: str) -> tuple[UserIdentityRecord, ...]:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT * FROM user_identities
+                WHERE user_id = ?
+                ORDER BY issuer, subject
+                """,
+                (user_id,),
+            ).fetchall()
+        return tuple(self._identity_record(row) for row in rows)
+
+    def principal_from_identity(
+        self,
+        issuer: str,
+        subject: str,
+    ) -> Optional[Principal]:
+        self._require_identity_key(issuer, subject)
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT users.id AS user_id, users.username, users.role
+                FROM user_identities
+                JOIN users ON users.id = user_identities.user_id
+                WHERE user_identities.issuer = ?
+                  AND user_identities.subject = ?
+                  AND users.enabled = 1
+                """,
+                (issuer, subject),
+            ).fetchone()
+        if row is None:
+            return None
+        return Principal(row["user_id"], row["username"], row["role"])
+
+    def create_session(
+        self,
+        token_digest_value: str,
+        user_id: str,
+        expires_at,
+        *,
+        now=None,
+    ) -> str:
+        if (
+            not isinstance(token_digest_value, str)
+            or len(token_digest_value) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in token_digest_value
+            )
+        ):
+            raise ValueError(
+                "Session token digest must be a SHA-256 hexadecimal digest"
+            )
+        created_at = self._timestamp(now)
+        expiry = self._timestamp(expires_at)
+        if expiry <= created_at:
+            raise ValueError("Session expiry must be in the future")
+        session_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            connection.execute(
+                """
+                INSERT INTO sessions (
+                    session_id, token_digest, user_id, expires_at,
+                    last_used_at, revoked_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                """,
+                (
+                    session_id,
+                    token_digest_value,
+                    user_id,
+                    str(expiry),
+                    str(created_at),
+                    str(created_at),
+                ),
+            )
+        return session_id
+
+    def principal_from_session(
+        self,
+        raw_token: Optional[str],
+        *,
+        now=None,
+        ttl_seconds: int = 30 * 24 * 60 * 60,
+    ) -> Optional[Principal]:
+        if not isinstance(raw_token, str) or not raw_token:
+            return None
+        if ttl_seconds <= 0:
+            raise ValueError("Session TTL must be positive")
+        digest = token_digest(raw_token)
+        used_at = self._timestamp(now)
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT sessions.token_digest, sessions.expires_at,
+                       sessions.revoked_at, users.id AS user_id,
+                       users.username, users.role, users.enabled
+                FROM sessions
+                JOIN users ON users.id = sessions.user_id
+                WHERE sessions.token_digest = ?
+                """,
+                (digest,),
+            ).fetchone()
+            if row is None or not hmac.compare_digest(row["token_digest"], digest):
+                return None
+            if (
+                row["revoked_at"] is not None
+                or not bool(row["enabled"])
+                or float(row["expires_at"]) <= used_at
+            ):
+                return None
+            connection.execute(
+                """
+                UPDATE sessions
+                SET expires_at = ?, last_used_at = ?
+                WHERE token_digest = ?
+                  AND revoked_at IS NULL
+                """,
+                (str(used_at + ttl_seconds), str(used_at), digest),
+            )
+        return Principal(row["user_id"], row["username"], row["role"])
+
+    def revoke_session(self, session_id: str, *, revoked_at=None) -> bool:
+        if not isinstance(session_id, str) or not session_id:
+            return False
+        timestamp = self._timestamp(revoked_at)
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE sessions SET revoked_at = ?
+                WHERE session_id = ? AND revoked_at IS NULL
+                """,
+                (str(timestamp), session_id),
+            )
+        return cursor.rowcount == 1
+
+    def revoke_session_by_token(
+        self,
+        raw_token: Optional[str],
+        *,
+        revoked_at=None,
+    ) -> bool:
+        if not isinstance(raw_token, str) or not raw_token:
+            return False
+        digest = token_digest(raw_token)
+        timestamp = self._timestamp(revoked_at)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT token_digest FROM sessions WHERE token_digest = ?",
+                (digest,),
+            ).fetchone()
+            if row is None or not hmac.compare_digest(row["token_digest"], digest):
+                return False
+            cursor = connection.execute(
+                """
+                UPDATE sessions SET revoked_at = ?
+                WHERE token_digest = ? AND revoked_at IS NULL
+                """,
+                (str(timestamp), digest),
+            )
+        return cursor.rowcount == 1
+
+    def revoke_all_sessions(self, user_id: str, *, revoked_at=None) -> int:
+        timestamp = self._timestamp(revoked_at)
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            cursor = connection.execute(
+                """
+                UPDATE sessions SET revoked_at = ?
+                WHERE user_id = ? AND revoked_at IS NULL
+                """,
+                (str(timestamp), user_id),
+            )
+        return cursor.rowcount
+
+    def raw_session_rows(self) -> tuple[str, ...]:
+        """Expose persisted scalar values for security inspection tests."""
+        with self._connection() as connection:
+            rows = connection.execute("SELECT * FROM sessions").fetchall()
+        return tuple(
+            str(value)
+            for row in rows
+            for value in row
+            if value is not None
+        )
 
     def set_book_visibility(self, book_id: str, visibility: str) -> None:
         if visibility not in {"authenticated", "restricted"}:
