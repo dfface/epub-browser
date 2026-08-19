@@ -149,13 +149,13 @@ class MigrationManagerTests(unittest.TestCase):
 
         with sqlite3.connect(result.database_path) as connection:
             reader = connection.execute(
-                "SELECT version, data FROM bookshelves WHERE username = 'reader'"
+                "SELECT version, data FROM bookshelves WHERE user_id = 'reader'"
             ).fetchone()
             other = connection.execute(
-                "SELECT version, data FROM bookshelves WHERE username = 'other'"
+                "SELECT version, data FROM bookshelves WHERE user_id = 'other'"
             ).fetchone()
             bad = connection.execute(
-                "SELECT version FROM bookshelves WHERE username = 'bad'"
+                "SELECT version FROM bookshelves WHERE user_id = 'bad'"
             ).fetchone()
         self.assertEqual(reader, (5, '{"items": ["new"]}'))
         self.assertEqual(other, (4, '{"items": ["other"]}'))

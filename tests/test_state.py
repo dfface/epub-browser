@@ -3,7 +3,9 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from epub_browser.auth import BootstrapCredentials
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
 
 
@@ -30,6 +32,36 @@ class StateStoreTests(unittest.TestCase):
             {"annotations", "bookshelves", "reading_progress", "books"} <= tables
         )
 
+    def test_v1_user_content_moves_to_bootstrap_administrator(self):
+        self._create_v1_database_with_annotation_bookshelf_and_progress(
+            "legacy-name"
+        )
+        store = StateStore(self.database)
+        admin = store.initialize(
+            bootstrap=BootstrapCredentials("admin", "secret")
+        )
+        self.assertEqual(
+            store.list_annotations(user_id=admin.user_id)[0]["text"],
+            "old note",
+        )
+        self.assertEqual(store.get_bookshelf(user_id=admin.user_id)[0], 7)
+        self.assertEqual(store.get_reading_progress(admin.user_id, "book"), 3)
+
+    def test_migration_rolls_back_if_rekeying_bookshelf_fails(self):
+        self._create_v1_database_with_annotation_bookshelf_and_progress(
+            "legacy-name"
+        )
+        with mock.patch.object(
+            StateStore,
+            "_migrate_bookshelves",
+            side_effect=sqlite3.Error("stop"),
+        ):
+            with self.assertRaises(sqlite3.Error):
+                StateStore(self.database).initialize(
+                    bootstrap=BootstrapCredentials("admin", "secret")
+                )
+        self.assertEqual(self._user_version(), 1)
+
     def test_content_update_keeps_book_id(self):
         source = Path(self.temporary.name, "books", "one.epub")
         metadata = {"title": "One", "authors": ["A"]}
@@ -53,6 +85,25 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(updated.book_id, record.book_id)
         self.assertEqual(updated.source_fingerprint, "fingerprint-b")
         self.assertEqual(json.loads(updated.metadata_json)["title"], "Updated")
+
+    def test_restricted_book_requires_matching_grant(self):
+        self.store.resolve_book(
+            Path(self.temporary.name, "book.epub"),
+            None,
+            "fingerprint",
+            {"title": "Book"},
+            preferred_book_id="book-1",
+        )
+        admin = self.store.create_user("admin", "hash", role="admin")
+        member = self.store.create_user("member", "hash", role="member")
+        self.store.set_book_visibility("book-1", "restricted")
+        self.assertFalse(
+            self.store.can_read_book(member.user_id, member.role, "book-1")
+        )
+        self.store.grant_book_access("book-1", member.user_id)
+        self.assertTrue(
+            self.store.can_read_book(member.user_id, member.role, "book-1")
+        )
 
     def test_new_book_can_preserve_a_correlated_legacy_identity(self):
         record = self.store.resolve_book(
@@ -161,14 +212,14 @@ class StateStoreTests(unittest.TestCase):
                 "created_at": "2026-01-01",
                 "updated_at": "2026-01-01",
             },
-            username="reader",
+            user_id="reader",
         )
 
         self.store.mark_missing(record.book_id)
 
         self.assertEqual(self.store.active_books(), ())
         self.assertEqual(
-            self.store.get_annotation("annotation", username="reader")["book_hash"],
+            self.store.get_annotation("annotation", user_id="reader")["book_hash"],
             record.book_id,
         )
 
@@ -247,6 +298,76 @@ class StateStoreTests(unittest.TestCase):
             }
         )
         self.assertEqual(store.get_annotation("new")["text"], "New")
+
+    def _create_v1_database_with_annotation_bookshelf_and_progress(
+        self,
+        username,
+    ):
+        self.database.unlink()
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("PRAGMA user_version = 1")
+            connection.execute(
+                """
+                CREATE TABLE annotations (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL DEFAULT '',
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    note TEXT,
+                    start_meta TEXT,
+                    end_meta TEXT,
+                    color TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO annotations (
+                    id, username, book_hash, chapter_index, text, color,
+                    created_at, updated_at
+                ) VALUES ('old', ?, 'book', 3, 'old note', '#fff', '2025', '2025')
+                """,
+                (username,),
+            )
+            connection.execute(
+                """
+                CREATE TABLE bookshelves (
+                    username TEXT PRIMARY KEY,
+                    version INTEGER NOT NULL,
+                    data TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            connection.execute(
+                "INSERT INTO bookshelves (username, version, data) VALUES (?, 7, '{}')",
+                (username,),
+            )
+            connection.execute(
+                """
+                CREATE TABLE reading_progress (
+                    username TEXT NOT NULL DEFAULT '',
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (username, book_hash)
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO reading_progress (username, book_hash, chapter_index)
+                VALUES (?, 'book', 3)
+                """,
+                (username,),
+            )
+
+    def _user_version(self):
+        with sqlite3.connect(self.database) as connection:
+            return connection.execute("PRAGMA user_version").fetchone()[0]
 
 
 if __name__ == "__main__":
