@@ -83,8 +83,13 @@
     }
 
     function handleUnauthorized(response) {
-      if (response && response.status === 401) redirectToLogin();
-      return response;
+      if (!response || response.status !== 401 || typeof response.clone !== 'function') {
+        return response;
+      }
+      return readJson(response.clone()).then(function(payload) {
+        if (payload && payload.code === 'authentication_required') redirectToLogin();
+        return response;
+      });
     }
 
     function rawFetch(url, options) {
@@ -472,7 +477,7 @@
       var close = element('accountClose');
       var logoutButton = element('accountLogout');
       var passwordForm = element('accountPasswordForm');
-      var associationForm = element('loginForm');
+      var associationForm = element('associationForm');
       var createUserForm = element('adminUserForm');
       if (menu) menu.addEventListener('click', openPanel);
       if (close) close.addEventListener('click', closePanel);

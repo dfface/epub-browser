@@ -44,7 +44,25 @@ PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/logout',
     '/api/identity/link',
 })
-PUBLIC_LOGIN_ASSETS = frozenset({'/assets/auth.js'})
+PUBLIC_LOGIN_ASSETS = frozenset({'/assets/auth.js', '/assets/i18n.js'})
+LOGIN_COPY = {
+    'en': {
+        'page_title': 'Sign in · EPUB Browser',
+        'sign_in': 'Sign in',
+        'username': 'Username',
+        'password': 'Password',
+        'invalid_credentials': 'Invalid username or password.',
+        'language': 'Language',
+    },
+    'zh-CN': {
+        'page_title': '登录 · EPUB Browser',
+        'sign_in': '登录',
+        'username': '用户名',
+        'password': '密码',
+        'invalid_credentials': '用户名或密码不正确。',
+        'language': '语言',
+    },
+}
 
 
 def error_payload(code, message):
@@ -53,6 +71,15 @@ def error_payload(code, message):
 
 def route_is_public_auth_endpoint(path):
     return path in PUBLIC_AUTH_ENDPOINTS or path in PUBLIC_LOGIN_ASSETS
+
+
+def normalize_login_locale(value, accept_language=''):
+    candidate = str(value or '').replace('_', '-').lower()
+    if not candidate:
+        candidate = str(accept_language or '').split(',', 1)[0].split(';', 1)[0].strip().lower()
+    if candidate == 'zh' or candidate.startswith(('zh-cn', 'zh-sg')):
+        return 'zh-CN'
+    return 'en'
 
 
 def require_principal(request) -> Principal:
@@ -378,25 +405,71 @@ def create_app(
     def client_key(request):
         return request.client.host if request.client is not None else 'unknown'
 
-    def login_form(next_path='/', error=None, status_code=200):
+    def login_form(
+        next_path='/',
+        error=None,
+        status_code=200,
+        locale='en',
+        locale_explicit=False,
+    ):
         safe_next = html.escape(_safe_relative_path(next_path), quote=True)
+        locale = normalize_login_locale(locale)
+        copy = LOGIN_COPY[locale]
         error_markup = (
-            '<p role="alert">Invalid username or password.</p>' if error else ''
+            '<p role="alert" data-i18n="account.error.invalid_credentials">'
+            + copy['invalid_credentials']
+            + '</p>'
+            if error
+            else ''
         )
-        markup = (
-            '<!doctype html><html><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Sign in · EPUB Browser</title></head><body>'
-            '<main><h1>Sign in</h1>'
-            + error_markup
-            + '<form id="loginForm" method="post" action="/login">'
-            '<input type="hidden" name="next" value="'
-            + safe_next
-            + '"><label>Username <input name="username" autocomplete="username" '
-            'required></label><label>Password <input name="password" type="password" '
-            'autocomplete="current-password" required></label>'
-            '<button type="submit">Sign in</button></form></main></body></html>'
-        )
+        en_selected = ' selected' if locale == 'en' else ''
+        zh_selected = ' selected' if locale == 'zh-CN' else ''
+        markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title data-i18n="account.loginPageTitle">{copy['page_title']}</title>
+<style>
+:root {{ font-family: system-ui,-apple-system,sans-serif; color-scheme: light dark; }}
+body {{ min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f3f6f4; color: #173336; }}
+.login-card {{ width: min(90vw, 28rem); box-sizing: border-box; padding: 2rem; border-radius: 1rem; background: #fff; box-shadow: 0 1rem 3rem rgba(20,50,53,.15); }}
+.login-language {{ display: flex; justify-content: flex-end; align-items: center; gap: .5rem; }}
+.login-card form,.login-card label {{ display: grid; gap: .5rem; }}
+.login-card form {{ gap: 1rem; }}
+.login-card input,.login-card select,.login-card button {{ box-sizing: border-box; min-height: 2.75rem; padding: .65rem .8rem; font: inherit; }}
+.login-card button {{ border: 0; border-radius: .5rem; background: #244548; color: #fff; cursor: pointer; }}
+[role=alert] {{ color: #a22424; }}
+@media (prefers-color-scheme: dark) {{ body {{ background: #112426; color: #eef7f5; }} .login-card {{ background: #193437; }} }}
+</style>
+<script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
+<script src="/assets/i18n.js"></script>
+<script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
+</head><body><main class="login-card">
+<label class="login-language"><span data-i18n="common.language">{copy['language']}</span>
+<select id="loginLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
+<option value="en"{en_selected} data-i18n="common.english">English</option>
+<option value="zh-CN"{zh_selected} data-i18n="common.chinese">中文</option>
+</select></label>
+<h1 data-i18n="account.signIn">{copy['sign_in']}</h1>
+{error_markup}
+<form id="loginForm" method="post" action="/login">
+<input type="hidden" name="next" value="{safe_next}">
+<input type="hidden" name="locale" value="{locale}">
+<label><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
+<label><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="current-password" required></label>
+<button type="submit" data-i18n="account.signIn">{copy['sign_in']}</button>
+</form></main>
+<script>(function() {{
+var i18n=window.EpubBrowserI18n;
+var localeSelect=document.getElementById('loginLocaleSelect');
+var localeField=document.querySelector('input[name="locale"]');
+if(i18n&&localeSelect){{
+localeSelect.value=i18n.getLocale();
+localeSelect.addEventListener('change',function(){{
+i18n.setLocale(localeSelect.value);
+if(localeField)localeField.value=localeSelect.value;
+}});
+}}
+}}());</script></body></html>'''
         return HTMLResponse(
             markup,
             status_code=status_code,
@@ -405,10 +478,19 @@ def create_app(
 
     async def login(request):
         requested_next = _safe_relative_path(request.query_params.get('next', '/'))
+        requested_locale = normalize_login_locale(
+            request.query_params.get('lang'),
+            request.headers.get('accept-language', ''),
+        )
+        locale_explicit = 'lang' in request.query_params
         if request.method == 'GET':
             if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None:
                 return RedirectResponse(requested_next, status_code=303)
-            return login_form(requested_next)
+            return login_form(
+                requested_next,
+                locale=requested_locale,
+                locale_explicit=locale_explicit,
+            )
 
         try:
             content_type = request.headers.get('content-type', '').split(';', 1)[0]
@@ -427,8 +509,17 @@ def create_app(
                 for key, entries in values.items()
             }
         except (UnicodeDecodeError, ValueError):
-            return login_form(requested_next, error=True, status_code=400)
+            return login_form(
+                requested_next,
+                error=True,
+                status_code=400,
+                locale=requested_locale,
+                locale_explicit=locale_explicit,
+            )
         next_path = _safe_relative_path(form.get('next') or requested_next)
+        submitted_locale = normalize_login_locale(
+            form.get('locale') or requested_locale
+        )
         client_key = request.client.host if request.client is not None else 'unknown'
         principal = auth_service.authenticate_password(
             form.get('username', ''),
@@ -436,7 +527,13 @@ def create_app(
             client_key,
         )
         if principal is None:
-            return login_form(next_path, error=True, status_code=401)
+            return login_form(
+                next_path,
+                error=True,
+                status_code=401,
+                locale=submitted_locale,
+                locale_explicit=True,
+            )
 
         raw_session, _ = auth_service.create_session(principal)
         redirect = RedirectResponse(
@@ -805,6 +902,12 @@ def create_app(
             path = normalize_public_path(request.path_params['path'])
         except ValueError:
             return response(error_payload('not_found', 'Not Found'), 404)
+        if path == 'assets/i18n.js':
+            return FileResponse(
+                os.path.join(os.path.dirname(__file__), 'assets', 'i18n.js'),
+                media_type='text/javascript',
+                headers={'Cache-Control': 'no-cache'},
+            )
         if '/' + path in PUBLIC_LOGIN_ASSETS:
             return await public_files.get_response(path, request.scope)
         principal = require_principal(request)

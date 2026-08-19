@@ -94,6 +94,7 @@ def _render_library_html(
                 <button type="button" class="bookshelf-close-btn" id="accountClose" aria-label="Close account settings" data-i18n-aria-label="account.close"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
         </div>
+        <div class="account-modal-body">
         <p id="accountStatus" class="account-status" role="status" aria-live="polite" hidden></p>
         <section aria-labelledby="accountProfileTitle">
             <h3 id="accountProfileTitle" data-i18n="account.profile">Profile</h3>
@@ -114,7 +115,7 @@ def _render_library_html(
         <details>
             <summary data-i18n="account.associationTitle">Associate a proxy identity</summary>
             <p data-i18n="account.associationDescription">If your trusted proxy identity is not recognized, prove which local account it belongs to.</p>
-            <form id="loginForm">
+            <form id="associationForm">
                 <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="username" required></label>
                 <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="current-password" required></label>
                 <button type="submit" class="bookshelf-action-btn" data-i18n="account.associate">Associate identity</button>
@@ -138,6 +139,7 @@ def _render_library_html(
                 <ul id="adminBookList"></ul>
             </section>
         </section>
+        </div>
     </div>
 </div>'''
         server_auth_script = '<script src="/assets/auth.js" defer></script>'

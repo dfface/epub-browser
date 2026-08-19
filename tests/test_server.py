@@ -154,6 +154,32 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(logout.headers["location"], "/login")
         self.assertEqual(self.client.get("/api/session").status_code, 401)
 
+    def test_public_login_is_a_localized_surface_in_english_and_chinese(self):
+        english = self.client.get('/login?lang=en&next=%2Fbook%2Fid%2Fchapter_0.html')
+        chinese = self.client.get('/login?lang=zh-CN&next=%2Fbook%2Fid%2Fchapter_0.html')
+
+        self.assertEqual(english.status_code, 200)
+        self.assertEqual(chinese.status_code, 200)
+        self.assertIn('<html lang="en">', english.text)
+        self.assertIn('<html lang="zh-CN">', chinese.text)
+        self.assertIn('<h1 data-i18n="account.signIn">Sign in</h1>', english.text)
+        self.assertIn('<h1 data-i18n="account.signIn">登录</h1>', chinese.text)
+        self.assertIn('id="loginForm"', english.text)
+        self.assertNotIn('id="associationForm"', english.text)
+        self.assertIn('id="loginLocaleSelect"', english.text)
+        self.assertIn('<option value="en" selected', english.text)
+        self.assertIn('<option value="zh-CN" selected', chinese.text)
+        self.assertIn('data-i18n="account.username">Username', english.text)
+        self.assertIn('data-i18n="account.username">用户名', chinese.text)
+        self.assertIn('src="/assets/i18n.js"', english.text)
+        self.assertIn('window.EpubBrowserI18n.init()', english.text)
+        self.assertIn('i18n.setLocale(localeSelect.value)', english.text)
+        self.assertIn(
+            'name="next" value="/book/id/chapter_0.html"',
+            chinese.text,
+        )
+        self.assertEqual(self.client.get('/assets/i18n.js').status_code, 200)
+
     def test_cookie_secure_flag_follows_explicit_auth_configuration(self):
         secure_config = AuthConfig.from_values(
             [],

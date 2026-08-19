@@ -19,7 +19,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ssg_html = self._library_html()
 
         for control_id in (
-            "loginForm",
+            "associationForm",
             "accountMenu",
             "accountPanel",
             "accountPasswordForm",
@@ -38,6 +38,24 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('auth.js', ssg_html)
         self.assertNotRegex(ssg_html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
         self.assertLess(server_html.index('/immutable/auth.'), server_html.rindex('/immutable/library.'))
+        self.assertNotIn('id=loginForm', server_html)
+
+    def test_account_modal_keeps_dynamic_lists_scrollable_on_mobile(self):
+        html = self._server_html()
+        stylesheet = Path('epub_browser/assets/bookshelf.css').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn('.account-modal-body {', stylesheet)
+        body_rule = stylesheet[
+            stylesheet.index('.account-modal-body {'):
+            stylesheet.index('}', stylesheet.index('.account-modal-body {'))
+        ]
+
+        self.assertRegex(html, r'class=(?:["\'])?account-modal-body(?:["\' >])')
+        self.assertIn('display: flex;', body_rule)
+        self.assertIn('flex-direction: column;', body_rule)
+        self.assertIn('min-height: 0;', body_rule)
+        self.assertIn('overflow-y: auto;', body_rule)
 
     def test_processor_convert_preserves_caller_supplied_identity(self):
         with tempfile.TemporaryDirectory() as directory:

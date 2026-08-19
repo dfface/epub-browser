@@ -153,6 +153,7 @@
       'account.close': 'Close account settings',
       'account.profile': 'Profile',
       'account.signIn': 'Sign in',
+      'account.loginPageTitle': 'Sign in · EPUB Browser',
       'account.signedInAs': 'Signed in as {username} · {role}',
       'account.role.admin': 'Administrator',
       'account.role.member': 'Member',
@@ -570,6 +571,7 @@
       'account.close': '关闭账户设置',
       'account.profile': '个人资料',
       'account.signIn': '登录',
+      'account.loginPageTitle': '登录 · EPUB Browser',
       'account.signedInAs': '已登录为 {username} · {role}',
       'account.role.admin': '管理员',
       'account.role.member': '成员',
@@ -1012,6 +1014,7 @@
 
     function updateManifestLink() {
       var link;
+      if (root.EpubBrowserDisableManifest) return;
       if (!root.document) return;
       if (root.document.querySelector) link = root.document.querySelector('#epubBrowserManifest');
       if (!link && root.document.createElement && root.document.head) {

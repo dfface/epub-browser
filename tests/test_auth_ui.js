@@ -7,6 +7,7 @@ function response(status, payload) {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(payload || {}),
+    clone: () => response(status, payload),
   };
 }
 
@@ -74,6 +75,52 @@ test('auth wrapper does not redirect for a successful response', async () => {
 
   assert.equal(result.status, 200);
   assert.deepEqual(root.navigations, []);
+});
+
+test('wrong current password stays signed in and shows the localized form error', async () => {
+  const status = { textContent: '', className: '', hidden: true };
+  const passwordFields = [
+    { value: 'wrong' },
+    { value: 'replacement' },
+  ];
+  const passwordForm = {
+    elements: {
+      current_password: passwordFields[0],
+      new_password: passwordFields[1],
+    },
+    listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    querySelectorAll() { return passwordFields; },
+  };
+  const root = rootWithFetch(() => Promise.resolve(response(401, {
+    code: 'invalid_credentials',
+    message: 'Raw server message',
+  })));
+  root.document.getElementById = id => ({
+    accountStatus: status,
+    accountPasswordForm: passwordForm,
+  })[id] || null;
+  root.EpubBrowserI18n = {
+    t(key) {
+      if (key === 'account.error.invalid_credentials') return '当前密码不正确。';
+      return key;
+    },
+  };
+  const auth = AuthModule.create(root);
+  const activeSession = {
+    user: { id: 'u', username: 'reader', role: 'member' },
+    csrf_token: 'token',
+  };
+  auth.setSession(activeSession);
+  await auth.init();
+
+  passwordForm.listeners.submit({ preventDefault() {} });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.deepEqual(root.navigations, []);
+  assert.equal(auth.getSession(), activeSession);
+  assert.equal(status.textContent, '当前密码不正确。');
+  assert.equal(status.hidden, false);
 });
 
 test('unsafe calls load the session once before sending the CSRF-protected request', async () => {
