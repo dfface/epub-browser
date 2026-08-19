@@ -14,7 +14,7 @@ from .auth import BootstrapCredentials, Principal, hash_password, token_digest
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 2
+DB_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -128,6 +128,8 @@ class StateStore:
                     connection,
                     administrator.user_id if administrator is not None else None,
                 )
+            if version < 3:
+                self._migrate_annotation_primary_key(connection)
             self._create_user_owned_indexes(connection)
             connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
             connection.execute("COMMIT")
@@ -145,7 +147,7 @@ class StateStore:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS annotations (
-                id TEXT PRIMARY KEY,
+                id TEXT NOT NULL,
                 username TEXT NOT NULL DEFAULT '',
                 user_id TEXT NOT NULL CHECK(length(user_id) > 0)
                     REFERENCES users(id) ON DELETE CASCADE,
@@ -157,7 +159,8 @@ class StateStore:
                 end_meta TEXT,
                 color TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, id)
             )
             """
         )
@@ -455,7 +458,7 @@ class StateStore:
         connection.execute(
             f"""
             CREATE TABLE {temporary_table} (
-                id TEXT PRIMARY KEY,
+                id TEXT NOT NULL,
                 username TEXT NOT NULL DEFAULT '',
                 user_id TEXT NOT NULL CHECK(length(user_id) > 0)
                     REFERENCES users(id) ON DELETE CASCADE,
@@ -467,7 +470,8 @@ class StateStore:
                 end_meta TEXT,
                 color TEXT NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, id)
             )
             """
         )
@@ -482,6 +486,53 @@ class StateStore:
             FROM annotations
             """,
             (administrator_id,),
+        )
+        connection.execute("DROP TABLE annotations")
+        connection.execute(
+            f"ALTER TABLE {temporary_table} RENAME TO annotations"
+        )
+
+    def _migrate_annotation_primary_key(self, connection) -> None:
+        columns = connection.execute("PRAGMA table_info(annotations)").fetchall()
+        primary_key = tuple(
+            row["name"]
+            for row in sorted(columns, key=lambda row: row["pk"])
+            if row["pk"]
+        )
+        if primary_key == ("user_id", "id"):
+            return
+        temporary_table = "annotations_owner_key_v3_migrating"
+        self._reject_migration_table(connection, temporary_table)
+        connection.execute(
+            f"""
+            CREATE TABLE {temporary_table} (
+                id TEXT NOT NULL,
+                username TEXT NOT NULL DEFAULT '',
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
+                book_hash TEXT NOT NULL,
+                chapter_index INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                note TEXT,
+                start_meta TEXT,
+                end_meta TEXT,
+                color TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, id)
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            INSERT INTO {temporary_table} (
+                id, username, user_id, book_hash, chapter_index, text, note,
+                start_meta, end_meta, color, created_at, updated_at
+            )
+            SELECT id, username, user_id, book_hash, chapter_index, text, note,
+                   start_meta, end_meta, color, created_at, updated_at
+            FROM annotations
+            """
         )
         connection.execute("DROP TABLE annotations")
         connection.execute(
@@ -1559,15 +1610,32 @@ class StateStore:
         user_id: str,
         replace_existing: bool = False,
     ) -> None:
-        operation = "INSERT OR REPLACE" if replace_existing else "INSERT"
+        conflict = (
+            """
+                ON CONFLICT(user_id, id) DO UPDATE SET
+                    username = excluded.username,
+                    book_hash = excluded.book_hash,
+                    chapter_index = excluded.chapter_index,
+                    text = excluded.text,
+                    note = excluded.note,
+                    start_meta = excluded.start_meta,
+                    end_meta = excluded.end_meta,
+                    color = excluded.color,
+                    created_at = excluded.created_at,
+                    updated_at = excluded.updated_at
+            """
+            if replace_existing
+            else ""
+        )
         with self._connection() as connection:
             self._require_user(connection, user_id)
             connection.execute(
                 f"""
-                {operation} INTO annotations (
+                INSERT INTO annotations (
                     id, book_hash, chapter_index, text, note, start_meta, end_meta,
                     color, created_at, updated_at, user_id, username
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                {conflict}
                 """,
                 (
                     annotation["id"],

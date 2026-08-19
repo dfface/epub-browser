@@ -567,6 +567,17 @@ class SessionOwnershipTests(unittest.TestCase):
         session = self.client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         self.csrf = {"X-CSRF-Token": session.json()["csrf_token"]}
+        self.bob_client = TestClient(self.app)
+        self.addCleanup(self.bob_client.close)
+        bob_login = self.bob_client.post(
+            "/login",
+            data={"username": "bob", "password": "bob-secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(bob_login.status_code, 303)
+        bob_session = self.bob_client.get("/api/session")
+        self.assertEqual(bob_session.status_code, 200)
+        self.bob_csrf = {"X-CSRF-Token": bob_session.json()["csrf_token"]}
         self.annotation = {
             "id": "alice-note",
             "book_hash": "book",
@@ -593,6 +604,44 @@ class SessionOwnershipTests(unittest.TestCase):
             self.store.list_annotations(user_id=self.bob.user_id),
             [],
         )
+
+    def test_batch_annotation_id_collision_cannot_replace_another_accounts_row(self):
+        bob_annotation = {
+            **self.annotation,
+            "id": "shared-client-id",
+            "text": "Bob's note",
+        }
+        alice_annotation = {
+            **self.annotation,
+            "id": "shared-client-id",
+            "text": "Alice's note",
+        }
+
+        bob_created = self.bob_client.post(
+            "/api/annotations/batch",
+            json={"annotations": [bob_annotation]},
+            headers=self.bob_csrf,
+        )
+        alice_created = self.client.post(
+            "/api/annotations/batch",
+            json={"annotations": [alice_annotation]},
+            headers=self.csrf,
+        )
+
+        self.assertEqual(bob_created.status_code, 201)
+        self.assertEqual(bob_created.json(), {"created": 1, "failed": 0})
+        self.assertEqual(alice_created.status_code, 201)
+        self.assertEqual(alice_created.json(), {"created": 1, "failed": 0})
+        bob_saved = self.bob_client.get(
+            "/api/annotations/item/shared-client-id"
+        )
+        alice_saved = self.client.get(
+            "/api/annotations/item/shared-client-id"
+        )
+        self.assertEqual(bob_saved.status_code, 200)
+        self.assertEqual(bob_saved.json()["data"]["text"], "Bob's note")
+        self.assertEqual(alice_saved.status_code, 200)
+        self.assertEqual(alice_saved.json()["data"]["text"], "Alice's note")
 
     def test_bookshelf_body_username_cannot_select_another_account(self):
         response = self.client.post(

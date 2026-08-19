@@ -374,6 +374,67 @@ class StateStoreTests(unittest.TestCase):
         self.assertIsNone(user_id[4])
         self.assertIn("users", {row[2] for row in foreign_keys})
 
+    def test_v2_annotation_ids_are_rekeyed_per_owner_without_data_loss(self):
+        member = self.store.create_user("member", "hash")
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP TABLE annotations")
+            connection.execute(
+                """
+                CREATE TABLE annotations (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL DEFAULT '',
+                    user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                        REFERENCES users(id) ON DELETE CASCADE,
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    note TEXT,
+                    start_meta TEXT,
+                    end_meta TEXT,
+                    color TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO annotations (
+                    id, user_id, book_hash, chapter_index, text, color,
+                    created_at, updated_at
+                ) VALUES ('shared', ?, 'book', 1, 'owner note', '#fff',
+                          '2026', '2026')
+                """,
+                (self.owner.user_id,),
+            )
+            connection.execute("PRAGMA user_version = 2")
+
+        migrated = StateStore(self.database)
+        migrated.initialize()
+        migrated.upsert_annotation(
+            {
+                "id": "shared",
+                "book_hash": "book",
+                "chapter_index": 2,
+                "text": "member note",
+                "color": "#000",
+                "created_at": "2027",
+                "updated_at": "2027",
+            },
+            user_id=member.user_id,
+            replace_existing=True,
+        )
+
+        owner_saved = migrated.get_annotation(
+            "shared",
+            user_id=self.owner.user_id,
+        )
+        member_saved = migrated.get_annotation("shared", user_id=member.user_id)
+        self.assertIsNotNone(owner_saved)
+        self.assertEqual(owner_saved["text"], "owner note")
+        self.assertIsNotNone(member_saved)
+        self.assertEqual(member_saved["text"], "member note")
+
     def test_initialize_rejects_a_database_from_a_newer_schema(self):
         future = Path(self.temporary.name, "future.db")
         with sqlite3.connect(future) as connection:
