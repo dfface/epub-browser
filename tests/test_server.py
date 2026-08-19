@@ -102,6 +102,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn("SameSite=lax", cookie)
         session = self.client.get("/api/session")
         self.assertEqual(session.status_code, 200)
+        self.assertEqual(session.headers["cache-control"], "private, no-cache")
         self.assertEqual(session.json()["user"]["username"], "alice")
         self.assertEqual(session.json()["user"]["id"], self.principal.user_id)
         self.assertEqual(
@@ -109,9 +110,11 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             403,
         )
         csrf = session.json()["csrf_token"]
+        csrf_response = self.client.get("/api/csrf")
+        self.assertEqual(csrf_response.json(), {"csrf_token": csrf})
         self.assertEqual(
-            self.client.get("/api/csrf").json(),
-            {"csrf_token": csrf},
+            csrf_response.headers["cache-control"],
+            "private, no-cache",
         )
         created = self.client.post(
             "/api/annotations/book",
@@ -119,6 +122,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             headers={self.auth_config.csrf_header_name: csrf},
         )
         self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.headers["cache-control"], "private, no-cache")
         self.assertEqual(
             self.store.list_annotations(user_id=self.principal.user_id)[0]["id"],
             "a1",
@@ -176,6 +180,40 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         self.assertIn("Secure", response.headers["set-cookie"])
         self.assertEqual(secure_client.get("/api/session").status_code, 200)
+
+    def test_authenticated_login_requires_csrf_before_replacing_the_session(self):
+        first_login = self.client.post(
+            "/login",
+            data={"username": "alice", "password": "secret"},
+        )
+        self.assertEqual(first_login.status_code, 303)
+        original_session = self.client.cookies.get("epub_browser_session")
+        csrf = self.client.get("/api/session").json()["csrf_token"]
+
+        denied = self.client.post(
+            "/login",
+            data={"username": "alice", "password": "secret"},
+        )
+
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.json()["code"], "csrf_required")
+        self.assertEqual(denied.headers["cache-control"], "private, no-cache")
+        self.assertEqual(
+            self.client.cookies.get("epub_browser_session"),
+            original_session,
+        )
+
+        replaced = self.client.post(
+            "/login",
+            data={"username": "alice", "password": "secret"},
+            headers={self.auth_config.csrf_header_name: csrf},
+        )
+
+        self.assertEqual(replaced.status_code, 303)
+        self.assertNotEqual(
+            self.client.cookies.get("epub_browser_session"),
+            original_session,
+        )
 
 
 class ServerCacheTests(unittest.TestCase):
@@ -303,15 +341,17 @@ class ServerCacheTests(unittest.TestCase):
 
         return asyncio.run(collect())
 
-    def test_immutable_assets_are_long_lived_and_validate_with_etag(self):
+    def test_authenticated_immutable_assets_revalidate_in_a_private_cache(self):
         response = self.client.get("/assets/immutable/app.0123456789ab.js")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["cache-control"], "public, max-age=31536000, immutable")
+        self.assertEqual(response.headers["cache-control"], "private, no-cache")
+        self.assertNotIn("public", response.headers["cache-control"])
         self.assertIn("etag", response.headers)
 
         cached = self.client.get("/assets/immutable/app.0123456789ab.js", headers={"If-None-Match": response.headers["etag"]})
         self.assertEqual(cached.status_code, 304)
+        self.assertEqual(cached.headers["cache-control"], "private, no-cache")
 
     def test_mutable_assets_and_worker_revalidate(self):
         for path in (
@@ -324,13 +364,13 @@ class ServerCacheTests(unittest.TestCase):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.headers["cache-control"], "no-cache")
+                self.assertEqual(response.headers["cache-control"], "private, no-cache")
 
     def test_html_is_revalidated_instead_of_long_lived(self):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["cache-control"], "no-cache")
+        self.assertEqual(response.headers["cache-control"], "private, no-cache")
 
     def test_starlette_static_errors_return_stable_json_codes(self):
         response = self.client.get("/missing-static-file")
@@ -338,14 +378,21 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"code": "not_found", "message": "Not Found"})
 
-    def test_book_resources_are_cached_while_book_pages_revalidate(self):
+    def test_authenticated_book_resources_are_private_and_unauthenticated_are_denied(self):
         book_page = self.client.get("/book/demo/index.html")
         chapter_page = self.client.get("/book/demo/chapter_0.html")
         cover = self.client.get("/book/demo/resources/cover.webp")
 
-        self.assertEqual(book_page.headers["cache-control"], "no-cache")
-        self.assertEqual(chapter_page.headers["cache-control"], "no-cache")
-        self.assertEqual(cover.headers["cache-control"], "public, max-age=2592000")
+        for response in (book_page, chapter_page, cover):
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers["cache-control"], "private, no-cache")
+            self.assertNotIn("public", response.headers["cache-control"])
+
+        unauthenticated = TestClient(self.app)
+        self.addCleanup(unauthenticated.close)
+        denied = unauthenticated.get("/book/demo/resources/cover.webp")
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.headers["cache-control"], "no-store")
 
     def test_annotation_routes_preserve_create_and_read_behavior(self):
         annotation = {"id": "a1", "book_hash": "book", "chapter_index": 1, "text": "note", "color": "#fff", "created_at": "2026-01-01", "updated_at": "2026-01-01"}
@@ -499,7 +546,7 @@ class ServerCacheTests(unittest.TestCase):
         headers, chunk, _ = self._library_event_chunks(app)
         lines = chunk.splitlines()
         self.assertEqual(headers["status"], 200)
-        self.assertEqual(headers["cache-control"], "no-store")
+        self.assertEqual(headers["cache-control"], "private, no-cache")
         self.assertEqual(headers["x-accel-buffering"], "no")
         self.assertEqual(lines[0], "event: progress")
         payload = json.loads(lines[1].removeprefix("data: "))

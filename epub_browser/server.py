@@ -692,14 +692,18 @@ def create_app(
             if is_public_auth:
                 return await call_next(request)
             return unauthenticated_response(request)
-        if request.method not in SAFE_METHODS and path != '/login':
+        if request.method not in SAFE_METHODS:
             if not auth_service.verify_csrf(request, principal):
-                return response(
+                denied = response(
                     error_payload('csrf_required', 'Valid CSRF token required'),
                     403,
                     cache_control='no-store',
                 )
-        return await call_next(request)
+                denied.headers['Cache-Control'] = 'private, no-cache'
+                return denied
+        authorized = await call_next(request)
+        authorized.headers['Cache-Control'] = 'private, no-cache'
+        return authorized
 
     app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
     return app
