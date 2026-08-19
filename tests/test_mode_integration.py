@@ -256,7 +256,7 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertIn("reverse proxy", readme.lower())
         self.assertTrue(migration.is_file())
         self.assertTrue(release.is_file())
-        self.assertIn('VERSION = "2.0.1"', Path("epub_browser/version.py").read_text())
+        self.assertIn('VERSION = "2.0.2"', Path("epub_browser/version.py").read_text())
 
     @staticmethod
     def _write_epub(path):
