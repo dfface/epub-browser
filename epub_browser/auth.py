@@ -5,11 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence, Tuple
 
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from argon2.low_level import Type
-
-
 SESSION_COOKIE = "epub_browser_session"
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 CSRF_HEADER_NAME = "X-CSRF-Token"
@@ -99,10 +94,17 @@ class AuthConfig:
 
 
 def hash_password(password: str) -> str:
+    from argon2 import PasswordHasher
+    from argon2.low_level import Type
+
     return PasswordHasher(type=Type.ID).hash(password)
 
 
 def verify_password(encoded: str, password: str) -> bool:
+    from argon2 import PasswordHasher
+    from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
+    from argon2.low_level import Type
+
     try:
         return PasswordHasher(type=Type.ID).verify(encoded, password)
     except (VerifyMismatchError, InvalidHashError, VerificationError):

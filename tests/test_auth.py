@@ -20,6 +20,12 @@ class AuthPrimitiveTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             AuthConfig.from_values(["10.0.0.0/8"], "X-Remote-User", None)
 
+    def test_proxy_config_rejects_malformed_cidr(self):
+        with self.assertRaises(ValueError):
+            AuthConfig.from_values(
+                ["not-a-cidr"], "X-Remote-User", "https://sso.example"
+            )
+
     def test_proxy_config_parses_cidrs_and_cookie_options(self):
         config = AuthConfig.from_values(
             ["10.0.0.0/8", "2001:db8::/32"],
@@ -34,4 +40,3 @@ class AuthPrimitiveTests(unittest.TestCase):
             session_cookie_options(config),
             {"httponly": True, "samesite": "lax", "secure": True, "path": "/"},
         )
-

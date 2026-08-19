@@ -1,5 +1,7 @@
 import contextlib
 import io
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -57,6 +59,30 @@ class NewCommandTests(unittest.TestCase):
                     "database",
                 ]
             )
+
+    def test_ssg_cli_parses_without_loading_argon2(self):
+        script = """
+import builtins
+original_import = builtins.__import__
+
+def without_argon2(name, *args, **kwargs):
+    if name == 'argon2' or name.startswith('argon2.'):
+        raise ImportError('argon2 must not load for SSG')
+    return original_import(name, *args, **kwargs)
+
+builtins.__import__ = without_argon2
+from epub_browser.cli import parse_cli
+config = parse_cli(['ssg', 'books', '--output-dir', 'dist'])
+assert config.output_dir.name == 'dist'
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).parents[1],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_ssg_parses_output_and_base_path(self):
         config = parse_cli(
@@ -159,6 +185,34 @@ class NewCommandTests(unittest.TestCase):
                     "state",
                     "--trusted-proxy-cidr",
                     "10.0.0.0/8",
+                ]
+            )
+
+    def test_server_rejects_invalid_cidr_and_each_incomplete_proxy_configuration(self):
+        partial_options = [
+            ["--trusted-proxy-cidr", "10.0.0.0/8"],
+            ["--proxy-subject-header", "X-Remote-User"],
+            ["--proxy-issuer", "https://sso.example"],
+            ["--proxy-display-name-header", "X-Remote-Name"],
+        ]
+        for options in partial_options:
+            with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    parse_cli(["server", "books", "--server-dir", "state", *options])
+
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parse_cli(
+                [
+                    "server",
+                    "books",
+                    "--server-dir",
+                    "state",
+                    "--trusted-proxy-cidr",
+                    "not-a-cidr",
+                    "--proxy-subject-header",
+                    "X-Remote-User",
+                    "--proxy-issuer",
+                    "https://sso.example",
                 ]
             )
 
