@@ -429,6 +429,69 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 self.assertIn("cache-boundary.", current.text)
         manager.shutdown()
 
+    def test_changed_source_output_is_denied_during_reconversion(self):
+        class BlockingProcessor(EPUBProcessor):
+            started = threading.Event()
+            release = threading.Event()
+
+            def convert(self):
+                self.started.set()
+                self.release.wait(timeout=5)
+                return super().convert()
+
+        self._write_epub(self.source, "Original", include_cover=True)
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        metadata = json.loads(record.metadata_json)
+        paths = (
+            "index.html",
+            "chapter_0.html",
+            metadata["cover"],
+        )
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": "admin", "password": "secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        self._write_epub(self.source, "Changed", include_cover=True)
+        manager.converter_factory = BlockingProcessor
+        results = []
+        reconcile_thread = threading.Thread(
+            target=lambda: results.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(BlockingProcessor.started.wait(timeout=2))
+            for path in paths:
+                with self.subTest(state="converting", path=path):
+                    response = client.get(f"/book/{record.book_id}/{path}")
+                    self.assertEqual(response.status_code, 404)
+        finally:
+            BlockingProcessor.release.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(results[0].converted, 1)
+        for path in paths:
+            with self.subTest(state="current", path=path):
+                response = client.get(f"/book/{record.book_id}/{path}")
+                self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "Changed",
+            client.get(f"/book/{record.book_id}/chapter_0.html").text,
+        )
+        manager.shutdown()
+
     def test_metadata_only_stat_change_is_recorded_after_one_recheck(self):
         manager = self._manager()
         manager.reconcile()
@@ -699,7 +762,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         manager.shutdown()
 
-    def test_failed_update_keeps_previous_cache_and_reports_degraded(self):
+    def test_failed_source_update_keeps_stale_output_denied_and_reports_degraded(self):
         broker = LibraryProgressBroker()
         loop = asyncio.new_event_loop()
         self.addCleanup(loop.close)
@@ -718,6 +781,20 @@ class ServerLibraryManagerTests(unittest.TestCase):
             / "chapter_0.html"
         )
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": "admin", "password": "secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
         self._write_epub(self.source, "Changed")
 
         class FailingProcessor:
@@ -732,8 +809,12 @@ class ServerLibraryManagerTests(unittest.TestCase):
 
         self.assertTrue(summary.degraded)
         self.assertEqual(summary.failed, 1)
+        self.assertFalse(summary.failures[0].kept_previous_cache)
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
-        self.assertEqual(self.store.active_books()[0].book_id, first.book_id)
+        self.assertIn(
+            client.get(f"/book/{first.book_id}/chapter_0.html").status_code,
+            (403, 404),
+        )
         snapshot = self._latest_subscription_snapshot(loop, subscription)
         self.assertEqual(snapshot.phase, "degraded")
         self.assertEqual(snapshot.failures[0].filename, self.source.name)
@@ -745,6 +826,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(retried.converted, 1)
         self.assertFalse(retried.degraded)
         self.assertIn("Changed", chapter_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            client.get(f"/book/{first.book_id}/chapter_0.html").status_code,
+            200,
+        )
         manager.shutdown()
 
     def test_reconciliation_callbacks_report_each_scan_result(self):
@@ -917,19 +1002,26 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )
 
     @staticmethod
-    def _write_epub(path, chapter_text):
+    def _write_epub(path, chapter_text, include_cover=False):
         container = """<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
 </container>
 """
-        package = """<?xml version="1.0" encoding="UTF-8"?>
+        cover_meta = '<meta name="cover" content="cover" />' if include_cover else ""
+        cover_item = (
+            '<item id="cover" href="cover.jpg" media-type="image/jpeg" />'
+            if include_cover
+            else ""
+        )
+        package = f"""<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="book-id">urn:test:server-library</dc:identifier>
     <dc:title>Server Book</dc:title><dc:creator>Author</dc:creator><dc:language>en</dc:language>
+    {cover_meta}
   </metadata>
-  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>{cover_item}</manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
 """
@@ -942,6 +1034,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
             archive.writestr("META-INF/container.xml", container)
             archive.writestr("OEBPS/content.opf", package)
             archive.writestr("OEBPS/chapter.xhtml", chapter)
+            if include_cover:
+                archive.writestr("OEBPS/cover.jpg", b"cover")
 
     @staticmethod
     def _replace_archive_text(path, member_name, before, after):

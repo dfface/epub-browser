@@ -394,6 +394,10 @@ class ServerLibraryManager:
                         self.progress_broker.record_reused(source)
                         continue
 
+                    with self._commit_lock:
+                        if self._stop_event.is_set():
+                            break
+                        self._invalidate_public_output(record.book_id)
                     plans.append(
                         _ConversionPlan(
                             source=source,
@@ -831,6 +835,10 @@ class ServerLibraryManager:
                 return False
         cover = metadata.get("cover")
         return not cover or (directory / cover).is_file()
+
+    def _invalidate_public_output(self, book_id: str) -> None:
+        directory = self.public_dir / "book" / book_id
+        (directory / SERVER_OUTPUT_REVISION_FILE).unlink(missing_ok=True)
 
     def _valid_active_records(self) -> tuple[BookRecord, ...]:
         return tuple(
