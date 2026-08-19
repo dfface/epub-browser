@@ -377,6 +377,54 @@ class ServerCacheTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(row, (2, json.dumps(payload["data"], ensure_ascii=False)))
 
+    def test_server_bookshelf_is_read_and_written_with_a_versioned_document(self):
+        headers = {"X-Username": "reader"}
+
+        initial = self.client.get("/api/bookshelf", headers=headers)
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.json(), {"version": 0, "data": {"items": [], "groups": {}, "order": []}})
+
+        created = self.client.put(
+            "/api/bookshelf",
+            headers=headers,
+            json={"version": 0, "data": {"items": ["book-a"], "groups": {}, "order": ["book-a"]}},
+        )
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(created.json()["version"], 1)
+
+        loaded = self.client.get("/api/bookshelf", headers=headers)
+        self.assertEqual(loaded.json(), created.json())
+
+    def test_server_bookshelf_requires_a_logged_in_username(self):
+        read = self.client.get("/api/bookshelf")
+        write = self.client.put(
+            "/api/bookshelf",
+            json={"version": 0, "data": {"items": [], "groups": {}, "order": []}},
+        )
+
+        self.assertEqual(read.status_code, 400)
+        self.assertEqual(write.status_code, 400)
+        self.assertEqual(read.json()["code"], "username_required")
+        self.assertEqual(write.json()["code"], "username_required")
+
+    def test_server_bookshelf_rejects_stale_automatic_saves_without_overwriting_data(self):
+        headers = {"X-Username": "reader"}
+        self.client.put(
+            "/api/bookshelf",
+            headers=headers,
+            json={"version": 0, "data": {"items": ["server"], "groups": {}, "order": ["server"]}},
+        )
+
+        conflict = self.client.put(
+            "/api/bookshelf",
+            headers=headers,
+            json={"version": 0, "data": {"items": ["client"], "groups": {}, "order": ["client"]}},
+        )
+
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(conflict.json()["code"], "bookshelf_conflict")
+        self.assertEqual(conflict.json()["data"]["items"], ["server"])
+
     def test_sync_returns_the_sqlite_shelf_to_an_older_client(self):
         self.client.post("/sync", json={"username": "reader", "version": 3, "data": {"items": ["server"], "groups": {}}})
 

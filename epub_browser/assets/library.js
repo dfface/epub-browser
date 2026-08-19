@@ -399,9 +399,15 @@ function initScript() {
 
     var loginCard = document.getElementById('loginCard');
     if (loginCard) {
-        loginCard.addEventListener('click', function() {
+        loginCard.addEventListener('click', async function() {
             var currentUsername = getUsername();
-            var username = prompt(t('library.usernamePrompt'), currentUsername || '');
+            var username = await window.EpubDialog.prompt({
+                title: t('library.login'),
+                inputLabel: t('library.usernamePrompt'),
+                defaultValue: currentUsername || '',
+                selectOnOpen: true,
+                confirmText: t('library.login')
+            });
             if (username !== null) {
                 if (username.trim()) {
                     setUsername(username.trim());

@@ -591,6 +591,14 @@ class EPUBProcessor:
     def create_index_page(self):
         """创建章节索引页面"""
         book_language = html.escape(self.lang or 'en', quote=True)
+        bookshelf_data_actions = """
+                <button class="bookshelf-action-btn" id="exportShelfBtn">
+                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+                </button>
+                <button class="bookshelf-action-btn" id="importShelfBtn">
+                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+                </button>
+                <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
         if self.authors:
             authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
         else:
@@ -611,6 +619,7 @@ class EPUBProcessor:
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
+    <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
@@ -800,33 +809,24 @@ class EPUBProcessor:
     </a>
 </div>
 <!-- 书架弹窗 -->
-<div class="bookshelf-modal" id="bookshelfModal">
-    <div class="bookshelf-content">
+<div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+    <div class="bookshelf-content" tabindex="-1">
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addShelfGroupBtn">
                     <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                 </button>
-                <button class="bookshelf-action-btn" id="syncShelfBtn">
-                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                    <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                 </button>
-                <button class="bookshelf-action-btn" id="exportShelfBtn">
-                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
-                </button>
-                <button class="bookshelf-action-btn" id="importShelfBtn">
-                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
-                </button>
-                <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                {bookshelf_data_actions}
             </div>
-            <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+            <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
             <div class="bookshelf-header-right">
                 <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-        </div>
-        <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
         </div>
         <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
@@ -840,12 +840,15 @@ class EPUBProcessor:
 </div>
 
 <!-- 分组弹窗 -->
-<div class="bookshelf-modal" id="groupModal">
-    <div class="bookshelf-content">
+<div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+    <div class="bookshelf-content" tabindex="-1">
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
                     <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                </button>
+                <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                    <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                 </button>
                 <button class="bookshelf-action-btn" id="renameGroupBtn">
                     <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
@@ -864,9 +867,6 @@ class EPUBProcessor:
                 </button>
             </div>
         </div>
-        <div class="bookshelf-tag-filter" id="groupTagFilter">
-            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
-        </div>
         <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
         </div>
@@ -881,6 +881,7 @@ class EPUBProcessor:
 
         index_html += """
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
@@ -1227,6 +1228,14 @@ document.addEventListener('DOMContentLoaded', function() {
         next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
         prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
         next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
+        bookshelf_data_actions = """
+                    <button class="bookshelf-action-btn" id="exportShelfBtn">
+                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="importShelfBtn">
+                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+                    </button>
+                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="en">
@@ -1247,6 +1256,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
+    <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
@@ -1626,33 +1636,24 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <!-- 书架弹窗 -->
-    <div class="bookshelf-modal" id="bookshelfModal">
-        <div class="bookshelf-content">
+    <div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addShelfGroupBtn">
                         <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                     </button>
-                    <button class="bookshelf-action-btn" id="syncShelfBtn">
-                        <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                    <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                     </button>
-                    <button class="bookshelf-action-btn" id="exportShelfBtn">
-                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
-                    </button>
-                    <button class="bookshelf-action-btn" id="importShelfBtn">
-                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
-                    </button>
-                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                    {bookshelf_data_actions}
                 </div>
-                <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+                <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
                 <div class="bookshelf-header-right">
                     <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-            </div>
-            <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
             </div>
             <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
@@ -1666,12 +1667,15 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <!-- 分组弹窗 -->
-    <div class="bookshelf-modal" id="groupModal">
-        <div class="bookshelf-content">
+    <div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
                         <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                     </button>
                     <button class="bookshelf-action-btn" id="renameGroupBtn">
                         <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
@@ -1690,9 +1694,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     </button>
                 </div>
             </div>
-            <div class="bookshelf-tag-filter" id="groupTagFilter">
-                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
-            </div>
             <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
             </div>
@@ -1707,6 +1708,7 @@ document.addEventListener('DOMContentLoaded', function() {
 """
         chapter_html += """
     <script src="/assets/theme.js" defer></script>
+    <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>

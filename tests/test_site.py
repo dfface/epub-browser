@@ -78,7 +78,9 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r'data-progress-close[^>]*hidden')
         self.assertIn('window.EpubLibraryProgress.start(window)', html)
         self.assertIn('id=loginCard', html)
-        self.assertIn('id=syncShelfBtn', html)
+        self.assertNotIn('id=exportShelfBtn', html)
+        self.assertNotIn('id=importShelfBtn', html)
+        self.assertNotIn('id=syncShelfBtn', html)
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -90,6 +92,8 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('id=libraryProgress', html)
         self.assertNotIn('library-progress', html)
         self.assertNotIn('id=loginCard', html)
+        self.assertIn('id=exportShelfBtn', html)
+        self.assertIn('id=importShelfBtn', html)
         self.assertNotIn('id=syncShelfBtn', html)
 
     def test_publish_library_shell_atomically_replaces_both_outputs(self):

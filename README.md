@@ -98,7 +98,7 @@ epub-browser server book.epub --ephemeral
 
 Only `data/` is authoritative. `cache/` can be deleted: the next start rebuilds it while retaining durable book IDs and user data. `.server.lock` remains as harmless diagnostic metadata after shutdown; an operating-system lock, rather than its recorded PID, controls exclusivity. Public files are never written at the Server root in the v2 layout.
 
-The bookshelf continues to use browser-local state and the existing manual **Sync** action. Therefore an untouched Server database can legitimately have no bookshelf row until a user performs Sync. This behavior is unchanged in v2.
+In Server mode, the bookshelf is stored as a versioned cloud document in the Server database and saves automatically after every change. Users must sign in with the existing username setting before using it. SSG mode keeps local bookshelf data and provides Import and Export; it has no Sync action.
 
 ## Docker
 
@@ -110,7 +110,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:ro \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.0.2
+  epub-browser:2.0.3
 ```
 
 `/app/EpubBrowserFiles` must be writable and persistent. `/app/Library` is read-only input. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:

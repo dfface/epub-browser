@@ -1,3 +1,71 @@
+/* Server mode keeps the bookshelf document in the server database, never in localStorage. */
+(function(root) {
+    var state = { username: '', version: 0, data: null, savedData: null };
+
+    function emptyBookshelf() {
+        return { items: [], groups: {}, order: [] };
+    }
+
+    function copy(data) {
+        return JSON.parse(JSON.stringify(data || emptyBookshelf()));
+    }
+
+    function apiUrl() {
+        var prefix = root.EpubBrowserBasePath || '/';
+        if (prefix.charAt(prefix.length - 1) !== '/') prefix += '/';
+        return prefix + 'api/bookshelf';
+    }
+
+    function request(method, username, body) {
+        var options = { method: method, headers: { 'X-Username': username } };
+        if (body) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
+        }
+        return Promise.resolve(fetch(apiUrl(), options)).then(function(response) {
+            return response.json().catch(function() { return {}; }).then(function(payload) {
+                if (!response.ok) return { error: payload || {} };
+                return payload;
+            });
+        }, function() { return { error: { code: 'server_error' } }; });
+    }
+
+    root.EpubBookshelfStore = {
+        isServerMode: function() { return root.EpubBrowserMode === 'server'; },
+        data: function() { return state.data ? copy(state.data) : null; },
+        load: function(username) {
+            if (root.EpubBrowserMode !== 'server') return Promise.resolve({ data: null, version: 0 });
+            return request('GET', username).then(function(result) {
+                if (result.error) return result;
+                state.username = username;
+                state.version = result.version;
+                state.data = copy(result.data);
+                state.savedData = copy(result.data);
+                return { data: copy(state.data), version: state.version };
+            });
+        },
+        save: function(username, data) {
+            if (root.EpubBrowserMode !== 'server') return Promise.resolve({ data: data });
+            return request('PUT', username, { version: state.version, data: data }).then(function(result) {
+                if (result.error) {
+                    if (result.error.code === 'bookshelf_conflict' && result.error.data) {
+                        state.version = result.error.version;
+                        state.data = copy(result.error.data);
+                        state.savedData = copy(result.error.data);
+                    } else if (state.savedData) {
+                        state.data = copy(state.savedData);
+                    }
+                    return result;
+                }
+                state.version = result.version;
+                state.data = copy(result.data);
+                state.savedData = copy(result.data);
+                return { data: copy(state.data), version: state.version };
+            });
+        }
+    };
+})(typeof window !== 'undefined' ? window : globalThis);
+
 function bookshelfMetadataUrl(basePath) {
     var prefix = basePath || '/';
     if (prefix.charAt(prefix.length - 1) !== '/') prefix += '/';
@@ -12,6 +80,7 @@ function initBookshelf() {
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
     var USERNAME_KEY = 'epub_browser_username';
+    var isServerMode = window.EpubBookshelfStore && window.EpubBookshelfStore.isServerMode();
 
     function getUsername() {
         if (isKindleMode()) {
@@ -20,14 +89,6 @@ function initBookshelf() {
         return localStorage.getItem(USERNAME_KEY);
     }
 
-    function setUsername(username) {
-        if (isKindleMode()) {
-            setCookie(USERNAME_KEY, username);
-        } else {
-            localStorage.setItem(USERNAME_KEY, username);
-        }
-    }
-    
     var bookMetadataCache = null;
     
     function loadBookMetadata(callback) {
@@ -63,22 +124,26 @@ function initBookshelf() {
     var bookshelfModal = document.getElementById('bookshelfModal');
     var bookshelfCloseBtn = document.getElementById('bookshelfCloseBtn');
     var bookshelfBody = document.getElementById('bookshelfBody');
-    var bookshelfTagFilter = document.getElementById('bookshelfTagFilter');
     var bookshelfStats = document.getElementById('bookshelfStats');
     var bookshelfLoading = document.getElementById('bookshelfLoading');
     var addShelfGroupBtn = document.getElementById('addShelfGroupBtn');
+    var addShelfBookBtn = document.getElementById('addShelfBookBtn');
     var exportShelfBtn = document.getElementById('exportShelfBtn');
     var importShelfBtn = document.getElementById('importShelfBtn');
     var importShelfFile = document.getElementById('importShelfFile');
-    var syncShelfBtn = document.getElementById('syncShelfBtn');
+    if (isServerMode) {
+        if (exportShelfBtn) exportShelfBtn.remove();
+        if (importShelfBtn) importShelfBtn.remove();
+        if (importShelfFile) importShelfFile.remove();
+    }
     
     var groupModal = document.getElementById('groupModal');
     var groupCloseBtn = document.getElementById('groupCloseBtn');
     var groupBody = document.getElementById('groupBody');
-    var groupTagFilter = document.getElementById('groupTagFilter');
     var groupStats = document.getElementById('groupStats');
     var groupLoading = document.getElementById('groupLoading');
     var addGroupSubGroupBtn = document.getElementById('addGroupSubGroupBtn');
+    var addGroupBookBtn = document.getElementById('addGroupBookBtn');
     var deleteGroupBtn = document.getElementById('deleteGroupBtn');
     var renameGroupBtn = document.getElementById('renameGroupBtn');
     
@@ -87,6 +152,7 @@ function initBookshelf() {
     var currentTag = 'All';
     var bookshelfSortableInstance = null;
     var groupSortableInstance = null;
+    var bookSearchModal = null;
     var i18n = window.EpubBrowserI18n;
 
     function tr(key, params) {
@@ -104,6 +170,8 @@ function initBookshelf() {
             batch_requires_post: true,
             database_unavailable: true,
             reading_progress_not_found: true,
+            bookshelf_conflict: true,
+            not_ready: true,
             server_error: true
         };
         return tr('error.' + (knownCodes[code] ? code : 'unknown'));
@@ -137,6 +205,9 @@ function initBookshelf() {
     
     // 获取书架数据
     function getBookshelf() {
+        if (isServerMode) {
+            return window.EpubBookshelfStore.data() || { items: [], groups: {}, order: [] };
+        }
         var data = localStorage.getItem(BOOKSHELF_KEY);
         if (data) {
             var shelfData = JSON.parse(data);
@@ -151,8 +222,38 @@ function initBookshelf() {
     
     // 保存书架数据
     function saveBookshelf(data) {
+        if (isServerMode) {
+            return window.EpubBookshelfStore.save(getUsername(), data);
+        }
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
         incrementBookshelfVersion();
+        return Promise.resolve({ data: data });
+    }
+
+    function ensureServerBookshelf() {
+        if (!isServerMode) return Promise.resolve(true);
+        var username = getUsername();
+        if (!username) {
+            showNotification(tr('loginRequired'), 'warning');
+            return Promise.resolve(false);
+        }
+        return window.EpubBookshelfStore.load(username).then(function(result) {
+            if (result.error) {
+                showNotification(syncErrorMessage(result.error.code), 'warning');
+                return false;
+            }
+            return true;
+        });
+    }
+
+    function persistBookshelf(data) {
+        return saveBookshelf(data).then(function(result) {
+            if (result.error) {
+                showNotification(syncErrorMessage(result.error.code), 'warning');
+                return false;
+            }
+            return true;
+        });
     }
     
     // 生成唯一ID
@@ -240,19 +341,6 @@ function initBookshelf() {
         return Array.from(tags);
     }
     
-    // 渲染标签过滤器
-    function renderTagFilter(container, tags, activeTag) {
-        container.innerHTML = '<span class="bookshelf-tag ' + (activeTag === 'All' ? 'active' : '') + '" data-tag="All" data-i18n="bookshelf.all">' + tr('all') + '</span>';
-        container.innerHTML += '<span class="bookshelf-tag ' + (activeTag === 'NoTag' ? 'active' : '') + '" data-tag="NoTag" data-i18n="bookshelf.noTag">' + tr('noTag') + '</span>';
-        tags.forEach(function(tag) {
-            var tagEl = document.createElement('span');
-            tagEl.className = 'bookshelf-tag' + (activeTag === tag ? ' active' : '');
-            tagEl.dataset.tag = tag;
-            tagEl.textContent = tag;
-            container.appendChild(tagEl);
-        });
-    }
-
     function appendIcon(container, className) {
         var icon = document.createElement('i');
         icon.className = className;
@@ -289,12 +377,14 @@ function initBookshelf() {
     }
 
     function createGroupElement(id, group) {
-        var groupElement = document.createElement('div');
+        var groupElement = document.createElement('button');
         var coverElement = document.createElement('div');
         var infoElement = document.createElement('div');
         var titleElement = document.createElement('div');
         var subtitleElement = document.createElement('div');
         groupElement.className = 'bookshelf-item group';
+        groupElement.type = 'button';
+        groupElement.setAttribute('aria-label', group.name + ': ' + countGroupItems(group));
         groupElement.dataset.id = id;
         coverElement.className = 'bookshelf-item-cover';
         infoElement.className = 'bookshelf-item-info';
@@ -312,12 +402,21 @@ function initBookshelf() {
 
     function createBookElement(id, bookInfo) {
         var bookElement = document.createElement('div');
+        var openButton = document.createElement('button');
+        var removeButton = document.createElement('button');
         var coverElement = document.createElement('div');
         var infoElement = document.createElement('div');
         var titleElement = document.createElement('div');
         var authorElement = document.createElement('div');
         bookElement.className = 'bookshelf-item book';
         bookElement.dataset.id = id;
+        openButton.className = 'bookshelf-item-open';
+        openButton.type = 'button';
+        openButton.setAttribute('aria-label', bookInfo.author ? bookInfo.title + ' — ' + bookInfo.author : bookInfo.title);
+        removeButton.className = 'bookshelf-item-remove';
+        removeButton.type = 'button';
+        removeButton.setAttribute('aria-label', tr('removeBook', { title: bookInfo.title }));
+        appendIcon(removeButton, 'fas fa-times');
         coverElement.className = 'bookshelf-item-cover';
         infoElement.className = 'bookshelf-item-info';
         titleElement.className = 'bookshelf-item-title';
@@ -336,9 +435,189 @@ function initBookshelf() {
         authorElement.textContent = bookInfo.author;
         infoElement.appendChild(titleElement);
         infoElement.appendChild(authorElement);
-        bookElement.appendChild(coverElement);
-        bookElement.appendChild(infoElement);
+        openButton.appendChild(coverElement);
+        openButton.appendChild(infoElement);
+        bookElement.appendChild(openButton);
+        bookElement.appendChild(removeButton);
         return bookElement;
+    }
+
+    function bindBookActions(bookElement, bookHash, inGroup) {
+        var openButton = bookElement.querySelector('.bookshelf-item-open');
+        var removeButton = bookElement.querySelector('.bookshelf-item-remove');
+        if (openButton) {
+            openButton.addEventListener('click', function() {
+                window.location.href = window.EpubBrowserURL.publicPath('/book/' + bookHash + '/index.html');
+            });
+        }
+        if (removeButton) {
+            removeButton.addEventListener('click', async function() {
+                var bookInfo = getBookInfo(bookHash);
+                var title = bookInfo ? bookInfo.title : bookHash;
+                if (await window.EpubDialog.confirm({
+                    title: tr('removeBook', { title: title }),
+                    message: tr('confirmRemoveBook', { title: title }),
+                    confirmText: tr('removeBook', { title: title }),
+                    destructive: true
+                })) {
+                    await removeBookFromLocation(bookHash, inGroup);
+                }
+            });
+        }
+    }
+
+    function getCurrentGroupFromData(shelfData) {
+        var group = shelfData.groups[currentGroupId];
+        for (var i = 0; group && i < currentGroupPath.length; i++) {
+            group = group.groups[currentGroupPath[i]];
+        }
+        return group;
+    }
+
+    function refreshBookshelfViews() {
+        renderBookshelf(currentTag);
+        if (groupModal.classList.contains('active') && currentGroupId) {
+            var group = getCurrentGroup();
+            if (group) renderGroupContent(group, currentTag);
+        }
+    }
+
+    async function addBookToLocation(bookHash, inGroup) {
+        var shelfData = getBookshelf();
+        if (isBookInShelf(bookHash, shelfData)) {
+            showNotification(tr('bookAlreadyAdded'), 'info');
+            return false;
+        }
+        var target = inGroup ? getCurrentGroupFromData(shelfData) : shelfData;
+        if (!target) return false;
+        if (!target.items) target.items = [];
+        if (!target.order) target.order = [];
+        target.items.push(bookHash);
+        target.order.push(bookHash);
+        if (!await persistBookshelf(shelfData)) return false;
+        var bookInfo = getBookInfo(bookHash);
+        refreshBookshelfViews();
+        showNotification(tr('bookAdded', { title: bookInfo ? bookInfo.title : bookHash }), 'success');
+        return true;
+    }
+
+    async function removeBookFromLocation(bookHash, inGroup) {
+        var shelfData = getBookshelf();
+        var target = inGroup ? getCurrentGroupFromData(shelfData) : shelfData;
+        if (!target || !target.items) return false;
+        var itemIndex = target.items.indexOf(bookHash);
+        if (itemIndex === -1) return false;
+        target.items.splice(itemIndex, 1);
+        if (target.order) {
+            target.order = target.order.filter(function(id) { return id !== bookHash; });
+        }
+        if (!await persistBookshelf(shelfData)) return false;
+        var bookInfo = getBookInfo(bookHash);
+        refreshBookshelfViews();
+        showNotification(tr('bookRemoved', { title: bookInfo ? bookInfo.title : bookHash }), 'success');
+        return true;
+    }
+
+    function closeBookSearchModal() {
+        if (!bookSearchModal) return;
+        bookSearchModal.remove();
+        bookSearchModal = null;
+    }
+
+    function showBookSearch(inGroup) {
+        loadBookMetadata(function(metadata) {
+            closeBookSearchModal();
+            var modal = document.createElement('div');
+            var backdrop = document.createElement('div');
+            var dialog = document.createElement('section');
+            var header = document.createElement('div');
+            var title = document.createElement('h3');
+            var close = document.createElement('button');
+            var label = document.createElement('label');
+            var input = document.createElement('input');
+            var results = document.createElement('div');
+
+            bookSearchModal = modal;
+            modal.className = 'bookshelf-search-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-labelledby', 'bookshelfSearchTitle');
+            backdrop.className = 'bookshelf-search-backdrop';
+            dialog.className = 'bookshelf-search-dialog';
+            header.className = 'bookshelf-search-header';
+            title.id = 'bookshelfSearchTitle';
+            title.textContent = tr('searchBooks');
+            close.type = 'button';
+            close.className = 'bookshelf-close-btn';
+            close.setAttribute('aria-label', tr('close'));
+            appendIcon(close, 'fas fa-times');
+            label.className = 'bookshelf-visually-hidden';
+            label.htmlFor = 'bookshelfSearchInput';
+            label.textContent = tr('searchBooks');
+            input.id = 'bookshelfSearchInput';
+            input.className = 'bookshelf-search-input';
+            input.type = 'search';
+            input.autocomplete = 'off';
+            input.placeholder = tr('searchPlaceholder');
+            results.className = 'bookshelf-search-results';
+            header.appendChild(title);
+            header.appendChild(close);
+            dialog.appendChild(header);
+            dialog.appendChild(label);
+            dialog.appendChild(input);
+            dialog.appendChild(results);
+            modal.appendChild(backdrop);
+            modal.appendChild(dialog);
+            document.body.appendChild(modal);
+
+            function renderResults() {
+                var query = input.value.trim().toLocaleLowerCase();
+                var shelfData = getBookshelf();
+                var available = metadata.filter(function(book) {
+                    return !isBookInShelf(book.hash, shelfData);
+                });
+                if (query) {
+                    available = available.filter(function(book) {
+                        return [book.title, (book.authors || []).join(' '), (book.tags || []).join(' ')]
+                            .join(' ').toLocaleLowerCase().indexOf(query) !== -1;
+                    });
+                }
+                results.textContent = '';
+                if (available.length === 0) {
+                    var empty = document.createElement('p');
+                    empty.className = 'bookshelf-search-empty';
+                    empty.textContent = query ? tr('searchNoResults', { query: input.value.trim() }) : tr('noBooksToAdd');
+                    results.appendChild(empty);
+                    return;
+                }
+                available.forEach(function(book) {
+                    var result = document.createElement('button');
+                    var text = document.createElement('span');
+                    var name = document.createElement('strong');
+                    var author = document.createElement('small');
+                    var action = document.createElement('span');
+                    result.className = 'bookshelf-search-result';
+                    result.type = 'button';
+                    name.textContent = book.title;
+                    author.textContent = (book.authors || []).join(' & ');
+                    action.textContent = tr('addBook');
+                    text.appendChild(name);
+                    if (author.textContent) text.appendChild(author);
+                    result.appendChild(text);
+                    result.appendChild(action);
+                    result.addEventListener('click', async function() {
+                        if (await addBookToLocation(book.hash, inGroup)) renderResults();
+                    });
+                    results.appendChild(result);
+                });
+            }
+
+            close.addEventListener('click', closeBookSearchModal);
+            backdrop.addEventListener('click', closeBookSearchModal);
+            input.addEventListener('input', renderResults);
+            renderResults();
+            input.focus();
+        });
     }
     
     // 渲染书架内容
@@ -351,10 +630,6 @@ function initBookshelf() {
         loadBookMetadata(function(metadata) {
             setTimeout(function() {
                 var shelfData = getBookshelf();
-                var allTags = getShelfTags(shelfData);
-                
-                renderTagFilter(bookshelfTagFilter, allTags, tag);
-                
                 bookshelfBody.innerHTML = '';
                 
                 var bookCount = 0;
@@ -391,12 +666,7 @@ function initBookshelf() {
                     } else if (tag !== 'All' && bookInfo.tags.indexOf(tag) === -1) continue;
                     
                     var bookEl = createBookElement(id, bookInfo);
-                    
-                    (function(bookHash) {
-                        bookEl.addEventListener('click', function() {
-                            window.location.href = window.EpubBrowserURL.publicPath('/book/' + bookHash + '/index.html');
-                        });
-                    })(id);
+                    bindBookActions(bookEl, id, false);
                     
                     bookshelfBody.appendChild(bookEl);
                     bookCount++;
@@ -552,6 +822,23 @@ function initBookshelf() {
         if (!groupModalTitle) return;
 
         groupModalTitle.textContent = '';
+        // The Home control is moved into this title after the first render, so it
+        // may be detached while the title is refreshed for a nested group.
+        var homeButton = groupCloseBtn;
+        if (homeButton) {
+            homeButton.className = 'path-item clickable';
+            homeButton.setAttribute('aria-label', tr('title'));
+            homeButton.textContent = '';
+            appendIcon(homeButton, 'fas fa-home');
+            var homeLabel = document.createElement('span');
+            homeLabel.textContent = tr('title');
+            homeButton.appendChild(homeLabel);
+            groupModalTitle.appendChild(homeButton);
+            var homeSeparator = document.createElement('span');
+            homeSeparator.className = 'path-separator';
+            homeSeparator.textContent = '→';
+            groupModalTitle.appendChild(homeSeparator);
+        }
         appendIcon(groupModalTitle, 'fas fa-folder');
         groupModalTitle.appendChild(document.createTextNode(' '));
         fullPath.forEach(function(name, index) {
@@ -603,13 +890,12 @@ function initBookshelf() {
         // 设置分组标题（可点击的路径）
         renderGroupTitle(fullPath, pathIds);
         
-        var groupTags = getGroupTags(group);
-        renderTagFilter(groupTagFilter, groupTags, 'All');
-        
         renderGroupContent(group, 'All');
         
         groupModal.classList.add('active');
         document.body.style.overflow = 'hidden';
+        var groupContent = groupModal.querySelector('.bookshelf-content');
+        if (groupContent) groupContent.focus();
     }
     
     // 渲染分组内容
@@ -657,12 +943,7 @@ function initBookshelf() {
                     } else if (tag !== 'All' && bookInfo.tags.indexOf(tag) === -1) continue;
                     
                     var bookEl = createBookElement(id, bookInfo);
-                    
-                    (function(bookHash) {
-                        bookEl.addEventListener('click', function() {
-                            window.location.href = window.EpubBrowserURL.publicPath('/book/' + bookHash + '/index.html');
-                        });
-                    })(id);
+                    bindBookActions(bookEl, id, true);
                     
                     groupBody.appendChild(bookEl);
                     bookCount++;
@@ -709,7 +990,7 @@ function initBookshelf() {
                 animation: 150,
                 delay: 300,
                 delayOnTouchOnly: true,
-                onEnd: function(evt) {
+                onEnd: async function(evt) {
                     var shelfData = getBookshelf();
                     var newOrder = [];
                     var newItems = [];
@@ -728,8 +1009,7 @@ function initBookshelf() {
                     shelfData.order = newOrder;
                     shelfData.items = newItems;
                     shelfData.groups = newGroups;
-                    saveBookshelf(shelfData);
-                    console.log('Saved order:', newOrder);
+                    if (!await persistBookshelf(shelfData)) renderBookshelf(currentTag);
                 }
             });
         }
@@ -745,7 +1025,7 @@ function initBookshelf() {
                 animation: 150,
                 delay: 300,
                 delayOnTouchOnly: true,
-                onEnd: function(evt) {
+                onEnd: async function(evt) {
                     var shelfData = getBookshelf();
                     var targetGroup = shelfData.groups[currentGroupId];
                     for (var i = 0; i < currentGroupPath.length; i++) {
@@ -770,16 +1050,22 @@ function initBookshelf() {
                     targetGroup.order = newOrder;
                     targetGroup.items = newItems;
                     targetGroup.groups = newGroups;
-                    saveBookshelf(shelfData);
-                    console.log('Saved group order:', newOrder);
+                    if (!await persistBookshelf(shelfData)) {
+                        var restoredGroup = getCurrentGroup();
+                        if (restoredGroup) renderGroupContent(restoredGroup, currentTag);
+                    }
                 }
             });
         }
     }
     
     // 添加分组
-    addShelfGroupBtn.addEventListener('click', function() {
-        var groupName = prompt(tr('groupNamePrompt'));
+    addShelfGroupBtn.addEventListener('click', async function() {
+        var groupName = await window.EpubDialog.prompt({
+            title: tr('addGroup'),
+            inputLabel: tr('groupNamePrompt'),
+            confirmText: tr('addGroup')
+        });
         if (groupName && groupName.trim()) {
             var shelfData = getBookshelf();
             var groupId = generateId();
@@ -794,14 +1080,23 @@ function initBookshelf() {
                 shelfData.order = [];
             }
             shelfData.order.push(groupId);
-            saveBookshelf(shelfData);
-            renderBookshelf(currentTag);
+            if (await persistBookshelf(shelfData)) renderBookshelf(currentTag);
         }
     });
+
+    if (addShelfBookBtn) {
+        addShelfBookBtn.addEventListener('click', function() {
+            showBookSearch(false);
+        });
+    }
     
     // 添加子分组
-    addGroupSubGroupBtn.addEventListener('click', function() {
-        var groupName = prompt(tr('groupNamePrompt'));
+    addGroupSubGroupBtn.addEventListener('click', async function() {
+        var groupName = await window.EpubDialog.prompt({
+            title: tr('addGroup'),
+            inputLabel: tr('groupNamePrompt'),
+            confirmText: tr('addGroup')
+        });
         if (groupName && groupName.trim()) {
             var shelfData = getBookshelf();
             var targetGroup = shelfData.groups[currentGroupId];
@@ -826,7 +1121,7 @@ function initBookshelf() {
                 order: []
             };
             targetGroup.order.push(groupId);
-            saveBookshelf(shelfData);
+            if (!await persistBookshelf(shelfData)) return;
             
             var group = shelfData.groups[currentGroupId];
             for (var i = 0; i < currentGroupPath.length; i++) {
@@ -836,9 +1131,15 @@ function initBookshelf() {
             renderGroupContent(group, currentTag);
         }
     });
+
+    if (addGroupBookBtn) {
+        addGroupBookBtn.addEventListener('click', function() {
+            showBookSearch(true);
+        });
+    }
     
     // 删除分组
-    deleteGroupBtn.addEventListener('click', function() {
+    deleteGroupBtn.addEventListener('click', async function() {
         var shelfData = getBookshelf();
         var targetGroup = shelfData;
         var parentGroups = shelfData.groups;
@@ -860,6 +1161,12 @@ function initBookshelf() {
             targetGroup = shelfData.groups[currentGroupId];
             parentGroups = shelfData.groups;
         }
+
+        if (!targetGroup) {
+            console.warn('Unable to delete bookshelf group: current group was not found.');
+            showNotification(tr('error.unknown'), 'error');
+            return;
+        }
         
         // 检查是否有嵌套分组
         if (targetGroup.groups && Object.keys(targetGroup.groups).length > 0) {
@@ -867,7 +1174,12 @@ function initBookshelf() {
             return;
         }
         
-        if (confirm(tr('confirmDeleteGroup', { name: targetGroup.name }))) {
+        if (await window.EpubDialog.confirm({
+            title: tr('deleteGroup'),
+            message: tr('confirmDeleteGroup', { name: targetGroup.name }),
+            confirmText: tr('deleteGroup'),
+            destructive: true
+        })) {
             delete parentGroups[targetId];
             
             if (currentGroupPath.length > 0) {
@@ -880,15 +1192,16 @@ function initBookshelf() {
                 }
             }
             
-            saveBookshelf(shelfData);
+            if (!await persistBookshelf(shelfData)) return;
             
             groupModal.classList.remove('active');
             renderBookshelf(currentTag);
+            showNotification(tr('groupDeleted', { name: targetGroup.name }), 'success');
         }
     });
     
     // 重命名分组
-    renameGroupBtn.addEventListener('click', function() {
+    renameGroupBtn.addEventListener('click', async function() {
         var shelfData = getBookshelf();
         var targetGroup = shelfData.groups[currentGroupId];
         for (var i = 0; i < currentGroupPath.length; i++) {
@@ -896,10 +1209,16 @@ function initBookshelf() {
             targetGroup = targetGroup.groups[pathId];
         }
         
-        var newName = prompt(tr('renameGroupPrompt'), targetGroup.name);
+        var newName = await window.EpubDialog.prompt({
+            title: tr('rename'),
+            inputLabel: tr('renameGroupPrompt'),
+            defaultValue: targetGroup.name,
+            selectOnOpen: true,
+            confirmText: tr('rename')
+        });
         if (newName && newName.trim() && newName.trim() !== targetGroup.name) {
             targetGroup.name = newName.trim();
-            saveBookshelf(shelfData);
+            if (!await persistBookshelf(shelfData)) return;
             
             var fullPath = [shelfData.groups[currentGroupId].name];
             var pathIds = [currentGroupId];
@@ -923,36 +1242,41 @@ function initBookshelf() {
     });
     
     // 导出书架数据
-    exportShelfBtn.addEventListener('click', function() {
-        var shelfData = getBookshelf();
-        var dataStr = JSON.stringify(shelfData, null, 2);
-        var blob = new Blob([dataStr], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'bookshelf_data.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    });
+    if (!isServerMode && exportShelfBtn) {
+        exportShelfBtn.addEventListener('click', function() {
+            var shelfData = getBookshelf();
+            var dataStr = JSON.stringify(shelfData, null, 2);
+            var blob = new Blob([dataStr], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'bookshelf_data.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    }
     
     // 导入书架数据（文件）
-    importShelfBtn.addEventListener('click', function() {
-        importShelfFile.click();
-    });
+    if (!isServerMode && importShelfBtn) {
+        importShelfBtn.addEventListener('click', function() {
+            importShelfFile.click();
+        });
+    }
     
-    importShelfFile.addEventListener('change', function(e) {
+    if (!isServerMode && importShelfFile) importShelfFile.addEventListener('change', async function(e) {
         var file = e.target.files[0];
         if (file) {
             var reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     var data = JSON.parse(e.target.result);
                     if (data.items && data.groups !== undefined) {
-                        saveBookshelf(data);
-                        renderBookshelf('All');
-                        showNotification(tr('importSucceeded'), 'success');
+                        if (await persistBookshelf(data)) {
+                            renderBookshelf('All');
+                            showNotification(tr('importSucceeded'), 'success');
+                        }
                     } else {
                         showNotification(tr('importInvalid'), 'warning');
                     }
@@ -966,109 +1290,15 @@ function initBookshelf() {
         e.target.value = '';
     });
     
-    // 同步书架数据
-    if (syncShelfBtn) {
-        syncShelfBtn.addEventListener('click', async function() {
-            var username = getUsername();
-            
-            if (!username) {
-                username = prompt(tr('usernamePrompt'));
-                if (!username || !username.trim()) {
-                    return;
-                }
-                username = username.trim();
-                setUsername(username);
-            }
-            
-            var version = getBookshelfVersion();
-            var shelfData = getBookshelf();
-            
-            try {
-                syncShelfBtn.disabled = true;
-                syncShelfBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> <span data-i18n="bookshelf.syncing">' + tr('syncing') + '</span>';
-                
-                var response = await fetch('/sync', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        username: username,
-                        version: version,
-                        data: shelfData
-                    })
-                });
-                
-                if (response.status === 404) {
-                    var result = await response.json();
-                    if (result.code) {
-                        console.warn('Bookshelf sync failed:', result.message);
-                        showNotification(syncErrorMessage(result.code), 'warning');
-                    } else {
-                        setBookshelfVersion(result.version || 1);
-                        showNotification(tr('syncNewUser', { username: username }), 'success');
-                    }
-                } else if (response.status === 200) {
-                    var result = await response.json();
-                    localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(result.data));
-                    setBookshelfVersion(result.version);
-                    renderBookshelf(currentTag);
-                    showNotification(tr('syncUpdated', { username: username }), 'success');
-                } else if (response.status === 304) {
-                    showNotification(tr('syncCurrent', { username: username }), 'info');
-                } else if (response.status === 405) {
-                    showNotification(tr('syncUnavailable', { username: username }), 'warning');
-                } else if (response.status === 201) {
-                    var result = await response.json();
-                    setBookshelfVersion(result.version);
-                    showNotification(tr('syncUploaded', { username: username }), 'success');
-                } else {
-                    var result = await response.json();
-                    console.warn('Bookshelf sync failed:', result.message);
-                    showNotification(syncErrorMessage(result.code), 'warning');
-                }
-            } catch (err) {
-                console.warn('Bookshelf sync failed:', err);
-                showNotification(tr('syncFailed', { username: username }), 'warning');
-            } finally {
-                syncShelfBtn.disabled = false;
-                syncShelfBtn.innerHTML = '<i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">' + tr('sync') + '</span>';
-            }
-        });
-    }
-    
-    // 标签过滤点击事件
-    bookshelfTagFilter.addEventListener('click', function(e) {
-        if (e.target.classList.contains('bookshelf-tag')) {
-            currentTag = e.target.dataset.tag;
-            bookshelfTagFilter.querySelectorAll('.bookshelf-tag').forEach(function(t) { t.classList.remove('active'); });
-            e.target.classList.add('active');
-            renderBookshelf(currentTag);
-        }
-    });
-    
-    groupTagFilter.addEventListener('click', function(e) {
-        if (e.target.classList.contains('bookshelf-tag')) {
-            currentTag = e.target.dataset.tag;
-            groupTagFilter.querySelectorAll('.bookshelf-tag').forEach(function(t) { t.classList.remove('active'); });
-            e.target.classList.add('active');
-            
-            var shelfData = getBookshelf();
-            var group = shelfData.groups[currentGroupId];
-            for (var i = 0; i < currentGroupPath.length; i++) {
-                var pathId = currentGroupPath[i];
-                group = group.groups[pathId];
-            }
-            renderGroupContent(group, currentTag);
-        }
-    });
-    
     // 打开书架弹窗
-    bookshelfBtn.addEventListener('click', function() {
+    bookshelfBtn.addEventListener('click', async function() {
+        if (!await ensureServerBookshelf()) return;
         currentTag = 'All';
         renderBookshelf('All');
         bookshelfModal.classList.add('active');
         document.body.style.overflow = 'hidden';
+        var content = bookshelfModal.querySelector('.bookshelf-content');
+        if (content) content.focus();
     });
     
     // 关闭书架弹窗
@@ -1109,6 +1339,25 @@ function initBookshelf() {
             groupModal.classList.remove('active');
             currentGroupId = null;
             currentGroupPath = [];
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Escape') return;
+        if (bookSearchModal) {
+            closeBookSearchModal();
+            return;
+        }
+        if (groupModal.classList.contains('active')) {
+            groupModal.classList.remove('active');
+            currentGroupId = null;
+            currentGroupPath = [];
+            return;
+        }
+        if (bookshelfModal.classList.contains('active')) {
+            bookshelfModal.classList.remove('active');
+            document.body.style.overflow = '';
+            bookshelfBtn.focus();
         }
     });
 

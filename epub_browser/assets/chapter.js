@@ -709,7 +709,7 @@ function initScript() {
         progressFill.style.width = p+'%';
     }
     
-    function restoreOriginalContent() {
+    async function restoreOriginalContent() {
         document.body.classList.remove('pagination-mode');
         contentContainer.classList.remove('pagination-mode');
         content.style.height = '';
@@ -733,7 +733,11 @@ function initScript() {
         var mtoc = document.getElementById('mobileTocBtn');
         if (mtoc) mtoc.style.display = 'flex';
         
-        if (isKindleMode() || confirm(i18n.t('reader.exitTurningConfirm'))) {
+        if (isKindleMode() || await window.EpubDialog.confirm({
+            title: i18n.t('reader.exitTurning'),
+            message: i18n.t('reader.exitTurningConfirm'),
+            confirmText: i18n.t('reader.exitTurning')
+        })) {
             location.reload();
         } else {
             enablePaginationMode();
@@ -1199,28 +1203,41 @@ function initScript() {
             showNotification(i18n.t('settings.saved'), 'success');
         });
         
-        saveDefaultBtn.addEventListener('click', function() {
-            if (confirm(i18n.t('settings.saveAsDefaultConfirm'))) {
+        saveDefaultBtn.addEventListener('click', async function() {
+            if (await window.EpubDialog.confirm({
+                title: i18n.t('settings.saveAsDefault'),
+                message: i18n.t('settings.saveAsDefaultConfirm'),
+                confirmText: i18n.t('settings.saveAsDefault')
+            })) {
                 localStorage.setItem(defKey, cssInput.value);
                 showNotification(i18n.t('settings.defaultSaved'), 'success');
             }
         });
         
-        loadDefaultBtn.addEventListener('click', function() {
+        loadDefaultBtn.addEventListener('click', async function() {
             var d = localStorage.getItem(defKey);
             if (!d) {
                 showNotification(i18n.t('settings.noDefault'), 'warning');
                 return;
             }
-            if (confirm(i18n.t('settings.loadDefaultConfirm'))) {
+            if (await window.EpubDialog.confirm({
+                title: i18n.t('settings.loadDefault'),
+                message: i18n.t('settings.loadDefaultConfirm'),
+                confirmText: i18n.t('settings.loadDefault')
+            })) {
                 cssInput.value = d;
                 apply(d);
                 showNotification(i18n.t('settings.loaded'), 'success');
             }
         });
         
-        resetBtn.addEventListener('click', function() {
-            if (confirm(i18n.t('settings.resetConfirm'))) {
+        resetBtn.addEventListener('click', async function() {
+            if (await window.EpubDialog.confirm({
+                title: i18n.t('settings.reset'),
+                message: i18n.t('settings.resetConfirm'),
+                confirmText: i18n.t('settings.reset'),
+                destructive: true
+            })) {
                 cssInput.value = '';
                 localStorage.removeItem(key);
                 apply('');

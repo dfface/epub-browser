@@ -157,7 +157,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("publicPath('/assets/manifest.'", scripts["i18n.js"])
         self.assertGreaterEqual(
             scripts["bookshelf.js"].count("EpubBrowserURL.publicPath('/book/"),
-            2,
+            1,
         )
         self.assertGreaterEqual(
             scripts["chapter.js"].count("EpubBrowserURL.publicPath('/book/"),
@@ -366,12 +366,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());", script)
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
-        self.assertIn("window.confirm(bookT('book.clearReadingProgressConfirm'))", script)
+        self.assertIn("window.EpubDialog.confirm({", script)
+        self.assertIn("message: bookT('book.clearReadingProgressConfirm')", script)
         self.assertIn("'DELETE',", script)
         self.assertIn("true,\n                    true", script)
         self.assertIn("if (!result || result.error)", script)
         self.assertIn("book.clearReadingProgressFailed", script)
-        clear_handler = script.index("window.confirm(bookT('book.clearReadingProgressConfirm'))")
+        clear_handler = script.index("window.EpubDialog.confirm({")
         server_request = script.index("window.EpubReadingProgress.request(", clear_handler)
         self.assertIn("if (!window.EpubReadingProgress.isServerMode())", script)
         self.assertLess(
@@ -733,12 +734,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
 
     def test_bookshelf_templates_localize_labels_without_translating_business_values(self):
-        for html in (self._book_html(), self._chapter_html()):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
             self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.addGroup')
-            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.sync')
-            self.assertRegex(html, r'data-tag=(?:["\'])?All(?:["\'])?')
-        self.assertRegex(self._library_html(), r'data-i18n=(?:["\'])?bookshelf\.addGroup')
-        self.assertNotRegex(self._library_html(), r'data-i18n=(?:["\'])?bookshelf\.sync')
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.addBook')
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.export')
+            self.assertRegex(html, r'data-i18n=(?:["\'])?bookshelf\.import')
+            self.assertNotIn('id="syncShelfBtn"', html)
+            self.assertNotIn('bookshelfTagFilter', html)
+            self.assertNotIn('groupTagFilter', html)
 
     def test_bookshelf_script_routes_user_messages_through_i18n(self):
         script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
@@ -753,6 +756,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('titleElement.textContent = group.name;', script)
         self.assertIn('titleElement.textContent = bookInfo.title;', script)
         self.assertIn('authorElement.textContent = bookInfo.author;', script)
+        self.assertIn('name.textContent = book.title;', script)
         self.assertIn('pathItem.textContent = name;', script)
         self.assertNotRegex(
             script,

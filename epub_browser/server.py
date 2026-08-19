@@ -341,6 +341,54 @@ def create_app(
         except json.JSONDecodeError: return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
         except Exception: return response(error_payload('server_error', 'Internal server error'), 500)
 
+    def bookshelf_document(username):
+        row = store.get_bookshelf(username)
+        if row is None:
+            legacy = load_legacy_bookshelf(sync_dir or base_directory, username)
+            if legacy is not None:
+                version, data = legacy
+                store.create_bookshelf(username, version, data)
+                return version, data
+            return 0, {"items": [], "groups": {}, "order": []}
+        version, serialized = row
+        return version, json.loads(serialized)
+
+    async def bookshelf(request):
+        username = request.headers.get('X-Username', '').strip()
+        if not username:
+            return response(error_payload('username_required', 'Username is required'), 400)
+        try:
+            current_version, current_data = bookshelf_document(username)
+            if request.method == 'GET':
+                return response({'version': current_version, 'data': current_data})
+            if not runtime_status.is_ready():
+                return response(error_payload('not_ready', 'Server is not ready'), 503)
+            payload = await request.json()
+            proposed_data = payload.get('data') if isinstance(payload, dict) else None
+            proposed_version = payload.get('version') if isinstance(payload, dict) else None
+            if not isinstance(proposed_data, dict) or not isinstance(proposed_version, int):
+                return response(error_payload('no_sync_data', 'A bookshelf document and version are required'), 400)
+            if proposed_version != current_version:
+                return response(
+                    {
+                        'code': 'bookshelf_conflict',
+                        'message': 'Bookshelf changed on the server',
+                        'version': current_version,
+                        'data': current_data,
+                    },
+                    409,
+                )
+            next_version = current_version + 1
+            if current_version == 0:
+                store.create_bookshelf(username, next_version, proposed_data)
+            else:
+                store.update_bookshelf(username, next_version, proposed_data)
+            return response({'version': next_version, 'data': proposed_data})
+        except json.JSONDecodeError:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        except Exception:
+            return response(error_payload('server_error', 'Internal server error'), 500)
+
     async def reading_progress(request):
         try:
             return await reading_progress_response(request)
@@ -388,6 +436,7 @@ def create_app(
         Route('/api/health', health),
         Route('/api/ready', ready),
         Route('/api/library-events', library_events),
+        Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
         Route('/sync', sync, methods=['POST']),

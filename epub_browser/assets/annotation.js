@@ -1305,8 +1305,13 @@
                 dialog.querySelector('.annotation-dialog-close').addEventListener('click', function() {
                     self.closeDialog();
                 });
-                dialog.querySelector('.annotation-btn-delete').addEventListener('click', function() {
-                    if (confirm(tr('confirmDelete'))) {
+                dialog.querySelector('.annotation-btn-delete').addEventListener('click', async function() {
+                    if (await window.EpubDialog.confirm({
+                        title: tr('confirmDelete'),
+                        message: tr('confirmDelete'),
+                        confirmText: tr('delete'),
+                        destructive: true
+                    })) {
                         self.deleteAnnotation(annotation.id);
                         self.closeDialog();
                     }
@@ -1833,7 +1838,7 @@
             // Storage toggle
             var storageRadios = tabPanel.querySelectorAll('input[name="annotationStorage"]');
             storageRadios.forEach(function(radio) {
-                radio.addEventListener('change', function() {
+                radio.addEventListener('change', async function() {
                     var targetType = this.value;
                     
                     // 如果选择的是当前存储类型，不处理
@@ -1850,8 +1855,12 @@
                         // 检查是否已登录，提示用户
                         var currentUsername = Utils.getAnnotationUsername();
                         if (!currentUsername) {
-                            var msg = tr('usernamePrompt');
-                            var username = prompt(msg, '');
+                            var username = await window.EpubDialog.prompt({
+                                title: tr('login'),
+                                message: tr('usernamePrompt'),
+                                inputLabel: tr('username'),
+                                confirmText: tr('login')
+                            });
                             if (username === null) {
                                 // 用户取消 → 使用共享模式
                                 Utils.showNotification(tr('usingSharedStorage'), 'info');

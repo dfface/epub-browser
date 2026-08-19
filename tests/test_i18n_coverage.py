@@ -15,6 +15,7 @@ FIRST_PARTY = [
             'bookshelf.js',
             'book.js',
             'chapter.js',
+            'dialog.js',
             'theme.js',
             'annotation.js',
             'annotation-hub.js',
@@ -33,7 +34,7 @@ PROPERTY_ASSIGNMENT = re.compile(
 SET_ATTRIBUTE_START = re.compile(r"\.\s*setAttribute\s*\(")
 VISIBLE_LITERAL = re.compile(r"(?P<quote>['\"])(?P<text>[A-Za-z][^'\"\r\n]*)(?P=quote)")
 TRANSLATION_KEY_ARGUMENT = re.compile(
-    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t))\s*\(\s*$"
+    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t|localized))\s*\(\s*$"
 )
 DICTIONARY_KEY = re.compile(r"^\s*'(?P<key>[^']+)':", re.MULTILINE)
 KNOWN_TRANSLATION_KEYS = {
@@ -46,6 +47,7 @@ TR_NAMESPACES = {
     'bookshelf.js': 'bookshelf.',
     'annotation.js': 'annotations.',
     'annotation-hub.js': 'annotations.',
+    'dialog.js': 'dialog.',
 }
 HTML_TAG = re.compile(r"<(?P<name>[A-Za-z][\w:-]*)\b(?P<attributes>[^>]*)>", re.DOTALL)
 HTML_ATTRIBUTE = re.compile(
@@ -88,7 +90,7 @@ def is_known_translation_key(value, literal, path):
         return False
     key = literal.group('text')
     function = call.group('function').replace(' ', '')
-    if function == 'tr':
+    if function in {'tr', 'localized'}:
         namespace = TR_NAMESPACES.get(path.name)
         return namespace is not None and namespace + key in KNOWN_TRANSLATION_KEYS
     return key in KNOWN_TRANSLATION_KEYS
