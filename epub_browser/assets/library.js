@@ -363,71 +363,11 @@ function initScript() {
         }
     }
 
-    var USERNAME_KEY = 'epub_browser_username';
-
-    function getUsername() {
-        if (isKindleMode()) {
-            return getCookie(USERNAME_KEY);
-        }
-        return localStorage.getItem(USERNAME_KEY);
-    }
-
-    function setUsername(username) {
-        if (isKindleMode()) {
-            setCookie(USERNAME_KEY, username);
-        } else {
-            localStorage.setItem(USERNAME_KEY, username);
-        }
-    }
-
-    function updateLoginDisplay() {
-        var loginValue = document.getElementById('loginValue');
-        var username = getUsername();
-        if (loginValue) {
-            if (username) {
-                loginValue.textContent = username;
-            } else {
-                loginValue.textContent = t('library.login');
-            }
-        }
-    }
-
-    // 暴露给全局，供 annotation.js 同步更新 Login 显示
-    window.updateLoginDisplay = updateLoginDisplay;
-
-    updateLoginDisplay();
-
-    var loginCard = document.getElementById('loginCard');
-    if (loginCard) {
-        loginCard.addEventListener('click', async function() {
-            var currentUsername = getUsername();
-            var username = await window.EpubDialog.prompt({
-                title: t('library.login'),
-                inputLabel: t('library.usernamePrompt'),
-                defaultValue: currentUsername || '',
-                selectOnOpen: true,
-                confirmText: t('library.login')
-            });
-            if (username !== null) {
-                if (username.trim()) {
-                    setUsername(username.trim());
-                    updateLoginDisplay();
-                    showNotification(t('library.usernameSaved', { username: username.trim() }), 'success');
-                } else if (username === '') {
-                    setUsername('');
-                    updateLoginDisplay();
-                    showNotification(t('library.usernameCleared'), 'info');
-                }
-            }
-        });
-    }
-
     if (i18n && document.documentElement.getAttribute('data-library-locale-listener') !== 'true') {
         document.documentElement.setAttribute('data-library-locale-listener', 'true');
         i18n.onLocaleChange(function() {
             var covers = document.querySelectorAll('.book-cover');
             var i;
-            updateLoginDisplay();
             for (i = 0; i < covers.length; i++) {
                 covers[i].setAttribute('alt', t('library.cover'));
             }

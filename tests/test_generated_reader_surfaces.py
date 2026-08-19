@@ -9,10 +9,36 @@ from pathlib import Path
 from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
 from epub_browser.processor import EPUBProcessor
+from epub_browser.site import publish_library_shell
 from epub_browser.urls import SiteURLs
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_server_includes_real_account_controls_but_ssg_includes_none(self):
+        server_html = self._server_html()
+        ssg_html = self._library_html()
+
+        for control_id in (
+            "loginForm",
+            "accountMenu",
+            "accountPanel",
+            "accountPasswordForm",
+            "sessionList",
+            "adminPanel",
+            "adminUserForm",
+            "adminBookList",
+        ):
+            self.assertRegex(server_html, rf'\bid=(?:["\'])?{control_id}(?:["\' >])')
+            self.assertNotIn(control_id, ssg_html)
+
+        self.assertRegex(
+            server_html,
+            r'/assets/immutable/auth\.[0-9a-f]{12}\.js',
+        )
+        self.assertNotIn('auth.js', ssg_html)
+        self.assertNotRegex(ssg_html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+        self.assertLess(server_html.index('/immutable/auth.'), server_html.rindex('/immutable/library.'))
+
     def test_processor_convert_preserves_caller_supplied_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -183,6 +209,37 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         for html in (self._book_html(), self._chapter_html()):
             self.assertNotIn("EpubBrowserCacheBoundary.start", html)
+
+    def test_server_reader_pages_load_auth_before_personal_data_clients(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            book_html = Path(processor.web_dir, "index.html").read_text(
+                encoding="utf-8"
+            )
+            chapter_html = processor.create_chapter_template(
+                "<p>Text</p>",
+                "",
+                0,
+                "One",
+            )
+
+        for html in (book_html, chapter_html):
+            self.assertRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+            self.assertLess(html.index('/immutable/auth.'), html.index('/immutable/reading-progress.'))
+            self.assertNotIn('syncShelfBtn', html)
+
+        for html in (self._book_html(), self._chapter_html()):
+            self.assertNotRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+            self.assertNotIn('EpubBrowserAuth.init', html)
+            self.assertIn('syncShelfBtn', html)
 
     def test_dynamic_browser_urls_use_the_generated_base_path_runtime(self):
         scripts = {
@@ -602,6 +659,18 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             library = EPUBLibrary(directory)
             library.create_library_home()
+            return Path(directory, "index.html").read_text(encoding="utf-8")
+
+    def _server_html(self):
+        with tempfile.TemporaryDirectory() as directory:
+            library = EPUBLibrary(directory)
+            publish_library_shell(
+                Path(directory),
+                (),
+                library.asset_manifest,
+                library.urls,
+                deployment_mode="server",
+            )
             return Path(directory, "index.html").read_text(encoding="utf-8")
 
     def _chapter_html(self):

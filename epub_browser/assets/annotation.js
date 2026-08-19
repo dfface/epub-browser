@@ -291,34 +291,6 @@
             document.cookie = key + '=' + value + '; expires=' + date.toUTCString() + '; path=/;';
         },
         
-        // 与首页 Login 保持一致的用户名管理
-        USERNAME_KEY: 'epub_browser_username',
-        
-        getAnnotationUsername: function() {
-            if (this.isKindleMode()) {
-                return this.getCookie(this.USERNAME_KEY) || '';
-            }
-            try {
-                return localStorage.getItem(this.USERNAME_KEY) || '';
-            } catch (e) {
-                return '';
-            }
-        },
-        
-        setAnnotationUsername: function(username) {
-            if (this.isKindleMode()) {
-                this.setCookie(this.USERNAME_KEY, username);
-            } else {
-                try {
-                    localStorage.setItem(this.USERNAME_KEY, username);
-                } catch (e) {}
-            }
-            // 同步更新首页 Login 显示
-            if (typeof window.updateLoginDisplay === 'function') {
-                window.updateLoginDisplay();
-            }
-        },
-        
         // Add alpha to hex color
         addColorAlpha: function(hex, alpha) {
             // Convert hex to rgba
@@ -1835,30 +1807,6 @@
                             return;
                         }
                         
-                        // 检查是否已登录，提示用户
-                        var currentUsername = Utils.getAnnotationUsername();
-                        if (!currentUsername) {
-                            var username = await window.EpubDialog.prompt({
-                                title: tr('login'),
-                                message: tr('usernamePrompt'),
-                                inputLabel: tr('username'),
-                                confirmText: tr('login')
-                            });
-                            if (username === null) {
-                                // 用户取消 → 使用共享模式
-                                Utils.showNotification(tr('usingSharedStorage'), 'info');
-                            } else {
-                                username = username.trim();
-                                if (username) {
-                                    Utils.setAnnotationUsername(username);
-                                    Utils.showNotification(tr('loggedInAs', { username: username }), 'success');
-                                    self.checkBackendStatus();
-                                } else {
-                                    Utils.showNotification(tr('usingSharedStorage'), 'info');
-                                }
-                            }
-                        }
-                        
                         // 继续迁移流程
                         self.showMigrationDialog(Settings.storageType, targetType);
                         return;
@@ -2144,12 +2092,12 @@
                 self.backendChecking = false;
                 
                 if (available) {
-                    var username = Utils.getAnnotationUsername();
-                    if (username) {
-                        statusEl.textContent = tr('connectedUser', { username: username });
-                    } else {
-                        statusEl.textContent = tr('connectedShared');
-                    }
+                    var session = window.EpubBrowserAuth && window.EpubBrowserAuth.getSession
+                        ? window.EpubBrowserAuth.getSession()
+                        : null;
+                    statusEl.textContent = session && session.user
+                        ? tr('connectedUser', { username: session.user.username })
+                        : tr('connectedAccount');
                     statusEl.className = 'storage-option-status connected';
                     backendOption.classList.remove('disabled');
                 } else {

@@ -23,7 +23,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "cache-boundary-v1"
+SERVER_OUTPUT_REVISION = "account-auth-v2"
 
 
 class EPUBProcessor:
@@ -599,6 +599,13 @@ class EPUBProcessor:
     
     def create_index_page(self):
         """创建章节索引页面"""
+        sync_shelf_button = (
+            ""
+            if self.deployment_mode == "server"
+            else '''<button class="bookshelf-action-btn" id="syncShelfBtn">
+                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                </button>'''
+        )
         book_language = html.escape(self.lang or 'en', quote=True)
         bookshelf_data_actions = """
                 <button class="bookshelf-action-btn" id="exportShelfBtn">
@@ -893,9 +900,18 @@ class EPUBProcessor:
             if self.deployment_mode == "server"
             else ""
         )
+        auth_script = (
+            '<script src="/assets/auth.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
         startup = (
             """function startBookClients() {
-    if (window.initScriptBook) window.initScriptBook();
+    if (!window.EpubBrowserAuth) return;
+    window.EpubBrowserAuth.init().then(function(session) {
+        if (!session) return;
+        if (window.initScriptBook) window.initScriptBook();
+    });
 }
 if (window.EpubBrowserCacheBoundary) {
     window.EpubBrowserCacheBoundary.start(startBookClients);
@@ -905,6 +921,7 @@ if (window.EpubBrowserCacheBoundary) {
         )
         index_html += f"""
 {cache_boundary_script}
+{auth_script}
 <script src="/assets/theme.js" defer></script>
 <script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
@@ -1247,6 +1264,13 @@ document.addEventListener('DOMContentLoaded', function() {{
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
+        sync_shelf_button = (
+            ""
+            if self.deployment_mode == "server"
+            else '''<button class="bookshelf-action-btn" id="syncShelfBtn">
+                        <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                    </button>'''
+        )
         prev_href = f'href="/book/{self.book_hash}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{self.book_hash}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
@@ -1741,9 +1765,18 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server"
             else ""
         )
+        auth_script = (
+            '<script src="/assets/auth.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
         startup = (
             """function startChapterClients() {
-        if (window.initScriptChapter) window.initScriptChapter();
+        if (!window.EpubBrowserAuth) return;
+        window.EpubBrowserAuth.init().then(function(session) {
+            if (!session) return;
+            if (window.initScriptChapter) window.initScriptChapter();
+        });
     }
     if (window.EpubBrowserCacheBoundary) {
         window.EpubBrowserCacheBoundary.start(startChapterClients);
@@ -1753,6 +1786,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         chapter_html += f"""
     {cache_boundary_script}
+    {auth_script}
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>

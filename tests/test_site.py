@@ -81,10 +81,13 @@ class SitePublicationTests(unittest.TestCase):
             'window.EpubBrowserCacheBoundary.start(startLibraryClients)',
             html,
         )
-        self.assertIn('id=loginCard', html)
+        self.assertIn('id=accountMenu', html)
+        self.assertIn('id=accountPanel', html)
+        self.assertNotIn('id=loginCard', html)
         self.assertNotIn('id=exportShelfBtn', html)
         self.assertNotIn('id=importShelfBtn', html)
         self.assertNotIn('id=syncShelfBtn', html)
+        self.assertRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):
         with tempfile.TemporaryDirectory() as directory:

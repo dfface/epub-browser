@@ -10,6 +10,7 @@ FIRST_PARTY = [
     *[
         Path('epub_browser/assets', name)
         for name in (
+            'auth.js',
             'library.js',
             'library-progress.js',
             'bookshelf.js',
@@ -233,6 +234,38 @@ def find_literal_ui_sinks(path):
 
 
 class I18nCoverageTests(unittest.TestCase):
+    def test_account_and_administration_copy_exists_in_both_locales(self):
+        required = {
+            'account.menu',
+            'account.signIn',
+            'account.associationTitle',
+            'account.associationSucceeded',
+            'account.changePassword',
+            'account.passwordChanged',
+            'account.sessions',
+            'account.sessionRevoked',
+            'account.logout',
+            'account.error.authentication_required',
+            'account.error.csrf_required',
+            'account.error.invalid_credentials',
+            'account.error.identity_already_linked',
+            'account.error.unknown',
+            'admin.title',
+            'admin.createUser',
+            'admin.resetPassword',
+            'admin.revokeSessions',
+            'admin.restrictedBook',
+            'admin.grantBook',
+            'admin.revokeBook',
+            'admin.error.last_enabled_admin',
+            'admin.error.user_disabled',
+            'admin.error.unknown',
+        }
+        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+        keys = set(DICTIONARY_KEY.findall(source))
+
+        self.assertEqual(required - keys, set())
+
     def test_first_party_ui_sinks_do_not_embed_english_copy(self):
         failures = []
         for path in FIRST_PARTY:
