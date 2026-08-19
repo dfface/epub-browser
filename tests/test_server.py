@@ -215,6 +215,47 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             original_session,
         )
 
+    def test_authenticated_unhandled_error_is_private_and_generic(self):
+        class FailingRuntimeStatus:
+            def is_ready(self):
+                return True
+
+            def snapshot(self):
+                raise RuntimeError("sensitive runtime detail")
+
+        failing_app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            status=FailingRuntimeStatus(),
+        )
+        client = TestClient(
+            failing_app,
+            follow_redirects=False,
+            raise_server_exceptions=False,
+        )
+        self.addCleanup(client.close)
+        self.assertEqual(
+            client.post(
+                "/login",
+                data={"username": "alice", "password": "secret"},
+            ).status_code,
+            303,
+        )
+
+        failed = client.get("/api/health")
+
+        self.assertEqual(failed.status_code, 500)
+        self.assertEqual(
+            failed.headers.get("cache-control"),
+            "private, no-cache",
+        )
+        self.assertEqual(
+            failed.json(),
+            {"code": "server_error", "message": "Internal server error"},
+        )
+        self.assertNotIn("sensitive runtime detail", failed.text)
+
 
 class ServerCacheTests(unittest.TestCase):
     def setUp(self):

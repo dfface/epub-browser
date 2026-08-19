@@ -441,6 +441,18 @@ def create_app(
         message = exc.detail if isinstance(exc.detail, str) else 'Internal server error'
         return response(error_payload(code, message), exc.status_code)
 
+    async def server_error(request, exc):
+        cache_control = (
+            'private, no-cache'
+            if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None
+            else 'no-store'
+        )
+        return response(
+            error_payload('server_error', 'Internal server error'),
+            500,
+            cache_control=cache_control,
+        )
+
     def row_data(row):
         data = dict(row)
         for key, target in [('start_meta', 'startMeta'), ('end_meta', 'endMeta')]:
@@ -678,7 +690,10 @@ def create_app(
     ]
     app = Starlette(
         routes=routes,
-        exception_handlers={StarletteHTTPException: http_exception},
+        exception_handlers={
+            StarletteHTTPException: http_exception,
+            Exception: server_error,
+        },
     )
 
     async def auth_middleware(request, call_next):
