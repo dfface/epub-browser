@@ -12,8 +12,10 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from starlette.testclient import TestClient
+
 from epub_browser.asset_publisher import AssetPublisher
-from epub_browser.auth import BootstrapCredentials
+from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials
 from epub_browser.epub_identity import (
     ensure_embedded_book_id,
     read_embedded_book_id,
@@ -23,6 +25,7 @@ from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.reporting import Reporter
+from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
@@ -367,6 +370,63 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 page.read_text(encoding="utf-8"),
                 r'/assets/immutable/cache-boundary\.[0-9a-f]{12}\.js',
             )
+        manager.shutdown()
+
+    def test_direct_reader_is_denied_while_legacy_output_reconverts(self):
+        class BlockingProcessor(EPUBProcessor):
+            started = threading.Event()
+            release = threading.Event()
+
+            def convert(self):
+                self.started.set()
+                self.release.wait(timeout=5)
+                return super().convert()
+
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        book_dir = manager.public_dir / "book" / record.book_id
+        (book_dir / ".server-output-revision").write_text(
+            "legacy\n",
+            encoding="utf-8",
+        )
+        manager.converter_factory = BlockingProcessor
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": "admin", "password": "secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        results = []
+        reconcile_thread = threading.Thread(
+            target=lambda: results.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(BlockingProcessor.started.wait(timeout=2))
+            for name in ("index.html", "chapter_0.html"):
+                with self.subTest(state="stale", name=name):
+                    stale = client.get(f"/book/{record.book_id}/{name}")
+                    self.assertEqual(stale.status_code, 404)
+        finally:
+            BlockingProcessor.release.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(results[0].converted, 1)
+        for name in ("index.html", "chapter_0.html"):
+            with self.subTest(state="current", name=name):
+                current = client.get(f"/book/{record.book_id}/{name}")
+                self.assertEqual(current.status_code, 200)
+                self.assertIn("cache-boundary.", current.text)
         manager.shutdown()
 
     def test_metadata_only_stat_change_is_recorded_after_one_recheck(self):

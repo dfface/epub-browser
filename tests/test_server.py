@@ -17,6 +17,7 @@ from epub_browser.auth import (
     hash_password,
 )
 from epub_browser.library_progress import LibraryProgressBroker
+from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import create_app, migrate_legacy_database
 from epub_browser.state import StateStore
@@ -707,6 +708,10 @@ class BookAuthorizationTests(unittest.TestCase):
         for book_id in ("open-id", "restricted-id"):
             book_dir = public / "book" / book_id
             (book_dir / "resources").mkdir(parents=True)
+            (book_dir / SERVER_OUTPUT_REVISION_FILE).write_text(
+                SERVER_OUTPUT_REVISION + "\n",
+                encoding="utf-8",
+            )
             (book_dir / "index.html").write_text("reader", encoding="utf-8")
             (book_dir / "chapter_0.html").write_text("chapter", encoding="utf-8")
             (book_dir / "toc.json").write_text("[]", encoding="utf-8")
@@ -940,6 +945,17 @@ class ServerCacheTests(unittest.TestCase):
         with open(os.path.join(self.directory.name, "sw.js"), "w", encoding="utf-8") as worker:
             worker.write("self.addEventListener('fetch', () => {})")
         os.makedirs(os.path.join(self.directory.name, "book", "demo", "resources"))
+        with open(
+            os.path.join(
+                self.directory.name,
+                "book",
+                "demo",
+                SERVER_OUTPUT_REVISION_FILE,
+            ),
+            "w",
+            encoding="utf-8",
+        ) as revision:
+            revision.write(SERVER_OUTPUT_REVISION + "\n")
         with open(os.path.join(self.directory.name, "book", "demo", "index.html"), "w", encoding="utf-8") as book_index:
             book_index.write("book")
         with open(os.path.join(self.directory.name, "book", "demo", "chapter_0.html"), "w", encoding="utf-8") as chapter:

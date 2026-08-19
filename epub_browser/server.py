@@ -30,6 +30,7 @@ from .auth import (
 )
 from .state import StateStore
 from .library_progress import LibraryProgressBroker
+from .processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from .server_library import library_metadata
 
 DATABASE_FILENAME = 'epub-browser.db'
@@ -191,6 +192,21 @@ def extract_book_id_from_public_path(path):
     if len(parts) >= 2 and parts[0] == 'book' and parts[1]:
         return parts[1]
     return None
+
+
+def server_book_output_is_current(base_directory, book_id):
+    marker = os.path.join(
+        base_directory,
+        'book',
+        book_id,
+        SERVER_OUTPUT_REVISION_FILE,
+    )
+    try:
+        with open(marker, encoding='utf-8') as revision_file:
+            revision = revision_file.read().strip()
+    except OSError:
+        return False
+    return revision == SERVER_OUTPUT_REVISION
 
 
 def load_legacy_bookshelf(directory, username):
@@ -793,12 +809,15 @@ def create_app(
             return await public_files.get_response(path, request.scope)
         principal = require_principal(request)
         book_id = extract_book_id_from_public_path(path)
-        if book_id and not store.can_read_book(
-            principal.user_id,
-            principal.role,
-            book_id,
-        ):
-            return response(error_payload('forbidden', 'Forbidden'), 403)
+        if book_id:
+            if not store.can_read_book(
+                principal.user_id,
+                principal.role,
+                book_id,
+            ):
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+            if not server_book_output_is_current(base_directory, book_id):
+                return response(error_payload('not_found', 'Not Found'), 404)
         return await public_files.get_response(path, request.scope)
 
     async def health(request):
