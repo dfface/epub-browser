@@ -570,6 +570,14 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertNotIn("Server Book", library_html)
         manager.shutdown()
 
+    def test_generated_server_cache_does_not_publish_a_service_worker(self):
+        manager = self._manager()
+
+        manager.prepare_public_shell()
+
+        self.assertFalse((manager.public_dir / "sw.js").exists())
+        manager.shutdown()
+
     def test_cache_deletion_rebuilds_without_changing_book_id(self):
         manager = self._manager()
         original = manager.reconcile().active_books[0]

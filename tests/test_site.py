@@ -77,6 +77,10 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r'data-progress-close[^>]*disabled')
         self.assertRegex(html, r'data-progress-close[^>]*hidden')
         self.assertIn('window.EpubLibraryProgress.start(window)', html)
+        self.assertIn(
+            'window.EpubBrowserCacheBoundary.start(startLibraryClients)',
+            html,
+        )
         self.assertIn('id=loginCard', html)
         self.assertNotIn('id=exportShelfBtn', html)
         self.assertNotIn('id=importShelfBtn', html)

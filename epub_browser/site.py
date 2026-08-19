@@ -331,8 +331,17 @@ if (isKindle) {
                 i18n.setLocale(localeSelect.value);
             });
         }
-        if (window.initScriptLibrary) window.initScriptLibrary();
-        {server_progress_start}
+        function startLibraryClients() {
+            if (window.initScriptLibrary) window.initScriptLibrary();
+            {server_progress_start}
+        }
+        if (window.EpubBrowserMode === 'server') {
+            if (window.EpubBrowserCacheBoundary) {
+                window.EpubBrowserCacheBoundary.start(startLibraryClients);
+            }
+        } else {
+            startLibraryClients();
+        }
     });
     </script>
     </body>

@@ -180,6 +180,7 @@ class ServerLibraryManager:
                 self.public_dir,
                 urls=self.urls,
             ).publish()
+            (self.public_dir / "sw.js").unlink(missing_ok=True)
             self._refresh_public_shell()
             active_records = self._valid_active_records()
             signature = self._library_signature(active_records)
