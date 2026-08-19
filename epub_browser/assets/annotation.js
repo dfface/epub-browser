@@ -557,81 +557,64 @@
                 self.available = false;
                 return Promise.resolve({ available: false });
             }
-            return new Promise(function(resolve) {
-                var xhr = new XMLHttpRequest();
-                xhr.open('GET', self.baseUrl + '/health', true);
-                xhr.timeout = CONFIG.HEALTH_TIMEOUT;
-                
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
+            if (!window.EpubBrowserAuth || typeof window.EpubBrowserAuth.fetch !== 'function') {
+                self.available = false;
+                return Promise.resolve({ available: false });
+            }
+            try {
+                return Promise.resolve(window.EpubBrowserAuth.fetch(self.baseUrl + '/health')).then(function(response) {
+                    if (!response.ok) return null;
+                    return response.text().then(function(responseText) {
                         try {
-                            var resp = JSON.parse(xhr.responseText);
-                            self.available = resp.status === 'ok';
+                            return JSON.parse(responseText);
                         } catch (e) {
-                            self.available = false;
+                            return null;
                         }
-                    } else {
-                        self.available = false;
-                    }
-                    resolve({ available: self.available });
-                };
-                
-                xhr.onerror = function() {
+                    });
+                }).then(function(payload) {
+                    self.available = !!payload && payload.status === 'ok';
+                    return { available: self.available };
+                }, function() {
                     self.available = false;
-                    resolve({ available: false });
-                };
-                
-                xhr.ontimeout = function() {
-                    self.available = false;
-                    resolve({ available: false });
-                };
-                
-                try {
-                    xhr.send();
-                } catch (e) {
-                    self.available = false;
-                    resolve({ available: false });
-                }
-            });
+                    return { available: false };
+                });
+            } catch (e) {
+                self.available = false;
+                return Promise.resolve({ available: false });
+            }
         },
         
         // 发送请求
         _request: function(method, path, data) {
             var self = this;
-            var username = Utils.getAnnotationUsername();
-            return new Promise(function(resolve, reject) {
-                var xhr = new XMLHttpRequest();
-                xhr.open(method, self.baseUrl + path, true);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.setRequestHeader('X-Username', username);
-                xhr.timeout = 10000;
-                
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            resolve(JSON.parse(xhr.responseText));
-                        } catch (e) {
-                            resolve(xhr.responseText);
+            if (!window.EpubBrowserAuth || typeof window.EpubBrowserAuth.fetch !== 'function') {
+                return Promise.reject(backendRequestError('network'));
+            }
+            var options = {
+                method: method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (data !== undefined && data !== null) {
+                options.body = JSON.stringify(data);
+            }
+            try {
+                return Promise.resolve(window.EpubBrowserAuth.fetch(self.baseUrl + path, options)).then(function(response) {
+                    return response.text().then(function(responseText) {
+                        if (!response.ok) {
+                            throw backendRequestError(errorCodeFromPayload(responseText));
                         }
-                    } else {
-                        reject(backendRequestError(errorCodeFromPayload(xhr.responseText)));
-                    }
-                };
-                
-                xhr.onerror = function() {
-                    reject(backendRequestError('network'));
-                };
-                
-                xhr.ontimeout = function() {
-                    reject(backendRequestError('timeout'));
-                };
-                
-                try {
-                    xhr.send(data ? JSON.stringify(data) : null);
-                } catch (e) {
-                    reject(backendRequestError('network'));
-                }
-            });
+                        try {
+                            return JSON.parse(responseText);
+                        } catch (e) {
+                            return responseText;
+                        }
+                    });
+                }, function() {
+                    throw backendRequestError('network');
+                });
+            } catch (e) {
+                return Promise.reject(backendRequestError('network'));
+            }
         },
         
         // 创建标注

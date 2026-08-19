@@ -1,6 +1,6 @@
 /* Server mode keeps the bookshelf document in the server database, never in localStorage. */
 (function(root) {
-    var state = { username: '', version: 0, data: null, savedData: null };
+    var state = { version: 0, data: null, savedData: null };
 
     function emptyBookshelf() {
         return { items: [], groups: {}, order: [] };
@@ -16,13 +16,16 @@
         return prefix + 'api/bookshelf';
     }
 
-    function request(method, username, body) {
-        var options = { method: method, headers: { 'X-Username': username } };
+    function request(method, body) {
+        var options = { method: method, headers: {} };
         if (body) {
             options.headers['Content-Type'] = 'application/json';
             options.body = JSON.stringify(body);
         }
-        return Promise.resolve(fetch(apiUrl(), options)).then(function(response) {
+        if (!root.EpubBrowserAuth || typeof root.EpubBrowserAuth.fetch !== 'function') {
+            return Promise.resolve({ error: { code: 'authentication_required' } });
+        }
+        return Promise.resolve(root.EpubBrowserAuth.fetch(apiUrl(), options)).then(function(response) {
             return response.json().catch(function() { return {}; }).then(function(payload) {
                 if (!response.ok) return { error: payload || {} };
                 return payload;
@@ -33,20 +36,19 @@
     root.EpubBookshelfStore = {
         isServerMode: function() { return root.EpubBrowserMode === 'server'; },
         data: function() { return state.data ? copy(state.data) : null; },
-        load: function(username) {
+        load: function() {
             if (root.EpubBrowserMode !== 'server') return Promise.resolve({ data: null, version: 0 });
-            return request('GET', username).then(function(result) {
+            return request('GET').then(function(result) {
                 if (result.error) return result;
-                state.username = username;
                 state.version = result.version;
                 state.data = copy(result.data);
                 state.savedData = copy(result.data);
                 return { data: copy(state.data), version: state.version };
             });
         },
-        save: function(username, data) {
+        save: function(data) {
             if (root.EpubBrowserMode !== 'server') return Promise.resolve({ data: data });
-            return request('PUT', username, { version: state.version, data: data }).then(function(result) {
+            return request('PUT', { version: state.version, data: data }).then(function(result) {
                 if (result.error) {
                     if (result.error.code === 'bookshelf_conflict' && result.error.data) {
                         state.version = result.error.version;
@@ -76,19 +78,34 @@ function bookshelfCoverUrl(book) {
     return book && book.cover ? book.cover : null;
 }
 
+function bookshelfSyncRequest(root, version, data) {
+    if (!root || root.EpubBrowserMode !== 'server') return Promise.resolve(null);
+    if (!root.EpubBrowserAuth || typeof root.EpubBrowserAuth.fetch !== 'function') {
+        return Promise.reject(new Error('Authenticated fetch is unavailable'));
+    }
+    return root.EpubBrowserAuth.fetch('/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: version, data: data })
+    });
+}
+
+function bookshelfSyncRequest(root, version, data) {
+    if (!root || root.EpubBrowserMode !== 'server') return Promise.resolve(null);
+    if (!root.EpubBrowserAuth || typeof root.EpubBrowserAuth.fetch !== 'function') {
+        return Promise.reject(new Error('Authenticated fetch is unavailable'));
+    }
+    return root.EpubBrowserAuth.fetch('/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: version, data: data })
+    });
+}
+
 function initBookshelf() {
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
-    var USERNAME_KEY = 'epub_browser_username';
     var isServerMode = window.EpubBookshelfStore && window.EpubBookshelfStore.isServerMode();
-
-    function getUsername() {
-        if (isKindleMode()) {
-            return getCookie(USERNAME_KEY);
-        }
-        return localStorage.getItem(USERNAME_KEY);
-    }
-
     var bookMetadataCache = null;
     
     function loadBookMetadata(callback) {
@@ -223,7 +240,7 @@ function initBookshelf() {
     // 保存书架数据
     function saveBookshelf(data) {
         if (isServerMode) {
-            return window.EpubBookshelfStore.save(getUsername(), data);
+            return window.EpubBookshelfStore.save(data);
         }
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
         incrementBookshelfVersion();
@@ -232,12 +249,7 @@ function initBookshelf() {
 
     function ensureServerBookshelf() {
         if (!isServerMode) return Promise.resolve(true);
-        var username = getUsername();
-        if (!username) {
-            showNotification(tr('loginRequired'), 'warning');
-            return Promise.resolve(false);
-        }
-        return window.EpubBookshelfStore.load(username).then(function(result) {
+        return window.EpubBookshelfStore.load().then(function(result) {
             if (result.error) {
                 showNotification(syncErrorMessage(result.error.code), 'warning');
                 return false;
@@ -1378,6 +1390,7 @@ if (typeof window !== 'undefined') window.initBookShelf = initBookshelf;
 if (typeof module === 'object' && module.exports) {
     module.exports = {
         metadataUrl: bookshelfMetadataUrl,
-        coverUrl: bookshelfCoverUrl
+        coverUrl: bookshelfCoverUrl,
+        syncRequest: bookshelfSyncRequest
     };
 }

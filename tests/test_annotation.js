@@ -16,12 +16,28 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride) {
   };
 
   const localStorage = { getItem: () => '', setItem: () => {} };
+  const authenticatedRequests = [];
   const window = {
     __EPUB_BROWSER_TESTING__: true,
     EpubBrowserMode: mode,
     navigator: { userAgent: '' },
     localStorage,
     document: documentOverride || { cookie: '' },
+    EpubBrowserAuth: {
+      fetch(url, options = {}) {
+        const headers = Object.assign({}, options.headers, { 'X-CSRF-Token': 'csrf' });
+        const authenticated = Object.assign({}, options, {
+          credentials: 'same-origin',
+          headers,
+        });
+        authenticatedRequests.push({ url, options: authenticated });
+        return Promise.resolve({
+          ok: response.status >= 200 && response.status < 300,
+          status: response.status,
+          text: () => Promise.resolve(response.body),
+        });
+      },
+    },
     EpubBrowserI18n: {
       t(key) {
         return {
@@ -44,6 +60,7 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride) {
   };
 
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/annotation.js', 'utf8'), context);
+  window.authenticatedRequests = authenticatedRequests;
   return window;
 }
 
@@ -53,12 +70,29 @@ function loadBackendStorage(response, mode = 'server') {
 
 test('SSG annotations do not probe the server API', async () => {
   const response = { status: 200, body: JSON.stringify({ status: 'ok' }) };
-  const storage = loadBackendStorage(response, 'ssg');
+  const window = loadAnnotationWindow(response, 'ssg');
+  const storage = window.AnnotationBackendStorage;
 
   const result = await storage.checkHealth();
 
   assert.equal(result.available, false);
   assert.equal(response.sendCount || 0, 0);
+  assert.equal(window.authenticatedRequests.length, 0);
+});
+
+test('server annotations use shared Cookie and CSRF authentication without a username', async () => {
+  const response = { status: 201, body: JSON.stringify({ data: { id: 'a1' } }) };
+  const window = loadAnnotationWindow(response);
+
+  const result = await window.AnnotationBackendStorage.create({ id: 'a1' });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), { id: 'a1' });
+  assert.equal(window.authenticatedRequests.length, 1);
+  const received = window.authenticatedRequests[0];
+  assert.equal(received.url, '/api/annotations');
+  assert.equal(received.options.credentials, 'same-origin');
+  assert.equal(received.options.headers['X-CSRF-Token'], 'csrf');
+  assert.equal(received.options.headers['X-Username'], undefined);
 });
 
 test('maps a non-2xx annotation API payload code to localized, non-server error text', async () => {

@@ -105,27 +105,20 @@
   function showProgressBar(value) { return value !== 'false'; }
   function progressBarClass(visible) { return visible ? '' : 'is-progress-bar-hidden'; }
 
-  function getUsername() {
-    try {
-      return root.localStorage ? root.localStorage.getItem('epub_browser_username') || '' : '';
-    } catch (error) {
-      return '';
-    }
-  }
-
   function request(method, url, chapterIndex, keepalive, includeError) {
     if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
     var options = { method: method };
     if (keepalive) options.keepalive = true;
-    var username = getUsername();
-    if (username) options.headers = { 'X-Username': username };
     if (method === 'PUT') {
-      if (!options.headers) options.headers = {};
+      options.headers = {};
       options.headers['Content-Type'] = 'application/json';
       options.body = JSON.stringify({ chapter_index: chapterIndex });
     }
     try {
-      return Promise.resolve(fetch(url, options)).then(function(response) {
+      if (!root.EpubBrowserAuth || typeof root.EpubBrowserAuth.fetch !== 'function') {
+        return Promise.resolve(includeError ? { error: {} } : null);
+      }
+      return Promise.resolve(root.EpubBrowserAuth.fetch(url, options)).then(function(response) {
         if (!response.ok) {
           if (!includeError) return null;
           return response.json().then(function(payload) {
@@ -149,7 +142,6 @@
     ChapterReporter: ChapterReporter,
     showProgressBar: showProgressBar,
     progressBarClass: progressBarClass,
-    getUsername: getUsername,
     isServerMode: function() { return root.EpubBrowserMode === 'server'; },
     request: request
   };

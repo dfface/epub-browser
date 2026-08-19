@@ -539,6 +539,94 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(self.member_client.get("/api/session").status_code, 200)
 
 
+class SessionOwnershipTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        self.store = StateStore(public / "epub-browser.db")
+        self.alice = self.store.initialize(
+            bootstrap=BootstrapCredentials("alice", "alice-secret")
+        )
+        self.bob = self.store.create_user("bob", hash_password("bob-secret"))
+        config = AuthConfig.from_values([], None, None)
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, config),
+        )
+        self.client = TestClient(self.app)
+        self.addCleanup(self.client.close)
+        login = self.client.post(
+            "/login",
+            data={"username": "alice", "password": "alice-secret"},
+            follow_redirects=False,
+        )
+        self.assertEqual(login.status_code, 303)
+        session = self.client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        self.csrf = {"X-CSRF-Token": session.json()["csrf_token"]}
+        self.annotation = {
+            "id": "alice-note",
+            "book_hash": "book",
+            "chapter_index": 1,
+            "text": "note",
+            "color": "#fff",
+            "created_at": "2026-01-01",
+            "updated_at": "2026-01-01",
+        }
+
+    def test_annotation_header_cannot_impersonate_another_account(self):
+        response = self.client.post(
+            "/api/annotations/book",
+            json=self.annotation,
+            headers={"X-Username": "bob", **self.csrf},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            self.store.list_annotations(user_id=self.alice.user_id)[0]["id"],
+            self.annotation["id"],
+        )
+        self.assertEqual(
+            self.store.list_annotations(user_id=self.bob.user_id),
+            [],
+        )
+
+    def test_bookshelf_body_username_cannot_select_another_account(self):
+        response = self.client.post(
+            "/sync",
+            json={
+                "username": "bob",
+                "version": 2,
+                "data": {"items": ["alice-book"], "groups": {}},
+            },
+            headers=self.csrf,
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("username", response.json())
+        self.assertIsNotNone(self.store.get_bookshelf(self.alice.user_id))
+        self.assertIsNone(self.store.get_bookshelf(self.bob.user_id))
+
+    def test_reading_progress_header_cannot_impersonate_another_account(self):
+        response = self.client.put(
+            "/api/reading-progress/book",
+            json={"chapter_index": 4},
+            headers={"X-Username": "bob", **self.csrf},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.store.get_reading_progress(self.alice.user_id, "book"),
+            4,
+        )
+        self.assertIsNone(
+            self.store.get_reading_progress(self.bob.user_id, "book")
+        )
+
+
 class ServerCacheTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
