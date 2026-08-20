@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "account-auth-v5"
+SERVER_OUTPUT_REVISION = "account-auth-v6"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -1018,17 +1018,23 @@ class EPUBProcessor:
 <body>
 """
         index_html += f"""
-<div class="breadcrumb-container app-header">
-    <nav class="breadcrumb app-nav app-nav-context" aria-label="Book navigation" data-i18n-aria-label="book.navigation" data-id="breadcrumb">
-        <a class="app-nav-brand" href="/" aria-label="Library" data-i18n-aria-label="book.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="book.library">Library</span></a>
-        <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current app-nav-current" id="book_home" aria-current="page" lang="{book_language}">{book_title_text}</span>
+<header class="app-header">
+    <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
+        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+        <div class="app-nav-links">
+            <a class="app-nav-link is-active" href="/" aria-current="location"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="book.library">Library</span></a>
+            <button type="button" class="app-nav-link" id="bookshelfBtn" style="display: none;" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
+        </div>
         <div class="app-nav-actions">
-            <button class="theme-toggle app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="control-name" data-i18n="book.theme">Theme</span></button>
+            <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="book.theme">Theme</span></button>
         </div>
     </nav>
-</div>
+</header>
 <div class="container">
+    <nav class="app-context-path" aria-label="Breadcrumb" data-i18n-aria-label="book.breadcrumb" data-id="breadcrumb">
+        <a href="/" data-i18n="book.library">Library</a><span aria-hidden="true">›</span><span class="breadcrumb-current" id="book_home" aria-current="page" lang="{book_language}">{book_title_text}</span>
+    </nav>
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
@@ -1067,7 +1073,6 @@ class EPUBProcessor:
                             <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                         </div>
                     </div>
-                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i><span data-i18n="book.annotations">Annotations</span></button>
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
             </div>
@@ -1132,20 +1137,10 @@ class EPUBProcessor:
     </div>
 </div>
 <div class="reading-controls" data-id="reading-controls">
-    <div class="control-btn" id="scrollToTopBtn">
+    <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="book.top">
         <i class="fas fa-arrow-up"></i>
         <span class="control-name" data-i18n="book.top">Top</span>
-    </div>
-    <button class="control-btn" id="bookshelfBtn" style="display: none;">
-        <i class="fas fa-bookmark"></i>
-        <span class="control-name" data-i18n="book.shelf">Shelf</span>
     </button>
-    <a href="/" aria-label="Home" data-i18n-aria-label="book.home">
-        <div class="control-btn">
-            <i class="fas fa-home"></i>
-            <span class="control-name" data-i18n="book.home">Home</span>
-        </div>
-    </a>
 </div>
 <!-- 书架弹窗 -->
 <div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
@@ -1789,23 +1784,6 @@ document.addEventListener('DOMContentLoaded', function() {{
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
-    <div class="top-controls chapter-tools">
-        <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning">
-            <i class="fas fa-book-open"></i>
-            <span class="control-name" data-i18n="reader.turning">Turning</span>
-        </button>
-
-        <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
-            <i class="fas fa-book"></i>
-            <span class="control-name" data-i18n="reader.bookChapters">Chapters</span>
-        </button>
-
-        <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents">
-            <i class="fas fa-list"></i>
-            <span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span>
-        </button>
-    </div>
-
     <nav class="toc-floating" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters">
         <div class="toc-header">
             <h3 data-i18n="reader.bookChapters">Chapters</h3>
@@ -1835,19 +1813,29 @@ document.addEventListener('DOMContentLoaded', function() {{
         </ul>
     </nav>
 
-    <div class="chapter-top-bar app-header">
-        <nav class="breadcrumb app-nav app-nav-context" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation" data-id="breadcrumb">
-            <a class="app-nav-brand" href="/" aria-label="Library" data-i18n-aria-label="reader.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="reader.library">Library</span></a>
-            <span class="breadcrumb-separator">/</span>
-            <a href="/book/{book_id_url}/index.html" class="a-book-home">{book_title_text}</a>
-            <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-current app-nav-current" aria-current="page">{chapter_title_text}</span>
+    <header class="chapter-top-bar app-header">
+        <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
+            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            <div class="app-nav-links">
+                <a class="app-nav-link" href="/"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.library">Library</span></a>
+                <a class="app-nav-link is-active a-book-home" href="/book/{book_id_url}/index.html" aria-current="location"><i class="fas fa-book-open" aria-hidden="true"></i><span data-i18n="reader.book">Book</span></a>
+                <button type="button" class="app-nav-link" id="bookshelfBtn" style="display: none;" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+            </div>
             <div class="app-nav-actions">
-                <button class="theme-toggle app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="control-name" data-i18n="reader.theme">Theme</span></button>
+                <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
             </div>
         </nav>
-    </div>
+    </header>
     <div class="container">
+        <nav class="app-context-path" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
+            <a href="/" data-i18n="reader.library">Library</a><span aria-hidden="true">›</span><a href="/book/{book_id_url}/index.html" class="a-book-home">{book_title_text}</a><span aria-hidden="true">›</span><span class="breadcrumb-current" aria-current="page">{chapter_title_text}</span>
+        </nav>
+        <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
+            <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning"><i class="fas fa-book-open"></i><span class="control-name" data-i18n="reader.turning">Turning</span></button>
+            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
+            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
+            <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+        </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
             <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
@@ -2028,18 +2016,6 @@ document.addEventListener('DOMContentLoaded', function() {{
             <i class="fas fa-arrow-up"></i>
             <span class="control-name" data-i18n="reader.top">Top</span>
         </button>
-        <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings">
-            <i class="fas fa-cog"></i>
-            <span class="control-name" data-i18n="reader.settings">Settings</span>
-        </button>
-        <button class="control-btn" id="bookshelfBtn" type="button" style="display: none;" aria-label="Shelf" data-i18n-aria-label="reader.shelf">
-            <i class="fas fa-bookmark"></i>
-            <span class="control-name" data-i18n="reader.shelf">Shelf</span>
-        </button>
-        <a class="control-btn" href="/" aria-label="Home" data-i18n-aria-label="reader.home">
-            <i class="fas fa-home"></i>
-            <span class="control-name" data-i18n="reader.home">Home</span>
-        </a>
     </div>
 
     <!-- 移动端控件 -->

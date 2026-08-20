@@ -1738,7 +1738,7 @@ function initScript() {
 
     function bookshelfSupport() {
         var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
+        if (bookshelfBtn) bookshelfBtn.style.display = '';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {

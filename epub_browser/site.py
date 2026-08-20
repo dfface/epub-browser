@@ -53,6 +53,10 @@ def _render_library_html(
                 <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
             </button>
             <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if deployment_mode == "ssg" else ""
+    install_control = """
+            <button type="button" class="app-nav-link" id="pwa-install-btn" style="display: none;">
+                <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="library.install">Install</span>
+            </button>""" if deployment_mode == "ssg" else ""
     server_account_control = ""
     server_account_panel = ""
     server_account_stylesheet = ""
@@ -81,10 +85,10 @@ def _render_library_html(
         server_progress_script = '<script src="/assets/library-progress.js" defer></script>'
         server_progress_start = 'if (window.EpubLibraryProgress) window.EpubLibraryProgress.start(window);'
         server_account_stylesheet = '<link rel="stylesheet" href="/assets/account.css">'
-        server_account_control = '''<button type="button" class="library-meta-action" id="adminMenu" aria-haspopup="dialog" aria-controls="adminPanel" hidden>
+        server_account_control = '''<button type="button" class="library-meta-action app-nav-action" id="adminMenu" aria-haspopup="dialog" aria-controls="adminPanel" hidden>
                 <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>
             </button>
-            <button type="button" class="library-meta-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel">
+            <button type="button" class="library-meta-action app-nav-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel">
                 <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue" data-i18n="account.menu">Account</span>
             </button>'''
         server_account_panel = '''
@@ -295,20 +299,33 @@ if (isKindle) {
                     all_tags.add(cur_tag.strip())
 
     library_html += f"""
-    <div class="breadcrumb-container app-header">
-    <nav class="breadcrumb library-breadcrumb app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
-        <a class="breadcrumb-current app-nav-brand" href="/" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="library.title">Library</span></a>
-        <div class="library-meta app-nav-menu" aria-label="Library information" data-i18n-aria-label="library.information">
-            <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i><span id="libraryBookCount" data-i18n="library.bookCount" data-i18n-params='{{"count": {len(self.books)}}}'>{len(self.books)} book(s)</span></span>
-            <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i><span id="libraryTagCount" data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
-            <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
-            <label class="library-language" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select></label>
-            <button type="button" class="theme-toggle app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="control-name" data-i18n="library.theme">Theme</span></button>
+    <header class="app-header">
+    <nav class="app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
+        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
+        <div class="app-nav-links">
+            <a class="app-nav-link is-active" href="/" aria-current="page"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="library.title">Library</span></a>
+            <button type="button" class="app-nav-link" id="bookshelfBtn" style="display: none;" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+            {install_control}
+        </div>
+        <div class="app-nav-actions">
+            <label class="library-language app-nav-locale" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select></label>
+            <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
             {server_account_control}
         </div>
     </nav>
-    </div>
+    </header>
     <div class="container">
+    <section class="library-overview" aria-labelledby="libraryHeading">
+        <div>
+            <p class="library-overview-kicker" data-i18n="common.brand">EPUB Browser</p>
+            <h1 id="libraryHeading" data-i18n="library.title">Library</h1>
+        </div>
+        <div class="library-summary" aria-label="Library information" data-i18n-aria-label="library.information">
+            <span class="library-summary-item"><i class="fas fa-book" aria-hidden="true"></i><span id="libraryBookCount" data-i18n="library.bookCount" data-i18n-params='{{"count": {len(self.books)}}}'>{len(self.books)} book(s)</span></span>
+            <span class="library-summary-item"><i class="fas fa-tags" aria-hidden="true"></i><span id="libraryTagCount" data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
+        </div>
+    </section>
 {server_progress_panel}
     <div class="controls" data-id="controls">
         <div class="search-container">
@@ -335,13 +352,9 @@ if (isKindle) {
     library_html += f"""
     </div>
     <div class="reading-controls" data-id="reading-controls">
-    <button class="control-btn" id="scrollToTopBtn">
+    <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="library.top">
         <i class="fas fa-arrow-up"></i>
         <span class="control-name" data-i18n="library.top">Top</span>
-    </button>
-    <button class="control-btn" id="bookshelfBtn" style="display: none;">
-        <i class="fas fa-bookmark"></i>
-        <span class="control-name" data-i18n="library.shelf">Shelf</span>
     </button>
     </div>
 </div>

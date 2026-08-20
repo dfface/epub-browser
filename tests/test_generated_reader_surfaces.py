@@ -806,29 +806,30 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertRegex(html, r'/assets/immutable/breadcrumb\.[0-9a-f]{12}\.css')
             self.assertIn('app-nav', html)
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
-        self.assertIn("width: min(calc(100% - 40px), 1120px)", css)
-        self.assertIn("min-height: 64px", css)
+        self.assertIn("width: min(calc(100% - 40px), 1180px)", css)
+        self.assertIn("min-height: 68px", css)
         self.assertIn(".app-nav-brand", css)
+        self.assertIn(".app-nav-links", css)
         self.assertIn(".app-nav-actions", css)
         self.assertIn(".app-nav-theme", css)
-        self.assertIn("linear-gradient(90deg, var(--primary), var(--secondary))", css)
+        self.assertIn("backdrop-filter: blur(18px)", css)
+        self.assertIn("position: sticky", css)
 
     def test_mobile_application_navigation_uses_the_shared_compact_layout(self):
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         book_html = self._book_html()
         chapter_html = self._chapter_html()
 
-        self.assertIn(".breadcrumb-library-label", css)
-        self.assertIn("@media (max-width: 860px)", css)
-        self.assertIn(".app-nav-primary", css)
+        self.assertIn(".app-nav-brand span", css)
+        self.assertIn("@media (max-width: 680px)", css)
+        self.assertIn(".app-nav-links", css)
         self.assertIn("flex-wrap: wrap;", css)
         self.assertIn("min-width: 0;", css)
         self.assertIn("text-overflow: ellipsis;", css)
-        self.assertIn(".app-nav > a:not(.app-nav-brand)", css)
         self.assertIn("overflow-x: auto;", css)
         for html in (book_html, chapter_html):
-            self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?(?:book|reader)\.library')
-            self.assertRegex(html, r'class=(?:["\'])?breadcrumb-library-label')
+            self.assertIn('app-nav-links', html)
+            self.assertIn('app-context-path', html)
             self.assertIn('app-nav-theme', html)
 
     def test_reader_chrome_uses_one_default_font_stack(self):
@@ -989,27 +990,30 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             archive.writestr("OEBPS/content.opf", package)
             archive.writestr("OEBPS/chapter.xhtml", chapter)
 
-    def test_library_places_its_summary_inside_the_primary_navigation(self):
+    def test_library_separates_primary_navigation_from_page_summary(self):
         html = self._library_html()
 
         self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=["\'][^"\']*\bapp-nav-primary\b)(?=[^>]*\bdata-i18n-aria-label=(?:["\'])?library\.navigation(?:["\'])?)[^>]*>')
-        self.assertRegex(html, r'<a\b(?=[^>]*\bclass=["\'][^"\']*\bapp-nav-brand\b)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<a\b(?=[^>]*\bclass=(?:["\'])?app-nav-brand)(?=[^>]*\baria-label=(?:["\'])?EPUB Browser(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<span\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
         self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
-        self.assertIn('breadcrumb-brand-mark', breadcrumb)
-        self.assertIn('library-meta app-nav-menu', breadcrumb)
+        self.assertIn('app-nav-brand-mark', breadcrumb)
+        self.assertIn('app-nav-links', breadcrumb)
         self.assertIn('app-nav-theme', breadcrumb)
+        self.assertIn('id=bookshelfBtn', breadcrumb)
+        self.assertIn('id=annotationsBtn', breadcrumb)
+        self.assertNotIn('id=libraryBookCount', breadcrumb)
+        self.assertNotIn('id=libraryTagCount', breadcrumb)
+        self.assertIn('class=library-overview', html)
+        self.assertIn('class=library-summary', html)
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
-        self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
 
     def test_locale_selector_exists_only_in_library_navigation(self):
         library = self._library_html()
         self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
-        breadcrumb = library[
-            library.index('class="breadcrumb library-breadcrumb app-nav'):library.index('</nav>')
-        ]
+        breadcrumb = library[library.index('<nav'):library.index('</nav>')]
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-CN(?:["\' >])')
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')
         self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
@@ -1017,6 +1021,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(library, r'localeSelect\.value=i18n\.getLocale\(\)')
         self.assertRegex(library, r'localeSelect\.addEventListener\(["\'`]change')
         self.assertRegex(library, r'i18n\.setLocale\(localeSelect\.value\)')
+
+    def test_desktop_floating_controls_only_keep_scroll_to_top(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            floating = re.search(r'class=(?:["\'])?reading-controls(?:["\' >])', html)
+            self.assertIsNotNone(floating)
+            self.assertGreater(html.index('scrollToTopBtn'), floating.start())
+            self.assertLess(html.index('bookshelfBtn'), floating.start())
+
+        chapter = self._chapter_html()
+        chapter_floating = re.search(r'class=(?:["\'])?reading-controls(?:["\' >])', chapter)
+        self.assertLess(chapter.index('settingsControlBtn'), chapter_floating.start())
+
+        self.assertIn('reader-toolbar top-controls chapter-tools', chapter)
+        toolbar = chapter[chapter.index('reader-toolbar top-controls chapter-tools'):]
+        toolbar = toolbar[:toolbar.index('</div>')]
+        for control_id in ('togglePagination', 'bookHomeToggle', 'tocToggle', 'settingsControlBtn'):
+            self.assertIn(control_id, toolbar)
+
+    def test_ssg_install_action_is_part_of_navigation_not_floating_controls(self):
+        html = self._library_html()
+        nav = html[html.index('<nav'):html.index('</nav>')]
+        self.assertIn('id=pwa-install-btn', nav)
+        script = Path('epub_browser/assets/library.js').read_text(encoding='utf-8')
+        self.assertIn("getElementById('pwa-install-btn')", script)
+        self.assertNotIn('readingControls.appendChild(installBtn)', script)
 
     def test_library_and_book_open_annotation_center_as_a_modal(self):
         library_html = self._library_html()

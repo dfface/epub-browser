@@ -8,6 +8,7 @@
   var STORAGE_KEY = 'epub_browser_locale';
   var dictionaries = {
     en: {
+      'common.brand': 'EPUB Browser',
       'common.language': 'Language',
       'common.chinese': 'Chinese',
       'common.english': 'English',
@@ -472,6 +473,7 @@
       'errors.network': 'A network error occurred.'
     },
     'zh-CN': {
+      'common.brand': 'EPUB Browser',
       'common.language': '语言',
       'common.chinese': '中文',
       'common.english': 'English',

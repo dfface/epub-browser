@@ -596,21 +596,12 @@ function initScript() {
             });
         }
         var deferredPrompt;
-        var readingControls = document.querySelector('.reading-controls');
-        
-        var installBtn = document.createElement('button');
-        installBtn.id = 'pwa-install-btn';
-        installBtn.className = 'control-btn';
-        installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name" data-i18n="library.install">' + t('library.install') + '</div>';
-        installBtn.style.display = 'none';
-        if (readingControls) {
-            readingControls.appendChild(installBtn);
-        }
+        var installBtn = document.getElementById('pwa-install-btn');
 
         window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
-            if (installBtn) installBtn.style.display = 'block';
+            if (installBtn) installBtn.style.display = '';
         });
 
         if (installBtn) {
@@ -639,7 +630,7 @@ function initScript() {
 
     function bookshelfSupport() {
         var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
+        if (bookshelfBtn) bookshelfBtn.style.display = '';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {
