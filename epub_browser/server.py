@@ -28,7 +28,7 @@ from .auth import (
     hash_password,
     session_cookie_options,
 )
-from .state import StateStore
+from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
 from .processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from .server_library import library_metadata
@@ -40,11 +40,43 @@ PENDING_IDENTITY_SCOPE_KEY = 'epub_browser.pending_identity'
 SESSION_TOKEN_SCOPE_KEY = 'epub_browser.session_token'
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
 PUBLIC_AUTH_ENDPOINTS = frozenset({
+    '/setup',
     '/login',
     '/logout',
     '/api/identity/link',
 })
 PUBLIC_LOGIN_ASSETS = frozenset({'/assets/auth.js', '/assets/i18n.js'})
+SETUP_COPY = {
+    'en': {
+        'page_title': 'Set up · EPUB Browser',
+        'title': 'Create a superuser account',
+        'description': (
+            'When you first access the web interface, you will be prompted '
+            'to create a superuser account.'
+        ),
+        'username': 'Username',
+        'password': 'Password',
+        'password_confirmation': 'Confirm password',
+        'submit': 'Create superuser',
+        'language': 'Language',
+        'invalid': 'Enter a username and password.',
+        'password_mismatch': 'Password and confirmation do not match.',
+        'username_unavailable': 'Username is unavailable.',
+    },
+    'zh-CN': {
+        'page_title': '设置 · EPUB Browser',
+        'title': '创建超级用户账户',
+        'description': '首次访问 Web 界面时，系统会提示你创建一个超级用户账户。',
+        'username': '用户名',
+        'password': '密码',
+        'password_confirmation': '确认密码',
+        'submit': '创建超级用户',
+        'language': '语言',
+        'invalid': '请输入用户名和密码。',
+        'password_mismatch': '密码与确认密码不一致。',
+        'username_unavailable': '用户名不可用。',
+    },
+}
 LOGIN_COPY = {
     'en': {
         'page_title': 'Sign in · EPUB Browser',
@@ -161,6 +193,35 @@ def unauthenticated_response(request):
     return JSONResponse(
         error_payload('forbidden', 'Forbidden'),
         status_code=403,
+        headers={'Cache-Control': 'no-store'},
+    )
+
+
+def setup_required_response(request):
+    path = request.url.path
+    if path in {'/api/health', '/api/ready'}:
+        return JSONResponse(
+            {'status': 'setup_required'},
+            status_code=503,
+            headers={'Cache-Control': 'no-store'},
+        )
+    content_path = (
+        path == '/book'
+        or path.startswith('/book/')
+        or path.startswith('/assets/')
+        or path == '/book-metadata.json'
+        or path == '/sync'
+        or path.startswith('/api/')
+    )
+    if not content_path and (path == '/login' or _request_expects_html(request)):
+        return RedirectResponse(
+            '/setup',
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
+    return JSONResponse(
+        error_payload('setup_required', 'Administrator setup required'),
+        status_code=503,
         headers={'Cache-Control': 'no-store'},
     )
 
@@ -404,6 +465,181 @@ def create_app(
 
     def client_key(request):
         return request.client.host if request.client is not None else 'unknown'
+
+    async def form_data(request, maximum_size=64 * 1024):
+        content_type = request.headers.get('content-type', '').split(';', 1)[0]
+        if content_type != 'application/x-www-form-urlencoded':
+            raise ValueError('Unsupported form content type')
+        body = await request.body()
+        if len(body) > maximum_size:
+            raise ValueError('Form is too large')
+        values = parse_qs(
+            body.decode('utf-8'),
+            keep_blank_values=True,
+            strict_parsing=False,
+        )
+        return {
+            key: entries[-1] if entries else ''
+            for key, entries in values.items()
+        }
+
+    def setup_form(
+        error=None,
+        status_code=200,
+        locale='en',
+        locale_explicit=False,
+    ):
+        locale = normalize_login_locale(locale)
+        copy = SETUP_COPY[locale]
+        error_key = {
+            'invalid': 'account.error.invalidSetup',
+            'password_mismatch': 'account.error.passwordMismatch',
+            'username_unavailable': 'account.error.username_unavailable',
+        }.get(error)
+        error_markup = (
+            '<p role="alert" data-i18n="{}">{}</p>'.format(
+                error_key,
+                copy[error],
+            )
+            if error_key is not None
+            else ''
+        )
+        en_selected = ' selected' if locale == 'en' else ''
+        zh_selected = ' selected' if locale == 'zh-CN' else ''
+        markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title data-i18n="account.setupPageTitle">{copy['page_title']}</title>
+<style>
+:root {{ font-family: system-ui,-apple-system,sans-serif; color-scheme: light dark; }}
+body {{ min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f3f6f4; color: #173336; }}
+.setup-card {{ width: min(90vw, 30rem); box-sizing: border-box; padding: 2rem; border-radius: 1rem; background: #fff; box-shadow: 0 1rem 3rem rgba(20,50,53,.15); }}
+.setup-language {{ display: flex; justify-content: flex-end; align-items: center; gap: .5rem; }}
+.setup-card form,.setup-card label {{ display: grid; gap: .5rem; }}
+.setup-card form {{ gap: 1rem; }}
+.setup-card input,.setup-card select,.setup-card button {{ box-sizing: border-box; min-height: 2.75rem; padding: .65rem .8rem; font: inherit; }}
+.setup-card button {{ border: 0; border-radius: .5rem; background: #244548; color: #fff; cursor: pointer; }}
+[role=alert] {{ color: #a22424; }}
+@media (prefers-color-scheme: dark) {{ body {{ background: #112426; color: #eef7f5; }} .setup-card {{ background: #193437; }} }}
+</style>
+<script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
+<script src="/assets/i18n.js"></script>
+<script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
+</head><body><main class="setup-card">
+<label class="setup-language"><span data-i18n="common.language">{copy['language']}</span>
+<select id="setupLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
+<option value="en"{en_selected} data-i18n="common.english">English</option>
+<option value="zh-CN"{zh_selected} data-i18n="common.chinese">中文</option>
+</select></label>
+<h1 data-i18n="account.setupTitle">{copy['title']}</h1>
+<p data-i18n="account.setupDescription">{copy['description']}</p>
+{error_markup}
+<form id="setupForm" method="post" action="/setup">
+<input type="hidden" name="locale" value="{locale}">
+<label><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
+<label><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="new-password" required></label>
+<label><span data-i18n="account.confirmPassword">{copy['password_confirmation']}</span><input name="password_confirmation" type="password" autocomplete="new-password" required></label>
+<button type="submit" data-i18n="account.createSuperuser">{copy['submit']}</button>
+</form></main>
+<script>(function() {{
+var i18n=window.EpubBrowserI18n;
+var localeSelect=document.getElementById('setupLocaleSelect');
+var localeField=document.querySelector('input[name="locale"]');
+if(i18n&&localeSelect){{
+localeSelect.value=i18n.getLocale();
+localeSelect.addEventListener('change',function(){{
+i18n.setLocale(localeSelect.value);
+if(localeField)localeField.value=localeSelect.value;
+}});
+}}
+}}());</script></body></html>'''
+        return HTMLResponse(
+            markup,
+            status_code=status_code,
+            headers={'Cache-Control': 'no-store'},
+        )
+
+    async def setup(request):
+        requested_locale = normalize_login_locale(
+            request.query_params.get('lang'),
+            request.headers.get('accept-language', ''),
+        )
+        locale_explicit = 'lang' in request.query_params
+        if store.has_administrator():
+            return RedirectResponse(
+                '/' if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None else '/login',
+                status_code=303,
+                headers={'Cache-Control': 'no-store'},
+            )
+        if request.method == 'GET':
+            return setup_form(
+                locale=requested_locale,
+                locale_explicit=locale_explicit,
+            )
+        try:
+            form = await form_data(request)
+        except (UnicodeDecodeError, ValueError):
+            return setup_form(
+                error='invalid',
+                status_code=400,
+                locale=requested_locale,
+                locale_explicit=locale_explicit,
+            )
+        submitted_locale = normalize_login_locale(
+            form.get('locale') or requested_locale
+        )
+        username = form.get('username')
+        password = form.get('password')
+        confirmation = form.get('password_confirmation')
+        if (
+            not isinstance(username, str)
+            or not username.strip()
+            or not isinstance(password, str)
+            or not password
+            or not isinstance(confirmation, str)
+        ):
+            return setup_form(
+                error='invalid',
+                status_code=400,
+                locale=submitted_locale,
+                locale_explicit=True,
+            )
+        if password != confirmation:
+            return setup_form(
+                error='password_mismatch',
+                status_code=400,
+                locale=submitted_locale,
+                locale_explicit=True,
+            )
+        try:
+            raw_session, _ = auth_service.complete_setup(username, password)
+        except SetupAlreadyCompleteError:
+            return RedirectResponse(
+                '/login',
+                status_code=303,
+                headers={'Cache-Control': 'no-store'},
+            )
+        except sqlite3.IntegrityError:
+            return setup_form(
+                error='username_unavailable',
+                status_code=409,
+                locale=submitted_locale,
+                locale_explicit=True,
+            )
+        except ValueError:
+            return setup_form(
+                error='invalid',
+                status_code=400,
+                locale=submitted_locale,
+                locale_explicit=True,
+            )
+        redirect = RedirectResponse(
+            '/',
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
+        set_session_cookie(redirect, raw_session)
+        return redirect
 
     def login_form(
         next_path='/',
@@ -902,14 +1138,12 @@ if(localeField)localeField.value=localeSelect.value;
             path = normalize_public_path(request.path_params['path'])
         except ValueError:
             return response(error_payload('not_found', 'Not Found'), 404)
-        if path == 'assets/i18n.js':
+        if '/' + path in PUBLIC_LOGIN_ASSETS:
             return FileResponse(
-                os.path.join(os.path.dirname(__file__), 'assets', 'i18n.js'),
+                os.path.join(os.path.dirname(__file__), path),
                 media_type='text/javascript',
                 headers={'Cache-Control': 'no-cache'},
             )
-        if '/' + path in PUBLIC_LOGIN_ASSETS:
-            return await public_files.get_response(path, request.scope)
         principal = require_principal(request)
         book_id = extract_book_id_from_public_path(path)
         if book_id:
@@ -1212,6 +1446,7 @@ if(localeField)localeField.value=localeSelect.value;
         return response({'message': 'Deleted'})
 
     routes = [
+        Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
         Route('/logout', logout, methods=['POST']),
         Route('/api/identity/link', link_proxy_identity, methods=['POST']),
@@ -1252,6 +1487,11 @@ if(localeField)localeField.value=localeSelect.value;
     )
 
     async def auth_middleware(request, call_next):
+        path = request.url.path
+        if not store.has_administrator():
+            if path == '/setup' or path in PUBLIC_LOGIN_ASSETS:
+                return await call_next(request)
+            return setup_required_response(request)
         raw_session = request.cookies.get(SESSION_COOKIE)
         session_principal = auth_service.principal_from_session(raw_session)
         host = request.client.host if request.client is not None else ''
@@ -1273,7 +1513,6 @@ if(localeField)localeField.value=localeSelect.value;
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
         request.scope[PENDING_IDENTITY_SCOPE_KEY] = pending_identity
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
-        path = request.url.path
         is_public_auth = route_is_public_auth_endpoint(path)
         if principal is None:
             if is_public_auth:

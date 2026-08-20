@@ -14,7 +14,11 @@ from .auth import BootstrapCredentials, Principal, hash_password, token_digest
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 3
+DB_SCHEMA_VERSION = 4
+
+
+class SetupAlreadyCompleteError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -114,12 +118,25 @@ class StateStore:
             self._create_compatible_schema(connection)
             administrator = self._administrator(connection)
             if administrator is None:
-                if bootstrap is None:
-                    raise RuntimeError(
-                        "Server administrator credentials are required for first startup"
+                administrator = (
+                    self._create_pending_administrator(connection)
+                    if bootstrap is None
+                    else self._bootstrap_admin(
+                        connection,
+                        bootstrap.username,
+                        hash_password(bootstrap.password),
                     )
-                administrator = self._bootstrap_admin(
+                )
+            elif (
+                bootstrap is not None
+                and self._administrator_is_pending(
                     connection,
+                    administrator.user_id,
+                )
+            ):
+                administrator = self._complete_pending_administrator(
+                    connection,
+                    administrator.user_id,
                     bootstrap.username,
                     hash_password(bootstrap.password),
                 )
@@ -144,6 +161,12 @@ class StateStore:
     def _create_compatible_schema(self, connection) -> None:
         self._migrate_historical_annotations(connection)
         self._create_account_schema(connection)
+        self._add_column_if_missing(
+            connection,
+            "users",
+            "setup_pending",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(setup_pending IN (0, 1))",
+        )
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS annotations (
@@ -262,6 +285,8 @@ class StateStore:
                 role TEXT NOT NULL CHECK(role IN ('admin', 'member')),
                 enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
                 password_hash TEXT,
+                setup_pending INTEGER NOT NULL DEFAULT 0
+                    CHECK(setup_pending IN (0, 1)),
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -678,10 +703,21 @@ class StateStore:
     def bootstrap_admin(self, username: str, password_hash: str) -> Principal:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            if self._administrator(connection) is not None:
-                raise RuntimeError("An administrator already exists")
-            return self._bootstrap_admin(
+            administrator = self._administrator(connection)
+            if administrator is None:
+                return self._bootstrap_admin(
+                    connection,
+                    username,
+                    password_hash,
+                ).principal
+            if not self._administrator_is_pending(
                 connection,
+                administrator.user_id,
+            ):
+                raise RuntimeError("An administrator already exists")
+            return self._complete_pending_administrator(
+                connection,
+                administrator.user_id,
                 username,
                 password_hash,
             ).principal
@@ -695,7 +731,93 @@ class StateStore:
             ).fetchone()
             if users_table is None:
                 return False
-            return self._administrator(connection) is not None
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(users)").fetchall()
+            }
+            pending_clause = (
+                " AND setup_pending = 0"
+                if "setup_pending" in columns
+                else ""
+            )
+            return connection.execute(
+                "SELECT 1 FROM users WHERE role = 'admin'"
+                + pending_clause
+                + " LIMIT 1"
+            ).fetchone() is not None
+
+    def complete_administrator_setup(
+        self,
+        username: str,
+        password_hash: str,
+        token_digest_value: str,
+        expires_at,
+        *,
+        now=None,
+    ) -> Principal:
+        normalized = self._normalize_username(username)
+        if not isinstance(password_hash, str) or not password_hash:
+            raise ValueError("Password hash must not be empty")
+        self._validate_session_digest(token_digest_value)
+        created_at = self._timestamp(now)
+        expiry = self._timestamp(expires_at)
+        if expiry <= created_at:
+            raise ValueError("Session expiry must be in the future")
+        session_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            pending = connection.execute(
+                """
+                SELECT id FROM users
+                WHERE role = 'admin' AND setup_pending = 1
+                ORDER BY created_at, id
+                """
+            ).fetchall()
+            if not pending:
+                raise SetupAlreadyCompleteError("Administrator setup is complete")
+            if len(pending) != 1:
+                raise RuntimeError("Invalid pending administrator state")
+            user_id = pending[0]["id"]
+            connection.execute(
+                """
+                UPDATE users
+                SET username = ?, enabled = 1, password_hash = ?,
+                    setup_pending = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND setup_pending = 1
+                """,
+                (normalized, password_hash, user_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO sessions (
+                    session_id, token_digest, user_id, expires_at,
+                    last_used_at, revoked_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                """,
+                (
+                    session_id,
+                    token_digest_value,
+                    user_id,
+                    str(expiry),
+                    str(created_at),
+                    str(created_at),
+                ),
+            )
+            return self._get_user(connection, user_id).principal
+
+    @staticmethod
+    def _validate_session_digest(token_digest_value: str) -> None:
+        if (
+            not isinstance(token_digest_value, str)
+            or len(token_digest_value) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in token_digest_value
+            )
+        ):
+            raise ValueError(
+                "Session token digest must be a SHA-256 hexadecimal digest"
+            )
 
     def _bootstrap_admin(
         self,
@@ -713,6 +835,47 @@ class StateStore:
             (user_id, normalized, password_hash),
         )
         return self._get_user(connection, user_id)
+
+    def _create_pending_administrator(self, connection) -> UserRecord:
+        user_id = uuid.uuid4().hex
+        connection.execute(
+            """
+            INSERT INTO users (
+                id, username, role, enabled, password_hash, setup_pending
+            ) VALUES (?, ?, 'admin', 0, NULL, 1)
+            """,
+            (user_id, "__epub_browser_setup_" + user_id),
+        )
+        return self._get_user(connection, user_id)
+
+    def _complete_pending_administrator(
+        self,
+        connection,
+        user_id: str,
+        username: str,
+        password_hash: str,
+    ) -> UserRecord:
+        normalized = self._normalize_username(username)
+        connection.execute(
+            """
+            UPDATE users
+            SET username = ?, enabled = 1, password_hash = ?,
+                setup_pending = 0, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND role = 'admin' AND setup_pending = 1
+            """,
+            (normalized, password_hash, user_id),
+        )
+        return self._get_user(connection, user_id)
+
+    @staticmethod
+    def _administrator_is_pending(connection, user_id: str) -> bool:
+        return connection.execute(
+            """
+            SELECT 1 FROM users
+            WHERE id = ? AND role = 'admin' AND setup_pending = 1
+            """,
+            (user_id,),
+        ).fetchone() is not None
 
     def _administrator(self, connection) -> Optional[UserRecord]:
         row = connection.execute(
@@ -1028,17 +1191,7 @@ class StateStore:
         *,
         now=None,
     ) -> str:
-        if (
-            not isinstance(token_digest_value, str)
-            or len(token_digest_value) != 64
-            or any(
-                character not in "0123456789abcdef"
-                for character in token_digest_value
-            )
-        ):
-            raise ValueError(
-                "Session token digest must be a SHA-256 hexadecimal digest"
-            )
+        self._validate_session_digest(token_digest_value)
         created_at = self._timestamp(now)
         expiry = self._timestamp(expires_at)
         if expiry <= created_at:

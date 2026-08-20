@@ -84,6 +84,38 @@ class MigrationManagerTests(unittest.TestCase):
             }
         self.assertIn("start_xpath", backup_columns)
 
+    def test_legacy_data_uses_pending_administrator_until_setup_completes(self):
+        source = self.server_dir / "annotations.db"
+        self._create_legacy_database(source, shelf_version=3)
+
+        result = MigrationManager(self.server_dir, None).prepare_data()
+        store = StateStore(result.database_path)
+        pending = store.list_users()
+        self.assertEqual(len(pending), 1)
+        self.assertFalse(store.has_administrator())
+        pending_id = pending[0].user_id
+        with sqlite3.connect(result.database_path) as connection:
+            annotation_owner = connection.execute(
+                "SELECT user_id FROM annotations WHERE id = 'a'"
+            ).fetchone()[0]
+            shelf_owner = connection.execute(
+                "SELECT user_id FROM bookshelves"
+            ).fetchone()[0]
+
+        MigrationManager(
+            self.server_dir,
+            None,
+            bootstrap=BootstrapCredentials("chosen-owner", "secret"),
+        ).prepare_data()
+        administrator = StateStore(result.database_path).get_user_by_username(
+            "chosen-owner"
+        )
+
+        self.assertEqual(annotation_owner, pending_id)
+        self.assertEqual(shelf_owner, pending_id)
+        self.assertEqual(administrator.user_id, pending_id)
+        self.assertTrue(administrator.enabled)
+
     def test_conflicting_root_databases_are_left_untouched(self):
         first = self.server_dir / "epub-browser.db"
         second = self.server_dir / "annotations.db"

@@ -75,17 +75,26 @@ For a private local library:
 ```bash
 epub-browser server /path/to/books \
   --server-dir /path/to/epub-browser-state \
-  --admin-username admin \
-  --admin-password-file /path/to/admin-password \
   --watch
 ```
 
-The first start of a Server directory requires an administrator username and
-password. Prefer a mode-`0600` password file: EPUB Browser removes one trailing
+On the first visit, `/setup` prompts for a username, password, confirmation,
+and language, then creates the sole initial superuser and signs it in. Until
+setup completes, EPUB Browser does not scan or expose the library: normal HTML
+redirects to `/setup`, while APIs, event streams, books, and generated assets
+return a minimal setup-required response.
+
+The setup page is a one-time claim. Complete it over loopback or another
+trusted/private path before exposing the port, because the first visitor who
+submits the form becomes the administrator. Trusted-proxy identity headers do
+not bypass or complete setup.
+
+For unattended deployment, provide `--admin-username` and preferably a
+mode-`0600` `--admin-password-file`. EPUB Browser removes exactly one trailing
 newline, creates the administrator with an Argon2id password hash, and never
-prints the secret. An empty or unreadable file stops startup. Once the database
-contains an administrator, later starts do not read or require the bootstrap
-secret.
+prints the secret. An incomplete unattended configuration or an empty or
+unreadable configured file stops startup. Once setup is complete, later starts
+do not read or require the bootstrap secret.
 
 The equivalent environment settings are
 `EPUB_BROWSER_ADMIN_USERNAME` and
@@ -133,13 +142,12 @@ For a disposable session, use `--ephemeral` instead of `--server-dir`:
 
 ```bash
 epub-browser server book.epub \
-  --ephemeral \
-  --admin-username admin \
-  --admin-password-file /path/to/admin-password
+  --ephemeral
 ```
 
-Because an ephemeral database is new on every run, it needs bootstrap
-credentials on every run.
+Because an ephemeral database is new on every run, web setup repeats on every
+run. Supply unattended bootstrap credentials if an interactive setup is not
+appropriate.
 
 - Initial and watch scans appear in the Server library page; Server mode does not use terminal tqdm.
 - Interactive terminals print the bound URL once. Docker/systemd runs stay quiet unless `--log` is enabled.
@@ -172,15 +180,27 @@ The image runs persistent Server mode. Mount EPUB input read-write so the defaul
 docker run -d \
   --name epub-browser \
   -p 127.0.0.1:8080:80 \
-  -e EPUB_BROWSER_ADMIN_USERNAME=admin \
-  -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
-  --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
   epub-browser:2.0.5
 ```
 
-`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library:rw` permits default sidecar creation and fingerprint refresh. A read-only input mount works only when every selected sidecar or embedded carrier already exists and matches; EPUB Browser no longer falls back to a database-only ID. Using `--book-id-storage embedded` opts into EPUB ZIP rebuilding and may be refused for signed, linked, read-only, or unsupported sources. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
+Visit `http://127.0.0.1:8080/setup` and complete setup before changing the port
+binding or proxy rules. For an unattended first start, add:
+
+```bash
+-e EPUB_BROWSER_ADMIN_USERNAME=admin \
+-e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
+--mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly
+```
+
+`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library:rw`
+permits default sidecar creation and fingerprint refresh. A read-only input
+mount works only when every selected sidecar or embedded carrier already exists
+and matches; EPUB Browser no longer falls back to a database-only ID. Using
+`--book-id-storage embedded` opts into EPUB ZIP rebuilding and may be refused
+for signed, linked, read-only, or unsupported sources. Mount
+`/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
 
 ```bash
 -v /path/to/legacy-sync:/app/SyncData:ro
@@ -232,7 +252,7 @@ epub-browser server --help
 | Server | `--legacy-sync-dir` | Read legacy bookshelf JSON during migration. |
 | Both | `--book-id-storage sidecar\|embedded` | Select one identity carrier for the entire invocation; default `sidecar`. |
 | Server | `--admin-username` | First-start administrator; environment fallback is supported. |
-| Server | `--admin-password-file` | Preferred first-start secret source. |
+| Server | `--admin-password-file` | Preferred optional unattended first-start secret source. |
 | Server | `--trusted-proxy-cidr` | Repeatable direct-proxy trust boundary; requires proxy header and issuer options. |
 | Server | `--cookie-secure` | Mark session cookies HTTPS-only. |
 | Both | `--log` | Show operational detail without corrupting progress output. |

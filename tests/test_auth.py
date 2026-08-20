@@ -63,6 +63,29 @@ class MutableClock:
         self.value += seconds
 
 
+class SetupAuthTests(unittest.TestCase):
+    def test_setup_completion_returns_an_authenticated_session_for_pending_admin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = StateStore(Path(directory) / "state.db")
+            pending = store.initialize()
+            clock = MutableClock()
+            service = AuthService(
+                store,
+                AuthConfig.from_values([], None, None),
+                clock=clock,
+            )
+
+            raw_token, principal = service.complete_setup("Owner", "secret")
+
+            self.assertEqual(principal.user_id, pending.user_id)
+            self.assertEqual(principal.username, "owner")
+            self.assertEqual(service.principal_from_session(raw_token), principal)
+            self.assertEqual(
+                service.authenticate_password("owner", "secret", "client"),
+                principal,
+            )
+
+
 class SessionAndProxyTests(unittest.TestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()

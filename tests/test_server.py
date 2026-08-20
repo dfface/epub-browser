@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 from starlette.testclient import TestClient
@@ -21,6 +22,180 @@ from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISIO
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import create_app, migrate_legacy_database
 from epub_browser.state import StateStore
+
+
+class ServerSetupBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.public = Path(self.directory.name) / "public"
+        self.public.mkdir()
+        (self.public / "index.html").write_text(
+            "private library content",
+            encoding="utf-8",
+        )
+        (self.public / "assets").mkdir()
+        (self.public / "assets" / "reader.js").write_text(
+            "private reader asset",
+            encoding="utf-8",
+        )
+        (self.public / "assets" / "auth.js").write_text(
+            "generated auth asset",
+            encoding="utf-8",
+        )
+        (self.public / "book" / "id").mkdir(parents=True)
+        (self.public / "book" / "id" / "index.html").write_text(
+            "private book",
+            encoding="utf-8",
+        )
+        self.store = StateStore(Path(self.directory.name) / "state.db")
+        self.pending = self.store.initialize()
+        self.auth_config = AuthConfig.from_values([], None, None)
+        self.app = create_app(
+            self.public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, self.auth_config),
+        )
+        self.client = TestClient(self.app, follow_redirects=False)
+        self.addCleanup(self.client.close)
+
+    def test_pending_setup_exposes_only_setup_fixed_assets_and_minimal_status(self):
+        english = self.client.get("/setup?lang=en")
+        chinese = self.client.get("/setup?lang=zh-CN")
+
+        self.assertEqual(english.status_code, 200)
+        self.assertEqual(chinese.status_code, 200)
+        self.assertIn(
+            "When you first access the web interface, you will be prompted "
+            "to create a superuser account.",
+            english.text,
+        )
+        self.assertIn("首次访问 Web 界面时，系统会提示你创建一个超级用户账户。", chinese.text)
+        self.assertIn('id="setupForm"', english.text)
+        self.assertIn('name="password_confirmation"', english.text)
+        self.assertIn('id="setupLocaleSelect"', english.text)
+
+        for path in ("/", "/index.html", "/login", "/reader.html"):
+            with self.subTest(path=path):
+                response = self.client.get(path, headers={"Accept": "text/html"})
+                self.assertEqual(response.status_code, 303)
+                self.assertEqual(response.headers["location"], "/setup")
+
+        for path in (
+            "/api/annotations/book",
+            "/api/library-events",
+            "/book/id/index.html",
+            "/assets/reader.js",
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()["code"], "setup_required")
+                self.assertNotIn("private", response.text)
+
+        fixed_auth = self.client.get("/assets/auth.js")
+        self.assertEqual(fixed_auth.status_code, 200)
+        self.assertNotIn("generated auth asset", fixed_auth.text)
+        self.assertEqual(self.client.get("/assets/i18n.js").status_code, 200)
+        for path in ("/api/health", "/api/ready"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json(), {"status": "setup_required"})
+
+    def test_setup_submission_activates_pending_admin_and_enters_library(self):
+        response = self.client.post(
+            "/setup",
+            data={
+                "username": "Owner",
+                "password": "setup-secret",
+                "password_confirmation": "setup-secret",
+                "locale": "en",
+            },
+        )
+
+        user = self.store.get_user_by_username("owner")
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/")
+        self.assertIn("epub_browser_session=", response.headers["set-cookie"])
+        self.assertNotIn("setup-secret", response.text)
+        self.assertEqual(user.user_id, self.pending.user_id)
+        self.assertTrue(user.enabled)
+        self.assertTrue(self.store.has_administrator())
+        self.assertEqual(self.client.get("/").text, "private library content")
+
+    def test_setup_rejects_invalid_form_without_echoing_password(self):
+        response = self.client.post(
+            "/setup",
+            data={
+                "username": "Owner",
+                "password": "do-not-echo-this",
+                "password_confirmation": "different",
+                "locale": "zh-CN",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('<html lang="zh-CN">', response.text)
+        self.assertIn("密码与确认密码不一致。", response.text)
+        self.assertNotIn("do-not-echo-this", response.text)
+        self.assertFalse(self.store.has_administrator())
+
+    def test_concurrent_setup_submissions_allow_exactly_one_claim(self):
+        barrier = threading.Barrier(2)
+
+        def submit(username):
+            with TestClient(self.app, follow_redirects=False) as client:
+                barrier.wait(timeout=5)
+                response = client.post(
+                    "/setup",
+                    data={
+                        "username": username,
+                        "password": "secret-" + username,
+                        "password_confirmation": "secret-" + username,
+                    },
+                )
+                return response.status_code, response.headers.get("location")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = tuple(executor.map(submit, ("first", "second")))
+
+        self.assertEqual(sorted(results), [(303, "/"), (303, "/login")])
+        users = self.store.list_users()
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0].user_id, self.pending.user_id)
+        self.assertTrue(users[0].enabled)
+        with sqlite3.connect(self.store.database_path) as connection:
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM sessions").fetchone()[0],
+                1,
+            )
+
+    def test_trusted_proxy_identity_cannot_claim_pending_setup(self):
+        proxy_config = AuthConfig.from_values(
+            ["10.0.0.0/8"],
+            "X-Remote-User",
+            "https://sso.example",
+        )
+        app = create_app(
+            self.public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, proxy_config),
+        )
+        with TestClient(
+            app,
+            client=("10.1.2.3", 4321),
+            follow_redirects=False,
+        ) as client:
+            response = client.get(
+                "/",
+                headers={"X-Remote-User": "attacker"},
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/setup")
+        self.assertNotIn("set-cookie", response.headers)
+        self.assertFalse(self.store.has_administrator())
 
 
 class ServerAuthBoundaryTests(unittest.TestCase):

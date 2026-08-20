@@ -23,20 +23,27 @@ Migration runs only for persistent Server mode. Given an existing v1 directory:
 epub-browser server /path/to/books \
   --server-dir /path/to/existing-v1-directory \
   --legacy-sync-dir /path/to/legacy-sync \
-  --admin-username admin \
-  --admin-password-file /path/to/admin-password \
   --watch
 ```
 
-The first v2 start needs administrator credentials because all legacy
-annotations, bookshelf rows, and reading progress are assigned to that account
-inside the same rollback-safe schema upgrade. Prefer a mode-`0600` secret file.
-The environment equivalents are `EPUB_BROWSER_ADMIN_USERNAME` and
-`EPUB_BROWSER_ADMIN_PASSWORD_FILE`; `EPUB_BROWSER_ADMIN_PASSWORD` is a less
-private fallback only when no file is configured. A configured empty or
+The migration first creates one disabled, unloginable pending administrator
+with a generated stable user ID. All legacy annotations, bookshelf rows, and
+reading progress are assigned to that ID inside the same rollback-safe schema
+upgrade; no legacy username is selected as the new login name. Visit `/setup`
+to choose the username and password. Setup atomically activates that same user
+ID, creates a session, and then allows library reconciliation and publication.
+
+Keep the Server port on loopback or another trusted/private path until setup is
+complete: the first visitor who submits the one-time form claims the
+administrator account. Trusted-proxy identity headers cannot claim it. For an
+unattended migration, add `--admin-username` and preferably a mode-`0600`
+`--admin-password-file`; the environment equivalents are
+`EPUB_BROWSER_ADMIN_USERNAME` and `EPUB_BROWSER_ADMIN_PASSWORD_FILE`.
+`EPUB_BROWSER_ADMIN_PASSWORD` is a less private fallback only when no file is
+configured. A partial unattended configuration or a configured empty or
 unreadable file fails closed and does not fall back to plaintext environment
-content. After an administrator exists, retries and ordinary restarts no longer
-read or require any bootstrap secret.
+content. After setup completes, retries and ordinary restarts no longer read or
+require any bootstrap secret.
 
 Startup performs these steps:
 
@@ -46,7 +53,7 @@ Startup performs these steps:
 4. Upgrade a temporary copy and atomically activate it as `data/epub-browser.db`.
 5. Preserve annotations, bookshelf rows, reading progress, and legacy book IDs.
 6. Import the highest valid `epub-browser-bookshelf-<username>-<version>.json` per user when it is newer than SQLite. JSON source files are not deleted.
-7. Reconcile every EPUB into `cache/public/`.
+7. Wait for web or unattended administrator setup, then reconcile every EPUB into `cache/public/`.
 8. After a complete reconciliation, move old root `index.html`, `book-metadata.json`, `sw.js`, `assets/`, and `book/` into `cache/legacy-public/`.
 9. Remove `cache/legacy-public/` only after the next successful startup.
 
@@ -119,7 +126,7 @@ The v2 image expects:
 - `/app/Library`: EPUB input, read-write for default sidecar creation or refresh;
 - `/app/EpubBrowserFiles`: required read-write persistent Server directory;
 - `/app/SyncData`: optional read-only legacy JSON import directory.
-- `/run/secrets/epub-browser-admin-password`: recommended read-only first-start password file.
+- `/run/secrets/epub-browser-admin-password`: optional read-only unattended first-start password file.
 
 The container command now uses `epub-browser server` and listens on `0.0.0.0` inside the container. A read-only Library mount works only when every selected identity carrier already exists and matches the source; there is no database-only fallback. `--book-id-storage embedded` may rebuild the EPUB and is refused when doing so would be unsafe. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
 
@@ -128,13 +135,14 @@ For example:
 ```bash
 docker run -d \
   -p 127.0.0.1:8080:80 \
-  -e EPUB_BROWSER_ADMIN_USERNAME=admin \
-  -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
-  --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/existing-v1-directory:/app/EpubBrowserFiles \
   epub-browser:2.0.5
 ```
+
+Complete `/setup` through the loopback binding before exposing the service. For
+unattended setup, add the administrator environment values and read-only secret
+mount shown in the main README Docker example.
 
 The container command uses `epub-browser server --watch`, listens on `0.0.0.0`
 inside the container, and retains authoritative data only through the mounted

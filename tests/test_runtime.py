@@ -139,7 +139,24 @@ class ServerBootstrapTests(unittest.TestCase):
             auth=auth,
         )
 
-    def test_first_persistent_start_requires_credentials_without_printing_secret(self):
+    def test_first_persistent_start_without_credentials_enters_setup_mode_silently(self):
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = run_server(self._config(), server_factory=_ReturningServer)
+
+        store = StateStore(self.server_dir / "data" / "epub-browser.db")
+        users = store.list_users()
+        self.assertEqual(result, 0)
+        self.assertFalse(store.has_administrator())
+        self.assertEqual(len(users), 1)
+        self.assertFalse(users[0].enabled)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_partial_unattended_credentials_fail_closed_without_printing_secret(self):
         with (
             mock.patch.dict(
                 os.environ,
@@ -153,6 +170,71 @@ class ServerBootstrapTests(unittest.TestCase):
         self.assertEqual(result, 5)
         self.assertIn("administrator credentials are required", stderr.getvalue())
         self.assertNotIn("secret-value", stderr.getvalue())
+
+    def test_library_publication_waits_until_web_setup_completes(self):
+        prepared = threading.Event()
+        reconciled = threading.Event()
+        responses = {}
+
+        class SetupLibrary:
+            def __init__(library, *, server_dir, **kwargs):
+                library.public_dir = Path(server_dir) / "cache" / "public"
+                library.on_reconcile_started = None
+                library.on_reconciled = None
+
+            def prepare_public_shell(library):
+                library.public_dir.mkdir(parents=True, exist_ok=True)
+                (library.public_dir / "index.html").write_text(
+                    "private library",
+                    encoding="utf-8",
+                )
+                prepared.set()
+
+            def reconcile(library):
+                if library.on_reconcile_started:
+                    library.on_reconcile_started()
+                summary = ReconcileSummary(0, 0, 0, (), ())
+                if library.on_reconciled:
+                    library.on_reconciled(summary)
+                reconciled.set()
+                return summary
+
+            def request_stop(library):
+                return None
+
+            def shutdown(library):
+                return None
+
+        class SetupServer(_ReturningServer):
+            def run(server):
+                with TestClient(server.config.app, follow_redirects=False) as client:
+                    responses["before"] = client.get("/")
+                    if not prepared.is_set() or reconciled.is_set():
+                        raise RuntimeError("setup boundary did not defer library scan")
+                    responses["setup"] = client.post(
+                        "/setup",
+                        data={
+                            "username": "owner",
+                            "password": "web-secret",
+                            "password_confirmation": "web-secret",
+                        },
+                    )
+                    responses["after"] = client.get("/")
+                    if not reconciled.wait(timeout=5):
+                        raise RuntimeError("library was not reconciled after setup")
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            result = run_server(
+                self._config(),
+                server_factory=SetupServer,
+                library_factory=SetupLibrary,
+            )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(responses["before"].status_code, 303)
+        self.assertEqual(responses["before"].headers["location"], "/setup")
+        self.assertEqual(responses["setup"].status_code, 303)
+        self.assertEqual(responses["after"].text, "private library")
 
     def test_empty_password_file_environment_setting_uses_plaintext_fallback(self):
         credentials = resolve_bootstrap_credentials(

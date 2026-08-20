@@ -46,6 +46,9 @@ class RuntimeStatus:
     def mark_migrating(self):
         self._set("migrating", 0, 0, available=False)
 
+    def mark_setup_required(self):
+        self._set("setup_required", 0, 0, available=False)
+
     def mark_scanning(self):
         self._set("scanning", 0, 0)
 
@@ -131,6 +134,22 @@ def resolve_bootstrap_credentials(
             "Server administrator credentials are required for first startup"
         )
     return BootstrapCredentials(username, password)
+
+
+def resolve_optional_bootstrap_credentials(
+    config: ServerConfig,
+    environ: Mapping[str, str],
+) -> Optional[BootstrapCredentials]:
+    username = config.auth.admin_username or environ.get(
+        "EPUB_BROWSER_ADMIN_USERNAME"
+    )
+    password_file = config.auth.admin_password_file or environ.get(
+        "EPUB_BROWSER_ADMIN_PASSWORD_FILE"
+    )
+    password = environ.get("EPUB_BROWSER_ADMIN_PASSWORD")
+    if not username and not password_file and not password:
+        return None
+    return resolve_bootstrap_credentials(config, environ)
 
 
 def _persistent_database_needs_bootstrap(server_dir: Path) -> bool:
@@ -323,7 +342,7 @@ def run_server(
             data_path = server_dir / "data" / "epub-browser.db"
             state_store = StateStore(data_path)
             bootstrap = (
-                resolve_bootstrap_credentials(config, os.environ)
+                resolve_optional_bootstrap_credentials(config, os.environ)
                 if not state_store.has_administrator()
                 else None
             )
@@ -331,7 +350,7 @@ def run_server(
         else:
             status.mark_migrating()
             bootstrap = (
-                resolve_bootstrap_credentials(config, os.environ)
+                resolve_optional_bootstrap_credentials(config, os.environ)
                 if _persistent_database_needs_bootstrap(server_dir)
                 else None
             )
@@ -348,7 +367,6 @@ def run_server(
                 migration_result.state_path
             )
 
-        status.mark_scanning()
         manager = library_factory(
             server_dir=server_dir,
             sources=config.sources,
@@ -363,11 +381,21 @@ def run_server(
             status,
             summary,
         )
+        setup_required = not state_store.has_administrator()
         manager.prepare_public_shell()
-        status.mark_available()
+        if setup_required:
+            status.mark_setup_required()
+        else:
+            status.mark_scanning()
+            status.mark_available()
 
         def initial_reconcile():
             try:
+                while not state_store.has_administrator():
+                    if watcher_stop.wait(0.05):
+                        return
+                if setup_required:
+                    status.mark_available()
                 summary: ReconcileSummary = manager.reconcile()
                 if (
                     not summary.cancelled

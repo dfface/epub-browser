@@ -308,6 +308,22 @@ class AuthService:
         )
         return raw_token, self.issue_csrf_token(principal, raw_token)
 
+    def complete_setup(self, username: str, password: str) -> Tuple[str, Principal]:
+        if not isinstance(username, str) or not username.strip():
+            raise ValueError("Username must not be empty")
+        if not isinstance(password, str) or not password:
+            raise ValueError("Password must not be empty")
+        raw_token = secrets.token_urlsafe(32)
+        now = self._now()
+        principal = self.store.complete_administrator_setup(
+            username,
+            hash_password(password),
+            token_digest(raw_token),
+            now + self.ttl,
+            now=now,
+        )
+        return raw_token, principal
+
     def principal_from_session(self, raw_token: Optional[str]) -> Optional[Principal]:
         if not raw_token:
             return None

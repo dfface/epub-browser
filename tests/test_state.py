@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from epub_browser.auth import BootstrapCredentials
+from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
 
 
@@ -65,34 +65,71 @@ class StateStoreTests(unittest.TestCase):
                 )
         self.assertEqual(self._database_snapshot(), before)
 
-    def test_initialize_without_bootstrap_leaves_v1_database_unchanged(self):
+    def test_initialize_without_bootstrap_migrates_v1_data_to_pending_administrator(self):
         self._create_v1_database_with_annotation_bookshelf_and_progress(
             "legacy-name"
         )
-        before = self._database_snapshot()
+        store = StateStore(self.database)
 
-        with self.assertRaisesRegex(RuntimeError, "administrator credentials"):
-            StateStore(self.database).initialize()
+        pending = store.initialize()
 
-        self.assertEqual(self._database_snapshot(), before)
+        user = store.get_user(pending.user_id)
+        self.assertFalse(store.has_administrator())
+        self.assertFalse(user.enabled)
+        self.assertIsNone(user.password_hash)
+        self.assertEqual(
+            store.list_annotations(user_id=pending.user_id)[0]["text"],
+            "old note",
+        )
+        self.assertEqual(store.get_bookshelf(pending.user_id)[0], 7)
+        self.assertEqual(store.get_reading_progress(pending.user_id, "book"), 3)
 
-    def test_initialize_without_bootstrap_leaves_new_database_uninitialized(self):
+    def test_initialize_without_bootstrap_creates_one_stable_pending_administrator(self):
         database = Path(self.temporary.name, "fresh", "state.db")
+        store = StateStore(database)
 
-        with self.assertRaisesRegex(RuntimeError, "administrator credentials"):
-            StateStore(database).initialize()
+        first = store.initialize()
+        second = store.initialize()
 
-        with sqlite3.connect(database) as connection:
-            self.assertEqual(
-                connection.execute("PRAGMA user_version").fetchone()[0],
-                0,
+        self.assertEqual(second.user_id, first.user_id)
+        self.assertEqual(len(store.list_users()), 1)
+        self.assertFalse(store.has_administrator())
+
+    def test_unattended_bootstrap_completes_pending_administrator_in_place(self):
+        database = Path(self.temporary.name, "pending", "state.db")
+        store = StateStore(database)
+        pending = store.initialize()
+
+        completed = store.initialize(BootstrapCredentials("Owner", "secret"))
+
+        user = store.get_user(completed.user_id)
+        self.assertEqual(completed.user_id, pending.user_id)
+        self.assertEqual(user.username, "owner")
+        self.assertTrue(user.enabled)
+        self.assertTrue(store.has_administrator())
+        self.assertEqual(len(store.list_users()), 1)
+
+    def test_setup_activation_and_session_insert_roll_back_together(self):
+        database = Path(self.temporary.name, "atomic", "state.db")
+        store = StateStore(database)
+        pending = store.initialize()
+        raw_token = "setup-session-token"
+        digest = token_digest(raw_token)
+        store.create_session(digest, pending.user_id, 200, now=100)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.complete_administrator_setup(
+                "owner",
+                hash_password("secret"),
+                digest,
+                300,
+                now=100,
             )
-            self.assertEqual(
-                connection.execute(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
-                ).fetchone()[0],
-                0,
-            )
+
+        user = store.get_user(pending.user_id)
+        self.assertFalse(user.enabled)
+        self.assertIsNone(user.password_hash)
+        self.assertFalse(store.has_administrator())
 
     def test_initialize_without_bootstrap_reuses_existing_administrator(self):
         self.assertEqual(self.store.initialize(), self.owner)
