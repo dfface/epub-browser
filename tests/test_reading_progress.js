@@ -169,6 +169,23 @@ test('server reading progress uses Cookie authentication and CSRF, never X-Usern
   assert.equal(received.options.headers['X-CSRF-Token'], 'csrf');
 });
 
+test('server reading progress identifies the authenticated account', () => {
+  const originalAuth = global.EpubBrowserAuth;
+  const originalMode = global.EpubBrowserMode;
+  global.EpubBrowserMode = 'server';
+  global.EpubBrowserAuth = {
+    getSession() { return { user: { username: 'alice', role: 'member' } }; },
+  };
+
+  try {
+    assert.equal(typeof Progress.getUsername, 'function');
+    assert.equal(Progress.getUsername(), 'alice');
+  } finally {
+    global.EpubBrowserAuth = originalAuth;
+    global.EpubBrowserMode = originalMode;
+  }
+});
+
 test('detailed reading progress requests preserve stable server error codes', async () => {
   const originalAuth = global.EpubBrowserAuth;
   const originalMode = global.EpubBrowserMode;

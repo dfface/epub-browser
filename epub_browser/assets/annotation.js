@@ -698,17 +698,14 @@
         // 初始化
         init: function() {
             var self = this;
-            return IDBStorage.init().then(function() {
-                if (window.EpubBrowserMode !== 'server') {
-                    self.currentType = 'idb';
-                    return;
-                }
-                // 从 localStorage 加载 storageType
-                var storageType = Utils.getStorage('annotation_storage_type');
-                if (storageType) {
-                    self.currentType = storageType;
-                }
-            });
+            if (window.EpubBrowserMode === 'server') {
+                self.currentType = 'backend';
+                Settings.storageType = 'backend';
+                return Promise.resolve();
+            }
+            self.currentType = 'idb';
+            Settings.storageType = 'idb';
+            return IDBStorage.init();
         },
         
         // 获取当前适配器
@@ -800,18 +797,13 @@
         load: function() {
             var enabled = Utils.getStorage('annotation_enabled');
             var color = Utils.getStorage('annotation_default_color');
-            var storageType = Utils.getStorage('annotation_storage_type');
             var colorOrder = Utils.getStorage('annotation_color_order');
             var customColors = Utils.getStorage('annotation_custom_colors');
             var deletedColors = Utils.getStorage('annotation_deleted_colors');
             
             if (enabled !== null) this.enabled = enabled === 'true';
             if (color) this.defaultColor = color;
-            if (window.EpubBrowserMode !== 'server') {
-                this.storageType = 'idb';
-            } else if (storageType) {
-                this.storageType = storageType;
-            }
+            this.storageType = window.EpubBrowserMode === 'server' ? 'backend' : 'idb';
             if (colorOrder) {
                 try { this.colorOrder = JSON.parse(colorOrder); } catch (e) { this.colorOrder = []; }
             }
@@ -827,7 +819,6 @@
         save: function() {
             Utils.setStorage('annotation_enabled', this.enabled.toString());
             Utils.setStorage('annotation_default_color', this.defaultColor);
-            Utils.setStorage('annotation_storage_type', this.storageType);
             Utils.setStorage('annotation_color_order', JSON.stringify(this.colorOrder));
             Utils.setStorage('annotation_custom_colors', JSON.stringify(this.customColors));
             Utils.setStorage('annotation_deleted_colors', JSON.stringify(this.deletedColors));
@@ -1676,20 +1667,6 @@
                     </label>\
                 </div>\
                 <div class="settings-group">\
-                    <label class="settings-label">' + tr('storageLocation') + '</label>\
-                    <div class="storage-options">\
-                        <label class="storage-option" id="storageOptionIdb">\
-                            <input type="radio" name="annotationStorage" value="idb" ' + (Settings.storageType === 'idb' ? 'checked' : '') + '>\
-                            <span class="storage-option-text">' + tr('localStorage') + '</span>\
-                        </label>\
-                        <label class="storage-option" id="storageOptionBackend">\
-                            <input type="radio" name="annotationStorage" value="backend" ' + (Settings.storageType === 'backend' ? 'checked' : '') + '>\
-                            <span class="storage-option-text">' + tr('cloudStorage') + '</span>\
-                            <span class="storage-option-status" id="backendStatus">' + tr('checking') + '</span>\
-                        </label>\
-                    </div>\
-                </div>\
-                <div class="settings-group">\
                     <label class="settings-label">\
                         ' + tr('defaultColor') + '\
                         <span class="color-tip-default" data-tooltip="' + tr('defaultColorTip') + '" aria-label="' + tr('defaultColorTip') + '"><i class="fas fa-info-circle"></i></span>\
@@ -1718,7 +1695,6 @@
                 
                 this.bindEvents(tabBtn, tabPanel);
                 this.initColorPicker(tabPanel);
-                this.checkBackendStatus();
                 
                 // Re-bind tab switch events for all tabs (including the new one)
                 this.rebindTabEvents();
@@ -1788,33 +1764,6 @@
                     HighlightInteraction.clearHighlights();
                 }
                 Utils.showNotification(tr(Settings.enabled ? 'enabledNotice' : 'disabledNotice'), 'info');
-            });
-            
-            // Storage toggle
-            var storageRadios = tabPanel.querySelectorAll('input[name="annotationStorage"]');
-            storageRadios.forEach(function(radio) {
-                radio.addEventListener('change', async function() {
-                    var targetType = this.value;
-                    
-                    // 如果选择的是当前存储类型，不处理
-                    if (targetType === Settings.storageType) return;
-                    
-                    // 切换到云端存储
-                    if (targetType === 'backend') {
-                        if (!Settings.backendAvailable) {
-                            Utils.showNotification(tr('cloudUnavailable'), 'warning');
-                            self.revertStorageRadio(Settings.storageType);
-                            return;
-                        }
-                        
-                        // 继续迁移流程
-                        self.showMigrationDialog(Settings.storageType, targetType);
-                        return;
-                    }
-                    
-                    // 切换到本地存储
-                    self.showMigrationDialog(Settings.storageType, targetType);
-                });
             });
             
             // 导出按钮

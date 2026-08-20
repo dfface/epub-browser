@@ -274,7 +274,7 @@ epub-browser server --help
 
 - Recursive EPUB and Calibre-library discovery, metadata tags, search, and pinyin search.
 - Scrolling, page turning, continuous reading, custom fonts and CSS, themes, and pure reading mode.
-- Highlights and notes with browser or Server-backed annotation storage where available.
+- Highlights and notes stored locally in SSG output and in the authenticated account's Server database in Server mode.
 - Nested bookshelf groups, tags, JSON import/export, and the existing optional manual sync.
 - PWA manifests and content-addressed static assets.
 - English and Simplified Chinese browser UI.

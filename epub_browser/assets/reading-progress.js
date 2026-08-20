@@ -143,6 +143,12 @@
     showProgressBar: showProgressBar,
     progressBarClass: progressBarClass,
     isServerMode: function() { return root.EpubBrowserMode === 'server'; },
+    getUsername: function() {
+      if (root.EpubBrowserMode !== 'server') return '';
+      var auth = root.EpubBrowserAuth;
+      var session = auth && typeof auth.getSession === 'function' ? auth.getSession() : null;
+      return session && session.user && session.user.username ? session.user.username : '';
+    },
     request: request
   };
 });

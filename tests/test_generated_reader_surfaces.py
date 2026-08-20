@@ -862,7 +862,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertIn("markReadingChapter(readKey, getProgressIdentity())", script)
         self.assertIn("if (window.EpubBrowserMode !== 'server') return '';", script)
-        self.assertIn("return window.EpubReadingProgress.getUsername() || 'shared';", script)
+        self.assertIn("return window.EpubReadingProgress.getUsername();", script)
+        self.assertNotIn("return 'shared';", script)
         self.assertIn("markReadingChapter(currentChapter);", script)
         self.assertIn("if (username) {", script)
         self.assertIn("chapter-sync-tag", script)

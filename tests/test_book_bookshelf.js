@@ -71,3 +71,10 @@ test('logged-in Server reader changes its shelf without a legacy username marker
     { message: 'book.removedFromShelf', level: 'success' },
   ]);
 });
+
+test('Server progress labels never invent a shared account identity', () => {
+  const client = loadBookClient();
+  client.context.window.EpubReadingProgress = { getUsername() { return ''; } };
+
+  assert.equal(client.context.getProgressIdentity(), '');
+});

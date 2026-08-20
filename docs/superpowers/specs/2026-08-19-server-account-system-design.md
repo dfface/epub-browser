@@ -216,7 +216,9 @@ authentication is enabled.
 ## Compatibility
 
 SSG emits no login, account, administration, proxy, session, or authentication
-API behavior.  Its annotations and reading progress remain browser-local.
+API behavior. Its annotations and reading progress remain browser-local. Server
+annotations always use the authenticated account's database storage; deployment
+mode determines the adapter and the reader does not offer a storage selector.
 
 The Server migration is intentionally a breaking security change: it no longer
 accepts username identity supplied by JavaScript, local storage, or clients.
