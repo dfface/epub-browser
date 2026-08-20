@@ -13,12 +13,13 @@ from typing import Callable, Optional, Sequence
 from tqdm import tqdm
 
 from .asset_publisher import AssetPublisher, PublishedAssets
+from .book_identity import inspect_book_identity, resolve_book_identity
 from .cli import SSGConfig
-from .epub_identity import ensure_embedded_book_id
 from .models import ConvertedBook
 from .processor import EPUBProcessor
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
+from .sidecar_identity import discover_orphan_sidecars
 from .urls import SiteURLs
 
 
@@ -52,7 +53,8 @@ class SSGPublisher:
     def build(self) -> Path:
         sources = self._discover_sources()
         self._validate_output_target(sources)
-        prepared = self._prepare_books(sources)
+        orphan_sidecars = discover_orphan_sidecars(self.config.sources, sources)
+        prepared = self._prepare_books(sources, orphan_sidecars)
 
         self.output_dir.parent.mkdir(parents=True, exist_ok=True)
         staging = Path(
@@ -76,6 +78,7 @@ class SSGPublisher:
     def _prepare_books(
         self,
         sources: Sequence[Path],
+        orphan_sidecars: Sequence[Path],
     ) -> tuple[_PreparedBook, ...]:
         failures = []
         prepared = []
@@ -84,7 +87,15 @@ class SSGPublisher:
             for source in sources:
                 processor = None
                 try:
-                    book_id = ensure_embedded_book_id(source)
+                    inspection = inspect_book_identity(
+                        source,
+                        orphan_sidecars=orphan_sidecars,
+                    )
+                    identity = resolve_book_identity(
+                        inspection,
+                        self.config.book_id_storage,
+                    )
+                    book_id = identity.book_id
                     processor = EPUBProcessor(
                         source,
                         probe_root,
@@ -118,7 +129,7 @@ class SSGPublisher:
             if len(paths) > 1
         }
         if duplicate_groups:
-            lines = ["Duplicate embedded SSG book IDs:"]
+            lines = ["Duplicate SSG book IDs:"]
             for book_id in sorted(duplicate_groups):
                 lines.append(f"  {book_id}:")
                 lines.extend(
@@ -135,13 +146,14 @@ class SSGPublisher:
             if not source.exists():
                 failures.append((source, "path does not exist"))
                 continue
-            resolved = source.resolve()
-            if resolved.is_file():
-                if resolved.suffix.lower() == ".epub":
-                    discovered.append(resolved)
+            absolute = source.absolute()
+            if absolute.is_file():
+                if absolute.suffix.lower() == ".epub":
+                    discovered.append(absolute)
                 else:
-                    failures.append((resolved, "file is not an EPUB"))
+                    failures.append((absolute, "file is not an EPUB"))
                 continue
+            resolved = source.resolve()
             if not resolved.is_dir():
                 failures.append((resolved, "path is not a regular file or directory"))
                 continue
@@ -172,7 +184,11 @@ class SSGPublisher:
                     f"Output directory cannot be an input source: {self.output_dir}"
                 )
         for source in sources:
-            if source == self.output_dir or source.is_relative_to(self.output_dir):
+            resolved_source = source.resolve()
+            if (
+                resolved_source == self.output_dir
+                or resolved_source.is_relative_to(self.output_dir)
+            ):
                 raise SSGBuildError(
                     f"Output directory would own an input EPUB: {self.output_dir}"
                 )

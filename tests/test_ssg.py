@@ -10,11 +10,12 @@ from pathlib import Path
 
 from epub_browser.cli import SSGConfig
 from epub_browser.epub_identity import read_embedded_book_id
+from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.ssg import SSGBuildError, SSGPublisher, run_ssg
 
 
 class SSGPublicationTests(unittest.TestCase):
-    def test_embedded_id_survives_package_metadata_changes(self):
+    def test_sidecar_id_survives_package_metadata_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "book.epub"
@@ -26,7 +27,8 @@ class SSGPublicationTests(unittest.TestCase):
             )
 
             publisher.build()
-            first_id = read_embedded_book_id(source)
+            first_sidecar = read_exact_sidecar(source)
+            first_id = first_sidecar.book_id
             first_metadata = json.loads(
                 (output / "book-metadata.json").read_text(encoding="utf-8")
             )
@@ -44,7 +46,48 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertRegex(first_id, r"^[A-Za-z0-9_-]{22}$")
             self.assertEqual(first_metadata[0]["hash"], first_id)
             self.assertEqual(second_metadata[0]["hash"], first_id)
-            self.assertEqual(read_embedded_book_id(source), first_id)
+            self.assertEqual(read_exact_sidecar(source).book_id, first_id)
+            self.assertNotEqual(
+                read_exact_sidecar(source).source_fingerprint,
+                first_sidecar.source_fingerprint,
+            )
+            self.assertIsNone(read_embedded_book_id(source))
+
+    def test_default_ssg_creates_sidecar_without_modifying_epub(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:sidecar")
+            before = source.read_bytes()
+
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+
+            sidecar = read_exact_sidecar(source)
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            self.assertIsNotNone(sidecar)
+            self.assertEqual(metadata[0]["hash"], sidecar.book_id)
+            self.assertEqual(source.read_bytes(), before)
+            self.assertIsNone(read_embedded_book_id(source))
+
+    def test_explicit_embedded_ssg_writes_opf_and_no_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:embedded")
+
+            SSGPublisher(
+                SSGConfig((source,), output, book_id_storage="embedded"),
+                show_progress=False,
+            ).build()
+
+            self.assertIsNotNone(read_embedded_book_id(source))
+            self.assertFalse(sidecar_path_for(source).exists())
 
     def test_ssg_build_publishes_complete_static_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -184,8 +227,9 @@ class SSGPublicationTests(unittest.TestCase):
             )
             self.assertEqual(list(root.glob(".dist.staging-*")), [])
             self.assertEqual(list(root.glob(".dist.previous-*")), [])
+            self.assertIsNotNone(read_exact_sidecar(source))
 
-    def test_copied_embedded_ids_report_every_source(self):
+    def test_copied_sidecar_ids_report_every_source(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             first = root / "first.epub"
@@ -198,6 +242,7 @@ class SSGPublicationTests(unittest.TestCase):
                 show_progress=False,
             ).build()
             shutil.copy2(first, second)
+            shutil.copy2(sidecar_path_for(first), sidecar_path_for(second))
 
             with self.assertRaises(SSGBuildError) as raised:
                 SSGPublisher(
@@ -206,9 +251,33 @@ class SSGPublicationTests(unittest.TestCase):
                 ).build()
 
             message = str(raised.exception)
-            self.assertIn(str(first.resolve()), message)
-            self.assertIn(str(second.resolve()), message)
+            self.assertIn(str(first.absolute()), message)
+            self.assertIn(str(second.absolute()), message)
             self.assertFalse(output.exists())
+
+    def test_copying_only_epub_allocates_a_distinct_sidecar_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "first.epub"
+            second = root / "second.epub"
+            seed_output = root / "seed-dist"
+            output = root / "copy-dist"
+            self._write_minimal_epub(first, identifier="urn:test:copy")
+            SSGPublisher(
+                SSGConfig((first,), seed_output), show_progress=False
+            ).build()
+            shutil.copy2(first, second)
+
+            SSGPublisher(
+                SSGConfig((first, second), output), show_progress=False
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(len({book["hash"] for book in metadata}), 2)
+            self.assertIsNone(read_embedded_book_id(first))
+            self.assertIsNone(read_embedded_book_id(second))
 
     def test_output_cannot_own_an_input_epub(self):
         with tempfile.TemporaryDirectory() as directory:
