@@ -37,6 +37,25 @@ from epub_browser.server_library import ReconcileSummary, ServerLibraryManager
 from epub_browser.state import StateStore
 
 
+def _json_login(client, username, password):
+    page = client.get("/login")
+    match = re.search(
+        r'<meta name="epub-browser-auth-nonce" content="([^"]+)">',
+        page.text,
+    )
+    if page.status_code != 200 or match is None:
+        raise RuntimeError("runtime login page did not provide an authentication nonce")
+    return client.post(
+        "/login",
+        json={"username": username, "password": password, "next": "/"},
+        headers={
+            "X-EPUB-Browser-Auth-Nonce": match.group(1),
+            "Origin": str(client.base_url).rstrip("/"),
+            "Sec-Fetch-Site": "same-origin",
+        },
+    )
+
+
 class RuntimeStatusTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -47,6 +66,13 @@ class RuntimeStatusTests(unittest.TestCase):
         (self.public / "index.html").write_text("library", encoding="utf-8")
         self.store = StateStore(self.root / "data" / "epub-browser.db")
         self.store.initialize(bootstrap=BootstrapCredentials("owner", "secret"))
+        self.store.resolve_book(
+            self.root / "book.epub",
+            None,
+            "book-fingerprint",
+            {"title": "Book"},
+            preferred_book_id="book",
+        )
         self.auth_config = AuthConfig.from_values([], None, None)
         self.auth_service = AuthService(self.store, self.auth_config)
 
@@ -60,12 +86,8 @@ class RuntimeStatusTests(unittest.TestCase):
             )
         )
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": "owner", "password": "secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(client, "owner", "secret")
+        self.assertEqual(login.status_code, 200)
         session = client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         client.headers[self.auth_config.csrf_header_name] = session.json()[
@@ -262,10 +284,7 @@ class ServerBootstrapTests(unittest.TestCase):
                     client=("203.0.113.9", 4321),
                     follow_redirects=False,
                 ) as client:
-                    login = client.post(
-                        "/login",
-                        data={"username": "owner", "password": "secret"},
-                    )
+                    login = _json_login(client, "owner", "secret")
                     session = client.get("/api/session").json()
                     response = client.post(
                         "/api/identity/link",
@@ -293,7 +312,7 @@ class ServerBootstrapTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         self.assertFalse(observed["proxy_headers"])
-        self.assertEqual(observed["login"], 303)
+        self.assertEqual(observed["login"], 200)
         self.assertEqual(observed["link"], 400)
         self.assertEqual(observed["code"], "proxy_identity_required")
 
@@ -997,12 +1016,8 @@ class _InspectingServer:
     def run(self):
         self.assert_started()
         client = TestClient(self.config.app)
-        login = client.post(
-            "/login",
-            data={"username": "owner", "password": "secret"},
-            follow_redirects=False,
-        )
-        if login.status_code != 303:
+        login = _json_login(client, "owner", "secret")
+        if login.status_code != 200:
             raise RuntimeError("runtime HTTP fixture could not authenticate")
         self.states.append(client.get("/api/health").json()["state"])
         _BlockingLibrary.release.set()

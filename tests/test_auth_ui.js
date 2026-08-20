@@ -160,3 +160,56 @@ test('SSG initialization returns before any account request or UI binding', asyn
   assert.equal(calls, 0);
   assert.deepEqual(root.navigations, []);
 });
+
+test('anonymous proxy association sends JSON with the page authentication nonce', async () => {
+  let received;
+  const root = rootWithFetch((url, options) => {
+    received = { url, options };
+    return Promise.resolve(response(201, { identity: {} }));
+  });
+  root.document.querySelector = selector => selector === 'meta[name="epub-browser-auth-nonce"]'
+    ? { content: 'strict-page-nonce' }
+    : null;
+  const auth = AuthModule.create(root);
+
+  await auth.associate({ username: 'reader', password: 'secret' });
+
+  assert.equal(received.url, '/api/identity/link');
+  assert.equal(received.options.headers['Content-Type'], 'application/json');
+  assert.equal(received.options.headers['X-EPUB-Browser-Auth-Nonce'], 'strict-page-nonce');
+  assert.equal(received.options.credentials, 'same-origin');
+});
+
+test('administrator identity helpers create and delete mappings with CSRF', async () => {
+  const calls = [];
+  const root = rootWithFetch((url, options) => {
+    calls.push({ url, options });
+    return Promise.resolve(response(options.method === 'POST' ? 201 : 200, {
+      identity: { issuer: 'issuer', subject: 'subject', user_id: 'member' },
+    }));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.createIdentity({
+    issuer: 'issuer',
+    subject: 'subject',
+    user_id: 'member',
+    display_name: 'Member',
+  }, false);
+  await auth.deleteIdentity('issuer', 'subject', false);
+
+  assert.deepEqual(calls.map(call => [call.url, call.options.method]), [
+    ['/api/admin/identities', 'POST'],
+    ['/api/admin/identities', 'DELETE'],
+  ]);
+  assert.equal(calls[0].options.headers['X-CSRF-Token'], 'admin-csrf');
+  assert.equal(calls[1].options.headers['X-CSRF-Token'], 'admin-csrf');
+  assert.deepEqual(JSON.parse(calls[1].options.body), {
+    issuer: 'issuer',
+    subject: 'subject',
+  });
+});

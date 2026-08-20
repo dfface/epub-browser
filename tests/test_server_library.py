@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -29,6 +30,25 @@ from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
+
+
+def _json_login(client, username, password):
+    page = client.get("/login")
+    match = re.search(
+        r'<meta name="epub-browser-auth-nonce" content="([^"]+)">',
+        page.text,
+    )
+    if page.status_code != 200 or match is None:
+        raise RuntimeError("login page did not provide an authentication nonce")
+    return client.post(
+        "/login",
+        json={"username": username, "password": password, "next": "/"},
+        headers={
+            "X-EPUB-Browser-Auth-Nonce": match.group(1),
+            "Origin": str(client.base_url).rstrip("/"),
+            "Sec-Fetch-Site": "same-origin",
+        },
+    )
 
 
 class ServerLibraryManagerTests(unittest.TestCase):
@@ -398,12 +418,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         client = TestClient(app)
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": "admin", "password": "secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(client, "admin", "secret")
+        self.assertEqual(login.status_code, 200)
         results = []
         reconcile_thread = threading.Thread(
             target=lambda: results.append(manager.reconcile()),
@@ -456,12 +472,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         client = TestClient(app)
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": "admin", "password": "secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(client, "admin", "secret")
+        self.assertEqual(login.status_code, 200)
         self._write_epub(self.source, "Changed", include_cover=True)
         manager.converter_factory = BlockingProcessor
         results = []
@@ -789,12 +801,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         client = TestClient(app)
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": "admin", "password": "secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(client, "admin", "secret")
+        self.assertEqual(login.status_code, 200)
         self._write_epub(self.source, "Changed")
 
         class FailingProcessor:

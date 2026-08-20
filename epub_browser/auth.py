@@ -136,6 +136,22 @@ def verify_password(encoded: str, password: str) -> bool:
         return False
 
 
+def validate_password_hash(encoded: str) -> None:
+    """Reject malformed, unsupported, or non-Argon2id local password hashes."""
+    from argon2 import extract_parameters
+    from argon2.exceptions import InvalidHashError
+    from argon2.low_level import ARGON2_VERSION, Type
+
+    if not isinstance(encoded, str) or not encoded:
+        raise ValueError("Password hash must not be empty")
+    try:
+        parameters = extract_parameters(encoded)
+    except (InvalidHashError, ValueError, TypeError) as error:
+        raise ValueError("Invalid local password hash") from error
+    if parameters.type is not Type.ID or parameters.version != ARGON2_VERSION:
+        raise ValueError("Unsupported local password hash")
+
+
 def session_cookie_options(config: AuthConfig) -> dict:
     return {
         "httponly": True,
@@ -301,6 +317,22 @@ class AuthService:
         raw_token = secrets.token_urlsafe(32)
         now = self._now()
         self.store.create_session(
+            token_digest(raw_token),
+            principal.user_id,
+            now + self.ttl,
+            now=now,
+        )
+        return raw_token, self.issue_csrf_token(principal, raw_token)
+
+    def replace_session(
+        self,
+        principal: Principal,
+        replaced_raw_token: str,
+    ) -> Tuple[str, str]:
+        raw_token = secrets.token_urlsafe(32)
+        now = self._now()
+        self.store.replace_session(
+            replaced_raw_token,
             token_digest(raw_token),
             principal.user_id,
             now + self.ttl,

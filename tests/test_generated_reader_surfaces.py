@@ -26,6 +26,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "sessionList",
             "adminPanel",
             "adminUserForm",
+            "adminIdentityForm",
+            "adminIdentityUser",
+            "adminIdentityList",
             "adminBookList",
         ):
             self.assertRegex(server_html, rf'\bid=(?:["\'])?{control_id}(?:["\' >])')
@@ -165,6 +168,114 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "Unsafe EPUB internal path"):
                 processor.convert()
+
+    def test_server_processor_makes_malicious_epub_markup_and_metadata_inert(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            processor.book_title = '</title><script id="title-payload">alert(1)</script>'
+            processor.authors = ['<img src=x onerror="alert(2)">']
+            processor.tags = ['</span><script id="tag-payload">alert(3)</script>']
+            processor.description = '<img src=x onerror="alert(4)"><b>description</b>'
+            processor.chapters = [{
+                "title": '<svg onload="alert(5)">One</svg>',
+                "path": "chapter.xhtml",
+            }]
+            processor.toc = [
+                {
+                    "title": '<img src=x onerror="alert(6)">Contents',
+                    "src": "chapter.xhtml",
+                    "level": 0,
+                    "anchor": 'bad\" onmouseover=\"alert(7)',
+                    "old_file_name": "chapter.xhtml",
+                }
+            ]
+            Path(processor.web_dir).mkdir(parents=True)
+            body, styles = processor.process_html_content(
+                '''<html><head>
+                <link rel="stylesheet" href="https://attacker.example/track.css">
+                <style>@import "https://attacker.example/x"; p { color: red; }</style>
+                </head><body>
+                <script id="body-payload">alert(8)</script>
+                <img src="javascript:alert(9)" onerror="alert(10)">
+                <a href="JaVaScRiPt:alert(11)" onclick="alert(12)">unsafe</a>
+                <form action="/logout"><button>submit</button></form>
+                <iframe srcdoc="<script>alert(13)</script>"></iframe>
+                <svg onload="alert(14)"><script>alert(15)</script></svg>
+                <p class="kept">Safe text</p>
+                </body></html>''',
+                "chapter.xhtml",
+            )
+            chapter_html = processor.create_chapter_template(
+                body,
+                styles,
+                0,
+                processor.chapters[0]["title"],
+            )
+            processor.create_index_page()
+            book_html = Path(processor.web_dir, "index.html").read_text(
+                encoding="utf-8"
+            )
+
+        combined = book_html + chapter_html
+        for payload in (
+            '<script id="title-payload"',
+            '<script id="tag-payload"',
+            "body-payload",
+            " onerror=",
+            " onclick=",
+            " onmouseover=",
+            "javascript:",
+            "attacker.example",
+            "<form",
+            "<iframe",
+            "<svg",
+        ):
+            self.assertNotIn(payload.lower(), combined.lower())
+        self.assertIn('alert(1)', book_html)
+        self.assertIn('description', book_html)
+        self.assertIn('<p class="kept">Safe text</p>', chapter_html)
+
+    def test_server_processor_sanitizes_copied_svg_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            extracted = Path(processor.extract_dir)
+            extracted.mkdir(parents=True)
+            (extracted / "diagram.svg").write_text(
+                '''<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">
+                <script>alert(2)</script>
+                <foreignObject><iframe src="https://attacker.example"></iframe></foreignObject>
+                <a href="javascript:alert(3)"><rect width="10" height="10" fill="red"/></a>
+                <path d="M0 0L10 10" stroke="black"/>
+                </svg>''',
+                encoding="utf-8",
+            )
+
+            processor.copy_resources()
+            rendered = Path(
+                processor.web_dir,
+                "resources",
+                "diagram.svg",
+            ).read_text(encoding="utf-8")
+
+        for payload in (
+            "script",
+            "foreignObject",
+            "iframe",
+            "onload",
+            "javascript:",
+            "attacker.example",
+        ):
+            self.assertNotIn(payload.lower(), rendered.lower())
+        self.assertIn("path", rendered)
+        self.assertIn("M0 0L10 10", rendered)
 
     def test_generated_book_pages_apply_base_path_without_runtime_url_repair(self):
         with tempfile.TemporaryDirectory() as directory:

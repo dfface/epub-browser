@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,6 +10,7 @@ import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import quote
 from unittest import mock
 
 from starlette.testclient import TestClient
@@ -23,6 +26,36 @@ from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISIO
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import create_app, migrate_legacy_database
 from epub_browser.state import StateStore
+
+
+def _anonymous_auth_nonce(testcase, client, path="/login"):
+    page = client.get(path)
+    testcase.assertEqual(page.status_code, 200)
+    match = re.search(
+        r'<meta name="epub-browser-auth-nonce" content="([^"]+)">',
+        page.text,
+    )
+    testcase.assertIsNotNone(match)
+    testcase.assertIn("epub_browser_auth_nonce=", page.headers["set-cookie"])
+    testcase.assertIn("SameSite=strict", page.headers["set-cookie"])
+    return match.group(1)
+
+
+def _json_login(testcase, client, username, password, *, next_path="/"):
+    nonce = _anonymous_auth_nonce(
+        testcase,
+        client,
+        "/login?next=" + quote(next_path, safe=""),
+    )
+    return client.post(
+        "/login",
+        json={"username": username, "password": password, "next": next_path},
+        headers={
+            "X-EPUB-Browser-Auth-Nonce": nonce,
+            "Origin": str(client.base_url).rstrip("/"),
+            "Sec-Fetch-Site": "same-origin",
+        },
+    )
 
 
 class ServerSetupBoundaryTests(unittest.TestCase):
@@ -117,6 +150,10 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertEqual(fixed_auth.status_code, 200)
         self.assertNotIn("generated auth asset", fixed_auth.text)
         self.assertEqual(self.client.get("/assets/i18n.js").status_code, 200)
+        tombstone = self.client.get("/sw.js")
+        self.assertEqual(tombstone.status_code, 200)
+        self.assertIn("self.registration.unregister()", tombstone.text)
+        self.assertIn("no-store", tombstone.headers["cache-control"])
         for path in ("/api/health", "/api/ready"):
             with self.subTest(path=path):
                 response = self.client.get(path)
@@ -338,6 +375,13 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.principal = self.store.initialize(
             bootstrap=BootstrapCredentials("alice", "secret")
         )
+        self.store.resolve_book(
+            public / "book.epub",
+            None,
+            "book-fingerprint",
+            {"title": "Book"},
+            preferred_book_id="book",
+        )
         self.auth_config = AuthConfig.from_values([], None, None)
         self.auth_service = AuthService(self.store, self.auth_config)
         self.app = create_app(
@@ -382,13 +426,16 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/ready").status_code, 401)
 
     def test_password_login_sets_session_and_requires_csrf_to_write(self):
-        response = self.client.post(
-            "/login?next=%2Fbook%2Fid%2Fchapter_0.html",
-            data={"username": "alice", "password": "secret"},
+        response = _json_login(
+            self,
+            self.client,
+            "alice",
+            "secret",
+            next_path="/book/id/chapter_0.html",
         )
 
-        self.assertEqual(response.status_code, 303)
-        self.assertEqual(response.headers["location"], "/book/id/chapter_0.html")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["redirect"], "/book/id/chapter_0.html")
         cookie = response.headers["set-cookie"]
         self.assertIn("HttpOnly", cookie)
         self.assertIn("SameSite=lax", cookie)
@@ -420,6 +467,68 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             "a1",
         )
 
+    def test_anonymous_login_requires_json_same_origin_source_and_strict_nonce(self):
+        nonce = _anonymous_auth_nonce(self, self.client)
+        valid_payload = {
+            "username": "alice",
+            "password": "secret",
+            "next": "/book/id/chapter_0.html",
+        }
+
+        form = self.client.post(
+            "/login",
+            data={"username": "alice", "password": "secret"},
+            headers={"X-EPUB-Browser-Auth-Nonce": nonce},
+        )
+        cross_site = self.client.post(
+            "/login",
+            json=valid_payload,
+            headers={
+                "X-EPUB-Browser-Auth-Nonce": nonce,
+                "Origin": "https://attacker.example",
+                "Sec-Fetch-Site": "cross-site",
+            },
+        )
+        missing_nonce = self.client.post(
+            "/login",
+            json=valid_payload,
+            headers={
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+        oversized = self.client.post(
+            "/login",
+            content=json.dumps({**valid_payload, "padding": "x" * (64 * 1024)}),
+            headers={
+                "Content-Type": "application/json",
+                "X-EPUB-Browser-Auth-Nonce": nonce,
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+
+        self.assertEqual(form.status_code, 415)
+        self.assertEqual(cross_site.status_code, 403)
+        self.assertEqual(cross_site.json()["code"], "invalid_auth_request")
+        self.assertEqual(missing_nonce.status_code, 403)
+        self.assertEqual(missing_nonce.json()["code"], "invalid_auth_request")
+        self.assertEqual(oversized.status_code, 413)
+        self.assertEqual(self.client.get("/api/session").status_code, 401)
+
+        logged_in = self.client.post(
+            "/login",
+            json=valid_payload,
+            headers={
+                "X-EPUB-Browser-Auth-Nonce": nonce,
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+        self.assertEqual(logged_in.status_code, 200)
+        self.assertEqual(logged_in.json()["redirect"], "/book/id/chapter_0.html")
+        self.assertEqual(self.client.get("/api/session").status_code, 200)
+
     def test_login_next_is_relative_and_logout_revokes_the_session(self):
         login_page = self.client.get("/login?next=https%3A%2F%2Fevil.example")
         self.assertEqual(login_page.status_code, 200)
@@ -429,11 +538,9 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         )
         self.assertIn('name="next" value="/"', encoded_backslash.text)
 
-        logged_in = self.client.post(
-            "/login?next=https%3A%2F%2Fevil.example",
-            data={"username": "alice", "password": "secret"},
-        )
-        self.assertEqual(logged_in.headers["location"], "/")
+        logged_in = _json_login(self, self.client, "alice", "secret")
+        self.assertEqual(logged_in.status_code, 200)
+        self.assertEqual(logged_in.json()["redirect"], "/")
         csrf = self.client.get("/api/session").json()["csrf_token"]
 
         self.assertEqual(self.client.post("/logout").status_code, 403)
@@ -490,27 +597,21 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         )
         self.addCleanup(secure_client.close)
 
-        response = secure_client.post(
-            "/login",
-            data={"username": "alice", "password": "secret"},
-        )
+        response = _json_login(self, secure_client, "alice", "secret")
 
-        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.status_code, 200)
         self.assertIn("Secure", response.headers["set-cookie"])
         self.assertEqual(secure_client.get("/api/session").status_code, 200)
 
     def test_authenticated_login_requires_csrf_before_replacing_the_session(self):
-        first_login = self.client.post(
-            "/login",
-            data={"username": "alice", "password": "secret"},
-        )
-        self.assertEqual(first_login.status_code, 303)
+        first_login = _json_login(self, self.client, "alice", "secret")
+        self.assertEqual(first_login.status_code, 200)
         original_session = self.client.cookies.get("epub_browser_session")
         csrf = self.client.get("/api/session").json()["csrf_token"]
 
         denied = self.client.post(
             "/login",
-            data={"username": "alice", "password": "secret"},
+            json={"username": "alice", "password": "secret", "next": "/"},
         )
 
         self.assertEqual(denied.status_code, 403)
@@ -523,15 +624,22 @@ class ServerAuthBoundaryTests(unittest.TestCase):
 
         replaced = self.client.post(
             "/login",
-            data={"username": "alice", "password": "secret"},
+            json={"username": "alice", "password": "secret", "next": "/"},
             headers={self.auth_config.csrf_header_name: csrf},
         )
 
-        self.assertEqual(replaced.status_code, 303)
+        self.assertEqual(replaced.status_code, 200)
         self.assertNotEqual(
             self.client.cookies.get("epub_browser_session"),
             original_session,
         )
+
+        with TestClient(self.app, follow_redirects=False) as replaced_client:
+            replaced_client.cookies.set("epub_browser_session", original_session)
+            self.assertEqual(
+                replaced_client.get("/api/session").status_code,
+                401,
+            )
 
     def test_authenticated_unhandled_error_is_private_and_generic(self):
         class FailingRuntimeStatus:
@@ -554,11 +662,8 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         )
         self.addCleanup(client.close)
         self.assertEqual(
-            client.post(
-                "/login",
-                data={"username": "alice", "password": "secret"},
-            ).status_code,
-            303,
+            _json_login(self, client, "alice", "secret").status_code,
+            200,
         )
 
         failed = client.get("/api/health")
@@ -611,9 +716,17 @@ class ProxyAssociationTests(unittest.TestCase):
         response = self.proxy_client.get("/")
         self.assertEqual(response.status_code, 303)
 
+        nonce = _anonymous_auth_nonce(self, self.proxy_client)
+        source_headers = {
+            "X-EPUB-Browser-Auth-Nonce": nonce,
+            "Origin": "http://testserver",
+            "Sec-Fetch-Site": "same-origin",
+        }
+
         rejected = self.proxy_client.post(
             "/api/identity/link",
             json={"username": "alice", "password": "wrong"},
+            headers=source_headers,
         )
         self.assertEqual(rejected.status_code, 401)
         self.assertIsNone(
@@ -623,6 +736,7 @@ class ProxyAssociationTests(unittest.TestCase):
         linked = self.proxy_client.post(
             "/api/identity/link",
             json={"username": "alice", "password": "secret"},
+            headers=source_headers,
         )
 
         self.assertEqual(linked.status_code, 201)
@@ -638,6 +752,41 @@ class ProxyAssociationTests(unittest.TestCase):
             "alice",
         )
 
+    def test_anonymous_proxy_link_rejects_cross_site_missing_nonce_and_non_json(self):
+        nonce = _anonymous_auth_nonce(self, self.proxy_client)
+        payload = {"username": "alice", "password": "secret"}
+
+        non_json = self.proxy_client.post(
+            "/api/identity/link",
+            data=payload,
+            headers={"X-EPUB-Browser-Auth-Nonce": nonce},
+        )
+        cross_site = self.proxy_client.post(
+            "/api/identity/link",
+            json=payload,
+            headers={
+                "X-EPUB-Browser-Auth-Nonce": nonce,
+                "Origin": "https://attacker.example",
+                "Sec-Fetch-Site": "cross-site",
+            },
+        )
+        missing_nonce = self.proxy_client.post(
+            "/api/identity/link",
+            json=payload,
+            headers={
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+
+        self.assertEqual(non_json.status_code, 415)
+        self.assertEqual(cross_site.status_code, 403)
+        self.assertEqual(cross_site.json()["code"], "invalid_auth_request")
+        self.assertEqual(missing_nonce.status_code, 403)
+        self.assertIsNone(
+            self.store.get_identity("https://sso.example", "subject-alice")
+        )
+
     def test_link_requires_an_unrecognized_assertion_from_a_trusted_peer(self):
         untrusted = TestClient(
             self.app,
@@ -646,9 +795,15 @@ class ProxyAssociationTests(unittest.TestCase):
         )
         self.addCleanup(untrusted.close)
 
+        nonce = _anonymous_auth_nonce(self, untrusted)
         response = untrusted.post(
             "/api/identity/link",
             json={"username": "alice", "password": "secret"},
+            headers={
+                "X-EPUB-Browser-Auth-Nonce": nonce,
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
         )
 
         self.assertEqual(response.status_code, 400)
@@ -700,11 +855,8 @@ class AdminAccountTests(unittest.TestCase):
     def _login(self, username, password):
         client = TestClient(self.app, follow_redirects=False)
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": username, "password": password},
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(self, client, username, password)
+        self.assertEqual(login.status_code, 200)
         session = client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
@@ -801,6 +953,52 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(self.member_client.get("/api/session").status_code, 401)
         self._login("member", "member-secret")
 
+    def test_admin_manages_proxy_identity_mappings_but_members_cannot(self):
+        initial = self.admin_client.get("/api/admin/identities")
+        created = self.admin_client.post(
+            "/api/admin/identities",
+            json={
+                "issuer": "https://sso.example",
+                "subject": "member-subject",
+                "user_id": self.member.user_id,
+                "display_name": "Member Example",
+            },
+        )
+        duplicate = self.admin_client.post(
+            "/api/admin/identities",
+            json={
+                "issuer": "https://sso.example",
+                "subject": "member-subject",
+                "user_id": self.admin.user_id,
+            },
+        )
+        listed = self.admin_client.get("/api/admin/identities")
+        member_denied = self.member_client.get("/api/admin/identities")
+        deleted = self.admin_client.request(
+            "DELETE",
+            "/api/admin/identities",
+            json={
+                "issuer": "https://sso.example",
+                "subject": "member-subject",
+            },
+        )
+
+        self.assertEqual(initial.json(), {"identities": []})
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["identity"]["username"], "member")
+        self.assertEqual(duplicate.status_code, 409)
+        self.assertEqual(duplicate.json()["code"], "identity_already_linked")
+        self.assertEqual(len(listed.json()["identities"]), 1)
+        self.assertEqual(member_denied.status_code, 403)
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(
+            self.store.principal_from_identity(
+                "https://sso.example",
+                "member-subject",
+            ),
+            None,
+        )
+
     def test_user_changes_password_and_all_existing_sessions_are_revoked(self):
         second_admin_client = self._login("admin", "admin-secret")
 
@@ -868,6 +1066,13 @@ class SessionOwnershipTests(unittest.TestCase):
             bootstrap=BootstrapCredentials("alice", "alice-secret")
         )
         self.bob = self.store.create_user("bob", hash_password("bob-secret"))
+        self.store.resolve_book(
+            public / "book.epub",
+            None,
+            "book-fingerprint",
+            {"title": "Book"},
+            preferred_book_id="book",
+        )
         config = AuthConfig.from_values([], None, None)
         self.app = create_app(
             public,
@@ -876,23 +1081,15 @@ class SessionOwnershipTests(unittest.TestCase):
         )
         self.client = TestClient(self.app)
         self.addCleanup(self.client.close)
-        login = self.client.post(
-            "/login",
-            data={"username": "alice", "password": "alice-secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(self, self.client, "alice", "alice-secret")
+        self.assertEqual(login.status_code, 200)
         session = self.client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         self.csrf = {"X-CSRF-Token": session.json()["csrf_token"]}
         self.bob_client = TestClient(self.app)
         self.addCleanup(self.bob_client.close)
-        bob_login = self.bob_client.post(
-            "/login",
-            data={"username": "bob", "password": "bob-secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(bob_login.status_code, 303)
+        bob_login = _json_login(self, self.bob_client, "bob", "bob-secret")
+        self.assertEqual(bob_login.status_code, 200)
         bob_session = self.bob_client.get("/api/session")
         self.assertEqual(bob_session.status_code, 200)
         self.bob_csrf = {"X-CSRF-Token": bob_session.json()["csrf_token"]}
@@ -1035,11 +1232,8 @@ class ServerAccountSecurityMatrixTests(unittest.TestCase):
     def _login(self, username, password):
         client = TestClient(self.app, follow_redirects=False)
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": username, "password": password},
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(self, client, username, password)
+        self.assertEqual(login.status_code, 200)
         session = client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         client.headers[self.auth_config.csrf_header_name] = session.json()[
@@ -1205,12 +1399,8 @@ class BookAuthorizationTests(unittest.TestCase):
     def _login(self, username, password):
         client = TestClient(self.app)
         self.addCleanup(client.close)
-        login = client.post(
-            "/login",
-            data={"username": username, "password": password},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(self, client, username, password)
+        self.assertEqual(login.status_code, 200)
         session = client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         client.headers[self.auth_config.csrf_header_name] = session.json()[
@@ -1344,6 +1534,92 @@ class BookAuthorizationTests(unittest.TestCase):
         self.assertEqual(unknown_user.status_code, 404)
         self.assertEqual(disabled_user.status_code, 400)
 
+    def test_revoked_book_access_blocks_every_annotation_and_progress_api_shape(self):
+        self.store.grant_book_access("restricted-id", self.member.user_id)
+        annotation = {
+            "id": "restricted-note",
+            "book_hash": "restricted-id",
+            "chapter_index": 0,
+            "text": "private note",
+            "color": "#fff",
+            "created_at": "2026-01-01",
+            "updated_at": "2026-01-01",
+        }
+        batch_annotation = {**annotation, "id": "restricted-batch-note"}
+        self.assertEqual(
+            self.member_client.post(
+                "/api/annotations/restricted-id",
+                json=annotation,
+            ).status_code,
+            201,
+        )
+        self.assertEqual(
+            self.member_client.post(
+                "/api/annotations/batch",
+                json={"annotations": [batch_annotation]},
+            ).status_code,
+            201,
+        )
+        self.assertEqual(
+            self.member_client.put(
+                "/api/reading-progress/restricted-id",
+                json={"chapter_index": 0},
+            ).status_code,
+            200,
+        )
+
+        self.store.revoke_book_access("restricted-id", self.member.user_id)
+
+        global_annotations = self.member_client.get("/api/annotations")
+        self.assertEqual(global_annotations.status_code, 200)
+        self.assertEqual(global_annotations.json()["data"], [])
+        requests = (
+            self.member_client.get("/api/annotations/restricted-id"),
+            self.member_client.get("/api/annotations/item/restricted-note"),
+            self.member_client.post(
+                "/api/annotations/restricted-id",
+                json={**annotation, "id": "new-single"},
+            ),
+            self.member_client.post(
+                "/api/annotations/batch",
+                json={"annotations": [{**annotation, "id": "new-batch"}]},
+            ),
+            self.member_client.put(
+                "/api/annotations/item/restricted-note",
+                json={"note": "changed"},
+            ),
+            self.member_client.delete(
+                "/api/annotations/item/restricted-note"
+            ),
+            self.member_client.get("/api/reading-progress/restricted-id"),
+            self.member_client.put(
+                "/api/reading-progress/restricted-id",
+                json={"chapter_index": 1},
+            ),
+            self.member_client.delete(
+                "/api/reading-progress/restricted-id"
+            ),
+        )
+        for denied in requests:
+            with self.subTest(response=denied):
+                self.assertEqual(denied.status_code, 403)
+                self.assertEqual(denied.json()["code"], "forbidden")
+
+        self.assertEqual(
+            self.store.get_annotation(
+                "restricted-note",
+                user_id=self.member.user_id,
+            )["note"],
+            "",
+        )
+        self.assertEqual(
+            self.store.get_reading_progress(
+                self.member.user_id,
+                "restricted-id",
+            ),
+            0,
+        )
+
     def test_untracked_book_directory_and_traversal_attempt_are_not_served(self):
         untracked = Path(self.directory.name) / "book" / "untracked"
         untracked.mkdir()
@@ -1410,6 +1686,20 @@ class ServerCacheTests(unittest.TestCase):
             {"title": "Demo", "cover": "resources/cover.webp"},
             preferred_book_id="demo",
         )
+        self.store.resolve_book(
+            Path(self.directory.name) / "book.epub",
+            None,
+            "book-fingerprint",
+            {"title": "Book"},
+            preferred_book_id="book",
+        )
+        self.store.resolve_book(
+            Path(self.directory.name) / "shared-book.epub",
+            None,
+            "shared-book-fingerprint",
+            {"title": "Shared book"},
+            preferred_book_id="shared-book",
+        )
         self.client = self._authenticated_client(self.app)
 
     def tearDown(self):
@@ -1432,12 +1722,8 @@ class ServerCacheTests(unittest.TestCase):
 
     def _authenticated_client(self, app):
         client = TestClient(app)
-        login = client.post(
-            "/login",
-            data={"username": "alice", "password": "secret"},
-            follow_redirects=False,
-        )
-        self.assertEqual(login.status_code, 303)
+        login = _json_login(self, client, "alice", "secret")
+        self.assertEqual(login.status_code, 200)
         session = client.get("/api/session")
         self.assertEqual(session.status_code, 200)
         client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
@@ -1524,12 +1810,53 @@ class ServerCacheTests(unittest.TestCase):
             "/assets/manifest.json",
             "/assets/manifest.en.json",
             "/assets/manifest.zh-CN.json",
-            "/sw.js",
         ):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.headers["cache-control"], "private, no-cache")
+
+    def test_server_serves_a_public_no_cache_service_worker_tombstone(self):
+        with TestClient(self.app, follow_redirects=False) as anonymous:
+            response = anonymous.get("/sw.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("no-store", response.headers["cache-control"])
+        self.assertEqual(response.headers["service-worker-allowed"], "/")
+        self.assertNotIn("self.addEventListener('fetch', () => {})", response.text)
+        self.assertIn("self.skipWaiting()", response.text)
+        self.assertIn("self.clients.claim()", response.text)
+        self.assertIn("name.indexOf('epub-browser-') === 0", response.text)
+        self.assertIn("self.registration.unregister()", response.text)
+        self.assertIn("client.navigate(client.url)", response.text)
+        self.assertNotIn("caches.delete(name)", response.text.split("epub-browser-")[0])
+
+    def test_server_reader_html_uses_hash_based_restrictive_csp(self):
+        script = "window.generatedReaderBootstrap=true;"
+        Path(
+            self.directory.name,
+            "book",
+            "demo",
+            "chapter_0.html",
+        ).write_text(f"<script>{script}</script><p>chapter</p>", encoding="utf-8")
+
+        response = self.client.get("/book/demo/chapter_0.html")
+        policy = response.headers["content-security-policy"]
+        expected_hash = base64.b64encode(
+            hashlib.sha256(script.encode("utf-8")).digest()
+        ).decode("ascii")
+        script_directive = next(
+            directive
+            for directive in policy.split(";")
+            if directive.strip().startswith("script-src")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("default-src 'self'", policy)
+        self.assertIn("object-src 'none'", policy)
+        self.assertIn("frame-ancestors 'none'", policy)
+        self.assertIn("'sha256-{}'".format(expected_hash), script_directive)
+        self.assertNotIn("'unsafe-inline'", script_directive)
 
     def test_html_is_revalidated_instead_of_long_lived(self):
         response = self.client.get("/")
@@ -1674,12 +2001,8 @@ class ServerCacheTests(unittest.TestCase):
         bob = TestClient(self.app)
         self.addCleanup(bob.close)
         self.assertEqual(
-            bob.post(
-                "/login",
-                data={"username": "bob", "password": "secret"},
-                follow_redirects=False,
-            ).status_code,
-            303,
+            _json_login(self, bob, "bob", "secret").status_code,
+            200,
         )
         bob.headers["X-CSRF-Token"] = bob.get("/api/session").json()["csrf_token"]
         named = bob.put(
@@ -1799,7 +2122,7 @@ class ServerCacheTests(unittest.TestCase):
             )
             self.assertEqual(
                 second_client.get("/api/reading-progress/shared-book").status_code,
-                404,
+                403,
             )
 
     def test_sync_persists_the_shelf_in_sqlite(self):
@@ -1871,21 +2194,23 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"message": "Server has newer or same version", "version": 3, "data": {"items": ["server"], "groups": {}}})
 
-    def test_sync_imports_the_highest_version_legacy_shelf_once(self):
+    def test_sync_never_imports_username_selected_legacy_shelf_files(self):
         Path(self.directory.name, "epub-browser-bookshelf-alice-2.json").write_text('{"items":["old"],"groups":{}}', encoding="utf-8")
         Path(self.directory.name, "epub-browser-bookshelf-alice-4.json").write_text('{"items":["new"],"groups":{}}', encoding="utf-8")
 
         response = self.client.post("/sync", json={"username": "reader", "version": 1, "data": {"items": [], "groups": {}}})
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["version"], 4)
-        self.assertEqual(response.json()["data"]["items"], ["new"])
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["version"], 1)
         with sqlite3.connect(os.path.join(self.directory.name, "epub-browser.db")) as connection:
             row = connection.execute(
-                "SELECT version FROM bookshelves WHERE user_id = ?",
+                "SELECT version, data FROM bookshelves WHERE user_id = ?",
                 (self.store.get_user_by_username("alice").user_id,),
             ).fetchone()
-        self.assertEqual(row, (4,))
+        self.assertEqual(
+            row,
+            (1, json.dumps({"items": [], "groups": {}}, ensure_ascii=False)),
+        )
 
     def test_startup_renames_the_legacy_annotation_database_without_losing_data(self):
         legacy_directory = tempfile.TemporaryDirectory()

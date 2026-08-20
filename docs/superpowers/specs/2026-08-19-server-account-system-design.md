@@ -222,7 +222,10 @@ The Server migration is intentionally a breaking security change: it no longer
 accepts username identity supplied by JavaScript, local storage, or clients.
 Existing browser data is not deleted, but only server-resident data migrates to
 the pending administrator that setup completes. Existing manual bookshelf sync begins operating
-under the authenticated session after users log in.
+under the authenticated session after users log in. Legacy bookshelf JSON is
+considered only by startup migration, which selects the highest valid record
+for the pending administrator without treating the filename username as an
+account identity; request-time Sync never scans legacy files.
 
 ## Error handling and observability
 

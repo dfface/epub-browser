@@ -134,6 +134,22 @@ class StateStoreTests(unittest.TestCase):
     def test_initialize_without_bootstrap_reuses_existing_administrator(self):
         self.assertEqual(self.store.initialize(), self.owner)
 
+    def test_restart_fails_closed_when_any_local_password_hash_is_corrupt(self):
+        member = self.store.create_user("member", hash_password("member-secret"))
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                ("not-an-argon2-hash", member.user_id),
+            )
+
+        with self.assertRaisesRegex(RuntimeError, "password hash"):
+            StateStore(self.database).initialize()
+
+        self.assertEqual(
+            self.store.get_user_by_username("owner").password_hash,
+            self.store.get_user(self.owner.user_id).password_hash,
+        )
+
     def test_v1_colliding_bookshelves_keep_highest_version_newest_deterministically(self):
         self._create_v1_database_with_annotation_bookshelf_and_progress("zeta")
         with sqlite3.connect(self.database) as connection:
@@ -412,7 +428,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertIn("users", {row[2] for row in foreign_keys})
 
     def test_v2_annotation_ids_are_rekeyed_per_owner_without_data_loss(self):
-        member = self.store.create_user("member", "hash")
+        member = self.store.create_user("member", hash_password("member-secret"))
         with sqlite3.connect(self.database) as connection:
             connection.execute("DROP TABLE annotations")
             connection.execute(
@@ -643,6 +659,37 @@ class StateStoreTests(unittest.TestCase):
         )
         self.assertTrue(
             self.store.revoke_user_session(member.user_id, member_session)
+        )
+
+    def test_session_replacement_rolls_back_if_new_token_cannot_be_inserted(self):
+        raw_current = "current-session-token"
+        current_digest = token_digest(raw_current)
+        duplicate_digest = "f" * 64
+        self.store.create_session(
+            current_digest,
+            self.owner.user_id,
+            200,
+            now=100,
+        )
+        self.store.create_session(
+            duplicate_digest,
+            self.owner.user_id,
+            200,
+            now=100,
+        )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.replace_session(
+                raw_current,
+                duplicate_digest,
+                self.owner.user_id,
+                300,
+                now=100,
+            )
+
+        self.assertEqual(
+            self.store.principal_from_session(raw_current, now=100),
+            self.owner,
         )
 
     def test_second_enabled_admin_allows_first_to_be_disabled_and_revokes_sessions(self):

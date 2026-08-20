@@ -10,7 +10,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-from .auth import BootstrapCredentials, Principal, hash_password, token_digest
+from .auth import (
+    BootstrapCredentials,
+    Principal,
+    hash_password,
+    token_digest,
+    validate_password_hash,
+)
 from .identity import new_server_book_id
 
 
@@ -148,6 +154,7 @@ class StateStore:
             if version < 3:
                 self._migrate_annotation_primary_key(connection)
             self._create_user_owned_indexes(connection)
+            self._validate_password_hashes(connection)
             connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
             connection.execute("COMMIT")
         except Exception:
@@ -325,6 +332,19 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)"
         )
+
+    @staticmethod
+    def _validate_password_hashes(connection) -> None:
+        rows = connection.execute(
+            "SELECT password_hash FROM users WHERE password_hash IS NOT NULL"
+        ).fetchall()
+        try:
+            for row in rows:
+                validate_password_hash(row["password_hash"])
+        except ValueError as error:
+            raise RuntimeError(
+                "Authoritative account store contains an invalid password hash"
+            ) from error
 
     def _migrate_historical_annotations(self, connection) -> None:
         table = connection.execute(
@@ -1161,6 +1181,16 @@ class StateStore:
             ).fetchall()
         return tuple(self._identity_record(row) for row in rows)
 
+    def list_all_identities(self) -> tuple[UserIdentityRecord, ...]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM user_identities
+                ORDER BY issuer, subject, user_id
+                """
+            ).fetchall()
+        return tuple(self._identity_record(row) for row in rows)
+
     def principal_from_identity(
         self,
         issuer: str,
@@ -1199,6 +1229,70 @@ class StateStore:
         session_id = uuid.uuid4().hex
         with self._connection() as connection:
             self._require_user(connection, user_id)
+            connection.execute(
+                """
+                INSERT INTO sessions (
+                    session_id, token_digest, user_id, expires_at,
+                    last_used_at, revoked_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                """,
+                (
+                    session_id,
+                    token_digest_value,
+                    user_id,
+                    str(expiry),
+                    str(created_at),
+                    str(created_at),
+                ),
+            )
+        return session_id
+
+    def replace_session(
+        self,
+        replaced_raw_token: str,
+        token_digest_value: str,
+        user_id: str,
+        expires_at,
+        *,
+        now=None,
+    ) -> str:
+        """Insert a new session and revoke the current token in one transaction."""
+        if not isinstance(replaced_raw_token, str) or not replaced_raw_token:
+            raise ValueError("Replaced session token must not be empty")
+        self._validate_session_digest(token_digest_value)
+        created_at = self._timestamp(now)
+        expiry = self._timestamp(expires_at)
+        if expiry <= created_at:
+            raise ValueError("Session expiry must be in the future")
+        replaced_digest = token_digest(replaced_raw_token)
+        session_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, user_id)
+            current = connection.execute(
+                """
+                SELECT token_digest, expires_at, revoked_at
+                FROM sessions WHERE token_digest = ?
+                """,
+                (replaced_digest,),
+            ).fetchone()
+            if (
+                current is None
+                or not hmac.compare_digest(
+                    current["token_digest"],
+                    replaced_digest,
+                )
+                or current["revoked_at"] is not None
+                or float(current["expires_at"]) <= created_at
+            ):
+                raise ValueError("Current session is not replaceable")
+            connection.execute(
+                """
+                UPDATE sessions SET revoked_at = ?
+                WHERE token_digest = ? AND revoked_at IS NULL
+                """,
+                (str(created_at), replaced_digest),
+            )
             connection.execute(
                 """
                 INSERT INTO sessions (

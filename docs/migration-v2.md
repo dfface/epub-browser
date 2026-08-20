@@ -52,7 +52,7 @@ Startup performs these steps:
 3. Copy the v1 root `epub-browser.db` or `annotations.db` to a verified backup under `data/backups/`.
 4. Upgrade a temporary root-database copy and atomically activate it as `data/epub-browser.db`. If an authoritative `data/epub-browser.db` already exists at an older supported schema version, integrity-check it and make a verified `data/backups/` copy before upgrading it in place.
 5. Preserve annotations, bookshelf rows, reading progress, and legacy book IDs.
-6. Import the highest valid `epub-browser-bookshelf-<username>-<version>.json` per user when it is newer than SQLite. JSON source files are not deleted.
+6. Import the single highest valid `epub-browser-bookshelf-<username>-<version>.json`, regardless of the legacy filename username, into the pending administrator when it is newer than SQLite. JSON source files are not deleted. This scan happens only during startup migration; ordinary `/sync` requests never inspect legacy files.
 7. Wait for web or unattended administrator setup, then reconcile every EPUB into `cache/public/`.
 8. After a complete reconciliation, move old root `index.html`, `book-metadata.json`, `sw.js`, `assets/`, and `book/` into `cache/legacy-public/`.
 9. Remove `cache/legacy-public/` only after the next successful startup.
@@ -81,7 +81,9 @@ Both carriers are checked before mutation. Conflicting IDs, duplicate active cop
 
 Existing v2.0.4 OPF IDs migrate without an EPUB write: v2.0.5 creates a same-ID sidecar and leaves the embedded metadata intact. Switching in either direction creates the selected carrier but never removes or refreshes the non-selected carrier. No SQLite schema migration is required for this change.
 
-The bookshelf product behavior is unchanged: it remains browser-local until the user invokes the existing manual Sync action. A database with no bookshelf row is therefore normal before the first Sync.
+In Server mode the bookshelf is a versioned document owned by the authenticated
+account and saves automatically after changes. Startup migration is the only
+legacy JSON import path; requests never select legacy files by username.
 
 ## Conflict and corruption handling
 

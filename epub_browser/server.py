@@ -1,11 +1,14 @@
 import asyncio
+import base64
+import hashlib
 import html
 import json
-import glob
 import os
 import posixpath
+import re
 import secrets
 import sqlite3
+from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
@@ -17,6 +20,7 @@ from starlette.responses import (
     HTMLResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
     StreamingResponse,
 )
 from starlette.routing import Route
@@ -40,12 +44,15 @@ PRINCIPAL_SCOPE_KEY = 'epub_browser.principal'
 PENDING_IDENTITY_SCOPE_KEY = 'epub_browser.pending_identity'
 SESSION_TOKEN_SCOPE_KEY = 'epub_browser.session_token'
 SETUP_NONCE_COOKIE = 'epub_browser_setup_nonce'
+AUTH_NONCE_COOKIE = 'epub_browser_auth_nonce'
+AUTH_NONCE_HEADER = 'X-EPUB-Browser-Auth-Nonce'
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
 PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/setup',
     '/login',
     '/logout',
     '/api/identity/link',
+    '/sw.js',
 })
 PUBLIC_LOGIN_ASSETS = frozenset({'/assets/auth.js', '/assets/i18n.js'})
 SETUP_COPY = {
@@ -97,6 +104,58 @@ LOGIN_COPY = {
         'language': '语言',
     },
 }
+
+SERVICE_WORKER_TOMBSTONE = r"""'use strict';
+self.addEventListener('install', function(event) {
+    event.waitUntil(self.skipWaiting());
+});
+self.addEventListener('activate', function(event) {
+    event.waitUntil((async function() {
+        const names = await caches.keys();
+        await Promise.all(names.filter(function(name) {
+            return name.indexOf('epub-browser-') === 0;
+        }).map(function(name) {
+            return caches.delete(name);
+        }));
+        await self.clients.claim();
+        await self.registration.unregister();
+        const windows = await self.clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        });
+        await Promise.all(windows.map(function(client) {
+            return client.navigate(client.url);
+        }));
+    }()));
+});
+"""
+_INLINE_SCRIPT = re.compile(
+    r'<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def reader_content_security_policy(markup):
+    if isinstance(markup, bytes):
+        markup = markup.decode('utf-8', errors='replace')
+    hashes = []
+    for script in _INLINE_SCRIPT.findall(str(markup or '')):
+        digest = base64.b64encode(
+            hashlib.sha256(script.encode('utf-8')).digest()
+        ).decode('ascii')
+        hashes.append("'sha256-{}'".format(digest))
+    script_sources = " ".join(["'self'"] + sorted(set(hashes)))
+    return (
+        "default-src 'self'; "
+        "script-src {}; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "media-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "object-src 'none'; frame-src 'none'; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'self'"
+    ).format(script_sources)
 
 
 def error_payload(code, message):
@@ -299,43 +358,18 @@ def server_book_output_is_current(base_directory, book_id):
     return revision == SERVER_OUTPUT_REVISION
 
 
-def load_legacy_bookshelf(directory, username):
-    """Return the newest readable legacy bookshelf JSON record, if any."""
-    pattern = os.path.join(directory, 'epub-browser-bookshelf-' + username + '-*.json')
-    records = []
-    for filename in glob.glob(pattern):
-        try:
-            version = int(os.path.basename(filename).rsplit('-', 1)[1][:-5])
-            with open(filename, encoding='utf-8') as source:
-                records.append((version, json.load(source)))
-        except (IndexError, ValueError, OSError, json.JSONDecodeError):
-            continue
-    return max(records, key=lambda record: record[0]) if records else None
-
-
 def sync_bookshelf(
     database_path,
-    legacy_directory,
     user_id,
     client_version,
     client_data,
     store=None,
-    legacy_username=None,
 ):
     """Synchronize one bookshelf document and return its response payload and status."""
     active_store = store or StateStore(database_path)
     if store is None:
         active_store.initialize()
     row = active_store.get_bookshelf(user_id)
-    if row is None:
-        legacy = load_legacy_bookshelf(legacy_directory, legacy_username or '')
-        if legacy is not None:
-            legacy_version, legacy_data = legacy
-            active_store.create_bookshelf(user_id, legacy_version, legacy_data)
-            row = (
-                legacy_version,
-                json.dumps(legacy_data, ensure_ascii=False),
-            )
 
     if row is not None:
         stored_version, stored_data = row
@@ -405,6 +439,17 @@ def create_app(
             headers={'Cache-Control': cache_control},
         )
 
+    def apply_reader_security_headers(target_response, file_path):
+        try:
+            markup = Path(file_path).read_text(encoding='utf-8')
+        except (OSError, UnicodeDecodeError):
+            return target_response
+        target_response.headers[
+            'Content-Security-Policy'
+        ] = reader_content_security_policy(markup)
+        target_response.headers['X-Content-Type-Options'] = 'nosniff'
+        return target_response
+
     def request_session_token(request):
         return request.scope.get(
             SESSION_TOKEN_SCOPE_KEY,
@@ -449,12 +494,58 @@ def create_app(
             samesite='strict',
         )
 
+    def set_auth_nonce_cookie(target_response, nonce):
+        target_response.set_cookie(
+            AUTH_NONCE_COOKIE,
+            nonce,
+            max_age=600,
+            path='/',
+            secure=auth_service.config.cookie_secure,
+            httponly=True,
+            samesite='strict',
+        )
+
+    def delete_auth_nonce_cookie(target_response):
+        target_response.delete_cookie(
+            AUTH_NONCE_COOKIE,
+            path='/',
+            secure=auth_service.config.cookie_secure,
+            httponly=True,
+            samesite='strict',
+        )
+
     async def json_object(request):
         try:
             data = await request.json()
         except (UnicodeDecodeError, json.JSONDecodeError):
             return None
         return data if isinstance(data, dict) else None
+
+    async def bounded_public_json_object(request, maximum_size=64 * 1024):
+        content_type = request.headers.get('content-type', '').split(';', 1)[0]
+        if content_type.strip().casefold() != 'application/json':
+            return None, 'unsupported_media_type'
+        content_length = request.headers.get('content-length')
+        if content_length:
+            try:
+                if int(content_length) < 0:
+                    return None, 'invalid_json'
+                if int(content_length) > maximum_size:
+                    return None, 'body_too_large'
+            except ValueError:
+                return None, 'invalid_json'
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > maximum_size:
+                return None, 'body_too_large'
+        try:
+            data = json.loads(bytes(body).decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return None, 'invalid_json'
+        if not isinstance(data, dict):
+            return None, 'invalid_json'
+        return data, None
 
     def user_data(user):
         return {
@@ -474,6 +565,16 @@ def create_app(
             'title': metadata.get('title') or 'EPUB Book',
             'visibility': book.visibility,
             'grants': list(store.book_grants(book.book_id)),
+        }
+
+    def admin_identity_data(identity):
+        user = store.get_user(identity.user_id)
+        return {
+            'issuer': identity.issuer,
+            'subject': identity.subject,
+            'user_id': identity.user_id,
+            'username': user.username,
+            'display_name': identity.display_name,
         }
 
     def session_data(record, current_session_id):
@@ -505,7 +606,7 @@ def create_app(
             for key, entries in values.items()
         }
 
-    def valid_setup_request_source(request):
+    def valid_same_origin_request_source(request):
         fetch_site = request.headers.get('sec-fetch-site')
         if fetch_site and fetch_site.strip().lower() != 'same-origin':
             return False
@@ -539,10 +640,56 @@ def create_app(
             and origin_port == host_port
         )
 
+    def valid_anonymous_auth_request(request):
+        if not valid_same_origin_request_source(request):
+            return False
+        cookie_nonce = request.cookies.get(AUTH_NONCE_COOKIE)
+        supplied_nonce = request.headers.get(AUTH_NONCE_HEADER)
+        if (
+            not isinstance(cookie_nonce, str)
+            or not isinstance(supplied_nonce, str)
+            or not cookie_nonce
+            or not supplied_nonce
+        ):
+            return False
+        try:
+            return secrets.compare_digest(cookie_nonce, supplied_nonce)
+        except TypeError:
+            return False
+
     def invalid_setup_request():
         return response(
             error_payload('invalid_setup_request', 'Invalid setup request'),
             403,
+            cache_control='no-store',
+        )
+
+    def invalid_auth_request():
+        return response(
+            error_payload('invalid_auth_request', 'Invalid authentication request'),
+            403,
+            cache_control='no-store',
+        )
+
+    def public_json_error(error):
+        if error == 'unsupported_media_type':
+            return response(
+                error_payload(
+                    'unsupported_media_type',
+                    'Content-Type must be application/json',
+                ),
+                415,
+                cache_control='no-store',
+            )
+        if error == 'body_too_large':
+            return response(
+                error_payload('body_too_large', 'Request body is too large'),
+                413,
+                cache_control='no-store',
+            )
+        return response(
+            error_payload('invalid_json', 'Invalid JSON data'),
+            400,
             cache_control='no-store',
         )
 
@@ -643,7 +790,7 @@ if(localeField)localeField.value=localeSelect.value;
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
             )
-        if not valid_setup_request_source(request):
+        if not valid_same_origin_request_source(request):
             return invalid_setup_request()
         try:
             form = await form_data(request)
@@ -735,19 +882,23 @@ if(localeField)localeField.value=localeSelect.value;
     ):
         safe_next = html.escape(_safe_relative_path(next_path), quote=True)
         locale = normalize_login_locale(locale)
+        nonce = secrets.token_urlsafe(32)
         copy = LOGIN_COPY[locale]
         error_markup = (
-            '<p role="alert" data-i18n="account.error.invalid_credentials">'
+            '<p id="loginError" role="alert" data-i18n="account.error.invalid_credentials">'
             + copy['invalid_credentials']
             + '</p>'
             if error
-            else ''
+            else '<p id="loginError" role="alert" data-i18n="account.error.invalid_credentials" hidden>'
+            + copy['invalid_credentials']
+            + '</p>'
         )
         en_selected = ' selected' if locale == 'en' else ''
         zh_selected = ' selected' if locale == 'zh-CN' else ''
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="epub-browser-auth-nonce" content="{nonce}">
 <title data-i18n="account.loginPageTitle">{copy['page_title']}</title>
 <style>
 :root {{ font-family: system-ui,-apple-system,sans-serif; color-scheme: light dark; }}
@@ -790,12 +941,33 @@ i18n.setLocale(localeSelect.value);
 if(localeField)localeField.value=localeSelect.value;
 }});
 }}
+var loginForm=document.getElementById('loginForm');
+var loginError=document.getElementById('loginError');
+if(loginForm)loginForm.addEventListener('submit',function(event){{
+event.preventDefault();
+var username=loginForm.elements.username.value;
+var password=loginForm.elements.password.value;
+var next=loginForm.elements.next.value;
+var locale=loginForm.elements.locale.value;
+fetch('/login',{{
+method:'POST',credentials:'same-origin',
+headers:{{'Content-Type':'application/json','{AUTH_NONCE_HEADER}':'{nonce}'}},
+body:JSON.stringify({{username:username,password:password,next:next,locale:locale}})
+}}).then(function(response){{
+return response.json().catch(function(){{return {{}};}}).then(function(payload){{
+if(!response.ok){{if(loginError)loginError.hidden=false;return;}}
+window.location.assign(payload.redirect||'/');
+}});
+}}).catch(function(){{if(loginError)loginError.hidden=false;}});
+}});
 }}());</script></body></html>'''
-        return HTMLResponse(
+        page = HTMLResponse(
             markup,
             status_code=status_code,
             headers={'Cache-Control': 'no-store'},
         )
+        set_auth_nonce_cookie(page, nonce)
+        return page
 
     async def login(request):
         requested_next = _safe_relative_path(request.query_params.get('next', '/'))
@@ -812,58 +984,44 @@ if(localeField)localeField.value=localeSelect.value;
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
             )
-
-        try:
-            content_type = request.headers.get('content-type', '').split(';', 1)[0]
-            if content_type != 'application/x-www-form-urlencoded':
-                raise ValueError('Unsupported login form content type')
-            body = await request.body()
-            if len(body) > 64 * 1024:
-                raise ValueError('Login form is too large')
-            values = parse_qs(
-                body.decode('utf-8'),
-                keep_blank_values=True,
-                strict_parsing=False,
-            )
-            form = {
-                key: entries[-1] if entries else ''
-                for key, entries in values.items()
-            }
-        except (UnicodeDecodeError, ValueError):
-            return login_form(
-                requested_next,
-                error=True,
-                status_code=400,
-                locale=requested_locale,
-                locale_explicit=locale_explicit,
-            )
-        next_path = _safe_relative_path(form.get('next') or requested_next)
-        submitted_locale = normalize_login_locale(
-            form.get('locale') or requested_locale
-        )
+        current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+        if current_principal is None and not valid_anonymous_auth_request(request):
+            return invalid_auth_request()
+        data, parse_error = await bounded_public_json_object(request)
+        if parse_error is not None:
+            return public_json_error(parse_error)
+        next_path = _safe_relative_path(data.get('next') or requested_next)
         client_key = request.client.host if request.client is not None else 'unknown'
         principal = auth_service.authenticate_password(
-            form.get('username', ''),
-            form.get('password', ''),
+            data.get('username', ''),
+            data.get('password', ''),
             client_key,
         )
         if principal is None:
-            return login_form(
-                next_path,
-                error=True,
-                status_code=401,
-                locale=submitted_locale,
-                locale_explicit=True,
+            return response(
+                error_payload(
+                    'invalid_credentials',
+                    'Invalid username or password',
+                ),
+                401,
+                cache_control='no-store',
             )
 
-        raw_session, _ = auth_service.create_session(principal)
-        redirect = RedirectResponse(
-            next_path,
-            status_code=303,
-            headers={'Cache-Control': 'no-store'},
+        current_session = request_session_token(request)
+        if current_principal is not None and current_session:
+            raw_session, _ = auth_service.replace_session(
+                principal,
+                current_session,
+            )
+        else:
+            raw_session, _ = auth_service.create_session(principal)
+        logged_in = response(
+            {'redirect': next_path},
+            cache_control='no-store',
         )
-        set_session_cookie(redirect, raw_session)
-        return redirect
+        set_session_cookie(logged_in, raw_session)
+        delete_auth_nonce_cookie(logged_in)
+        return logged_in
 
     async def logout(request):
         auth_service.revoke_session(request.cookies.get(SESSION_COOKIE))
@@ -906,6 +1064,12 @@ if(localeField)localeField.value=localeSelect.value;
         )
 
     async def link_proxy_identity(request):
+        current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+        if current_principal is None and not valid_anonymous_auth_request(request):
+            return invalid_auth_request()
+        data, parse_error = await bounded_public_json_object(request)
+        if parse_error is not None:
+            return public_json_error(parse_error)
         pending_identity = request.scope.get(PENDING_IDENTITY_SCOPE_KEY)
         if pending_identity is None:
             return response(
@@ -913,13 +1077,6 @@ if(localeField)localeField.value=localeSelect.value;
                     'proxy_identity_required',
                     'An unrecognized trusted proxy identity is required',
                 ),
-                400,
-                cache_control='no-store',
-            )
-        data = await json_object(request)
-        if data is None:
-            return response(
-                error_payload('invalid_json', 'Invalid JSON data'),
                 400,
                 cache_control='no-store',
             )
@@ -958,7 +1115,14 @@ if(localeField)localeField.value=localeSelect.value;
                 409,
                 cache_control='no-store',
             )
-        raw_session, _ = auth_service.create_session(principal)
+        current_session = request_session_token(request)
+        if current_principal is not None and current_session:
+            raw_session, _ = auth_service.replace_session(
+                principal,
+                current_session,
+            )
+        else:
+            raw_session, _ = auth_service.create_session(principal)
         linked = response(
             {
                 'user': {
@@ -976,6 +1140,7 @@ if(localeField)localeField.value=localeSelect.value;
             cache_control='no-store',
         )
         set_session_cookie(linked, raw_session)
+        delete_auth_nonce_cookie(linked)
         return linked
 
     async def change_password(request):
@@ -1147,6 +1312,79 @@ if(localeField)localeField.value=localeSelect.value;
         )
         return response({'user': user_data(updated)})
 
+    async def admin_identities(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response(
+                {
+                    'identities': [
+                        admin_identity_data(identity)
+                        for identity in store.list_all_identities()
+                    ]
+                }
+            )
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        issuer = data.get('issuer')
+        subject = data.get('subject')
+        if isinstance(issuer, str):
+            issuer = issuer.strip()
+        if isinstance(subject, str):
+            subject = subject.strip()
+        if request.method == 'DELETE':
+            if not isinstance(issuer, str) or not isinstance(subject, str):
+                return response(
+                    error_payload('invalid_identity', 'Invalid identity data'),
+                    400,
+                )
+            try:
+                deleted = store.delete_identity(issuer, subject)
+            except ValueError:
+                deleted = False
+            if not deleted:
+                return response(error_payload('not_found', 'Identity not found'), 404)
+            return response({'message': 'Identity deleted'})
+
+        user_id = data.get('user_id')
+        display_name = data.get('display_name')
+        if (
+            not isinstance(issuer, str)
+            or not issuer.strip()
+            or not isinstance(subject, str)
+            or not subject.strip()
+            or not isinstance(user_id, str)
+            or not user_id
+            or (display_name is not None and not isinstance(display_name, str))
+        ):
+            return response(
+                error_payload('invalid_identity', 'Invalid identity data'),
+                400,
+            )
+        try:
+            identity = store.create_identity(
+                issuer,
+                subject,
+                user_id,
+                display_name.strip() if display_name else None,
+            )
+        except KeyError:
+            return response(error_payload('not_found', 'User not found'), 404)
+        except ValueError:
+            return response(
+                error_payload('invalid_identity', 'Invalid identity data'),
+                400,
+            )
+        except sqlite3.IntegrityError:
+            return response(
+                error_payload(
+                    'identity_already_linked',
+                    'External identity is already linked',
+                ),
+                409,
+            )
+        return response({'identity': admin_identity_data(identity)}, 201)
+
     async def admin_books(request):
         require_admin(request)
         return response(
@@ -1216,7 +1454,18 @@ if(localeField)localeField.value=localeSelect.value;
             return response(error_payload('not_found', 'Library index not found'), 404)
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
-        return response
+        return apply_reader_security_headers(response, index_path)
+
+    async def service_worker_tombstone(request):
+        return Response(
+            SERVICE_WORKER_TOMBSTONE,
+            media_type='text/javascript',
+            headers={
+                'Cache-Control': 'no-store, no-cache, must-revalidate',
+                'Service-Worker-Allowed': '/',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        )
 
     async def protected_public_file(request):
         try:
@@ -1240,7 +1489,17 @@ if(localeField)localeField.value=localeSelect.value;
                 return response(error_payload('forbidden', 'Forbidden'), 403)
             if not server_book_output_is_current(base_directory, book_id):
                 return response(error_payload('not_found', 'Not Found'), 404)
-        return await public_files.get_response(path, request.scope)
+        static_response = await public_files.get_response(path, request.scope)
+        if path.casefold().endswith(('.html', '.htm')):
+            apply_reader_security_headers(
+                static_response,
+                getattr(
+                    static_response,
+                    'path',
+                    os.path.join(base_directory, *path.split('/')),
+                ),
+            )
+        return static_response
 
     async def health(request):
         payload = {'status': 'ok'}
@@ -1317,6 +1576,20 @@ if(localeField)localeField.value=localeSelect.value;
             data[target] = json.loads(data[key]) if data.get(key) else None
         return data
 
+    def book_access_denied(principal, book_id):
+        return (
+            not isinstance(book_id, str)
+            or not book_id
+            or not store.can_read_book(
+                principal.user_id,
+                principal.role,
+                book_id,
+            )
+        )
+
+    def forbidden_book_response():
+        return response(error_payload('forbidden', 'Forbidden'), 403)
+
     async def annotations(request):
         principal = require_principal(request)
         parts = [part for part in request.path_params['path'].split('/') if part]
@@ -1334,6 +1607,8 @@ if(localeField)localeField.value=localeSelect.value;
                     )
                 if tail[:1] == ['item'] and len(tail) == 2:
                     row = store.get_annotation(tail[1], user_id=principal.user_id)
+                    if row and book_access_denied(principal, row.get('book_hash')):
+                        return forbidden_book_response()
                     return (
                         response({'data': row}, 200)
                         if row
@@ -1347,6 +1622,8 @@ if(localeField)localeField.value=localeSelect.value;
                     )
                 if len(tail) > 2:
                     return response(error_payload('not_found', 'Not found'), 404)
+                if tail and book_access_denied(principal, tail[0]):
+                    return forbidden_book_response()
                 chapter_index = None
                 if len(tail) == 2:
                     try:
@@ -1364,11 +1641,22 @@ if(localeField)localeField.value=localeSelect.value;
                     chapter_index=chapter_index,
                     user_id=principal.user_id,
                 )
+                if not tail:
+                    rows = [
+                        row for row in rows
+                        if not book_access_denied(
+                            principal,
+                            row.get('book_hash'),
+                        )
+                    ]
                 return response({'data': rows})
 
             if request.method == 'DELETE':
                 if len(tail) != 2 or tail[0] != 'item':
                     return response(error_payload('not_found', 'Not found'), 404)
+                row = store.get_annotation(tail[1], user_id=principal.user_id)
+                if row and book_access_denied(principal, row.get('book_hash')):
+                    return forbidden_book_response()
                 store.delete_annotation(tail[1], user_id=principal.user_id)
                 return response({'message': 'Deleted'})
             try:
@@ -1378,6 +1666,24 @@ if(localeField)localeField.value=localeSelect.value;
 
             if request.method == 'POST':
                 entries = data.get('annotations', []) if tail == ['batch'] else [data]
+                if not isinstance(entries, list) or any(
+                    not isinstance(entry, dict) for entry in entries
+                ):
+                    return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+                path_book_id = (
+                    tail[0]
+                    if tail and tail[0] not in {'batch', 'item'}
+                    else None
+                )
+                if path_book_id and book_access_denied(principal, path_book_id):
+                    return forbidden_book_response()
+                for entry in entries:
+                    entry_book_id = entry.get('book_hash')
+                    if (
+                        (path_book_id and entry_book_id != path_book_id)
+                        or book_access_denied(principal, entry_book_id)
+                    ):
+                        return forbidden_book_response()
                 created = failed = 0
                 for entry in entries:
                     try:
@@ -1398,6 +1704,15 @@ if(localeField)localeField.value=localeSelect.value;
             if len(tail) != 2 or tail[0] != 'item':
                 return response(error_payload('not_found', 'Not found'), 404)
             annotation_id = tail[1]
+            stored = store.get_annotation(
+                annotation_id,
+                user_id=principal.user_id,
+            )
+            if stored and book_access_denied(
+                principal,
+                stored.get('book_hash'),
+            ):
+                return forbidden_book_response()
             if 'chapter_index' in data and (
                 isinstance(data['chapter_index'], bool)
                 or not isinstance(data['chapter_index'], int)
@@ -1431,9 +1746,8 @@ if(localeField)localeField.value=localeSelect.value;
             data = await request.json()
             version, shelf = data.get('version', 1), data.get('data')
             payload, status = sync_bookshelf(
-                database_path(base_directory), sync_dir or base_directory,
-                principal.user_id, version, shelf, store=store,
-                legacy_username=principal.username,
+                database_path(base_directory), principal.user_id,
+                version, shelf, store=store,
             )
             if status == 400:
                 return response(error_payload('no_sync_data', payload['message']), status)
@@ -1499,6 +1813,9 @@ if(localeField)localeField.value=localeSelect.value;
         principal = require_principal(request)
         book_hash = request.path_params['book_hash']
 
+        if book_access_denied(principal, book_hash):
+            return forbidden_book_response()
+
         if request.method != 'GET' and not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)
 
@@ -1534,6 +1851,7 @@ if(localeField)localeField.value=localeSelect.value;
         Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
         Route('/logout', logout, methods=['POST']),
+        Route('/sw.js', service_worker_tombstone, methods=['GET']),
         Route('/api/identity/link', link_proxy_identity, methods=['POST']),
         Route('/api/session', session, methods=['GET']),
         Route('/api/csrf', csrf, methods=['GET']),
@@ -1543,6 +1861,11 @@ if(localeField)localeField.value=localeSelect.value;
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
+        Route(
+            '/api/admin/identities',
+            admin_identities,
+            methods=['GET', 'POST', 'DELETE'],
+        ),
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/{book_id}', admin_book, methods=['PUT']),
         Route(
@@ -1574,9 +1897,11 @@ if(localeField)localeField.value=localeSelect.value;
     async def auth_middleware(request, call_next):
         path = request.url.path
         if not store.has_administrator():
-            if path == '/setup' or path in PUBLIC_LOGIN_ASSETS:
+            if path in {'/setup', '/sw.js'} or path in PUBLIC_LOGIN_ASSETS:
                 return await call_next(request)
             return setup_required_response(request)
+        if path == '/sw.js':
+            return await call_next(request)
         raw_session = request.cookies.get(SESSION_COOKIE)
         session_principal = auth_service.principal_from_session(raw_session)
         host = request.client.host if request.client is not None else ''

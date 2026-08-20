@@ -133,6 +133,17 @@ def _render_library_html(
                 </form>
                 <ul id="adminUserList"></ul>
             </section>
+            <section aria-labelledby="adminIdentitiesTitle">
+                <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
+                <form id="adminIdentityForm">
+                    <label><span data-i18n="admin.identityIssuer">Issuer</span><input type="text" name="issuer" autocomplete="off" required></label>
+                    <label><span data-i18n="admin.identitySubject">Subject</span><input type="text" name="subject" autocomplete="off" required></label>
+                    <label><span data-i18n="admin.identityDisplayName">Display name</span><input type="text" name="display_name" autocomplete="off"></label>
+                    <label><span data-i18n="admin.identityUser">Local user</span><select id="adminIdentityUser" name="user_id" required></select></label>
+                    <button type="submit" class="bookshelf-action-btn" data-i18n="admin.createIdentity">Create identity</button>
+                </form>
+                <ul id="adminIdentityList"></ul>
+            </section>
             <section aria-labelledby="adminBooksTitle">
                 <h4 id="adminBooksTitle" data-i18n="admin.books">Book access</h4>
                 <p data-i18n="admin.restrictedBook">Restricted books are visible only to administrators and explicitly granted users.</p>

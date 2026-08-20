@@ -273,7 +273,7 @@ Kindle/Silk browsers receive an e-reader-friendly mode; browser-heavy features m
 
 ## Data safety and migration
 
-Persistent Server startup automatically checks for the v1 root database, verifies it, creates a backup, upgrades a copied database, imports eligible legacy bookshelf JSON, and only then removes the migrated root database. Legacy public files are retired in two successful startup phases and are never treated as authoritative data.
+Persistent Server startup automatically checks for the v1 root database, verifies it, creates a backup, upgrades a copied database, imports the highest eligible legacy bookshelf JSON into the pending administrator, and only then removes the migrated root database. Ordinary `/sync` requests never scan legacy files or select them by username. Legacy public files are retired in two successful startup phases and are never treated as authoritative data.
 
 If both `epub-browser.db` and `annotations.db` exist at the legacy root, startup stops with a conflict instead of guessing. Corrupt databases are also left untouched. See [docs/migration-v2.md](docs/migration-v2.md).
 

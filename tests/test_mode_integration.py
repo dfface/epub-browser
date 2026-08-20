@@ -2,6 +2,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -21,6 +22,25 @@ from epub_browser.runtime import run_server
 from epub_browser.server_library import ServerLibraryManager
 from epub_browser.ssg import run_ssg
 from epub_browser.state import StateStore
+
+
+def _json_login(client, username, password):
+    page = client.get("/login")
+    match = re.search(
+        r'<meta name="epub-browser-auth-nonce" content="([^"]+)">',
+        page.text,
+    )
+    if page.status_code != 200 or match is None:
+        raise RuntimeError("runtime login page did not provide an authentication nonce")
+    return client.post(
+        "/login",
+        json={"username": username, "password": password, "next": "/"},
+        headers={
+            "X-EPUB-Browser-Auth-Nonce": match.group(1),
+            "Origin": str(client.base_url).rstrip("/"),
+            "Sec-Fetch-Site": "same-origin",
+        },
+    )
 
 
 class ModeIntegrationTests(unittest.TestCase):
@@ -376,12 +396,8 @@ class _ReturningServer:
 
     def run(self):
         with TestClient(self.config.app) as client:
-            login = client.post(
-                "/login",
-                data={"username": "admin", "password": "admin-secret"},
-                follow_redirects=False,
-            )
-            if login.status_code != 303:
+            login = _json_login(client, "admin", "admin-secret")
+            if login.status_code != 200:
                 raise RuntimeError("runtime administrator login failed")
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:

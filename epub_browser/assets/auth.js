@@ -12,6 +12,7 @@
     var initialized = false;
     var users = [];
     var books = [];
+    var identities = [];
 
     function i18n() {
       return root.EpubBrowserI18n;
@@ -140,6 +141,12 @@
       });
     }
 
+    function pageAuthenticationNonce() {
+      if (!root.document || !root.document.querySelector) return '';
+      var meta = root.document.querySelector('meta[name="epub-browser-auth-nonce"]');
+      return meta && meta.content ? meta.content : '';
+    }
+
     function associate(credentials) {
       var options = {
         method: 'POST',
@@ -147,6 +154,9 @@
         body: JSON.stringify(credentials || {})
       };
       var csrfToken = sessionState && sessionState.csrf_token;
+      if (!csrfToken) {
+        options.headers['X-EPUB-Browser-Auth-Nonce'] = pageAuthenticationNonce();
+      }
       return Promise.resolve(root.fetch(
         '/api/identity/link',
         requestOptions(options, csrfToken, '/api/identity/link')
@@ -179,6 +189,8 @@
         last_enabled_admin: true,
         not_found: true,
         invalid_visibility: true,
+        invalid_identity: true,
+        identity_already_linked: true,
         user_disabled: true,
         forbidden: true,
         csrf_required: true,
@@ -426,6 +438,73 @@
       if (!books.length) list.appendChild(createTextElement('li', '', 'admin.noBooks'));
     }
 
+    function renderIdentities() {
+      var list = element('adminIdentityList');
+      var userSelect = element('adminIdentityUser');
+      if (userSelect) {
+        var selectedUser = userSelect.value;
+        userSelect.textContent = '';
+        users.forEach(function(user) {
+          var option = root.document.createElement('option');
+          option.value = user.id;
+          option.textContent = user.username;
+          option.selected = user.id === selectedUser;
+          userSelect.appendChild(option);
+        });
+      }
+      if (!list) return;
+      list.textContent = '';
+      identities.forEach(function(identity) {
+        var item = root.document.createElement('li');
+        item.appendChild(createTextElement(
+          'span',
+          'admin-identity-summary',
+          'admin.identitySummary',
+          {
+            issuer: identity.issuer,
+            subject: identity.subject,
+            username: identity.username,
+            displayName: identity.display_name || identity.username
+          }
+        ));
+        item.appendChild(actionButton('admin.deleteIdentity', function() {
+          deleteIdentity(identity.issuer, identity.subject);
+        }));
+        list.appendChild(item);
+      });
+      if (!identities.length) {
+        list.appendChild(createTextElement('li', '', 'admin.noIdentities'));
+      }
+    }
+
+    function createIdentity(payload, reload) {
+      return authenticatedFetch('/api/admin/identities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      }).then(function(response) {
+        if (!response.ok) return showResponseError(response, 'admin');
+        showStatus('admin.identityCreated', 'success');
+        return reload === false ? response : loadAdminData();
+      }).catch(function() {
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
+    function deleteIdentity(issuer, subject, reload) {
+      return authenticatedFetch('/api/admin/identities', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issuer: issuer, subject: subject })
+      }).then(function(response) {
+        if (!response.ok) return showResponseError(response, 'admin');
+        showStatus('admin.identityDeleted', 'success');
+        return reload === false ? response : loadAdminData();
+      }).catch(function() {
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
     function mutateGrant(bookId, userId, method) {
       return authenticatedFetch(
         '/api/admin/books/' + encodeURIComponent(bookId) + '/grants/' + encodeURIComponent(userId),
@@ -443,15 +522,23 @@
       }
       return Promise.all([
         authenticatedFetch('/api/admin/users'),
-        authenticatedFetch('/api/admin/books')
+        authenticatedFetch('/api/admin/books'),
+        authenticatedFetch('/api/admin/identities')
       ]).then(function(responses) {
         if (!responses[0].ok) return showResponseError(responses[0], 'admin');
         if (!responses[1].ok) return showResponseError(responses[1], 'admin');
-        return Promise.all([readJson(responses[0]), readJson(responses[1])]).then(function(payloads) {
+        if (!responses[2].ok) return showResponseError(responses[2], 'admin');
+        return Promise.all([
+          readJson(responses[0]),
+          readJson(responses[1]),
+          readJson(responses[2])
+        ]).then(function(payloads) {
           users = payloads[0].users || [];
           books = payloads[1].books || [];
+          identities = payloads[2].identities || [];
           renderUsers();
           renderBooks();
+          renderIdentities();
         });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
@@ -479,6 +566,7 @@
       var passwordForm = element('accountPasswordForm');
       var associationForm = element('associationForm');
       var createUserForm = element('adminUserForm');
+      var createIdentityForm = element('adminIdentityForm');
       if (menu) menu.addEventListener('click', openPanel);
       if (close) close.addEventListener('click', closePanel);
       if (logoutButton) logoutButton.addEventListener('click', function() {
@@ -530,12 +618,24 @@
           return loadAdminData();
         }).catch(function() { showStatus('admin.error.network', 'error'); });
       });
+      if (createIdentityForm) createIdentityForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        createIdentity({
+          issuer: formValue(createIdentityForm, 'issuer'),
+          subject: formValue(createIdentityForm, 'subject'),
+          display_name: formValue(createIdentityForm, 'display_name'),
+          user_id: formValue(createIdentityForm, 'user_id')
+        }).then(function() {
+          createIdentityForm.reset();
+        });
+      });
       if (i18n() && i18n().onLocaleChange) {
         i18n().onLocaleChange(function() {
           renderIdentity();
           renderSessions([]);
           renderUsers();
           renderBooks();
+          renderIdentities();
           loadSessions();
         });
       }
@@ -562,6 +662,8 @@
       session: loadSession,
       logout: logout,
       associate: associate,
+      createIdentity: createIdentity,
+      deleteIdentity: deleteIdentity,
       init: init,
       setSession: setSession,
       getSession: function() { return sessionState; }
