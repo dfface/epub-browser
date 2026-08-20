@@ -90,18 +90,6 @@ function bookshelfSyncRequest(root, version, data) {
     });
 }
 
-function bookshelfSyncRequest(root, version, data) {
-    if (!root || root.EpubBrowserMode !== 'server') return Promise.resolve(null);
-    if (!root.EpubBrowserAuth || typeof root.EpubBrowserAuth.fetch !== 'function') {
-        return Promise.reject(new Error('Authenticated fetch is unavailable'));
-    }
-    return root.EpubBrowserAuth.fetch('/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version: version, data: data })
-    });
-}
-
 function initBookshelf() {
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';

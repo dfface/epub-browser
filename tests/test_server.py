@@ -114,6 +114,10 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         )
         self.assertIn("首次访问 Web 界面时，系统会提示你创建一个超级用户账户。", chinese.text)
         self.assertIn('id="setupForm"', english.text)
+        self.assertIn('class="auth-page"', english.text)
+        self.assertIn('class="auth-card setup-card"', english.text)
+        self.assertIn('href="/assets/account.css"', english.text)
+        self.assertNotIn('<style>', english.text)
         self.assertIn('name="password_confirmation"', english.text)
         self.assertIn('name="setup_nonce"', english.text)
         nonce = re.search(
@@ -127,6 +131,11 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertIn("HttpOnly", setup_cookie)
         self.assertIn("Path=/setup", setup_cookie)
         self.assertIn("SameSite=strict", setup_cookie)
+        account_styles = self.client.get('/assets/account.css')
+        self.assertEqual(account_styles.status_code, 200)
+        self.assertIn('text/css', account_styles.headers['content-type'])
+        self.assertIn('.auth-card', account_styles.text)
+        self.assertIn('.account-layout', account_styles.text)
 
         for path in ("/", "/index.html", "/login", "/reader.html"):
             with self.subTest(path=path):
@@ -563,6 +572,11 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('<h1 data-i18n="account.signIn">Sign in</h1>', english.text)
         self.assertIn('<h1 data-i18n="account.signIn">登录</h1>', chinese.text)
         self.assertIn('id="loginForm"', english.text)
+        self.assertIn('class="auth-page"', english.text)
+        self.assertIn('class="auth-card login-card"', english.text)
+        self.assertIn('href="/assets/account.css"', english.text)
+        self.assertIn('data-i18n="account.loginDescription"', english.text)
+        self.assertNotIn('<style>', english.text)
         self.assertNotIn('id="associationForm"', english.text)
         self.assertIn('id="loginLocaleSelect"', english.text)
         self.assertIn('<option value="en" selected', english.text)
@@ -577,6 +591,9 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             chinese.text,
         )
         self.assertEqual(self.client.get('/assets/i18n.js').status_code, 200)
+        stylesheet = self.client.get('/assets/account.css')
+        self.assertEqual(stylesheet.status_code, 200)
+        self.assertIn('text/css', stylesheet.headers['content-type'])
 
     def test_cookie_secure_flag_follows_explicit_auth_configuration(self):
         secure_config = AuthConfig.from_values(
@@ -2179,46 +2196,40 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(row, (2, json.dumps(payload["data"], ensure_ascii=False)))
 
     def test_server_bookshelf_is_read_and_written_with_a_versioned_document(self):
-        headers = {"X-Username": "reader"}
-
-        initial = self.client.get("/api/bookshelf", headers=headers)
+        initial = self.client.get("/api/bookshelf")
         self.assertEqual(initial.status_code, 200)
         self.assertEqual(initial.json(), {"version": 0, "data": {"items": [], "groups": {}, "order": []}})
 
         created = self.client.put(
             "/api/bookshelf",
-            headers=headers,
             json={"version": 0, "data": {"items": ["book-a"], "groups": {}, "order": ["book-a"]}},
         )
         self.assertEqual(created.status_code, 200)
         self.assertEqual(created.json()["version"], 1)
 
-        loaded = self.client.get("/api/bookshelf", headers=headers)
+        loaded = self.client.get("/api/bookshelf")
         self.assertEqual(loaded.json(), created.json())
 
-    def test_server_bookshelf_requires_a_logged_in_username(self):
-        read = self.client.get("/api/bookshelf")
-        write = self.client.put(
+    def test_server_bookshelf_ignores_spoofed_username_and_uses_principal(self):
+        created = self.client.put(
             "/api/bookshelf",
+            headers={"X-Username": "someone-else"},
             json={"version": 0, "data": {"items": [], "groups": {}, "order": []}},
         )
 
-        self.assertEqual(read.status_code, 400)
-        self.assertEqual(write.status_code, 400)
-        self.assertEqual(read.json()["code"], "username_required")
-        self.assertEqual(write.json()["code"], "username_required")
+        self.assertEqual(created.status_code, 200)
+        self.assertIsNotNone(
+            self.store.get_bookshelf(self.store.get_user_by_username("alice").user_id)
+        )
 
     def test_server_bookshelf_rejects_stale_automatic_saves_without_overwriting_data(self):
-        headers = {"X-Username": "reader"}
         self.client.put(
             "/api/bookshelf",
-            headers=headers,
             json={"version": 0, "data": {"items": ["server"], "groups": {}, "order": ["server"]}},
         )
 
         conflict = self.client.put(
             "/api/bookshelf",
-            headers=headers,
             json={"version": 0, "data": {"items": ["client"], "groups": {}, "order": ["client"]}},
         )
 

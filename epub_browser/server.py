@@ -58,7 +58,11 @@ PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/api/identity/link',
     '/sw.js',
 })
-PUBLIC_LOGIN_ASSETS = frozenset({'/assets/auth.js', '/assets/i18n.js'})
+PUBLIC_LOGIN_ASSETS = frozenset({
+    '/assets/account.css',
+    '/assets/auth.js',
+    '/assets/i18n.js',
+})
 SETUP_COPY = {
     'en': {
         'page_title': 'Set up · EPUB Browser',
@@ -94,6 +98,7 @@ LOGIN_COPY = {
     'en': {
         'page_title': 'Sign in · EPUB Browser',
         'sign_in': 'Sign in',
+        'description': 'Sign in to continue to your personal library.',
         'username': 'Username',
         'password': 'Password',
         'invalid_credentials': 'Invalid username or password.',
@@ -102,6 +107,7 @@ LOGIN_COPY = {
     'zh-CN': {
         'page_title': '登录 · EPUB Browser',
         'sign_in': '登录',
+        'description': '登录后继续进入你的个人书库。',
         'username': '用户名',
         'password': '密码',
         'invalid_credentials': '用户名或密码不正确。',
@@ -712,7 +718,7 @@ def create_app(
             'username_unavailable': 'account.error.username_unavailable',
         }.get(error)
         error_markup = (
-            '<p role="alert" data-i18n="{}">{}</p>'.format(
+            '<p class="auth-alert" role="alert" data-i18n="{}">{}</p>'.format(
                 error_key,
                 copy[error],
             )
@@ -725,38 +731,28 @@ def create_app(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title data-i18n="account.setupPageTitle">{copy['page_title']}</title>
-<style>
-:root {{ font-family: system-ui,-apple-system,sans-serif; color-scheme: light dark; }}
-body {{ min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f3f6f4; color: #173336; }}
-.setup-card {{ width: min(90vw, 30rem); box-sizing: border-box; padding: 2rem; border-radius: 1rem; background: #fff; box-shadow: 0 1rem 3rem rgba(20,50,53,.15); }}
-.setup-language {{ display: flex; justify-content: flex-end; align-items: center; gap: .5rem; }}
-.setup-card form,.setup-card label {{ display: grid; gap: .5rem; }}
-.setup-card form {{ gap: 1rem; }}
-.setup-card input,.setup-card select,.setup-card button {{ box-sizing: border-box; min-height: 2.75rem; padding: .65rem .8rem; font: inherit; }}
-.setup-card button {{ border: 0; border-radius: .5rem; background: #244548; color: #fff; cursor: pointer; }}
-[role=alert] {{ color: #a22424; }}
-@media (prefers-color-scheme: dark) {{ body {{ background: #112426; color: #eef7f5; }} .setup-card {{ background: #193437; }} }}
-</style>
+<link rel="stylesheet" href="/assets/account.css">
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
-</head><body><main class="setup-card">
-<label class="setup-language"><span data-i18n="common.language">{copy['language']}</span>
+</head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card setup-card">
+<header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
+<label class="auth-language setup-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
 <select id="setupLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
 <option value="en"{en_selected} data-i18n="common.english">English</option>
 <option value="zh-CN"{zh_selected} data-i18n="common.chinese">中文</option>
-</select></label>
-<h1 data-i18n="account.setupTitle">{copy['title']}</h1>
-<p data-i18n="account.setupDescription">{copy['description']}</p>
+</select></label></header>
+<div class="auth-intro"><h1 data-i18n="account.setupTitle">{copy['title']}</h1>
+<p class="auth-description" data-i18n="account.setupDescription">{copy['description']}</p></div>
 {error_markup}
-<form id="setupForm" method="post" action="/setup">
+<form class="auth-form" id="setupForm" method="post" action="/setup">
 <input type="hidden" name="setup_nonce" value="{nonce}">
 <input type="hidden" name="locale" value="{locale}">
-<label><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
-<label><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="new-password" required></label>
-<label><span data-i18n="account.confirmPassword">{copy['password_confirmation']}</span><input name="password_confirmation" type="password" autocomplete="new-password" required></label>
-<button type="submit" data-i18n="account.createSuperuser">{copy['submit']}</button>
-</form></main>
+<label class="auth-field"><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
+<label class="auth-field"><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="new-password" required></label>
+<label class="auth-field"><span data-i18n="account.confirmPassword">{copy['password_confirmation']}</span><input name="password_confirmation" type="password" autocomplete="new-password" required></label>
+<button class="auth-primary-button" type="submit" data-i18n="account.createSuperuser">{copy['submit']}</button>
+</form></section><p class="auth-footnote">EPUB Browser</p></div></main>
 <script>(function() {{
 var i18n=window.EpubBrowserI18n;
 var localeSelect=document.getElementById('setupLocaleSelect');
@@ -889,11 +885,11 @@ if(localeField)localeField.value=localeSelect.value;
         nonce = secrets.token_urlsafe(32)
         copy = LOGIN_COPY[locale]
         error_markup = (
-            '<p id="loginError" role="alert" data-i18n="account.error.invalid_credentials">'
+            '<p class="auth-alert" id="loginError" role="alert" data-i18n="account.error.invalid_credentials">'
             + copy['invalid_credentials']
             + '</p>'
             if error
-            else '<p id="loginError" role="alert" data-i18n="account.error.invalid_credentials" hidden>'
+            else '<p class="auth-alert" id="loginError" role="alert" data-i18n="account.error.invalid_credentials" hidden>'
             + copy['invalid_credentials']
             + '</p>'
         )
@@ -904,36 +900,27 @@ if(localeField)localeField.value=localeSelect.value;
 <meta name="color-scheme" content="light dark">
 <meta name="epub-browser-auth-nonce" content="{nonce}">
 <title data-i18n="account.loginPageTitle">{copy['page_title']}</title>
-<style>
-:root {{ font-family: system-ui,-apple-system,sans-serif; color-scheme: light dark; }}
-body {{ min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f3f6f4; color: #173336; }}
-.login-card {{ width: min(90vw, 28rem); box-sizing: border-box; padding: 2rem; border-radius: 1rem; background: #fff; box-shadow: 0 1rem 3rem rgba(20,50,53,.15); }}
-.login-language {{ display: flex; justify-content: flex-end; align-items: center; gap: .5rem; }}
-.login-card form,.login-card label {{ display: grid; gap: .5rem; }}
-.login-card form {{ gap: 1rem; }}
-.login-card input,.login-card select,.login-card button {{ box-sizing: border-box; min-height: 2.75rem; padding: .65rem .8rem; font: inherit; }}
-.login-card button {{ border: 0; border-radius: .5rem; background: #244548; color: #fff; cursor: pointer; }}
-[role=alert] {{ color: #a22424; }}
-@media (prefers-color-scheme: dark) {{ body {{ background: #112426; color: #eef7f5; }} .login-card {{ background: #193437; }} }}
-</style>
+<link rel="stylesheet" href="/assets/account.css">
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
-</head><body><main class="login-card">
-<label class="login-language"><span data-i18n="common.language">{copy['language']}</span>
+</head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
+<header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
+<label class="auth-language login-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
 <select id="loginLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
 <option value="en"{en_selected} data-i18n="common.english">English</option>
 <option value="zh-CN"{zh_selected} data-i18n="common.chinese">中文</option>
-</select></label>
-<h1 data-i18n="account.signIn">{copy['sign_in']}</h1>
+</select></label></header>
+<div class="auth-intro"><h1 data-i18n="account.signIn">{copy['sign_in']}</h1>
+<p class="auth-description" data-i18n="account.loginDescription">{copy['description']}</p></div>
 {error_markup}
-<form id="loginForm" method="post" action="/login">
+<form class="auth-form" id="loginForm" method="post" action="/login">
 <input type="hidden" name="next" value="{safe_next}">
 <input type="hidden" name="locale" value="{locale}">
-<label><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
-<label><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="current-password" required></label>
-<button type="submit" data-i18n="account.signIn">{copy['sign_in']}</button>
-</form></main>
+<label class="auth-field"><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
+<label class="auth-field"><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="current-password" required></label>
+<button class="auth-primary-button" type="submit" data-i18n="account.signIn">{copy['sign_in']}</button>
+</form></section><p class="auth-footnote">EPUB Browser</p></div></main>
 <script>(function() {{
 var i18n=window.EpubBrowserI18n;
 var localeSelect=document.getElementById('loginLocaleSelect');
@@ -1479,7 +1466,7 @@ window.location.assign(payload.redirect||'/');
         if '/' + path in PUBLIC_LOGIN_ASSETS:
             return FileResponse(
                 os.path.join(os.path.dirname(__file__), path),
-                media_type='text/javascript',
+                media_type='text/css' if path.endswith('.css') else 'text/javascript',
                 headers={'Cache-Control': 'no-cache'},
             )
         principal = require_principal(request)
@@ -1786,24 +1773,18 @@ window.location.assign(payload.redirect||'/');
         except json.JSONDecodeError: return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
         except Exception: return response(error_payload('server_error', 'Internal server error'), 500)
 
-    def bookshelf_document(username):
-        row = store.get_bookshelf(username)
+    def bookshelf_document(user_id):
+        row = store.get_bookshelf(user_id)
         if row is None:
-            legacy = load_legacy_bookshelf(sync_dir or base_directory, username)
-            if legacy is not None:
-                version, data = legacy
-                store.create_bookshelf(username, version, data)
-                return version, data
             return 0, {"items": [], "groups": {}, "order": []}
         version, serialized = row
         return version, json.loads(serialized)
 
     async def bookshelf(request):
-        username = request.headers.get('X-Username', '').strip()
-        if not username:
-            return response(error_payload('username_required', 'Username is required'), 400)
+        principal = require_principal(request)
+        user_id = principal.user_id
         try:
-            current_version, current_data = bookshelf_document(username)
+            current_version, current_data = bookshelf_document(user_id)
             if request.method == 'GET':
                 return response({'version': current_version, 'data': current_data})
             if not runtime_status.is_ready():
@@ -1825,9 +1806,9 @@ window.location.assign(payload.redirect||'/');
                 )
             next_version = current_version + 1
             if current_version == 0:
-                store.create_bookshelf(username, next_version, proposed_data)
+                store.create_bookshelf(user_id, next_version, proposed_data)
             else:
-                store.update_bookshelf(username, next_version, proposed_data)
+                store.update_bookshelf(user_id, next_version, proposed_data)
             return response({'version': next_version, 'data': proposed_data})
         except json.JSONDecodeError:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)

@@ -88,6 +88,7 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('id=importShelfBtn', html)
         self.assertNotIn('id=syncShelfBtn', html)
         self.assertRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+        self.assertRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -99,6 +100,7 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('id=libraryProgress', html)
         self.assertNotIn('library-progress', html)
         self.assertNotIn('id=loginCard', html)
+        self.assertNotRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
         self.assertIn('id=exportShelfBtn', html)
         self.assertIn('id=importShelfBtn', html)
         self.assertNotIn('id=syncShelfBtn', html)

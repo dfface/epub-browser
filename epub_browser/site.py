@@ -55,6 +55,7 @@ def _render_library_html(
             <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if deployment_mode == "ssg" else ""
     server_account_control = ""
     server_account_panel = ""
+    server_account_stylesheet = ""
     server_auth_script = ""
     server_client_start = f"""
             if (window.initScriptLibrary) window.initScriptLibrary();
@@ -79,6 +80,7 @@ def _render_library_html(
     </section>"""
         server_progress_script = '<script src="/assets/library-progress.js" defer></script>'
         server_progress_start = 'if (window.EpubLibraryProgress) window.EpubLibraryProgress.start(window);'
+        server_account_stylesheet = '<link rel="stylesheet" href="/assets/account.css">'
         server_account_control = '''<button type="button" class="library-meta-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel">
                 <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue" data-i18n="account.menu">Account</span>
             </button>'''
@@ -87,70 +89,74 @@ def _render_library_html(
     <div class="bookshelf-content account-content">
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
-                <button type="button" class="bookshelf-action-btn" id="accountLogout"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> <span data-i18n="account.logout">Sign out</span></button>
+                <button type="button" class="bookshelf-action-btn account-danger-action" id="accountLogout"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> <span data-i18n="account.logout">Sign out</span></button>
             </div>
             <h2 class="bookshelf-title" id="accountTitle" data-i18n="account.title">Account settings</h2>
             <div class="bookshelf-header-right">
                 <button type="button" class="bookshelf-close-btn" id="accountClose" aria-label="Close account settings" data-i18n-aria-label="account.close"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
         </div>
-        <div class="account-modal-body">
+        <div class="account-modal-body"><div class="account-layout">
         <p id="accountStatus" class="account-status" role="status" aria-live="polite" hidden></p>
-        <section aria-labelledby="accountProfileTitle">
+        <section class="account-card account-profile-card" aria-labelledby="accountProfileTitle">
             <h3 id="accountProfileTitle" data-i18n="account.profile">Profile</h3>
             <p id="accountIdentity"></p>
         </section>
-        <section aria-labelledby="accountPasswordTitle">
+        <div class="account-grid">
+        <section class="account-card" aria-labelledby="accountPasswordTitle">
             <h3 id="accountPasswordTitle" data-i18n="account.changePassword">Change password</h3>
-            <form id="accountPasswordForm">
+            <form class="account-form" id="accountPasswordForm">
                 <label><span data-i18n="account.currentPassword">Current password</span><input type="password" name="current_password" autocomplete="current-password" required></label>
                 <label><span data-i18n="account.newPassword">New password</span><input type="password" name="new_password" autocomplete="new-password" required></label>
-                <button type="submit" class="bookshelf-action-btn" data-i18n="account.savePassword">Save password</button>
+                <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="account.savePassword">Save password</button>
             </form>
         </section>
-        <section aria-labelledby="accountSessionsTitle">
+        <section class="account-card" aria-labelledby="accountSessionsTitle">
             <h3 id="accountSessionsTitle" data-i18n="account.sessions">Active sessions</h3>
-            <ul id="sessionList"></ul>
+            <ul class="account-list" id="sessionList"></ul>
         </section>
-        <details>
+        <details class="account-card account-card-wide account-details">
             <summary data-i18n="account.associationTitle">Associate a proxy identity</summary>
-            <p data-i18n="account.associationDescription">If your trusted proxy identity is not recognized, prove which local account it belongs to.</p>
-            <form id="associationForm">
+            <div class="account-details-body"><p data-i18n="account.associationDescription">If your trusted proxy identity is not recognized, prove which local account it belongs to.</p>
+            <form class="account-form" id="associationForm">
                 <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="username" required></label>
                 <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="current-password" required></label>
-                <button type="submit" class="bookshelf-action-btn" data-i18n="account.associate">Associate identity</button>
-            </form>
+                <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="account.associate">Associate identity</button>
+            </form></div>
         </details>
-        <section id="adminPanel" aria-labelledby="adminTitle" hidden>
+        </div>
+        <section class="account-admin" id="adminPanel" aria-labelledby="adminTitle" hidden>
             <h3 id="adminTitle" data-i18n="admin.title">Administration</h3>
-            <section aria-labelledby="adminUsersTitle">
+            <div class="account-admin-grid">
+            <section class="account-admin-section" aria-labelledby="adminUsersTitle">
                 <h4 id="adminUsersTitle" data-i18n="admin.users">Users</h4>
-                <form id="adminUserForm">
+                <form class="account-form" id="adminUserForm">
                     <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="off" required></label>
                     <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="new-password" required></label>
                     <label><span data-i18n="admin.role">Role</span><select name="role"><option value="member" data-i18n="account.role.member">Member</option><option value="admin" data-i18n="account.role.admin">Administrator</option></select></label>
-                    <button type="submit" class="bookshelf-action-btn" data-i18n="admin.createUser">Create user</button>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.createUser">Create user</button>
                 </form>
-                <ul id="adminUserList"></ul>
+                <ul class="account-list" id="adminUserList"></ul>
             </section>
-            <section aria-labelledby="adminIdentitiesTitle">
+            <section class="account-admin-section" aria-labelledby="adminIdentitiesTitle">
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
-                <form id="adminIdentityForm">
+                <form class="account-form" id="adminIdentityForm">
                     <label><span data-i18n="admin.identityIssuer">Issuer</span><input type="text" name="issuer" autocomplete="off" required></label>
                     <label><span data-i18n="admin.identitySubject">Subject</span><input type="text" name="subject" autocomplete="off" required></label>
                     <label><span data-i18n="admin.identityDisplayName">Display name</span><input type="text" name="display_name" autocomplete="off"></label>
                     <label><span data-i18n="admin.identityUser">Local user</span><select id="adminIdentityUser" name="user_id" required></select></label>
-                    <button type="submit" class="bookshelf-action-btn" data-i18n="admin.createIdentity">Create identity</button>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.createIdentity">Create identity</button>
                 </form>
-                <ul id="adminIdentityList"></ul>
+                <ul class="account-list" id="adminIdentityList"></ul>
             </section>
-            <section aria-labelledby="adminBooksTitle">
+            <section class="account-admin-section account-card-wide" aria-labelledby="adminBooksTitle">
                 <h4 id="adminBooksTitle" data-i18n="admin.books">Book access</h4>
-                <p data-i18n="admin.restrictedBook">Restricted books are visible only to administrators and explicitly granted users.</p>
-                <ul id="adminBookList"></ul>
+                <p class="account-section-copy" data-i18n="admin.restrictedBook">Restricted books are visible only to administrators and explicitly granted users.</p>
+                <ul class="account-list" id="adminBookList"></ul>
             </section>
+            </div>
         </section>
-        </div>
+        </div></div>
     </div>
 </div>'''
         server_auth_script = '<script src="/assets/auth.js" defer></script>'
@@ -185,6 +191,7 @@ def _render_library_html(
 <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
+{server_account_stylesheet}
 {server_progress_stylesheet}
 <script>
 // 立即应用主题，避免闪现 —— Kindle 兼容版
@@ -440,6 +447,7 @@ if (isKindle) {
     library_html = library_html.replace("{server_progress_start}", server_progress_start)
     library_html = library_html.replace("{bookshelf_data_actions}", bookshelf_data_actions)
     library_html = library_html.replace("{server_account_panel}", server_account_panel)
+    library_html = library_html.replace("{server_account_stylesheet}", server_account_stylesheet)
     library_html = library_html.replace("{server_auth_script}", server_auth_script)
     library_html = library_html.replace("{server_client_start}", server_client_start)
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)

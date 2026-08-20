@@ -42,6 +42,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(ssg_html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
         self.assertLess(server_html.index('/immutable/auth.'), server_html.rindex('/immutable/library.'))
         self.assertNotIn('id=loginForm', server_html)
+        self.assertRegex(
+            server_html,
+            r'/assets/immutable/account\.[0-9a-f]{12}\.css',
+        )
+        self.assertRegex(server_html, r'class=(?:["\'])?account-layout(?:["\' >])')
+        self.assertRegex(server_html, r'class=(?:["\'])?account-grid(?:["\' >])')
+
+    def test_account_surfaces_use_the_library_form_and_card_system(self):
+        stylesheet = Path('epub_browser/assets/account.css').read_text(
+            encoding='utf-8'
+        )
+
+        for selector in (
+            '.auth-card',
+            '.auth-primary-button',
+            '.account-layout',
+            '.account-grid',
+            '.account-card',
+            '.account-form',
+            '.account-list-item',
+            '.account-danger-action',
+        ):
+            self.assertIn(selector, stylesheet)
+        self.assertIn('@media (max-width: 560px)', stylesheet)
+        self.assertIn('var(--button-bg, #4361ee)', stylesheet)
 
     def test_account_modal_keeps_dynamic_lists_scrollable_on_mobile(self):
         html = self._server_html()
@@ -474,7 +499,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         for html in (self._book_html(), self._chapter_html()):
             self.assertNotRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
             self.assertNotIn('EpubBrowserAuth.init', html)
-            self.assertIn('syncShelfBtn', html)
+            self.assertNotIn('syncShelfBtn', html)
 
     def test_dynamic_browser_urls_use_the_generated_base_path_runtime(self):
         scripts = {
@@ -1066,7 +1091,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         html = self._chapter_html()
 
         for key in (
-            'reader.tableOfContents', 'reader.previous', 'reader.next',
+            'reader.thisChapterContents', 'reader.previous', 'reader.next',
             'settings.appearance', 'settings.readingMode', 'settings.customStyles',
         ):
             self.assertIn('data-i18n="' + key + '"', html)

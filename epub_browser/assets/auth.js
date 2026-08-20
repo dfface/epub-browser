@@ -235,8 +235,10 @@
       return node;
     }
 
-    function actionButton(key, action) {
-      var button = createTextElement('button', 'bookshelf-action-btn', key);
+    function actionButton(key, action, variant) {
+      var className = 'bookshelf-action-btn account-inline-action';
+      if (variant === 'danger') className += ' account-danger-action';
+      var button = createTextElement('button', className, key);
       button.type = 'button';
       button.addEventListener('click', action);
       return button;
@@ -283,6 +285,7 @@
       list.textContent = '';
       (records || []).forEach(function(record) {
         var item = root.document.createElement('li');
+        item.className = 'account-list-item account-session-item';
         var label = createTextElement('span', 'account-session-label', 'account.sessionDescription', {
           created: formatDate(record.created_at),
           lastUsed: formatDate(record.last_used_at)
@@ -301,11 +304,11 @@
             }).catch(function() {
               showStatus('account.error.network', 'error');
             });
-          }));
+          }, 'danger'));
         }
         list.appendChild(item);
       });
-      if (!(records || []).length) list.appendChild(createTextElement('li', '', 'account.noSessions'));
+      if (!(records || []).length) list.appendChild(createTextElement('li', 'account-empty', 'account.noSessions'));
     }
 
     function loadSessions() {
@@ -342,6 +345,8 @@
         var item = root.document.createElement('li');
         var summary = root.document.createElement('span');
         var password = root.document.createElement('input');
+        item.className = 'account-list-item account-user-item';
+        summary.className = 'account-list-summary';
         summary.textContent = t('admin.userSummary', {
           username: user.username,
           role: roleLabel(user.role),
@@ -356,10 +361,11 @@
         }));
         item.appendChild(actionButton('admin.revokeSessions', function() {
           updateUser(user.username, { revoke_sessions: true });
-        }));
+        }, 'danger'));
         password.type = 'password';
         password.autocomplete = 'new-password';
         password.placeholder = t('admin.newPassword');
+        password.className = 'account-inline-input';
         password.setAttribute('data-i18n-placeholder', 'admin.newPassword');
         item.appendChild(password);
         item.appendChild(actionButton('admin.resetPassword', function() {
@@ -383,6 +389,7 @@
       list.textContent = '';
       books.forEach(function(book) {
         var item = root.document.createElement('li');
+        item.className = 'account-list-item account-book-item';
         var title = root.document.createElement('strong');
         var visibility = root.document.createElement('select');
         var grantUser = root.document.createElement('select');
@@ -426,7 +433,7 @@
           var user = userById(userId);
           var revoke = actionButton('admin.revokeBook', function() {
             mutateGrant(book.id, userId, 'DELETE');
-          });
+          }, 'danger');
           revoke.setAttribute('aria-label', t('admin.revokeBookFor', {
             username: user ? user.username : userId,
             book: book.title
@@ -435,7 +442,7 @@
         });
         list.appendChild(item);
       });
-      if (!books.length) list.appendChild(createTextElement('li', '', 'admin.noBooks'));
+      if (!books.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.noBooks'));
     }
 
     function renderIdentities() {
@@ -456,6 +463,7 @@
       list.textContent = '';
       identities.forEach(function(identity) {
         var item = root.document.createElement('li');
+        item.className = 'account-list-item account-identity-item';
         item.appendChild(createTextElement(
           'span',
           'admin-identity-summary',
@@ -469,11 +477,11 @@
         ));
         item.appendChild(actionButton('admin.deleteIdentity', function() {
           deleteIdentity(identity.issuer, identity.subject);
-        }));
+        }, 'danger'));
         list.appendChild(item);
       });
       if (!identities.length) {
-        list.appendChild(createTextElement('li', '', 'admin.noIdentities'));
+        list.appendChild(createTextElement('li', 'account-empty', 'admin.noIdentities'));
       }
     }
 
