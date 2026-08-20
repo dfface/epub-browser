@@ -221,7 +221,7 @@ Repositories and libraries that never ran v2.0.4 simply receive a new sidecar ID
 
 ## Repository examples and CI
 
-The three tracked example EPUBs are restored byte-for-byte from the commit immediately before embedded identity was introduced. Before restoration, their currently published IDs are captured and written to these tracked visible files:
+The three tracked example EPUBs are restored byte-for-byte from the commit immediately before embedded identity was introduced. The two successfully embedded v2.0.4 IDs are retained. The non-standard `1984` EPUB was never rewritten successfully, so its existing v2.0.3 TOC-derived public ID is retained instead. Those three existing public IDs are written to these tracked visible files:
 
 ```text
 examples/Mao Ze Dong Xuan Ji - Mao Ze Dong.epub.epub-browser.json
