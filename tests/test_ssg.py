@@ -2,16 +2,50 @@ import contextlib
 import io
 import json
 import re
+import shutil
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
 
 from epub_browser.cli import SSGConfig
+from epub_browser.epub_identity import read_embedded_book_id
 from epub_browser.ssg import SSGBuildError, SSGPublisher, run_ssg
 
 
 class SSGPublicationTests(unittest.TestCase):
+    def test_embedded_id_survives_package_metadata_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:before")
+            publisher = SSGPublisher(
+                SSGConfig((source,), output),
+                show_progress=False,
+            )
+
+            publisher.build()
+            first_id = read_embedded_book_id(source)
+            first_metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            self._replace_archive_text(
+                source,
+                "OEBPS/content.opf",
+                b"urn:test:before",
+                b"urn:test:after-identifier-changed",
+            )
+            publisher.build()
+            second_metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+
+            self.assertRegex(first_id, r"^[A-Za-z0-9_-]{22}$")
+            self.assertEqual(first_metadata[0]["hash"], first_id)
+            self.assertEqual(second_metadata[0]["hash"], first_id)
+            self.assertEqual(read_embedded_book_id(source), first_id)
+
     def test_ssg_build_publishes_complete_static_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -151,14 +185,19 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertEqual(list(root.glob(".dist.staging-*")), [])
             self.assertEqual(list(root.glob(".dist.previous-*")), [])
 
-    def test_duplicate_deterministic_ids_report_every_source(self):
+    def test_copied_embedded_ids_report_every_source(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             first = root / "first.epub"
             second = root / "second.epub"
-            output = root / "dist"
+            seed_output = root / "seed-dist"
+            output = root / "collision-dist"
             self._write_minimal_epub(first, identifier="urn:test:duplicate")
-            self._write_minimal_epub(second, identifier="urn:test:duplicate")
+            SSGPublisher(
+                SSGConfig((first,), seed_output),
+                show_progress=False,
+            ).build()
+            shutil.copy2(first, second)
 
             with self.assertRaises(SSGBuildError) as raised:
                 SSGPublisher(
@@ -178,12 +217,14 @@ class SSGPublicationTests(unittest.TestCase):
             self._write_minimal_epub(source, identifier="urn:test:unsafe-output")
 
             with self.assertRaisesRegex(SSGBuildError, "Output directory"):
+                before = source.read_bytes()
                 SSGPublisher(
                     SSGConfig((source,), output),
                     show_progress=False,
                 ).build()
 
             self.assertTrue(source.exists())
+            self.assertEqual(source.read_bytes(), before)
 
     def test_epub_resource_directory_named_data_is_not_server_state(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -266,6 +307,19 @@ class SSGPublicationTests(unittest.TestCase):
             archive.writestr("OEBPS/chapter.xhtml", chapter)
             if resource_path:
                 archive.writestr("OEBPS/" + resource_path, b"png")
+
+    @staticmethod
+    def _replace_archive_text(path, member_name, before, after):
+        temporary = path.with_suffix(".rewritten.epub")
+        with zipfile.ZipFile(path, "r") as source:
+            with zipfile.ZipFile(temporary, "w") as destination:
+                destination.comment = source.comment
+                for info in source.infolist():
+                    data = source.read(info)
+                    if info.filename == member_name:
+                        data = data.replace(before, after)
+                    destination.writestr(info, data)
+        temporary.replace(path)
 
 
 if __name__ == "__main__":

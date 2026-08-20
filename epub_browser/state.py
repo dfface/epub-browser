@@ -298,9 +298,11 @@ class StateStore:
         source_size: Optional[int] = None,
         source_mtime_ns: Optional[int] = None,
         preferred_book_id: Optional[str] = None,
+        authoritative_book_id: Optional[str] = None,
     ) -> BookRecord:
         canonical_path = str(Path(source_path).expanduser().resolve())
         identifier = (epub_identifier or "").strip() or None
+        authoritative_id = (authoritative_book_id or "").strip() or None
         metadata_json = self._metadata_json(metadata)
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -309,6 +311,11 @@ class StateStore:
                 (canonical_path,),
             ).fetchone()
             if row is not None:
+                if authoritative_id and row["book_id"] != authoritative_id:
+                    raise ValueError(
+                        "Embedded EPUB book ID conflicts with the book registered "
+                        f"for {canonical_path}"
+                    )
                 connection.execute(
                     """
                     UPDATE books SET
@@ -327,6 +334,42 @@ class StateStore:
                     ),
                 )
                 return self._get_book(connection, row["book_id"])
+
+            if authoritative_id:
+                identity_row = connection.execute(
+                    "SELECT * FROM books WHERE book_id = ?",
+                    (authoritative_id,),
+                ).fetchone()
+                if identity_row is not None:
+                    if identity_row["active"]:
+                        raise ValueError(
+                            "Embedded EPUB book ID is already used by another source: "
+                            f"{identity_row['source_path']}"
+                        )
+                    connection.execute(
+                        """
+                        UPDATE books SET
+                            source_path = ?,
+                            epub_identifier = COALESCE(?, epub_identifier),
+                            source_fingerprint = ?,
+                            metadata_json = ?,
+                            source_size = ?,
+                            source_mtime_ns = ?,
+                            active = 1,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE book_id = ?
+                        """,
+                        (
+                            canonical_path,
+                            identifier,
+                            source_fingerprint,
+                            metadata_json,
+                            source_size,
+                            source_mtime_ns,
+                            authoritative_id,
+                        ),
+                    )
+                    return self._get_book(connection, authoritative_id)
 
             move_matches = []
             if identifier and source_fingerprint:
@@ -362,11 +405,19 @@ class StateStore:
                 )
                 return self._get_book(connection, book_id)
 
-            book_id = (preferred_book_id or "").strip() or new_server_book_id()
+            book_id = (
+                authoritative_id
+                or (preferred_book_id or "").strip()
+                or new_server_book_id()
+            )
             if connection.execute(
                 "SELECT 1 FROM books WHERE book_id = ?",
                 (book_id,),
             ).fetchone():
+                if authoritative_id:
+                    raise ValueError(
+                        f"Embedded EPUB book ID is already registered: {book_id}"
+                    )
                 book_id = new_server_book_id()
             connection.execute(
                 """

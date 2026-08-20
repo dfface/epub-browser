@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from epub_browser.epub_identity import read_embedded_book_id
 from epub_browser.identity import source_sha256
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
@@ -53,6 +54,66 @@ class ServerLibraryManagerTests(unittest.TestCase):
         while not subscription.queue.empty():
             latest = subscription.queue.get_nowait()
         return latest
+
+    def test_first_reconcile_embeds_the_database_book_id_without_changing_resources(self):
+        with zipfile.ZipFile(self.source) as archive:
+            chapter_before = archive.read("OEBPS/chapter.xhtml")
+        manager = self._manager()
+
+        record = manager.reconcile().active_books[0]
+
+        self.assertEqual(read_embedded_book_id(self.source), record.book_id)
+        with zipfile.ZipFile(self.source) as archive:
+            self.assertEqual(archive.read("OEBPS/chapter.xhtml"), chapter_before)
+            self.assertIsNone(archive.testzip())
+            self.assertEqual(archive.infolist()[0].filename, "mimetype")
+            self.assertEqual(archive.infolist()[0].compress_type, zipfile.ZIP_STORED)
+        manager.shutdown()
+
+    def test_offline_move_and_content_edit_reuse_embedded_book_id(self):
+        manager = self._manager()
+        original = manager.reconcile().active_books[0]
+        moved = self.source_dir / "moved.epub"
+        self.source.rename(moved)
+        self._replace_archive_text(
+            moved,
+            "OEBPS/chapter.xhtml",
+            b"Original",
+            b"Changed after move",
+        )
+
+        summary = manager.reconcile()
+
+        self.assertFalse(summary.degraded)
+        self.assertEqual([record.book_id for record in summary.active_books], [original.book_id])
+        self.assertEqual(Path(summary.active_books[0].source_path), moved.resolve())
+        manager.shutdown()
+
+    def test_conflicting_embedded_id_degrades_scan_and_keeps_previous_cache(self):
+        manager = self._manager()
+        original = manager.reconcile().active_books[0]
+        self._replace_archive_text(
+            self.source,
+            "OEBPS/content.opf",
+            original.book_id.encode("ascii"),
+            b"A" * 22,
+        )
+
+        summary = manager.reconcile()
+
+        self.assertTrue(summary.degraded)
+        self.assertEqual(summary.failures[0].book_id, original.book_id)
+        self.assertTrue(summary.failures[0].kept_previous_cache)
+        self.assertEqual([record.book_id for record in summary.active_books], [original.book_id])
+        self.assertTrue(
+            (
+                manager.public_dir
+                / "book"
+                / original.book_id
+                / "index.html"
+            ).is_file()
+        )
+        manager.shutdown()
 
     def test_reconcile_reports_incremental_progress_and_catalog_publication(self):
         broker = LibraryProgressBroker()
@@ -680,6 +741,19 @@ class ServerLibraryManagerTests(unittest.TestCase):
             archive.writestr("META-INF/container.xml", container)
             archive.writestr("OEBPS/content.opf", package)
             archive.writestr("OEBPS/chapter.xhtml", chapter)
+
+    @staticmethod
+    def _replace_archive_text(path, member_name, before, after):
+        temporary = path.with_suffix(".rewritten.epub")
+        with zipfile.ZipFile(path, "r") as source:
+            with zipfile.ZipFile(temporary, "w") as destination:
+                destination.comment = source.comment
+                for info in source.infolist():
+                    data = source.read(info)
+                    if info.filename == member_name:
+                        data = data.replace(before, after)
+                    destination.writestr(info, data)
+        temporary.replace(path)
 
 
 if __name__ == "__main__":

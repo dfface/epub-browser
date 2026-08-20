@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from .asset_publisher import AssetPublisher, PublishedAssets
-from .identity import source_sha256
+from .epub_identity import EPUBIdentityWriteRefused, ensure_embedded_book_id
+from .identity import new_server_book_id, source_sha256
 from .library_progress import LibraryProgressBroker
 from .migration import MigrationManager
 from .models import BookMetadata, ConvertedBook
@@ -200,9 +201,21 @@ class ServerLibraryManager:
                 existing = self.state_store.book_by_source(source)
                 try:
                     stat = source.stat()
-                except OSError as error:
+                    embedded_book_id = self._ensure_source_identity(
+                        source,
+                        existing,
+                        legacy_ids.get(source),
+                    )
+                    stat = source.stat()
+                except Exception as error:
+                    kept = bool(existing and self._cache_valid(existing))
                     failures.append(
-                        ConversionFailure(source, None, str(error), False)
+                        ConversionFailure(
+                            source,
+                            existing.book_id if existing else None,
+                            str(error),
+                            kept,
+                        )
                     )
                     self._mark_missing_if_deleted(source, existing)
                     self.progress_broker.record_failure(source, error)
@@ -226,6 +239,7 @@ class ServerLibraryManager:
                                 json.loads(existing.metadata_json),
                                 source_size=stat.st_size,
                                 source_mtime_ns=stat.st_mtime_ns,
+                                authoritative_book_id=embedded_book_id,
                             )
                     except (OSError, _StaleSourceError) as error:
                         failures.append(
@@ -260,6 +274,7 @@ class ServerLibraryManager:
                                 source_size=stat.st_size,
                                 source_mtime_ns=stat.st_mtime_ns,
                                 preferred_book_id=legacy_ids.get(source),
+                                authoritative_book_id=embedded_book_id,
                             )
                 except Exception as error:
                     kept = bool(existing and self._cache_valid(existing))
@@ -291,6 +306,7 @@ class ServerLibraryManager:
                                 metadata,
                                 source_size=stat.st_size,
                                 source_mtime_ns=stat.st_mtime_ns,
+                                authoritative_book_id=embedded_book_id,
                             )
                     except (OSError, _StaleSourceError) as error:
                         failures.append(
@@ -611,6 +627,25 @@ class ServerLibraryManager:
                 return processor.get_metadata()
             finally:
                 processor.cleanup()
+
+    def _ensure_source_identity(
+        self,
+        source: Path,
+        existing: Optional[BookRecord],
+        legacy_book_id: Optional[str],
+    ) -> str:
+        preferred = existing.book_id if existing else legacy_book_id
+        try:
+            return ensure_embedded_book_id(
+                source,
+                preferred_book_id=preferred,
+            )
+        except EPUBIdentityWriteRefused as error:
+            fallback = preferred or new_server_book_id()
+            self.reporter.detail(
+                f"Using database-only book ID for {source}: {error}"
+            )
+            return fallback
 
     def _convert_plan(self, plan: _ConversionPlan) -> BookRecord:
         if self._stop_event.is_set():
