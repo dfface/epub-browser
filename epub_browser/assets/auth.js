@@ -385,32 +385,75 @@
       list.textContent = '';
       users.forEach(function(user) {
         var item = root.document.createElement('li');
-        var summary = root.document.createElement('span');
+        var overview = root.document.createElement('div');
+        var profile = root.document.createElement('div');
+        var avatar = root.document.createElement('span');
+        var identity = root.document.createElement('div');
+        var username = root.document.createElement('strong');
+        var badges = root.document.createElement('div');
+        var role = root.document.createElement('span');
+        var status = root.document.createElement('span');
+        var details = root.document.createElement('details');
+        var detailsSummary = createTextElement('summary', 'account-user-manage', 'admin.manageUser');
+        var detailsBody = root.document.createElement('div');
+        var accountActions = root.document.createElement('section');
+        var accountActionButtons = root.document.createElement('div');
+        var securityActions = root.document.createElement('section');
+        var passwordControls = root.document.createElement('div');
         var password = root.document.createElement('input');
         item.className = 'account-list-item account-user-item';
-        summary.className = 'account-list-summary';
-        summary.textContent = t('admin.userSummary', {
-          username: user.username,
-          role: roleLabel(user.role),
-          status: enabledLabel(user.enabled)
-        });
-        item.appendChild(summary);
-        item.appendChild(actionButton(user.enabled ? 'admin.disableUser' : 'admin.enableUser', function() {
+        overview.className = 'account-user-overview';
+        profile.className = 'account-user-profile';
+        avatar.className = 'account-user-avatar';
+        avatar.textContent = String(user.username || '?').charAt(0).toUpperCase();
+        avatar.setAttribute('aria-hidden', 'true');
+        identity.className = 'account-user-identity';
+        username.className = 'account-user-name';
+        username.textContent = user.username;
+        badges.className = 'account-user-badges';
+        role.className = 'account-user-badge account-user-role';
+        role.textContent = roleLabel(user.role);
+        status.className = 'account-user-badge account-user-status ' +
+          (user.enabled ? 'is-enabled' : 'is-disabled');
+        status.textContent = enabledLabel(user.enabled);
+        badges.appendChild(role);
+        badges.appendChild(status);
+        identity.appendChild(username);
+        identity.appendChild(badges);
+        profile.appendChild(avatar);
+        profile.appendChild(identity);
+        overview.appendChild(profile);
+        item.appendChild(overview);
+
+        details.className = 'account-user-details';
+        detailsBody.className = 'account-user-details-body';
+        accountActions.className = 'account-user-action-group';
+        accountActionButtons.className = 'account-user-action-buttons';
+        accountActions.appendChild(createTextElement(
+          'h5', 'account-user-action-title', 'admin.accountAccess'
+        ));
+        accountActionButtons.appendChild(actionButton(user.enabled ? 'admin.disableUser' : 'admin.enableUser', function() {
           updateUser(user.username, { enabled: !user.enabled });
-        }));
-        item.appendChild(actionButton(user.role === 'admin' ? 'admin.makeMember' : 'admin.makeAdmin', function() {
+        }, user.enabled ? 'danger' : undefined));
+        accountActionButtons.appendChild(actionButton(user.role === 'admin' ? 'admin.makeMember' : 'admin.makeAdmin', function() {
           updateUser(user.username, { role: user.role === 'admin' ? 'member' : 'admin' });
         }));
-        item.appendChild(actionButton('admin.revokeSessions', function() {
-          updateUser(user.username, { revoke_sessions: true });
-        }, 'danger'));
+        accountActions.appendChild(accountActionButtons);
+
+        securityActions.className = 'account-user-action-group';
+        securityActions.appendChild(createTextElement(
+          'h5', 'account-user-action-title', 'admin.security'
+        ));
         password.type = 'password';
         password.autocomplete = 'new-password';
         password.placeholder = t('admin.newPassword');
         password.className = 'account-inline-input';
         password.setAttribute('data-i18n-placeholder', 'admin.newPassword');
-        item.appendChild(password);
-        item.appendChild(actionButton('admin.resetPassword', function() {
+        password.setAttribute('aria-label', t('admin.newPassword'));
+        password.setAttribute('data-i18n-aria-label', 'admin.newPassword');
+        passwordControls.className = 'account-user-password-controls';
+        passwordControls.appendChild(password);
+        passwordControls.appendChild(actionButton('admin.resetPassword', function() {
           authenticatedFetch('/api/admin/users/' + encodeURIComponent(user.username) + '/password', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -421,6 +464,16 @@
             showStatus('admin.passwordReset', 'success');
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }));
+        securityActions.appendChild(passwordControls);
+        securityActions.appendChild(actionButton('admin.revokeSessions', function() {
+          updateUser(user.username, { revoke_sessions: true });
+        }, 'danger'));
+
+        detailsBody.appendChild(accountActions);
+        detailsBody.appendChild(securityActions);
+        details.appendChild(detailsSummary);
+        details.appendChild(detailsBody);
+        item.appendChild(details);
         list.appendChild(item);
       });
     }

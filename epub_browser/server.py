@@ -42,6 +42,7 @@ from .processor import (
     server_book_public_path_allowed,
 )
 from .server_library import library_metadata
+from .version import render_footer
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -65,6 +66,7 @@ PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/i18n.js',
     '/assets/theme-bootstrap.js',
     '/assets/theme.css',
+    '/assets/version-check.js',
 })
 SETUP_COPY = {
     'en': {
@@ -749,6 +751,7 @@ def create_app(
         )
         en_selected = ' selected' if locale == 'en' else ''
         zh_selected = ' selected' if locale == 'zh-CN' else ''
+        footer_markup = render_footer(datetime.now().year)
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -758,6 +761,7 @@ def create_app(
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script>
+<script src="/assets/version-check.js" defer></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
 </head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card setup-card">
 <header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
@@ -768,15 +772,15 @@ def create_app(
 </select></label></header>
 <div class="auth-intro"><h1 data-i18n="account.setupTitle">{copy['title']}</h1>
 <p class="auth-description" data-i18n="account.setupDescription">{copy['description']}</p></div>
-{error_markup}
 <form class="auth-form" id="setupForm" method="post" action="/setup">
 <input type="hidden" name="setup_nonce" value="{nonce}">
 <input type="hidden" name="locale" value="{locale}">
+{error_markup}
 <label class="auth-field"><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
 <label class="auth-field"><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="new-password" required></label>
 <label class="auth-field"><span data-i18n="account.confirmPassword">{copy['password_confirmation']}</span><input name="password_confirmation" type="password" autocomplete="new-password" required></label>
 <button class="auth-primary-button" type="submit" data-i18n="account.createSuperuser">{copy['submit']}</button>
-</form></section><p class="auth-footnote">EPUB Browser</p></div></main>
+</form></section>{footer_markup}</div></main>
 <script>(function() {{
 var i18n=window.EpubBrowserI18n;
 var localeSelect=document.getElementById('setupLocaleSelect');
@@ -923,6 +927,7 @@ if(localeField)localeField.value=localeSelect.value;
         )
         en_selected = ' selected' if locale == 'en' else ''
         zh_selected = ' selected' if locale == 'zh-CN' else ''
+        footer_markup = render_footer(datetime.now().year)
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -933,6 +938,7 @@ if(localeField)localeField.value=localeSelect.value;
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script>
+<script src="/assets/version-check.js" defer></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
 </head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
 <header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
@@ -943,14 +949,14 @@ if(localeField)localeField.value=localeSelect.value;
 </select></label></header>
 <div class="auth-intro"><h1 data-i18n="account.signIn">{copy['sign_in']}</h1>
 <p class="auth-description" data-i18n="account.loginDescription">{copy['description']}</p></div>
-{error_markup}
 <form class="auth-form" id="loginForm" method="post" action="/login">
 <input type="hidden" name="next" value="{safe_next}">
 <input type="hidden" name="locale" value="{locale}">
+{error_markup}
 <label class="auth-field"><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
 <label class="auth-field"><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="current-password" required></label>
 <button class="auth-primary-button" type="submit" data-i18n="account.signIn">{copy['sign_in']}</button>
-</form></section><p class="auth-footnote">EPUB Browser</p></div></main>
+</form></section>{footer_markup}</div></main>
 <script>(function() {{
 var i18n=window.EpubBrowserI18n;
 var localeSelect=document.getElementById('loginLocaleSelect');
@@ -964,8 +970,15 @@ if(localeField)localeField.value=localeSelect.value;
 }}
 var loginForm=document.getElementById('loginForm');
 var loginError=document.getElementById('loginError');
+function setLoginError(visible){{
+if(loginError)loginError.hidden=!visible;
+if(loginForm)Array.prototype.forEach.call(loginForm.querySelectorAll('input[name="username"],input[name="password"]'),function(field){{
+if(visible)field.setAttribute('aria-invalid','true');else field.removeAttribute('aria-invalid');
+}});
+}}
 if(loginForm)loginForm.addEventListener('submit',function(event){{
 event.preventDefault();
+setLoginError(false);
 var username=loginForm.elements.username.value;
 var password=loginForm.elements.password.value;
 var next=loginForm.elements.next.value;
@@ -976,10 +989,10 @@ headers:{{'Content-Type':'application/json','{AUTH_NONCE_HEADER}':'{nonce}'}},
 body:JSON.stringify({{username:username,password:password,next:next,locale:locale}})
 }}).then(function(response){{
 return response.json().catch(function(){{return {{}};}}).then(function(payload){{
-if(!response.ok){{if(loginError)loginError.hidden=false;return;}}
+if(!response.ok){{setLoginError(true);return;}}
 window.location.assign(payload.redirect||'/');
 }});
-}}).catch(function(){{if(loginError)loginError.hidden=false;}});
+}}).catch(function(){{setLoginError(true);}});
 }});
 }}());</script></body></html>'''
         page = HTMLResponse(

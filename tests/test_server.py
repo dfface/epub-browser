@@ -119,6 +119,10 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertIn('href="/assets/account.css"', english.text)
         self.assertIn('href="/assets/theme.css"', english.text)
         self.assertIn('src="/assets/theme-bootstrap.js"', english.text)
+        self.assertIn('src="/assets/version-check.js"', english.text)
+        self.assertIn('data-id="eb-footer"', english.text)
+        self.assertIn('data-i18n="footer.product"', english.text)
+        self.assertIn('href="https://github.com/dfface/epub-browser"', english.text)
         self.assertNotIn('<style>', english.text)
         self.assertIn('name="password_confirmation"', english.text)
         self.assertIn('name="setup_nonce"', english.text)
@@ -166,6 +170,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
             self.client.get("/assets/theme-bootstrap.js").status_code,
             200,
         )
+        self.assertEqual(self.client.get("/assets/version-check.js").status_code, 200)
         tombstone = self.client.get("/sw.js")
         self.assertEqual(tombstone.status_code, 200)
         self.assertIn("self.registration.unregister()", tombstone.text)
@@ -584,6 +589,10 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('href="/assets/account.css"', english.text)
         self.assertIn('href="/assets/theme.css"', english.text)
         self.assertIn('src="/assets/theme-bootstrap.js"', english.text)
+        self.assertIn('src="/assets/version-check.js"', english.text)
+        self.assertIn('data-id="eb-footer"', english.text)
+        self.assertIn('data-current-version=', english.text)
+        self.assertIn('data-i18n="footer.poweredBy"', english.text)
         self.assertIn('data-i18n="account.loginDescription"', english.text)
         self.assertNotIn('<style>', english.text)
         self.assertNotIn('id="associationForm"', english.text)
@@ -595,6 +604,11 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('src="/assets/i18n.js"', english.text)
         self.assertIn('window.EpubBrowserI18n.init()', english.text)
         self.assertIn('i18n.setLocale(localeSelect.value)', english.text)
+        self.assertGreater(
+            english.text.index('id="loginError"'),
+            english.text.index('id="loginForm"'),
+        )
+        self.assertIn("setLoginError(true)", english.text)
         self.assertIn(
             'name="next" value="/book/id/chapter_0.html"',
             chinese.text,

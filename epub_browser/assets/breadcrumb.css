@@ -1,150 +1,234 @@
-/* One navigation surface for library, book, and chapter pages. */
-.breadcrumb-container {
-    width: min(100%, 1000px);
-    max-width: 1000px;
+/* Shared application navigation for library, book, and chapter surfaces. */
+.breadcrumb-container.app-header,
+.chapter-top-bar.app-header {
+    width: min(calc(100% - 40px), 1120px);
+    max-width: 1120px;
     margin: 0 auto;
-    padding-top: 12px;
+    padding: 20px 0 0;
 }
 
-.breadcrumb {
+.breadcrumb.app-nav {
+    position: relative;
     display: flex;
     align-items: center;
-    margin: 12px 0;
-    padding: 15px 20px;
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
-    transition: var(--transition);
-    position: relative;
+    min-width: 0;
+    min-height: 64px;
+    box-sizing: border-box;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
     overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+    border-radius: var(--border-radius-xl, 14px);
+    background: color-mix(in srgb, var(--card-bg) 94%, var(--background));
+    box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, .06));
+    transition: var(--transition);
 }
 
-.breadcrumb::before {
-    content: '';
+.breadcrumb.app-nav::before {
     position: absolute;
     inset: 0 0 auto;
-    height: 4px;
-    background: linear-gradient(to right, var(--primary), var(--secondary));
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    content: "";
 }
 
-.breadcrumb a {
-    text-decoration: none;
-    color: var(--text-secondary);
-    transition: var(--transition);
-    display: flex;
+.app-nav a {
+    display: inline-flex;
     align-items: center;
+    min-width: 0;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 160ms ease, background-color 160ms ease;
 }
 
-.breadcrumb a:hover { color: var(--breadcrumb-link-hover); }
+.app-nav a:hover {
+    color: var(--breadcrumb-link-hover);
+}
+
+.app-nav .app-nav-brand {
+    flex: 0 0 auto;
+    gap: 9px;
+    min-height: 42px;
+    padding: 0 10px;
+    border-radius: 9px;
+    color: var(--text);
+    font-size: .96rem;
+    font-weight: 760;
+    letter-spacing: -.015em;
+}
+
+.app-nav .app-nav-brand:hover {
+    background: var(--hover);
+    color: var(--text);
+}
 
 .breadcrumb-brand-mark {
     display: block;
-    width: 22px;
-    height: 22px;
-    margin-right: 8px;
-    align-self: center;
-    flex: 0 0 auto;
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+    margin: 0;
     object-fit: contain;
 }
 
-.breadcrumb-current {
-    display: inline-flex;
-    align-items: center;
-    color: var(--text);
-    font-weight: 600;
-}
-
 .breadcrumb-separator {
-    flex: 0 0 auto;
-    margin: 0 10px;
+    display: inline-grid;
+    flex: 0 0 16px;
+    width: 16px;
+    margin: 0;
+    place-items: center;
+    overflow: hidden;
+    color: transparent;
+    font-size: 0;
+}
+
+.breadcrumb-separator::before {
     color: var(--breadcrumb-separator);
+    content: "›";
+    font-size: 1rem;
+    line-height: 1;
 }
 
-/* Reader paths stay on one line on desktop; long labels truncate in place. */
-.breadcrumb:not(.library-breadcrumb) {
-    flex-wrap: nowrap;
-    min-width: 0;
-}
-
-.breadcrumb:not(.library-breadcrumb) > a,
-.breadcrumb:not(.library-breadcrumb) > .breadcrumb-current {
-    min-width: 0;
+.app-nav > a:not(.app-nav-brand),
+.app-nav-current {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.breadcrumb:not(.library-breadcrumb) > a:first-of-type {
+.app-nav > a:not(.app-nav-brand) {
+    flex: 0 1 auto;
+    max-width: 34%;
+    padding: 7px 6px;
+    border-radius: 7px;
+    font-size: .84rem;
+    font-weight: 600;
+}
+
+.app-nav-current {
+    flex: 1 1 auto;
+    min-width: 56px;
+    color: var(--text);
+    font-size: .86rem;
+    font-weight: 650;
+}
+
+.app-nav-actions {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.app-nav .app-nav-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    gap: 7px;
+    width: auto;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 650;
+}
+
+.app-nav .app-nav-theme:hover {
+    background: var(--hover);
+    color: var(--text);
+    transform: none;
+}
+
+.app-nav .app-nav-theme i {
+    color: var(--button-bg);
+    font-size: 1rem;
+}
+
+.app-nav .app-nav-theme:focus-visible,
+.app-nav a:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 38%, transparent);
+    outline-offset: 2px;
+}
+
+.app-nav-primary {
+    justify-content: space-between;
+}
+
+.app-nav-primary .app-nav-menu {
+    min-width: 0;
+    margin-left: auto;
+}
+
+.app-nav-primary .breadcrumb-current {
     flex: 0 0 auto;
 }
 
-.breadcrumb:not(.library-breadcrumb) > a:not(:first-of-type) {
-    flex: 0 1 auto;
+@media (max-width: 860px) {
+    .breadcrumb-container.app-header,
+    .chapter-top-bar.app-header {
+        width: 100%;
+        padding-top: 12px;
+    }
+
+    .breadcrumb.app-nav {
+        min-height: 58px;
+        padding: 8px;
+        border-radius: 11px;
+    }
+
+    .app-nav-primary {
+        align-items: stretch;
+        flex-wrap: wrap;
+    }
+
+    .app-nav-primary .app-nav-menu {
+        display: flex;
+        flex: 1 1 100%;
+        width: 100%;
+        margin-left: 0;
+        padding: 7px 2px 1px;
+        overflow-x: auto;
+        border-top: 1px solid var(--border);
+        scrollbar-width: none;
+    }
+
+    .app-nav-primary .app-nav-menu::-webkit-scrollbar {
+        display: none;
+    }
 }
 
-.breadcrumb:not(.library-breadcrumb) > .breadcrumb-current {
-    flex: 1 1 auto;
-}
-
-@media (max-width: 768px) {
-    /* Keep the reader path on one predictable line; long names truncate in place. */
-    .breadcrumb-container,
-    .chapter-top-bar {
-        padding: 0;
-    }
-
-    .breadcrumb {
-        margin: 0;
-        padding: 14px 16px;
-        flex-wrap: nowrap;
-        min-width: 0;
-    }
-
-    .breadcrumb a,
-    .breadcrumb-current {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .breadcrumb a:first-of-type {
-        flex: 0 0 auto;
-    }
-
-    .breadcrumb a:not(:first-of-type) {
-        flex: 0 1 auto;
-        max-width: 45%;
-    }
-
-    .breadcrumb-current {
-        flex: 1 1 auto;
-    }
-
-    .breadcrumb-library-label {
+@media (max-width: 560px) {
+    .app-header .breadcrumb-library-label,
+    .app-nav-theme .control-name {
         display: none;
     }
 
+    .app-nav .app-nav-brand {
+        min-height: 40px;
+        padding: 0 8px;
+    }
+
     .breadcrumb-brand-mark {
-        width: 20px;
-        height: 20px;
-        margin-right: 0;
+        flex-basis: 24px;
+        width: 24px;
+        height: 24px;
     }
 
-    .breadcrumb-separator {
-        flex: 0 0 auto;
-        margin: 0 5px;
+    .app-nav > a:not(.app-nav-brand) {
+        max-width: 34%;
     }
 
-    /* The library summary is supplementary information, so it may use a second row. */
-    .library-breadcrumb {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .library-breadcrumb .breadcrumb-current {
-        flex: 0 0 auto;
-        overflow: visible;
-        white-space: normal;
+    .app-nav .app-nav-theme {
+        width: 40px;
+        padding: 0;
     }
 }

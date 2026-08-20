@@ -237,6 +237,9 @@ class I18nCoverageTests(unittest.TestCase):
     def test_account_and_administration_copy_exists_in_both_locales(self):
         required = {
             'account.menu',
+            'library.navigation',
+            'book.navigation',
+            'reader.navigation',
             'account.signIn',
             'account.associationTitle',
             'account.associationOidcHelp',
@@ -256,6 +259,10 @@ class I18nCoverageTests(unittest.TestCase):
             'admin.title',
             'admin.close',
             'admin.description',
+            'admin.usersDescription',
+            'admin.manageUser',
+            'admin.accountAccess',
+            'admin.security',
             'admin.createUser',
             'admin.resetPassword',
             'admin.revokeSessions',

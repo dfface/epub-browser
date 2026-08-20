@@ -64,6 +64,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             '.account-card',
             '.account-form',
             '.account-list-item',
+            '.account-user-item',
+            '.account-user-badge',
+            '.account-user-details',
             '.account-danger-action',
         ):
             self.assertIn(selector, stylesheet)
@@ -798,34 +801,35 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotIn('/#AwU__ARVZEOf9_LKuztYxQ', html)
             self.assertRegex(html, r'href=(?:["\'])?/(?:["\' >])')
 
-    def test_pages_link_one_shared_breadcrumb_stylesheet(self):
-        for html in (self._library_html(), self._chapter_html()):
+    def test_pages_link_one_shared_application_navigation_stylesheet(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
             self.assertRegex(html, r'/assets/immutable/breadcrumb\.[0-9a-f]{12}\.css')
+            self.assertIn('app-nav', html)
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
-        self.assertIn("width: min(100%, 1000px)", css)
-        self.assertIn("padding-top: 12px", css)
-        self.assertIn("margin: 12px 0", css)
-        self.assertIn("padding: 15px 20px", css)
-        self.assertIn("align-self: center;", css)
+        self.assertIn("width: min(calc(100% - 40px), 1120px)", css)
+        self.assertIn("min-height: 64px", css)
+        self.assertIn(".app-nav-brand", css)
+        self.assertIn(".app-nav-actions", css)
+        self.assertIn(".app-nav-theme", css)
+        self.assertIn("linear-gradient(90deg, var(--primary), var(--secondary))", css)
 
-    def test_mobile_reader_breadcrumb_uses_the_shared_compact_layout(self):
+    def test_mobile_application_navigation_uses_the_shared_compact_layout(self):
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         book_html = self._book_html()
         chapter_html = self._chapter_html()
 
         self.assertIn(".breadcrumb-library-label", css)
-        self.assertIn("@media (max-width: 768px)", css)
-        self.assertIn("flex-wrap: nowrap;", css)
+        self.assertIn("@media (max-width: 860px)", css)
+        self.assertIn(".app-nav-primary", css)
+        self.assertIn("flex-wrap: wrap;", css)
         self.assertIn("min-width: 0;", css)
         self.assertIn("text-overflow: ellipsis;", css)
-        self.assertIn(".breadcrumb a:not(:first-of-type)", css)
-        self.assertIn("max-width: 45%;", css)
-        self.assertIn("padding: 0;", css)
-        self.assertIn("margin: 0;", css)
-        self.assertIn(".library-breadcrumb", css)
+        self.assertIn(".app-nav > a:not(.app-nav-brand)", css)
+        self.assertIn("overflow-x: auto;", css)
         for html in (book_html, chapter_html):
             self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?(?:book|reader)\.library')
             self.assertRegex(html, r'class=(?:["\'])?breadcrumb-library-label')
+            self.assertIn('app-nav-theme', html)
 
     def test_reader_chrome_uses_one_default_font_stack(self):
         for path in ("library.css", "book.css", "chapter.css"):
@@ -876,7 +880,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_pagination_uses_a_chapter_top_bar_not_a_breadcrumb_container(self):
         html = self._chapter_html()
 
-        self.assertIn('class="chapter-top-bar"', html)
+        self.assertIn('class="chapter-top-bar app-header"', html)
         self.assertNotIn('class="breadcrumb-container"', html)
 
     def test_chapter_breadcrumb_and_reading_container_share_a_width_rule(self):
@@ -985,25 +989,26 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             archive.writestr("OEBPS/content.opf", package)
             archive.writestr("OEBPS/chapter.xhtml", chapter)
 
-    def test_library_places_its_summary_inside_the_current_location_breadcrumb(self):
+    def test_library_places_its_summary_inside_the_primary_navigation(self):
         html = self._library_html()
 
-        self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=(?:["\'])?breadcrumb(?:["\'])?)(?=[^>]*\bdata-i18n-aria-label=(?:["\'])?reader\.breadcrumb(?:["\'])?)[^>]*>')
-        self.assertRegex(html, r'<span\b(?=[^>]*\bclass=(?:["\'])?breadcrumb-current(?:["\'])?)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=["\'][^"\']*\bapp-nav-primary\b)(?=[^>]*\bdata-i18n-aria-label=(?:["\'])?library\.navigation(?:["\'])?)[^>]*>')
+        self.assertRegex(html, r'<a\b(?=[^>]*\bclass=["\'][^"\']*\bapp-nav-brand\b)(?=[^>]*\baria-current=(?:["\'])?page(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<span\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
         self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertIn('breadcrumb-brand-mark', breadcrumb)
-        self.assertRegex(breadcrumb, r'\bclass=(?:["\'])?library-meta(?:["\'])?')
+        self.assertIn('library-meta app-nav-menu', breadcrumb)
+        self.assertIn('app-nav-theme', breadcrumb)
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-title', breadcrumb)
         self.assertNotIn('library-info', html)
 
-    def test_locale_selector_exists_only_in_library_breadcrumb(self):
+    def test_locale_selector_exists_only_in_library_navigation(self):
         library = self._library_html()
         self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
         breadcrumb = library[
-            library.index('class="breadcrumb library-breadcrumb"'):library.index('</nav>')
+            library.index('class="breadcrumb library-breadcrumb app-nav'):library.index('</nav>')
         ]
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-CN(?:["\' >])')
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')

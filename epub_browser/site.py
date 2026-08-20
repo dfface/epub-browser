@@ -144,9 +144,10 @@ def _render_library_html(
         <section class="account-admin account-admin-console" aria-labelledby="adminTitle">
             <p class="account-admin-intro" data-i18n="admin.description">Manage users, external identities, and access to restricted books.</p>
             <div class="account-admin-grid">
-            <section class="account-admin-section" aria-labelledby="adminUsersTitle">
+            <section class="account-admin-section account-card-wide account-users-section" aria-labelledby="adminUsersTitle">
                 <h4 id="adminUsersTitle" data-i18n="admin.users">Users</h4>
-                <form class="account-form" id="adminUserForm">
+                <p class="account-section-copy" data-i18n="admin.usersDescription">Create local accounts and manage their access, role, password, and sessions.</p>
+                <form class="account-form account-create-user-form" id="adminUserForm">
                     <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="off" required></label>
                     <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="new-password" required></label>
                     <label><span data-i18n="admin.role">Role</span><select name="role"><option value="member" data-i18n="account.role.member">Member</option><option value="admin" data-i18n="account.role.admin">Administrator</option></select></label>
@@ -154,7 +155,7 @@ def _render_library_html(
                 </form>
                 <ul class="account-list" id="adminUserList"></ul>
             </section>
-            <section class="account-admin-section" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
+            <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
                 <p class="account-section-copy" data-i18n="admin.identityHelp">For OIDC, let a trusted reverse proxy complete the protocol and pass a stable subject. Issuer must match --proxy-issuer; subject must match the configured subject header.</p>
                 <form class="account-form" id="adminIdentityForm">
@@ -284,12 +285,6 @@ if (isKindle) {
 </script>
 </head>
 <body>
-    <div class="top-controls" data-id="top-controls">
-    <div class="theme-toggle" id="themeToggle">
-        <i class="fas fa-moon"></i>
-        <span class="control-name" data-i18n="library.theme">Theme</span>
-    </div>
-    </div>
 """
     all_tags = set()
     for book_hash, book_info in self.books.items():
@@ -300,14 +295,15 @@ if (isKindle) {
                     all_tags.add(cur_tag.strip())
 
     library_html += f"""
-    <div class="breadcrumb-container">
-    <nav class="breadcrumb library-breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb">
-        <span class="breadcrumb-current" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="library.title">Library</span></span>
-        <div class="library-meta" aria-label="Library information" data-i18n-aria-label="library.information">
+    <div class="breadcrumb-container app-header">
+    <nav class="breadcrumb library-breadcrumb app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
+        <a class="breadcrumb-current app-nav-brand" href="/" aria-current="page"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="library.title">Library</span></a>
+        <div class="library-meta app-nav-menu" aria-label="Library information" data-i18n-aria-label="library.information">
             <span class="library-meta-item"><i class="fas fa-book" aria-hidden="true"></i><span id="libraryBookCount" data-i18n="library.bookCount" data-i18n-params='{{"count": {len(self.books)}}}'>{len(self.books)} book(s)</span></span>
             <span class="library-meta-item"><i class="fas fa-tags" aria-hidden="true"></i><span id="libraryTagCount" data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
             <button type="button" class="library-meta-action" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
             <label class="library-language" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select></label>
+            <button type="button" class="theme-toggle app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="control-name" data-i18n="library.theme">Theme</span></button>
             {server_account_control}
         </div>
     </nav>

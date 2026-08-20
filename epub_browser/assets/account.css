@@ -223,7 +223,37 @@ body.auth-page {
     outline-offset: 3px;
 }
 
-.auth-alert,
+.auth-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    box-sizing: border-box;
+    margin: -2px 0 0;
+    padding: 9px 11px;
+    border: 0;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--account-danger) 7%, var(--account-card));
+    color: var(--account-danger);
+    font-size: .8rem;
+    line-height: 1.5;
+}
+
+.auth-alert::before {
+    display: inline-grid;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--account-danger);
+    color: var(--account-card);
+    content: "!";
+    font-size: .7rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
 .account-status {
     box-sizing: border-box;
     margin: 0;
@@ -236,11 +266,26 @@ body.auth-page {
     line-height: 1.5;
 }
 
-.auth-footnote {
-    margin: 0;
+.auth-stack .eb-footer {
+    padding: 10px 0;
+    border-top: 1px solid var(--account-border);
     color: var(--account-muted);
-    font-size: .78rem;
+    font-size: .8rem;
     text-align: center;
+}
+
+.auth-stack .eb-footer p {
+    margin: 0;
+    line-height: 1.6;
+}
+
+.auth-stack .eb-footer a {
+    color: var(--account-primary);
+    text-underline-offset: 3px;
+}
+
+.auth-stack .eb-footer a:hover {
+    color: var(--account-primary-hover);
 }
 
 /* Authenticated account settings. */
@@ -430,9 +475,20 @@ body.auth-page {
     background: color-mix(in srgb, var(--account-card) 88%, var(--account-bg));
 }
 
+.account-users-section {
+    padding: clamp(20px, 3vw, 28px);
+}
+
 #adminUserForm {
     grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
     align-items: end;
+}
+
+.account-create-user-form {
+    padding: 18px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: var(--account-card);
 }
 
 #adminIdentityForm {
@@ -462,6 +518,149 @@ body.auth-page {
     border: 1px solid var(--account-border);
     border-radius: 9px;
     background: var(--account-card);
+}
+
+#adminUserList {
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 14px;
+}
+
+.account-user-item {
+    display: block;
+    align-self: start;
+    padding: 0;
+    overflow: hidden;
+}
+
+.account-user-overview {
+    padding: 17px 18px;
+}
+
+.account-user-profile {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+}
+
+.account-user-avatar {
+    display: grid;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--account-primary) 22%, var(--account-border));
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    color: var(--account-primary);
+    font-size: 1rem;
+    font-weight: 750;
+}
+
+.account-user-identity {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.account-user-name {
+    overflow: hidden;
+    color: var(--account-text);
+    font-size: .92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-user-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.account-user-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+.account-user-role {
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.account-user-status.is-enabled {
+    background: color-mix(in srgb, var(--account-success) 11%, var(--account-card));
+    color: var(--account-success);
+}
+
+.account-user-status.is-disabled {
+    background: color-mix(in srgb, var(--account-danger) 9%, var(--account-card));
+    color: var(--account-danger);
+}
+
+.account-user-details {
+    border-top: 1px solid var(--account-border);
+}
+
+.account-user-details > summary {
+    padding: 12px 18px;
+    color: var(--account-muted);
+    font-size: .76rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.account-user-details > summary:hover {
+    background: color-mix(in srgb, var(--account-primary) 5%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.account-user-details[open] > summary {
+    border-bottom: 1px solid var(--account-border);
+}
+
+.account-user-details-body {
+    display: grid;
+    gap: 0;
+    padding: 4px 18px 18px;
+}
+
+.account-user-action-group {
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+}
+
+.account-user-action-group + .account-user-action-group {
+    margin-top: 14px;
+    border-top: 1px solid var(--account-border);
+}
+
+.account-user-action-title {
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .7rem;
+    font-weight: 750;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.account-user-action-buttons,
+.account-user-password-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.account-user-password-controls .account-inline-input {
+    flex: 1 1 180px;
+    width: auto;
+    max-width: none;
 }
 
 .account-list-summary,
@@ -629,6 +828,10 @@ body.auth-page {
         grid-template-columns: 1fr 1fr;
     }
 
+    #adminUserList {
+        grid-template-columns: 1fr;
+    }
+
     .account-book-item {
         grid-template-columns: 1fr 1fr;
     }
@@ -709,6 +912,17 @@ body.auth-page {
     .account-list-item > button,
     .account-list-item > input,
     .account-list-item > select {
+        width: 100%;
+        max-width: none;
+    }
+
+    .account-user-password-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .account-user-password-controls .account-inline-input,
+    .account-user-password-controls .account-inline-action {
         width: 100%;
         max-width: none;
     }

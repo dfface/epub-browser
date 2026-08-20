@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "account-auth-v4"
+SERVER_OUTPUT_REVISION = "account-auth-v5"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -1016,20 +1016,16 @@ class EPUBProcessor:
     </script>
 </head>
 <body>
-
-<div class="top-controls">
-    <div class="theme-toggle" id="themeToggle">
-        <i class="fas fa-moon"></i>
-        <span class="control-name" data-i18n="book.theme">Theme</span>
-    </div>
-</div>
 """
         index_html += f"""
-<div class="breadcrumb-container">
-    <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="book.breadcrumb" data-id="breadcrumb">
-        <a href="/" aria-label="Library" data-i18n-aria-label="book.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="book.library">Library</span></a>
+<div class="breadcrumb-container app-header">
+    <nav class="breadcrumb app-nav app-nav-context" aria-label="Book navigation" data-i18n-aria-label="book.navigation" data-id="breadcrumb">
+        <a class="app-nav-brand" href="/" aria-label="Library" data-i18n-aria-label="book.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="book.library">Library</span></a>
         <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current" id="book_home" aria-current="page" lang="{book_language}">{book_title_text}</span>
+        <span class="breadcrumb-current app-nav-current" id="book_home" aria-current="page" lang="{book_language}">{book_title_text}</span>
+        <div class="app-nav-actions">
+            <button class="theme-toggle app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="control-name" data-i18n="book.theme">Theme</span></button>
+        </div>
     </nav>
 </div>
 <div class="container">
@@ -1793,12 +1789,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
-    <div class="top-controls">
-        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme">
-            <i class="fas fa-moon"></i>
-            <span class="control-name" data-i18n="reader.theme">Theme</span>
-        </button>
-
+    <div class="top-controls chapter-tools">
         <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning">
             <i class="fas fa-book-open"></i>
             <span class="control-name" data-i18n="reader.turning">Turning</span>
@@ -1844,13 +1835,16 @@ document.addEventListener('DOMContentLoaded', function() {{
         </ul>
     </nav>
 
-    <div class="chapter-top-bar">
-        <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
-            <a href="/" aria-label="Library" data-i18n-aria-label="reader.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="reader.library">Library</span></a>
+    <div class="chapter-top-bar app-header">
+        <nav class="breadcrumb app-nav app-nav-context" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation" data-id="breadcrumb">
+            <a class="app-nav-brand" href="/" aria-label="Library" data-i18n-aria-label="reader.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="reader.library">Library</span></a>
             <span class="breadcrumb-separator">/</span>
             <a href="/book/{book_id_url}/index.html" class="a-book-home">{book_title_text}</a>
             <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-current" aria-current="page">{chapter_title_text}</span>
+            <span class="breadcrumb-current app-nav-current" aria-current="page">{chapter_title_text}</span>
+            <div class="app-nav-actions">
+                <button class="theme-toggle app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="control-name" data-i18n="reader.theme">Theme</span></button>
+            </div>
         </nav>
     </div>
     <div class="container">
