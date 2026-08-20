@@ -21,7 +21,7 @@ COPY --from=builder /build/epub-browser/dist/*.whl /tmp/packages/
 RUN pip install --no-cache-dir /tmp/packages/*.whl \
     && rm -rf /tmp/packages
 
-# /app/Library is EPUB input. Mount it read-only when possible.
+# /app/Library is EPUB input. Default sidecar creation/refresh needs a writable mount.
 # /app/EpubBrowserFiles is durable Server data and must be writable/persistent.
 # /app/SyncData is optional, read-only legacy bookshelf import data.
 RUN mkdir -p /app/Library /app/EpubBrowserFiles /app/SyncData

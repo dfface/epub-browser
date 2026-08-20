@@ -11,6 +11,7 @@ EPUB Browser v2 separates static-site generation (`ssg`) from the stateful readi
 | `epub-browser BOOKS --output-dir DIST --no-server` | `epub-browser ssg BOOKS --output-dir DIST` |
 | `--sync-dir DIR` | `server --legacy-sync-dir DIR` |
 | temporary `--keep-files` | retained by the compatibility adapter |
+| `--book-id-storage sidecar\|embedded` | invocation-wide identity carrier; default `sidecar` |
 
 The v1 `--output-dir` had two meanings. v2 removes that ambiguity: SSG output is a deployable snapshot, while Server storage contains durable data plus a replaceable cache.
 
@@ -52,6 +53,12 @@ During migration, v1 hashes found in `book-metadata.json` and `book/<hash>/` are
 
 Deleting a source marks its book inactive but does not delete its durable registry row, annotations, bookshelf records, or reading progress. Deleting `cache/` is safe; a later start regenerates it with the same Server book IDs.
 
+Starting with v2.0.5, the default identity carrier is the visible adjacent file `BOOK.epub.epub-browser.json`. Its `book_id` is the same value used as URL/client `book_hash`, and the EPUB itself is not rewritten. `--book-id-storage embedded` instead stores that ID in OPF metadata for the whole invocation and may rebuild the EPUB ZIP.
+
+Both carriers are checked before mutation. Conflicting IDs, duplicate active copies, or ambiguous inactive/move candidates stop that source instead of guessing. Server only reuses generated content when the established source fingerprint agrees with its database record and the cache remains valid; a sidecar fingerprint alone is not reuse evidence.
+
+Existing v2.0.4 OPF IDs migrate without an EPUB write: v2.0.5 creates a same-ID sidecar and leaves the embedded metadata intact. Switching in either direction creates the selected carrier but never removes or refreshes the non-selected carrier. No SQLite schema migration is required for this change.
+
 The bookshelf product behavior is unchanged: it remains browser-local until the user invokes the existing manual Sync action. A database with no bookshelf row is therefore normal before the first Sync.
 
 ## Conflict and corruption handling
@@ -88,14 +95,16 @@ cp /path/to/server-dir/data/backups/epub-browser.db.TIMESTAMP.DIGEST.bak \
 
 If multiple backups exist, choose the timestamp and digest recorded in `data/migration-state.json` rather than using a wildcard blindly.
 
+Visible sidecars do not alter the EPUB and can be retained during rollback. v2.0.4 does not understand sidecar-only identities; before rolling back an SSG deployment that must keep identical public URLs, run v2.0.5 once with `--book-id-storage embedded` so the same ID is also present in OPF metadata. EPUBs that already carried a v2.0.4 embedded ID need no identity conversion.
+
 For a v2 retry instead of a downgrade, keep `data/epub-browser.db` and rerun the same `server --server-dir` command. Generated cache files may be removed without touching `data/`.
 
 ## Docker migration
 
 The v2 image expects:
 
-- `/app/Library`: EPUB input, preferably read-only;
+- `/app/Library`: EPUB input, read-write for default sidecar creation or refresh;
 - `/app/EpubBrowserFiles`: required read-write persistent Server directory;
 - `/app/SyncData`: optional read-only legacy JSON import directory.
 
-The container command now uses `epub-browser server` and listens on `0.0.0.0` inside the container. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
+The container command now uses `epub-browser server` and listens on `0.0.0.0` inside the container. A read-only Library mount works only when every selected identity carrier already exists and matches the source; there is no database-only fallback. `--book-id-storage embedded` may rebuild the EPUB and is refused when doing so would be unsafe. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.

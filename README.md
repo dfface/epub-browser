@@ -48,6 +48,26 @@ SSG activation is transactional: EPUB Browser builds and validates a sibling sta
 
 Browser-local bookshelf data remains local unless you use the existing manual Sync action against a compatible endpoint. Static reading progress and annotations stay in browser storage and do not probe EPUB Browser Server APIs.
 
+## Book identity storage
+
+EPUB Browser gives every book a stable `book_id`; this is the same value exposed as `book_hash` in generated URLs and browser data. The default for SSG, Server, `--watch`, and legacy command syntax is:
+
+```bash
+--book-id-storage sidecar
+```
+
+Sidecar mode stores the identity in a visible file beside the source, for example `BOOK.epub.epub-browser.json`. It preserves the EPUB byte-for-byte. The sidecar also records a verified SHA-256 source fingerprint, which Server combines with database state and cache validation when deciding whether generated content can be reused.
+
+To store the same ID inside OPF metadata instead, opt in for the entire command invocation:
+
+```bash
+--book-id-storage embedded
+```
+
+Embedded mode may rebuild the EPUB ZIP and is refused for sources that cannot be changed safely. There is no database-only fallback: the selected carrier must already be valid or be writable. EPUB Browser reads both carrier types before writing and stops on disagreeing IDs, duplicate active IDs, or ambiguous move candidates.
+
+When upgrading from v2.0.4, an existing embedded ID is copied to the default sidecar without rewriting the EPUB or deleting its OPF metadata. Switching storage modes likewise creates the selected carrier with the existing ID and leaves the other carrier intact.
+
 ## Server: run a persistent reading library
 
 For a private local library:
@@ -102,7 +122,7 @@ In Server mode, the bookshelf is stored as a versioned cloud document in the Ser
 
 ## Docker
 
-The image runs persistent Server mode. Mount EPUB input read-write so EPUB Browser can embed durable book IDs, and mount Server state read-write:
+The image runs persistent Server mode. Mount EPUB input read-write so the default sidecars can be created and refreshed, and mount Server state read-write:
 
 ```bash
 docker run -d \
@@ -110,10 +130,10 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.0.4
+  epub-browser:2.0.5
 ```
 
-`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library` should be writable so v2.0.4 can add a stable ID to each EPUB's OPF metadata. A read-only mount remains supported in Server mode, but those books use database-only IDs and cannot carry their identity with the source file. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
+`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library:rw` permits default sidecar creation and fingerprint refresh. A read-only input mount works only when every selected sidecar or embedded carrier already exists and matches; EPUB Browser no longer falls back to a database-only ID. Using `--book-id-storage embedded` opts into EPUB ZIP rebuilding and may be refused for signed, linked, read-only, or unsupported sources. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
 
 ```bash
 -v /path/to/legacy-sync:/app/SyncData:ro
@@ -153,6 +173,7 @@ epub-browser server --help
 | Server | `--host` | Bind address, default `127.0.0.1`. |
 | Server | `--port`, `-p` | Bind port, default `8000`. |
 | Server | `--legacy-sync-dir` | Read legacy bookshelf JSON during migration. |
+| Both | `--book-id-storage sidecar\|embedded` | Select one identity carrier for the entire invocation; default `sidecar`. |
 | Both | `--log` | Show operational detail without corrupting progress output. |
 
 ## Reading features
