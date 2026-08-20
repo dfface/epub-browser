@@ -69,6 +69,55 @@ class EPUBIdentityTests(unittest.TestCase):
         self.assertEqual(second, "stable_book_id")
         self.assertEqual(self.source.read_bytes(), once)
 
+    def test_embedding_repairs_mimetype_packaging_without_changing_resources(self):
+        self._write_epub(
+            self.source,
+            mimetype_first=False,
+            mimetype_compressed=True,
+        )
+        before = self._archive_snapshot(self.source)
+
+        self._require_api()
+        book_id = ensure_embedded_book_id(
+            self.source,
+            preferred_book_id="stable_book_id",
+        )
+
+        after = self._archive_snapshot(self.source)
+        self.assertEqual(book_id, "stable_book_id")
+        self.assertEqual(before["order"][0], "META-INF/container.xml")
+        self.assertEqual(
+            after["order"],
+            ["mimetype", *[name for name in before["order"] if name != "mimetype"]],
+        )
+        self.assertEqual(after["comment"], before["comment"])
+        self.assertEqual(after["metadata"]["mimetype"][0], zipfile.ZIP_STORED)
+        self.assertEqual(after["metadata"]["mimetype"][3], b"")
+        self.assertEqual(
+            {
+                name: metadata
+                for name, metadata in after["metadata"].items()
+                if name != "mimetype"
+            },
+            {
+                name: metadata
+                for name, metadata in before["metadata"].items()
+                if name != "mimetype"
+            },
+        )
+        self.assertEqual(
+            {
+                name: data
+                for name, data in after["contents"].items()
+                if name != "OEBPS/content.opf"
+            },
+            {
+                name: data
+                for name, data in before["contents"].items()
+                if name != "OEBPS/content.opf"
+            },
+        )
+
     def test_new_identity_is_url_safe_uuid_value(self):
         self._write_epub(self.source)
         self._require_api()
@@ -192,6 +241,8 @@ class EPUBIdentityTests(unittest.TestCase):
         signed=False,
         package_version="2.0",
         embedded_meta="",
+        mimetype_first=True,
+        mimetype_compressed=False,
     ):
         container = """<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
@@ -212,13 +263,22 @@ class EPUBIdentityTests(unittest.TestCase):
         chapter = b"<html xmlns='http://www.w3.org/1999/xhtml'><body>unchanged</body></html>"
         with zipfile.ZipFile(path, "w") as archive:
             mimetype = zipfile.ZipInfo("mimetype", (2020, 1, 2, 3, 4, 6))
-            mimetype.compress_type = zipfile.ZIP_STORED
-            archive.writestr(mimetype, "application/epub+zip")
+            mimetype.compress_type = (
+                zipfile.ZIP_DEFLATED
+                if mimetype_compressed
+                else zipfile.ZIP_STORED
+            )
+            if mimetype_compressed:
+                mimetype.extra = b"\x55\x54\x05\x00\x01\x00\x00\x00\x00"
+            if mimetype_first:
+                archive.writestr(mimetype, "application/epub+zip")
             archive.writestr(
                 "META-INF/container.xml",
                 container,
                 compress_type=zipfile.ZIP_DEFLATED,
             )
+            if not mimetype_first:
+                archive.writestr(mimetype, "application/epub+zip")
             opf = zipfile.ZipInfo("OEBPS/content.opf", (2021, 2, 3, 4, 5, 6))
             opf.compress_type = zipfile.ZIP_DEFLATED
             opf.external_attr = 0o100640 << 16

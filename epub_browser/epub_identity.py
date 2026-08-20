@@ -219,15 +219,14 @@ def _validate_container_for_rewrite(
     archive: zipfile.ZipFile,
     infos: list[zipfile.ZipInfo],
 ) -> None:
-    if not infos or infos[0].filename != "mimetype":
-        raise EPUBIdentityWriteRefused("EPUB mimetype entry is not first")
-    mimetype = infos[0]
-    if (
-        mimetype.compress_type != zipfile.ZIP_STORED
-        or mimetype.extra
-        or archive.read(mimetype) != b"application/epub+zip"
-    ):
-        raise EPUBIdentityWriteRefused("EPUB mimetype entry is not safely packaged")
+    mimetype = next(
+        (info for info in infos if info.filename == "mimetype"),
+        None,
+    )
+    if mimetype is None:
+        raise EPUBIdentityWriteRefused("EPUB has no mimetype entry")
+    if archive.read(mimetype) != b"application/epub+zip":
+        raise EPUBIdentityWriteRefused("EPUB mimetype content is invalid")
     for info in infos:
         if info.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:
             raise EPUBIdentityWriteRefused(
@@ -255,10 +254,22 @@ def _replace_package_atomically(
     try:
         with zipfile.ZipFile(source_path, "r") as source:
             source_infos = source.infolist()
+            ordered_infos = [
+                next(info for info in source_infos if info.filename == "mimetype"),
+                *(info for info in source_infos if info.filename != "mimetype"),
+            ]
             with zipfile.ZipFile(temporary_path, "w", allowZip64=True) as destination:
                 destination.comment = source.comment
-                for info in source_infos:
+                for info in ordered_infos:
                     copied_info = copy.copy(info)
+                    if info.filename == "mimetype":
+                        copied_info.compress_type = zipfile.ZIP_STORED
+                        copied_info.extra = b""
+                        destination.writestr(
+                            copied_info,
+                            b"application/epub+zip",
+                        )
+                        continue
                     if info.filename == package_name:
                         destination.writestr(copied_info, package_bytes)
                         continue
@@ -318,10 +329,17 @@ def _validate_rewritten_archive(
         }
     with zipfile.ZipFile(rewritten_path, "r") as rewritten:
         rewritten_infos = rewritten.infolist()
-        if [info.filename for info in rewritten_infos] != [
-            info.filename for info in source_infos
-        ]:
+        expected_order = [
+            "mimetype",
+            *(info.filename for info in source_infos if info.filename != "mimetype"),
+        ]
+        if [info.filename for info in rewritten_infos] != expected_order:
             raise RuntimeError("rewritten EPUB changed ZIP entry order")
+        if not rewritten_infos or rewritten_infos[0].filename != "mimetype":
+            raise RuntimeError("rewritten EPUB did not place mimetype first")
+        mimetype = rewritten_infos[0]
+        if mimetype.compress_type != zipfile.ZIP_STORED or mimetype.extra:
+            raise RuntimeError("rewritten EPUB did not normalize mimetype")
         if rewritten.comment != source_comment:
             raise RuntimeError("rewritten EPUB changed its ZIP comment")
         _validate_container_for_rewrite(rewritten, rewritten_infos)
