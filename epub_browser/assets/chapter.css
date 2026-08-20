@@ -65,10 +65,10 @@ body {
     width: 50px;
     height: 50px;
     border-radius: 50%;
-
     background: var(--card-bg);
     border: none;
-
+    color: var(--text);
+    font: inherit;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -211,6 +211,8 @@ body {
 .toc-list {
     flex: 1; /* 内容区域占据剩余空间 */
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     list-style-type: none;
     padding: 10px 0;
 }
@@ -240,6 +242,55 @@ body {
 .toc-level-1 { margin-left: 0; }
 .toc-level-2 { margin-left: 15px; font-size: 0.85em; }
 .toc-level-3 { margin-left: 30px; font-size: 0.8em; }
+
+/* Keep the book-level chapter list visible only when the original reader width still fits. */
+@media (min-width: 1360px) {
+    body.desktop-chapter-sidebar .container,
+    body.desktop-chapter-sidebar .chapter-top-bar {
+        width: min(1000px, calc(100vw - 360px));
+        max-width: 1000px;
+        margin-left: max(240px, calc((100vw - 1000px) / 2 - 20px));
+        margin-right: 0;
+    }
+
+    body.desktop-chapter-sidebar #bookHomeFloating {
+        display: flex;
+        left: 20px;
+        right: auto;
+        top: 24px;
+        bottom: 24px;
+        width: 220px;
+        height: auto;
+        max-height: calc(100vh - 48px);
+        z-index: 40;
+    }
+
+    body.desktop-chapter-sidebar #bookHomeFloating .toc-header {
+        padding: 12px 14px;
+    }
+
+    body.desktop-chapter-sidebar #bookHomeFloating .toc-book-home span,
+    body.desktop-chapter-sidebar #bookHomeFloating .toc-close,
+    body.desktop-chapter-sidebar #bookHomeToggle {
+        display: none;
+    }
+
+    body.desktop-chapter-sidebar #bookHomeFloating .toc-item {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
+        background: var(--hover);
+        box-shadow: inset 3px 0 0 var(--button-bg);
+    }
+}
+
+@media (max-width: 1359px) {
+    .desktop-setting-only {
+        display: none;
+    }
+}
 
 .breadcrumb {
     display: flex;
@@ -527,7 +578,7 @@ body {
     height: 50px;
     border-radius: 50%;
     background: var(--button-bg);
-    color: white;
+    color: var(--button-text);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -536,11 +587,40 @@ body {
     box-shadow: var(--shadow-md);
     border: none;
     flex-direction: column;
+    font: inherit;
+    padding: 0;
+    text-decoration: none;
 }
 
 .reading-controls .control-btn:hover, .top-controls .control-btn:hover {
     background: var(--button-hover);
+    color: var(--button-text);
     transform: scale(1.1);
+}
+
+.theme-toggle:focus-visible,
+.reading-controls .control-btn:focus-visible,
+.top-controls .control-btn:focus-visible {
+    outline: 3px solid var(--button-bg);
+    outline-offset: 3px;
+}
+
+.skip-link {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 1000;
+    padding: 10px 14px;
+    color: var(--button-text);
+    background: var(--button-bg);
+    border-radius: 8px;
+    text-decoration: none;
+    transform: translate(-50%, -160%);
+    transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+    transform: translate(-50%, 0);
 }
 
 .settings-overlay {
@@ -1024,6 +1104,17 @@ body {
 
 .control-name {
     font-size: 0.5rem;
+    line-height: normal;
+    margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-toggle,
+    .reading-controls .control-btn,
+    .top-controls .control-btn,
+    .skip-link {
+        transition: none;
+    }
 }
 
 /* 翻页控制面板 */

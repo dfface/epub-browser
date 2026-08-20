@@ -1343,35 +1343,37 @@ document.addEventListener('DOMContentLoaded', function() {
         chapter_html +=f"""
 <body>
 
+    <a class="skip-link" href="#eb-content" data-i18n="reader.skipToContent">Skip to reading content</a>
+
     <div class="reading-progress-container">
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
     <div class="top-controls">
-        <div class="theme-toggle" id="themeToggle">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme">
             <i class="fas fa-moon"></i>
             <span class="control-name" data-i18n="reader.theme">Theme</span>
-        </div>
+        </button>
 
-        <div class="control-btn" id="togglePagination">
+        <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning">
             <i class="fas fa-book-open"></i>
             <span class="control-name" data-i18n="reader.turning">Turning</span>
-        </div>
+        </button>
 
-        <div class="control-btn" id="bookHomeToggle" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+        <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
             <i class="fas fa-book"></i>
-            <span class="control-name" data-i18n="reader.book">Book</span>
-        </div>
+            <span class="control-name" data-i18n="reader.bookChapters">Chapters</span>
+        </button>
 
-        <div class="control-btn" id="tocToggle">
+        <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents">
             <i class="fas fa-list"></i>
-            <span class="control-name" data-i18n="reader.tableOfContents">Table of contents</span>
-        </div>
+            <span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span>
+        </button>
     </div>
 
-    <div class="toc-floating" id="bookHomeFloating">
+    <nav class="toc-floating" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters">
         <div class="toc-header">
-            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
+            <h3 data-i18n="reader.bookChapters">Chapters</h3>
             <div class="toc-header-actions">
                 <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
                     <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
@@ -1384,11 +1386,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <ul class="toc-list" id="bookHomeTocList">
             <!-- 动态生成的书籍目录将放在这里 -->
         </ul>
-    </div>
+    </nav>
 
-    <div class="toc-floating" id="tocFloating">
+    <nav class="toc-floating" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents">
         <div class="toc-header">
-            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
+            <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
             <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
                 <i class="fas fa-times"></i>
             </button>
@@ -1396,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <ul class="toc-list" id="tocList">
             <!-- 动态生成的目录将放在这里 -->
         </ul>
-    </div>
+    </nav>
 
     <div class="chapter-top-bar">
         <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
@@ -1535,6 +1537,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
                     </label>
+                    <label class="settings-switch desktop-setting-only">
+                        <input type="checkbox" id="desktopChapterSidebarToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar on desktop</span>
+                    </label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
@@ -1579,23 +1586,21 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <div class="reading-controls" data-id="reading-controls">
-        <div class="control-btn" id="scrollToTopBtn">
+        <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="reader.top">
             <i class="fas fa-arrow-up"></i>
             <span class="control-name" data-i18n="reader.top">Top</span>
-        </div>
-        <div class="control-btn" id="settingsControlBtn">
+        </button>
+        <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings">
             <i class="fas fa-cog"></i>
             <span class="control-name" data-i18n="reader.settings">Settings</span>
-        </div>
-        <button class="control-btn" id="bookshelfBtn" style="display: none;">
+        </button>
+        <button class="control-btn" id="bookshelfBtn" type="button" style="display: none;" aria-label="Shelf" data-i18n-aria-label="reader.shelf">
             <i class="fas fa-bookmark"></i>
             <span class="control-name" data-i18n="reader.shelf">Shelf</span>
         </button>
-        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
-            <div class="control-btn">
-                <i class="fas fa-home"></i>
-                <span class="control-name" data-i18n="reader.home">Home</span>
-            </div>
+        <a class="control-btn" href="/" aria-label="Home" data-i18n-aria-label="reader.home">
+            <i class="fas fa-home"></i>
+            <span class="control-name" data-i18n="reader.home">Home</span>
         </a>
     </div>
 
@@ -1603,7 +1608,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="mobile-controls" data-id="mobile-controls">
         <div class="control-btn" id="mobileTocBtn">
             <i class="fas fa-list"></i>
-            <span data-i18n="reader.tableOfContents">Table of contents</span>
+            <span data-i18n="reader.thisChapterContents">This chapter</span>
         </div>
         <div class="control-btn" id="mobileThemeBtn">
             <i class="fas fa-moon"></i>
@@ -1621,9 +1626,9 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </a>
         {next_link_mobile}
-        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
             <i class="fas fa-book"></i>
-            <span data-i18n="reader.book">Book</span>
+            <span data-i18n="reader.bookChapters">Chapters</span>
         </div>
         <div class="control-btn" id="mobileSettingsBtn">
             <i class="fas fa-cog"></i>

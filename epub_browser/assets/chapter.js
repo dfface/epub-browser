@@ -341,6 +341,7 @@ function initScript() {
             if (!buttons[i]) continue;
             buttons[i].innerHTML = '<i class="fas fa-scroll"></i><span class="control-name"></span>';
             buttons[i].querySelector('.control-name').textContent = i18n.t('reader.scrolling');
+            buttons[i].setAttribute('aria-label', i18n.t('reader.scrolling'));
         }
     }
 
@@ -359,6 +360,7 @@ function initScript() {
     var isLoadingChapter = false;  // 防止重复加载
     var maxScrollTopSoFar = 0;  // 连续滚动模式下，跟踪用户向下滚过的最远位置
     var continuousChapterWindow = null;
+    var visibleChapterIndex = parseInt(chapter_index, 10);
 
     function getReadingPreference(key) {
         return isKindleMode() ? getCookie(key) : localStorage.getItem(key);
@@ -380,7 +382,15 @@ function initScript() {
     var showReadingProgressBar = window.EpubReadingProgress
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
         : getReadingPreference('showReadingProgressBar') !== 'false';
+    var showDesktopChapterSidebar = getReadingPreference('desktopChapterSidebar') === 'true';
     applyReadingProgressBarVisibility(showReadingProgressBar);
+
+    function applyDesktopChapterSidebar() {
+        document.body.classList.toggle(
+            'desktop-chapter-sidebar',
+            showDesktopChapterSidebar && !isPaginationMode && !isKindleMode()
+        );
+    }
 
     var fontSize = "3";
     var fontFamily = "ebook-default";
@@ -461,6 +471,7 @@ function initScript() {
         fontFamily = getCookie('font_family') || "ebook-default";
         fontFamilyInput = getCookie('font_family_input');
     }
+    applyDesktopChapterSidebar();
     if (isPaginationMode) {
         updateFontSize(fontSize);
     } else {
@@ -1284,25 +1295,41 @@ function initScript() {
                     var item = data[i];
                     var li = document.createElement('li');
                     li.className = 'toc-item toc-level-' + Math.min(item.level, 3);
+                    li.setAttribute('data-chapter-index', item.chapter_index);
                     var a = document.createElement('a');
                     var href = window.EpubBrowserURL.publicPath('/book/' + hash + '/' + item.chapter_file);
                     if (item.anchor) href += '#' + item.anchor;
                     a.href = href;
+                    a.setAttribute('data-chapter-index', item.chapter_index);
                     a.textContent = item.title;
                     a.addEventListener('click', function(e) {
                         e.preventDefault();
+                        var targetIndex = parseInt(this.getAttribute('data-chapter-index'), 10);
+                        var loadedChapter = content.querySelector(
+                            '.continuous-chapter[data-chapter-index="' + targetIndex + '"]'
+                        );
+                        if (isContinuousScroll && loadedChapter) {
+                            var target = loadedChapter;
+                            if (this.hash) {
+                                var anchorId = decodeURIComponent(this.hash.substring(1));
+                                var anchoredElements = loadedChapter.querySelectorAll('[id]');
+                                for (var j = 0; j < anchoredElements.length; j++) {
+                                    if (anchoredElements[j].id === anchorId) {
+                                        target = anchoredElements[j];
+                                        break;
+                                    }
+                                }
+                            }
+                            var targetTop = target.getBoundingClientRect().top + window.scrollY - 80;
+                            window.scrollTo({top: targetTop, behavior: 'smooth'});
+                            return;
+                        }
                         window.location.href = this.href;
                     });
                     li.appendChild(a);
                     list.appendChild(li);
                 }
-                var cur = path.split('/').pop();
-                var active = list.querySelector('a[href*="' + cur + '"]');
-                if (active) {
-                    var p = active.parentElement;
-                    p.classList.add('active');
-                    list.scrollTop = p.offsetTop - 150;
-                }
+                setBookTocActiveChapter(visibleChapterIndex, true);
             } else {
                 list.innerHTML = '<li class="toc-item"></li>';
                 list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
@@ -1313,6 +1340,36 @@ function initScript() {
             list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
         };
         xhr.send();
+    }
+
+    function setBookTocActiveChapter(index, keepVisible) {
+        var list = document.getElementById('bookHomeTocList');
+        if (!list) return;
+        var active = list.querySelector('.toc-item[data-chapter-index="' + index + '"]');
+        if (!active) return;
+        list.querySelectorAll('.toc-item.active').forEach(function(item) {
+            item.classList.remove('active');
+            var link = item.querySelector('a');
+            if (link) link.removeAttribute('aria-current');
+        });
+        active.classList.add('active');
+        var activeLink = active.querySelector('a');
+        if (activeLink) {
+            activeLink.setAttribute('aria-current', 'location');
+            var breadcrumbCurrent = document.querySelector('.breadcrumb-current');
+            var activeTitle = activeLink.textContent.trim();
+            if (breadcrumbCurrent && activeTitle) {
+                breadcrumbCurrent.textContent = activeTitle;
+                breadcrumbCurrent.title = activeTitle;
+            }
+        }
+        if (keepVisible !== false) {
+            var itemTop = active.offsetTop;
+            var itemBottom = itemTop + active.offsetHeight;
+            if (itemTop < list.scrollTop || itemBottom > list.scrollTop + list.clientHeight) {
+                list.scrollTop = Math.max(0, itemTop - list.clientHeight / 2);
+            }
+        }
     }
     
     if (!isKindleMode()) {
@@ -1440,15 +1497,7 @@ function initScript() {
     }
 
     function bookHomeFloatingScrolling() {
-        var list = document.getElementById('bookHomeTocList');
-        var cur = window.location.pathname.split('/').pop();
-        var a = list.querySelector('a[href*="' + cur + '"]');
-        if (a) {
-            var li = a.parentElement;
-            list.querySelectorAll('.toc-item').forEach(function(i) { i.classList.remove('active'); });
-            li.classList.add('active');
-            list.scrollTop = li.offsetTop - 150;
-        }
+        setBookTocActiveChapter(visibleChapterIndex, true);
     }
     
     tocToggle.addEventListener('click', function() {
@@ -1810,7 +1859,6 @@ function initScript() {
     }
 
     function updateContinuousReadingChapter() {
-        if (!readingProgressReporter) return;
         var elements = content.querySelectorAll('.continuous-chapter');
         var sections = [];
         for (var i = 0; i < elements.length; i++) {
@@ -1821,11 +1869,16 @@ function initScript() {
                 bottom: bounds.bottom
             });
         }
-        var currentIdx = window.EpubReadingProgress.activeChapter(sections, window.innerHeight / 2);
+        var currentIdx = window.EpubReadingProgress
+            ? window.EpubReadingProgress.activeChapter(sections, window.innerHeight / 2)
+            : NaN;
         if (isNaN(currentIdx)) return;
+        if (currentIdx === visibleChapterIndex) return;
+        visibleChapterIndex = currentIdx;
         localStorage.setItem(book_hash, 'eb_ci_' + currentIdx);
         updateContinuousScrollUrl(currentIdx);
         selectReadingChapter(currentIdx);
+        setBookTocActiveChapter(currentIdx, true);
     }
     
     function getChapterUrl(idx) {
@@ -2082,12 +2135,25 @@ function initScript() {
     var continuousScrollToggle = document.getElementById('continuousScrollToggle');
     var continuousScrollTip = document.getElementById('continuousScrollTip');
     var showReadingProgressBarToggle = document.getElementById('showReadingProgressBarToggle');
+    var desktopChapterSidebarToggle = document.getElementById('desktopChapterSidebarToggle');
     if (showReadingProgressBarToggle) {
         showReadingProgressBarToggle.checked = showReadingProgressBar;
         showReadingProgressBarToggle.addEventListener('change', function() {
             showReadingProgressBar = this.checked;
             setReadingPreference('showReadingProgressBar', showReadingProgressBar ? 'true' : 'false');
             applyReadingProgressBarVisibility(showReadingProgressBar);
+        });
+    }
+    if (desktopChapterSidebarToggle) {
+        desktopChapterSidebarToggle.checked = showDesktopChapterSidebar;
+        desktopChapterSidebarToggle.addEventListener('change', function() {
+            showDesktopChapterSidebar = this.checked;
+            setReadingPreference(
+                'desktopChapterSidebar',
+                showDesktopChapterSidebar ? 'true' : 'false'
+            );
+            applyDesktopChapterSidebar();
+            if (showDesktopChapterSidebar) setBookTocActiveChapter(visibleChapterIndex, true);
         });
     }
     if (continuousScrollToggle) {

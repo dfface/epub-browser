@@ -55,8 +55,35 @@
 }
 
 .breadcrumb-separator {
+    flex: 0 0 auto;
     margin: 0 10px;
     color: var(--breadcrumb-separator);
+}
+
+/* Reader paths stay on one line on desktop; long labels truncate in place. */
+.breadcrumb:not(.library-breadcrumb) {
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.breadcrumb:not(.library-breadcrumb) > a,
+.breadcrumb:not(.library-breadcrumb) > .breadcrumb-current {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.breadcrumb:not(.library-breadcrumb) > a:first-of-type {
+    flex: 0 0 auto;
+}
+
+.breadcrumb:not(.library-breadcrumb) > a:not(:first-of-type) {
+    flex: 0 1 auto;
+}
+
+.breadcrumb:not(.library-breadcrumb) > .breadcrumb-current {
+    flex: 1 1 auto;
 }
 
 @media (max-width: 768px) {
