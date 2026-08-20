@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "account-auth-v6"
+SERVER_OUTPUT_REVISION = "account-auth-v7"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -1023,7 +1023,7 @@ class EPUBProcessor:
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
             <a class="app-nav-link is-active" href="/" aria-current="location"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="book.library">Library</span></a>
-            <button type="button" class="app-nav-link" id="bookshelfBtn" style="display: none;" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
         </div>
         <div class="app-nav-actions">
@@ -1032,10 +1032,6 @@ class EPUBProcessor:
     </nav>
 </header>
 <div class="container">
-    <nav class="app-context-path" aria-label="Breadcrumb" data-i18n-aria-label="book.breadcrumb" data-id="breadcrumb">
-        <a href="/" data-i18n="book.library">Library</a><span aria-hidden="true">›</span><span class="breadcrumb-current" id="book_home" aria-current="page" lang="{book_language}">{book_title_text}</span>
-    </nav>
-
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
                 <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
@@ -1696,6 +1692,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
+    <link rel="stylesheet" href="/assets/annotation-hub.css">
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -1817,9 +1814,9 @@ document.addEventListener('DOMContentLoaded', function() {{
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
             <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
             <div class="app-nav-links">
-                <a class="app-nav-link" href="/"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.library">Library</span></a>
-                <a class="app-nav-link is-active a-book-home" href="/book/{book_id_url}/index.html" aria-current="location"><i class="fas fa-book-open" aria-hidden="true"></i><span data-i18n="reader.book">Book</span></a>
-                <button type="button" class="app-nav-link" id="bookshelfBtn" style="display: none;" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+                <a class="app-nav-link is-active" href="/" aria-current="location"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.library">Library</span></a>
+                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+                <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
             </div>
             <div class="app-nav-actions">
                 <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
@@ -1827,9 +1824,6 @@ document.addEventListener('DOMContentLoaded', function() {{
         </nav>
     </header>
     <div class="container">
-        <nav class="app-context-path" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
-            <a href="/" data-i18n="reader.library">Library</a><span aria-hidden="true">›</span><a href="/book/{book_id_url}/index.html" class="a-book-home">{book_title_text}</a><span aria-hidden="true">›</span><span class="breadcrumb-current" aria-current="page">{chapter_title_text}</span>
-        </nav>
         <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
             <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning"><i class="fas fa-book-open"></i><span class="control-name" data-i18n="reader.turning">Turning</span></button>
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
@@ -1840,7 +1834,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}">
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
         </div>
@@ -2165,6 +2159,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
+    <script src="/assets/annotation-hub.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
     <script src="/assets/bookshelf.js" defer></script>

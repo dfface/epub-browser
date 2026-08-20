@@ -304,7 +304,7 @@ if (isKindle) {
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
             <a class="app-nav-link is-active" href="/" aria-current="page"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="library.title">Library</span></a>
-            <button type="button" class="app-nav-link" id="bookshelfBtn" style="display: none;" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
             {install_control}
         </div>

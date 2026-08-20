@@ -113,12 +113,13 @@
 }
 
 .app-nav .app-nav-theme {
-    width: auto;
+    width: 42px;
     height: 42px;
-    padding: 0 12px;
+    padding: 0;
     border-radius: 10px;
     background: transparent;
     color: var(--text-secondary);
+    flex-direction: row;
 }
 
 .app-nav .app-nav-theme:hover {
@@ -130,6 +131,18 @@
 .app-nav .app-nav-theme i {
     color: currentColor;
     font-size: .98rem;
+}
+
+.app-nav .app-nav-theme .app-nav-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .app-nav .app-nav-action::before,
@@ -162,75 +175,39 @@
     outline-offset: 2px;
 }
 
-.app-context-path {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    gap: 9px;
-    margin: 22px 0 16px;
-    color: var(--text-secondary);
-    font-size: .82rem;
-    line-height: 1.4;
-}
-
-.app-context-path a {
-    flex: 0 1 auto;
-    max-width: 34%;
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-weight: 620;
-    text-decoration: none;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.app-context-path a:hover {
-    color: var(--breadcrumb-link-hover);
-}
-
-.app-context-path > span[aria-hidden="true"] {
-    flex: 0 0 auto;
-    color: var(--breadcrumb-separator);
-}
-
-.app-context-path .breadcrumb-current {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--text);
-    font-weight: 680;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .reader-toolbar.top-controls {
-    position: static;
+    position: fixed;
+    top: 50%;
+    right: 18px;
+    z-index: 88;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    flex-direction: row;
-    gap: 6px;
-    width: 100%;
-    margin: 0 0 14px;
-    padding: 6px;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    width: auto;
+    margin: 0;
+    padding: 5px;
     border: 1px solid var(--border);
-    border-radius: 12px;
-    background: color-mix(in srgb, var(--card-bg) 92%, var(--background));
-    box-shadow: var(--shadow-sm);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-50%);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
 .reader-toolbar.top-controls .control-btn {
-    width: auto;
-    height: 40px;
-    min-width: 0;
-    padding: 0 12px;
-    border-radius: 9px;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    padding: 0;
+    border-radius: 10px;
     background: transparent;
     box-shadow: none;
     color: var(--text-secondary);
     flex-direction: row;
-    gap: 7px;
-    font-size: .82rem;
-    font-weight: 650;
+    gap: 0;
 }
 
 .reader-toolbar.top-controls .control-btn:hover {
@@ -240,10 +217,18 @@
 }
 
 .reader-toolbar.top-controls .control-name {
-    font-size: inherit;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
-/* The only desktop floating action is scroll-related. */
+/* Global floating action: only reveal scroll-to-top after meaningful scrolling. */
 .reading-controls {
     gap: 0;
 }
@@ -256,12 +241,28 @@
     background: color-mix(in srgb, var(--card-bg) 94%, var(--button-bg));
     box-shadow: var(--shadow-md);
     color: var(--button-bg);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 160ms ease, visibility 160ms ease, transform 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.reading-controls #scrollToTopBtn.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
 }
 
 .reading-controls #scrollToTopBtn:hover {
     background: var(--button-bg);
     color: var(--button-text);
     transform: translateY(-2px);
+}
+
+.kindle-mode #bookshelfBtn {
+    display: none;
 }
 
 .reading-controls #scrollToTopBtn .control-name {
@@ -342,10 +343,6 @@
         flex: 0 0 auto;
         min-height: 38px;
         padding: 0 10px;
-    }
-
-    .app-context-path {
-        margin: 14px 12px 12px;
     }
 
     .reader-toolbar.top-controls,

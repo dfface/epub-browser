@@ -1339,12 +1339,6 @@ function initScript() {
         var activeLink = active.querySelector('a');
         if (activeLink) {
             activeLink.setAttribute('aria-current', 'location');
-            var breadcrumbCurrent = document.querySelector('.breadcrumb-current');
-            var activeTitle = activeLink.textContent.trim();
-            if (breadcrumbCurrent && activeTitle) {
-                breadcrumbCurrent.textContent = activeTitle;
-                breadcrumbCurrent.title = activeTitle;
-            }
         }
         if (keepVisible !== false) {
             var itemTop = active.offsetTop;
@@ -1581,6 +1575,17 @@ function initScript() {
     scrollTopBtn.addEventListener('click', function() {
         window.scrollTo(0,0);
     });
+    function updateScrollToTopVisibility() {
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
+        if (scrollTop > threshold && !document.body.classList.contains('pagination-mode')) {
+            scrollTopBtn.classList.add('is-visible');
+        } else {
+            scrollTopBtn.classList.remove('is-visible');
+        }
+    }
+    window.addEventListener('scroll', updateScrollToTopVisibility);
+    updateScrollToTopVisibility();
     var mobileTopBtn = document.getElementById('mobileTopBtn');
     mobileTopBtn.addEventListener('click', function() {
         window.scrollTo(0,0);
@@ -1737,8 +1742,6 @@ function initScript() {
     });
 
     function bookshelfSupport() {
-        var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = '';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {
@@ -1912,9 +1915,7 @@ function initScript() {
                 
                 if (chapterContent) {
                     // 提取章节标题
-                    var chapterTitle = '';
-                    var titleEl = tempDiv.querySelector('.breadcrumb-current');
-                    if (titleEl) chapterTitle = titleEl.textContent.trim();
+                    var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
                     if (!chapterTitle) {
                         var pageTitle = tempDiv.querySelector('title');
                         if (pageTitle) {
@@ -2010,9 +2011,7 @@ function initScript() {
                 if (loaderEl) loaderEl.remove();
                 
                 if (chapterContent) {
-                    var chapterTitle = '';
-                    var titleEl = tempDiv.querySelector('.breadcrumb-current');
-                    if (titleEl) chapterTitle = titleEl.textContent.trim();
+                    var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
                     if (!chapterTitle) {
                         var pageTitle = tempDiv.querySelector('title');
                         if (pageTitle) {

@@ -825,11 +825,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn(".app-nav-links", css)
         self.assertIn("flex-wrap: wrap;", css)
         self.assertIn("min-width: 0;", css)
-        self.assertIn("text-overflow: ellipsis;", css)
         self.assertIn("overflow-x: auto;", css)
         for html in (book_html, chapter_html):
             self.assertIn('app-nav-links', html)
-            self.assertIn('app-context-path', html)
+            self.assertNotIn('app-context-path', html)
             self.assertIn('app-nav-theme', html)
 
     def test_reader_chrome_uses_one_default_font_stack(self):
@@ -910,12 +909,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("border-top: 1px solid var(--footer-border);", footer_rules)
         self.assertNotIn("background: var(--header-bg);", footer_rules)
 
-    def test_chapter_content_has_desktop_breathing_room_below_the_breadcrumb(self):
+    def test_chapter_content_has_desktop_breathing_room_below_the_app_header(self):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
         content_rules = css[css.index(".eb-content-container {"):css.index("}", css.index(".eb-content-container {"))]
 
         self.assertIn("margin-top: 18px;", content_rules)
         self.assertIn(".navigation, .custom-css-panel, .eb-content-container", css)
+
+    def test_book_and_chapter_do_not_repeat_location_breadcrumbs(self):
+        for html in (self._book_html(), self._chapter_html()):
+            self.assertNotIn('app-context-path', html)
+            self.assertNotRegex(html, r'data-i18n-aria-label=(?:["\'])?(?:book|reader)\.breadcrumb')
 
     def test_generated_pages_do_not_include_fullscreen_loading_overlay(self):
         for html in (self._library_html(), self._chapter_html()):
@@ -1039,6 +1043,48 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         for control_id in ('togglePagination', 'bookHomeToggle', 'tocToggle', 'settingsControlBtn'):
             self.assertIn(control_id, toolbar)
 
+        css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        self.assertIn('.reader-toolbar.top-controls {', css)
+        self.assertIn('position: fixed;', css)
+        self.assertIn('transform: translateY(-50%);', css)
+        self.assertIn('#scrollToTopBtn.is-visible', css)
+
+    def test_primary_navigation_is_stable_and_consistent_across_reader_pages(self):
+        pages = (self._library_html(), self._book_html(), self._chapter_html())
+        for html in pages:
+            match = re.search(r'<nav\b[^>]*\bclass=(?:["\'])?app-nav[^>]*>.*?</nav>', html, re.S)
+            self.assertIsNotNone(match)
+            nav = match.group(0)
+            self.assertRegex(nav, r'\bid=(?:["\'])?bookshelfBtn(?:["\' >])')
+            shelf = re.search(r'<button\b[^>]*\bid=(?:["\'])?bookshelfBtn(?:["\' >])[^>]*>', nav)
+            self.assertIsNotNone(shelf)
+            self.assertNotRegex(shelf.group(0), r'\bstyle=(?:["\'])?display:\s*none')
+            self.assertRegex(nav, r'data-annotation-hub')
+            self.assertRegex(nav, r'data-i18n=(?:["\'])?(?:library\.title|book\.library|reader\.library)')
+            self.assertNotRegex(nav, r'data-i18n=(?:["\'])?reader\.book(?:["\'])?')
+
+        for asset in ('library.js', 'book.js', 'chapter.js'):
+            script = Path('epub_browser/assets', asset).read_text(encoding='utf-8')
+            self.assertNotIn("bookshelfBtn.style.display = ''", script)
+
+    def test_theme_action_is_a_compact_icon_control(self):
+        css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        theme_rules = css[css.index('.app-nav .app-nav-theme {'):css.index('}', css.index('.app-nav .app-nav-theme {'))]
+        self.assertIn('width: 42px;', theme_rules)
+        self.assertIn('padding: 0;', theme_rules)
+        self.assertIn('flex-direction: row;', theme_rules)
+        self.assertIn('.app-nav .app-nav-theme .app-nav-action-label', css)
+
+    def test_scroll_to_top_visibility_is_driven_by_scroll_state(self):
+        css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        self.assertIn('opacity: 0;', css)
+        self.assertIn('#scrollToTopBtn.is-visible', css)
+        for asset in ('library.js', 'book.js', 'chapter.js'):
+            script = Path('epub_browser/assets', asset).read_text(encoding='utf-8')
+            self.assertIn('function updateScrollToTopVisibility()', script)
+            self.assertIn("classList.add('is-visible')", script)
+            self.assertIn("classList.remove('is-visible')", script)
+
     def test_ssg_install_action_is_part_of_navigation_not_floating_controls(self):
         html = self._library_html()
         nav = html[html.index('<nav'):html.index('</nav>')]
@@ -1047,9 +1093,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("getElementById('pwa-install-btn')", script)
         self.assertNotIn('readingControls.appendChild(installBtn)', script)
 
-    def test_library_and_book_open_annotation_center_as_a_modal(self):
+    def test_library_book_and_chapter_open_annotation_center_as_a_modal(self):
         library_html = self._library_html()
         book_html = self._book_html()
+        chapter_html = self._chapter_html()
 
         self.assertRegex(library_html, r'\bid=(?:["\'])?annotationsBtn')
         self.assertRegex(library_html, r'\bdata-annotation-hub')
@@ -1061,6 +1108,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(book_html, r'\bdata-book-hash=')
         self.assertIn('aria-haspopup=dialog', book_html)
         self.assertRegex(book_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
+        self.assertRegex(chapter_html, r'\bid=(?:["\'])?chapterAnnotationsBtn')
+        self.assertRegex(chapter_html, r'\bdata-book-hash=')
+        self.assertRegex(chapter_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
+        self.assertRegex(chapter_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.js')
+        self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+data-chapter-title=')
 
     def test_annotation_modal_assets_are_immutable_and_not_a_separate_page(self):
         with tempfile.TemporaryDirectory() as directory:

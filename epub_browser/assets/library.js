@@ -582,6 +582,15 @@ function initScript() {
         window.scrollTo(0, 0);
     });
 
+    function updateScrollToTopVisibility() {
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
+        if (scrollTop > threshold) scrollToTopBtn.classList.add('is-visible');
+        else scrollToTopBtn.classList.remove('is-visible');
+    }
+    window.addEventListener('scroll', updateScrollToTopVisibility);
+    updateScrollToTopVisibility();
+
     function pwaSupport() {
         if (window.EpubBrowserMode === 'server') return;
         if ('serviceWorker' in navigator) {
@@ -629,8 +638,6 @@ function initScript() {
     }
 
     function bookshelfSupport() {
-        var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = '';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {
