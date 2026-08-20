@@ -22,13 +22,11 @@ body {
     font-family: var(--font-family, system-ui, -apple-system, sans-serif) !important;
 }
 
-.container, .chapter-top-bar {
+.container {
     max-width: 1000px;
     width: 80%;
     margin: 0 auto;
 }
-
-.chapter-top-bar { padding-top: 12px; }
 
 .eb-header {
     text-align: center;
@@ -295,8 +293,7 @@ body.reader-drawer-open {
 
 /* Keep the book-level chapter list visible only when the original reader width still fits. */
 @media (min-width: 1360px) {
-    body.desktop-chapter-sidebar .container,
-    body.desktop-chapter-sidebar .chapter-top-bar {
+    body.desktop-chapter-sidebar .container {
         width: min(1000px, calc(100vw - 360px));
         max-width: 1000px;
         margin-left: max(240px, calc((100vw - 1000px) / 2 - 20px));
@@ -1569,10 +1566,6 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     }
     
     body:not(.pagination-mode) .container {
-        width: 100%;
-    }
-
-    body:not(.pagination-mode) .chapter-top-bar {
         width: 100%;
     }
 

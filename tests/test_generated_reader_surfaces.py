@@ -980,14 +980,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('class="chapter-top-bar app-header"', html)
         self.assertNotIn('class="breadcrumb-container"', html)
 
-    def test_chapter_breadcrumb_and_reading_container_share_a_width_rule(self):
+    def test_chapter_application_header_keeps_the_shared_navigation_geometry(self):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
 
-        self.assertIn(".container, .chapter-top-bar", css)
-        self.assertIn("width: 80%;", css)
-        self.assertIn(".chapter-top-bar { padding-top: 12px; }", css)
-        self.assertIn("body:not(.pagination-mode) .chapter-top-bar", css)
-        self.assertIn("width: 100%;", css)
+        self.assertIn(".container {", css)
+        self.assertNotIn(".container, .chapter-top-bar", css)
+        self.assertNotRegex(
+            css,
+            r"\.chapter-top-bar\s*\{[^}]*(?:width|max-width|margin|padding-top)\s*:",
+        )
 
     def test_book_toc_offers_a_direct_book_home_link(self):
         html = self._chapter_html()
