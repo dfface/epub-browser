@@ -69,7 +69,7 @@ class EPUBIdentityTests(unittest.TestCase):
         self.assertEqual(second, "stable_book_id")
         self.assertEqual(self.source.read_bytes(), once)
 
-    def test_embedding_repairs_mimetype_packaging_without_changing_resources(self):
+    def test_embedding_preserves_nonstandard_mimetype_packaging(self):
         self._write_epub(
             self.source,
             mimetype_first=False,
@@ -86,25 +86,9 @@ class EPUBIdentityTests(unittest.TestCase):
         after = self._archive_snapshot(self.source)
         self.assertEqual(book_id, "stable_book_id")
         self.assertEqual(before["order"][0], "META-INF/container.xml")
-        self.assertEqual(
-            after["order"],
-            ["mimetype", *[name for name in before["order"] if name != "mimetype"]],
-        )
+        self.assertEqual(after["order"], before["order"])
         self.assertEqual(after["comment"], before["comment"])
-        self.assertEqual(after["metadata"]["mimetype"][0], zipfile.ZIP_STORED)
-        self.assertEqual(after["metadata"]["mimetype"][3], b"")
-        self.assertEqual(
-            {
-                name: metadata
-                for name, metadata in after["metadata"].items()
-                if name != "mimetype"
-            },
-            {
-                name: metadata
-                for name, metadata in before["metadata"].items()
-                if name != "mimetype"
-            },
-        )
+        self.assertEqual(after["metadata"], before["metadata"])
         self.assertEqual(
             {
                 name: data

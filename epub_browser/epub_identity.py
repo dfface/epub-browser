@@ -254,22 +254,10 @@ def _replace_package_atomically(
     try:
         with zipfile.ZipFile(source_path, "r") as source:
             source_infos = source.infolist()
-            ordered_infos = [
-                next(info for info in source_infos if info.filename == "mimetype"),
-                *(info for info in source_infos if info.filename != "mimetype"),
-            ]
             with zipfile.ZipFile(temporary_path, "w", allowZip64=True) as destination:
                 destination.comment = source.comment
-                for info in ordered_infos:
+                for info in source_infos:
                     copied_info = copy.copy(info)
-                    if info.filename == "mimetype":
-                        copied_info.compress_type = zipfile.ZIP_STORED
-                        copied_info.extra = b""
-                        destination.writestr(
-                            copied_info,
-                            b"application/epub+zip",
-                        )
-                        continue
                     if info.filename == package_name:
                         destination.writestr(copied_info, package_bytes)
                         continue
@@ -329,17 +317,10 @@ def _validate_rewritten_archive(
         }
     with zipfile.ZipFile(rewritten_path, "r") as rewritten:
         rewritten_infos = rewritten.infolist()
-        expected_order = [
-            "mimetype",
-            *(info.filename for info in source_infos if info.filename != "mimetype"),
-        ]
-        if [info.filename for info in rewritten_infos] != expected_order:
+        if [info.filename for info in rewritten_infos] != [
+            info.filename for info in source_infos
+        ]:
             raise RuntimeError("rewritten EPUB changed ZIP entry order")
-        if not rewritten_infos or rewritten_infos[0].filename != "mimetype":
-            raise RuntimeError("rewritten EPUB did not place mimetype first")
-        mimetype = rewritten_infos[0]
-        if mimetype.compress_type != zipfile.ZIP_STORED or mimetype.extra:
-            raise RuntimeError("rewritten EPUB did not normalize mimetype")
         if rewritten.comment != source_comment:
             raise RuntimeError("rewritten EPUB changed its ZIP comment")
         _validate_container_for_rewrite(rewritten, rewritten_infos)
