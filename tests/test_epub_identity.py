@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 import zipfile
@@ -9,11 +10,13 @@ try:
         EPUBIdentityWriteRefused,
         ensure_embedded_book_id,
         read_embedded_book_id,
+        validate_book_id,
     )
 except ImportError:
     EPUBIdentityWriteRefused = None
     ensure_embedded_book_id = None
     read_embedded_book_id = None
+    validate_book_id = None
 
 
 class EPUBIdentityTests(unittest.TestCase):
@@ -110,6 +113,25 @@ class EPUBIdentityTests(unittest.TestCase):
 
         self.assertRegex(book_id, r"^[A-Za-z0-9_-]{22}$")
         self.assertEqual(read_embedded_book_id(self.source), book_id)
+
+    def test_book_id_validation_is_carrier_neutral(self):
+        self.assertEqual(validate_book_id("safe_id"), "safe_id")
+        with self.assertRaisesRegex(ValueError, "Invalid EPUB Browser book ID"):
+            validate_book_id("unsafe/id")
+
+    def test_embedded_mode_refuses_source_symlink(self):
+        self._write_epub(self.source)
+        linked = self.root / "linked.epub"
+        linked.symlink_to(self.source)
+        with self.assertRaisesRegex(EPUBIdentityWriteRefused, "symbolic-link"):
+            ensure_embedded_book_id(linked, preferred_book_id="safe_id")
+
+    def test_embedded_mode_refuses_source_hard_link(self):
+        self._write_epub(self.source)
+        linked = self.root / "linked.epub"
+        os.link(self.source, linked)
+        with self.assertRaisesRegex(EPUBIdentityWriteRefused, "hard links"):
+            ensure_embedded_book_id(linked, preferred_book_id="safe_id")
 
     def test_signed_epub_is_not_modified(self):
         self._write_epub(self.source, signed=True)

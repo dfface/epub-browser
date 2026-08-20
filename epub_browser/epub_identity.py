@@ -39,7 +39,7 @@ def ensure_embedded_book_id(
 ) -> str:
     """Return an existing identity or safely add one to an unsigned EPUB."""
     path = Path(epub_path)
-    preferred = _validated_book_id(preferred_book_id) if preferred_book_id else None
+    preferred = validate_book_id(preferred_book_id) if preferred_book_id else None
     existing = read_embedded_book_id(path)
     if existing:
         if preferred and preferred != existing:
@@ -139,16 +139,16 @@ def _book_id_from_package(package_bytes: bytes) -> Optional[str]:
         elif element.get("property") == BOOK_ID_META_NAME:
             value = element.text
         if value is not None and value.strip():
-            values.append(_validated_book_id(value.strip()))
+            values.append(validate_book_id(value.strip()))
     unique = set(values)
     if len(unique) > 1:
         raise ValueError("EPUB contains conflicting embedded book IDs")
     return values[0] if values else None
 
 
-def _validated_book_id(value: str) -> str:
+def validate_book_id(value: str) -> str:
     if not _SAFE_BOOK_ID.fullmatch(value):
-        raise ValueError(f"Invalid embedded EPUB book ID: {value!r}")
+        raise ValueError(f"Invalid EPUB Browser book ID: {value!r}")
     return value
 
 
