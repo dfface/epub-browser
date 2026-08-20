@@ -2,6 +2,7 @@ import json
 import contextlib
 import io
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -211,9 +212,15 @@ class ServerBootstrapTests(unittest.TestCase):
                     responses["before"] = client.get("/")
                     if not prepared.is_set() or reconciled.is_set():
                         raise RuntimeError("setup boundary did not defer library scan")
+                    setup_page = client.get("/setup")
+                    nonce = re.search(
+                        r'name="setup_nonce" value="([^"]+)"',
+                        setup_page.text,
+                    ).group(1)
                     responses["setup"] = client.post(
                         "/setup",
                         data={
+                            "setup_nonce": nonce,
                             "username": "owner",
                             "password": "web-secret",
                             "password_confirmation": "web-secret",
@@ -235,6 +242,60 @@ class ServerBootstrapTests(unittest.TestCase):
         self.assertEqual(responses["before"].headers["location"], "/setup")
         self.assertEqual(responses["setup"].status_code, 303)
         self.assertEqual(responses["after"].text, "private library")
+
+    def test_forwarded_allow_ips_cannot_rewrite_the_proxy_trust_peer(self):
+        observed = {}
+        config = self._config(
+            ServerAuthOptions(
+                trusted_proxy_cidrs=("10.0.0.0/8",),
+                proxy_subject_header="X-Remote-User",
+                proxy_issuer="https://sso.example",
+            )
+        )
+
+        class PeerInspectingServer(_ReturningServer):
+            def run(server):
+                observed["proxy_headers"] = server.config.proxy_headers
+                server.config.load()
+                with TestClient(
+                    server.config.loaded_app,
+                    client=("203.0.113.9", 4321),
+                    follow_redirects=False,
+                ) as client:
+                    login = client.post(
+                        "/login",
+                        data={"username": "owner", "password": "secret"},
+                    )
+                    session = client.get("/api/session").json()
+                    response = client.post(
+                        "/api/identity/link",
+                        json={"username": "owner", "password": "secret"},
+                        headers={
+                            "X-Forwarded-For": "10.1.2.3",
+                            "X-Remote-User": "spoofed-subject",
+                            "X-CSRF-Token": session["csrf_token"],
+                        },
+                    )
+                    observed["login"] = login.status_code
+                    observed["link"] = response.status_code
+                    observed["code"] = response.json().get("code")
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "EPUB_BROWSER_ADMIN_USERNAME": "owner",
+                "EPUB_BROWSER_ADMIN_PASSWORD": "secret",
+                "FORWARDED_ALLOW_IPS": "*",
+            },
+            clear=True,
+        ):
+            result = run_server(config, server_factory=PeerInspectingServer)
+
+        self.assertEqual(result, 0)
+        self.assertFalse(observed["proxy_headers"])
+        self.assertEqual(observed["login"], 303)
+        self.assertEqual(observed["link"], 400)
+        self.assertEqual(observed["code"], "proxy_identity_required")
 
     def test_empty_password_file_environment_setting_uses_plaintext_fallback(self):
         credentials = resolve_bootstrap_credentials(
@@ -562,6 +623,53 @@ class ServerRuntimeTests(unittest.TestCase):
 
         self.assertEqual(status, 0)
         self.assertLess(elapsed, 1.0)
+
+    def test_setup_watcher_does_not_start_when_admin_probe_fails(self):
+        poll_failed = threading.Event()
+        watcher_started = threading.Event()
+        probe_count = 0
+
+        def has_administrator(_store):
+            nonlocal probe_count
+            probe_count += 1
+            if probe_count == 1:
+                return False
+            poll_failed.set()
+            raise sqlite3.OperationalError("admin probe failed")
+
+        class HoldingServer(_ReturningServer):
+            def run(server):
+                if not poll_failed.wait(timeout=5):
+                    raise RuntimeError("admin probe did not run")
+                watcher_started.wait(timeout=0.2)
+
+        def watcher_factory(*args, **kwargs):
+            watcher_started.set()
+            return mock.Mock()
+
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+            watch=True,
+        )
+        with (
+            mock.patch.object(
+                StateStore,
+                "has_administrator",
+                new=has_administrator,
+            ),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            status = run_server(
+                config,
+                server_factory=HoldingServer,
+                watcher_factory=watcher_factory,
+            )
+
+        self.assertEqual(status, 0)
+        self.assertFalse(watcher_started.is_set())
 
     def test_interrupted_initial_scan_does_not_retire_legacy_public_backup(self):
         source = self.sources / "slow.epub"

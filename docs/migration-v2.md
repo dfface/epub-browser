@@ -50,7 +50,7 @@ Startup performs these steps:
 1. Acquire the Server and migration locks.
 2. Reject ambiguous root databases or an unreadable/corrupt SQLite file.
 3. Copy the v1 root `epub-browser.db` or `annotations.db` to a verified backup under `data/backups/`.
-4. Upgrade a temporary copy and atomically activate it as `data/epub-browser.db`.
+4. Upgrade a temporary root-database copy and atomically activate it as `data/epub-browser.db`. If an authoritative `data/epub-browser.db` already exists at an older supported schema version, integrity-check it and make a verified `data/backups/` copy before upgrading it in place.
 5. Preserve annotations, bookshelf rows, reading progress, and legacy book IDs.
 6. Import the highest valid `epub-browser-bookshelf-<username>-<version>.json` per user when it is newer than SQLite. JSON source files are not deleted.
 7. Wait for web or unattended administrator setup, then reconcile every EPUB into `cache/public/`.
@@ -65,7 +65,9 @@ Backups use a name such as:
 data/backups/epub-browser.db.20260818T120000Z.0123456789ab.bak
 ```
 
-The backup is verified before the v1 root database is removed.
+The backup is byte-digest verified and passes SQLite integrity checking before
+the v1 root database is removed or an authoritative older schema is changed.
+A current-schema restart creates no repeated backup.
 
 ## Book identity and user data
 
@@ -92,7 +94,12 @@ annotations.db
 
 Move the non-authoritative file aside and retry. EPUB Browser never chooses one automatically.
 
-If SQLite integrity checks fail, the source file is left in place. Repair or restore it before retrying. If `data/epub-browser.db` already exists, it is authoritative; any later-discovered root database is left untouched and reported with `--log`.
+If SQLite integrity checks fail, the source file is left in place. Repair or
+restore it before retrying. If an authoritative-database backup cannot be
+created and verified, startup stops before changing the database; its original
+bytes and schema remain intact. If `data/epub-browser.db` already exists, it is
+authoritative; any later-discovered root database is left untouched and
+reported with `--log`.
 
 ## Rollback
 
@@ -102,8 +109,11 @@ To return to v1 after a successful v2 migration:
 
 1. Preserve the entire v2 Server directory as an additional backup.
 2. Select the matching verified `.bak` file under `data/backups/`.
-3. Copy it back to the v1 root as `epub-browser.db` (or `annotations.db` if that was the original name).
-4. Run the previous v1 package against that root.
+3. For a migrated root database, copy it back to the v1 root as
+   `epub-browser.db` (or `annotations.db` if that was the original name). For an
+   in-place authoritative schema upgrade, copy it back to
+   `data/epub-browser.db`.
+4. Run the compatible earlier package against that restored schema.
 
 Example:
 

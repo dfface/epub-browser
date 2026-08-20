@@ -136,7 +136,10 @@ headers and set its own authenticated values. EPUB Browser ignores proxy
 identity headers from every peer outside the configured CIDRs. TLS terminates
 at the reverse proxy; `--cookie-secure` ensures the session cookie is returned
 only over the browser-facing HTTPS connection. The local administrator remains
-the recovery account even when proxy identity is enabled.
+the recovery account even when proxy identity is enabled. Proxy trust always
+uses the direct socket peer; EPUB Browser disables Uvicorn processing of
+`X-Forwarded-For`/`Forwarded`, and `FORWARDED_ALLOW_IPS` cannot expand the
+trusted CIDR boundary.
 
 For a disposable session, use `--ephemeral` instead of `--server-dir`:
 

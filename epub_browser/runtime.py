@@ -300,6 +300,7 @@ def run_server(
     initial_reconcile_thread = None
     watcher_stop = threading.Event()
     initial_reconcile_done = threading.Event()
+    administrator_observed = threading.Event()
     lock = None
     ephemeral_root = None
     created_ephemeral_root = False
@@ -394,6 +395,7 @@ def run_server(
                 while not state_store.has_administrator():
                     if watcher_stop.wait(0.05):
                         return
+                administrator_observed.set()
                 if setup_required:
                     status.mark_available()
                 summary: ReconcileSummary = manager.reconcile()
@@ -422,7 +424,10 @@ def run_server(
         if config.watch:
             def watch_after_initial_reconcile():
                 initial_reconcile_done.wait()
-                if watcher_stop.is_set():
+                if (
+                    watcher_stop.is_set()
+                    or not administrator_observed.is_set()
+                ):
                     return
                 try:
                     watcher = watcher_factory(
@@ -456,6 +461,7 @@ def run_server(
             port=config.port,
             log_level="info" if config.log else "warning",
             access_log=config.log,
+            proxy_headers=False,
         )
         server = server_factory(uvicorn_config)
         local_url = _local_url(config.host, config.port)

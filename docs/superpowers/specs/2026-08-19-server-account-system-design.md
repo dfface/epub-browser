@@ -57,8 +57,13 @@ Annotations, reading progress, and bookshelves gain `user_id` ownership.
 Their legacy `username` values are retained only during compatibility migration
 and must not participate in authorization after the migration.
 
-All migration work happens in one SQLite `BEGIN IMMEDIATE` transaction.  The
-existing verified database-backup process runs before opening that transaction.
+All migration work happens in one SQLite `BEGIN IMMEDIATE` transaction. The
+verified database-backup process runs before opening that transaction. A root
+legacy database is upgraded through a temporary copy. Before an authoritative
+`data/epub-browser.db` at an older supported schema is upgraded in place, it is
+integrity-checked and copied to `data/backups/`; the copy is digest-verified and
+integrity-checked. A backup failure leaves the authoritative database bytes and
+schema unchanged, while a current-schema restart creates no repeated backup.
 For an existing database without an administrator, initialization creates one
 inactive pending administrator with a generated stable `user_id`, then assigns
 every legacy data row to it and rebuilds any username-based primary keys or
@@ -88,8 +93,10 @@ The application never reads `X-Username`.  A proxy identity is honored only
 when both of these are configured: a trusted source address range and an
 identity-header definition.  The configured issuer is part of the identity
 key, and a proxy-supplied display name is never used as a key.  Requests from
-any other peer ignore forwarded identity headers.  This prevents a direct
-client from forging an SSO login.
+any other peer ignore forwarded identity headers. Uvicorn forwarded-address
+rewriting is disabled: the CIDR check always uses the direct socket peer and
+never `X-Forwarded-For`, `Forwarded`, or `FORWARDED_ALLOW_IPS`. This prevents a
+direct client from forging an SSO login.
 
 ### Authorization service
 
@@ -124,6 +131,13 @@ administrator, inserts its initial session in the same transaction, and enters
 the library. A later submission follows the setup-complete/login path. The
 deployment must complete setup before exposing the port to untrusted visitors,
 because the first visitor can otherwise claim the administrator account.
+
+Every setup page load generates a high-entropy nonce, embeds it in the form,
+and sets the matching short-lived `HttpOnly`, `SameSite=Strict` setup cookie.
+Setup submission requires a constant-time nonce match. Origin/Host and
+`Sec-Fetch-Site` validation reject cross-origin claims with the same generic
+response before and after setup, and the setup cookie is cleared when setup
+completes.
 
 Unattended deployments may provide `EPUB_BROWSER_ADMIN_USERNAME` and one of
 `EPUB_BROWSER_ADMIN_PASSWORD_FILE` (preferred) or

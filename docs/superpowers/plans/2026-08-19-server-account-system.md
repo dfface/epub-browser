@@ -764,8 +764,14 @@ complete:
 - trusted-proxy headers are not evaluated and cannot claim setup.
 
 Validate submitted username/password/confirmation without returning or logging
-the password. A successful claim creates the session cookie and redirects to
-the library; losing concurrent claims redirect through login.
+the password. Protect the claim with a high-entropy hidden nonce and matching
+short-lived `HttpOnly`, `SameSite=Strict` cookie, checked with
+`compare_digest`. Validate Origin against Host and reject non-same-origin
+`Sec-Fetch-Site` values with the same generic response regardless of setup
+state. Clear the setup cookie after success or setup-complete. A successful
+claim creates the session cookie and redirects to the library; losing
+concurrent claims redirect through login. GET and HEAD render setup (HEAD has no
+body) instead of entering form parsing.
 
 - [ ] **Step 4: Make runtime web-first while retaining unattended setup**
 
@@ -776,7 +782,18 @@ credential source is configured, require a complete valid username/password
 pair and fail closed otherwise. Prefer the password file, remove exactly one
 trailing newline, never report its contents, and complete a pending row in
 place. Completed restarts do not read any configured secret. Construct the real
-`AuthConfig`/`AuthService` with trusted-proxy and secure-cookie options.
+`AuthConfig`/`AuthService` with trusted-proxy and secure-cookie options. Disable
+Uvicorn proxy-header processing so trusted-proxy CIDRs always evaluate the
+direct socket peer, never a forwarded client address. Start the watcher only
+after an explicit successful administrator observation; a polling error must
+not be treated like completed setup.
+
+Before changing an existing authoritative `data/epub-browser.db` from an older
+supported schema, run its integrity check and create a digest- and
+integrity-verified backup under `data/backups/` using the migration naming
+convention. Stop before schema mutation on any backup failure, preserve a
+restorable prior-schema copy, and avoid repeated backups on current-schema
+restarts.
 
 - [ ] **Step 5: Update deployment and migration guidance**
 

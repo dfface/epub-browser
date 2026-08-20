@@ -4,6 +4,7 @@ import json
 import glob
 import os
 import posixpath
+import secrets
 import sqlite3
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, urlsplit
@@ -38,6 +39,7 @@ LEGACY_DATABASE_FILENAME = 'annotations.db'
 PRINCIPAL_SCOPE_KEY = 'epub_browser.principal'
 PENDING_IDENTITY_SCOPE_KEY = 'epub_browser.pending_identity'
 SESSION_TOKEN_SCOPE_KEY = 'epub_browser.session_token'
+SETUP_NONCE_COOKIE = 'epub_browser_setup_nonce'
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
 PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/setup',
@@ -427,6 +429,26 @@ def create_app(
             samesite=cookie_options['samesite'],
         )
 
+    def set_setup_nonce_cookie(target_response, nonce):
+        target_response.set_cookie(
+            SETUP_NONCE_COOKIE,
+            nonce,
+            max_age=600,
+            path='/setup',
+            secure=auth_service.config.cookie_secure,
+            httponly=True,
+            samesite='strict',
+        )
+
+    def delete_setup_nonce_cookie(target_response):
+        target_response.delete_cookie(
+            SETUP_NONCE_COOKIE,
+            path='/setup',
+            secure=auth_service.config.cookie_secure,
+            httponly=True,
+            samesite='strict',
+        )
+
     async def json_object(request):
         try:
             data = await request.json()
@@ -483,6 +505,47 @@ def create_app(
             for key, entries in values.items()
         }
 
+    def valid_setup_request_source(request):
+        fetch_site = request.headers.get('sec-fetch-site')
+        if fetch_site and fetch_site.strip().lower() != 'same-origin':
+            return False
+        host = request.headers.get('host', '').strip()
+        if not host or any(character.isspace() for character in host) or ',' in host:
+            return False
+        origin = request.headers.get('origin')
+        if not origin:
+            return True
+        try:
+            parsed_origin = urlsplit(origin)
+            parsed_host = urlsplit('//' + host)
+            if (
+                parsed_origin.scheme not in {'http', 'https'}
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+                or parsed_origin.query
+                or parsed_origin.fragment
+                or parsed_origin.path not in {'', '/'}
+                or parsed_origin.hostname is None
+                or parsed_host.hostname is None
+            ):
+                return False
+            default_port = 443 if parsed_origin.scheme == 'https' else 80
+            origin_port = parsed_origin.port or default_port
+            host_port = parsed_host.port or default_port
+        except ValueError:
+            return False
+        return (
+            parsed_origin.hostname.casefold() == parsed_host.hostname.casefold()
+            and origin_port == host_port
+        )
+
+    def invalid_setup_request():
+        return response(
+            error_payload('invalid_setup_request', 'Invalid setup request'),
+            403,
+            cache_control='no-store',
+        )
+
     def setup_form(
         error=None,
         status_code=200,
@@ -490,6 +553,7 @@ def create_app(
         locale_explicit=False,
     ):
         locale = normalize_login_locale(locale)
+        nonce = secrets.token_urlsafe(32)
         copy = SETUP_COPY[locale]
         error_key = {
             'invalid': 'account.error.invalidSetup',
@@ -535,6 +599,7 @@ body {{ min-height: 100vh; margin: 0; display: grid; place-items: center; backgr
 <p data-i18n="account.setupDescription">{copy['description']}</p>
 {error_markup}
 <form id="setupForm" method="post" action="/setup">
+<input type="hidden" name="setup_nonce" value="{nonce}">
 <input type="hidden" name="locale" value="{locale}">
 <label><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
 <label><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="new-password" required></label>
@@ -553,11 +618,13 @@ if(localeField)localeField.value=localeSelect.value;
 }});
 }}
 }}());</script></body></html>'''
-        return HTMLResponse(
+        page = HTMLResponse(
             markup,
             status_code=status_code,
             headers={'Cache-Control': 'no-store'},
         )
+        set_setup_nonce_cookie(page, nonce)
+        return page
 
     async def setup(request):
         requested_locale = normalize_login_locale(
@@ -565,26 +632,41 @@ if(localeField)localeField.value=localeSelect.value;
             request.headers.get('accept-language', ''),
         )
         locale_explicit = 'lang' in request.query_params
-        if store.has_administrator():
-            return RedirectResponse(
-                '/' if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None else '/login',
-                status_code=303,
-                headers={'Cache-Control': 'no-store'},
-            )
-        if request.method == 'GET':
+        if request.method in {'GET', 'HEAD'}:
+            if store.has_administrator():
+                return RedirectResponse(
+                    '/' if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None else '/login',
+                    status_code=303,
+                    headers={'Cache-Control': 'no-store'},
+                )
             return setup_form(
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
             )
+        if not valid_setup_request_source(request):
+            return invalid_setup_request()
         try:
             form = await form_data(request)
         except (UnicodeDecodeError, ValueError):
-            return setup_form(
-                error='invalid',
-                status_code=400,
-                locale=requested_locale,
-                locale_explicit=locale_explicit,
+            return invalid_setup_request()
+        cookie_nonce = request.cookies.get(SETUP_NONCE_COOKIE)
+        submitted_nonce = form.get('setup_nonce')
+        if (
+            not isinstance(cookie_nonce, str)
+            or not isinstance(submitted_nonce, str)
+            or not cookie_nonce
+            or not submitted_nonce
+            or not secrets.compare_digest(cookie_nonce, submitted_nonce)
+        ):
+            return invalid_setup_request()
+        if store.has_administrator():
+            completed = RedirectResponse(
+                '/login',
+                status_code=303,
+                headers={'Cache-Control': 'no-store'},
             )
+            delete_setup_nonce_cookie(completed)
+            return completed
         submitted_locale = normalize_login_locale(
             form.get('locale') or requested_locale
         )
@@ -614,11 +696,13 @@ if(localeField)localeField.value=localeSelect.value;
         try:
             raw_session, _ = auth_service.complete_setup(username, password)
         except SetupAlreadyCompleteError:
-            return RedirectResponse(
+            completed = RedirectResponse(
                 '/login',
                 status_code=303,
                 headers={'Cache-Control': 'no-store'},
             )
+            delete_setup_nonce_cookie(completed)
+            return completed
         except sqlite3.IntegrityError:
             return setup_form(
                 error='username_unavailable',
@@ -639,6 +723,7 @@ if(localeField)localeField.value=localeSelect.value;
             headers={'Cache-Control': 'no-store'},
         )
         set_session_cookie(redirect, raw_session)
+        delete_setup_nonce_cookie(redirect)
         return redirect
 
     def login_form(

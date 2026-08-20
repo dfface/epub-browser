@@ -16,7 +16,7 @@ from .auth import BootstrapCredentials
 from .asset_publisher import PublishedAssets
 from .processor import EPUBProcessor
 from .reporting import Reporter
-from .state import StateStore
+from .state import DB_SCHEMA_VERSION, StateStore
 from .urls import SiteURLs
 
 
@@ -102,6 +102,10 @@ class MigrationManager:
 
         if self.database_path.is_file():
             self._check_integrity(self.database_path)
+            if self._schema_version(self.database_path) < DB_SCHEMA_VERSION:
+                backup_path = self._backup_authoritative_database(
+                    self.database_path
+                )
             self._initialize_database(self.database_path)
             self._check_integrity(self.database_path)
             if root_candidates:
@@ -183,6 +187,38 @@ class MigrationManager:
             if temporary_database.exists():
                 temporary_database.unlink()
         return backup_path
+
+    def _backup_authoritative_database(self, source: Path) -> Path:
+        try:
+            source_digest = self._sha256(source)
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            self.backups_dir.mkdir(parents=True, exist_ok=True)
+            backup_path = self.backups_dir / (
+                f"{source.name}.{timestamp}.{source_digest[:12]}.bak"
+            )
+            self._copy_atomic(source, backup_path)
+            if self._sha256(backup_path) != source_digest:
+                raise MigrationError(
+                    f"Database backup verification failed for {source}"
+                )
+            self._check_integrity(backup_path)
+            return backup_path
+        except MigrationError:
+            raise
+        except OSError as error:
+            raise MigrationError(
+                f"Database backup failed for {source}: {error}"
+            ) from error
+
+    @staticmethod
+    def _schema_version(path: Path) -> int:
+        try:
+            with sqlite3.connect(path) as connection:
+                return int(connection.execute("PRAGMA user_version").fetchone()[0])
+        except sqlite3.DatabaseError as error:
+            raise MigrationError(
+                f"Unable to read database schema version for {path}: {error}"
+            ) from error
 
     def _initialize_database(self, path: Path) -> None:
         try:

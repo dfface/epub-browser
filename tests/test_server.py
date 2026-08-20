@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 import tempfile
 import threading
@@ -59,6 +60,14 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.client = TestClient(self.app, follow_redirects=False)
         self.addCleanup(self.client.close)
 
+    def _setup_nonce(self, client=None, path="/setup"):
+        active_client = client or self.client
+        response = active_client.get(path)
+        match = re.search(r'name="setup_nonce" value="([^"]+)"', response.text)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(match)
+        return match.group(1)
+
     def test_pending_setup_exposes_only_setup_fixed_assets_and_minimal_status(self):
         english = self.client.get("/setup?lang=en")
         chinese = self.client.get("/setup?lang=zh-CN")
@@ -73,7 +82,18 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertIn("首次访问 Web 界面时，系统会提示你创建一个超级用户账户。", chinese.text)
         self.assertIn('id="setupForm"', english.text)
         self.assertIn('name="password_confirmation"', english.text)
+        self.assertIn('name="setup_nonce"', english.text)
+        nonce = re.search(
+            r'name="setup_nonce" value="([^"]+)"',
+            english.text,
+        ).group(1)
+        self.assertGreaterEqual(len(nonce), 32)
         self.assertIn('id="setupLocaleSelect"', english.text)
+        setup_cookie = english.headers["set-cookie"]
+        self.assertIn("epub_browser_setup_nonce=", setup_cookie)
+        self.assertIn("HttpOnly", setup_cookie)
+        self.assertIn("Path=/setup", setup_cookie)
+        self.assertIn("SameSite=strict", setup_cookie)
 
         for path in ("/", "/index.html", "/login", "/reader.html"):
             with self.subTest(path=path):
@@ -103,14 +123,27 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(response.json(), {"status": "setup_required"})
 
+    def test_setup_head_matches_get_status_and_has_no_body(self):
+        response = self.client.head("/setup")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"")
+        self.assertIn("epub_browser_setup_nonce=", response.headers["set-cookie"])
+
     def test_setup_submission_activates_pending_admin_and_enters_library(self):
+        nonce = self._setup_nonce()
         response = self.client.post(
             "/setup",
             data={
+                "setup_nonce": nonce,
                 "username": "Owner",
                 "password": "setup-secret",
                 "password_confirmation": "setup-secret",
                 "locale": "en",
+            },
+            headers={
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
             },
         )
 
@@ -118,6 +151,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         self.assertEqual(response.headers["location"], "/")
         self.assertIn("epub_browser_session=", response.headers["set-cookie"])
+        self.assertNotIn("epub_browser_setup_nonce", self.client.cookies)
         self.assertNotIn("setup-secret", response.text)
         self.assertEqual(user.user_id, self.pending.user_id)
         self.assertTrue(user.enabled)
@@ -125,9 +159,11 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertEqual(self.client.get("/").text, "private library content")
 
     def test_setup_rejects_invalid_form_without_echoing_password(self):
+        nonce = self._setup_nonce(path="/setup?lang=zh-CN")
         response = self.client.post(
             "/setup",
             data={
+                "setup_nonce": nonce,
                 "username": "Owner",
                 "password": "do-not-echo-this",
                 "password_confirmation": "different",
@@ -141,15 +177,95 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertNotIn("do-not-echo-this", response.text)
         self.assertFalse(self.store.has_administrator())
 
+    def test_setup_rejects_cross_origin_form_even_with_valid_nonce(self):
+        for headers in (
+            {
+                "Origin": "https://attacker.example",
+                "Sec-Fetch-Site": "same-origin",
+            },
+            {
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "cross-site",
+            },
+        ):
+            with self.subTest(headers=headers):
+                nonce = self._setup_nonce()
+                response = self.client.post(
+                    "/setup",
+                    data={
+                        "setup_nonce": nonce,
+                        "username": "owner",
+                        "password": "secret",
+                        "password_confirmation": "secret",
+                    },
+                    headers=headers,
+                )
+                self.assertEqual(response.status_code, 403)
+                self.assertEqual(
+                    response.json()["code"],
+                    "invalid_setup_request",
+                )
+        self.assertFalse(self.store.has_administrator())
+
+    def test_cross_origin_rejection_does_not_reveal_setup_completion(self):
+        nonce = self._setup_nonce()
+        payload = {
+            "setup_nonce": nonce,
+            "username": "owner",
+            "password": "secret",
+            "password_confirmation": "secret",
+        }
+        hostile_headers = {
+            "Origin": "https://attacker.example",
+            "Sec-Fetch-Site": "cross-site",
+        }
+        before = self.client.post(
+            "/setup",
+            data=payload,
+            headers=hostile_headers,
+        )
+        completed = self.client.post("/setup", data=payload)
+        with TestClient(self.app, follow_redirects=False) as anonymous:
+            after = anonymous.post(
+                "/setup",
+                data=payload,
+                headers=hostile_headers,
+            )
+
+        self.assertEqual(completed.status_code, 303)
+        self.assertEqual(before.status_code, after.status_code)
+        self.assertEqual(before.json(), after.json())
+
+    def test_setup_rejects_missing_or_mismatched_nonce(self):
+        valid_nonce = self._setup_nonce()
+        for nonce in (None, valid_nonce + "wrong"):
+            with self.subTest(nonce=nonce):
+                data = {
+                    "username": "owner",
+                    "password": "secret",
+                    "password_confirmation": "secret",
+                }
+                if nonce is not None:
+                    data["setup_nonce"] = nonce
+                response = self.client.post("/setup", data=data)
+                self.assertEqual(response.status_code, 403)
+                self.assertEqual(
+                    response.json()["code"],
+                    "invalid_setup_request",
+                )
+        self.assertFalse(self.store.has_administrator())
+
     def test_concurrent_setup_submissions_allow_exactly_one_claim(self):
         barrier = threading.Barrier(2)
 
         def submit(username):
             with TestClient(self.app, follow_redirects=False) as client:
+                nonce = self._setup_nonce(client)
                 barrier.wait(timeout=5)
                 response = client.post(
                     "/setup",
                     data={
+                        "setup_nonce": nonce,
                         "username": username,
                         "password": "secret-" + username,
                         "password_confirmation": "secret-" + username,

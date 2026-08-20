@@ -161,6 +161,69 @@ class MigrationManagerTests(unittest.TestCase):
                 1,
             )
 
+    def test_prior_authoritative_schema_is_backed_up_before_in_place_upgrade(self):
+        database = self.server_dir / "data" / "epub-browser.db"
+        store = StateStore(database)
+        administrator = store.initialize(bootstrap=self.bootstrap)
+        with sqlite3.connect(database) as connection:
+            connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION - 1}")
+
+        manager = self._manager()
+        first = manager.prepare_data()
+        backup_count = len(tuple((self.server_dir / "data" / "backups").iterdir()))
+        second = manager.prepare_data()
+
+        self.assertIsNotNone(first.backup_path)
+        self.assertTrue(first.backup_path.is_file())
+        self.assertEqual(second.backup_path, first.backup_path)
+        self.assertEqual(
+            len(tuple((self.server_dir / "data" / "backups").iterdir())),
+            backup_count,
+        )
+        with sqlite3.connect(database) as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION,
+            )
+
+        restored = self.server_dir / "restored.db"
+        restored.write_bytes(first.backup_path.read_bytes())
+        with sqlite3.connect(restored) as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION - 1,
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT id FROM users WHERE username = 'admin'"
+                ).fetchone()[0],
+                administrator.user_id,
+            )
+
+    def test_authoritative_upgrade_backup_failure_leaves_database_unchanged(self):
+        database = self.server_dir / "data" / "epub-browser.db"
+        StateStore(database).initialize(bootstrap=self.bootstrap)
+        with sqlite3.connect(database) as connection:
+            connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION - 1}")
+        original = database.read_bytes()
+
+        with (
+            mock.patch.object(
+                MigrationManager,
+                "_copy_atomic",
+                side_effect=OSError("backup unavailable"),
+            ),
+            self.assertRaisesRegex(MigrationError, "backup"),
+        ):
+            self._manager().prepare_data()
+
+        self.assertEqual(database.read_bytes(), original)
+        with sqlite3.connect(database) as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION - 1,
+            )
+
     def test_imports_only_highest_legacy_bookshelf_for_administrator(self):
         source = self.server_dir / "epub-browser.db"
         self._create_legacy_database(source, shelf_version=3)
