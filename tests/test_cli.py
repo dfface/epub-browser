@@ -14,6 +14,50 @@ from epub_browser.main import main
 
 
 class NewCommandTests(unittest.TestCase):
+    def test_book_id_storage_defaults_to_sidecar_in_both_modes(self):
+        ssg = parse_cli(["ssg", "books", "--output-dir", "dist"])
+        server = parse_cli(["server", "books", "--server-dir", "state"])
+        self.assertEqual(ssg.book_id_storage, "sidecar")
+        self.assertEqual(server.book_id_storage, "sidecar")
+
+    def test_book_id_storage_is_invocation_wide_in_both_modes(self):
+        ssg = parse_cli(
+            [
+                "ssg",
+                "one.epub",
+                "two.epub",
+                "--output-dir",
+                "dist",
+                "--book-id-storage",
+                "embedded",
+            ]
+        )
+        server = parse_cli(
+            [
+                "server",
+                "books",
+                "--server-dir",
+                "state",
+                "--book-id-storage",
+                "embedded",
+            ]
+        )
+        self.assertEqual(ssg.book_id_storage, "embedded")
+        self.assertEqual(server.book_id_storage, "embedded")
+
+    def test_invalid_book_id_storage_is_rejected(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parse_cli(
+                [
+                    "ssg",
+                    "books",
+                    "--output-dir",
+                    "dist",
+                    "--book-id-storage",
+                    "database",
+                ]
+            )
+
     def test_ssg_parses_output_and_base_path(self):
         config = parse_cli(
             ["ssg", "books", "--output-dir", "dist", "--base-path", "/reader/"]
@@ -93,6 +137,24 @@ class NewCommandTests(unittest.TestCase):
 
 
 class LegacyCommandTests(unittest.TestCase):
+    def test_legacy_book_id_storage_maps_to_the_new_command(self):
+        config = parse_cli(
+            [
+                "books",
+                "--output-dir",
+                "state",
+                "--book-id-storage",
+                "embedded",
+            ]
+        )
+        self.assertEqual(config.book_id_storage, "embedded")
+        self.assertEqual(
+            format_legacy_migration_hint(config),
+            "Legacy command syntax is deprecated; equivalent command: "
+            "epub-browser server books --server-dir state "
+            "--book-id-storage embedded",
+        )
+
     def test_old_output_dir_maps_to_persistent_server(self):
         config = parse_cli(
             [
