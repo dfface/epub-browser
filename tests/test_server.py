@@ -994,6 +994,127 @@ class SessionOwnershipTests(unittest.TestCase):
         )
 
 
+class ServerAccountSecurityMatrixTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        book_dir = public / "book" / "restricted-id"
+        book_dir.mkdir(parents=True)
+        (book_dir / SERVER_OUTPUT_REVISION_FILE).write_text(
+            SERVER_OUTPUT_REVISION + "\n",
+            encoding="utf-8",
+        )
+        (book_dir / "chapter_0.html").write_text("chapter", encoding="utf-8")
+
+        self.store = StateStore(public / "epub-browser.db")
+        self.store.initialize(BootstrapCredentials("admin", "admin-password"))
+        self.store.resolve_book(
+            public / "restricted.epub",
+            None,
+            "restricted-fingerprint",
+            {
+                "title": "Restricted book",
+                "authors": [],
+                "tags": [],
+                "cover": None,
+            },
+            preferred_book_id="restricted-id",
+        )
+        self.auth_config = AuthConfig.from_values([], None, None)
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, self.auth_config),
+        )
+        self.admin = None
+        self.member = None
+        self.member_ids = {}
+
+    def _login(self, username, password):
+        client = TestClient(self.app, follow_redirects=False)
+        self.addCleanup(client.close)
+        login = client.post(
+            "/login",
+            data={"username": username, "password": password},
+        )
+        self.assertEqual(login.status_code, 303)
+        session = client.get("/api/session")
+        self.assertEqual(session.status_code, 200)
+        client.headers[self.auth_config.csrf_header_name] = session.json()[
+            "csrf_token"
+        ]
+        return client
+
+    def login_admin(self):
+        self.admin = self._login("admin", "admin-password")
+        return self.admin
+
+    def create_member(self, username, password):
+        response = self.admin.post(
+            "/api/admin/users",
+            json={
+                "username": username,
+                "password": password,
+                "role": "member",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.member_ids[username] = response.json()["user"]["id"]
+
+    def restrict_book(self, book_id):
+        response = self.admin.put(
+            "/api/admin/books/" + book_id,
+            json={"visibility": "restricted"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def login_member(self, username, password):
+        self.member = self._login(username, password)
+        return self.member
+
+    def grant_book(self, book_id, username):
+        response = self.admin.put(
+            "/api/admin/books/{}/grants/{}".format(
+                book_id,
+                self.member_ids[username],
+            ),
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def disable_user(self, username):
+        response = self.admin.put(
+            "/api/admin/users/" + username,
+            json={"enabled": False},
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_member_lifecycle_from_login_to_restricted_book_revocation(self):
+        self.login_admin()
+        self.create_member("reader", "initial-password")
+        self.restrict_book("restricted-id")
+        self.assertEqual(
+            self.login_member("reader", "initial-password").get(
+                "/book/restricted-id/chapter_0.html"
+            ).status_code,
+            403,
+        )
+        self.grant_book("restricted-id", "reader")
+        self.assertEqual(
+            self.member.get(
+                "/book/restricted-id/chapter_0.html"
+            ).status_code,
+            200,
+        )
+        raw_session = self.member.cookies.get("epub_browser_session")
+        self.disable_user("reader")
+        denied = self.member.get("/api/session")
+        self.assertEqual(denied.status_code, 401)
+        self.assertNotIn("initial-password", denied.text)
+        self.assertNotIn(raw_session, denied.text)
+
+
 class BookAuthorizationTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
