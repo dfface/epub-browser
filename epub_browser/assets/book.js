@@ -439,11 +439,6 @@ function initBookShelfButton(bookHash) {
 
     if (!toggleShelfBtn) return;
 
-    function getBookshelfUsername() {
-        if (isKindleMode()) return getCookie('epub_browser_username');
-        return localStorage.getItem('epub_browser_username');
-    }
-
     function getBookshelfVersion() {
         var version = localStorage.getItem(BOOKSHELF_VERSION_KEY);
         return version ? parseInt(version, 10) : 1;
@@ -471,7 +466,7 @@ function initBookShelfButton(bookHash) {
 
     function saveBookshelf(data) {
         if (isServerMode) {
-            return window.EpubBookshelfStore.save(getBookshelfUsername(), data);
+            return window.EpubBookshelfStore.save(data);
         }
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
         incrementBookshelfVersion();
@@ -480,12 +475,7 @@ function initBookShelfButton(bookHash) {
 
     function ensureServerBookshelf() {
         if (!isServerMode) return Promise.resolve(true);
-        var username = getBookshelfUsername();
-        if (!username) {
-            showNotification(window.EpubBrowserI18n.t('bookshelf.loginRequired'), 'warning');
-            return Promise.resolve(false);
-        }
-        return window.EpubBookshelfStore.load(username).then(function(result) {
+        return window.EpubBookshelfStore.load().then(function(result) {
             if (result.error) {
                 showNotification(window.EpubBrowserI18n.t('bookshelf.error.' + (result.error.code || 'unknown')), 'warning');
                 return false;
@@ -779,7 +769,7 @@ function initBookShelfButton(bookHash) {
     });
 
     window.refreshBookShelfButton = updateButtonState;
-    if (isServerMode && getBookshelfUsername()) {
+    if (isServerMode) {
         ensureServerBookshelf().then(function() { updateButtonState(); });
     } else {
         updateButtonState();
