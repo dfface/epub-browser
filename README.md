@@ -141,6 +141,16 @@ uses the direct socket peer; EPUB Browser disables Uvicorn processing of
 `X-Forwarded-For`/`Forwarded`, and `FORWARDED_ALLOW_IPS` cannot expand the
 trusted CIDR boundary.
 
+EPUB Browser is not itself an OAuth/OIDC client. To use OIDC, place an
+OIDC-aware authentication proxy in front of it. That proxy completes the
+provider login and forwards a stable provider subject in the configured
+`--proxy-subject-header`; `--proxy-issuer` identifies the provider/security
+domain and must stay stable. Do not use a mutable display name as the subject.
+An unknown trusted-proxy identity can be linked to an existing local account by
+proving that account's password, or an administrator can create the same
+issuer/subject mapping in Account settings. Local administrator/password login
+remains the recovery path.
+
 For a disposable session, use `--ephemeral` instead of `--server-dir`:
 
 ```bash

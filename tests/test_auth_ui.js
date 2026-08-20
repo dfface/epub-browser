@@ -161,6 +161,147 @@ test('SSG initialization returns before any account request or UI binding', asyn
   assert.deepEqual(root.navigations, []);
 });
 
+test('member account settings keep the administration module hidden', async () => {
+  const adminPanel = { hidden: false };
+  const adminMenu = { hidden: false, addEventListener() {} };
+  const associationCard = { hidden: false };
+  const adminIdentitiesSection = { hidden: false };
+  const root = rootWithFetch(() => Promise.resolve(response(200, {})));
+  root.document.getElementById = id => ({
+    adminPanel,
+    adminMenu,
+    associationCard,
+    adminIdentitiesSection,
+  })[id] || null;
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'member', username: 'reader', role: 'member' },
+    csrf_token: 'token',
+  });
+
+  await auth.init();
+
+  assert.equal(adminPanel.hidden, true);
+  assert.equal(adminMenu.hidden, true);
+  assert.equal(associationCard.hidden, true);
+  assert.equal(adminIdentitiesSection.hidden, true);
+});
+
+test('trusted-proxy controls are visible only for a configured administrator session', async () => {
+  const adminPanel = { hidden: true };
+  const adminMenu = { hidden: true, addEventListener() {} };
+  const associationCard = { hidden: true };
+  const adminIdentitiesSection = { hidden: true };
+  const root = rootWithFetch(() => Promise.resolve(response(200, {})));
+  root.document.getElementById = id => ({
+    adminPanel,
+    adminMenu,
+    associationCard,
+    adminIdentitiesSection,
+  })[id] || null;
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin' },
+    csrf_token: 'token',
+    authentication: { proxy_enabled: true, pending_proxy_identity: true },
+  });
+
+  await auth.init();
+
+  assert.equal(adminPanel.hidden, false);
+  assert.equal(adminMenu.hidden, false);
+  assert.equal(associationCard.hidden, false);
+  assert.equal(adminIdentitiesSection.hidden, false);
+});
+
+test('account settings and administration open as separate surfaces', async () => {
+  const calls = [];
+  function control() {
+    return {
+      hidden: false,
+      listeners: {},
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+    };
+  }
+  function panel() {
+    return {
+      hidden: false,
+      active: false,
+      attributes: {},
+      classList: {
+        add() { this.owner.active = true; },
+        remove() { this.owner.active = false; },
+        owner: null,
+      },
+      setAttribute(name, value) { this.attributes[name] = value; },
+    };
+  }
+  const accountMenu = control();
+  const adminMenu = control();
+  const accountPanel = panel();
+  const adminPanel = panel();
+  accountPanel.classList.owner = accountPanel;
+  adminPanel.classList.owner = adminPanel;
+  const root = rootWithFetch((url) => {
+    calls.push(url);
+    if (url === '/api/account/sessions') return Promise.resolve(response(200, { sessions: [] }));
+    if (url === '/api/admin/users') return Promise.resolve(response(200, { users: [] }));
+    if (url === '/api/admin/books') return Promise.resolve(response(200, { books: [] }));
+    return Promise.resolve(response(404, {}));
+  });
+  root.document.getElementById = id => ({
+    accountMenu,
+    adminMenu,
+    accountPanel,
+    adminPanel,
+  })[id] || null;
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin' },
+    csrf_token: 'token',
+    authentication: { proxy_enabled: false, pending_proxy_identity: false },
+  });
+
+  await auth.init();
+  accountMenu.listeners.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(accountPanel.active, true);
+  assert.equal(adminPanel.active, false);
+  assert.deepEqual(calls, ['/api/account/sessions']);
+
+  adminMenu.listeners.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(adminPanel.active, true);
+  assert.deepEqual(calls, [
+    '/api/account/sessions',
+    '/api/admin/users',
+    '/api/admin/books',
+  ]);
+});
+
+test('proxy association form stays hidden without a pending third-party identity', async () => {
+  const associationCard = { hidden: false };
+  const adminIdentitiesSection = { hidden: true };
+  const root = rootWithFetch(() => Promise.resolve(response(200, {})));
+  root.document.getElementById = id => ({
+    associationCard,
+    adminIdentitiesSection,
+  })[id] || null;
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin' },
+    csrf_token: 'token',
+    authentication: { proxy_enabled: true, pending_proxy_identity: false },
+  });
+
+  await auth.init();
+
+  assert.equal(associationCard.hidden, true);
+  assert.equal(adminIdentitiesSection.hidden, false);
+});
+
 test('anonymous proxy association sends JSON with the page authentication nonce', async () => {
   let received;
   const root = rootWithFetch((url, options) => {
@@ -212,4 +353,49 @@ test('administrator identity helpers create and delete mappings with CSRF', asyn
     issuer: 'issuer',
     subject: 'subject',
   });
+});
+
+test('account success feedback uses the shared notification component', async () => {
+  const shown = [];
+  const root = rootWithFetch(() => Promise.resolve(response(201, {
+    identity: { issuer: 'issuer', subject: 'subject', user_id: 'member' },
+  })));
+  root.EpubBrowserI18n = { t(key) { return key === 'admin.identityCreated' ? 'Created' : key; } };
+  root.EpubBrowserNotification = {
+    show(message, type) { shown.push({ message, type }); },
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.createIdentity({
+    issuer: 'issuer',
+    subject: 'subject',
+    user_id: 'member',
+  }, false);
+
+  assert.deepEqual(shown, [{ message: 'Created', type: 'success' }]);
+});
+
+test('administrator saves the complete multi-user book grant selection in one request', async () => {
+  let received;
+  const root = rootWithFetch((url, options) => {
+    received = { url, options };
+    return Promise.resolve(response(200, { grants: { user_ids: ['one', 'two'] } }));
+  });
+  root.EpubBrowserNotification = { show() {} };
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.saveBookGrants('book/id', ['one', 'two'], false);
+
+  assert.equal(received.url, '/api/admin/books/book%2Fid/grants');
+  assert.equal(received.options.method, 'PUT');
+  assert.equal(received.options.headers['X-CSRF-Token'], 'admin-csrf');
+  assert.deepEqual(JSON.parse(received.options.body), { user_ids: ['one', 'two'] });
 });

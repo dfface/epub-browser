@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from .auth import (
     BootstrapCredentials,
@@ -79,6 +79,8 @@ class SessionRecord:
     last_used_at: str
     revoked_at: Optional[str]
     created_at: str
+    client_address: Optional[str]
+    user_agent: Optional[str]
 
 
 class StateStore:
@@ -325,9 +327,23 @@ class StateStore:
                 expires_at TEXT NOT NULL,
                 last_used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 revoked_at TEXT,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                client_address TEXT,
+                user_agent TEXT
             )
             """
+        )
+        StateStore._add_column_if_missing(
+            connection,
+            "sessions",
+            "client_address",
+            "TEXT",
+        )
+        StateStore._add_column_if_missing(
+            connection,
+            "sessions",
+            "user_agent",
+            "TEXT",
         )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)"
@@ -774,6 +790,8 @@ class StateStore:
         expires_at,
         *,
         now=None,
+        client_address=None,
+        user_agent=None,
     ) -> Principal:
         normalized = self._normalize_username(username)
         if not isinstance(password_hash, str) or not password_hash:
@@ -784,6 +802,10 @@ class StateStore:
         if expiry <= created_at:
             raise ValueError("Session expiry must be in the future")
         session_id = uuid.uuid4().hex
+        client_address, user_agent = self._session_client_metadata(
+            client_address,
+            user_agent,
+        )
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             pending = connection.execute(
@@ -811,8 +833,9 @@ class StateStore:
                 """
                 INSERT INTO sessions (
                     session_id, token_digest, user_id, expires_at,
-                    last_used_at, revoked_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                    last_used_at, revoked_at, created_at,
+                    client_address, user_agent
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)
                 """,
                 (
                     session_id,
@@ -821,6 +844,8 @@ class StateStore:
                     str(expiry),
                     str(created_at),
                     str(created_at),
+                    client_address,
+                    user_agent,
                 ),
             )
             return self._get_user(connection, user_id).principal
@@ -838,6 +863,20 @@ class StateStore:
             raise ValueError(
                 "Session token digest must be a SHA-256 hexadecimal digest"
             )
+
+    @staticmethod
+    def _session_client_metadata(client_address, user_agent):
+        address = (
+            client_address.strip()[:128]
+            if isinstance(client_address, str) and client_address.strip()
+            else None
+        )
+        agent = (
+            user_agent.strip()[:512]
+            if isinstance(user_agent, str) and user_agent.strip()
+            else None
+        )
+        return address, agent
 
     def _bootstrap_admin(
         self,
@@ -1220,6 +1259,8 @@ class StateStore:
         expires_at,
         *,
         now=None,
+        client_address=None,
+        user_agent=None,
     ) -> str:
         self._validate_session_digest(token_digest_value)
         created_at = self._timestamp(now)
@@ -1227,14 +1268,19 @@ class StateStore:
         if expiry <= created_at:
             raise ValueError("Session expiry must be in the future")
         session_id = uuid.uuid4().hex
+        client_address, user_agent = self._session_client_metadata(
+            client_address,
+            user_agent,
+        )
         with self._connection() as connection:
             self._require_user(connection, user_id)
             connection.execute(
                 """
                 INSERT INTO sessions (
                     session_id, token_digest, user_id, expires_at,
-                    last_used_at, revoked_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                    last_used_at, revoked_at, created_at,
+                    client_address, user_agent
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)
                 """,
                 (
                     session_id,
@@ -1243,6 +1289,8 @@ class StateStore:
                     str(expiry),
                     str(created_at),
                     str(created_at),
+                    client_address,
+                    user_agent,
                 ),
             )
         return session_id
@@ -1255,6 +1303,8 @@ class StateStore:
         expires_at,
         *,
         now=None,
+        client_address=None,
+        user_agent=None,
     ) -> str:
         """Insert a new session and revoke the current token in one transaction."""
         if not isinstance(replaced_raw_token, str) or not replaced_raw_token:
@@ -1266,6 +1316,10 @@ class StateStore:
             raise ValueError("Session expiry must be in the future")
         replaced_digest = token_digest(replaced_raw_token)
         session_id = uuid.uuid4().hex
+        client_address, user_agent = self._session_client_metadata(
+            client_address,
+            user_agent,
+        )
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._require_user(connection, user_id)
@@ -1297,8 +1351,9 @@ class StateStore:
                 """
                 INSERT INTO sessions (
                     session_id, token_digest, user_id, expires_at,
-                    last_used_at, revoked_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, NULL, ?)
+                    last_used_at, revoked_at, created_at,
+                    client_address, user_agent
+                ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)
                 """,
                 (
                     session_id,
@@ -1307,6 +1362,8 @@ class StateStore:
                     str(expiry),
                     str(created_at),
                     str(created_at),
+                    client_address,
+                    user_agent,
                 ),
             )
         return session_id
@@ -1417,6 +1474,8 @@ class StateStore:
             last_used_at=row["last_used_at"],
             revoked_at=row["revoked_at"],
             created_at=row["created_at"],
+            client_address=row["client_address"],
+            user_agent=row["user_agent"],
         )
 
     def list_sessions(
@@ -1436,7 +1495,7 @@ class StateStore:
             rows = connection.execute(
                 """
                 SELECT session_id, user_id, expires_at, last_used_at,
-                       revoked_at, created_at
+                       revoked_at, created_at, client_address, user_agent
                 FROM sessions
                 WHERE """
                 + " AND ".join(conditions)
@@ -1549,6 +1608,35 @@ class StateStore:
                 (book_id,),
             ).fetchall()
         return tuple(row["user_id"] for row in rows)
+
+    def replace_book_grants(
+        self,
+        book_id: str,
+        user_ids: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Atomically replace a book's explicit member grants."""
+        normalized_user_ids = tuple(dict.fromkeys(user_ids))
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            for user_id in normalized_user_ids:
+                user = self._get_user(connection, user_id)
+                if not user.enabled:
+                    raise ValueError(
+                        "Book access cannot be granted to a disabled user"
+                    )
+                if user.role != "member":
+                    raise ValueError(
+                        "Explicit book access can only be granted to members"
+                    )
+            connection.execute(
+                "DELETE FROM book_access WHERE book_id = ?",
+                (book_id,),
+            )
+            connection.executemany(
+                "INSERT INTO book_access (book_id, user_id) VALUES (?, ?)",
+                ((book_id, user_id) for user_id in normalized_user_ids),
+            )
+        return tuple(sorted(normalized_user_ids))
 
     def revoke_book_access(self, book_id: str, user_id: str) -> None:
         with self._connection() as connection:

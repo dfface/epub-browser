@@ -336,7 +336,13 @@ class AuthService:
         self._record_login_failure(key, now)
         return None
 
-    def create_session(self, principal: Principal) -> Tuple[str, str]:
+    def create_session(
+        self,
+        principal: Principal,
+        *,
+        client_address=None,
+        user_agent=None,
+    ) -> Tuple[str, str]:
         raw_token = secrets.token_urlsafe(32)
         now = self._now()
         self.store.create_session(
@@ -344,6 +350,8 @@ class AuthService:
             principal.user_id,
             now + self.ttl,
             now=now,
+            client_address=client_address,
+            user_agent=user_agent,
         )
         return raw_token, self.issue_csrf_token(principal, raw_token)
 
@@ -351,6 +359,9 @@ class AuthService:
         self,
         principal: Principal,
         replaced_raw_token: str,
+        *,
+        client_address=None,
+        user_agent=None,
     ) -> Tuple[str, str]:
         raw_token = secrets.token_urlsafe(32)
         now = self._now()
@@ -360,10 +371,19 @@ class AuthService:
             principal.user_id,
             now + self.ttl,
             now=now,
+            client_address=client_address,
+            user_agent=user_agent,
         )
         return raw_token, self.issue_csrf_token(principal, raw_token)
 
-    def complete_setup(self, username: str, password: str) -> Tuple[str, Principal]:
+    def complete_setup(
+        self,
+        username: str,
+        password: str,
+        *,
+        client_address=None,
+        user_agent=None,
+    ) -> Tuple[str, Principal]:
         if not isinstance(username, str) or not username.strip():
             raise ValueError("Username must not be empty")
         if not isinstance(password, str) or not password:
@@ -376,6 +396,8 @@ class AuthService:
             token_digest(raw_token),
             now + self.ttl,
             now=now,
+            client_address=client_address,
+            user_agent=user_agent,
         )
         return raw_token, principal
 

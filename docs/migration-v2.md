@@ -164,3 +164,9 @@ reverse proxy is intended. When a proxy supplies identity headers, enable
 `--trusted-proxy-cidr`, configure the subject header and issuer together, and
 make the proxy strip client-supplied copies of those headers. A public client
 network is never an appropriate trusted-proxy CIDR.
+
+Direct OAuth/OIDC protocol handling is not built into EPUB Browser. An
+OIDC-aware reverse proxy performs the provider flow and passes a stable subject
+through the configured trusted header; EPUB Browser maps the proxy's
+issuer/subject pair to a local account. Keep local administrator login available
+as the recovery path.

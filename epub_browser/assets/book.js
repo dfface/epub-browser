@@ -57,24 +57,7 @@ function bookT(key, params) {
 
 // 显示通知
 function showNotification(message, type) {
-    var existingNotification = document.querySelector('.custom-css-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    var notification = document.createElement('div');
-    notification.className = "custom-css-notification " + type;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    setTimeout(function() {
-        notification.classList.add('fade-out');
-        setTimeout(function() {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
+    return window.EpubBrowserNotification.show(message, type);
 }
 
 // 页面加载时恢复顺序

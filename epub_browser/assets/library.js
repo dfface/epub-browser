@@ -1,22 +1,5 @@
 function showNotification(message, type) {
-    var existingNotification = document.querySelector('.custom-css-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    var notification = document.createElement('div');
-    notification.className = "custom-css-notification " + type;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    setTimeout(function() {
-        notification.classList.add('fade-out');
-        setTimeout(function() {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
+    return window.EpubBrowserNotification.show(message, type);
 }
 
 // 设置 cookie
@@ -172,14 +155,35 @@ function initScript() {
         }
     }
 
-    function showLibraryState(key) {
+    function showLibraryState(titleKey, descriptionKey, variant) {
         var bookGrid = document.querySelector('.book-grid');
         var state;
-        if (!bookGrid || bookGrid.querySelector('.library-state')) return;
-        state = document.createElement('div');
-        state.className = 'empty-state library-state';
-        state.setAttribute('data-i18n', key);
-        state.textContent = t(key);
+        var icon;
+        var iconGlyph;
+        var title;
+        var description;
+        var stateVariant = variant || 'empty';
+        if (!bookGrid || bookGrid.querySelector('.library-state--' + stateVariant)) return;
+        state = document.createElement('section');
+        state.className = 'empty-state library-state library-state--' + stateVariant;
+        state.setAttribute('role', 'status');
+        icon = document.createElement('span');
+        icon.className = 'library-state-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        iconGlyph = document.createElement('i');
+        iconGlyph.className = stateVariant === 'filtered'
+            ? 'fas fa-search'
+            : 'fas fa-book-open';
+        icon.appendChild(iconGlyph);
+        title = document.createElement('h2');
+        title.setAttribute('data-i18n', titleKey);
+        title.textContent = t(titleKey);
+        description = document.createElement('p');
+        description.setAttribute('data-i18n', descriptionKey);
+        description.textContent = t(descriptionKey);
+        state.appendChild(icon);
+        state.appendChild(title);
+        state.appendChild(description);
         bookGrid.appendChild(state);
     }
     
@@ -311,7 +315,13 @@ function initScript() {
         updateLibraryCounts(books, tagCount);
 
         if (!books.length) {
-            showLibraryState('library.empty');
+            showLibraryState(
+                'library.emptyTitle',
+                window.EpubBrowserMode === 'server'
+                    ? 'library.emptyServerDescription'
+                    : 'library.emptySsgDescription',
+                'empty'
+            );
             restoreOrder(storageKeySortableBook, 'book-grid');
             restoreOrder(storageKeySortableTag, 'tag-cloud');
             applyLibraryFilters();
@@ -500,11 +510,25 @@ function initScript() {
         var searchTerm = (searchBox.value || '').toLowerCase().trim();
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var tagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
-        document.querySelectorAll('.book-card').forEach(function(card) {
+        var bookGrid = document.querySelector('.book-grid');
+        var filteredState = bookGrid && bookGrid.querySelector('.library-state--filtered');
+        var visibleCount = 0;
+        var cards = document.querySelectorAll('.book-card');
+        if (filteredState) bookGrid.removeChild(filteredState);
+        cards.forEach(function(card) {
             var textMatches = cardMatchesSearch(card, searchTerm);
             var tagMatches = cardMatchesTag(card, tagId);
-            card.style.display = textMatches && tagMatches ? 'block' : 'none';
+            var visible = textMatches && tagMatches;
+            card.style.display = visible ? 'block' : 'none';
+            if (visible) visibleCount += 1;
         });
+        if (cards.length && visibleCount === 0) {
+            showLibraryState(
+                'library.noResultsTitle',
+                'library.noResultsDescription',
+                'filtered'
+            );
+        }
     }
 
     function activateTag(tagId) {

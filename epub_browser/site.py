@@ -81,7 +81,10 @@ def _render_library_html(
         server_progress_script = '<script src="/assets/library-progress.js" defer></script>'
         server_progress_start = 'if (window.EpubLibraryProgress) window.EpubLibraryProgress.start(window);'
         server_account_stylesheet = '<link rel="stylesheet" href="/assets/account.css">'
-        server_account_control = '''<button type="button" class="library-meta-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel">
+        server_account_control = '''<button type="button" class="library-meta-action" id="adminMenu" aria-haspopup="dialog" aria-controls="adminPanel" hidden>
+                <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>
+            </button>
+            <button type="button" class="library-meta-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel">
                 <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue" data-i18n="account.menu">Account</span>
             </button>'''
         server_account_panel = '''
@@ -97,7 +100,6 @@ def _render_library_html(
             </div>
         </div>
         <div class="account-modal-body"><div class="account-layout">
-        <p id="accountStatus" class="account-status" role="status" aria-live="polite" hidden></p>
         <section class="account-card account-profile-card" aria-labelledby="accountProfileTitle">
             <h3 id="accountProfileTitle" data-i18n="account.profile">Profile</h3>
             <p id="accountIdentity"></p>
@@ -115,9 +117,10 @@ def _render_library_html(
             <h3 id="accountSessionsTitle" data-i18n="account.sessions">Active sessions</h3>
             <ul class="account-list" id="sessionList"></ul>
         </section>
-        <details class="account-card account-card-wide account-details">
+        <details class="account-card account-card-wide account-details" id="associationCard" hidden>
             <summary data-i18n="account.associationTitle">Associate a proxy identity</summary>
             <div class="account-details-body"><p data-i18n="account.associationDescription">If your trusted proxy identity is not recognized, prove which local account it belongs to.</p>
+            <p class="account-section-copy" data-i18n="account.associationOidcHelp">EPUB Browser does not connect to OIDC directly. Open it through the configured OIDC-aware trusted proxy first; this form then links that external identity to an existing local account.</p>
             <form class="account-form" id="associationForm">
                 <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="username" required></label>
                 <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="current-password" required></label>
@@ -125,8 +128,21 @@ def _render_library_html(
             </form></div>
         </details>
         </div>
-        <section class="account-admin" id="adminPanel" aria-labelledby="adminTitle" hidden>
-            <h3 id="adminTitle" data-i18n="admin.title">Administration</h3>
+        </div></div>
+    </div>
+</div>
+<div class="bookshelf-modal account-modal admin-modal" id="adminPanel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="adminTitle" hidden>
+    <div class="bookshelf-content account-content">
+        <div class="bookshelf-header">
+            <div class="bookshelf-header-left"></div>
+            <h2 class="bookshelf-title" id="adminTitle"><i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.title">Administration</span></h2>
+            <div class="bookshelf-header-right">
+                <button type="button" class="bookshelf-close-btn" id="adminClose" aria-label="Close administration" data-i18n-aria-label="admin.close"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+        </div>
+        <div class="account-modal-body"><div class="account-layout">
+        <section class="account-admin account-admin-console" aria-labelledby="adminTitle">
+            <p class="account-admin-intro" data-i18n="admin.description">Manage users, external identities, and access to restricted books.</p>
             <div class="account-admin-grid">
             <section class="account-admin-section" aria-labelledby="adminUsersTitle">
                 <h4 id="adminUsersTitle" data-i18n="admin.users">Users</h4>
@@ -138,8 +154,9 @@ def _render_library_html(
                 </form>
                 <ul class="account-list" id="adminUserList"></ul>
             </section>
-            <section class="account-admin-section" aria-labelledby="adminIdentitiesTitle">
+            <section class="account-admin-section" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
+                <p class="account-section-copy" data-i18n="admin.identityHelp">For OIDC, let a trusted reverse proxy complete the protocol and pass a stable subject. Issuer must match --proxy-issuer; subject must match the configured subject header.</p>
                 <form class="account-form" id="adminIdentityForm">
                     <label><span data-i18n="admin.identityIssuer">Issuer</span><input type="text" name="issuer" autocomplete="off" required></label>
                     <label><span data-i18n="admin.identitySubject">Subject</span><input type="text" name="subject" autocomplete="off" required></label>
@@ -185,6 +202,7 @@ def _render_library_html(
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/notification.css">
 <link rel="stylesheet" href="/assets/dialog.css">
 <link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
@@ -406,6 +424,7 @@ if (isKindle) {
 """
     library_html += """
     <script src="/assets/cache-boundary.js" defer></script>
+    <script src="/assets/notification.js" defer></script>
 {server_auth_script}
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>

@@ -210,6 +210,11 @@
     }
 
     function showStatus(key, type, params) {
+      var notification = root.EpubBrowserNotification;
+      if (notification && typeof notification.show === 'function') {
+        notification.show(t(key, params), type || 'info');
+        return;
+      }
       var status = element('accountStatus');
       if (!status) return;
       status.textContent = t(key, params);
@@ -276,7 +281,38 @@
       });
       if (menuValue) menuValue.textContent = sessionState.user.username;
       var adminPanel = element('adminPanel');
+      var adminMenu = element('adminMenu');
       if (adminPanel) adminPanel.hidden = sessionState.user.role !== 'admin';
+      if (adminMenu) adminMenu.hidden = sessionState.user.role !== 'admin';
+      var authentication = sessionState.authentication || {};
+      var proxyEnabled = authentication.proxy_enabled === true;
+      var pendingProxyIdentity = authentication.pending_proxy_identity === true;
+      var associationCard = element('associationCard');
+      var adminIdentities = element('adminIdentitiesSection');
+      if (associationCard) {
+        associationCard.hidden = !proxyEnabled || !pendingProxyIdentity;
+      }
+      if (adminIdentities) {
+        adminIdentities.hidden = !proxyEnabled || sessionState.user.role !== 'admin';
+      }
+    }
+
+    function describeSessionDevice(userAgent) {
+      var agent = String(userAgent || '');
+      var browser = '';
+      var platform = '';
+      if (/Edg\//.test(agent)) browser = 'Edge';
+      else if (/Firefox\//.test(agent)) browser = 'Firefox';
+      else if (/Chrome\//.test(agent) || /CriOS\//.test(agent)) browser = 'Chrome';
+      else if (/Safari\//.test(agent)) browser = 'Safari';
+      if (/Android/.test(agent)) platform = 'Android';
+      else if (/iPhone|iPad|iPod/.test(agent)) platform = 'iOS';
+      else if (/Macintosh|Mac OS X/.test(agent)) platform = 'macOS';
+      else if (/Windows/.test(agent)) platform = 'Windows';
+      else if (/Linux/.test(agent)) platform = 'Linux';
+      if (browser && platform) return browser + ' · ' + platform;
+      if (browser || platform) return browser || platform;
+      return agent ? agent.slice(0, 80) : t('account.unknownDevice');
     }
 
     function renderSessions(records) {
@@ -286,10 +322,23 @@
       (records || []).forEach(function(record) {
         var item = root.document.createElement('li');
         item.className = 'account-list-item account-session-item';
-        var label = createTextElement('span', 'account-session-label', 'account.sessionDescription', {
+        var label = root.document.createElement('span');
+        var device = root.document.createElement('strong');
+        var address = root.document.createElement('span');
+        var times = createTextElement('span', 'account-session-times', 'account.sessionTimes', {
           created: formatDate(record.created_at),
-          lastUsed: formatDate(record.last_used_at)
+          lastUsed: formatDate(record.last_used_at),
+          expires: formatDate(record.expires_at)
         });
+        label.className = 'account-session-label';
+        device.className = 'account-session-device';
+        device.textContent = describeSessionDevice(record.user_agent);
+        if (record.user_agent) device.title = record.user_agent;
+        address.className = 'account-session-address';
+        address.textContent = record.client_address || t('account.unknownAddress');
+        label.appendChild(device);
+        label.appendChild(address);
+        label.appendChild(times);
         item.appendChild(label);
         if (record.current) {
           item.appendChild(createTextElement('strong', 'account-current-session', 'account.currentSession'));
@@ -316,13 +365,6 @@
         if (!response.ok) return showResponseError(response, 'account');
         return readJson(response).then(function(payload) { renderSessions(payload.sessions); });
       }).catch(function() { showStatus('account.error.network', 'error'); });
-    }
-
-    function userById(userId) {
-      for (var index = 0; index < users.length; index++) {
-        if (users[index].id === userId) return users[index];
-      }
-      return null;
     }
 
     function updateUser(username, payload) {
@@ -392,8 +434,14 @@
         item.className = 'account-list-item account-book-item';
         var title = root.document.createElement('strong');
         var visibility = root.document.createElement('select');
-        var grantUser = root.document.createElement('select');
+        var grants = root.document.createElement('fieldset');
+        var grantLegend = createTextElement('legend', '', 'admin.grantUsers');
+        var grantOptions = root.document.createElement('div');
+        var grantableUsers = users.filter(function(user) {
+          return user.enabled && user.role === 'member';
+        });
         title.textContent = book.title;
+        title.className = 'account-book-title';
         item.appendChild(title);
         ['authenticated', 'restricted'].forEach(function(value) {
           var option = root.document.createElement('option');
@@ -416,30 +464,44 @@
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         });
         item.appendChild(visibility);
-        users.filter(function(user) { return user.enabled && user.role !== 'admin'; }).forEach(function(user) {
-          var option = root.document.createElement('option');
-          option.value = user.id;
-          option.textContent = user.username;
-          grantUser.appendChild(option);
+        grants.className = 'account-book-grants';
+        grantOptions.className = 'account-book-grant-options';
+        grants.appendChild(grantLegend);
+        grantableUsers.forEach(function(user) {
+          var label = root.document.createElement('label');
+          var checkbox = root.document.createElement('input');
+          var name = root.document.createElement('span');
+          label.className = 'account-book-grant-option';
+          checkbox.type = 'checkbox';
+          checkbox.value = user.id;
+          checkbox.checked = (book.grants || []).indexOf(user.id) !== -1;
+          name.textContent = user.username;
+          label.appendChild(checkbox);
+          label.appendChild(name);
+          grantOptions.appendChild(label);
         });
-        grantUser.setAttribute('aria-label', t('admin.grantUser'));
-        grantUser.setAttribute('data-i18n-aria-label', 'admin.grantUser');
-        item.appendChild(grantUser);
-        item.appendChild(actionButton('admin.grantBook', function() {
-          if (!grantUser.value) return;
-          mutateGrant(book.id, grantUser.value, 'PUT');
-        }));
-        (book.grants || []).forEach(function(userId) {
-          var user = userById(userId);
-          var revoke = actionButton('admin.revokeBook', function() {
-            mutateGrant(book.id, userId, 'DELETE');
-          }, 'danger');
-          revoke.setAttribute('aria-label', t('admin.revokeBookFor', {
-            username: user ? user.username : userId,
-            book: book.title
-          }));
-          item.appendChild(revoke);
+        if (!grantableUsers.length) {
+          grantOptions.appendChild(createTextElement(
+            'p',
+            'account-empty',
+            'admin.noGrantableUsers'
+          ));
+        }
+        grants.appendChild(grantOptions);
+        grants.disabled = book.visibility !== 'restricted';
+        item.appendChild(grants);
+        var saveGrants = actionButton('admin.saveBookGrants', function() {
+          var selected = [];
+          Array.prototype.forEach.call(
+            grantOptions.querySelectorAll('input[type="checkbox"]'),
+            function(checkbox) {
+              if (checkbox.checked) selected.push(checkbox.value);
+            }
+          );
+          replaceBookGrants(book.id, selected);
         });
+        saveGrants.disabled = book.visibility !== 'restricted';
+        item.appendChild(saveGrants);
         list.appendChild(item);
       });
       if (!books.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.noBooks'));
@@ -513,14 +575,18 @@
       });
     }
 
-    function mutateGrant(bookId, userId, method) {
+    function replaceBookGrants(bookId, userIds, reload) {
       return authenticatedFetch(
-        '/api/admin/books/' + encodeURIComponent(bookId) + '/grants/' + encodeURIComponent(userId),
-        { method: method }
+        '/api/admin/books/' + encodeURIComponent(bookId) + '/grants',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_ids: userIds || [] })
+        }
       ).then(function(response) {
         if (!response.ok) return showResponseError(response, 'admin');
-        showStatus(method === 'PUT' ? 'admin.bookGranted' : 'admin.bookRevoked', 'success');
-        return loadAdminData();
+        showStatus('admin.bookGrantsSaved', 'success');
+        return reload === false ? response : loadAdminData();
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
@@ -528,22 +594,27 @@
       if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') {
         return Promise.resolve(null);
       }
-      return Promise.all([
+      var proxyEnabled = Boolean(
+        sessionState.authentication && sessionState.authentication.proxy_enabled
+      );
+      var requests = [
         authenticatedFetch('/api/admin/users'),
-        authenticatedFetch('/api/admin/books'),
-        authenticatedFetch('/api/admin/identities')
-      ]).then(function(responses) {
+        authenticatedFetch('/api/admin/books')
+      ];
+      if (proxyEnabled) requests.push(authenticatedFetch('/api/admin/identities'));
+      return Promise.all(requests).then(function(responses) {
         if (!responses[0].ok) return showResponseError(responses[0], 'admin');
         if (!responses[1].ok) return showResponseError(responses[1], 'admin');
-        if (!responses[2].ok) return showResponseError(responses[2], 'admin');
-        return Promise.all([
+        if (proxyEnabled && !responses[2].ok) return showResponseError(responses[2], 'admin');
+        var payloadRequests = [
           readJson(responses[0]),
-          readJson(responses[1]),
-          readJson(responses[2])
-        ]).then(function(payloads) {
+          readJson(responses[1])
+        ];
+        if (proxyEnabled) payloadRequests.push(readJson(responses[2]));
+        return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
           books = payloads[1].books || [];
-          identities = payloads[2].identities || [];
+          identities = proxyEnabled ? (payloads[2].identities || []) : [];
           renderUsers();
           renderBooks();
           renderIdentities();
@@ -557,7 +628,6 @@
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
       loadSessions();
-      loadAdminData();
     }
 
     function closePanel() {
@@ -567,9 +637,28 @@
       panel.setAttribute('aria-hidden', 'true');
     }
 
+    function openAdminPanel() {
+      if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') return;
+      var panel = element('adminPanel');
+      if (!panel) return;
+      panel.hidden = false;
+      panel.classList.add('active');
+      panel.setAttribute('aria-hidden', 'false');
+      loadAdminData();
+    }
+
+    function closeAdminPanel() {
+      var panel = element('adminPanel');
+      if (!panel) return;
+      panel.classList.remove('active');
+      panel.setAttribute('aria-hidden', 'true');
+    }
+
     function bindUi() {
       var menu = element('accountMenu');
       var close = element('accountClose');
+      var adminMenu = element('adminMenu');
+      var adminClose = element('adminClose');
       var logoutButton = element('accountLogout');
       var passwordForm = element('accountPasswordForm');
       var associationForm = element('associationForm');
@@ -577,6 +666,8 @@
       var createIdentityForm = element('adminIdentityForm');
       if (menu) menu.addEventListener('click', openPanel);
       if (close) close.addEventListener('click', closePanel);
+      if (adminMenu) adminMenu.addEventListener('click', openAdminPanel);
+      if (adminClose) adminClose.addEventListener('click', closeAdminPanel);
       if (logoutButton) logoutButton.addEventListener('click', function() {
         logout().catch(function() { showStatus('account.error.network', 'error'); });
       });
@@ -672,6 +763,7 @@
       associate: associate,
       createIdentity: createIdentity,
       deleteIdentity: deleteIdentity,
+      saveBookGrants: replaceBookGrants,
       init: init,
       setSession: setSession,
       getSession: function() { return sessionState; }

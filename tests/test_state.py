@@ -34,6 +34,56 @@ class StateStoreTests(unittest.TestCase):
             {"annotations", "bookshelves", "reading_progress", "books"} <= tables
         )
 
+    def test_initialize_adds_session_client_metadata_to_existing_account_database(self):
+        database = Path(self.temporary.name, "legacy-session.db")
+        password_hash = hash_password("secret")
+        with sqlite3.connect(database) as connection:
+            connection.executescript(
+                """
+                CREATE TABLE users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    role TEXT NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    password_hash TEXT,
+                    setup_pending INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE sessions (
+                    session_id TEXT PRIMARY KEY,
+                    token_digest TEXT NOT NULL UNIQUE,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    expires_at TEXT NOT NULL,
+                    last_used_at TEXT NOT NULL,
+                    revoked_at TEXT,
+                    created_at TEXT NOT NULL
+                );
+                PRAGMA user_version = 4;
+                """
+            )
+            connection.execute(
+                "INSERT INTO users (id, username, role, password_hash) "
+                "VALUES ('admin', 'admin', 'admin', ?)",
+                (password_hash,),
+            )
+            connection.execute(
+                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, NULL, ?)",
+                ("old-session", "1" * 64, "admin", "200", "100", "100"),
+            )
+
+        store = StateStore(database)
+        store.initialize()
+
+        record = store.list_sessions("admin")[0]
+        self.assertIsNone(record.client_address)
+        self.assertIsNone(record.user_agent)
+        with sqlite3.connect(database) as connection:
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(sessions)")
+            }
+        self.assertTrue({"client_address", "user_agent"} <= columns)
+
     def test_v1_user_content_moves_to_bootstrap_administrator(self):
         self._create_v1_database_with_annotation_bookshelf_and_progress(
             "legacy-name"
@@ -297,6 +347,39 @@ class StateStoreTests(unittest.TestCase):
         self.assertTrue(
             self.store.can_read_book(member.user_id, member.role, "book-1")
         )
+
+    def test_replace_book_grants_is_atomic_and_member_only(self):
+        self.store.resolve_book(
+            Path(self.temporary.name, "batch.epub"),
+            None,
+            "batch-fingerprint",
+            {"title": "Batch"},
+            preferred_book_id="batch-book",
+        )
+        first = self.store.create_user("first", "hash", role="member")
+        second = self.store.create_user("second", "hash", role="member")
+        disabled = self.store.create_user("disabled", "hash", role="member")
+        self.store.set_user_enabled(disabled.user_id, False)
+
+        grants = self.store.replace_book_grants(
+            "batch-book",
+            [second.user_id, first.user_id, second.user_id],
+        )
+
+        self.assertEqual(grants, tuple(sorted((first.user_id, second.user_id))))
+        self.assertEqual(self.store.book_grants("batch-book"), grants)
+        with self.assertRaises(ValueError):
+            self.store.replace_book_grants(
+                "batch-book",
+                [first.user_id, disabled.user_id],
+            )
+        self.assertEqual(self.store.book_grants("batch-book"), grants)
+        with self.assertRaises(ValueError):
+            self.store.replace_book_grants(
+                "batch-book",
+                [self.owner.user_id],
+            )
+        self.assertEqual(self.store.book_grants("batch-book"), grants)
 
     def test_new_book_can_preserve_a_correlated_legacy_identity(self):
         record = self.store.resolve_book(
@@ -671,12 +754,17 @@ class StateStoreTests(unittest.TestCase):
             member.user_id,
             200,
             now=100,
+            client_address="192.0.2.10",
+            user_agent="Example Browser",
         )
 
+        member_records = self.store.list_sessions(member.user_id)
         self.assertEqual(
-            {session.session_id for session in self.store.list_sessions(member.user_id)},
+            {session.session_id for session in member_records},
             {member_session},
         )
+        self.assertEqual(member_records[0].client_address, "192.0.2.10")
+        self.assertEqual(member_records[0].user_agent, "Example Browser")
         self.assertFalse(
             self.store.revoke_user_session(member.user_id, owner_session)
         )

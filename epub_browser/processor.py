@@ -932,6 +932,7 @@ class EPUBProcessor:
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
+    <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
@@ -1247,6 +1248,7 @@ if (window.EpubBrowserCacheBoundary) {
         )
         index_html += f"""
 {cache_boundary_script}
+<script src="/assets/notification.js" defer></script>
 {auth_script}
 <script src="/assets/theme.js" defer></script>
 <script src="/assets/dialog.js" defer></script>
@@ -1697,6 +1699,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
+    <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
@@ -2178,6 +2181,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         chapter_html += f"""
     {cache_boundary_script}
+    <script src="/assets/notification.js" defer></script>
     {auth_script}
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>

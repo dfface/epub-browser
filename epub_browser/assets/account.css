@@ -258,11 +258,24 @@ body.auth-page {
     padding: clamp(22px, 4vw, 46px) 20px 64px;
 }
 
+.account-modal[hidden],
+.account-modal [hidden] {
+    display: none !important;
+}
+
+#adminMenu[hidden] {
+    display: none !important;
+}
+
 .account-layout {
     display: grid;
     width: min(100%, 1120px);
     margin: 0 auto;
     gap: 22px;
+}
+
+.admin-modal .account-layout {
+    width: min(100%, 1280px);
 }
 
 .account-grid,
@@ -279,6 +292,17 @@ body.auth-page {
     border-radius: var(--account-radius);
     background: var(--account-card);
     box-shadow: var(--account-shadow);
+}
+
+.account-admin-console {
+    gap: 18px;
+}
+
+.account-admin-intro {
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .92rem;
+    line-height: 1.6;
 }
 
 .account-card {
@@ -451,6 +475,31 @@ body.auth-page {
     line-height: 1.45;
 }
 
+.account-session-label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 14px;
+}
+
+.account-session-device {
+    overflow: hidden;
+    color: var(--account-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-session-address {
+    color: var(--account-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .74rem;
+}
+
+.account-session-times {
+    grid-column: 1 / -1;
+    color: var(--account-muted);
+    font-size: .76rem;
+}
+
 .account-current-session {
     flex: 0 0 auto;
     padding: 4px 9px;
@@ -494,8 +543,13 @@ body.auth-page {
     min-height: 38px !important;
 }
 
+.account-book-item {
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) minmax(150px, 190px) minmax(260px, 1.5fr) auto;
+    align-items: center;
+}
+
 .account-book-item strong {
-    flex: 1 1 220px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -503,31 +557,60 @@ body.auth-page {
 }
 
 .account-book-item select {
-    flex: 0 1 190px;
-    width: auto;
+    width: 100%;
     min-height: 38px;
 }
 
-.account-status {
-    position: sticky;
-    z-index: 2;
-    top: 0;
-    border-color: color-mix(in srgb, var(--account-primary) 30%, transparent);
-    background: color-mix(in srgb, var(--account-primary) 8%, var(--account-card));
-    color: var(--account-primary);
-    box-shadow: var(--account-shadow);
+.account-book-grants {
+    min-width: 0;
+    margin: 0;
+    padding: 8px 10px 10px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
 }
 
-.account-status.success {
-    border-color: color-mix(in srgb, var(--account-success) 30%, transparent);
-    background: color-mix(in srgb, var(--account-success) 8%, var(--account-card));
-    color: var(--account-success);
+.account-book-grants legend {
+    padding: 0 5px;
+    color: var(--account-muted);
+    font-size: .72rem;
+    font-weight: 650;
 }
 
-.account-status.error {
-    border-color: color-mix(in srgb, var(--account-danger) 30%, transparent);
-    background: color-mix(in srgb, var(--account-danger) 8%, var(--account-card));
-    color: var(--account-danger);
+.account-book-grant-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.account-book-grant-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    box-sizing: border-box;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-primary) 7%, var(--account-card));
+    color: var(--account-text);
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+.account-book-grant-option input {
+    width: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--account-primary);
+}
+
+.account-book-grants:disabled {
+    opacity: .58;
+}
+
+.account-book-grants:disabled .account-book-grant-option {
+    cursor: not-allowed;
 }
 
 .account-empty {
@@ -544,6 +627,14 @@ body.auth-page {
     #adminUserForm,
     #adminIdentityForm {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .account-book-item {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .account-book-grants {
+        grid-column: 1 / -1;
     }
 }
 
@@ -584,6 +675,15 @@ body.auth-page {
         display: none;
     }
 
+    .admin-modal .bookshelf-header-left {
+        display: none;
+    }
+
+    .admin-modal .bookshelf-title {
+        display: flex;
+        justify-content: flex-start;
+    }
+
     .account-modal .account-modal-body {
         padding: 16px 12px 44px;
     }
@@ -612,18 +712,18 @@ body.auth-page {
         width: 100%;
         max-width: none;
     }
+
+    .account-book-item {
+        grid-template-columns: 1fr;
+    }
+
+    .account-book-grants {
+        grid-column: auto;
+    }
 }
 
-@media (prefers-color-scheme: dark) {
-    body.auth-page {
-        --account-bg: #171717;
-        --account-card: #242424;
-        --account-text: #f2f2f2;
-        --account-muted: #b8b8b8;
-        --account-border: #3b3b3b;
-        --account-hover: #303030;
-        color-scheme: dark;
-    }
+.dark-mode body.auth-page {
+    color-scheme: dark;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -117,6 +117,8 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertIn('class="auth-page"', english.text)
         self.assertIn('class="auth-card setup-card"', english.text)
         self.assertIn('href="/assets/account.css"', english.text)
+        self.assertIn('href="/assets/theme.css"', english.text)
+        self.assertIn('src="/assets/theme-bootstrap.js"', english.text)
         self.assertNotIn('<style>', english.text)
         self.assertIn('name="password_confirmation"', english.text)
         self.assertIn('name="setup_nonce"', english.text)
@@ -159,6 +161,11 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertEqual(fixed_auth.status_code, 200)
         self.assertNotIn("generated auth asset", fixed_auth.text)
         self.assertEqual(self.client.get("/assets/i18n.js").status_code, 200)
+        self.assertEqual(self.client.get("/assets/theme.css").status_code, 200)
+        self.assertEqual(
+            self.client.get("/assets/theme-bootstrap.js").status_code,
+            200,
+        )
         tombstone = self.client.get("/sw.js")
         self.assertEqual(tombstone.status_code, 200)
         self.assertIn("self.registration.unregister()", tombstone.text)
@@ -575,6 +582,8 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('class="auth-page"', english.text)
         self.assertIn('class="auth-card login-card"', english.text)
         self.assertIn('href="/assets/account.css"', english.text)
+        self.assertIn('href="/assets/theme.css"', english.text)
+        self.assertIn('src="/assets/theme-bootstrap.js"', english.text)
         self.assertIn('data-i18n="account.loginDescription"', english.text)
         self.assertNotIn('<style>', english.text)
         self.assertNotIn('id="associationForm"', english.text)
@@ -1050,6 +1059,19 @@ class AdminAccountTests(unittest.TestCase):
 
         self.assertEqual(sessions.status_code, 200)
         self.assertEqual(member_sessions.status_code, 200)
+        current = next(
+            session for session in sessions.json()["sessions"]
+            if session["current"]
+        )
+        self.assertTrue(current["client_address"])
+        self.assertTrue(current["user_agent"])
+        self.assertIn("T", current["created_at"])
+        self.assertIn("T", current["last_used_at"])
+        self.assertIn("T", current["expires_at"])
+        self.assertEqual(
+            self.admin_client.get("/api/session").json()["authentication"],
+            {"proxy_enabled": False, "pending_proxy_identity": False},
+        )
         member_session = member_sessions.json()["sessions"][0]
 
         denied = self.admin_client.delete(
@@ -1524,6 +1546,44 @@ class BookAuthorizationTests(unittest.TestCase):
             ).status_code,
             403,
         )
+
+    def test_administrator_atomically_replaces_multiple_book_grants(self):
+        second = self.store.create_user(
+            "second-member",
+            hash_password("second-secret"),
+        )
+
+        saved = self.admin_client.put(
+            "/api/admin/books/restricted-id/grants",
+            json={"user_ids": [self.member.user_id, second.user_id]},
+        )
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(
+            saved.json()["grants"]["user_ids"],
+            sorted((self.member.user_id, second.user_id)),
+        )
+        self.assertEqual(
+            self.store.book_grants("restricted-id"),
+            tuple(sorted((self.member.user_id, second.user_id))),
+        )
+
+        rejected = self.admin_client.put(
+            "/api/admin/books/restricted-id/grants",
+            json={"user_ids": [self.member.user_id, self.disabled_member.user_id]},
+        )
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(
+            self.store.book_grants("restricted-id"),
+            tuple(sorted((self.member.user_id, second.user_id))),
+        )
+
+        cleared = self.admin_client.put(
+            "/api/admin/books/restricted-id/grants",
+            json={"user_ids": []},
+        )
+        self.assertEqual(cleared.status_code, 200)
+        self.assertEqual(self.store.book_grants("restricted-id"), ())
 
     def test_book_administration_validates_role_book_visibility_and_enabled_user(self):
         member_denied = self.member_client.put(

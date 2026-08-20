@@ -8,6 +8,7 @@ import posixpath
 import re
 import secrets
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, urlsplit
@@ -62,6 +63,8 @@ PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/account.css',
     '/assets/auth.js',
     '/assets/i18n.js',
+    '/assets/theme-bootstrap.js',
+    '/assets/theme.css',
 })
 SETUP_COPY = {
     'en': {
@@ -588,16 +591,35 @@ def create_app(
         }
 
     def session_data(record, current_session_id):
+        def iso_timestamp(value):
+            try:
+                return datetime.fromtimestamp(
+                    float(value),
+                    timezone.utc,
+                ).isoformat().replace('+00:00', 'Z')
+            except (TypeError, ValueError, OverflowError):
+                return value
+
         return {
             'id': record.session_id,
-            'created_at': record.created_at,
-            'last_used_at': record.last_used_at,
-            'expires_at': record.expires_at,
+            'created_at': iso_timestamp(record.created_at),
+            'last_used_at': iso_timestamp(record.last_used_at),
+            'expires_at': iso_timestamp(record.expires_at),
+            'client_address': record.client_address,
+            'user_agent': record.user_agent,
             'current': record.session_id == current_session_id,
         }
 
     def client_key(request):
         return request.client.host if request.client is not None else 'unknown'
+
+    def session_client_metadata(request):
+        return {
+            'client_address': (
+                request.client.host if request.client is not None else None
+            ),
+            'user_agent': request.headers.get('user-agent'),
+        }
 
     async def form_data(request, maximum_size=64 * 1024):
         content_type = request.headers.get('content-type', '').split(';', 1)[0]
@@ -731,7 +753,9 @@ def create_app(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title data-i18n="account.setupPageTitle">{copy['page_title']}</title>
+<link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
+<script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
@@ -841,7 +865,11 @@ if(localeField)localeField.value=localeSelect.value;
                 locale_explicit=True,
             )
         try:
-            raw_session, _ = auth_service.complete_setup(username, password)
+            raw_session, _ = auth_service.complete_setup(
+                username,
+                password,
+                **session_client_metadata(request),
+            )
         except SetupAlreadyCompleteError:
             completed = RedirectResponse(
                 '/login',
@@ -900,7 +928,9 @@ if(localeField)localeField.value=localeSelect.value;
 <meta name="color-scheme" content="light dark">
 <meta name="epub-browser-auth-nonce" content="{nonce}">
 <title data-i18n="account.loginPageTitle">{copy['page_title']}</title>
+<link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
+<script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
@@ -1003,9 +1033,13 @@ window.location.assign(payload.redirect||'/');
             raw_session, _ = auth_service.replace_session(
                 principal,
                 current_session,
+                **session_client_metadata(request),
             )
         else:
-            raw_session, _ = auth_service.create_session(principal)
+            raw_session, _ = auth_service.create_session(
+                principal,
+                **session_client_metadata(request),
+            )
         logged_in = response(
             {'redirect': next_path},
             cache_control='no-store',
@@ -1038,6 +1072,14 @@ window.location.assign(payload.redirect||'/');
                     principal,
                     raw_session,
                 ),
+                'authentication': {
+                    'proxy_enabled': bool(
+                        auth_service.config.trusted_proxy_networks
+                    ),
+                    'pending_proxy_identity': request.scope.get(
+                        PENDING_IDENTITY_SCOPE_KEY
+                    ) is not None,
+                },
             },
             cache_control='no-store',
         )
@@ -1111,9 +1153,13 @@ window.location.assign(payload.redirect||'/');
             raw_session, _ = auth_service.replace_session(
                 principal,
                 current_session,
+                **session_client_metadata(request),
             )
         else:
-            raw_session, _ = auth_service.create_session(principal)
+            raw_session, _ = auth_service.create_session(
+                principal,
+                **session_client_metadata(request),
+            )
         linked = response(
             {
                 'user': {
@@ -1429,6 +1475,43 @@ window.location.assign(payload.redirect||'/');
                     'book_id': book_id,
                     'user_id': user_id,
                     'granted': granted,
+                }
+            }
+        )
+
+    async def admin_book_grants(request):
+        require_admin(request)
+        book_id = request.path_params['book_id']
+        data = await json_object(request)
+        user_ids = data.get('user_ids') if data is not None else None
+        if (
+            not isinstance(user_ids, list)
+            or any(
+                not isinstance(user_id, str) or not user_id
+                for user_id in user_ids
+            )
+        ):
+            return response(
+                error_payload('invalid_user', 'Invalid book grant users'),
+                400,
+            )
+        try:
+            grants = store.replace_book_grants(book_id, user_ids)
+        except KeyError:
+            return response(
+                error_payload('not_found', 'Book or user not found'),
+                404,
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_user', 'Invalid book grant users'),
+                400,
+            )
+        return response(
+            {
+                'grants': {
+                    'book_id': book_id,
+                    'user_ids': list(grants),
                 }
             }
         )
@@ -1881,6 +1964,11 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/{book_id}', admin_book, methods=['PUT']),
         Route(
+            '/api/admin/books/{book_id}/grants',
+            admin_book_grants,
+            methods=['PUT'],
+        ),
+        Route(
             '/api/admin/books/{book_id}/grants/{user_id}',
             admin_book_grant,
             methods=['PUT', 'DELETE'],
@@ -1951,7 +2039,10 @@ window.location.assign(payload.redirect||'/');
                 return denied
         new_proxy_session = None
         if raw_session is None:
-            new_proxy_session, _ = auth_service.create_session(principal)
+            new_proxy_session, _ = auth_service.create_session(
+                principal,
+                **session_client_metadata(request),
+            )
             request.scope[SESSION_TOKEN_SCOPE_KEY] = new_proxy_session
         authorized = await call_next(request)
         if new_proxy_session is not None:
