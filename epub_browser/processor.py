@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "account-auth-v7"
+SERVER_OUTPUT_REVISION = "account-auth-v9"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -95,11 +95,20 @@ _SAFE_DATA_IMAGE = re.compile(
     r"^data:image/(?:gif|jpe?g|png|webp);base64,[a-z0-9+/=\s]+$",
     re.IGNORECASE,
 )
+_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})\s?|([^\r\n]))")
 _RISKY_CSS = re.compile(
     r"(?:@import|@namespace|expression\s*\(|javascript\s*:|behavior\s*:|"
-    r"-moz-binding|url\s*\()",
+    r"-moz-binding|(?:-webkit-)?image-set\s*\()",
     re.IGNORECASE,
 )
+_CSS_DECLARATION_AT_RULES = frozenset({
+    "counter-style", "font-face", "page", "property",
+})
+_CSS_GROUP_AT_RULES = frozenset({
+    "container", "keyframes", "layer", "media", "scope", "supports",
+    "-webkit-keyframes",
+})
 _SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 _SAFE_SVG_TAGS = frozenset({
     "circle", "clipPath", "defs", "desc", "ellipse", "g", "line",
@@ -184,10 +193,14 @@ class _EPUBHTMLSanitizer(HTMLParser):
         serialized = []
         for raw_name, raw_value in attrs:
             attribute = str(raw_name or "").casefold()
-            if (
-                attribute.startswith("on")
-                or attribute in {"style", "srcdoc", "formaction"}
-            ):
+            if attribute.startswith("on") or attribute in {"srcdoc", "formaction"}:
+                continue
+            if attribute == "style":
+                safe_style = sanitize_css_declarations(raw_value)
+                if safe_style:
+                    serialized.append(
+                        " style=\"{}\"".format(html.escape(safe_style, quote=True))
+                    )
                 continue
             if not (
                 attribute in _GLOBAL_HTML_ATTRIBUTES
@@ -259,9 +272,223 @@ def sanitize_html_fragment(content):
     return sanitizer.fragment()
 
 
+def _decode_css_escapes(content):
+    def replace(match):
+        if match.group(1):
+            try:
+                codepoint = int(match.group(1), 16)
+                return chr(codepoint) if codepoint else "\ufffd"
+            except (OverflowError, ValueError):
+                return "\ufffd"
+        return match.group(2) or ""
+
+    return _CSS_ESCAPE.sub(replace, str(content or ""))
+
+
+def _safe_css_url(value):
+    candidate = html.unescape(_decode_css_escapes(value)).strip()
+    if len(candidate) >= 2 and candidate[0] == candidate[-1] \
+            and candidate[0] in {'"', "'"}:
+        candidate = candidate[1:-1].strip()
+    if not candidate or any(ord(character) < 32 for character in candidate):
+        return False
+    if candidate.startswith("#"):
+        return True
+    if candidate.casefold().startswith("data:"):
+        return bool(_SAFE_DATA_IMAGE.fullmatch(candidate))
+    parsed = urllib.parse.urlsplit(candidate)
+    if parsed.scheme or parsed.netloc or candidate.startswith(("/", "\\")):
+        return False
+    decoded_path = parsed.path
+    for _ in range(3):
+        unquoted = urllib.parse.unquote(decoded_path)
+        if unquoted == decoded_path:
+            break
+        decoded_path = unquoted
+    suffix = PurePosixPath(decoded_path.replace("\\", "/")).suffix.casefold().lstrip(".")
+    return suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+
+
+def _css_urls_are_safe(content):
+    decoded = _decode_css_escapes(content)
+    position = 0
+    while True:
+        match = re.search(r"url\s*\(", decoded[position:], re.IGNORECASE)
+        if match is None:
+            return True
+        start = position + match.end()
+        index = start
+        quote = None
+        escaped = False
+        while index < len(decoded):
+            character = decoded[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif quote:
+                if character == quote:
+                    quote = None
+            elif character in {'"', "'"}:
+                quote = character
+            elif character == ")":
+                break
+            index += 1
+        if index >= len(decoded) or quote is not None:
+            return False
+        if not _safe_css_url(decoded[start:index]):
+            return False
+        position = index + 1
+
+
+def _split_css_declarations(content):
+    parts = []
+    start = 0
+    quote = None
+    escaped = False
+    parentheses = 0
+    for index, character in enumerate(content):
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif character == ";" and not parentheses:
+            parts.append(content[start:index])
+            start = index + 1
+    parts.append(content[start:])
+    return parts
+
+
+def sanitize_css_declarations(content):
+    declarations = []
+    for raw_declaration in _split_css_declarations(str(content or "")):
+        declaration = raw_declaration.strip()
+        if not declaration or ":" not in declaration:
+            continue
+        decoded = _decode_css_escapes(declaration)
+        if _RISKY_CSS.search(decoded) or not _css_urls_are_safe(declaration):
+            continue
+        declarations.append(declaration)
+    return "; ".join(declarations)
+
+
+def _css_at_rule_name(prelude):
+    match = re.match(r"\s*@([\w-]+)", _decode_css_escapes(prelude))
+    return match.group(1).casefold() if match else ""
+
+
+def _find_css_boundary(content, start):
+    quote = None
+    escaped = False
+    parentheses = 0
+    for index in range(start, len(content)):
+        character = content[index]
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif not parentheses and character in "{;":
+            return index, character
+    return len(content), ""
+
+
+def _find_matching_css_brace(content, opening):
+    quote = None
+    escaped = False
+    depth = 1
+    for index in range(opening + 1, len(content)):
+        character = content[index]
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _sanitize_css_stylesheet(content):
+    output = []
+    position = 0
+    while position < len(content):
+        while position < len(content) and content[position].isspace():
+            position += 1
+        boundary, kind = _find_css_boundary(content, position)
+        prelude = content[position:boundary].strip()
+        if not kind:
+            break
+        if kind == ";":
+            rule_name = _css_at_rule_name(prelude)
+            if rule_name not in {"import", "namespace", "charset"} \
+                    and prelude and not _RISKY_CSS.search(_decode_css_escapes(prelude)):
+                output.append(prelude + ";")
+            position = boundary + 1
+            continue
+
+        closing = _find_matching_css_brace(content, boundary)
+        if closing is None:
+            break
+        body = content[boundary + 1:closing]
+        rule_name = _css_at_rule_name(prelude)
+        if rule_name:
+            if rule_name in _CSS_DECLARATION_AT_RULES:
+                safe_body = sanitize_css_declarations(body)
+            elif rule_name in _CSS_GROUP_AT_RULES:
+                safe_body = _sanitize_css_stylesheet(body)
+            else:
+                safe_body = ""
+        elif _RISKY_CSS.search(_decode_css_escapes(prelude)):
+            safe_body = ""
+        else:
+            safe_body = sanitize_css_declarations(body)
+        if prelude and safe_body:
+            output.append("{} {{ {} }}".format(prelude, safe_body))
+        position = closing + 1
+    return "\n".join(output)
+
+
 def sanitize_css_text(content):
-    candidate = str(content or "")
-    return "" if _RISKY_CSS.search(candidate) else candidate
+    candidate = _CSS_COMMENT.sub("", str(content or ""))
+    if not _RISKY_CSS.search(_decode_css_escapes(candidate)) \
+            and _css_urls_are_safe(candidate):
+        return candidate
+    return _sanitize_css_stylesheet(candidate)
 
 
 def _xml_local_name(name):
@@ -1022,7 +1249,6 @@ class EPUBProcessor:
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
-            <a class="app-nav-link is-active" href="/" aria-current="location"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="book.library">Library</span></a>
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
         </div>
@@ -1041,7 +1267,7 @@ class EPUBProcessor:
                 {authors_html}"""
         if self.description:
             description = (
-                html.escape(metadata_text(self.description), quote=False)
+                sanitize_html_fragment(self.description)
                 if self.deployment_mode == "server"
                 else self.description
             )
@@ -1781,7 +2007,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
-    <nav class="toc-floating" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters">
+    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true">
         <div class="toc-header">
             <h3 data-i18n="reader.bookChapters">Chapters</h3>
             <div class="toc-header-actions">
@@ -1798,7 +2024,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         </ul>
     </nav>
 
-    <nav class="toc-floating" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents">
+    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true">
         <div class="toc-header">
             <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
             <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
@@ -1810,11 +2036,12 @@ document.addEventListener('DOMContentLoaded', function() {{
         </ul>
     </nav>
 
+    <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
+
     <header class="chapter-top-bar app-header">
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
             <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
             <div class="app-nav-links">
-                <a class="app-nav-link is-active" href="/" aria-current="location"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.library">Library</span></a>
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
             </div>
@@ -1826,8 +2053,8 @@ document.addEventListener('DOMContentLoaded', function() {{
     <div class="container">
         <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
             <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning"><i class="fas fa-book-open"></i><span class="control-name" data-i18n="reader.turning">Turning</span></button>
-            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
-            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
+            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
+            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
         </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
@@ -1841,10 +2068,10 @@ document.addEventListener('DOMContentLoaded', function() {{
 
         <div class="navigation" data-id="navigation">
             {prev_link}
-            <a href="/" aria-label="Home" data-i18n-aria-label="reader.home" id="navigationHomeBtn">
+            <a href="/book/{book_id_url}/index.html" aria-label="Book" data-i18n-aria-label="reader.book" id="navigationHomeBtn">
                 <div class="control-btn">
-                    <i class="fas fa-home"></i>
-                    <span class="control-name" data-i18n="reader.home">Home</span>
+                    <i class="fas fa-book-open"></i>
+                    <span class="control-name" data-i18n="reader.book">Book</span>
                 </div>
             </a>
 

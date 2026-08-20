@@ -1,7 +1,6 @@
 /* Shared application shell for library, book, and chapter surfaces. */
 .app-header {
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 90;
     width: 100vw;
     max-width: none;
@@ -151,20 +150,27 @@
 }
 
 .app-nav-locale {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
     min-height: 42px;
-    padding: 0 8px 0 11px;
+    padding: 0;
     border-radius: 10px;
 }
 
-.app-nav-locale:hover {
-    background: var(--hover);
+.app-nav .app-nav-locale-toggle {
+    min-height: 42px;
+    padding: 0 10px;
+    gap: 8px;
 }
 
-.app-nav-locale select {
-    min-height: 36px;
-    padding-right: 22px;
-    border: 0;
-    background: transparent;
+.app-nav-menu-chevron {
+    font-size: .64rem !important;
+    transition: transform 160ms ease;
+}
+
+.app-nav-locale-toggle[aria-expanded="true"] .app-nav-menu-chevron {
+    transform: rotate(180deg);
 }
 
 .app-nav-link:focus-visible,
@@ -193,11 +199,20 @@
     background: color-mix(in srgb, var(--card-bg) 88%, transparent);
     box-shadow: var(--shadow-md);
     transform: translateY(-50%);
+    transition: opacity 160ms ease, visibility 160ms ease, transform 160ms ease;
     backdrop-filter: blur(16px) saturate(140%);
     -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
+body.reader-drawer-open .reader-toolbar.top-controls {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(10px, -50%);
+}
+
 .reader-toolbar.top-controls .control-btn {
+    position: relative;
     width: 42px;
     height: 42px;
     min-width: 42px;
@@ -208,6 +223,35 @@
     color: var(--text-secondary);
     flex-direction: row;
     gap: 0;
+}
+
+.reader-toolbar.top-controls .control-btn::after {
+    content: attr(aria-label);
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 10px);
+    z-index: 2;
+    width: max-content;
+    max-width: 180px;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+    color: var(--text);
+    font-size: .76rem;
+    font-weight: 600;
+    line-height: 1.2;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(4px, -50%);
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.reader-toolbar.top-controls .control-btn:hover::after,
+.reader-toolbar.top-controls .control-btn:focus-visible::after {
+    opacity: 1;
+    transform: translate(0, -50%);
 }
 
 .reader-toolbar.top-controls .control-btn:hover {
@@ -352,15 +396,11 @@
 }
 
 @media (max-width: 430px) {
-    .app-nav-locale i {
+    .app-nav-locale-toggle > .fa-globe {
         display: none;
     }
 
-    .app-nav-locale {
-        padding-left: 5px;
-    }
-
-    .app-nav-locale select {
-        max-width: 82px;
+    .app-nav .app-nav-locale-toggle {
+        padding: 0 8px;
     }
 }

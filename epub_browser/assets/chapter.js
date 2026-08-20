@@ -369,10 +369,12 @@ function initScript() {
     applyReadingProgressBarVisibility(showReadingProgressBar);
 
     function applyDesktopChapterSidebar() {
-        document.body.classList.toggle(
-            'desktop-chapter-sidebar',
-            showDesktopChapterSidebar && !isPaginationMode && !isKindleMode()
-        );
+        var isVisible = showDesktopChapterSidebar && !isPaginationMode && !isKindleMode();
+        document.body.classList.toggle('desktop-chapter-sidebar', isVisible);
+        var persistentDrawer = document.getElementById('bookHomeFloating');
+        if (persistentDrawer && !persistentDrawer.classList.contains('active')) {
+            persistentDrawer.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+        }
     }
 
     var fontSize = "3";
@@ -1464,6 +1466,8 @@ function initScript() {
     var tocClose = document.getElementById('tocClose');
     var bookHomeClose = document.getElementById('bookHomeClose');
     var tocList = document.getElementById('tocList');
+    var readerDrawerBackdrop = document.getElementById('readerDrawerBackdrop');
+    var readerDrawerOpener = null;
     
     generateToc();
     
@@ -1476,32 +1480,81 @@ function initScript() {
     function bookHomeFloatingScrolling() {
         setBookTocActiveChapter(visibleChapterIndex, true);
     }
-    
+
+    function isPersistentBookDrawer(panel) {
+        return panel === bookHomeFloating &&
+            document.body.classList.contains('desktop-chapter-sidebar') &&
+            window.innerWidth >= 1360;
+    }
+
+    function closeReaderDrawers(restoreFocus) {
+        [tocFloating, bookHomeFloating].forEach(function(panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('aria-hidden', isPersistentBookDrawer(panel) ? 'false' : 'true');
+        });
+        [tocToggle, bookHomeToggle].forEach(function(toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+        });
+        [mobileTocBtn, mobileBookHomeBtn].forEach(function(toggle) {
+            if (toggle) toggle.classList.remove('active');
+        });
+        document.body.classList.remove('reader-drawer-open');
+        readerDrawerBackdrop.classList.remove('is-active');
+        readerDrawerBackdrop.setAttribute('aria-hidden', 'true');
+        if (restoreFocus && readerDrawerOpener) readerDrawerOpener.focus();
+        readerDrawerOpener = null;
+    }
+
+    function openReaderDrawer(panel, toggle, mobileToggle, afterOpen, opener) {
+        if (isPersistentBookDrawer(panel)) {
+            afterOpen();
+            return;
+        }
+        if (panel.classList.contains('active')) {
+            closeReaderDrawers(true);
+            return;
+        }
+        closeReaderDrawers(false);
+        readerDrawerOpener = opener || toggle;
+        panel.classList.add('active');
+        panel.setAttribute('aria-hidden', 'false');
+        toggle.setAttribute('aria-expanded', 'true');
+        if (mobileToggle) mobileToggle.classList.add('active');
+        document.body.classList.add('reader-drawer-open');
+        readerDrawerBackdrop.classList.add('is-active');
+        readerDrawerBackdrop.setAttribute('aria-hidden', 'false');
+        afterOpen();
+        window.requestAnimationFrame(function() {
+            var closeButton = panel.querySelector('.toc-close');
+            if (closeButton) closeButton.focus();
+        });
+    }
+
     tocToggle.addEventListener('click', function() {
-        tocFloating.classList.toggle('active');
-        tocFloatingScrolling();
+        openReaderDrawer(tocFloating, tocToggle, mobileTocBtn, tocFloatingScrolling, tocToggle);
     });
     bookHomeToggle.addEventListener('click', function() {
-        bookHomeFloating.classList.toggle('active');
-        if (bookHomeFloating.classList.contains('active')) bookHomeFloatingScrolling();
+        openReaderDrawer(bookHomeFloating, bookHomeToggle, mobileBookHomeBtn, bookHomeFloatingScrolling, bookHomeToggle);
     });
     mobileTocBtn.addEventListener('click', function() {
-        tocFloating.classList.toggle('active');
-        tocFloatingScrolling();
-        mobileTocBtn.classList.toggle('active');
+        openReaderDrawer(tocFloating, tocToggle, mobileTocBtn, tocFloatingScrolling, mobileTocBtn);
     });
     mobileBookHomeBtn.addEventListener('click', function() {
-        bookHomeFloating.classList.toggle('active');
-        mobileBookHomeBtn.classList.toggle('active');
-        if (bookHomeFloating.classList.contains('active')) bookHomeFloatingScrolling();
+        openReaderDrawer(bookHomeFloating, bookHomeToggle, mobileBookHomeBtn, bookHomeFloatingScrolling, mobileBookHomeBtn);
     });
     tocClose.addEventListener('click', function() {
-        tocFloating.classList.remove('active');
-        mobileTocBtn.classList.remove('active');
+        closeReaderDrawers(true);
     });
     bookHomeClose.addEventListener('click', function() {
-        bookHomeFloating.classList.remove('active');
-        mobileBookHomeBtn.classList.remove('active');
+        closeReaderDrawers(true);
+    });
+    readerDrawerBackdrop.addEventListener('click', function() {
+        closeReaderDrawers(true);
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && document.body.classList.contains('reader-drawer-open')) {
+            closeReaderDrawers(true);
+        }
     });
     
     function generateToc() {
@@ -1541,8 +1594,7 @@ function initScript() {
                 } else {
                     window.scrollTo({top: t.offsetTop-100, behavior:'smooth'});
                 }
-                tocFloating.classList.remove('active');
-                if (mobileTocBtn) mobileTocBtn.classList.remove('active');
+                closeReaderDrawers(false);
             });
             li.appendChild(a);
             tocList.appendChild(li);

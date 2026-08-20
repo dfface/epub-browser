@@ -269,6 +269,98 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('description', book_html)
         self.assertIn('<p class="kept">Safe text</p>', chapter_html)
 
+    def test_server_processor_preserves_safe_epub_inline_styles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            body, _ = processor.process_html_content(
+                '''<body><p style="color: #234; text-align: center;
+                background-image: url(https://attacker.example/pixel.png);
+                behavior: url(#payload)" onclick="alert(1)">Styled text</p></body>''',
+                "Text/chapter.xhtml",
+            )
+
+        self.assertIn('style="color: #234; text-align: center"', body)
+        self.assertNotIn("attacker.example", body)
+        self.assertNotIn("background-image", body)
+        self.assertNotIn("behavior", body)
+        self.assertNotIn("onclick", body)
+
+    def test_server_processor_preserves_safe_css_rules_with_local_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            extracted = Path(processor.extract_dir)
+            extracted.mkdir(parents=True)
+            (extracted / "book.css").write_text(
+                '''@import "https://attacker.example/payload.css";
+                @font-face { font-family: "Book Serif";
+                  src: url("Fonts/book.woff2") format("woff2"); }
+                p.body { color: #234; text-align: justify;
+                  background-image: url("Images/paper.png"); }
+                a.track { color: navy;
+                  background-image: url("https://attacker.example/pixel.png"); }
+                a.sprite { color: teal;
+                  background-image: image-set("https://attacker.example/2x.png" 2x); }''',
+                encoding="utf-8",
+            )
+
+            processor.copy_resources()
+            rendered = Path(
+                processor.web_dir,
+                "resources",
+                "book.css",
+            ).read_text(encoding="utf-8")
+
+        self.assertIn('@font-face', rendered)
+        self.assertIn('font-family: "Book Serif"', rendered)
+        self.assertIn('url("Fonts/book.woff2")', rendered)
+        self.assertIn('p.body', rendered)
+        self.assertIn('text-align: justify', rendered)
+        self.assertIn('url("Images/paper.png")', rendered)
+        self.assertIn('a.track', rendered)
+        self.assertIn('color: navy', rendered)
+        self.assertIn('a.sprite', rendered)
+        self.assertIn('color: teal', rendered)
+        self.assertNotIn('@import', rendered)
+        self.assertNotIn('attacker.example', rendered)
+
+    def test_server_book_description_preserves_safe_metadata_markup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub",
+                directory,
+                deployment_mode="server",
+            )
+            processor.book_title = "Styled Book"
+            processor.description = (
+                '<p class="summary">First <em>formatted</em> paragraph.</p>'
+                '<ul><li>One</li><li>Two</li></ul>'
+                '<a href="javascript:alert(1)" onclick="alert(2)">unsafe</a>'
+                '<script>alert(3)</script>'
+            )
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            rendered = Path(processor.web_dir, "index.html").read_text(
+                encoding="utf-8"
+            )
+
+        self.assertRegex(
+            rendered,
+            r'<p class=(?:"summary"|summary)>First <em>formatted</em> paragraph\.',
+        )
+        self.assertRegex(rendered, r'<ul><li>One(?:</li>)?<li>Two')
+        self.assertIn('<a>unsafe</a>', rendered)
+        self.assertNotIn('javascript:', rendered)
+        self.assertNotIn('onclick', rendered)
+        self.assertNotIn('<script>alert(3)</script>', rendered)
+
     def test_server_processor_sanitizes_copied_svg_resources(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor(
@@ -813,7 +905,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn(".app-nav-actions", css)
         self.assertIn(".app-nav-theme", css)
         self.assertIn("backdrop-filter: blur(18px)", css)
-        self.assertIn("position: sticky", css)
+        header_rule = css[
+            css.index(".app-header {"):
+            css.index("}", css.index(".app-header {"))
+        ]
+        self.assertIn("position: relative", header_rule)
+        self.assertNotIn("position: sticky", header_rule)
 
     def test_mobile_application_navigation_uses_the_shared_compact_layout(self):
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
@@ -999,7 +1096,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertRegex(html, r'<nav\b(?=[^>]*\bclass=["\'][^"\']*\bapp-nav-primary\b)(?=[^>]*\bdata-i18n-aria-label=(?:["\'])?library\.navigation(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<a\b(?=[^>]*\bclass=(?:["\'])?app-nav-brand)(?=[^>]*\baria-label=(?:["\'])?EPUB Browser(?:["\'])?)[^>]*>')
-        self.assertRegex(html, r'<span\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
+        self.assertRegex(html, r'<h1\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
         self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertIn('app-nav-brand-mark', breadcrumb)
@@ -1018,6 +1115,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         library = self._library_html()
         self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
         breadcrumb = library[library.index('<nav'):library.index('</nav>')]
+        self.assertRegex(breadcrumb, r'\bid=(?:["\'])?localeToggle(?:["\' >])')
+        self.assertRegex(breadcrumb, r'\baria-haspopup=(?:["\'])?menu(?:["\' >])')
+        self.assertRegex(breadcrumb, r'\baria-expanded=(?:["\'])?false(?:["\' >])')
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-CN(?:["\' >])')
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')
         self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
@@ -1025,6 +1125,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(library, r'localeSelect\.value=i18n\.getLocale\(\)')
         self.assertRegex(library, r'localeSelect\.addEventListener\(["\'`]change')
         self.assertRegex(library, r'i18n\.setLocale\(localeSelect\.value\)')
+        self.assertRegex(library, r'localeMenu\.className=["\'`]theme-menu locale-menu["\'`]')
+        self.assertRegex(library, r'item\.setAttribute\(["\'`]role["\'`],["\'`]menuitemradio["\'`]\)')
+        self.assertRegex(library, r'item\.setAttribute\(["\'`]aria-checked["\'`]')
 
     def test_desktop_floating_controls_only_keep_scroll_to_top(self):
         for html in (self._library_html(), self._book_html(), self._chapter_html()):
@@ -1047,6 +1150,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('.reader-toolbar.top-controls {', css)
         self.assertIn('position: fixed;', css)
         self.assertIn('transform: translateY(-50%);', css)
+        self.assertIn('body.reader-drawer-open .reader-toolbar.top-controls', css)
         self.assertIn('#scrollToTopBtn.is-visible', css)
 
     def test_primary_navigation_is_stable_and_consistent_across_reader_pages(self):
@@ -1060,12 +1164,57 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIsNotNone(shelf)
             self.assertNotRegex(shelf.group(0), r'\bstyle=(?:["\'])?display:\s*none')
             self.assertRegex(nav, r'data-annotation-hub')
-            self.assertRegex(nav, r'data-i18n=(?:["\'])?(?:library\.title|book\.library|reader\.library)')
+            self.assertRegex(nav, r'class=(?:["\'])?app-nav-brand')
+            self.assertRegex(nav, r'class=(?:["\'])?app-nav-brand[^>]*\bhref=(?:["\'])?/(?:["\' >])')
+            self.assertNotRegex(nav, r'class=(?:["\'])?app-nav-link[^>]*\bhref=(?:["\'])?/(?:["\' >])')
+            self.assertNotRegex(nav, r'\bclass=(?:["\'])?[^"\']*\bis-active\b')
+            self.assertNotRegex(nav, r'\baria-current=')
             self.assertNotRegex(nav, r'data-i18n=(?:["\'])?reader\.book(?:["\'])?')
 
         for asset in ('library.js', 'book.js', 'chapter.js'):
             script = Path('epub_browser/assets', asset).read_text(encoding='utf-8')
             self.assertNotIn("bookshelfBtn.style.display = ''", script)
+
+    def test_reader_chapter_navigation_uses_one_accessible_drawer_system(self):
+        chapter = self._chapter_html()
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+
+        for panel_id in ('bookHomeFloating', 'tocFloating'):
+            panel = re.search(
+                rf'<nav\b[^>]*\bid=(?:["\'])?{panel_id}(?:["\' >])[^>]*>',
+                chapter,
+            )
+            self.assertIsNotNone(panel)
+            self.assertRegex(panel.group(0), r'\bclass=(?:["\'])?[^"\']*\breader-drawer\b')
+            self.assertRegex(panel.group(0), r'\baria-hidden=(?:["\'])?true(?:["\' >])')
+
+        self.assertRegex(chapter, r'\bid=(?:["\'])?readerDrawerBackdrop(?:["\' >])')
+        self.assertRegex(chapter, r'\bid=(?:["\'])?bookHomeToggle[^>]*\baria-controls=(?:["\'])?bookHomeFloating')
+        self.assertRegex(chapter, r'\bid=(?:["\'])?tocToggle[^>]*\baria-controls=(?:["\'])?tocFloating')
+        self.assertIn('function openReaderDrawer(', chapter_js)
+        self.assertIn('function closeReaderDrawers(', chapter_js)
+        self.assertIn("readerDrawerBackdrop.addEventListener('click'", chapter_js)
+        self.assertIn("event.key === 'Escape'", chapter_js)
+        self.assertIn('.reader-drawer-backdrop.is-active', chapter_css)
+        self.assertIn('transform: translateX(calc(100% + 42px));', chapter_css)
+        self.assertIn('body.reader-drawer-open', chapter_css)
+
+    def test_scroll_reader_uses_a_compact_book_level_navigation_bar(self):
+        chapter = self._chapter_html()
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+
+        home = re.search(
+            r'<a\b[^>]*\bid=(?:["\'])?navigationHomeBtn(?:["\' >])[^>]*>',
+            chapter,
+        )
+        self.assertIsNotNone(home)
+        self.assertRegex(home.group(0), r'\bhref=(?:["\'])?/book/[^ >]+/index\.html')
+        self.assertRegex(home.group(0), r'data-i18n-aria-label=(?:["\'])?reader\.book')
+        self.assertIn('body:not(.pagination-mode) .navigation {', chapter_css)
+        self.assertIn('width: min(100%, 520px);', chapter_css)
+        self.assertIn('body:not(.pagination-mode) .navigation .control-btn', chapter_css)
+        self.assertIn('flex-direction: row;', chapter_css)
 
     def test_theme_action_is_a_compact_icon_control(self):
         css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')

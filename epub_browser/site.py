@@ -303,13 +303,15 @@ if (isKindle) {
     <nav class="app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
-            <a class="app-nav-link is-active" href="/" aria-current="page"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="library.title">Library</span></a>
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
             {install_control}
         </div>
         <div class="app-nav-actions">
-            <label class="library-language app-nav-locale" for="localeSelect"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" data-i18n="common.language">Language</span><select id="localeSelect" data-i18n-aria-label="common.language"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select></label>
+            <div class="library-language app-nav-locale">
+                <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span id="localeCurrentLabel">中文</span><i class="fas fa-chevron-down app-nav-menu-chevron" aria-hidden="true"></i></button>
+                <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select>
+            </div>
             <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
             {server_account_control}
         </div>
@@ -449,11 +451,93 @@ if (isKindle) {
     document.addEventListener('DOMContentLoaded', function() {
         var i18n = window.EpubBrowserI18n;
         var localeSelect = document.getElementById('localeSelect');
-        if (i18n && localeSelect) {
+        var localeToggle = document.getElementById('localeToggle');
+        var localeCurrentLabel = document.getElementById('localeCurrentLabel');
+        if (i18n && localeSelect && localeToggle && localeCurrentLabel) {
+            var localeMenu = document.createElement('div');
+            localeMenu.className = 'theme-menu locale-menu';
+            localeMenu.setAttribute('role', 'menu');
+            localeMenu.setAttribute('aria-label', i18n.t('common.language'));
+            localeMenu.style.display = 'none';
+            localeMenu.style.position = 'fixed';
+            localeMenu.style.zIndex = '10000';
+            document.body.appendChild(localeMenu);
+
+            function localeName(locale) {
+                return i18n.t(locale === 'zh-CN' ? 'common.chinese' : 'common.english');
+            }
+
+            function positionLocaleMenu() {
+                var rect = localeToggle.getBoundingClientRect();
+                localeMenu.style.top = (rect.bottom + 8) + 'px';
+                localeMenu.style.right = (window.innerWidth - rect.right) + 'px';
+            }
+
+            function closeLocaleMenu() {
+                localeMenu.style.display = 'none';
+                localeToggle.setAttribute('aria-expanded', 'false');
+            }
+
+            function renderLocaleMenu() {
+                var current = i18n.getLocale();
+                localeMenu.innerHTML = '';
+                ['zh-CN', 'en'].forEach(function(locale) {
+                    var item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'theme-menu-item locale-menu-item';
+                    item.setAttribute('role', 'menuitemradio');
+                    item.setAttribute('aria-checked', locale === current ? 'true' : 'false');
+                    var check = document.createElement('i');
+                    check.className = locale === current ? 'fas fa-check' : 'fas fa-language';
+                    check.setAttribute('aria-hidden', 'true');
+                    item.appendChild(check);
+                    item.appendChild(document.createTextNode(localeName(locale)));
+                    item.addEventListener('click', function() {
+                        localeSelect.value = locale;
+                        i18n.setLocale(locale);
+                        closeLocaleMenu();
+                        localeToggle.focus();
+                    });
+                    localeMenu.appendChild(item);
+                });
+                localeCurrentLabel.textContent = localeName(current);
+                localeMenu.setAttribute('aria-label', i18n.t('common.language'));
+            }
+
             localeSelect.value = i18n.getLocale();
             localeSelect.addEventListener('change', function() {
                 i18n.setLocale(localeSelect.value);
             });
+            localeToggle.addEventListener('click', function(event) {
+                event.stopPropagation();
+                if (localeMenu.style.display === 'none') {
+                    renderLocaleMenu();
+                    positionLocaleMenu();
+                    localeMenu.style.display = 'block';
+                    localeToggle.setAttribute('aria-expanded', 'true');
+                    var selected = localeMenu.querySelector('[aria-checked="true"]');
+                    if (selected) selected.focus();
+                } else {
+                    closeLocaleMenu();
+                }
+            });
+            document.addEventListener('click', function(event) {
+                if (!localeToggle.contains(event.target) && !localeMenu.contains(event.target)) closeLocaleMenu();
+            });
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && localeMenu.style.display !== 'none') {
+                    closeLocaleMenu();
+                    localeToggle.focus();
+                }
+            });
+            window.addEventListener('resize', function() {
+                if (localeMenu.style.display !== 'none') positionLocaleMenu();
+            });
+            i18n.onLocaleChange(function() {
+                localeSelect.value = i18n.getLocale();
+                renderLocaleMenu();
+            });
+            renderLocaleMenu();
         }
         function startLibraryClients() {
             {server_client_start}

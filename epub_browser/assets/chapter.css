@@ -110,13 +110,6 @@ body {
     transition: width 0.3s ease;
 }
 
-#bookHomeFloating {
-    height: 100%;
-    bottom: 80px;
-    top: 150px;
-    overflow: hidden;
-}
-
 #bookHomeIframe {
     width: 100%;
     height: 100%;
@@ -124,39 +117,78 @@ body {
     display: flex;
 }
 
+.reader-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 91;
+    background: color-mix(in srgb, var(--text) 18%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.reader-drawer-backdrop.is-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
 .toc-floating {
     position: fixed;
-    top: 208px;
-    right: 30px;
-    width: 280px;
-
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
-    transition: var(--transition);
-    max-height: 70vh;
-    display: none;
-    flex-direction: column;  /* 垂直方向排列 */
-    z-index: 88;
+    top: 84px;
+    right: 18px;
+    bottom: 18px;
+    z-index: 92;
+    display: flex;
+    flex-direction: column;
+    width: min(390px, calc(100vw - 36px));
+    max-height: none;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--card-bg) 96%, transparent);
+    box-shadow: 0 24px 70px color-mix(in srgb, var(--text) 18%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(calc(100% + 42px));
+    transition: transform 200ms ease, opacity 180ms ease, visibility 200ms ease;
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 
 .toc-floating.active {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+body.reader-drawer-open {
+    overflow: hidden;
 }
 
 .toc-header {
-    padding: 28px 24px;
-    height: 60px;
-    border-bottom: 1px solid var(--border);
     display: flex;
-    flex-shrink: 0; /* 头部不收缩 */ 
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
+    gap: 12px;
+    min-height: 70px;
+    padding: 12px 14px 12px 18px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
 }
 
 .toc-header h3 {
+    min-width: 0;
     color: var(--text);
-    font-size: 1.1rem;
+    font-size: 1rem;
+    font-weight: 760;
+    line-height: 1.25;
+    letter-spacing: -.015em;
     transition: var(--transition);
 }
 
@@ -168,8 +200,8 @@ body {
 
 .toc-book-home,
 .toc-close {
-    background: none;
-    border: none;
+    border: 1px solid transparent;
+    background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
     min-width: 44px;
@@ -182,9 +214,11 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 0 8px;
-    border-radius: 6px;
+    padding: 0 10px;
+    border-radius: 10px;
     color: var(--text-secondary);
+    font-size: .82rem;
+    font-weight: 650;
     text-decoration: none;
 }
 
@@ -192,8 +226,8 @@ body {
     display: inline-grid;
     place-items: center;
     padding: 0;
-    border-radius: 6px;
-    font-size: 1.2rem;
+    border-radius: 10px;
+    font-size: 1.05rem;
 }
 
 .toc-book-home:hover,
@@ -209,34 +243,50 @@ body {
 }
 
 .toc-list {
-    flex: 1; /* 内容区域占据剩余空间 */
+    flex: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     list-style-type: none;
-    padding: 10px 0;
+    padding: 10px 8px 18px;
 }
 
 .toc-item {
-    padding: 8px 20px;
+    margin: 2px 0;
+    padding: 0;
+    border-radius: 10px;
     transition: var(--transition);
 }
 
 .toc-item a {
     text-decoration: none;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: .88rem;
+    font-weight: 560;
+    line-height: 1.45;
     display: block;
+    padding: 11px 12px;
+    border-radius: inherit;
     transition: var(--transition);
 }
 
-.toc-item a:hover {
+.toc-item:hover {
+    background: var(--hover);
+}
+
+.toc-item a:hover,
+.toc-item a:focus-visible {
     color: var(--button-bg);
+}
+
+.toc-item.active {
+    background: color-mix(in srgb, var(--button-bg) 10%, transparent);
+    box-shadow: inset 3px 0 0 var(--button-bg);
 }
 
 .toc-item.active a {
     color: var(--button-bg);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .toc-level-1 { margin-left: 0; }
@@ -254,15 +304,18 @@ body {
     }
 
     body.desktop-chapter-sidebar #bookHomeFloating {
-        display: flex;
         left: 20px;
         right: auto;
-        top: 24px;
+        top: 84px;
         bottom: 24px;
         width: 220px;
         height: auto;
-        max-height: calc(100vh - 48px);
+        max-height: calc(100vh - 108px);
         z-index: 40;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: none;
     }
 
     body.desktop-chapter-sidebar #bookHomeFloating .toc-header {
@@ -275,9 +328,9 @@ body {
         display: none;
     }
 
-    body.desktop-chapter-sidebar #bookHomeFloating .toc-item {
-        padding-left: 14px;
-        padding-right: 14px;
+    body.desktop-chapter-sidebar #bookHomeFloating .toc-item a {
+        padding-left: 12px;
+        padding-right: 12px;
     }
 
     body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
@@ -531,6 +584,51 @@ body {
 
 .navigation .control-btn:hover {
     transform: translateY(-4px);
+}
+
+body:not(.pagination-mode) .navigation {
+    justify-content: center;
+    gap: 4px;
+    width: min(100%, 520px);
+    margin: 28px auto;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+}
+
+body:not(.pagination-mode) .navigation > a {
+    flex: 1 1 0;
+    min-width: 0;
+    border-radius: 10px;
+}
+
+body:not(.pagination-mode) .navigation > a:not([href]) {
+    opacity: .38;
+    pointer-events: none;
+}
+
+body:not(.pagination-mode) .navigation .control-btn {
+    justify-content: center;
+    flex-direction: row;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: .82rem;
+}
+
+body:not(.pagination-mode) .navigation .control-btn:hover {
+    background: var(--hover);
+    color: var(--text);
+    transform: none;
+}
+
+body:not(.pagination-mode) .navigation a:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 34%, transparent);
+    outline-offset: 2px;
 }
 
 .eb-footer {
@@ -1491,6 +1589,18 @@ body {
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
+
+    body:not(.pagination-mode) .navigation {
+        width: calc(100% - 24px);
+        margin: 18px 12px;
+        padding: 5px;
+        overflow: visible;
+    }
+
+    body:not(.pagination-mode) .navigation .control-btn {
+        min-height: 42px;
+        padding: 0 8px;
+    }
     
     .navigation::-webkit-scrollbar {
         display: none;
@@ -1559,19 +1669,20 @@ body {
     }
     
     .toc-floating {
-        width: 90%;
-        right: 5%;
-        left: 5%;
-        top: 20px;
-        bottom: 90px;
-        max-height: 100vh;
+        top: 12px;
+        right: 12px;
+        bottom: 82px;
+        left: 12px;
+        width: auto;
+        max-height: none;
+        border-radius: 16px;
     }
 
     #bookHomeFloating {
-        right: 5%;
-        left: 5%;
-        top: 20px;
-        bottom: 90px;
+        right: 12px;
+        left: 12px;
+        top: 12px;
+        bottom: 82px;
         width: auto;
         height: auto;
     }
