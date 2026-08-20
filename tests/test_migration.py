@@ -201,6 +201,7 @@ class MigrationManagerTests(unittest.TestCase):
     def test_runtime_maps_migration_failure_to_exit_status_three(self):
         from epub_browser.runtime import run_server
 
+        self._manager().prepare_data()
         config = ServerConfig(
             sources=(self.server_dir / "books",),
             server_dir=self.server_dir,

@@ -2,6 +2,7 @@ import errno
 import json
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -9,7 +10,7 @@ import time
 import uuid
 import webbrowser
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Mapping, Optional, Union
 
 import uvicorn
 
@@ -23,6 +24,7 @@ try:
 except ImportError:  # pragma: no cover - exercised on POSIX
     msvcrt = None
 
+from .auth import AuthConfig, AuthService, BootstrapCredentials
 from .cli import ServerConfig
 from .library_progress import LibraryProgressBroker
 from .migration import MigrationError, MigrationManager
@@ -91,6 +93,75 @@ class ServerLockError(RuntimeError):
 
 class _DescriptorLockUnavailable(RuntimeError):
     pass
+
+
+def read_secret_file(path: Optional[Union[Path, str]]) -> Optional[str]:
+    if path is None:
+        return None
+    try:
+        secret = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise ServerLockError(
+            "Server administrator password file is unreadable"
+        ) from error
+    if secret.endswith("\n"):
+        secret = secret[:-1]
+    if not secret:
+        raise ServerLockError("Server administrator password file is empty")
+    return secret
+
+
+def resolve_bootstrap_credentials(
+    config: ServerConfig,
+    environ: Mapping[str, str],
+) -> BootstrapCredentials:
+    username = config.auth.admin_username or environ.get(
+        "EPUB_BROWSER_ADMIN_USERNAME"
+    )
+    password_file = config.auth.admin_password_file or environ.get(
+        "EPUB_BROWSER_ADMIN_PASSWORD_FILE"
+    )
+    password = (
+        read_secret_file(password_file)
+        if password_file
+        else environ.get("EPUB_BROWSER_ADMIN_PASSWORD")
+    )
+    if not username or not password:
+        raise ServerLockError(
+            "Server administrator credentials are required for first startup"
+        )
+    return BootstrapCredentials(username, password)
+
+
+def _persistent_database_needs_bootstrap(server_dir: Path) -> bool:
+    data_database = server_dir / "data" / "epub-browser.db"
+    if data_database.is_file():
+        probe_path = data_database
+    else:
+        root_candidates = tuple(
+            path
+            for path in (
+                server_dir / "epub-browser.db",
+                server_dir / "annotations.db",
+            )
+            if path.is_file()
+        )
+        if len(root_candidates) > 1:
+            return False
+        if not root_candidates:
+            return True
+        probe_path = root_candidates[0]
+    try:
+        with sqlite3.connect(probe_path) as connection:
+            schema_version = connection.execute(
+                "PRAGMA user_version"
+            ).fetchone()[0]
+        if schema_version > DB_SCHEMA_VERSION:
+            return False
+        return not StateStore(probe_path).has_administrator()
+    except sqlite3.DatabaseError:
+        # MigrationManager owns corruption diagnostics and backup handling.
+        return False
 
 
 class ServerLock:
@@ -240,16 +311,34 @@ def run_server(
         lock.acquire()
         migration_manager = None
         initial_layout_phase = None
+        auth_config = AuthConfig.from_values(
+            config.auth.trusted_proxy_cidrs,
+            config.auth.proxy_subject_header,
+            config.auth.proxy_issuer,
+            config.auth.proxy_display_name_header,
+            cookie_secure=bool(config.auth.cookie_secure),
+        )
 
         if config.ephemeral:
             data_path = server_dir / "data" / "epub-browser.db"
             state_store = StateStore(data_path)
-            state_store.initialize()
+            bootstrap = (
+                resolve_bootstrap_credentials(config, os.environ)
+                if not state_store.has_administrator()
+                else None
+            )
+            state_store.initialize(bootstrap=bootstrap)
         else:
             status.mark_migrating()
+            bootstrap = (
+                resolve_bootstrap_credentials(config, os.environ)
+                if _persistent_database_needs_bootstrap(server_dir)
+                else None
+            )
             migration_manager = MigrationManager(
                 server_dir,
                 config.legacy_sync_dir,
+                bootstrap=bootstrap,
             )
             migration_result = migration_manager.prepare_data()
             for warning in migration_result.warnings:
@@ -328,6 +417,7 @@ def run_server(
         app = create_app(
             manager.public_dir,
             state_store=state_store,
+            auth_service=AuthService(state_store, auth_config),
             status=status,
             sync_dir=config.legacy_sync_dir or server_dir,
             progress_broker=progress_broker,

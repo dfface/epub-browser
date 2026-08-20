@@ -85,8 +85,21 @@ def _new_parser() -> argparse.ArgumentParser:
     server.add_argument("--log", action="store_true")
     server.add_argument("--legacy-sync-dir")
     _add_book_id_storage(server)
-    server.add_argument("--admin-username")
-    server.add_argument("--admin-password-file")
+    server.add_argument(
+        "--admin-username",
+        help=(
+            "first-start administrator username "
+            "(fallback: EPUB_BROWSER_ADMIN_USERNAME)"
+        ),
+    )
+    server.add_argument(
+        "--admin-password-file",
+        help=(
+            "first-start administrator password file "
+            "(fallback: EPUB_BROWSER_ADMIN_PASSWORD_FILE, then "
+            "EPUB_BROWSER_ADMIN_PASSWORD when no file is configured)"
+        ),
+    )
     server.add_argument("--trusted-proxy-cidr", action="append", default=[])
     server.add_argument("--proxy-subject-header")
     server.add_argument("--proxy-display-name-header")

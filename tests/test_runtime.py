@@ -17,13 +17,20 @@ from epub_browser.auth import (
     AuthConfig,
     AuthService,
     BootstrapCredentials,
+    ServerAuthOptions,
+    verify_password,
 )
 from epub_browser.cli import ServerConfig
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.reporting import Reporter
-from epub_browser.runtime import RuntimeStatus, ServerLock, run_server
+from epub_browser.runtime import (
+    RuntimeStatus,
+    ServerLock,
+    resolve_bootstrap_credentials,
+    run_server,
+)
 from epub_browser.server import create_app
 from epub_browser.server_library import ReconcileSummary, ServerLibraryManager
 from epub_browser.state import StateStore
@@ -113,6 +120,193 @@ class RuntimeStatusTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class ServerBootstrapTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.sources = self.root / "sources"
+        self.sources.mkdir()
+        self.server_dir = self.root / "server"
+        self.password_file = self.root / "admin-password"
+
+    def _config(self, auth=ServerAuthOptions()):
+        return ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+            auth=auth,
+        )
+
+    def test_first_persistent_start_requires_credentials_without_printing_secret(self):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"EPUB_BROWSER_ADMIN_PASSWORD": "secret-value"},
+                clear=True,
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            result = run_server(self._config(), server_factory=_ReturningServer)
+
+        self.assertEqual(result, 5)
+        self.assertIn("administrator credentials are required", stderr.getvalue())
+        self.assertNotIn("secret-value", stderr.getvalue())
+
+    def test_empty_password_file_environment_setting_uses_plaintext_fallback(self):
+        credentials = resolve_bootstrap_credentials(
+            self._config(),
+            {
+                "EPUB_BROWSER_ADMIN_USERNAME": "admin",
+                "EPUB_BROWSER_ADMIN_PASSWORD_FILE": "",
+                "EPUB_BROWSER_ADMIN_PASSWORD": "environment-secret",
+            },
+        )
+
+        self.assertEqual(credentials.username, "admin")
+        self.assertEqual(credentials.password, "environment-secret")
+
+    def test_runtime_reads_password_file_once_and_bootstraps_admin(self):
+        self.password_file.write_text("secret-value\n", encoding="utf-8")
+        config = self._config(
+            ServerAuthOptions(
+                admin_username="admin",
+                admin_password_file=self.password_file,
+            )
+        )
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            result = run_server(config, server_factory=_ReturningServer)
+
+        administrator = StateStore(
+            self.server_dir / "data" / "epub-browser.db"
+        ).get_user_by_username("admin")
+        self.assertEqual(result, 0)
+        self.assertTrue(administrator.is_admin)
+        self.assertTrue(verify_password(administrator.password_hash, "secret-value"))
+
+    def test_password_file_removes_exactly_one_trailing_newline_and_wins_over_env(self):
+        self.password_file.write_text("file-secret\n\n", encoding="utf-8")
+        config = self._config(
+            ServerAuthOptions(
+                admin_username="admin",
+                admin_password_file=self.password_file,
+            )
+        )
+
+        with mock.patch.dict(
+            os.environ,
+            {"EPUB_BROWSER_ADMIN_PASSWORD": "environment-secret"},
+            clear=True,
+        ):
+            result = run_server(config, server_factory=_ReturningServer)
+
+        administrator = StateStore(
+            self.server_dir / "data" / "epub-browser.db"
+        ).get_user_by_username("admin")
+        self.assertEqual(result, 0)
+        self.assertTrue(verify_password(administrator.password_hash, "file-secret\n"))
+        self.assertFalse(verify_password(administrator.password_hash, "file-secret"))
+        self.assertFalse(
+            verify_password(administrator.password_hash, "environment-secret")
+        )
+
+    def test_empty_or_unreadable_password_file_fails_closed(self):
+        for password_path in (self.password_file, self.root):
+            with self.subTest(password_path=password_path):
+                self.password_file.write_text("", encoding="utf-8")
+                config = self._config(
+                    ServerAuthOptions(
+                        admin_username="admin",
+                        admin_password_file=password_path,
+                    )
+                )
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {"EPUB_BROWSER_ADMIN_PASSWORD": "fallback-secret"},
+                        clear=True,
+                    ),
+                    contextlib.redirect_stderr(io.StringIO()) as stderr,
+                ):
+                    result = run_server(config, server_factory=_ReturningServer)
+
+                self.assertEqual(result, 5)
+                self.assertFalse(
+                    (self.server_dir / "data" / "epub-browser.db").is_file()
+                )
+                self.assertNotIn("fallback-secret", stderr.getvalue())
+
+    def test_restart_does_not_read_or_require_bootstrap_secret(self):
+        config = self._config(
+            ServerAuthOptions(
+                admin_username="admin",
+                admin_password_file=self.root / "removed-password-file",
+            )
+        )
+        first_environment = {
+            "EPUB_BROWSER_ADMIN_USERNAME": "admin",
+            "EPUB_BROWSER_ADMIN_PASSWORD": "first-start-secret",
+        }
+        environment_config = self._config()
+        with mock.patch.dict(os.environ, first_environment, clear=True):
+            first = run_server(
+                environment_config,
+                server_factory=_ReturningServer,
+            )
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            second = run_server(config, server_factory=_ReturningServer)
+
+        self.assertEqual(first, 0)
+        self.assertEqual(second, 0)
+
+    def test_runtime_passes_proxy_and_cookie_configuration_to_auth_service(self):
+        self.password_file.write_text("secret-value\n", encoding="utf-8")
+        config = self._config(
+            ServerAuthOptions(
+                admin_username="admin",
+                admin_password_file=self.password_file,
+                trusted_proxy_cidrs=("10.0.0.0/8",),
+                proxy_subject_header="X-Remote-User",
+                proxy_display_name_header="X-Remote-Name",
+                proxy_issuer="https://sso.example",
+                cookie_secure=True,
+            )
+        )
+        captured = {}
+        real_create_app = create_app
+
+        def capture_create_app(*args, auth_service, **kwargs):
+            captured["auth_service"] = auth_service
+            return real_create_app(
+                *args,
+                auth_service=auth_service,
+                **kwargs,
+            )
+
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch(
+                "epub_browser.runtime.create_app",
+                side_effect=capture_create_app,
+            ),
+        ):
+            result = run_server(config, server_factory=_ReturningServer)
+
+        auth_service = captured["auth_service"]
+        self.assertEqual(result, 0)
+        self.assertIsInstance(auth_service, AuthService)
+        self.assertTrue(auth_service.config.cookie_secure)
+        self.assertTrue(auth_service.config.is_trusted_proxy("10.2.3.4"))
+        self.assertEqual(
+            auth_service.config.proxy_subject_header,
+            "X-Remote-User",
+        )
+        self.assertEqual(auth_service.config.proxy_issuer, "https://sso.example")
+
+
 class ServerRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -122,45 +316,16 @@ class ServerRuntimeTests(unittest.TestCase):
         self.sources.mkdir()
         self.server_dir = self.root / "server"
         self.bootstrap = BootstrapCredentials("owner", "secret")
-        self.auth_config = AuthConfig.from_values([], None, None)
-        self.runtime_store = mock.patch(
-            "epub_browser.runtime.StateStore",
-            side_effect=self._initialized_store,
+        self.runtime_environment = mock.patch.dict(
+            os.environ,
+            {
+                "EPUB_BROWSER_ADMIN_USERNAME": self.bootstrap.username,
+                "EPUB_BROWSER_ADMIN_PASSWORD": self.bootstrap.password,
+            },
+            clear=True,
         )
-        self.runtime_migration = mock.patch(
-            "epub_browser.runtime.MigrationManager",
-            side_effect=self._migration_manager,
-        )
-        self.runtime_app = mock.patch(
-            "epub_browser.runtime.create_app",
-            side_effect=self._authenticated_app,
-        )
-        self.runtime_store.start()
-        self.runtime_migration.start()
-        self.runtime_app.start()
-        self.addCleanup(self.runtime_app.stop)
-        self.addCleanup(self.runtime_migration.stop)
-        self.addCleanup(self.runtime_store.stop)
-
-    def _initialized_store(self, database_path):
-        store = StateStore(database_path)
-        store.initialize(bootstrap=self.bootstrap)
-        return store
-
-    def _migration_manager(self, server_dir, legacy_sync_dir):
-        return MigrationManager(
-            server_dir,
-            legacy_sync_dir,
-            bootstrap=self.bootstrap,
-        )
-
-    def _authenticated_app(self, public_dir, *, state_store, **kwargs):
-        return create_app(
-            public_dir,
-            state_store=state_store,
-            auth_service=AuthService(state_store, self.auth_config),
-            **kwargs,
-        )
+        self.runtime_environment.start()
+        self.addCleanup(self.runtime_environment.stop)
 
     def test_second_lock_for_same_server_directory_returns_status_five(self):
         self.server_dir.mkdir()
@@ -467,12 +632,12 @@ class ServerRuntimeTests(unittest.TestCase):
             def shutdown(self):
                 return None
 
-        def fake_create_app(*args, progress_broker, **kwargs):
+        def fake_create_app(*args, progress_broker, auth_service, **kwargs):
             captured["app_broker"] = progress_broker
-            state_store = kwargs["state_store"]
+            captured["auth_service"] = auth_service
             return create_app(
                 *args,
-                auth_service=AuthService(state_store, self.auth_config),
+                auth_service=auth_service,
                 **kwargs,
             )
 
@@ -486,6 +651,7 @@ class ServerRuntimeTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertIsInstance(captured["library_broker"], LibraryProgressBroker)
         self.assertIs(captured["library_broker"], captured["app_broker"])
+        self.assertIsInstance(captured["auth_service"], AuthService)
 
     def test_runtime_passes_book_id_storage_to_library_manager(self):
         captured = {}

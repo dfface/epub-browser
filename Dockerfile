@@ -24,7 +24,9 @@ RUN pip install --no-cache-dir /tmp/packages/*.whl \
 # /app/Library is EPUB input. Default sidecar creation/refresh needs a writable mount.
 # /app/EpubBrowserFiles is durable Server data and must be writable/persistent.
 # /app/SyncData is optional, read-only legacy bookshelf import data.
-RUN mkdir -p /app/Library /app/EpubBrowserFiles /app/SyncData
+# First start also requires EPUB_BROWSER_ADMIN_USERNAME and preferably a
+# read-only EPUB_BROWSER_ADMIN_PASSWORD_FILE mounted under /run/secrets.
+RUN mkdir -p /app/Library /app/EpubBrowserFiles /app/SyncData /run/secrets
 VOLUME ["/app/EpubBrowserFiles"]
 
 EXPOSE 80

@@ -22,8 +22,21 @@ Migration runs only for persistent Server mode. Given an existing v1 directory:
 ```bash
 epub-browser server /path/to/books \
   --server-dir /path/to/existing-v1-directory \
-  --legacy-sync-dir /path/to/legacy-sync
+  --legacy-sync-dir /path/to/legacy-sync \
+  --admin-username admin \
+  --admin-password-file /path/to/admin-password \
+  --watch
 ```
+
+The first v2 start needs administrator credentials because all legacy
+annotations, bookshelf rows, and reading progress are assigned to that account
+inside the same rollback-safe schema upgrade. Prefer a mode-`0600` secret file.
+The environment equivalents are `EPUB_BROWSER_ADMIN_USERNAME` and
+`EPUB_BROWSER_ADMIN_PASSWORD_FILE`; `EPUB_BROWSER_ADMIN_PASSWORD` is a less
+private fallback only when no file is configured. A configured empty or
+unreadable file fails closed and does not fall back to plaintext environment
+content. After an administrator exists, retries and ordinary restarts no longer
+read or require any bootstrap secret.
 
 Startup performs these steps:
 
@@ -106,5 +119,28 @@ The v2 image expects:
 - `/app/Library`: EPUB input, read-write for default sidecar creation or refresh;
 - `/app/EpubBrowserFiles`: required read-write persistent Server directory;
 - `/app/SyncData`: optional read-only legacy JSON import directory.
+- `/run/secrets/epub-browser-admin-password`: recommended read-only first-start password file.
 
 The container command now uses `epub-browser server` and listens on `0.0.0.0` inside the container. A read-only Library mount works only when every selected identity carrier already exists and matches the source; there is no database-only fallback. `--book-id-storage embedded` may rebuild the EPUB and is refused when doing so would be unsafe. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
+
+For example:
+
+```bash
+docker run -d \
+  -p 127.0.0.1:8080:80 \
+  -e EPUB_BROWSER_ADMIN_USERNAME=admin \
+  -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
+  --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
+  -v /path/to/books:/app/Library:rw \
+  -v /path/to/existing-v1-directory:/app/EpubBrowserFiles \
+  epub-browser:2.0.5
+```
+
+The container command uses `epub-browser server --watch`, listens on `0.0.0.0`
+inside the container, and retains authoritative data only through the mounted
+`/app/EpubBrowserFiles` volume. Bind the host port to `127.0.0.1` unless a TLS
+reverse proxy is intended. When a proxy supplies identity headers, enable
+`--cookie-secure`, trust only the direct proxy network with
+`--trusted-proxy-cidr`, configure the subject header and issuer together, and
+make the proxy strip client-supplied copies of those headers. A public client
+network is never an appropriate trusted-proxy CIDR.

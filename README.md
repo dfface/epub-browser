@@ -75,8 +75,23 @@ For a private local library:
 ```bash
 epub-browser server /path/to/books \
   --server-dir /path/to/epub-browser-state \
+  --admin-username admin \
+  --admin-password-file /path/to/admin-password \
   --watch
 ```
+
+The first start of a Server directory requires an administrator username and
+password. Prefer a mode-`0600` password file: EPUB Browser removes one trailing
+newline, creates the administrator with an Argon2id password hash, and never
+prints the secret. An empty or unreadable file stops startup. Once the database
+contains an administrator, later starts do not read or require the bootstrap
+secret.
+
+The equivalent environment settings are
+`EPUB_BROWSER_ADMIN_USERNAME` and
+`EPUB_BROWSER_ADMIN_PASSWORD_FILE`. `EPUB_BROWSER_ADMIN_PASSWORD` is a
+plaintext environment fallback only when no password file is configured; a CLI
+password-file path takes priority over both environment password sources.
 
 Server binds to `127.0.0.1` by default. This is the safe default for one machine. To make it reachable on a trusted LAN, opt in explicitly:
 
@@ -89,13 +104,42 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-Do not expose the built-in Server directly to the public internet. Put it behind a TLS reverse proxy with authentication and appropriate network controls.
+Do not expose the built-in Server directly to the public internet. Put it
+behind a TLS reverse proxy with appropriate network controls and enable secure
+cookies:
+
+```bash
+epub-browser server /path/to/books \
+  --server-dir /path/to/epub-browser-state \
+  --watch \
+  --host 0.0.0.0 \
+  --cookie-secure \
+  --trusted-proxy-cidr 10.42.0.0/16 \
+  --proxy-subject-header X-Remote-User \
+  --proxy-display-name-header X-Remote-Name \
+  --proxy-issuer https://login.example.com \
+  --no-browser
+```
+
+The trusted CIDR must describe the reverse proxy's direct network, not a public
+client range. Configure that proxy to remove inbound copies of the identity
+headers and set its own authenticated values. EPUB Browser ignores proxy
+identity headers from every peer outside the configured CIDRs. TLS terminates
+at the reverse proxy; `--cookie-secure` ensures the session cookie is returned
+only over the browser-facing HTTPS connection. The local administrator remains
+the recovery account even when proxy identity is enabled.
 
 For a disposable session, use `--ephemeral` instead of `--server-dir`:
 
 ```bash
-epub-browser server book.epub --ephemeral
+epub-browser server book.epub \
+  --ephemeral \
+  --admin-username admin \
+  --admin-password-file /path/to/admin-password
 ```
+
+Because an ephemeral database is new on every run, it needs bootstrap
+credentials on every run.
 
 - Initial and watch scans appear in the Server library page; Server mode does not use terminal tqdm.
 - Interactive terminals print the bound URL once. Docker/systemd runs stay quiet unless `--log` is enabled.
@@ -128,6 +172,9 @@ The image runs persistent Server mode. Mount EPUB input read-write so the defaul
 docker run -d \
   --name epub-browser \
   -p 127.0.0.1:8080:80 \
+  -e EPUB_BROWSER_ADMIN_USERNAME=admin \
+  -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
+  --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
   epub-browser:2.0.5
@@ -139,7 +186,17 @@ docker run -d \
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-The container intentionally binds the process to `0.0.0.0`; control exposure with the published Docker port, firewall, and reverse proxy.
+The image command includes `--watch`, so changes under `/app/Library` are
+reconciled automatically. Keep `/app/EpubBrowserFiles` across container
+replacement; a restart with an existing administrator succeeds even when the
+one-time secret mount has been removed.
+
+The container intentionally binds the process to `0.0.0.0`. The loopback-only
+published port above keeps the built-in HTTP server behind the host boundary.
+For remote access, terminate TLS at a reverse proxy and configure
+`--cookie-secure` plus the proxy's actual container-network CIDR and identity
+headers as described above. Do not trust arbitrary forwarded headers or expose
+port 80 directly to the internet.
 
 ## Legacy v1 command compatibility
 
@@ -174,6 +231,10 @@ epub-browser server --help
 | Server | `--port`, `-p` | Bind port, default `8000`. |
 | Server | `--legacy-sync-dir` | Read legacy bookshelf JSON during migration. |
 | Both | `--book-id-storage sidecar\|embedded` | Select one identity carrier for the entire invocation; default `sidecar`. |
+| Server | `--admin-username` | First-start administrator; environment fallback is supported. |
+| Server | `--admin-password-file` | Preferred first-start secret source. |
+| Server | `--trusted-proxy-cidr` | Repeatable direct-proxy trust boundary; requires proxy header and issuer options. |
+| Server | `--cookie-secure` | Mark session cookies HTTPS-only. |
 | Both | `--log` | Show operational detail without corrupting progress output. |
 
 ## Reading features

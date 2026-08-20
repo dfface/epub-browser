@@ -216,6 +216,17 @@ assert config.output_dir.name == 'dist'
                 ]
             )
 
+    def test_server_help_documents_bootstrap_environment_fallbacks(self):
+        with contextlib.redirect_stdout(io.StringIO()) as stdout, self.assertRaises(
+            SystemExit
+        ) as raised:
+            parse_cli(["server", "--help"])
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertIn("EPUB_BROWSER_ADMIN_USERNAME", stdout.getvalue())
+        self.assertIn("EPUB_BROWSER_ADMIN_PASSWORD_FILE", stdout.getvalue())
+        self.assertIn("EPUB_BROWSER_ADMIN_PASSWORD", stdout.getvalue())
+
     def test_top_level_help_discovers_the_two_v2_modes(self):
         with contextlib.redirect_stdout(io.StringIO()) as stdout, self.assertRaises(
             SystemExit
