@@ -24,7 +24,31 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "account-auth-v3"
+SERVER_OUTPUT_REVISION = "account-auth-v4"
+
+SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
+    "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
+    "jpg", "m4a", "m4v", "mp3", "mp4", "mpeg", "mpg", "oga", "ogg",
+    "ogv", "opus", "otf", "png", "svg", "ttf", "wav", "webm", "webp",
+    "woff", "woff2",
+})
+_GENERATED_READER_PAGE = re.compile(r"^(?:index|chapter_[0-9]+)\.html$")
+
+
+def server_book_public_path_allowed(relative_path):
+    """Return whether a Server book path is generated or a passive resource."""
+    candidate = PurePosixPath(str(relative_path or ""))
+    if candidate.is_absolute() or ".." in candidate.parts:
+        return False
+    parts = candidate.parts
+    if len(parts) == 1:
+        return parts[0] == "toc.json" or bool(
+            _GENERATED_READER_PAGE.fullmatch(parts[0])
+        )
+    if len(parts) < 2 or parts[0] != "resources":
+        return False
+    suffix = candidate.suffix.casefold().lstrip(".")
+    return suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
 
 
 _SAFE_HTML_TAGS = frozenset({
@@ -106,6 +130,22 @@ def _safe_html_url(tag, attribute, value):
     parsed = urllib.parse.urlsplit(candidate)
     scheme = parsed.scheme.casefold()
     if not scheme:
+        resource_path = PurePosixPath(parsed.path)
+        suffix = resource_path.suffix.casefold().lstrip(".")
+        if attribute in {"src", "poster"}:
+            return (
+                candidate
+                if suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+                else None
+            )
+        if attribute == "href" and suffix:
+            if _GENERATED_READER_PAGE.fullmatch(resource_path.name):
+                return candidate
+            return (
+                candidate
+                if suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+                else None
+            )
         return candidate
     if attribute == "href" and scheme in _SAFE_LINK_SCHEMES:
         return candidate
@@ -855,17 +895,25 @@ class EPUBProcessor:
                     <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                 </button>
                 <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
-        safe_book_title = metadata_text(self.book_title)
-        book_title_text = html.escape(safe_book_title, quote=False)
-        book_title_attribute = html.escape(safe_book_title, quote=True)
-        book_id_attribute = html.escape(str(self.book_hash), quote=True)
-        book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
-        if self.authors:
+        if self.deployment_mode == "server":
+            safe_book_title = metadata_text(self.book_title)
+            book_title_text = html.escape(safe_book_title, quote=False)
+            book_title_attribute = html.escape(safe_book_title, quote=True)
+            book_id_attribute = html.escape(str(self.book_hash), quote=True)
+            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+        else:
+            book_title_text = self.book_title
+            book_title_attribute = self.book_title
+            book_id_attribute = self.book_hash
+            book_id_url = self.book_hash
+        if self.authors and self.deployment_mode == "server":
             authors_text = " & ".join(
                 html.escape(metadata_text(author), quote=False)
                 for author in self.authors
             )
             authors_html = f'<p class="book-info-author" lang="{book_language}">{authors_text}</p>'
+        elif self.authors:
+            authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         index_html = f"""<!DOCTYPE html>
@@ -987,23 +1035,31 @@ class EPUBProcessor:
 
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
-                <img src="{html.escape(self.get_book_info()['cover'], quote=True)}" alt="">
+                <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
             </div>
             <div class="book-info-content">
                 <h2 class="book-info-title" lang="{book_language}">{book_title_text}</h2>
                 {authors_html}"""
         if self.description:
+            description = (
+                html.escape(metadata_text(self.description), quote=False)
+                if self.deployment_mode == "server"
+                else self.description
+            )
             index_html += f""" 
                 <div class="book-info-desc" lang="{book_language}">
-                    {html.escape(metadata_text(self.description), quote=False)}
+                    {description}
                 </div>"""
         index_html += f"""
                 <div class="book-info-tags" lang="{book_language}">"""
         if self.tags:
             for tag in self.tags:
-                index_html += """<span class="book-tag">{}</span>""".format(
+                tag_text = (
                     html.escape(metadata_text(tag), quote=False)
+                    if self.deployment_mode == "server"
+                    else tag
                 )
+                index_html += """<span class="book-tag">{}</span>""".format(tag_text)
         index_html += f"""
                 </div>
                 <div class="css-controls clearReadingProgress">
@@ -1041,11 +1097,19 @@ class EPUBProcessor:
                 chapter_index = self._find_chapter_index(toc_src, chapter_index_map, chapter_filename_map)
                 
                 if chapter_index is not None:
-                    toc_title = html.escape(
-                        metadata_text(toc_item.get("title")), quote=False
+                    toc_title = (
+                        html.escape(
+                            metadata_text(toc_item.get("title")), quote=False
+                        )
+                        if self.deployment_mode == "server"
+                        else toc_item["title"]
                     )
                     if chapter_anchor is not None:
-                        safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
+                        safe_anchor = (
+                            urllib.parse.quote(str(chapter_anchor), safe='')
+                            if self.deployment_mode == "server"
+                            else chapter_anchor
+                        )
                         index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
                         index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
@@ -1058,8 +1122,12 @@ class EPUBProcessor:
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
-                chapter_title = html.escape(
-                    metadata_text(chapter.get("title")), quote=False
+                chapter_title = (
+                    html.escape(
+                        metadata_text(chapter.get("title")), quote=False
+                    )
+                    if self.deployment_mode == "server"
+                    else chapter["title"]
                 )
                 index_html += f'        <li><a class="chapter-link" href="/book/{book_id_url}/chapter_{i}.html" id="eb_ci_{i}"><span class="chapter-title" lang="{book_language}">{chapter_title}</span></a></li>\n'
         
@@ -1345,13 +1413,20 @@ document.addEventListener('DOMContentLoaded', function() {{
         style_links = self.extract_style_links(content, chapter_path)
         
         # 提取body内容
-        body_content = sanitize_html_fragment(self.clean_html_content(content))
+        body_content = self.clean_html_content(content)
+
+        if self.deployment_mode == "server":
+            # Rewrite known spine links before the allowlist rejects arbitrary
+            # HTML documents. Only generated chapter_N.html links survive.
+            body_content = self.fix_html_file_links(body_content, chapter_path)
+            body_content = sanitize_html_fragment(body_content)
         
         # 修复body中的图片链接
         body_content = self.fix_image_links(body_content, chapter_path)
 
         # 修复body 中可能的 html 文件链接，比如有些书有目录页面
-        body_content = self.fix_html_file_links(body_content, chapter_path)
+        if self.deployment_mode != "server":
+            body_content = self.fix_html_file_links(body_content, chapter_path)
         
         # 修复body中的其他资源链接
         body_content = self.fix_other_links(body_content, chapter_path)
@@ -1360,6 +1435,61 @@ document.addEventListener('DOMContentLoaded', function() {{
     
     def extract_style_links(self, content, chapter_path):
         """从head中提取样式链接"""
+        if self.deployment_mode != "server":
+            def add_class_to_link(tag, class_name):
+                if 'class=' in tag:
+                    return re.sub(
+                        r'class="([^"]*)"',
+                        f'class="\\1 {class_name}"',
+                        tag,
+                    )
+                return tag.replace('<link ', f'<link class="{class_name}" ', 1)
+
+            def add_class_to_style(tag, class_name):
+                if 'class=' in tag:
+                    return re.sub(
+                        r'class="([^"]*)"',
+                        f'class="\\1 {class_name}"',
+                        tag,
+                    )
+                return tag.replace('<style', f'<style class="{class_name}"', 1)
+
+            style_links = []
+            head_match = re.search(
+                r'<head[^>]*>(.*?)</head>',
+                content,
+                re.DOTALL | re.IGNORECASE,
+            )
+            if head_match:
+                head_content = head_match.group(1)
+                links = re.findall(
+                    r'<link[^>]+rel=["\']stylesheet["\'][^>]*>',
+                    head_content,
+                    re.IGNORECASE,
+                )
+                for link in links:
+                    link = add_class_to_link(link, "eb")
+                    href_match = re.search(r'href=["\']([^"\']+)["\']', link)
+                    if not href_match:
+                        continue
+                    href = href_match.group(1)
+                    if self._is_external_reference(href):
+                        style_links.append(link)
+                    else:
+                        chapter_dir = posixpath.dirname(chapter_path)
+                        web_href = self._resource_reference(href, chapter_dir)
+                        style_links.append(
+                            link.replace(f'href="{href}"', f'href="{web_href}"')
+                        )
+                styles = re.findall(
+                    r'<style[^>]*>.*?</style>',
+                    head_content,
+                    re.DOTALL,
+                )
+                for style in styles:
+                    style_links.append(add_class_to_style(style, "eb"))
+            return '\n        '.join(style_links)
+
         style_links = []
         
         # 匹配head标签
@@ -1453,6 +1583,13 @@ document.addEventListener('DOMContentLoaded', function() {{
             # 如果已经是绝对路径或数据URI，则不处理
             if self._is_external_reference(src):
                 return match.group(0)
+            if (
+                self.deployment_mode == "server"
+                and urllib.parse.urlsplit(html.unescape(src).strip()).scheme
+            ):
+                # The final allowlist removes active schemes. Avoid resolving
+                # them as EPUB-internal paths before that pass.
+                return match.group(0)
 
             chapter_dir = posixpath.dirname(chapter_path)
             self._resolve_internal_path(src, chapter_dir)
@@ -1502,15 +1639,23 @@ document.addEventListener('DOMContentLoaded', function() {{
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        content = sanitize_html_fragment(content)
-        book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
-        book_id_attribute = html.escape(str(self.book_hash), quote=True)
-        safe_book_title = metadata_text(self.book_title)
-        safe_chapter_title = metadata_text(chapter_title)
-        book_title_text = html.escape(safe_book_title, quote=False)
-        book_title_attribute = html.escape(safe_book_title, quote=True)
-        chapter_title_text = html.escape(safe_chapter_title, quote=False)
-        chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
+        if self.deployment_mode == "server":
+            content = sanitize_html_fragment(content)
+            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+            book_id_attribute = html.escape(str(self.book_hash), quote=True)
+            safe_book_title = metadata_text(self.book_title)
+            safe_chapter_title = metadata_text(chapter_title)
+            book_title_text = html.escape(safe_book_title, quote=False)
+            book_title_attribute = html.escape(safe_book_title, quote=True)
+            chapter_title_text = html.escape(safe_chapter_title, quote=False)
+            chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
+        else:
+            book_id_url = self.book_hash
+            book_id_attribute = self.book_hash
+            book_title_text = self.book_title
+            book_title_attribute = self.book_title
+            chapter_title_text = chapter_title
+            chapter_title_attribute = chapter_title
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -2086,10 +2231,17 @@ document.addEventListener('DOMContentLoaded', function() {{
         # 复制整个提取目录
         for root, dirs, files in os.walk(self.extract_dir):
             for file in files:
-                suffix = file.rsplit(".", 1)[-1].casefold()
-                if suffix in ("html", "xhtml", "xml", "txt", "opf", "ncx", "mimetype"):
-                    # html 不需要了，已经重新生成了
-                    continue
+                if self.deployment_mode == "server":
+                    suffix = file.rsplit(".", 1)[-1].casefold()
+                    if suffix not in SERVER_PASSIVE_RESOURCE_SUFFIXES:
+                        continue
+                else:
+                    suffix = file.split(".")[-1]
+                    if suffix in (
+                        "html", "xhtml", "xml", "txt", "opf", "ncx", "mimetype"
+                    ):
+                        # SSG retains the historical resource-copy behavior.
+                        continue
 
                 src_path = os.path.join(root, file)
                 # 计算相对于提取目录的相对路径
@@ -2098,10 +2250,19 @@ document.addEventListener('DOMContentLoaded', function() {{
                 
                 # 确保目标目录存在
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                if suffix == "svg":
+                if self.deployment_mode == "server" and suffix == "svg":
                     source = Path(src_path).read_text(encoding="utf-8")
                     Path(dst_path).write_text(
                         sanitize_svg_content(source),
+                        encoding="utf-8",
+                    )
+                elif self.deployment_mode == "server" and suffix == "css":
+                    source = Path(src_path).read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+                    Path(dst_path).write_text(
+                        sanitize_css_text(source),
                         encoding="utf-8",
                     )
                 else:

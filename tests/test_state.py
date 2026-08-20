@@ -150,6 +150,29 @@ class StateStoreTests(unittest.TestCase):
             self.store.get_user(self.owner.user_id).password_hash,
         )
 
+    def test_restart_rejects_structurally_invalid_argon2id_encodings(self):
+        malformed_hashes = (
+            "$argon2id$v=19$m=65536,t=3,p=4$bad$bad",
+            "$argon2id$v=19$m=65536,t=3,p=4$$",
+            "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$",
+            "$argon2id$v=19$m=65536,t=3,p=4$$ZGlnZXN0",
+        )
+        for encoded in malformed_hashes:
+            with self.subTest(encoded=encoded), tempfile.TemporaryDirectory() as directory:
+                database = Path(directory, "state.db")
+                store = StateStore(database)
+                administrator = store.initialize(
+                    bootstrap=BootstrapCredentials("owner", "secret")
+                )
+                with sqlite3.connect(database) as connection:
+                    connection.execute(
+                        "UPDATE users SET password_hash = ? WHERE id = ?",
+                        (encoded, administrator.user_id),
+                    )
+
+                with self.assertRaisesRegex(RuntimeError, "password hash"):
+                    StateStore(database).initialize()
+
     def test_v1_colliding_bookshelves_keep_highest_version_newest_deterministically(self):
         self._create_v1_database_with_annotation_bookshelf_and_progress("zeta")
         with sqlite3.connect(self.database) as connection:

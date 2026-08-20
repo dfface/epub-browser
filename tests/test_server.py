@@ -1570,6 +1570,27 @@ class BookAuthorizationTests(unittest.TestCase):
 
         self.store.revoke_book_access("restricted-id", self.member.user_id)
 
+        cross_book_overwrite = self.member_client.post(
+            "/api/annotations/batch",
+            json={
+                "annotations": [
+                    {
+                        **annotation,
+                        "book_hash": "open-id",
+                        "text": "must not overwrite revoked data",
+                    }
+                ]
+            },
+        )
+        self.assertEqual(cross_book_overwrite.status_code, 403)
+        self.assertEqual(cross_book_overwrite.json()["code"], "forbidden")
+        stored_after_cross_book_attempt = self.store.get_annotation(
+            "restricted-note",
+            user_id=self.member.user_id,
+        )
+        self.assertEqual(stored_after_cross_book_attempt["book_hash"], "restricted-id")
+        self.assertEqual(stored_after_cross_book_attempt["text"], "private note")
+
         global_annotations = self.member_client.get("/api/annotations")
         self.assertEqual(global_annotations.status_code, 200)
         self.assertEqual(global_annotations.json()["data"], [])
@@ -1857,6 +1878,25 @@ class ServerCacheTests(unittest.TestCase):
         self.assertIn("frame-ancestors 'none'", policy)
         self.assertIn("'sha256-{}'".format(expected_hash), script_directive)
         self.assertNotIn("'unsafe-inline'", script_directive)
+
+    def test_server_never_serves_active_documents_from_book_resources(self):
+        payload = Path(
+            self.directory.name,
+            "book",
+            "demo",
+            "resources",
+            "payload.htm",
+        )
+        payload.write_text(
+            '<script id="payload">fetch("/api/session")</script>',
+            encoding="utf-8",
+        )
+
+        response = self.client.get("/book/demo/resources/payload.htm")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("content-security-policy", response.headers)
+        self.assertNotIn("payload", response.text)
 
     def test_html_is_revalidated_instead_of_long_lived(self):
         response = self.client.get("/")

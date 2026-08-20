@@ -1893,13 +1893,14 @@ class StateStore:
                     color = excluded.color,
                     created_at = excluded.created_at,
                     updated_at = excluded.updated_at
+                WHERE annotations.book_hash = excluded.book_hash
             """
             if replace_existing
             else ""
         )
         with self._connection() as connection:
             self._require_user(connection, user_id)
-            connection.execute(
+            cursor = connection.execute(
                 f"""
                 INSERT INTO annotations (
                     id, book_hash, chapter_index, text, note, start_meta, end_meta,
@@ -1922,6 +1923,8 @@ class StateStore:
                     "",
                 ),
             )
+            if replace_existing and cursor.rowcount != 1:
+                raise ValueError("Annotation IDs cannot move between books")
 
     def update_annotation(self, annotation_id: str, data, user_id: str):
         assignments = []

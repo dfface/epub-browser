@@ -138,8 +138,12 @@ def verify_password(encoded: str, password: str) -> bool:
 
 def validate_password_hash(encoded: str) -> None:
     """Reject malformed, unsupported, or non-Argon2id local password hashes."""
-    from argon2 import extract_parameters
-    from argon2.exceptions import InvalidHashError
+    from argon2 import PasswordHasher, extract_parameters
+    from argon2.exceptions import (
+        InvalidHashError,
+        VerificationError,
+        VerifyMismatchError,
+    )
     from argon2.low_level import ARGON2_VERSION, Type
 
     if not isinstance(encoded, str) or not encoded:
@@ -150,6 +154,25 @@ def validate_password_hash(encoded: str) -> None:
         raise ValueError("Invalid local password hash") from error
     if parameters.type is not Type.ID or parameters.version != ARGON2_VERSION:
         raise ValueError("Unsupported local password hash")
+    if not (
+        1 <= parameters.time_cost <= 10
+        and 8 <= parameters.memory_cost <= 262144
+        and parameters.memory_cost >= 8 * parameters.parallelism
+        and 1 <= parameters.parallelism <= 16
+        and 8 <= parameters.salt_len <= 64
+        and 16 <= parameters.hash_len <= 64
+    ):
+        raise ValueError("Unsupported local password hash parameters")
+    try:
+        PasswordHasher(type=Type.ID).verify(
+            encoded,
+            "epub-browser-password-hash-integrity-probe",
+        )
+    except VerifyMismatchError:
+        # A mismatch proves the complete PHC encoding was decoded successfully.
+        return
+    except (InvalidHashError, VerificationError, ValueError, TypeError) as error:
+        raise ValueError("Invalid local password hash") from error
 
 
 def session_cookie_options(config: AuthConfig) -> dict:

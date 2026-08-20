@@ -35,7 +35,11 @@ from .auth import (
 )
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
-from .processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
+from .processor import (
+    SERVER_OUTPUT_REVISION,
+    SERVER_OUTPUT_REVISION_FILE,
+    server_book_public_path_allowed,
+)
 from .server_library import library_metadata
 
 DATABASE_FILENAME = 'epub-browser.db'
@@ -1480,6 +1484,7 @@ window.location.assign(payload.redirect||'/');
             )
         principal = require_principal(request)
         book_id = extract_book_id_from_public_path(path)
+        book_relative_path = None
         if book_id:
             if not store.can_read_book(
                 principal.user_id,
@@ -1489,8 +1494,15 @@ window.location.assign(payload.redirect||'/');
                 return response(error_payload('forbidden', 'Forbidden'), 403)
             if not server_book_output_is_current(base_directory, book_id):
                 return response(error_payload('not_found', 'Not Found'), 404)
+            book_relative_path = '/'.join(path.split('/')[2:])
+            if not server_book_public_path_allowed(book_relative_path):
+                return response(error_payload('not_found', 'Not Found'), 404)
         static_response = await public_files.get_response(path, request.scope)
-        if path.casefold().endswith(('.html', '.htm')):
+        if book_relative_path and re.fullmatch(
+            r'(?:index|chapter_[0-9]+)\.html',
+            book_relative_path,
+            re.IGNORECASE,
+        ):
             apply_reader_security_headers(
                 static_response,
                 getattr(
@@ -1679,6 +1691,25 @@ window.location.assign(payload.redirect||'/');
                     return forbidden_book_response()
                 for entry in entries:
                     entry_book_id = entry.get('book_hash')
+                    stored = None
+                    if entry.get('id'):
+                        stored = store.get_annotation(
+                            entry['id'],
+                            user_id=principal.user_id,
+                        )
+                    if stored and book_access_denied(
+                        principal,
+                        stored.get('book_hash'),
+                    ):
+                        return forbidden_book_response()
+                    if stored and stored.get('book_hash') != entry_book_id:
+                        return response(
+                            error_payload(
+                                'annotation_book_mismatch',
+                                'Annotation cannot move between books',
+                            ),
+                            409,
+                        )
                     if (
                         (path_book_id and entry_book_id != path_book_id)
                         or book_access_denied(principal, entry_book_id)

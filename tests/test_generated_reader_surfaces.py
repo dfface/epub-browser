@@ -257,6 +257,30 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 </svg>''',
                 encoding="utf-8",
             )
+            (extracted / "payload.htm").write_text(
+                '<script id="resource-payload">fetch("/api/session")</script>',
+                encoding="utf-8",
+            )
+            (extracted / "payload.svgz").write_bytes(b"compressed-active-svg")
+            (extracted / "payload.js").write_text(
+                'fetch("/api/session")',
+                encoding="utf-8",
+            )
+            (extracted / "safe.css").write_text(
+                "p { color: red; }",
+                encoding="utf-8",
+            )
+            (extracted / "unsafe.css").write_text(
+                '@import "https://attacker.example/payload.css";',
+                encoding="utf-8",
+            )
+            (extracted / "cover.png").write_bytes(b"passive-image")
+
+            body, _ = processor.process_html_content(
+                '<body><a href="payload.htm">payload</a>'
+                '<img src="payload.svgz"></body>',
+                "chapter.xhtml",
+            )
 
             processor.copy_resources()
             rendered = Path(
@@ -264,6 +288,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 "resources",
                 "diagram.svg",
             ).read_text(encoding="utf-8")
+            resources = Path(processor.web_dir, "resources")
+            blocked_resources = {
+                name: (resources / name).exists()
+                for name in ("payload.htm", "payload.svgz", "payload.js")
+            }
+            safe_css = (resources / "safe.css").read_text(encoding="utf-8")
+            unsafe_css = (resources / "unsafe.css").read_text(encoding="utf-8")
+            cover_bytes = (resources / "cover.png").read_bytes()
 
         for payload in (
             "script",
@@ -276,6 +308,80 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotIn(payload.lower(), rendered.lower())
         self.assertIn("path", rendered)
         self.assertIn("M0 0L10 10", rendered)
+        self.assertNotIn("payload.htm", body)
+        self.assertNotIn("payload.svgz", body)
+        self.assertEqual(blocked_resources, {
+            "payload.htm": False,
+            "payload.svgz": False,
+            "payload.js": False,
+        })
+        self.assertEqual(safe_css, "p { color: red; }")
+        self.assertEqual(unsafe_css, "")
+        self.assertEqual(cover_bytes, b"passive-image")
+
+    def test_ssg_processor_preserves_existing_epub_markup_metadata_and_resources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory, deployment_mode="ssg")
+            processor.book_title = '<script id="ssg-title">title()</script>'
+            processor.authors = ['<b id="ssg-author">Author</b>']
+            processor.description = '<em id="ssg-description">Description</em>'
+            processor.tags = ['<i id="ssg-tag">Tag</i>']
+            processor.chapters = [{"title": '<u id="ssg-chapter">One</u>'}]
+            Path(processor.web_dir).mkdir(parents=True)
+
+            body, styles = processor.process_html_content(
+                '''<html><head>
+                <link rel="stylesheet" href="https://example.test/book.css">
+                <style>p { color: red; background: url(image.png); }</style>
+                </head><body><p style="color:red" onclick="run()">Text</p>
+                <script id="ssg-body">body()</script></body></html>''',
+                "chapter.xhtml",
+            )
+            chapter_html = processor.create_chapter_template(
+                body,
+                styles,
+                0,
+                processor.chapters[0]["title"],
+            )
+            processor.create_index_page()
+            index_html = Path(processor.web_dir, "index.html").read_text(
+                encoding="utf-8"
+            )
+
+            extracted = Path(processor.extract_dir)
+            extracted.mkdir(parents=True)
+            (extracted / "active.svg").write_text(
+                '<svg onload="run()"><script>svg()</script></svg>',
+                encoding="utf-8",
+            )
+            (extracted / "linked.htm").write_text(
+                '<script>linked()</script>',
+                encoding="utf-8",
+            )
+            processor.copy_resources()
+
+            self.assertIn('onclick="run()"', chapter_html)
+            self.assertIn('style="color:red"', chapter_html)
+            self.assertIn('id="ssg-body"', chapter_html)
+            self.assertIn("background: url(image.png)", chapter_html)
+            self.assertIn("https://example.test/book.css", chapter_html)
+            for marker in (
+                "ssg-title",
+                "ssg-author",
+                "ssg-description",
+                "ssg-tag",
+            ):
+                self.assertIn(marker, index_html)
+            self.assertIn("ssg-chapter", chapter_html)
+            self.assertIn(
+                'onload="run()"',
+                Path(processor.web_dir, "resources", "active.svg").read_text(
+                    encoding="utf-8"
+                ),
+            )
+            self.assertTrue(
+                Path(processor.web_dir, "resources", "linked.htm").exists()
+            )
 
     def test_generated_book_pages_apply_base_path_without_runtime_url_repair(self):
         with tempfile.TemporaryDirectory() as directory:
