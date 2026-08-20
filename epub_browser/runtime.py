@@ -267,6 +267,7 @@ def run_server(
             migration_manager=migration_manager,
             reporter=active_reporter,
             progress_broker=progress_broker,
+            book_id_storage=config.book_id_storage,
         )
         manager.on_reconcile_started = status.mark_scanning
         manager.on_reconciled = lambda summary: _update_runtime_status(

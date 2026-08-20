@@ -237,7 +237,7 @@ class ModeIntegrationTests(unittest.TestCase):
             )
 
         self.assertEqual(logged_status, 0)
-        self.assertIn(str(self.source.resolve()), logged_stderr.getvalue())
+        self.assertIn(str(self.source.absolute()), logged_stderr.getvalue())
 
     def test_v2_documentation_matches_the_public_mode_contract(self):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")

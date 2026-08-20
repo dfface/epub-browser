@@ -12,13 +12,17 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
-from epub_browser.epub_identity import read_embedded_book_id
+from epub_browser.epub_identity import (
+    ensure_embedded_book_id,
+    read_embedded_book_id,
+)
 from epub_browser.identity import source_sha256
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.reporting import Reporter
 from epub_browser.server_library import ServerLibraryManager
+from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
 
 
@@ -55,64 +59,113 @@ class ServerLibraryManagerTests(unittest.TestCase):
             latest = subscription.queue.get_nowait()
         return latest
 
-    def test_first_reconcile_embeds_the_database_book_id_without_changing_resources(self):
-        with zipfile.ZipFile(self.source) as archive:
-            chapter_before = archive.read("OEBPS/chapter.xhtml")
+    def test_first_reconcile_creates_sidecar_without_modifying_epub(self):
+        before = self.source.read_bytes()
         manager = self._manager()
-
         record = manager.reconcile().active_books[0]
-
-        self.assertEqual(read_embedded_book_id(self.source), record.book_id)
-        with zipfile.ZipFile(self.source) as archive:
-            self.assertEqual(archive.read("OEBPS/chapter.xhtml"), chapter_before)
-            self.assertIsNone(archive.testzip())
-            self.assertEqual(archive.infolist()[0].filename, "mimetype")
-            self.assertEqual(archive.infolist()[0].compress_type, zipfile.ZIP_STORED)
+        self.assertEqual(read_exact_sidecar(self.source).book_id, record.book_id)
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertIsNone(read_embedded_book_id(self.source))
         manager.shutdown()
 
-    def test_offline_move_and_content_edit_reuse_embedded_book_id(self):
+    def test_v204_embedded_id_migrates_to_sidecar_without_epub_write(self):
+        ensure_embedded_book_id(
+            self.source, preferred_book_id="v204_embedded_id"
+        )
+        before = self.source.read_bytes()
         manager = self._manager()
-        original = manager.reconcile().active_books[0]
+        record = manager.reconcile().active_books[0]
+        self.assertEqual(record.book_id, "v204_embedded_id")
+        self.assertEqual(read_exact_sidecar(self.source).book_id, record.book_id)
+        self.assertEqual(self.source.read_bytes(), before)
+        manager.shutdown()
+
+    def test_content_edit_retains_exact_sidecar_id(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        self._write_epub(self.source, "Changed")
+        second = manager.reconcile().active_books[0]
+        self.assertEqual(second.book_id, first.book_id)
+        self.assertEqual(read_exact_sidecar(self.source).book_id, first.book_id)
+        manager.shutdown()
+
+    def test_offline_epub_only_move_adopts_orphan_and_database_id(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        orphan = sidecar_path_for(self.source)
         moved = self.source_dir / "moved.epub"
         self.source.rename(moved)
-        self._replace_archive_text(
-            moved,
-            "OEBPS/chapter.xhtml",
-            b"Original",
-            b"Changed after move",
-        )
-
-        summary = manager.reconcile()
-
-        self.assertFalse(summary.degraded)
-        self.assertEqual([record.book_id for record in summary.active_books], [original.book_id])
-        self.assertEqual(Path(summary.active_books[0].source_path), moved.resolve())
+        second = manager.reconcile().active_books[0]
+        self.assertEqual(second.book_id, first.book_id)
+        self.assertEqual(Path(second.source_path), moved.resolve())
+        self.assertFalse(orphan.exists())
+        self.assertEqual(read_exact_sidecar(moved).book_id, first.book_id)
         manager.shutdown()
 
-    def test_conflicting_embedded_id_degrades_scan_and_keeps_previous_cache(self):
+    def test_epub_only_copy_gets_distinct_id_while_original_is_active(self):
         manager = self._manager()
-        original = manager.reconcile().active_books[0]
-        self._replace_archive_text(
-            self.source,
-            "OEBPS/content.opf",
-            original.book_id.encode("ascii"),
-            b"A" * 22,
-        )
-
+        first = manager.reconcile().active_books[0]
+        copied = self.source_dir / "copied.epub"
+        shutil.copy2(self.source, copied)
         summary = manager.reconcile()
+        self.assertEqual(len(summary.active_books), 2)
+        self.assertEqual(len({record.book_id for record in summary.active_books}), 2)
+        self.assertNotEqual(read_exact_sidecar(copied).book_id, first.book_id)
+        manager.shutdown()
 
-        self.assertTrue(summary.degraded)
-        self.assertEqual(summary.failures[0].book_id, original.book_id)
-        self.assertTrue(summary.failures[0].kept_previous_cache)
-        self.assertEqual([record.book_id for record in summary.active_books], [original.book_id])
-        self.assertTrue(
-            (
-                manager.public_dir
-                / "book"
-                / original.book_id
-                / "index.html"
-            ).is_file()
+    def test_explicit_embedded_mode_writes_once_then_reuses(self):
+        converter = mock.Mock(side_effect=EPUBProcessor)
+        manager = self._manager(converter, book_id_storage="embedded")
+        first = manager.reconcile()
+        converter.reset_mock()
+        second = manager.reconcile()
+        self.assertEqual(first.converted, 1)
+        self.assertEqual(second.reused, 1)
+        self.assertIsNotNone(read_embedded_book_id(self.source))
+        self.assertFalse(sidecar_path_for(self.source).exists())
+        converter.assert_not_called()
+        manager.shutdown()
+
+    def test_epub_and_sidecar_copy_reports_duplicate_active_id(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        copied = self.source_dir / "copied.epub"
+        shutil.copy2(self.source, copied)
+        shutil.copy2(sidecar_path_for(self.source), sidecar_path_for(copied))
+        summary = manager.reconcile()
+        self.assertEqual(summary.failed, 1)
+        self.assertIn("already used by another source", summary.failures[0].message)
+        self.assertEqual(
+            [record.book_id for record in summary.active_books],
+            [first.book_id],
         )
+        manager.shutdown()
+
+    def test_carrier_database_conflict_keeps_previous_cache(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        ensure_embedded_book_id(
+            self.source, preferred_book_id="conflicting_id"
+        )
+        summary = manager.reconcile()
+        self.assertTrue(summary.degraded)
+        self.assertTrue(summary.failures[0].kept_previous_cache)
+        self.assertTrue(
+            (manager.public_dir / "book" / first.book_id / "index.html").is_file()
+        )
+        manager.shutdown()
+
+    def test_sidecar_replace_failure_has_no_database_only_fallback(self):
+        manager = self._manager()
+        with mock.patch(
+            "epub_browser.book_identity.write_sidecar",
+            side_effect=OSError("sidecar replace failed"),
+        ):
+            summary = manager.reconcile()
+        self.assertEqual(summary.failed, 1)
+        self.assertIn("sidecar replace failed", summary.failures[0].message)
+        self.assertEqual(summary.active_books, ())
+        self.assertEqual(self.store.active_books(), ())
         manager.shutdown()
 
     def test_reconcile_reports_incremental_progress_and_catalog_publication(self):

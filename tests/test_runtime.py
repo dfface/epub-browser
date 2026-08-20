@@ -408,6 +408,46 @@ class ServerRuntimeTests(unittest.TestCase):
         self.assertIsInstance(captured["library_broker"], LibraryProgressBroker)
         self.assertIs(captured["library_broker"], captured["app_broker"])
 
+    def test_runtime_passes_book_id_storage_to_library_manager(self):
+        captured = {}
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+            book_id_storage="embedded",
+        )
+
+        class Library:
+            def __init__(self, *, server_dir, book_id_storage, **kwargs):
+                captured["book_id_storage"] = book_id_storage
+                self.public_dir = Path(server_dir) / "cache" / "public"
+                self.on_reconcile_started = None
+                self.on_reconciled = None
+
+            def prepare_public_shell(self):
+                self.public_dir.mkdir(parents=True, exist_ok=True)
+                (self.public_dir / "index.html").write_text(
+                    "library", encoding="utf-8"
+                )
+
+            def reconcile(self):
+                return ReconcileSummary(0, 0, 0, (), ())
+
+            def request_stop(self):
+                return None
+
+            def shutdown(self):
+                return None
+
+        status = run_server(
+            config,
+            server_factory=_ReturningServer,
+            library_factory=Library,
+        )
+        self.assertEqual(status, 0)
+        self.assertEqual(captured["book_id_storage"], "embedded")
+
 
 class _ReturningServer:
     def __init__(self, config):
