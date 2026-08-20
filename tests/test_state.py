@@ -87,7 +87,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(resolved.source_path, str(moved.resolve()))
         self.assertTrue(resolved.active)
 
-    def test_ambiguous_inactive_move_allocates_a_new_identity(self):
+    def test_ambiguous_inactive_move_is_refused(self):
         first = self.store.resolve_book(
             Path(self.temporary.name, "first.epub"),
             "urn:test:ambiguous",
@@ -102,15 +102,46 @@ class StateStoreTests(unittest.TestCase):
         )
         self.store.mark_missing(first.book_id)
         self.store.mark_missing(second.book_id)
+        matches = self.store.inactive_book_matches(
+            "urn:test:ambiguous",
+            "same-content",
+        )
+        self.assertEqual(
+            {record.book_id for record in matches},
+            {first.book_id, second.book_id},
+        )
+        with self.assertRaisesRegex(ValueError, "Multiple inactive"):
+            self.store.resolve_book(
+                Path(self.temporary.name, "moved.epub"),
+                "urn:test:ambiguous",
+                "same-content",
+                {"title": "Book"},
+            )
 
+    def test_authoritative_id_selects_exact_inactive_row_despite_ambiguity(self):
+        first = self.store.resolve_book(
+            Path(self.temporary.name, "first.epub"),
+            "urn:test:ambiguous",
+            "same-content",
+            {"title": "Book"},
+        )
+        second = self.store.resolve_book(
+            Path(self.temporary.name, "second.epub"),
+            "urn:test:ambiguous",
+            "same-content",
+            {"title": "Book"},
+        )
+        self.store.mark_missing(first.book_id)
+        self.store.mark_missing(second.book_id)
         moved = self.store.resolve_book(
             Path(self.temporary.name, "moved.epub"),
             "urn:test:ambiguous",
             "same-content",
             {"title": "Book"},
+            authoritative_book_id=first.book_id,
         )
-
-        self.assertNotIn(moved.book_id, {first.book_id, second.book_id})
+        self.assertEqual(moved.book_id, first.book_id)
+        self.assertTrue(moved.active)
 
     def test_mark_missing_does_not_delete_user_data(self):
         record = self.store.resolve_book(

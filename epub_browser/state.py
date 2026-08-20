@@ -313,7 +313,7 @@ class StateStore:
             if row is not None:
                 if authoritative_id and row["book_id"] != authoritative_id:
                     raise ValueError(
-                        "Embedded EPUB book ID conflicts with the book registered "
+                        "Book ID conflicts with the book registered "
                         f"for {canonical_path}"
                     )
                 connection.execute(
@@ -343,7 +343,7 @@ class StateStore:
                 if identity_row is not None:
                     if identity_row["active"]:
                         raise ValueError(
-                            "Embedded EPUB book ID is already used by another source: "
+                            "Book ID is already used by another source: "
                             f"{identity_row['source_path']}"
                         )
                     connection.execute(
@@ -371,17 +371,11 @@ class StateStore:
                     )
                     return self._get_book(connection, authoritative_id)
 
-            move_matches = []
-            if identifier and source_fingerprint:
-                move_matches = connection.execute(
-                    """
-                    SELECT * FROM books
-                    WHERE active = 0
-                      AND epub_identifier = ?
-                      AND source_fingerprint = ?
-                    """,
-                    (identifier, source_fingerprint),
-                ).fetchall()
+            move_matches = self._inactive_move_rows(
+                connection,
+                identifier,
+                source_fingerprint,
+            )
             if len(move_matches) == 1:
                 book_id = move_matches[0]["book_id"]
                 connection.execute(
@@ -404,6 +398,11 @@ class StateStore:
                     ),
                 )
                 return self._get_book(connection, book_id)
+            if len(move_matches) > 1:
+                raise ValueError(
+                    "Multiple inactive books match the same EPUB identifier "
+                    "and fingerprint"
+                )
 
             book_id = (
                 authoritative_id
@@ -416,7 +415,7 @@ class StateStore:
             ).fetchone():
                 if authoritative_id:
                     raise ValueError(
-                        f"Embedded EPUB book ID is already registered: {book_id}"
+                        f"Book ID is already registered: {book_id}"
                     )
                 book_id = new_server_book_id()
             connection.execute(
@@ -437,6 +436,35 @@ class StateStore:
                 ),
             )
             return self._get_book(connection, book_id)
+
+    @staticmethod
+    def _inactive_move_rows(connection, identifier, source_fingerprint):
+        if not identifier or not source_fingerprint:
+            return []
+        return connection.execute(
+            """
+            SELECT * FROM books
+            WHERE active = 0
+              AND epub_identifier = ?
+              AND source_fingerprint = ?
+            ORDER BY book_id
+            """,
+            (identifier, source_fingerprint),
+        ).fetchall()
+
+    def inactive_book_matches(
+        self,
+        epub_identifier: Optional[str],
+        source_fingerprint: str,
+    ) -> tuple[BookRecord, ...]:
+        identifier = (epub_identifier or "").strip() or None
+        with self._connection() as connection:
+            rows = self._inactive_move_rows(
+                connection,
+                identifier,
+                source_fingerprint,
+            )
+        return tuple(self._book_record(row) for row in rows)
 
     def update_book_version(
         self,
