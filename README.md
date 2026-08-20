@@ -102,18 +102,18 @@ In Server mode, the bookshelf is stored as a versioned cloud document in the Ser
 
 ## Docker
 
-The image runs persistent Server mode. Mount EPUB input read-only and Server state read-write:
+The image runs persistent Server mode. Mount EPUB input read-write so EPUB Browser can embed durable book IDs, and mount Server state read-write:
 
 ```bash
 docker run -d \
   --name epub-browser \
   -p 127.0.0.1:8080:80 \
-  -v /path/to/books:/app/Library:ro \
+  -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.0.3
+  epub-browser:2.0.4
 ```
 
-`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library` is read-only input. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
+`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library` should be writable so v2.0.4 can add a stable ID to each EPUB's OPF metadata. A read-only mount remains supported in Server mode, but those books use database-only IDs and cannot carry their identity with the source file. Mount `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
 
 ```bash
 -v /path/to/legacy-sync:/app/SyncData:ro
