@@ -310,8 +310,17 @@ class AIReadingService:
         return {"status": "queued", "cached": False, "job": self.store.get_ai_job(job_id, principal.user_id)}
 
     async def _provider_call(
-        self, principal: Principal, config: ProviderConfig, messages: list[dict]
+        self,
+        principal: Principal,
+        config: ProviderConfig,
+        messages: list[dict],
+        *,
+        book_id: str,
     ) -> str:
+        if not self.store.can_use_ai(principal) or not self.store.can_read_book(
+            principal.user_id, principal.role, book_id
+        ):
+            raise AIReadingError("ai_not_authorized")
         if not self.store.reserve_ai_usage(principal, date.today().isoformat()):
             raise AIReadingError("ai_quota_exhausted")
         loop, control = self._call_control()
@@ -331,6 +340,10 @@ class AIReadingService:
                     if not self.store.reserve_ai_usage(principal, date.today().isoformat()):
                         raise AIReadingError("ai_quota_exhausted") from None
                     try:
+                        if not self.store.can_use_ai(principal) or not self.store.can_read_book(
+                            principal.user_id, principal.role, book_id
+                        ):
+                            raise AIReadingError("ai_not_authorized")
                         return await asyncio.to_thread(client.complete, messages)
                     except AIProviderError as retry_error:
                         raise AIReadingError(retry_error.code) from None
@@ -421,12 +434,14 @@ class AIReadingService:
                         principal,
                         config,
                         self._bridge_prompt(request, profile, chapter_index, chapter_text),
+                        book_id=request.book_id,
                     )
                     bridges.append("[Chapter {} bridge]\n{}".format(chapter_index, bridge[:_MAX_BRIDGE_CHARS]))
                     self.store.update_ai_job_progress(job_id, position, total)
                 material = "\n\n".join(bridges)
             raw = await self._provider_call(
-                principal, config, self._prompt(request, metadata, profile, material)
+                principal, config, self._prompt(request, metadata, profile, material),
+                book_id=request.book_id,
             )
             result = self.store.store_ai_reading_result(
                 cache_key=cache_key,
@@ -488,6 +503,7 @@ class AIReadingService:
                         "content": "Reading result:\n" + json.dumps(result["content"], ensure_ascii=False) + "\n\nQuestion:\n" + followup["question"],
                     },
                 ],
+                book_id=result["book_id"],
             )
             self.store.finish_ai_followup(
                 followup["id"], principal.user_id, answer=answer
