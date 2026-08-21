@@ -585,6 +585,7 @@ def create_app(
         return {
             'id': book.book_id,
             'title': metadata.get('title') or 'EPUB Book',
+            'epub_tags': list(metadata.get('tags') or ()),
             'visibility': book.visibility,
             'grants': list(store.book_grants(book.book_id)),
             'ai_profile': store.get_book_ai_profile(book.book_id),

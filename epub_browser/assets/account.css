@@ -844,6 +844,14 @@ body.auth-page {
     white-space: nowrap;
 }
 
+.admin-book-epub-tags {
+    grid-column: 1 / -1;
+    margin: -3px 0 2px;
+    color: var(--account-muted);
+    font-size: .78rem;
+    line-height: 1.45;
+}
+
 .account-book-item select {
     width: 100%;
     min-height: 38px;
