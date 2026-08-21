@@ -1012,13 +1012,6 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     text-align: right;
 }
 
-.page-width-value {
-    min-height: 20px;
-    color: var(--button-bg);
-    font-size: 0.82rem;
-    font-weight: 600;
-}
-
 .scale-mark {
     width: 4px;
     height: 8px;

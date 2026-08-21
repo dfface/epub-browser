@@ -1819,11 +1819,6 @@ function initScript() {
             slider.value = pageWidthPreset;
             slider.setAttribute('aria-valuetext', translatedLabel);
         }
-        var value = document.getElementById('pageWidthValue');
-        if (value) {
-            value.setAttribute('data-i18n', labels[pageWidthPreset]);
-            value.textContent = translatedLabel;
-        }
         if (reflowPagination && isPaginationMode) {
             window.requestAnimationFrame(function() {
                 calculateTotalPages();

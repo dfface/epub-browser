@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "reader-drawers-v15"
+SERVER_OUTPUT_REVISION = "reader-width-output-v16"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -2189,7 +2189,6 @@ document.addEventListener('DOMContentLoaded', function() {{
                             <span data-i18n="settings.pageWidthWide">Wide</span>
                             <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
                         </div>
-                        <output class="page-width-value" id="pageWidthValue" for="pageWidthSlider" data-i18n="settings.pageWidthWide">Wide</output>
                     </div>
                 </div>
                 <div class="settings-group">

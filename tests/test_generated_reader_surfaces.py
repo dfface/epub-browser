@@ -1304,6 +1304,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             reading_tab,
             r'id="pageWidthSlider"[^>]+min="1"[^>]+max="4"[^>]+value="3"',
         )
+        self.assertNotIn('id="pageWidthValue"', reading_tab)
+        self.assertNotIn('<output', reading_tab)
         for key in (
             'settings.pageWidth',
             'settings.pageWidthNarrow',
