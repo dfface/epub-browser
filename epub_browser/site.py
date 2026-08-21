@@ -343,6 +343,7 @@ if (isKindle) {
         library_html += f"""<div class="tag-cloud-item" data-id="{tag}">{tag}</div>"""
     library_html += """
         </div>
+        <button type="button" class="tag-cloud-toggle" id="tagCloudToggle" hidden aria-expanded="false" data-i18n="library.showMoreTags">Show more</button>
     </div>"""
 
     library_html += """

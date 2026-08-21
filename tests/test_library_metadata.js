@@ -30,7 +30,14 @@ function element(tagName) {
     },
     setAttribute(name, value) { this.attributes[name] = String(value); },
     getAttribute(name) { return this.attributes[name] || null; },
-    addEventListener() {},
+    listeners: {},
+    addEventListener(type, listener) {
+      this.listeners[type] = this.listeners[type] || [];
+      this.listeners[type].push(listener);
+    },
+    dispatch(type) {
+      (this.listeners[type] || []).forEach((listener) => listener({ target: this }));
+    },
     querySelector(selector) {
       return findAll(this, selector)[0] || null;
     },
@@ -95,6 +102,9 @@ function createLibraryHarness(responses, mode = 'server') {
   noTag.setAttribute('data-id', 'NoTag');
   tagCloud.appendChild(allTag);
   tagCloud.appendChild(noTag);
+  const tagCloudToggle = element('button');
+  tagCloudToggle.className = 'tag-cloud-toggle';
+  tagCloudToggle.hidden = true;
   const container = element('div');
   const scrollToTop = element('button');
   const bookshelfModal = element('div');
@@ -117,6 +127,7 @@ function createLibraryHarness(responses, mode = 'server') {
         scrollToTopBtn: scrollToTop,
         libraryBookCount: bookCount,
         libraryTagCount: tagCount,
+        tagCloudToggle,
       }[id] || null;
     },
     querySelector(selector) {
@@ -125,13 +136,14 @@ function createLibraryHarness(responses, mode = 'server') {
         '.book-grid': bookGrid,
         '.search-box': searchBox,
         '.tag-cloud': tagCloud,
+        '.tag-cloud-toggle': tagCloudToggle,
         '.container': container,
         '.bookshelf-modal': bookshelfModal,
       }[selector] || findAll({ children: [bookGrid, searchBox, tagCloud, container, bookshelfModal] }, selector)[0] || null;
     },
     querySelectorAll(selector) {
       assertValidSelector(selector);
-      return findAll({ children: [bookGrid, searchBox, tagCloud, container, bookshelfModal] }, selector);
+      return findAll({ children: [bookGrid, searchBox, tagCloud, tagCloudToggle, container, bookshelfModal] }, selector);
     },
   };
   let responseIndex = 0;
@@ -161,13 +173,17 @@ function createLibraryHarness(responses, mode = 'server') {
     getItem(key) { return storageValues[key] || null; },
     setItem(key, value) { storageValues[key] = String(value); },
   };
+  const windowListeners = {};
   const window = {
     navigator: { userAgent: 'Kindle' },
     EpubBrowserBasePath: '/reader/',
     EpubBrowserMode: mode,
     document,
     localStorage,
-    addEventListener() {},
+    addEventListener(type, listener) {
+      windowListeners[type] = windowListeners[type] || [];
+      windowListeners[type].push(listener);
+    },
     scrollTo() {},
   };
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/library.js', 'utf8'), {
@@ -184,6 +200,8 @@ function createLibraryHarness(responses, mode = 'server') {
     state(variant) { return bookGrid.querySelector('.library-state--' + variant); },
     setSavedOrder(key, order) { localStorage.setItem(key, order); },
     pendingResponseCount() { return pendingResponses.length; },
+    tagCloudToggle,
+    resize() { (windowListeners.resize || []).forEach((listener) => listener()); },
     resolveNextResponse() {
       const pending = pendingResponses.shift();
       completeResponse(pending.xhr, pending.response);
@@ -411,4 +429,30 @@ test('incremental metadata refresh ignores malformed saved order JSON', async ()
   await harness.window.refreshLibraryMetadata();
 
   assert.deepEqual(harness.cardIds(), ['one']);
+});
+
+test('collapses a tag cloud that grows beyond two rows and restores it on demand', () => {
+  const harness = createLibraryHarness([[
+    { hash: 'one', title: 'One', authors: [], tags: ['A', 'B', 'C', 'D'], url: '/book/one/', cover: null },
+  ]]);
+  harness.window.initScriptLibrary();
+  harness.tag('All').offsetTop = 0;
+  harness.tag('NoTag').offsetTop = 0;
+  harness.tag('A').offsetTop = 0;
+  harness.tag('B').offsetTop = 40;
+  harness.tag('C').offsetTop = 40;
+  harness.tag('D').offsetTop = 80;
+
+  harness.resize();
+
+  assert.equal(harness.tagCloudToggle.hidden, false);
+  assert.equal(harness.tagCloudToggle.attributes['aria-expanded'], 'false');
+  assert.equal(harness.tagCloudToggle.attributes['data-i18n'], 'library.showMoreTags');
+  assert.equal(harness.tag('All').parentNode.classList.contains('tag-cloud--collapsed'), true);
+
+  harness.tagCloudToggle.dispatch('click');
+
+  assert.equal(harness.tagCloudToggle.attributes['aria-expanded'], 'true');
+  assert.equal(harness.tagCloudToggle.attributes['data-i18n'], 'library.showFewerTags');
+  assert.equal(harness.tag('All').parentNode.classList.contains('tag-cloud--expanded'), true);
 });

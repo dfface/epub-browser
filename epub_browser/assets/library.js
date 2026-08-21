@@ -301,6 +301,49 @@ function initScript() {
         return tagNames.length;
     }
 
+    function tagCloudRowCount(tagCloud) {
+        var tagItems = tagCloud.querySelectorAll('.tag-cloud-item');
+        var rowTops = [];
+        var i;
+        var top;
+        if (!tagItems.length) return 0;
+        for (i = 0; i < tagItems.length; i++) {
+            top = tagItems[i].offsetTop;
+            if (typeof top !== 'number') return 0;
+            if (rowTops.indexOf(top) === -1) rowTops.push(top);
+        }
+        return rowTops.length;
+    }
+
+    function setTagCloudToggleLabel(toggle, expanded) {
+        var key = expanded ? 'library.showFewerTags' : 'library.showMoreTags';
+        toggle.textContent = t(key);
+        toggle.setAttribute('data-i18n', key);
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+
+    function updateTagCloudCollapse() {
+        var tagCloud = document.querySelector('.tag-cloud');
+        var toggle = document.getElementById('tagCloudToggle');
+        var expanded;
+        var overflows;
+        if (!tagCloud || !toggle) return;
+
+        expanded = tagCloud.classList.contains('tag-cloud--expanded');
+        overflows = tagCloudRowCount(tagCloud) > 2;
+        tagCloud.classList.remove('tag-cloud--overflowing');
+        tagCloud.classList.remove('tag-cloud--collapsed');
+        tagCloud.classList.remove('tag-cloud--expanded');
+        toggle.hidden = !overflows;
+
+        if (!overflows) return;
+
+        tagCloud.classList.add('tag-cloud--overflowing');
+        tagCloud.classList.add('tag-cloud--collapsed');
+        if (expanded) tagCloud.classList.add('tag-cloud--expanded');
+        setTagCloudToggleLabel(toggle, expanded);
+    }
+
     function replaceBookCards(books) {
         var bookGrid = document.querySelector('.book-grid');
         var activeTag = document.querySelector('.tag-cloud-item.active');
@@ -324,6 +367,7 @@ function initScript() {
             );
             restoreOrder(storageKeySortableBook, 'book-grid');
             restoreOrder(storageKeySortableTag, 'tag-cloud');
+            updateTagCloudCollapse();
             applyLibraryFilters();
             return;
         }
@@ -334,6 +378,7 @@ function initScript() {
 
         restoreOrder(storageKeySortableBook, 'book-grid');
         restoreOrder(storageKeySortableTag, 'tag-cloud');
+        updateTagCloudCollapse();
         applyLibraryFilters();
     }
 
@@ -550,6 +595,21 @@ function initScript() {
             if (tag && tag.classList.contains('tag-cloud-item')) activateTag(tag.getAttribute('data-id'));
         });
     }
+    var tagCloudToggle = document.getElementById('tagCloudToggle');
+    if (tagCloudToggle && tagCloudToggle.getAttribute('data-tag-cloud-toggle-listener') !== 'true') {
+        tagCloudToggle.setAttribute('data-tag-cloud-toggle-listener', 'true');
+        tagCloudToggle.addEventListener('click', function() {
+            if (!tagCloud) return;
+            if (tagCloud.classList.contains('tag-cloud--expanded')) {
+                tagCloud.classList.remove('tag-cloud--expanded');
+                setTagCloudToggleLabel(tagCloudToggle, false);
+            } else {
+                tagCloud.classList.add('tag-cloud--expanded');
+                setTagCloudToggleLabel(tagCloudToggle, true);
+            }
+        });
+    }
+    if (window.addEventListener) window.addEventListener('resize', updateTagCloudCollapse);
     var libraryGrid = document.querySelector('.book-grid');
     if (libraryGrid && libraryGrid.getAttribute('data-library-filter-listener') !== 'true') {
         libraryGrid.setAttribute('data-library-filter-listener', 'true');

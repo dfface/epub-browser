@@ -1217,6 +1217,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-info', html)
 
+    def test_library_tag_cloud_can_be_collapsed_after_two_rows(self):
+        html = self._library_html()
+        css = Path("epub_browser/assets/library.css").read_text(encoding="utf-8")
+
+        self.assertRegex(html, r'\bid=(?:["\'])?tagCloudToggle(?:["\' >])')
+        self.assertRegex(html, r'\bdata-i18n=(?:["\'])?library\.showMoreTags(?:["\' >])')
+        self.assertIn('.tag-cloud--collapsed:not(.tag-cloud--expanded)', css)
+        self.assertIn('max-height: calc(var(--tag-cloud-row-height) * 2 + var(--tag-cloud-gap))', css)
+
     def test_locale_selector_exists_only_in_library_navigation(self):
         library = self._library_html()
         self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)

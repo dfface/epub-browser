@@ -607,11 +607,22 @@ body {
 }
 
 .tag-cloud {
+    --tag-cloud-gap: 10px;
+    --tag-cloud-row-height: calc(1.44rem + 16px);
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--tag-cloud-gap);
     margin-bottom: 30px;
     justify-content: center;
+}
+
+.tag-cloud--overflowing {
+    margin-bottom: 12px;
+}
+
+.tag-cloud--collapsed:not(.tag-cloud--expanded) {
+    max-height: calc(var(--tag-cloud-row-height) * 2 + var(--tag-cloud-gap));
+    overflow: hidden;
 }
 
 .tag-cloud-item {
@@ -623,11 +634,44 @@ body {
     transition: var(--transition);
     box-shadow: var(--shadow-md);
     color: var(--text);
+    white-space: nowrap;
 }
 
 .tag-cloud-item:hover, .tag-cloud-item.active {
     background: var(--button-bg);
     color: white;
+}
+
+.tag-cloud-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    margin: 0 auto 30px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: .875rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tag-cloud-toggle:hover,
+.tag-cloud-toggle:focus-visible {
+    border-color: var(--button-bg);
+    color: var(--button-bg);
+}
+
+.tag-cloud-toggle:focus-visible {
+    outline: 2px solid var(--button-bg);
+    outline-offset: 2px;
+}
+
+.tag-cloud-toggle[hidden] {
+    display: none;
 }
 
 @media (max-width: 768px) {
