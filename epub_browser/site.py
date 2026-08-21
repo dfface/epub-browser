@@ -186,6 +186,11 @@ def _render_library_html(
                     </form>
                     <ul class="account-list" id="adminAiTagList"></ul>
                 </div>
+                <div class="admin-ai-subsection admin-ai-cache-actions">
+                    <h5 data-i18n="admin.ai.cache">AI result cache</h5>
+                    <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearRevision" data-i18n="admin.ai.clearRevision">Clear results for this configuration</button>
+                    <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearAll" data-i18n="admin.ai.clearAll">Clear all AI results</button>
+                </div>
             </section>
             <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>

@@ -592,6 +592,18 @@
       if (!aiTags.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.ai.noTags'));
     }
 
+    function clearAiResults(scope) {
+      return authenticatedFetch('/api/admin/ai/results', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scope || {})
+      }).then(function(response) {
+        if (!response.ok) return showResponseError(response, 'admin');
+        showStatus('admin.ai.cacheCleared', 'success');
+        return loadAdminData();
+      }).catch(function() { showStatus('admin.error.network', 'error'); });
+    }
+
     function renderBooks() {
       var list = element('adminBookList');
       if (!list) return;
@@ -720,6 +732,9 @@
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }));
+        item.appendChild(actionButton('admin.ai.clearBookResults', function() {
+          clearAiResults({ book_id: book.id });
+        }, 'danger'));
         list.appendChild(item);
       });
       if (!books.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.noBooks'));
@@ -895,6 +910,8 @@
       var createIdentityForm = element('adminIdentityForm');
       var aiSettingsForm = element('adminAiSettingsForm');
       var aiTagForm = element('adminAiTagForm');
+      var clearAiRevision = element('adminAiClearRevision');
+      var clearAiAll = element('adminAiClearAll');
       if (menu) menu.addEventListener('click', openPanel);
       if (close) close.addEventListener('click', closePanel);
       if (adminMenu) adminMenu.addEventListener('click', openAdminPanel);
@@ -992,6 +1009,12 @@
           showStatus('admin.ai.tagAdded', 'success');
           return loadAdminData();
         }).catch(function() { showStatus('admin.error.network', 'error'); });
+      });
+      if (clearAiRevision) clearAiRevision.addEventListener('click', function() {
+        if (aiSettings) clearAiResults({ config_revision: aiSettings.config_revision });
+      });
+      if (clearAiAll) clearAiAll.addEventListener('click', function() {
+        clearAiResults({});
       });
       if (i18n() && i18n().onLocaleChange) {
         i18n().onLocaleChange(function() {
