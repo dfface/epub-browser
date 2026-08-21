@@ -704,13 +704,17 @@
         accessActions.className = 'admin-book-actions';
         accessActions.appendChild(saveGrants);
         access.appendChild(accessActions);
+        var tags = root.document.createElement('fieldset');
+        var tagsLegend = createTextElement('legend', '', 'admin.bookTags');
         var ai = root.document.createElement('fieldset');
-        var aiLegend = createTextElement('legend', '', 'admin.bookContentSettings');
+        var aiLegend = createTextElement('legend', '', 'admin.bookAiReading');
         var profile = root.document.createElement('select');
         var tagOptions = root.document.createElement('div');
         var profileLabel = root.document.createElement('label');
         var profileText = root.document.createElement('span');
+        var tagActions = root.document.createElement('div');
         var aiActions = root.document.createElement('div');
+        tags.className = 'account-book-grants admin-book-tags-settings';
         ai.className = 'account-book-grants admin-book-ai-settings';
         profile.setAttribute('aria-label', t('admin.ai.readingProfile'));
         profile.setAttribute('data-i18n-aria-label', 'admin.ai.readingProfile');
@@ -722,6 +726,7 @@
           profile.appendChild(option);
         });
         tagOptions.className = 'account-book-grant-options';
+        tags.appendChild(tagsLegend);
         ai.appendChild(aiLegend);
         profileLabel.className = 'admin-book-field';
         profileText.textContent = t('admin.ai.readingProfile');
@@ -747,16 +752,28 @@
         if (!aiTags.length) tagOptions.appendChild(createTextElement(
           'p', 'account-empty', 'admin.ai.noTags'
         ));
-        ai.appendChild(tagOptions);
-        aiActions.className = 'admin-book-actions';
-        aiActions.appendChild(actionButton('admin.ai.saveBookSettings', function() {
+        tags.appendChild(tagOptions);
+        tagActions.className = 'admin-book-actions';
+        tagActions.appendChild(actionButton('admin.saveBookTags', function() {
           var tagIds = [];
           Array.prototype.forEach.call(tagOptions.querySelectorAll('input[type="checkbox"]'), function(checkbox) {
             if (checkbox.checked) tagIds.push(checkbox.value);
           });
           authenticatedFetch('/api/admin/books/' + encodeURIComponent(book.id) + '/ai', {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profile: profile.value, tag_ids: tagIds })
+            body: JSON.stringify({ tag_ids: tagIds })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            showStatus('admin.ai.bookSaved', 'success');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        }));
+        tags.appendChild(tagActions);
+        aiActions.className = 'admin-book-actions';
+        aiActions.appendChild(actionButton('admin.ai.saveBookProfile', function() {
+          authenticatedFetch('/api/admin/books/' + encodeURIComponent(book.id) + '/ai', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: profile.value })
           }).then(function(response) {
             if (!response.ok) return showResponseError(response, 'admin');
             showStatus('admin.ai.bookSaved', 'success');
@@ -772,6 +789,7 @@
           clearAiResults({ book_id: book.id });
         }, 'danger'));
         settings.appendChild(access);
+        settings.appendChild(tags);
         settings.appendChild(ai);
         item.appendChild(settings);
         item.appendChild(results);
