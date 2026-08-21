@@ -76,6 +76,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(started["status"], "queued")
         completed = await self._wait_for_job(started["job"]["id"])
         self.assertEqual(completed["status"], "complete")
+        self.assertIsNotNone(completed["result_id"])
         self.assertEqual(len(_FakeClient.calls), 1)
         self.assertIn("<UNTRUSTED_EPUB_CONTENT>", _FakeClient.calls[0][1]["content"])
         self.assertIn("Source sentence.", _FakeClient.calls[0][1]["content"])

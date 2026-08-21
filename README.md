@@ -133,6 +133,30 @@ After setup:
 - Administrators can manage users, roles, passwords, sessions, external identities, and book grants.
 - Sessions use an HttpOnly cookie, CSRF protection, and a 30-day sliding lifetime.
 
+### AI reading (Server only)
+
+Administrators configure AI reading in **Administration**, immediately after user
+management and before book access. The page stores one OpenAI-compatible Base
+URL, API key, model, timeout, concurrency cap, and default daily provider-call
+limit in the Server SQLite database. The API key is intentionally stored as
+plaintext SQLite configuration for this first release because only an
+administrator can set it; it is never returned to a browser or exposed by an
+API. Protect the Server state directory accordingly.
+
+AI reading starts disabled for members. An administrator grants it per member
+and can set an individual daily limit (`0` means unlimited). Administrators are
+always allowed. The book page offers a spoiler-free guide, an already-read
+pathway, or a whole-book review that includes spoilers; chapter pages offer a
+chapter-level reading guide. Results, task state, custom tags, book reading
+classification, and private follow-ups are stored in SQLite. Existing results
+remain available after a model configuration change until a reader explicitly
+regenerates them.
+
+When a reader requests an AI guide, the selected EPUB text is sent to the
+configured external provider. Do not enable this feature unless readers are
+permitted to send that content to the provider. SSG output contains no AI
+reading controls or provider configuration.
+
 For unattended first start, provide a username and password file:
 
 ```bash

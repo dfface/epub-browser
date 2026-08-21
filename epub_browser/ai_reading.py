@@ -443,10 +443,7 @@ class AIReadingService:
                 job_id, len(full_book_segments) + 1 if full_book_segments else 1,
                 len(full_book_segments) + 1 if full_book_segments else 1,
             )
-            self.store.finish_ai_job(job_id)
-            # The result id is intentionally not required to poll completion: clients
-            # load the current shared result by the same request parameters.
-            del result
+            self.store.finish_ai_job(job_id, result_id=result["id"])
         except AIReadingError as error:
             self.store.finish_ai_job(job_id, error_code=error.code)
         except (ValueError, OSError):

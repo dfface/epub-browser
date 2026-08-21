@@ -1168,6 +1168,7 @@ class EPUBProcessor:
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
+    <link rel="stylesheet" href="/assets/ai-reading.css">
 """
         index_html += """
     <script>
@@ -1244,6 +1245,14 @@ class EPUBProcessor:
 </head>
 <body>
 """
+        ai_book_button = (
+            '<button class="css-btn secondary" type="button" '
+            f'data-ai-reading-book data-book-id="{book_id_attribute}">'
+            '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
+            '<span data-i18n="ai.bookGuide">AI guide</span></button>'
+            if self.deployment_mode == "server"
+            else ""
+        )
         index_html += f"""
 <header class="app-header">
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
@@ -1295,6 +1304,7 @@ class EPUBProcessor:
                             <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                         </div>
                     </div>
+                    {ai_book_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
             </div>
@@ -1467,7 +1477,8 @@ if (window.EpubBrowserCacheBoundary) {
 <script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
-<script src="/assets/book.js?v=13" defer></script>
+    <script src="/assets/book.js?v=13" defer></script>
+    <script src="/assets/ai-reading.js" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
 <script src="/assets/annotation.js" defer></script>
 <script src="/assets/annotation-hub.js" defer></script>
@@ -1878,6 +1889,14 @@ document.addEventListener('DOMContentLoaded', function() {{
                         <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
                     </button>'''
         )
+        ai_chapter_button = (
+            '<button class="control-btn" type="button" data-ai-reading-chapter '
+            f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
+            '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
+            '<span class="control-name" data-i18n="ai.chapterRead">AI reading</span></button>'
+            if self.deployment_mode == "server"
+            else ""
+        )
         prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
@@ -1919,6 +1938,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
+    <link rel="stylesheet" href="/assets/ai-reading.css">
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -2056,6 +2076,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
             <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            {ai_chapter_button}
         </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
             <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
@@ -2405,6 +2426,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
     <script src="/assets/bookshelf.js" defer></script>
+    <script src="/assets/ai-reading.js" defer></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {{
         {startup}
