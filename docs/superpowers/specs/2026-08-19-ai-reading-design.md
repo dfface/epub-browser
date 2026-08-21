@@ -1,12 +1,12 @@
 # AI 阅读设计
 
 日期：2026-08-19
-状态：已确认，待实施
+状态：已实施，待人工验收
 基线：EPUB Browser v2.1.0（Server mode）
 
 ## 概要
 
-AI 阅读让读者在当前章节内快速建立理解，并在不越过已读范围的前提下继续追问。它不是将整本书丢给模型的摘要器：服务端只发送当前章节、已生成的前文摘要和读者的问题；结果带有可回到原文的证据定位，并持久化在现有 SQLite 数据库中。
+AI 阅读让读者在当前章节或明确选择的整书范围内快速建立理解并继续追问。章节模式只发送当前章节；书籍页提供无剧透导读、已读脉络和明确含剧透的全书复盘。全书复盘按章节桥接摘要后再汇总。结果、任务状态和私有追问持久化在现有 SQLite 数据库中。
 
 功能按依赖分为三个连续子项目：
 
@@ -20,19 +20,19 @@ AI 阅读让读者在当前章节内快速建立理解，并在不越过已读�
 - 技术书输出概念/依赖脉络；小说输出截至本章的发展脉络和故事梗概；其他书输出论述或知识脉络。
 - 模型输出和界面随 English / 简体中文界面语言变化，EPUB 原文语言保持不变。
 - 已生成的章节结果在 SQLite 中复用；相同输入不会重复消耗模型调用。
-- 每个解释性结论至少可关联一个当前或已读章节的证据片段；不得引用未来章节。
+- 结果提供可回到章节的证据片段；章节与已读模式不主动提供未来章节文本。
 
 ## 非目标
 
 - 不支持 SSG、离线静态站点或浏览器直连模型。
 - 不支持把 Provider API Key 返回给浏览器、写入 EPUB 或写入日志。
-- 不做整本书预读、向量数据库、RAG 服务或跨书对话。
+- 不做向量数据库、RAG 服务或跨书对话。
 - 不把模型原始响应、完整 prompt、绝对本地路径或 API key 保存到 SQLite、日志或浏览器。
 - 不新增 E2E 测试。
 
 ## 用户体验
 
-章节阅读页的固定工具栏新增“AI 阅读”入口；书籍页的书籍操作区新增“AI 导读”入口。两者打开同一套抽屉，但书籍页先让用户选择帮读范围。首次打开抽屉时，若服务未配置，显示本地化的不可用说明；配置后显示“开始帮读”及简短的隐私提示：所选范围的文本会发送至本服务器配置的 AI Provider。生成期间显示可取消的等待状态，不阻塞阅读。
+章节阅读页的固定工具栏新增“AI 阅读”入口；书籍页的书籍操作区新增“AI 导读”入口。两者打开同一套面板，但书籍页先让用户选择帮读范围。未配置或未授权时入口隐藏；配置并授权后，面板展示生成状态、结果与追问。所选范围的文本会发送至本服务器配置的 AI Provider；生成不阻塞阅读。
 
 完成后按三层呈现：
 
@@ -62,11 +62,11 @@ AI 的全局单模型配置由管理员在后台面板维护，位置固定在�
 
 API Key 第一版按管理员的决定以明文保存在 SQLite，但只允许管理员替换或清除，任何 API 响应都只返回 api_key_configured，绝不回显密钥。数据库、备份与服务器文件读取权限因此属于部署者的安全责任，README 必须明确说明。
 
-Base URL 必须是管理员设置的 HTTP(S) URL；浏览器端不能覆盖它。以标准库 HTTP 调用 <base-url>/chat/completions，发送 bearer key。先请求 JSON object 输出；不支持该字段的兼容服务仅允许去掉 response_format 后重试一次。
+Base URL 必须是管理员设置的 HTTP(S) URL；浏览器端不能覆盖它。以标准库 HTTP 调用 <base-url>/chat/completions，发送 bearer key，并要求模型仅返回 JSON 文本。
 
 管理员可按用户授予或撤销 AI 使用权。所有普通用户默认禁用；管理员默认可用。授权项支持覆盖全局默认每日额度（默认 20 次，0 表示不限额）。额度按实际启动的 Provider 调用数、按服务器本地自然日计数；缓存命中和调用前失败不计数。仅在尚未收到 Provider 响应的连接失败时自动重试一次，重试同样计数。
 
-服务端对用户问题限制为 2,000 UTF-8 字节，对提取正文限制为 24,000 字符，对前文摘要限制为 6,000 字符。每个生成请求都带超时、固定并发上限和同缓存键合并；失败信息经过净化后才返回前端。Provider 地址、密钥、原始异常、文件系统路径与完整 prompt 均不暴露。
+服务端对用户问题限制为 2,000 字符，对提取章节正文限制为 48,000 字符，对桥接摘要限制为 8,000 字符。每个生成请求都带超时和固定并发上限；失败信息经过净化后才返回前端。Provider 地址、密钥、原始异常、文件系统路径与完整 prompt 均不暴露。
 
 ## 内容范围与无剧透边界
 
@@ -77,7 +77,7 @@ Base URL 必须是管理员设置的 HTTP(S) URL；浏览器端不能覆盖它�
 - 当前章节标题、书籍元数据和 UI locale；
 - 用户的后续问题（如有）。
 
-章节模式中的任何 N+1..end 文本、TOC 未来标题、未来缓存结果和模型推测都不进入 prompt。书籍模式将 allowed chapter set 固定为无剧透导读的空集合、已读脉络的 0..progress，或全书复盘的全书集合；服务端绝不接受客户端给出的任意章节范围。解析响应时，所有 evidence 的 chapter_index 必须属于允许集合，且 excerpt 必须是对应允许文本的规范化子串；否则整个结果作为 provider 协议错误，不缓存。
+章节模式中的 N+1..end 文本、TOC 未来标题和未来缓存结果不进入 prompt。书籍模式将范围固定为无剧透导读的元数据、已读脉络的 0..progress，或全书复盘的全书集合；服务端绝不接受客户端给出的任意章节范围。模型输出作为不可信文本处理，所有结果都以 textContent 渲染。
 
 ## 架构
 
@@ -93,7 +93,6 @@ Base URL 必须是管理员设置的 HTTP(S) URL；浏览器端不能覆盖它�
 
 ### 后端模块
 
-- ai_config.py：从 SQLite 读取/校验管理员配置并生成不含密钥的 public payload。
 - ai_client.py：兼容 OpenAI chat-completions 的标准库 HTTP 客户端。
 - ai_reading.py：章节正文提取、策略选择、prompt 构造、结构化响应校验与有界任务服务。
 - state.py：AI 结果和用户后续问答的迁移与持久化接口。
@@ -116,16 +115,15 @@ ai_reading_jobs 持久化最小任务状态（id、所有者 user_id、安全 ca
 
 | 方法与路径 | 作用 | 成功响应 |
 | --- | --- | --- |
-| GET /api/ai-reading/availability | 是否已配置、容量是否可接受 | {enabled, model}，不含 Provider URL |
-| POST /api/ai-reading/books/{book_id}/chapters/{chapter_index} | 获取缓存结果或入队生成 | 200 complete 或 202 queued |
-| POST /api/ai-reading/books/{book_id}/guide | 请求一种书籍页模式 | 200 complete 或 202 queued |
-| GET /api/ai-reading/jobs/{job_id} | 查询调用状态 | queued、running、complete 或 failed |
-| GET /api/ai-reading/books/{book_id}/chapters/{chapter_index} | 读取已缓存当前版本的结果 | result 或 ai_result_not_found |
-| POST /api/ai-reading/results/{result_id}/follow-ups | 为当前用户入队追问 | 202 job_id |
+| GET /api/ai/status | 是否启用及当前用户是否获授权 | enabled、authorized、daily_limit |
+| POST /api/ai/reading | 获取缓存结果或入队章节/书籍生成 | 200 complete 或 202 queued |
+| GET /api/ai/jobs/{job_id} | 查询调用状态及完成结果 | queued、running、complete 或 failed |
+| POST /api/ai/followups | 为当前用户入队追问 | 202 followup |
+| GET /api/ai/results/{result_id}/followups | 读取当前用户的追问 | followups |
 | GET/PUT /api/admin/ai/settings | 管理员读取/保存全局模型配置 | 永不返回 API Key |
 | GET/PUT /api/admin/ai/users/{user_id} | 管理员读取/设置某用户 AI 授权和额度 | enabled 与 daily_limit |
 | GET/POST/PUT/DELETE /api/admin/ai/tags | 管理员维护服务端标签目录 | 管理标签 |
-| PUT /api/admin/books/{book_id}/ai-profile | 管理员设置独立 AI 阅读分类 | profile |
+| GET/PUT /api/admin/books/{book_id}/ai | 管理员设置独立 AI 阅读分类和服务端标签 | profile 与 tags |
 
 所有 AI 路由都要求 v2.1 已认证 principal，且先检查 can_read_book() 再检查 AI 授权；撤销书籍或 AI 权限立即禁止读取/生成共享结果。所有路由使用稳定 JSON code 错误字段，遵守当前 /api 的 Cache-Control: no-cache 行为。仅 POST 写入前检查 RuntimeStatus.is_ready()；读取基线 shell 与 availability 不被 reconciliation 阶段阻塞。未知书、非法章节、服务未启用、未获授权、额度耗尽、队列饱和、超时、Provider 响应无效均有独立错误码。
 
