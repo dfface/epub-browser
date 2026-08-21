@@ -161,7 +161,7 @@ def _render_library_html(
             </section>
             <section class="account-admin-section account-card-wide account-ai-section" aria-labelledby="adminAiTitle">
                 <h4 id="adminAiTitle" data-i18n="admin.ai.title">AI reading</h4>
-                <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and server-managed tags. Selected book text is sent to the configured provider.</p>
+                <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and cached results. Selected book text is sent to the configured provider.</p>
                 <form class="account-form admin-ai-settings-form" id="adminAiSettingsForm">
                     <label class="admin-ai-enabled"><span data-i18n="admin.ai.enabled">Enable AI reading</span><input type="checkbox" name="enabled"></label>
                     <label><span data-i18n="admin.ai.baseUrl">Provider base URL</span><input type="url" name="base_url" autocomplete="off" placeholder="https://api.example/v1" required></label>
@@ -178,19 +178,20 @@ def _render_library_html(
                     <h5 data-i18n="admin.ai.memberAccess">Member AI access</h5>
                     <ul class="account-list" id="adminAiUserList"></ul>
                 </div>
-                <div class="admin-ai-subsection">
-                    <h5 data-i18n="admin.ai.tags">Server tags</h5>
-                    <form class="account-form admin-ai-tag-form" id="adminAiTagForm">
-                        <label><span data-i18n="admin.ai.tagName">Tag name</span><input type="text" name="name" maxlength="80" required></label>
-                        <button type="submit" class="bookshelf-action-btn" data-i18n="admin.ai.addTag">Add tag</button>
-                    </form>
-                    <ul class="account-list" id="adminAiTagList"></ul>
-                </div>
                 <div class="admin-ai-subsection admin-ai-cache-actions">
                     <h5 data-i18n="admin.ai.cache">AI result cache</h5>
                     <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearRevision" data-i18n="admin.ai.clearRevision">Clear results for this configuration</button>
                     <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearAll" data-i18n="admin.ai.clearAll">Clear all AI results</button>
                 </div>
+            </section>
+            <section class="account-admin-section account-card-wide account-tags-section" aria-labelledby="adminTagsTitle">
+                <h4 id="adminTagsTitle" data-i18n="admin.tags">Tag management</h4>
+                <p class="account-section-copy" data-i18n="admin.tagsDescription">Create server-managed tags and assign them to books. They complement read-only EPUB tags.</p>
+                <form class="account-form admin-ai-tag-form" id="adminAiTagForm">
+                    <label><span data-i18n="admin.ai.tagName">Tag name</span><input type="text" name="name" maxlength="80" required></label>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.ai.addTag">Add tag</button>
+                </form>
+                <ul class="account-list" id="adminAiTagList"></ul>
             </section>
             <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
@@ -205,8 +206,8 @@ def _render_library_html(
                 <ul class="account-list" id="adminIdentityList"></ul>
             </section>
             <section class="account-admin-section account-card-wide" aria-labelledby="adminBooksTitle">
-                <h4 id="adminBooksTitle" data-i18n="admin.books">Book access</h4>
-                <p class="account-section-copy" data-i18n="admin.restrictedBook">Restricted books are visible only to administrators and explicitly granted users.</p>
+                <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
+                <p class="account-section-copy" data-i18n="admin.booksDescription">Manage visibility, member access, server tags, AI reading classification, and AI results for each book.</p>
                 <ul class="account-list" id="adminBookList"></ul>
             </section>
             </div>

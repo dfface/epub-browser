@@ -610,22 +610,32 @@
       list.textContent = '';
       books.forEach(function(book) {
         var item = root.document.createElement('li');
+        var header = root.document.createElement('div');
+        var settings = root.document.createElement('div');
         item.className = 'account-list-item account-book-item';
+        header.className = 'admin-book-header';
+        settings.className = 'admin-book-settings-grid';
         var title = root.document.createElement('strong');
         var visibility = root.document.createElement('select');
         var grants = root.document.createElement('fieldset');
         var grantLegend = createTextElement('legend', '', 'admin.grantUsers');
         var grantOptions = root.document.createElement('div');
+        var access = root.document.createElement('section');
+        var accessTitle = createTextElement('h5', 'admin-book-section-title', 'admin.bookAccessSettings');
+        var visibilityField = root.document.createElement('label');
+        var visibilityText = root.document.createElement('span');
+        var accessActions = root.document.createElement('div');
         var grantableUsers = users.filter(function(user) {
           return user.enabled && user.role === 'member';
         });
         title.textContent = book.title;
         title.className = 'account-book-title';
-        item.appendChild(title);
         var epubTags = root.document.createElement('p');
         epubTags.className = 'admin-book-epub-tags';
         epubTags.textContent = t('admin.ai.epubTags') + ': ' + ((book.epub_tags || []).join(', ') || t('admin.ai.noEpubTags'));
-        item.appendChild(epubTags);
+        header.appendChild(title);
+        header.appendChild(epubTags);
+        item.appendChild(header);
         ['authenticated', 'restricted'].forEach(function(value) {
           var option = root.document.createElement('option');
           option.value = value;
@@ -635,6 +645,11 @@
         });
         visibility.setAttribute('aria-label', t('admin.bookVisibility'));
         visibility.setAttribute('data-i18n-aria-label', 'admin.bookVisibility');
+        visibilityField.className = 'admin-book-field';
+        visibilityText.textContent = t('admin.bookVisibility');
+        visibilityText.setAttribute('data-i18n', 'admin.bookVisibility');
+        visibilityField.appendChild(visibilityText);
+        visibilityField.appendChild(visibility);
         visibility.addEventListener('change', function() {
           authenticatedFetch('/api/admin/books/' + encodeURIComponent(book.id), {
             method: 'PUT',
@@ -646,7 +661,9 @@
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         });
-        item.appendChild(visibility);
+        access.className = 'admin-book-section admin-book-access';
+        access.appendChild(accessTitle);
+        access.appendChild(visibilityField);
         grants.className = 'account-book-grants';
         grantOptions.className = 'account-book-grant-options';
         grants.appendChild(grantLegend);
@@ -672,7 +689,7 @@
         }
         grants.appendChild(grantOptions);
         grants.disabled = book.visibility !== 'restricted';
-        item.appendChild(grants);
+        access.appendChild(grants);
         var saveGrants = actionButton('admin.saveBookGrants', function() {
           var selected = [];
           Array.prototype.forEach.call(
@@ -684,11 +701,16 @@
           replaceBookGrants(book.id, selected);
         });
         saveGrants.disabled = book.visibility !== 'restricted';
-        item.appendChild(saveGrants);
+        accessActions.className = 'admin-book-actions';
+        accessActions.appendChild(saveGrants);
+        access.appendChild(accessActions);
         var ai = root.document.createElement('fieldset');
-        var aiLegend = createTextElement('legend', '', 'admin.ai.bookSettings');
+        var aiLegend = createTextElement('legend', '', 'admin.bookContentSettings');
         var profile = root.document.createElement('select');
         var tagOptions = root.document.createElement('div');
+        var profileLabel = root.document.createElement('label');
+        var profileText = root.document.createElement('span');
+        var aiActions = root.document.createElement('div');
         ai.className = 'account-book-grants admin-book-ai-settings';
         profile.setAttribute('aria-label', t('admin.ai.readingProfile'));
         profile.setAttribute('data-i18n-aria-label', 'admin.ai.readingProfile');
@@ -701,7 +723,12 @@
         });
         tagOptions.className = 'account-book-grant-options';
         ai.appendChild(aiLegend);
-        ai.appendChild(profile);
+        profileLabel.className = 'admin-book-field';
+        profileText.textContent = t('admin.ai.readingProfile');
+        profileText.setAttribute('data-i18n', 'admin.ai.readingProfile');
+        profileLabel.appendChild(profileText);
+        profileLabel.appendChild(profile);
+        ai.appendChild(profileLabel);
         aiTags.forEach(function(tag) {
           var label = root.document.createElement('label');
           var checkbox = root.document.createElement('input');
@@ -721,8 +748,8 @@
           'p', 'account-empty', 'admin.ai.noTags'
         ));
         ai.appendChild(tagOptions);
-        item.appendChild(ai);
-        item.appendChild(actionButton('admin.ai.saveBookSettings', function() {
+        aiActions.className = 'admin-book-actions';
+        aiActions.appendChild(actionButton('admin.ai.saveBookSettings', function() {
           var tagIds = [];
           Array.prototype.forEach.call(tagOptions.querySelectorAll('input[type="checkbox"]'), function(checkbox) {
             if (checkbox.checked) tagIds.push(checkbox.value);
@@ -736,9 +763,18 @@
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }));
-        item.appendChild(actionButton('admin.ai.clearBookResults', function() {
+        ai.appendChild(aiActions);
+        var results = root.document.createElement('div');
+        var resultsLabel = createTextElement('span', 'admin-book-results-label', 'admin.bookResults');
+        results.className = 'admin-book-results';
+        results.appendChild(resultsLabel);
+        results.appendChild(actionButton('admin.ai.clearBookResults', function() {
           clearAiResults({ book_id: book.id });
         }, 'danger'));
+        settings.appendChild(access);
+        settings.appendChild(ai);
+        item.appendChild(settings);
+        item.appendChild(results);
         list.appendChild(item);
       });
       if (!books.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.noBooks'));
