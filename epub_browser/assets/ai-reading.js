@@ -9,6 +9,7 @@
   var activeRun = 0;
   var focusReturn;
   var evidenceMarks = [];
+  var evidenceResultId;
   var insightPopover;
 
   function t(key, params) {
@@ -167,13 +168,13 @@
 
   function closePanel() {
     activeRun += 1;
-    clearEvidenceMarks();
     if (overlay) overlay.hidden = true;
     document.body.classList.remove('ai-reading-open');
     if (focusReturn && typeof focusReturn.focus === 'function') focusReturn.focus();
   }
 
   function addResult(result) {
+    if (evidenceMarks.length && evidenceResultId !== result.id) clearEvidenceMarks();
     var body = panel.querySelector('.ai-reading-body');
     body.textContent = '';
     var content = result.content || {};
@@ -199,7 +200,7 @@
     var evidence = content.evidence || [];
     if (evidence.length) {
       body.appendChild(el('h4', '', t('ai.evidence')));
-      if (requestContext.scope === 'chapter') addEvidenceHighlightControl(body, evidence);
+      if (requestContext.scope === 'chapter') addEvidenceHighlightControl(body, evidence, result.id);
       evidence.forEach(function(item) {
         var card = el('blockquote', 'ai-reading-evidence');
         card.appendChild(el('p', '', item.quote || ''));
@@ -217,9 +218,9 @@
     addFollowup(body, result.id);
   }
 
-  function addEvidenceHighlightControl(parent, evidence) {
+  function addEvidenceHighlightControl(parent, evidence, resultId) {
     var control = action('ai.showEvidenceHighlights', function() {
-      if (evidenceMarks.length) {
+      if (evidenceMarks.length && evidenceResultId === resultId) {
         clearEvidenceMarks();
         control.textContent = t('ai.showEvidenceHighlights', { count: evidence.length });
         return;
@@ -229,10 +230,13 @@
         showEvidenceNotice(parent, 'ai.noEvidenceHighlights');
         return;
       }
+      evidenceResultId = resultId;
       control.textContent = t('ai.hideEvidenceHighlights', { count: found });
     });
     control.classList.add('ai-reading-evidence-toggle');
-    control.textContent = t('ai.showEvidenceHighlights', { count: evidence.length });
+    control.textContent = evidenceMarks.length && evidenceResultId === resultId
+      ? t('ai.hideEvidenceHighlights', { count: evidenceMarks.length })
+      : t('ai.showEvidenceHighlights', { count: evidence.length });
     parent.appendChild(control);
   }
 
@@ -302,6 +306,7 @@
       parent.normalize();
     });
     evidenceMarks = [];
+    evidenceResultId = undefined;
   }
 
   function showInsightPopover(mark) {
