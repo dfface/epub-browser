@@ -992,6 +992,20 @@ class AdminAccountTests(unittest.TestCase):
             403,
         )
 
+    def test_authorized_member_can_poll_a_shared_ai_generation_job(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "shared-job.epub",
+            "urn:test:shared-job", "shared-job-fingerprint", {"title": "Book"},
+        )
+        self.store.create_ai_job(
+            "shared-generation", self.admin.user_id, "chapter:shared", book_id=book.book_id,
+        )
+
+        response = self.member_client.get("/api/ai/jobs/shared-generation")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["job"]["book_id"], book.book_id)
+
     def test_admin_saves_book_tags_and_ai_profile_independently(self):
         book = self.store.resolve_book(
             Path(self.directory.name) / "book.epub",

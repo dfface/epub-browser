@@ -335,12 +335,23 @@ class AIReadingService:
         job_id = hashlib.sha256(
             (cache_key + principal.user_id + str(asyncio.get_running_loop().time())).encode()
         ).hexdigest()[:32]
-        self.store.create_ai_job(
+        job, created = self.store.create_or_get_active_ai_job(
             job_id,
             principal.user_id,
+            request.book_id,
             cache_key,
             progress_total=progress_total,
         )
+        if not created:
+            return {"status": job["status"], "cached": False, "shared": True, "job": job}
+        # A previous task can finish after the first cache lookup but before
+        # this request acquires the single-flight lock. Prefer its result over
+        # another Provider request.
+        cached = self.store.get_current_ai_reading_result(cache_key)
+        if cached is not None and not request.force:
+            self.store.start_ai_job(job_id)
+            self.store.finish_ai_job(job_id, result_id=cached["id"])
+            return {"status": "complete", "cached": True, "result": cached}
         task = asyncio.create_task(
             self._run_generation(
                 job_id, principal, request, metadata, material, full_book_segments,
@@ -349,7 +360,7 @@ class AIReadingService:
         )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
-        return {"status": "queued", "cached": False, "job": self.store.get_ai_job(job_id, principal.user_id)}
+        return {"status": "queued", "cached": False, "shared": False, "job": job}
 
     async def _provider_call(
         self,

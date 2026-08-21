@@ -1641,6 +1641,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("addEvidenceHighlightControl(body, evidence, result.id)", script)
         self.assertIn("range.surroundContents(mark)", script)
         self.assertIn("clearEvidenceMarks();", script)
+        self.assertIn("payload.job.progress_current || 0", script)
         self.assertIn('.ai-evidence-mark {', stylesheet)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
