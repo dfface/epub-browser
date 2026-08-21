@@ -858,6 +858,34 @@ class StateStoreTests(unittest.TestCase):
         self.assertTrue(self.store.can_use_ai(member))
         self.assertEqual(self.store.ai_daily_limit(member), 5)
 
+    def test_administrator_tags_merge_with_epub_tags_and_ai_profile_is_independent(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "book.epub"),
+            "urn:test:tags",
+            "fingerprint",
+            {"title": "Book", "tags": ["History", "DDD"]},
+        )
+
+        tag = self.store.create_ai_tag(" history ")
+        custom = self.store.create_ai_tag("Domain driven design")
+        self.store.replace_book_ai_tags(book.book_id, [tag["id"], custom["id"]])
+        self.store.set_book_ai_profile(book.book_id, "fiction")
+
+        self.assertEqual(
+            self.store.effective_book_tags(book.book_id),
+            ("DDD", "Domain driven design", "History"),
+        )
+        self.assertEqual(
+            tuple(item["name"] for item in self.store.book_ai_tags(book.book_id)),
+            ("Domain driven design", "history"),
+        )
+        self.assertEqual(self.store.get_book_ai_profile(book.book_id), "fiction")
+        self.store.delete_ai_tag(tag["id"])
+        self.assertEqual(
+            self.store.effective_book_tags(book.book_id),
+            ("DDD", "Domain driven design", "History"),
+        )
+
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,
         username,
