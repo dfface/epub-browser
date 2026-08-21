@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 Server mode 中提供无剧透、可缓存、可追问的自适应 AI 阅读体验。
+**Goal:** 在 Server mode 中提供受 v2.1 账户与后台治理的、可缓存、可追问的自适应 AI 阅读体验。
 
-**Architecture:** 以现有 StateStore 为唯一持久化边界，AIReadingService 用受限 worker 调度兼容 OpenAI 的请求并合并相同工作。Starlette 只暴露固定的 Server API；章节页通过独立的 ES5 控制器渲染经服务端验证的结构化结果。
+**Architecture:** 以现有 StateStore 为唯一持久化边界，管理员在 SQLite 中管理单模型配置、用户授权/额度、服务端标签和书籍 AI 分类。AIReadingService 用受限 worker 调度兼容 OpenAI 的请求并合并相同工作；账户 principal、book_access 与 AI grant 共同决定每一个读写操作。
 
 **Tech Stack:** Python 3.9+、标准库 urllib、SQLite、Starlette、ES5 JavaScript、CSS、Python unittest、Node node:test。
 
@@ -13,11 +13,66 @@
 ## Global Constraints
 
 - I18N 现有基线是 v2.0.1；所有新增 UI 必须有完整 aiReading.* EN/zh-CN 键。
-- AI 仅在 Server mode 且三项必需环境变量有效时启用；SSG 不包含 AI API 或资源。
-- API key、Provider URL、原始 prompt/response、绝对路径不进入浏览器、SQLite 或日志。
+- AI 仅在 Server mode 且管理员保存有效单模型配置时启用；SSG 不包含 AI API 或资源。
+- API Key 按已确认决定明文存入 SQLite，但绝不进入浏览器/API 响应/日志；Provider URL、原始 prompt/response、绝对路径不进入浏览器或日志。
 - 章节模式第 N 章仅使用 0..N 的正文和前文 bridge summary；书籍模式只能使用服务端从 mode 和阅读进度推导的范围，禁止未来章节、未来 TOC 或未来缓存输入，除非该次 full_review 明确确认。
 - 不运行 E2E；不得修改既有书架、标注、阅读进度、书籍 identity 或 migration 行为。
 - 所有不受信任文本（模型、EPUB、问题）均经 JSON/textContent，不写入 innerHTML。
+
+## v2.1 已确认执行修订
+
+本节替代下方旧任务中与环境变量、匿名用户名、全书二次确认相冲突的描述。
+
+1. **后台与账户先于调用服务。** schema 从 v2.1 的版本 4 升级，只新增：单行 ai_settings、ai_user_access、ai_usage、ai_tags、book_ai_tags、book_ai_profiles、ai_reading_results、ai_reading_current、ai_reading_jobs、ai_reading_followups。所有外键使用 users.id 或 books.book_id；启动时将未终止 job 标记 interrupted。
+2. **管理员面板。** 在 adminUserList 所在 section 后、adminBookList section 前插入 AI Settings section；包含全局配置、授权用户与额度、服务端标签目录。书籍列表的每项显示 EPUB 标签（只读）、服务端标签（可编辑）和独立 AI 分类 select。
+3. **授权。** 管理员默认允许，成员默认拒绝；每次 AI 读/写先 require_principal，再 can_read_book，再 can_use_ai。GET job/result 和 follow-up 同样检查所有者/书籍授权，撤权立即生效。
+4. **额度。** 默认 20 次/服务器本地日；成员 override 可为 0（不限额）。在每次实际 Provider HTTP 尝试前事务化递增 ai_usage；缓存命中/调用前失败不计数，连接级自动重试也计数。
+5. **缓存。** 每一个完成结果和 follow-up 写入 SQLite。结果 generation 含 config_revision，但当前指针不随配置变更自动移动；用户点击重新生成才创建新 generation 并更新指针。管理员可清理结果，不能读取用户追问正文。
+6. **范围与 UX。** 书籍页默认为不自动执行的 spoiler_free；read_so_far 用当前 principal 的 reading_progress；full_review 直接作为清晰模式发起，无二次弹窗。全书由章节 bridge summary 分层汇总，并显示 X/Y 进度。
+
+### v2.1 Task A: 持久化治理模型
+
+**Files:** Modify epub_browser/state.py; Modify tests/test_state.py.
+
+- [ ] 先写迁移、默认拒绝、额度原子计数、标签来源合并、AI profile 与 interrupted job 的失败测试。
+- [ ] 仅新增 schema/索引和 StateStore 方法；管理员配置读取必须返回 api_key_configured 而非 key。
+- [ ] Run: /usr/bin/python3 -m unittest tests.test_state -v
+- [ ] Commit: git commit -m "feat: persist AI reading administration"
+
+### v2.1 Task B: Provider、范围、结果和有界任务服务
+
+**Files:** Create epub_browser/ai_config.py, epub_browser/ai_client.py, epub_browser/ai_reading.py; Create tests/test_ai_config.py, tests/test_ai_client.py, tests/test_ai_reading.py.
+
+- [ ] 以 StateStore 配置快照构造客户端；测试 API Key 不在 public payload、Provider 重试及错误净化。
+- [ ] 测试章节、三种书籍范围、profile override、evidence 子串校验、缓存命中、分层全书 job、任务所有者与额度。
+- [ ] Run: /usr/bin/python3 -m unittest tests.test_ai_config tests.test_ai_client tests.test_ai_reading -v
+- [ ] Commit: git commit -m "feat: add governed AI reading service"
+
+### v2.1 Task C: API、runtime 与管理员面板
+
+**Files:** Modify epub_browser/server.py, epub_browser/runtime.py, epub_browser/site.py, epub_browser/assets/auth.js, epub_browser/assets/account.css, epub_browser/assets/i18n.js; Modify tests/test_server.py, tests/test_runtime.py, tests/test_auth_ui.js, tests/test_i18n.js.
+
+- [ ] 路由必须在通配 API 前注册；所有写请求走现有 CSRF 与 require_admin/require_principal。
+- [ ] 管理员 API 永不回显 Key，成员无法读写管理项或 AI 数据；AI 页面/错误中英文同构。
+- [ ] Run: /usr/bin/python3 -m unittest tests.test_server tests.test_runtime tests.test_i18n_coverage -v && PATH="/usr/bin:$PATH" node --test tests/test_auth_ui.js tests/test_i18n.js
+- [ ] Commit: git commit -m "feat: manage AI reading from administration"
+
+### v2.1 Task D: Server 页面与阅读体验
+
+**Files:** Create epub_browser/assets/ai-reading.js, epub_browser/assets/ai-reading.css, tests/test_ai_reading.js; Modify epub_browser/processor.py, epub_browser/site.py, tests/test_site.py, tests/test_generated_reader_surfaces.py.
+
+- [ ] Server-only 发出书籍/章节入口、结果抽屉、标签合并元数据；SSG 不发 AI assets。
+- [ ] 以 textContent/createElementNS 渲染结果、证据、SVG，full_review 不弹确认；缓存/任务状态可重连读取。
+- [ ] Run: /usr/bin/python3 -m unittest tests.test_site tests.test_generated_reader_surfaces -v && PATH="/usr/bin:$PATH" node --test tests/test_ai_reading.js
+- [ ] Commit: git commit -m "feat: add adaptive AI reading experience"
+
+### v2.1 Task E: 文档、清理和完整验证
+
+**Files:** Modify README.md; add release note only after user requests a release.
+
+- [ ] 说明管理员配置、明文 Key 的部署风险、授权、额度、正文外发、缓存和清理。
+- [ ] Run: /usr/bin/python3 -m unittest discover -s tests -v && PATH="/usr/bin:$PATH" node --test tests/*.js && git diff --check
+- [ ] 不运行 E2E；用户确认发布前不得改版本号、打 tag 或创建 Release。
 
 ---
 

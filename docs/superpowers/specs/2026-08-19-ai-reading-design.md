@@ -1,8 +1,8 @@
 # AI 阅读设计
 
 日期：2026-08-19
-状态：提案
-基线：EPUB Browser v2.0.1（Server mode）
+状态：已确认，待实施
+基线：EPUB Browser v2.1.0（Server mode）
 
 ## 概要
 
@@ -25,7 +25,7 @@ AI 阅读让读者在当前章节内快速建立理解，并在不越过已读�
 ## 非目标
 
 - 不支持 SSG、离线静态站点或浏览器直连模型。
-- 不支持把 API key、Provider URL 或模型设置开放给浏览器端修改。
+- 不支持把 Provider API Key 返回给浏览器、写入 EPUB 或写入日志。
 - 不做整本书预读、向量数据库、RAG 服务或跨书对话。
 - 不把模型原始响应、完整 prompt、绝对本地路径或 API key 保存到 SQLite、日志或浏览器。
 - 不新增 E2E 测试。
@@ -52,19 +52,19 @@ AI 阅读让读者在当前章节内快速建立理解，并在不越过已读�
 | --- | --- | --- | --- |
 | 无剧透导读 | 书籍元数据、当前已读进度之前的桥接摘要；不读取未来章节或未来目录标题 | 开始阅读前或任何时候 | 不透露、推测或暗示后续事件/结论 |
 | 已读脉络 | 从第 0 章到读者保存的当前阅读进度（无进度时仅使用当前书籍元数据） | 阅读过程中 | 仅总结已经读过的章节 |
-| 全书复盘（含剧透） | 全部可提取章节 | 读完后或明确想复盘时 | 点击后先显示本地化确认对话框；确认才入队 |
+| 全书复盘（含剧透） | 全部可提取章节 | 读完后或明确想复盘时 | 明确选择该模式后即可入队，不再显示二次确认 |
 
-三种模式都使用同样的“快速掌握 / 脉络理解 / 深入理解”三层结果和证据图，但小说的事件线、技术书的概念依赖、通用书的论述结构均严格限制在所选输入范围。全书复盘确认是每次请求都必须携带的显式布尔值，不能仅由已读进度或前端状态推断。
+三种模式都使用同样的“快速掌握 / 脉络理解 / 深入理解”三层结果和证据图，但小说的事件线、技术书的概念依赖、通用书的论述结构均严格限制在所选输入范围。选择“全书复盘（含剧透）”并点击生成即代表该次范围选择；无须为了正文外发或剧透另弹确认。
 
-## 配置与安全
+## 后台配置、权限与安全
 
-AI 只在以下环境变量均有效时启用：
+AI 的全局单模型配置由管理员在后台面板维护，位置固定在“用户管理”之后、“书籍可见性管理”之前。配置包含启用开关、OpenAI-compatible Base URL、API Key、模型名、超时、最大并发和默认每日调用额度；保存后新任务立即使用新配置，运行中的任务继续使用创建时的配置快照。
 
-    EPUB_BROWSER_AI_BASE_URL=https://provider.example/v1
-    EPUB_BROWSER_AI_API_KEY=...
-    EPUB_BROWSER_AI_MODEL=gpt-4.1-mini
+API Key 第一版按管理员的决定以明文保存在 SQLite，但只允许管理员替换或清除，任何 API 响应都只返回 api_key_configured，绝不回显密钥。数据库、备份与服务器文件读取权限因此属于部署者的安全责任，README 必须明确说明。
 
-可选变量：EPUB_BROWSER_AI_TIMEOUT_SECONDS（默认 60，范围 5–180）和 EPUB_BROWSER_AI_MAX_CONCURRENCY（默认 2，范围 1–4）。Base URL 必须为 https，或本机 loopback 的 http；客户端不能覆盖这些配置。以标准库 HTTP 调用 <base-url>/chat/completions，发送 bearer key。先请求 JSON object 输出；不支持该字段的兼容服务仅允许去掉 response_format 后重试一次。
+Base URL 必须是管理员设置的 HTTP(S) URL；浏览器端不能覆盖它。以标准库 HTTP 调用 <base-url>/chat/completions，发送 bearer key。先请求 JSON object 输出；不支持该字段的兼容服务仅允许去掉 response_format 后重试一次。
+
+管理员可按用户授予或撤销 AI 使用权。所有普通用户默认禁用；管理员默认可用。授权项支持覆盖全局默认每日额度（默认 20 次，0 表示不限额）。额度按实际启动的 Provider 调用数、按服务器本地自然日计数；缓存命中和调用前失败不计数。仅在尚未收到 Provider 响应的连接失败时自动重试一次，重试同样计数。
 
 服务端对用户问题限制为 2,000 UTF-8 字节，对提取正文限制为 24,000 字符，对前文摘要限制为 6,000 字符。每个生成请求都带超时、固定并发上限和同缓存键合并；失败信息经过净化后才返回前端。Provider 地址、密钥、原始异常、文件系统路径与完整 prompt 均不暴露。
 
@@ -77,7 +77,7 @@ AI 只在以下环境变量均有效时启用：
 - 当前章节标题、书籍元数据和 UI locale；
 - 用户的后续问题（如有）。
 
-章节模式中的任何 N+1..end 文本、TOC 未来标题、未来缓存结果和模型推测都不进入 prompt。书籍模式将 allowed chapter set 固定为无剧透导读的空集合、已读脉络的 0..progress，或已经明确确认的全书集合；服务端绝不接受客户端给出的任意章节范围。系统提示明确要求“只陈述给定证据支持的内容；不预示、猜测或暗示范围外发展”。解析响应时，所有 evidence 的 chapter_index 必须属于允许集合，且 excerpt 必须是对应允许文本的规范化子串；否则整个结果作为 provider 协议错误，不缓存。
+章节模式中的任何 N+1..end 文本、TOC 未来标题、未来缓存结果和模型推测都不进入 prompt。书籍模式将 allowed chapter set 固定为无剧透导读的空集合、已读脉络的 0..progress，或全书复盘的全书集合；服务端绝不接受客户端给出的任意章节范围。解析响应时，所有 evidence 的 chapter_index 必须属于允许集合，且 excerpt 必须是对应允许文本的规范化子串；否则整个结果作为 provider 协议错误，不缓存。
 
 ## 架构
 
@@ -93,7 +93,7 @@ AI 只在以下环境变量均有效时启用：
 
 ### 后端模块
 
-- ai_config.py：不可变配置、环境变量解析与安全的 public availability payload。
+- ai_config.py：从 SQLite 读取/校验管理员配置并生成不含密钥的 public payload。
 - ai_client.py：兼容 OpenAI chat-completions 的标准库 HTTP 客户端。
 - ai_reading.py：章节正文提取、策略选择、prompt 构造、结构化响应校验与有界任务服务。
 - state.py：AI 结果和用户后续问答的迁移与持久化接口。
@@ -102,11 +102,15 @@ AI 只在以下环境变量均有效时启用：
 
 ### SQLite 模型
 
-ai_reading_results 是共享、可复用的章节或书籍结果。唯一键为 (book_id, scope, chapter_index_or_null, mode, allowed_through_chapter, source_fingerprint, locale, strategy, model, result_version)；scope 为 chapter 或 book，mode 为 chapter、spoiler_free、read_so_far、full_review。保存已验证的结果 JSON、前文桥接摘要、内容哈希、创建时间。书籍更新、阅读范围或章节文本变化自然产生新键，旧记录可保留以便回滚。
+ai_settings 是单行全局配置，保存 Provider 与额度设置及递增的 config_revision。ai_user_access 以 user_id 保存授权开关和可选额度覆盖。管理 API 返回 mask 后的配置，不返回 API Key。
 
-ai_reading_followups 是用户隔离的问答。键含 username、结果 id、问题与回答；用户名语义与现有标注一致。问题和回答均不参与其他读者的缓存。
+ai_tags 与 book_ai_tags 保存管理员维护的扁平自定义标签和书籍关联。标签用 Unicode 规范化名称去重；EPUB dc:subject 不写入这两张表，始终来自书籍元数据。前台对两种来源按规范化名称合并显示，后台显示 EPUB（只读）与服务端标签（可编辑）。book_ai_profiles 是书籍独立的 AI 分类：auto、technical、fiction 或 general；它不由普通标签隐式改变。
 
-数据库 schema 升级必须只新增表/索引并递增 DB_SCHEMA_VERSION；从 v2.0.1 启动时不迁移或修改既有标注、书架、阅读进度和书籍行。
+ai_reading_results 是共享、可复用的章节或书籍结果。每个 generation 含 config_revision、书籍指纹、范围、locale、profile、内容哈希和结果 JSON；结果与一个不含配置版本的“当前版本”指针关联。配置变化不自动替换该指针，只有获授权用户主动重新生成才创建新的 generation 并更新默认结果。所有完成结果都持久化于 SQLite；管理员可按书、按配置版本或全量清除。
+
+ai_reading_jobs 持久化最小任务状态（id、所有者 user_id、安全 cache key、状态、时间与安全错误码），但不保存正文、prompt 或 Provider 原始响应。启动后残留的 queued/running job 标记为 interrupted。ai_reading_followups 是用户隔离的问答；仅所有者可读取，管理员只能获得聚合用量和安全错误码。
+
+数据库 schema 升级必须只新增表/索引并递增 DB_SCHEMA_VERSION；从 v2.1.0 启动时不迁移或修改既有标注、书架、阅读进度和书籍行。
 
 ### API 合同
 
@@ -118,8 +122,12 @@ ai_reading_followups 是用户隔离的问答。键含 username、结果 id、�
 | GET /api/ai-reading/jobs/{job_id} | 查询调用状态 | queued、running、complete 或 failed |
 | GET /api/ai-reading/books/{book_id}/chapters/{chapter_index} | 读取已缓存当前版本的结果 | result 或 ai_result_not_found |
 | POST /api/ai-reading/results/{result_id}/follow-ups | 为当前用户入队追问 | 202 job_id |
+| GET/PUT /api/admin/ai/settings | 管理员读取/保存全局模型配置 | 永不返回 API Key |
+| GET/PUT /api/admin/ai/users/{user_id} | 管理员读取/设置某用户 AI 授权和额度 | enabled 与 daily_limit |
+| GET/POST/PUT/DELETE /api/admin/ai/tags | 管理员维护服务端标签目录 | 管理标签 |
+| PUT /api/admin/books/{book_id}/ai-profile | 管理员设置独立 AI 阅读分类 | profile |
 
-所有路由使用稳定 JSON code 错误字段，遵守当前 /api 的 Cache-Control: no-cache 行为。仅 POST 写入前检查 RuntimeStatus.is_ready()；读取基线 shell 与 availability 不被 reconciliation 阶段阻塞。未知书、非法章节、服务未启用、队列饱和、超时、Provider 响应无效均有独立错误码。
+所有 AI 路由都要求 v2.1 已认证 principal，且先检查 can_read_book() 再检查 AI 授权；撤销书籍或 AI 权限立即禁止读取/生成共享结果。所有路由使用稳定 JSON code 错误字段，遵守当前 /api 的 Cache-Control: no-cache 行为。仅 POST 写入前检查 RuntimeStatus.is_ready()；读取基线 shell 与 availability 不被 reconciliation 阶段阻塞。未知书、非法章节、服务未启用、未获授权、额度耗尽、队列饱和、超时、Provider 响应无效均有独立错误码。
 
 ## 结构化结果合同
 
@@ -144,11 +152,12 @@ ai_reading_followups 是用户隔离的问答。键含 username、结果 id、�
 
 ## 验收标准
 
-- 未配置环境变量时，SSG 没有 AI 资源，Server 的书籍/章节页面显示本地化不可用状态，且没有模型网络调用。
+- 未配置后台模型时，SSG 没有 AI 资源，Server 的书籍/章节页面显示本地化不可用状态，且没有模型网络调用。
 - 已配置时，当前章节可生成三层结果；同一输入第二次返回 SQLite 缓存，不新建 Provider 调用。
 - 技术、小说、通用策略分别产生对应字段与可渲染脉络图。
 - 所有证据只能指向当前或更早章节，且 excerpt 在允许文本中逐字存在。
 - 同一缓存键的并发请求合并为一个 job；用户可读取其终态；关闭 Server 不遗留 worker。
 - UI 语言切换影响所有 AI 控件和新生成的模型语言；模型/EPUB 文本不进入 innerHTML。
-- 书籍页提供无剧透导读、已读脉络与全书复盘三个可选模式；只有后者在当前请求中带有明确确认时才能读取未来章节。
+- 书籍页提供无剧透导读、已读脉络与全书复盘三个可选模式；全书复盘以明确模式名称提示剧透，不再二次确认。
+- AI 授权、额度、书籍可见性、后台标签、书籍 AI 分类与缓存清理均能在管理员面板完成；普通用户不能读取 Key、追问内容或不可见书籍的 AI 数据。
 - Python 与 Node focused/full suite 通过；不运行 E2E。
