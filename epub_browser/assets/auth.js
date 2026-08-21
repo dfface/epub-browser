@@ -15,6 +15,12 @@
     var identities = [];
     var aiSettings = null;
     var aiTags = [];
+    var aiProfileTranslationKeys = {
+      auto: 'admin.ai.profile.auto',
+      technical: 'admin.ai.profile.technical',
+      fiction: 'admin.ai.profile.fiction',
+      general: 'admin.ai.profile.general'
+    };
 
     function i18n() {
       return root.EpubBrowserI18n;
@@ -721,7 +727,7 @@
         ['auto', 'technical', 'fiction', 'general'].forEach(function(value) {
           var option = root.document.createElement('option');
           option.value = value;
-          option.textContent = t('admin.ai.profile.' + value);
+          option.textContent = t(aiProfileTranslationKeys[value]);
           option.selected = value === (book.ai_profile || 'auto');
           profile.appendChild(option);
         });

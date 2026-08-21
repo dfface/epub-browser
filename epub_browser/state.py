@@ -2600,6 +2600,22 @@ class StateStore:
             ).fetchall()
         return tuple(dict(row) for row in rows)
 
+    def get_ai_followup(
+        self, followup_id: str, owner_user_id: str
+    ) -> Optional[dict]:
+        """Return one user's persisted AI conversation turn."""
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT id, result_id, owner_user_id, question, answer, status,
+                       error_code, created_at, updated_at
+                FROM ai_reading_followups
+                WHERE id = ? AND owner_user_id = ?
+                """,
+                (followup_id, owner_user_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
     def resolve_book(
         self,
         source_path: Path,

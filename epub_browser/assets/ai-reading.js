@@ -11,6 +11,8 @@
   var evidenceMarks = [];
   var evidenceResultId;
   var insightPopover;
+  var jobEventSource;
+  var followupEventSources = {};
 
   function t(key, params) {
     var i18n = root.EpubBrowserI18n;
@@ -125,6 +127,7 @@
 
   function openPanel(context, trigger) {
     activeRun += 1;
+    stopEventStreams();
     requestContext = context;
     focusReturn = trigger || document.activeElement;
     var target = ensurePanel();
@@ -168,6 +171,7 @@
 
   function closePanel() {
     activeRun += 1;
+    stopEventStreams();
     if (overlay) overlay.hidden = true;
     document.body.classList.remove('ai-reading-open');
     if (focusReturn && typeof focusReturn.focus === 'function') focusReturn.focus();
@@ -402,40 +406,128 @@
   }
 
   function addFollowup(parent, resultId) {
+    var chat = el('section', 'ai-reading-chat');
+    chat.setAttribute('aria-label', t('ai.conversation'));
+    chat.appendChild(el('h4', '', t('ai.conversation')));
+    var thread = el('div', 'ai-reading-chat-log');
+    thread.setAttribute('aria-live', 'polite');
+    chat.appendChild(thread);
+
     var form = el('form', 'ai-reading-followup');
     var input = el('input', '');
     input.type = 'text';
     input.maxLength = 2000;
     input.placeholder = t('ai.followupPlaceholder');
     input.setAttribute('aria-label', t('ai.followupPlaceholder'));
+    var ask = el('button', 'ai-reading-primary', t('ai.ask'));
+    ask.type = 'submit';
     form.appendChild(input);
-    form.appendChild(action('ai.ask', function() {
+    form.appendChild(ask);
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
       var question = input.value.trim();
       if (!question) return;
+      ask.disabled = true;
       fetchApi('/api/ai/followups', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ result_id: resultId, question: question, language: locale() })
       }).then(function(payload) {
         input.value = '';
-        pollFollowup(resultId, payload.followup.id, parent);
-      }).catch(showError);
-    }, true));
-    parent.appendChild(form);
+        renderFollowupTurn(thread, payload.followup);
+        streamFollowup(resultId, payload.followup.id, thread);
+      }).catch(showError).finally(function() {
+        ask.disabled = false;
+      });
+    });
+    chat.appendChild(form);
+    parent.appendChild(chat);
+    loadFollowups(resultId, thread);
   }
 
-  function pollFollowup(resultId, id, parent) {
+  function loadFollowups(resultId, thread) {
+    fetchApi('/api/ai/results/' + encodeURIComponent(resultId) + '/followups').then(function(payload) {
+      thread.textContent = '';
+      (payload.followups || []).forEach(function(followup) {
+        renderFollowupTurn(thread, followup);
+        if (followup.status === 'queued' || followup.status === 'running') {
+          streamFollowup(resultId, followup.id, thread);
+        }
+      });
+    }).catch(showError);
+  }
+
+  function findFollowupTurn(thread, id) {
+    return Array.prototype.slice.call(thread.children).filter(function(child) {
+      return child.getAttribute('data-ai-followup-id') === id;
+    })[0];
+  }
+
+  function followupStatusText(followup) {
+    if (followup.status === 'queued') return t('ai.queued', { current: 0, total: 1 });
+    if (followup.status === 'running') return t('ai.generating', { current: 0, total: 1 });
+    if (followup.status === 'failed' || followup.status === 'interrupted') {
+      return t('ai.error.' + (followup.error_code || 'unknown'));
+    }
+    return '';
+  }
+
+  function renderFollowupTurn(thread, followup) {
+    if (!followup || !followup.id) return;
+    var turn = el('article', 'ai-reading-chat-turn');
+    turn.setAttribute('data-ai-followup-id', followup.id);
+    var question = el('section', 'ai-reading-chat-message ai-reading-chat-question');
+    question.appendChild(el('strong', '', t('ai.you')));
+    question.appendChild(el('p', '', followup.question || ''));
+    turn.appendChild(question);
+    var answer = el('section', 'ai-reading-chat-message ai-reading-chat-answer');
+    answer.appendChild(el('strong', '', t('ai.assistant')));
+    if (followup.status === 'complete') {
+      answer.appendChild(el('p', '', followup.answer || ''));
+    } else {
+      answer.appendChild(el('p', 'ai-reading-chat-pending', followupStatusText(followup)));
+    }
+    turn.appendChild(answer);
+    var existing = findFollowupTurn(thread, followup.id);
+    if (existing) thread.replaceChild(turn, existing);
+    else thread.appendChild(turn);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function pollFollowup(resultId, id, thread) {
     function poll() {
       fetchApi('/api/ai/results/' + encodeURIComponent(resultId) + '/followups').then(function(payload) {
         var found = (payload.followups || []).filter(function(item) { return item.id === id; })[0];
-        if (!found || found.status === 'queued' || found.status === 'running') return root.setTimeout(poll, 700);
+        if (!found) throw Object.assign(new Error('not_found'), { code: 'not_found' });
+        renderFollowupTurn(thread, found);
+        if (found.status === 'queued' || found.status === 'running') return root.setTimeout(poll, 700);
         if (found.status !== 'complete') throw Object.assign(new Error(found.error_code), { code: found.error_code });
-        var answer = el('section', 'ai-reading-answer');
-        answer.appendChild(el('h4', '', t('ai.answer')));
-        answer.appendChild(el('p', '', found.answer || ''));
-        parent.appendChild(answer);
       }).catch(showError);
     }
     poll();
+  }
+
+  function streamFollowup(resultId, id, thread) {
+    if (!root.EventSource) return pollFollowup(resultId, id, thread);
+    if (followupEventSources[id]) followupEventSources[id].close();
+    var source = new root.EventSource('/api/ai/events?followup_id=' + encodeURIComponent(id));
+    followupEventSources[id] = source;
+    source.addEventListener('followup', function(event) {
+      var payload;
+      try { payload = JSON.parse(event.data); } catch (error) { return; }
+      var followup = payload.followup;
+      if (!followup) return;
+      renderFollowupTurn(thread, followup);
+      if (followup.status !== 'queued' && followup.status !== 'running') {
+        source.close();
+        if (followupEventSources[id] === source) delete followupEventSources[id];
+      }
+    });
+    source.onerror = function() {
+      if (followupEventSources[id] !== source) return;
+      source.close();
+      delete followupEventSources[id];
+      pollFollowup(resultId, id, thread);
+    };
   }
 
   function pollJob(jobId, context, run) {
@@ -467,6 +559,53 @@
     poll();
   }
 
+  function streamJob(jobId, context, run) {
+    if (!root.EventSource) return pollJob(jobId, context, run);
+    if (jobEventSource) jobEventSource.close();
+    var source = new root.EventSource('/api/ai/events?job_id=' + encodeURIComponent(jobId));
+    jobEventSource = source;
+    source.addEventListener('job', function(event) {
+      if (run !== activeRun || !overlay || overlay.hidden) return;
+      var payload;
+      try { payload = JSON.parse(event.data); } catch (error) { return; }
+      var job = payload.job || {};
+      if (job.status === 'queued' || job.status === 'running') {
+        setProgress(
+          context.progress,
+          job.status,
+          job.progress_current || 0,
+          job.progress_total || 1
+        );
+        return;
+      }
+      source.close();
+      if (jobEventSource === source) jobEventSource = undefined;
+      if (job.status !== 'complete') {
+        showError({ code: job.error_code || 'unknown' });
+        if (context.generateButton) context.generateButton.disabled = false;
+        return;
+      }
+      if (context.generateButton) context.generateButton.disabled = false;
+      if (payload.result) addResult(payload.result);
+      else showError({ code: 'ai_result_not_found' });
+    });
+    source.onerror = function() {
+      if (jobEventSource !== source || run !== activeRun || !overlay || overlay.hidden) return;
+      source.close();
+      jobEventSource = undefined;
+      pollJob(jobId, context, run);
+    };
+  }
+
+  function stopEventStreams() {
+    if (jobEventSource) jobEventSource.close();
+    jobEventSource = undefined;
+    Object.keys(followupEventSources).forEach(function(id) {
+      followupEventSources[id].close();
+      delete followupEventSources[id];
+    });
+  }
+
   function startGeneration(context, force) {
     var run = activeRun;
     if (!context.progress || !panel.contains(context.progress.root)) {
@@ -493,7 +632,7 @@
           payload.job.progress_total || 1
         );
       }
-      pollJob(payload.job.id, context, run);
+      streamJob(payload.job.id, context, run);
     }).catch(function(error) {
       if (run === activeRun) {
         if (context.generateButton) context.generateButton.disabled = false;

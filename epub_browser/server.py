@@ -1800,6 +1800,78 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('forbidden', 'Forbidden'), 403)
         return response({'job': job, 'result': result})
 
+    async def ai_events(request):
+        """Push AI task state for a reader's open assistant panel.
+
+        The model clients are intentionally request/response based, so this
+        stream reports durable SQLite state changes rather than pretending to
+        stream provider tokens.  A reconnect therefore resumes accurately
+        after the panel is closed or the page is refreshed.
+        """
+        principal = require_principal(request)
+        job_id = request.query_params.get('job_id')
+        followup_id = request.query_params.get('followup_id')
+        if bool(job_id) == bool(followup_id):
+            return response(error_payload('invalid_ai_event_request', 'Invalid AI event request'), 400)
+
+        if job_id:
+            job = store.get_ai_job(job_id)
+            if job is None:
+                return response(error_payload('not_found', 'AI job not found'), 404)
+            if job.get('book_id'):
+                allowed = store.can_read_book(principal.user_id, principal.role, job['book_id'])
+            else:
+                allowed = job['owner_user_id'] == principal.user_id
+            if not allowed:
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+
+            def snapshot():
+                current = store.get_ai_job(job_id)
+                if current is None:
+                    return None
+                result = store.get_ai_reading_result(current['result_id']) if current.get('result_id') else None
+                return {'job': current, 'result': result}
+
+            event_name = 'job'
+            terminal = lambda payload: payload is None or payload['job']['status'] not in {'queued', 'running'}
+        else:
+            followup = store.get_ai_followup(followup_id, principal.user_id)
+            if followup is None:
+                return response(error_payload('not_found', 'AI follow-up not found'), 404)
+            result = store.get_ai_reading_result(followup['result_id'])
+            if result is None:
+                return response(error_payload('not_found', 'AI result not found'), 404)
+            if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+
+            def snapshot():
+                current = store.get_ai_followup(followup_id, principal.user_id)
+                return {'followup': current} if current is not None else None
+
+            event_name = 'followup'
+            terminal = lambda payload: payload is None or payload['followup']['status'] not in {'queued', 'running'}
+
+        async def events():
+            previous = None
+            while True:
+                payload = snapshot()
+                serialized = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+                if serialized != previous:
+                    yield 'event: ' + event_name + '\ndata: ' + serialized + '\n\n'
+                    previous = serialized
+                if terminal(payload):
+                    return
+                await asyncio.sleep(0.5)
+
+        return StreamingResponse(
+            events(),
+            media_type='text/event-stream',
+            headers={
+                'Cache-Control': 'no-store',
+                'X-Accel-Buffering': 'no',
+            },
+        )
+
     async def ai_followups(request):
         principal = require_principal(request)
         if request.method == 'GET':
@@ -2307,6 +2379,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/ai/reading', ai_reading_request, methods=['POST']),
         Route('/api/ai/jobs/{job_id}', ai_job, methods=['GET']),
+        Route('/api/ai/events', ai_events, methods=['GET']),
         Route('/api/ai/followups', ai_followups, methods=['POST']),
         Route('/api/ai/results/{result_id}/followups', ai_followups, methods=['GET']),
         Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
