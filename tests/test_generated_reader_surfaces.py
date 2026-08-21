@@ -1596,8 +1596,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("new root.EventSource('/api/ai/events?job_id='", script)
         self.assertIn("new root.EventSource('/api/ai/events?followup_id='", script)
         self.assertIn("loadFollowups(resultId, thread);", script)
+        self.assertIn("showEvidenceMarks(evidence, false)", script)
+        self.assertIn("ai-reading-mode-card", script)
+        self.assertIn("ai.evidenceApplied", script)
         self.assertIn(".ai-reading-chat-log", stylesheet)
         self.assertIn("body.ai-reading-open:not(.pagination-mode) .container", stylesheet)
+        self.assertIn("border-left: 1px solid var(--border, #ddd);", stylesheet)
         self.assertIn('.ai-evidence-mark {', stylesheet)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from epub_browser.ai_client import ProviderConfig
+from epub_browser.ai_client import AIProviderError, ProviderConfig
 from epub_browser.ai_reading import (
     AIReadingService,
     ReadingRequest,
@@ -31,6 +31,18 @@ class _FakeClient:
                 "evidence": [{"chapter_index": 0, "quote": "Source sentence", "reason": "Support"}],
             }
         )
+
+
+class _FlakyClient(_FakeClient):
+    calls = []
+
+    def complete(self, messages):
+        type(self).calls.append(messages)
+        if len(type(self).calls) == 1:
+            raise AIProviderError("provider_server_error", retryable_without_response=True)
+        answer = super().complete(messages)
+        type(self).calls.pop()
+        return answer
 
 
 class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -126,12 +138,40 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(joined["job"]["id"], "already-running")
         self.assertEqual(_FakeClient.calls, [])
 
+    async def test_transient_provider_server_error_retries_once_before_failing_the_job(self):
+        _FlakyClient.calls = []
+        service = AIReadingService(self.store, self.root / "public", _FlakyClient)
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+
+        started = await service.submit(self.member, request)
+        completed = await self._wait_for_job(started["job"]["id"])
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(len(_FlakyClient.calls), 2)
+
+    def test_full_book_bridges_keep_provider_inputs_and_final_synthesis_bounded(self):
+        long_chapter = "start " + ("middle " * 5000) + "finish"
+
+        bridge_material = self.service._bridge_material(long_chapter)
+        groups = self.service._bridge_groups(tuple((index, long_chapter) for index in range(30)))
+        synthesis = self.service._bounded_book_bridges(["x" * 5000 for _ in range(20)])
+
+        self.assertLessEqual(len(bridge_material), 12080)
+        self.assertTrue(bridge_material.startswith("start "))
+        self.assertTrue(bridge_material.endswith("finish"))
+        self.assertLess(len(groups), 30)
+        self.assertTrue(all(len(material) <= 12080 for _label, material in groups))
+        self.assertEqual(", ".join(str(index) for index in range(30)), ", ".join(
+            label for label, _material in groups
+        ))
+        self.assertLessEqual(len(synthesis), 36000)
+
 
 class ChapterExtractionTests(unittest.TestCase):
     def test_extract_chapter_text_omits_script_and_navigation(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "chapter.html"
-            path.write_text("<p>Hello</p><script>secret</script><style>x</style><p>World</p>")
+            path.write_text("<header>Chrome</header><nav>Menu</nav><p>Hello</p><script>secret</script><style>x</style><p>World</p>")
             self.assertEqual(extract_chapter_text(path), "Hello\nWorld")
 
 

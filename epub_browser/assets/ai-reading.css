@@ -5,7 +5,7 @@
     display: flex;
     align-items: stretch;
     justify-content: flex-end;
-    padding: 84px 18px 18px;
+    padding: 0;
     box-sizing: border-box;
     pointer-events: none;
     background: transparent;
@@ -41,13 +41,15 @@ body.ai-reading-open {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     width: var(--ai-reading-drawer-width, min(460px, calc(100vw - 36px)));
+    height: 100dvh;
     max-height: none;
     min-height: 0;
     overflow: hidden;
-    border: 1px solid var(--border, #ddd);
-    border-radius: 18px;
-    background: color-mix(in srgb, var(--card-bg, #fff) 97%, transparent);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, .24);
+    border: 0;
+    border-left: 1px solid var(--border, #ddd);
+    border-radius: 0;
+    background: var(--background, var(--card-bg, #fff));
+    box-shadow: -18px 0 42px color-mix(in srgb, var(--text, #333) 10%, transparent);
     color: var(--text, #333);
     pointer-events: auto;
     backdrop-filter: blur(18px) saturate(130%);
@@ -111,6 +113,12 @@ body.ai-reading-open {
 .ai-reading-primary { border-color: var(--button-bg, #4361ee); background: var(--button-bg, #4361ee); color: #fff; }
 .ai-reading-primary:hover { background: var(--button-hover, #3f37c9); }
 .ai-reading-primary:disabled, .ai-reading-action:disabled { cursor: wait; opacity: .58; }
+.ai-reading-mode-cards { display: grid; gap: 9px; }
+.ai-reading-mode-card { display: grid; gap: 4px; width: 100%; min-height: 78px; padding: 13px; border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 18%, var(--border, #ddd)); border-radius: 12px; background: var(--card-bg, #fff); color: var(--text, #333); text-align: left; font: inherit; cursor: pointer; transition: transform 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out; }
+.ai-reading-mode-card strong { font-size: .92rem; }
+.ai-reading-mode-card span { color: var(--text-secondary, #666); font-size: .82rem; line-height: 1.45; }
+.ai-reading-mode-card:hover, .ai-reading-mode-card:focus-visible { border-color: var(--button-bg, #4361ee); background: color-mix(in srgb, var(--button-bg, #4361ee) 7%, var(--card-bg, #fff)); transform: translateX(-2px); }
+.ai-reading-mode-card:disabled { cursor: wait; opacity: .58; transform: none; }
 .ai-reading-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .ai-reading-map-node { display: grid; gap: 4px; padding: 10px; border-left: 3px solid var(--button-bg, #4361ee); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--button-bg, #4361ee) 7%, var(--card-bg, #fff)); font-size: .86rem; }
 .ai-reading-map-node span { color: var(--text-secondary, #666); line-height: 1.5; }
@@ -124,6 +132,7 @@ body.ai-reading-open {
 .ai-reading-evidence footer { color: var(--text-secondary, #666); font-size: .84rem; }
 .ai-reading-evidence a { color: var(--button-bg, #4361ee); }
 .ai-reading-evidence-toggle { justify-self: start; }
+.ai-reading-evidence-applied { color: var(--text-secondary, #666); font-size: .86rem; }
 .ai-evidence-mark { --ai-evidence-line: #6d5dfc; padding: 0 .08em; border-radius: .18em; color: inherit; cursor: pointer; background: linear-gradient(112deg, color-mix(in srgb, var(--ai-evidence-line) 19%, transparent), color-mix(in srgb, var(--secondary, #4cc9f0) 13%, transparent)); box-decoration-break: clone; -webkit-box-decoration-break: clone; border-bottom: 2px solid var(--ai-evidence-line); text-decoration: none; }
 .ai-evidence-mark[data-ai-evidence-color="1"] { --ai-evidence-line: #0f9fbd; }
 .ai-evidence-mark[data-ai-evidence-color="2"] { --ai-evidence-line: #c65ccf; }
@@ -149,7 +158,7 @@ body.ai-reading-open {
 @media (max-width: 960px) {
     .ai-reading-overlay { align-items: flex-end; padding: 0; pointer-events: auto; background: rgba(0, 0, 0, .42); }
     body.ai-reading-open { overflow: hidden; }
-    .ai-reading-panel { width: 100%; max-height: min(86dvh, 760px); border-radius: 20px 20px 0 0; }
+    .ai-reading-panel { width: 100%; height: auto; max-height: min(86dvh, 760px); border: 1px solid var(--border, #ddd); border-bottom: 0; border-radius: 20px 20px 0 0; box-shadow: 0 -18px 42px color-mix(in srgb, var(--text, #333) 18%, transparent); }
     .ai-reading-body { padding: 16px; }
     .ai-reading-followup { flex-direction: column; }
     .ai-reading-chat-log { max-height: min(31dvh, 280px); }

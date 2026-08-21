@@ -77,6 +77,16 @@ class AIClientTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "provider_connection_failed")
         self.assertTrue(raised.exception.retryable_without_response)
 
+        def failed_server(request, timeout):
+            raise HTTPError(request.full_url, 502, "ignored", {}, io.BytesIO(b"secret"))
+
+        with self.assertRaises(AIProviderError) as raised:
+            OpenAICompatibleClient(self.config, opener=failed_server).complete(
+                [{"role": "user", "content": "Read"}]
+            )
+        self.assertEqual(raised.exception.code, "provider_server_error")
+        self.assertTrue(raised.exception.retryable_without_response)
+
     def test_rejects_unsafe_provider_urls(self):
         self.assertEqual(
             validate_provider_base_url(" https://provider.example/v1/ "),

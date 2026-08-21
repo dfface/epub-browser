@@ -102,7 +102,12 @@ class OpenAICompatibleClient:
                 raise AIProviderError("provider_rate_limited") from None
             if 400 <= error.code < 500:
                 raise AIProviderError("provider_request_rejected") from None
-            raise AIProviderError("provider_server_error") from None
+            # Gateways and hosted OpenAI-compatible providers commonly return
+            # a transient 5xx while a large model is warming up.  The caller
+            # accounts for the retry as another real provider attempt.
+            raise AIProviderError(
+                "provider_server_error", retryable_without_response=True
+            ) from None
         except (URLError, socket.timeout, TimeoutError, ConnectionError):
             raise AIProviderError(
                 "provider_connection_failed", retryable_without_response=True
