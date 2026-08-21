@@ -378,6 +378,7 @@ function initScript() {
     }
 
     var fontSize = "3";
+    var pageWidthPreset = "3";
     var fontFamily = "ebook-default";
     var fontFamilyInput = null;
     var supportedFonts = getAvailableFonts();
@@ -427,6 +428,14 @@ function initScript() {
                 window.epubBrowserCache.font_size = fontSize;
             }
         }
+
+        if (window.epubBrowserCache && window.epubBrowserCache.page_width) {
+            pageWidthPreset = window.epubBrowserCache.page_width;
+        } else {
+            pageWidthPreset = localStorage.getItem('page_width') || "3";
+            if (!window.epubBrowserCache) window.epubBrowserCache = {};
+            window.epubBrowserCache.page_width = pageWidthPreset;
+        }
         
         if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
             fontFamily = window.epubBrowserCache.font_family;
@@ -453,9 +462,11 @@ function initScript() {
         var currentPaginationMode = getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
         fontSize = getCookie('font_size') || "3";
+        pageWidthPreset = getCookie('page_width') || "3";
         fontFamily = getCookie('font_family') || "ebook-default";
         fontFamilyInput = getCookie('font_family_input');
     }
+    updatePageWidth(pageWidthPreset, false);
     applyDesktopChapterSidebar();
     if (isPaginationMode) {
         updateFontSize(fontSize);
@@ -1506,6 +1517,7 @@ function initScript() {
     }
 
     function openReaderDrawer(panel, toggle, mobileToggle, afterOpen, opener) {
+        if ((toggle && toggle.disabled) || (opener && opener.disabled)) return;
         if (isPersistentBookDrawer(panel)) {
             afterOpen();
             return;
@@ -1528,6 +1540,10 @@ function initScript() {
             var closeButton = panel.querySelector('.toc-close');
             if (closeButton) closeButton.focus();
         });
+    }
+
+    if (window.EpubReaderLayout) {
+        window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll);
     }
 
     tocToggle.addEventListener('click', function() {
@@ -1769,6 +1785,37 @@ function initScript() {
         content.classList.add('font-size-' + size);
     }
 
+    function updatePageWidth(preset, reflowPagination) {
+        if (!window.EpubReaderLayout) return;
+        pageWidthPreset = window.EpubReaderLayout.applyPageWidth(
+            document.documentElement,
+            preset
+        );
+        var labels = {
+            '1': 'settings.pageWidthNarrow',
+            '2': 'settings.pageWidthComfortable',
+            '3': 'settings.pageWidthWide',
+            '4': 'settings.pageWidthExtraWide'
+        };
+        var translatedLabel = i18n.t(labels[pageWidthPreset]);
+        var slider = document.getElementById('pageWidthSlider');
+        if (slider) {
+            slider.value = pageWidthPreset;
+            slider.setAttribute('aria-valuetext', translatedLabel);
+        }
+        var value = document.getElementById('pageWidthValue');
+        if (value) {
+            value.setAttribute('data-i18n', labels[pageWidthPreset]);
+            value.textContent = translatedLabel;
+        }
+        if (reflowPagination && isPaginationMode) {
+            window.requestAnimationFrame(function() {
+                calculateTotalPages();
+                showPage(Math.min(currentPage, totalPages - 1));
+            });
+        }
+    }
+
     var fontSizeSlider = document.getElementById('fontSizeSlider');
     if (fontSizeSlider) {
         fontSizeSlider.addEventListener('input', function() {
@@ -1776,6 +1823,17 @@ function initScript() {
             if (!isKindleMode()) localStorage.setItem('font_size', s);
             else setCookie('font_size', s);
             updateFontSize(s);
+        });
+    }
+
+    var pageWidthSlider = document.getElementById('pageWidthSlider');
+    if (pageWidthSlider) {
+        pageWidthSlider.addEventListener('input', function() {
+            pageWidthPreset = window.EpubReaderLayout.normalizePageWidth(this.value);
+            setReadingPreference('page_width', pageWidthPreset);
+            if (!window.epubBrowserCache) window.epubBrowserCache = {};
+            window.epubBrowserCache.page_width = pageWidthPreset;
+            updatePageWidth(pageWidthPreset, true);
         });
     }
     
@@ -2217,6 +2275,9 @@ function initScript() {
             }
             
             isContinuousScroll = this.checked;
+            if (window.EpubReaderLayout) {
+                window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll);
+            }
             if (!isKindleMode()) {
                 localStorage.setItem('continuousScroll', isContinuousScroll ? 'true' : 'false');
             } else {

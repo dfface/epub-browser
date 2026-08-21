@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "compact-locale-v13"
+SERVER_OUTPUT_REVISION = "reader-layout-v14"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -2178,6 +2178,19 @@ document.addEventListener('DOMContentLoaded', function() {{
             </div>
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
+                    <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
+                    <div class="page-width-control">
+                        <input type="range" id="pageWidthSlider" min="1" max="4" value="3" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                        <div class="page-width-scale" aria-hidden="true">
+                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
+                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
+                            <span data-i18n="settings.pageWidthWide">Wide</span>
+                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
+                        </div>
+                        <output class="page-width-value" id="pageWidthValue" for="pageWidthSlider" data-i18n="settings.pageWidthWide">Wide</output>
+                    </div>
+                </div>
+                <div class="settings-group">
                     <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
                     <label class="settings-switch">
                         <input type="checkbox" id="showReadingProgressBarToggle" checked>
@@ -2241,10 +2254,10 @@ document.addEventListener('DOMContentLoaded', function() {{
 
     <!-- 移动端控件 -->
     <div class="mobile-controls" data-id="mobile-controls">
-        <div class="control-btn" id="mobileTocBtn">
+        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
             <i class="fas fa-list"></i>
             <span data-i18n="reader.thisChapterContents">This chapter</span>
-        </div>
+        </button>
         <div class="control-btn" id="mobileThemeBtn">
             <i class="fas fa-moon"></i>
             <span data-i18n="reader.theme">Theme</span>
@@ -2383,6 +2396,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
     <script src="/assets/reading-progress.js" defer></script>
+    <script src="/assets/reader-layout.js" defer></script>
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>

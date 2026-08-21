@@ -253,6 +253,18 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     transform: none;
 }
 
+.reader-toolbar.top-controls .control-btn:disabled,
+.reader-toolbar.top-controls .control-btn:disabled:hover {
+    background: transparent;
+    color: var(--text-muted);
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+.reader-toolbar.top-controls .control-btn:disabled::after {
+    display: none;
+}
+
 .reader-toolbar.top-controls .control-name {
     position: absolute;
     width: 1px;

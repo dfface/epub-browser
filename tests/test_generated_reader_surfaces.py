@@ -1283,6 +1283,40 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('transform: translateX(calc(100% + 42px));', chapter_css)
         self.assertIn('body.reader-drawer-open', chapter_css)
 
+    def test_continuous_reader_disables_the_chapter_local_toc(self):
+        chapter = self._chapter_html()
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        mobile_toc = re.search(
+            r'<button\b[^>]*\bid=(?:["\'])?mobileTocBtn(?:["\' >])[^>]*>',
+            chapter,
+        )
+        self.assertIsNotNone(mobile_toc)
+        self.assertIn('syncChapterTocAvailability(document, isContinuousScroll)', chapter_js)
+        self.assertRegex(chapter, r'/assets/immutable/reader-layout\.[0-9a-f]{12}\.js')
+
+    def test_reader_settings_offer_four_responsive_page_widths(self):
+        chapter = self._chapter_html()
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        reading_tab = chapter[chapter.index('id="reading-tab"'):]
+
+        self.assertRegex(
+            reading_tab,
+            r'id="pageWidthSlider"[^>]+min="1"[^>]+max="4"[^>]+value="3"',
+        )
+        for key in (
+            'settings.pageWidth',
+            'settings.pageWidthNarrow',
+            'settings.pageWidthComfortable',
+            'settings.pageWidthWide',
+            'settings.pageWidthExtraWide',
+        ):
+            self.assertIn(f'data-i18n="{key}"', reading_tab)
+        self.assertIn('max-width: var(--reader-page-width, 1000px);', chapter_css)
+        self.assertIn('updatePageWidth(pageWidthPreset, false);', Path(
+            'epub_browser/assets/chapter.js'
+        ).read_text(encoding='utf-8'))
+
     def test_scroll_reader_uses_a_compact_book_level_navigation_bar(self):
         chapter = self._chapter_html()
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')

@@ -23,7 +23,7 @@ body {
 }
 
 .container {
-    max-width: 1000px;
+    max-width: var(--reader-page-width, 1000px);
     width: 80%;
     margin: 0 auto;
 }
@@ -294,9 +294,9 @@ body.reader-drawer-open {
 /* Keep the book-level chapter list visible only when the original reader width still fits. */
 @media (min-width: 1360px) {
     body.desktop-chapter-sidebar .container {
-        width: min(1000px, calc(100vw - 360px));
-        max-width: 1000px;
-        margin-left: max(240px, calc((100vw - 1000px) / 2 - 20px));
+        width: min(var(--reader-page-width, 1000px), calc(100vw - 360px));
+        max-width: var(--reader-page-width, 1000px);
+        margin-left: max(240px, calc((100vw - var(--reader-page-width, 1000px)) / 2 - 20px));
         margin-right: 0;
     }
 
@@ -693,6 +693,15 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     transform: scale(1.1);
 }
 
+.top-controls .control-btn:disabled,
+.mobile-controls .control-btn:disabled {
+    opacity: 0.42;
+    color: var(--text-muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
 .theme-toggle:focus-visible,
 .reading-controls .control-btn:focus-visible,
 .top-controls .control-btn:focus-visible {
@@ -900,14 +909,16 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     margin-bottom: 2px;
 }
 
-.font-size-control {
+.font-size-control,
+.page-width-control {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
 }
 
-.font-size-control input[type="range"] {
+.font-size-control input[type="range"],
+.page-width-control input[type="range"] {
     width: 100%;
     height: 6px;
     -webkit-appearance: none;
@@ -917,7 +928,8 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     outline: none;
 }
 
-.font-size-control input[type="range"]::-webkit-slider-thumb {
+.font-size-control input[type="range"]::-webkit-slider-thumb,
+.page-width-control input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: 18px;
@@ -929,11 +941,13 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     transition: transform 0.2s;
 }
 
-.font-size-control input[type="range"]::-webkit-slider-thumb:hover {
+.font-size-control input[type="range"]::-webkit-slider-thumb:hover,
+.page-width-control input[type="range"]::-webkit-slider-thumb:hover {
     transform: scale(1.1);
 }
 
-.font-size-control input[type="range"]::-moz-range-thumb {
+.font-size-control input[type="range"]::-moz-range-thumb,
+.page-width-control input[type="range"]::-moz-range-thumb {
     width: 18px;
     height: 18px;
     background: var(--button-bg);
@@ -948,6 +962,31 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     justify-content: space-between;
     width: 100%;
     padding: 0 5px;
+}
+
+.page-width-scale {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    width: 100%;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1.25;
+    text-align: center;
+}
+
+.page-width-scale span:first-child {
+    text-align: left;
+}
+
+.page-width-scale span:last-child {
+    text-align: right;
+}
+
+.page-width-value {
+    min-height: 20px;
+    color: var(--button-bg);
+    font-size: 0.82rem;
+    font-weight: 600;
 }
 
 .scale-mark {
@@ -994,6 +1033,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     align-items: center;
     background: none;
     border: none;
+    font: inherit;
     color: var(--text-secondary);
     cursor: pointer;
     transition: var(--transition);
@@ -1003,6 +1043,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 .mobile-controls .control-btn:hover,
 .mobile-controls .control-btn.active {
     color: var(--button-bg);
+}
+
+.mobile-controls .control-btn:disabled,
+.mobile-controls .control-btn:disabled:hover {
+    color: var(--text-muted);
 }
 
 .mobile-controls .control-btn i {
@@ -1546,7 +1591,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 /* 响应式设计 */
 @media (max-width: 1079px) {
     .container {
-        max-width: 100%;
+        max-width: min(100%, var(--reader-page-width, 1000px));
         min-width: 70%;
     }
 }
@@ -1755,7 +1800,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
 @media (max-width: 480px) {
     .container {
-        max-width: 100%;
+        max-width: min(100%, var(--reader-page-width, 1000px));
         min-width: 80%;
     }
 
