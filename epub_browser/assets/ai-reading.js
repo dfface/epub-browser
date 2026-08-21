@@ -485,6 +485,14 @@
     }).then(function(payload) {
       if (run !== activeRun || !overlay || overlay.hidden) return;
       if (payload.status === 'complete') return addResult(payload.result);
+      if (payload.job) {
+        setProgress(
+          context.progress,
+          payload.job.status,
+          payload.job.progress_current || 0,
+          payload.job.progress_total || 1
+        );
+      }
       pollJob(payload.job.id, context, run);
     }).catch(function(error) {
       if (run === activeRun) {

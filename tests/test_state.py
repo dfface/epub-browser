@@ -904,6 +904,24 @@ class StateStoreTests(unittest.TestCase):
             "interrupted",
         )
 
+    def test_ai_generation_jobs_single_flight_by_cache_key(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "single-flight.epub"),
+            "urn:test:single-flight", "fingerprint", {"title": "Book"},
+        )
+        first, created_first = self.store.create_or_get_active_ai_job(
+            "job-first", self.owner.user_id, book.book_id, "same-request", progress_total=3,
+        )
+        second, created_second = self.store.create_or_get_active_ai_job(
+            "job-second", self.owner.user_id, book.book_id, "same-request", progress_total=3,
+        )
+
+        self.assertTrue(created_first)
+        self.assertFalse(created_second)
+        self.assertEqual(first["id"], "job-first")
+        self.assertEqual(second["id"], "job-first")
+        self.assertEqual(second["book_id"], book.book_id)
+
     def test_ai_settings_keep_an_existing_key_until_an_admin_clears_it(self):
         self.store.set_ai_settings(
             enabled=True,

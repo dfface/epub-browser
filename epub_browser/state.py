@@ -21,7 +21,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 7
+DB_SCHEMA_VERSION = 8
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -365,6 +365,7 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS ai_reading_jobs (
                 id TEXT PRIMARY KEY,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
                 cache_key TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN (
                     'queued', 'running', 'complete', 'failed', 'interrupted'
@@ -378,6 +379,16 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_owner "
             "ON ai_reading_jobs(owner_user_id, created_at DESC)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_active_cache "
+            "ON ai_reading_jobs(cache_key, status)"
+        )
+        self._add_column_if_missing(
+            connection,
+            "ai_reading_jobs",
+            "book_id",
+            "TEXT REFERENCES books(book_id) ON DELETE CASCADE",
         )
         self._add_column_if_missing(
             connection,
@@ -2251,6 +2262,7 @@ class StateStore:
         owner_user_id: str,
         cache_key: str,
         *,
+        book_id: Optional[str] = None,
         result_id: Optional[str] = None,
         progress_total: int = 1,
     ) -> None:
@@ -2258,14 +2270,68 @@ class StateStore:
             raise ValueError("AI job progress total must be positive")
         with self._connection() as connection:
             self._require_user(connection, owner_user_id)
+            if book_id is not None:
+                self._get_book(connection, book_id)
             connection.execute(
                 """
                 INSERT INTO ai_reading_jobs (
-                    id, owner_user_id, cache_key, result_id, status, progress_total
+                    id, owner_user_id, book_id, cache_key, result_id, status, progress_total
+                ) VALUES (?, ?, ?, ?, ?, 'queued', ?)
+                """,
+                (job_id, owner_user_id, book_id, cache_key, result_id, int(progress_total)),
+            )
+
+    def create_or_get_active_ai_job(
+        self,
+        job_id: str,
+        owner_user_id: str,
+        book_id: str,
+        cache_key: str,
+        *,
+        progress_total: int = 1,
+    ) -> tuple[dict, bool]:
+        """Atomically join an in-flight shared generation or create one.
+
+        The immediate SQLite transaction is a global single-flight lock. It
+        deliberately excludes the independent follow-up task table.
+        """
+        if int(progress_total) < 1:
+            raise ValueError("AI job progress total must be positive")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, owner_user_id)
+            self._get_book(connection, book_id)
+            existing = connection.execute(
+                """
+                SELECT id, owner_user_id, book_id, cache_key, status, error_code,
+                       result_id, progress_current, progress_total, created_at, updated_at
+                FROM ai_reading_jobs
+                WHERE cache_key = ? AND status IN ('queued', 'running')
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
+                (cache_key,),
+            ).fetchone()
+            if existing is not None:
+                connection.execute("COMMIT")
+                return dict(existing), False
+            connection.execute(
+                """
+                INSERT INTO ai_reading_jobs (
+                    id, owner_user_id, book_id, cache_key, status, progress_total
                 ) VALUES (?, ?, ?, ?, 'queued', ?)
                 """,
-                (job_id, owner_user_id, cache_key, result_id, int(progress_total)),
+                (job_id, owner_user_id, book_id, cache_key, int(progress_total)),
             )
+            created = connection.execute(
+                """
+                SELECT id, owner_user_id, book_id, cache_key, status, error_code,
+                       result_id, progress_current, progress_total, created_at, updated_at
+                FROM ai_reading_jobs WHERE id = ?
+                """,
+                (job_id,),
+            ).fetchone()
+            connection.execute("COMMIT")
+        return dict(created), True
 
     def start_ai_job(self, job_id: str) -> bool:
         with self._connection() as connection:
@@ -2329,17 +2395,21 @@ class StateStore:
             )
         return cursor.rowcount == 1
 
-    def get_ai_job(self, job_id: str, owner_user_id: str) -> Optional[dict]:
+    def get_ai_job(
+        self, job_id: str, owner_user_id: Optional[str] = None
+    ) -> Optional[dict]:
         with self._connection() as connection:
-            row = connection.execute(
-                """
-                SELECT id, owner_user_id, cache_key, status, error_code,
+            statement = """
+                SELECT id, owner_user_id, book_id, cache_key, status, error_code,
                        result_id, progress_current, progress_total, created_at, updated_at
                 FROM ai_reading_jobs
-                WHERE id = ? AND owner_user_id = ?
-                """,
-                (job_id, owner_user_id),
-            ).fetchone()
+                WHERE id = ?
+                """
+            parameters = (job_id,)
+            if owner_user_id is not None:
+                statement += " AND owner_user_id = ?"
+                parameters += (owner_user_id,)
+            row = connection.execute(statement, parameters).fetchone()
         return dict(row) if row is not None else None
 
     def store_ai_reading_result(

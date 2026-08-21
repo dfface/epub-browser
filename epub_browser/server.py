@@ -1780,8 +1780,15 @@ window.location.assign(payload.redirect||'/');
 
     async def ai_job(request):
         principal = require_principal(request)
-        job = store.get_ai_job(request.path_params['job_id'], principal.user_id)
+        job = store.get_ai_job(request.path_params['job_id'])
         if job is None:
+            return response(error_payload('not_found', 'AI job not found'), 404)
+        if job.get('book_id'):
+            if not store.can_read_book(principal.user_id, principal.role, job['book_id']):
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+        elif job['owner_user_id'] != principal.user_id:
+            # Rows created before the shared-job migration lack the book
+            # reference required for authorization, so keep them owner-only.
             return response(error_payload('not_found', 'AI job not found'), 404)
         result = (
             store.get_ai_reading_result(job['result_id'])

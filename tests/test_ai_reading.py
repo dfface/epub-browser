@@ -108,6 +108,24 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entries[0]["status"], "complete")
         self.assertEqual(self.store.list_ai_followups(cached["result"]["id"], self.owner.user_id), ())
 
+    async def test_second_opening_joins_the_existing_chapter_job_without_a_provider_call(self):
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        material, _metadata, progress_total, _segments = self.service._material_for_request(self.member, request)
+        cache_key = self.service._cache_key(
+            request, material, self.store.get_book_ai_profile(self.book.book_id)
+        )
+        self.store.create_ai_job(
+            "already-running", self.member.user_id, cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+        )
+
+        joined = await self.service.submit(self.member, request)
+
+        self.assertEqual(joined["status"], "queued")
+        self.assertTrue(joined["shared"])
+        self.assertEqual(joined["job"]["id"], "already-running")
+        self.assertEqual(_FakeClient.calls, [])
+
 
 class ChapterExtractionTests(unittest.TestCase):
     def test_extract_chapter_text_omits_script_and_navigation(self):
