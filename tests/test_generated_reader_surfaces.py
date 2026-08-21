@@ -913,13 +913,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("position: relative", header_rule)
         self.assertNotIn("position: sticky", header_rule)
 
-    def test_mobile_application_navigation_uses_the_shared_compact_layout(self):
+    def test_mobile_application_navigation_uses_the_shared_reader_breakpoint(self):
         css = Path("epub_browser/assets/breadcrumb.css").read_text(encoding="utf-8")
         book_html = self._book_html()
         chapter_html = self._chapter_html()
 
         self.assertIn(".app-nav-brand span", css)
-        self.assertIn("@media (max-width: 680px)", css)
+        self.assertIn("@media (max-width: 768px)", css)
         self.assertIn(".app-nav-links", css)
         self.assertIn("flex-wrap: wrap;", css)
         self.assertIn("min-width: 0;", css)
@@ -928,6 +928,56 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('app-nav-links', html)
             self.assertNotIn('app-context-path', html)
             self.assertIn('app-nav-theme', html)
+
+    def test_small_reader_uses_bottom_controls_without_the_desktop_side_toolbar(self):
+        shared_css = Path("epub_browser/assets/breadcrumb.css").read_text(
+            encoding="utf-8"
+        )
+        chapter_css = Path("epub_browser/assets/chapter.css").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("@media (max-width: 768px)", shared_css)
+        shared_mobile = shared_css.split("@media (max-width: 768px)", 1)[1]
+        shared_mobile = shared_mobile.split("@media (max-width: 430px)", 1)[0]
+        chapter_mobile = chapter_css.split("@media (max-width: 768px)", 1)[-1]
+        chapter_mobile = chapter_mobile.split("@media (max-width: 480px)", 1)[0]
+
+        self.assertRegex(
+            shared_mobile,
+            r"\.reader-toolbar\.top-controls,\s*\.reading-controls\s*\{\s*display:\s*none;",
+        )
+        self.assertRegex(
+            shared_mobile,
+            r"\.app-nav-link\s*\{[^}]*min-height:\s*44px;",
+        )
+        self.assertRegex(
+            chapter_mobile,
+            r"\.mobile-controls\s*\{\s*display:\s*flex;",
+        )
+        self.assertRegex(
+            chapter_mobile,
+            r"\.mobile-controls\s+\.control-btn[^}]*min-height:\s*44px;",
+        )
+        self.assertRegex(
+            chapter_mobile,
+            r"\.mobile-controls\s*\{[^}]*overflow-x:\s*auto;",
+        )
+        self.assertIn("env(safe-area-inset-bottom)", chapter_mobile)
+        self.assertRegex(
+            chapter_mobile,
+            r"\.mobile-controls\s+#mobileTopBtn\s*\{\s*display:\s*none;",
+        )
+        self.assertRegex(
+            chapter_mobile,
+            r"\.mobile-controls\s+#mobileTopBtn\.is-visible\s*\{\s*display:\s*flex;",
+        )
+
+        chapter_script = Path("epub_browser/assets/chapter.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("mobileTopBtn.classList.add('is-visible')", chapter_script)
+        self.assertIn("mobileTopBtn.classList.remove('is-visible')", chapter_script)
 
     def test_reader_chrome_uses_one_default_font_stack(self):
         for path in ("library.css", "book.css", "chapter.css"):
@@ -1221,10 +1271,42 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
     def test_theme_action_is_a_compact_icon_control(self):
         css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
         theme_rules = css[css.index('.app-nav .app-nav-theme {'):css.index('}', css.index('.app-nav .app-nav-theme {'))]
-        self.assertIn('width: 42px;', theme_rules)
+        self.assertIn('width: 44px;', theme_rules)
+        self.assertIn('height: 44px;', theme_rules)
         self.assertIn('padding: 0;', theme_rules)
         self.assertIn('flex-direction: row;', theme_rules)
         self.assertIn('.app-nav .app-nav-theme .app-nav-action-label', css)
+
+    def test_shared_navigation_keeps_touch_targets_at_least_44_pixels(self):
+        css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        action_rules = css[
+            css.index('.app-nav-link,\n.app-nav-action {'):
+            css.index('}', css.index('.app-nav-link,\n.app-nav-action {'))
+        ]
+        brand_rules = css[
+            css.index('.app-nav-brand {'):
+            css.index('}', css.index('.app-nav-brand {'))
+        ]
+        locale_rules = css[
+            css.index('.app-nav .app-nav-locale-toggle {'):
+            css.index('}', css.index('.app-nav .app-nav-locale-toggle {'))
+        ]
+        compact_rules = css.split('@media (max-width: 940px)', 1)[1]
+        compact_rules = compact_rules.split('@media (max-width: 768px)', 1)[0]
+        mobile_rules = css.split('@media (max-width: 768px)', 1)[1]
+        mobile_rules = mobile_rules.split('@media (max-width: 430px)', 1)[0]
+
+        self.assertIn('min-height: 44px;', brand_rules)
+        self.assertIn('min-height: 44px;', action_rules)
+        self.assertIn('min-height: 44px;', locale_rules)
+        self.assertRegex(
+            compact_rules,
+            r'\.app-nav-action,[^}]*width:\s*44px;',
+        )
+        self.assertRegex(
+            mobile_rules,
+            r'\.app-nav-brand\s*\{[^}]*min-height:\s*44px;',
+        )
 
     def test_scroll_to_top_visibility_is_driven_by_scroll_state(self):
         css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')

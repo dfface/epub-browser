@@ -77,7 +77,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 42px;
+    min-height: 44px;
     padding: 0 12px;
     border: 0;
     border-radius: 10px;
@@ -112,8 +112,8 @@
 }
 
 .app-nav .app-nav-theme {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border-radius: 10px;
     background: transparent;
@@ -159,7 +159,7 @@
 }
 
 .app-nav .app-nav-locale-toggle {
-    min-height: 42px;
+    min-height: 44px;
     padding: 0 10px;
     gap: 8px;
 }
@@ -337,12 +337,12 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     .app-nav .app-nav-theme,
     .app-nav #adminMenu,
     .app-nav #accountMenu {
-        width: 42px;
+        width: 44px;
         padding: 0;
     }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 768px) {
     .app-header {
         position: relative;
     }
@@ -355,7 +355,7 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     }
 
     .app-nav-brand {
-        min-height: 40px;
+        min-height: 44px;
     }
 
     .app-nav-brand-mark,
@@ -385,7 +385,7 @@ body.reader-drawer-open .reader-toolbar.top-controls {
 
     .app-nav-link {
         flex: 0 0 auto;
-        min-height: 38px;
+        min-height: 44px;
         padding: 0 10px;
     }
 

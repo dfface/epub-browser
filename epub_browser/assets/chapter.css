@@ -1682,6 +1682,43 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
     .mobile-controls {
         display: flex;
+        justify-content: flex-start;
+        gap: 2px;
+        padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+
+    .mobile-controls::-webkit-scrollbar {
+        display: none;
+    }
+
+    .mobile-controls > .control-btn,
+    .mobile-controls > a {
+        flex: 1 0 44px;
+        min-width: 44px;
+    }
+
+    .mobile-controls .control-btn {
+        min-height: 44px;
+        padding: 3px 2px;
+    }
+
+    .mobile-controls > a .control-btn {
+        width: 100%;
+    }
+
+    .mobile-controls #mobileTopBtn {
+        display: none;
+    }
+
+    .mobile-controls #mobileTopBtn.is-visible {
+        display: flex;
+    }
+
+    body:not(.pagination-mode) {
+        padding-bottom: calc(64px + env(safe-area-inset-bottom));
     }
 
     .settings-modal {

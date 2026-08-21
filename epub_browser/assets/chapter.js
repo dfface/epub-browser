@@ -1624,6 +1624,7 @@ function initScript() {
     }
     
     var scrollTopBtn = document.getElementById('scrollToTopBtn');
+    var mobileTopBtn = document.getElementById('mobileTopBtn');
     scrollTopBtn.addEventListener('click', function() {
         window.scrollTo(0,0);
     });
@@ -1632,13 +1633,14 @@ function initScript() {
         var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
         if (scrollTop > threshold && !document.body.classList.contains('pagination-mode')) {
             scrollTopBtn.classList.add('is-visible');
+            mobileTopBtn.classList.add('is-visible');
         } else {
             scrollTopBtn.classList.remove('is-visible');
+            mobileTopBtn.classList.remove('is-visible');
         }
     }
     window.addEventListener('scroll', updateScrollToTopVisibility);
     updateScrollToTopVisibility();
-    var mobileTopBtn = document.getElementById('mobileTopBtn');
     mobileTopBtn.addEventListener('click', function() {
         window.scrollTo(0,0);
     });
