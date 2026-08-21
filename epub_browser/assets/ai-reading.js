@@ -13,6 +13,7 @@
   var insightPopover;
   var jobEventSource;
   var followupEventSources = {};
+  var panelFullscreen = false;
 
   function t(key, params) {
     var i18n = root.EpubBrowserI18n;
@@ -24,6 +25,100 @@
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
     return node;
+  }
+
+  function appendInlineMarkdown(parent, source) {
+    var text = String(source || '');
+    var token = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|`([^`]+)`/g;
+    var index = 0;
+    var match;
+    while ((match = token.exec(text))) {
+      if (match.index > index) parent.appendChild(document.createTextNode(text.slice(index, match.index)));
+      if (match[1]) {
+        var link = el('a', '', match[1]);
+        link.href = match[2];
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        parent.appendChild(link);
+      } else if (match[3] || match[4]) {
+        parent.appendChild(el('strong', '', match[3] || match[4]));
+      } else {
+        parent.appendChild(el('code', '', match[5]));
+      }
+      index = token.lastIndex;
+    }
+    if (index < text.length) parent.appendChild(document.createTextNode(text.slice(index)));
+  }
+
+  // Follow-up answers are Provider text. Render a deliberately small Markdown
+  // subset with DOM nodes, rather than trusting HTML supplied by the model.
+  function renderMarkdown(parent, source) {
+    parent.textContent = '';
+    var lines = String(source || '').replace(/\r\n?/g, '\n').split('\n');
+    var paragraph = [];
+    var list;
+    var codeLines;
+    function flushParagraph() {
+      if (!paragraph.length) return;
+      var block = el('p', '');
+      paragraph.forEach(function(line, index) {
+        if (index) block.appendChild(el('br'));
+        appendInlineMarkdown(block, line);
+      });
+      parent.appendChild(block);
+      paragraph.length = 0;
+    }
+    function flushList() { list = null; }
+    lines.forEach(function(line) {
+      if (/^```/.test(line)) {
+        flushParagraph(); flushList();
+        if (codeLines) {
+          var pre = el('pre', '');
+          pre.appendChild(el('code', '', codeLines.join('\n')));
+          parent.appendChild(pre);
+          codeLines = null;
+        } else {
+          codeLines = [];
+        }
+        return;
+      }
+      if (codeLines) { codeLines.push(line); return; }
+      var heading = line.match(/^(#{1,3})\s+(.+)$/);
+      var item = line.match(/^\s*([-*+]|\d+\.)\s+(.+)$/);
+      var quote = line.match(/^>\s?(.*)$/);
+      if (heading) {
+        flushParagraph(); flushList();
+        var title = el(heading[1].length === 1 ? 'h5' : 'h6', '');
+        appendInlineMarkdown(title, heading[2]);
+        parent.appendChild(title);
+      } else if (item) {
+        flushParagraph();
+        var ordered = /\d+\./.test(item[1]);
+        if (!list || list.tagName !== (ordered ? 'OL' : 'UL')) {
+          list = el(ordered ? 'ol' : 'ul', '');
+          parent.appendChild(list);
+        }
+        var entry = el('li', '');
+        appendInlineMarkdown(entry, item[2]);
+        list.appendChild(entry);
+      } else if (quote) {
+        flushParagraph(); flushList();
+        var blockquote = el('blockquote', '');
+        appendInlineMarkdown(blockquote, quote[1]);
+        parent.appendChild(blockquote);
+      } else if (!line.trim()) {
+        flushParagraph(); flushList();
+      } else {
+        flushList();
+        paragraph.push(line);
+      }
+    });
+    if (codeLines) {
+      var unfinished = el('pre', '');
+      unfinished.appendChild(el('code', '', codeLines.join('\n')));
+      parent.appendChild(unfinished);
+    }
+    flushParagraph();
   }
 
   function action(label, handler, primary) {
@@ -100,6 +195,32 @@
     return button;
   }
 
+  function fullscreenButton() {
+    var button = el('button', 'ai-reading-expand');
+    button.type = 'button';
+    button.setAttribute('data-ai-fullscreen', '');
+    button.addEventListener('click', toggleFullscreen);
+    updateFullscreenButton(button);
+    return button;
+  }
+
+  function updateFullscreenButton(button) {
+    if (!button) return;
+    button.textContent = '';
+    button.setAttribute('aria-pressed', panelFullscreen ? 'true' : 'false');
+    button.setAttribute('aria-label', t(panelFullscreen ? 'ai.exitFullscreen' : 'ai.fullscreen'));
+    button.setAttribute('title', t(panelFullscreen ? 'ai.exitFullscreen' : 'ai.fullscreen'));
+    var icon = el('i', panelFullscreen ? 'fas fa-compress' : 'fas fa-expand');
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
+  }
+
+  function toggleFullscreen() {
+    panelFullscreen = !panelFullscreen;
+    document.body.classList.toggle('ai-reading-fullscreen', panelFullscreen);
+    updateFullscreenButton(panel && panel.querySelector('[data-ai-fullscreen]'));
+  }
+
   function addProgress(body) {
     var progress = el('div', 'ai-reading-progress');
     var status = el('p', 'ai-reading-status', '');
@@ -142,6 +263,7 @@
     target.setAttribute('aria-labelledby', title.id);
     header.appendChild(title);
     var close = closeButton();
+    header.appendChild(fullscreenButton());
     header.appendChild(close);
     target.appendChild(header);
     var body = el('div', 'ai-reading-body');
@@ -181,6 +303,8 @@
     stopEventStreams();
     if (overlay) overlay.hidden = true;
     document.body.classList.remove('ai-reading-open');
+    document.body.classList.remove('ai-reading-fullscreen');
+    panelFullscreen = false;
     if (focusReturn && typeof focusReturn.focus === 'function') focusReturn.focus();
   }
 
@@ -498,7 +622,9 @@
     var answer = el('section', 'ai-reading-chat-message ai-reading-chat-answer');
     answer.appendChild(el('strong', '', t('ai.assistant')));
     if (followup.status === 'complete') {
-      answer.appendChild(el('p', '', followup.answer || ''));
+      var markdown = el('div', 'ai-reading-markdown');
+      renderMarkdown(markdown, followup.answer || '');
+      answer.appendChild(markdown);
     } else {
       answer.appendChild(el('p', 'ai-reading-chat-pending', followupStatusText(followup)));
     }
