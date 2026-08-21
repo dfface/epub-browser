@@ -56,15 +56,19 @@
       panel.querySelector('.ai-reading-body').prepend(status);
     }
     if (status) status.textContent = t('ai.error.' + (error && error.code || 'unknown'));
+    if (panel && requestContext && !panel.querySelector('[data-ai-retry]')) {
+      var retry = action('ai.tryAgain', function() { startGeneration(requestContext, true); }, true);
+      retry.setAttribute('data-ai-retry', '');
+      panel.querySelector('.ai-reading-body').appendChild(retry);
+    }
   }
 
   function ensurePanel() {
     if (panel) return panel;
     overlay = el('div', 'ai-reading-overlay');
     overlay.hidden = true;
-    panel = el('section', 'ai-reading-panel');
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-modal', 'false');
+    panel = el('aside', 'ai-reading-panel');
+    panel.setAttribute('role', 'complementary');
     panel.setAttribute('aria-label', t('ai.title'));
     panel.tabIndex = -1;
     overlay.appendChild(panel);
@@ -146,21 +150,24 @@
     // attached before startGeneration can look it up again.
     target.appendChild(body);
     if (context.scope === 'book') {
-      body.appendChild(el('p', 'ai-reading-copy', t('ai.bookModeHelp')));
-      var select = el('select', 'ai-reading-mode');
-      select.setAttribute('aria-label', t('ai.mode'));
+      body.appendChild(el('p', 'ai-reading-copy', t('ai.chooseGuide')));
+      var modes = el('div', 'ai-reading-mode-cards');
       ['spoiler_free', 'read_so_far', 'full_review'].forEach(function(mode) {
-        var option = el('option', '', t('ai.mode.' + mode));
-        option.value = mode;
-        select.appendChild(option);
+        var card = el('button', 'ai-reading-mode-card');
+        card.type = 'button';
+        card.setAttribute('data-ai-mode', mode);
+        card.setAttribute('aria-label', t('ai.mode.' + mode));
+        card.appendChild(el('strong', '', t('ai.mode.' + mode)));
+        card.appendChild(el('span', '', t('ai.mode.' + mode + '.description')));
+        card.addEventListener('click', function() {
+          context.mode = mode;
+          context.generateButton = card;
+          startGeneration(context, false);
+        });
+        modes.appendChild(card);
       });
-      body.appendChild(select);
-      var generate = action('ai.generate', function() {
-        context.mode = select.value;
-        startGeneration(context, false);
-      }, true);
-      context.generateButton = generate;
-      body.appendChild(generate);
+      context.modeButtons = Array.prototype.slice.call(modes.children);
+      body.appendChild(modes);
     } else {
       startGeneration(context, false);
     }
@@ -204,7 +211,16 @@
     var evidence = content.evidence || [];
     if (evidence.length) {
       body.appendChild(el('h4', '', t('ai.evidence')));
-      if (requestContext.scope === 'chapter') addEvidenceHighlightControl(body, evidence, result.id);
+      if (requestContext.scope === 'chapter') {
+        var applied = evidenceMarks.length && evidenceResultId === result.id
+          ? evidenceMarks.length
+          : showEvidenceMarks(evidence, false);
+        if (applied) {
+          evidenceResultId = result.id;
+          body.appendChild(el('p', 'ai-reading-evidence-applied', t('ai.evidenceApplied', { count: applied })));
+        }
+        addEvidenceHighlightControl(body, evidence, result.id);
+      }
       evidence.forEach(function(item) {
         var card = el('blockquote', 'ai-reading-evidence');
         card.appendChild(el('p', '', item.quote || ''));
@@ -229,7 +245,7 @@
         control.textContent = t('ai.showEvidenceHighlights', { count: evidence.length });
         return;
       }
-      var found = showEvidenceMarks(evidence);
+      var found = showEvidenceMarks(evidence, true);
       if (!found) {
         showEvidenceNotice(parent, 'ai.noEvidenceHighlights');
         return;
@@ -255,14 +271,14 @@
     notice.textContent = t(key);
   }
 
-  function showEvidenceMarks(evidence) {
+  function showEvidenceMarks(evidence, reveal) {
     var article = document.querySelector('#eb-content');
     if (!article) return 0;
     evidence.forEach(function(item, index) {
       var mark = markEvidenceQuote(article, item && item.quote, item && item.reason, index);
       if (mark) evidenceMarks.push(mark);
     });
-    if (evidenceMarks.length) {
+    if (reveal && evidenceMarks.length) {
       var reduceMotion = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
       evidenceMarks[0].scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
     }
@@ -552,6 +568,7 @@
       }).catch(function(error) {
         if (run === activeRun) {
           if (context.generateButton) context.generateButton.disabled = false;
+          (context.modeButtons || []).forEach(function(button) { button.disabled = false; });
           showError(error);
         }
       });
@@ -583,6 +600,7 @@
       if (job.status !== 'complete') {
         showError({ code: job.error_code || 'unknown' });
         if (context.generateButton) context.generateButton.disabled = false;
+        (context.modeButtons || []).forEach(function(button) { button.disabled = false; });
         return;
       }
       if (context.generateButton) context.generateButton.disabled = false;
@@ -614,6 +632,7 @@
       context.progress = addProgress(body);
     }
     if (context.generateButton) context.generateButton.disabled = true;
+    (context.modeButtons || []).forEach(function(button) { button.disabled = true; });
     setProgress(context.progress, 'queued', 0, 1);
     fetchApi('/api/ai/reading', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -636,6 +655,7 @@
     }).catch(function(error) {
       if (run === activeRun) {
         if (context.generateButton) context.generateButton.disabled = false;
+        (context.modeButtons || []).forEach(function(button) { button.disabled = false; });
         showError(error);
       }
     });
