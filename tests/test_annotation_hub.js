@@ -28,6 +28,26 @@ async function withHubGlobals(overrides, callback) {
   }
 }
 
+function fakeDocument() {
+  return {
+    createElement(tagName) {
+      return {
+        tagName: tagName.toUpperCase(),
+        className: '',
+        textContent: '',
+        children: [],
+        attributes: {},
+        listeners: {},
+        style: {},
+        appendChild(child) { this.children.push(child); return child; },
+        setAttribute(name, value) { this.attributes[name] = value; },
+        removeAttribute(name) { delete this.attributes[name]; },
+        addEventListener(name, listener) { this.listeners[name] = listener; },
+      };
+    },
+  };
+}
+
 const englishI18n = {
   t: (key, params = {}) => ({
     'annotations.chapterNumber': `Chapter ${params.number}`,
@@ -82,6 +102,34 @@ test('uses shared i18n for chapter fallback, counts, and timestamps', () => {
 
 test('builds a chapter deep link with an encoded annotation id', () => {
   assert.equal(Hub.annotationHref({ book_hash: 'book', chapter_index: 3, id: 'note / 1' }), '/book/book/chapter_3.html?annotation=note%20%2F%201');
+});
+
+test('renders an icon-only delete action outside the annotation card content', async () => {
+  await withHubGlobals({
+    document: fakeDocument(),
+    EpubBrowserI18n: { t: (key) => key === 'annotations.deleteAnnotation' ? 'Delete annotation' : key },
+  }, async () => {
+    const row = Hub.annotationCard({
+      id: 'annotation-1',
+      book_hash: 'book',
+      chapter_index: 1,
+      text: 'Highlighted text',
+      color: '#42a5f5',
+    });
+
+    assert.equal(row.tagName, 'ARTICLE');
+    assert.equal(row.className, 'annotation-card-row');
+    assert.deepEqual(row.children.map(child => child.className), ['annotation-card', 'annotation-card-delete']);
+
+    const card = row.children[0];
+    const deleteButton = row.children[1];
+    assert.equal(card.tagName, 'A');
+    assert.equal(deleteButton.tagName, 'BUTTON');
+    assert.equal(deleteButton.textContent, '');
+    assert.equal(deleteButton.attributes['aria-label'], 'Delete annotation');
+    assert.equal(deleteButton.attributes.title, 'Delete annotation');
+    assert.deepEqual(deleteButton.children.map(child => child.className), ['fas fa-trash-alt']);
+  });
 });
 
 test('deletes an annotation after destructive confirmation and announces success', async () => {

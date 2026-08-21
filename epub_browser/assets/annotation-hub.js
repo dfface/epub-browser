@@ -272,42 +272,48 @@
             var section = element('section', 'annotation-chapter-group');
             section.appendChild(element('h2', '', group.title));
             group.annotations.forEach(function(annotation) {
-                var card = element('article', 'annotation-card');
-                var link = element('a', 'annotation-card-link');
-                link.href = annotationHref(annotation); link.addEventListener('click', close);
-                var stripe = element('span', 'annotation-card-color');
-                stripe.style.backgroundColor = annotation.color || '#FFEB3B'; link.appendChild(stripe);
-                var content = element('div', 'annotation-card-content');
-                content.appendChild(element('blockquote', '', annotation.text || ''));
-                if (annotation.note && annotation.note.trim()) content.appendChild(element('p', 'annotation-card-note', annotation.note));
-                content.appendChild(element('p', 'annotation-card-meta', formatTimestamp(annotationTime(annotation))));
-                link.appendChild(content); card.appendChild(link);
-                var deleteButton = element('button', 'annotation-card-delete');
-                deleteButton.type = 'button';
-                deleteButton.setAttribute('aria-label', tr('deleteAnnotation'));
-                var deleteIcon = element('i', 'fas fa-trash-alt');
-                deleteIcon.setAttribute('aria-hidden', 'true');
-                deleteButton.appendChild(deleteIcon);
-                deleteButton.appendChild(element('span', '', tr('delete')));
-                deleteButton.addEventListener('click', function(event) {
-                    event.preventDefault(); event.stopPropagation();
-                    if (deleteButton.disabled) return;
-                    deleteButton.disabled = true;
-                    deleteButton.setAttribute('aria-busy', 'true');
-                    deleteAnnotation(annotation, function() {
-                        modalState.data.annotations = modalState.data.annotations.filter(function(item) { return item.id !== annotation.id; });
-                        renderCurrentView();
-                    }).then(function(deleted) {
-                        if (!deleted) {
-                            deleteButton.disabled = false;
-                            deleteButton.removeAttribute('aria-busy');
-                        }
-                    });
-                });
-                card.appendChild(deleteButton); section.appendChild(card);
+                section.appendChild(annotationCard(annotation));
             });
             container.appendChild(section);
         });
+    }
+
+    function annotationCard(annotation) {
+        var row = element('article', 'annotation-card-row');
+        var card = element('a', 'annotation-card');
+        card.href = annotationHref(annotation); card.addEventListener('click', close);
+        var stripe = element('span', 'annotation-card-color');
+        stripe.style.backgroundColor = annotation.color || '#FFEB3B'; card.appendChild(stripe);
+        var content = element('div', 'annotation-card-content');
+        content.appendChild(element('blockquote', '', annotation.text || ''));
+        if (annotation.note && annotation.note.trim()) content.appendChild(element('p', 'annotation-card-note', annotation.note));
+        content.appendChild(element('p', 'annotation-card-meta', formatTimestamp(annotationTime(annotation))));
+        card.appendChild(content); row.appendChild(card);
+
+        var deleteButton = element('button', 'annotation-card-delete');
+        deleteButton.type = 'button';
+        deleteButton.setAttribute('aria-label', tr('deleteAnnotation'));
+        deleteButton.setAttribute('title', tr('deleteAnnotation'));
+        var deleteIcon = element('i', 'fas fa-trash-alt');
+        deleteIcon.setAttribute('aria-hidden', 'true');
+        deleteButton.appendChild(deleteIcon);
+        deleteButton.addEventListener('click', function(event) {
+            event.preventDefault(); event.stopPropagation();
+            if (deleteButton.disabled) return;
+            deleteButton.disabled = true;
+            deleteButton.setAttribute('aria-busy', 'true');
+            deleteAnnotation(annotation, function() {
+                modalState.data.annotations = modalState.data.annotations.filter(function(item) { return item.id !== annotation.id; });
+                renderCurrentView();
+            }).then(function(deleted) {
+                if (!deleted) {
+                    deleteButton.disabled = false;
+                    deleteButton.removeAttribute('aria-busy');
+                }
+            });
+        });
+        row.appendChild(deleteButton);
+        return row;
     }
 
     function load(bookHash) {
@@ -389,5 +395,5 @@
         else bind();
     }
 
-    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
+    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
 });

@@ -1520,6 +1520,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("root.AnnotationStorage.delete(annotation.id)", script)
         self.assertIn("notify('deleted', 'success')", script)
         self.assertIn('.annotation-card-delete:focus-visible', css)
+        self.assertIn('.annotation-card-row:hover .annotation-card-delete', css)
+        self.assertIn('@media (hover: none), (pointer: coarse)', css)
         self.assertIn('@media (max-width: 600px)', css)
 
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
