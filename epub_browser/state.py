@@ -21,7 +21,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 6
+DB_SCHEMA_VERSION = 7
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -293,7 +293,7 @@ class StateStore:
                 api_key TEXT NOT NULL DEFAULT '',
                 model TEXT NOT NULL DEFAULT '',
                 timeout_seconds INTEGER NOT NULL DEFAULT 60
-                    CHECK(timeout_seconds BETWEEN 5 AND 180),
+                    CHECK(timeout_seconds BETWEEN 5 AND 3600),
                 max_concurrency INTEGER NOT NULL DEFAULT 2
                     CHECK(max_concurrency BETWEEN 1 AND 4),
                 daily_limit INTEGER NOT NULL DEFAULT 20
@@ -307,6 +307,7 @@ class StateStore:
             "INSERT INTO ai_settings (singleton) VALUES (1) "
             "ON CONFLICT(singleton) DO NOTHING"
         )
+        self._migrate_ai_settings_timeout_range(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ai_user_access (
@@ -660,6 +661,48 @@ class StateStore:
             return False
         connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
         return True
+
+    def _migrate_ai_settings_timeout_range(self, connection) -> None:
+        """Expand the immutable SQLite CHECK constraint without losing settings."""
+        definition = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'ai_settings'"
+        ).fetchone()["sql"]
+        if "BETWEEN 5 AND 3600" in definition:
+            return
+        temporary_table = "ai_settings_timeout_migration"
+        self._reject_migration_table(connection, temporary_table)
+        connection.execute(
+            f"""
+            CREATE TABLE {temporary_table} (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
+                base_url TEXT NOT NULL DEFAULT '',
+                api_key TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                timeout_seconds INTEGER NOT NULL DEFAULT 60
+                    CHECK(timeout_seconds BETWEEN 5 AND 3600),
+                max_concurrency INTEGER NOT NULL DEFAULT 2
+                    CHECK(max_concurrency BETWEEN 1 AND 4),
+                daily_limit INTEGER NOT NULL DEFAULT 20
+                    CHECK(daily_limit >= 0),
+                config_revision INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            INSERT INTO {temporary_table} (
+                singleton, enabled, base_url, api_key, model, timeout_seconds,
+                max_concurrency, daily_limit, config_revision, updated_at
+            )
+            SELECT singleton, enabled, base_url, api_key, model, timeout_seconds,
+                   max_concurrency, daily_limit, config_revision, updated_at
+            FROM ai_settings
+            """
+        )
+        connection.execute("DROP TABLE ai_settings")
+        connection.execute(f"ALTER TABLE {temporary_table} RENAME TO ai_settings")
 
     def migrate_user_owned_data(
         self,
@@ -1913,7 +1956,7 @@ class StateStore:
             raise ValueError("AI settings must be strings")
         if not isinstance(model, str):
             raise ValueError("AI model must be text")
-        if not 5 <= int(timeout_seconds) <= 180:
+        if not 5 <= int(timeout_seconds) <= 3600:
             raise ValueError("AI timeout is out of range")
         if not 1 <= int(max_concurrency) <= 4:
             raise ValueError("AI concurrency is out of range")
