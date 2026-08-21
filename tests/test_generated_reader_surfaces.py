@@ -1634,6 +1634,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('grid-template-rows: auto minmax(0, 1fr);', stylesheet)
         self.assertIn('overflow-y: auto;', stylesheet)
         self.assertIn('min-height: 0;', stylesheet)
+        self.assertIn('justify-content: flex-end;', stylesheet)
+        self.assertIn('pointer-events: none;', stylesheet)
+        self.assertIn("addInsightCards(body, 'ai.deepThemes'", script)
+        self.assertIn('parseLegacyObject(value, titleKeys.concat(detailKeys))', script)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

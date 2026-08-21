@@ -5,7 +5,12 @@ import unittest
 from pathlib import Path
 
 from epub_browser.ai_client import ProviderConfig
-from epub_browser.ai_reading import AIReadingService, ReadingRequest, extract_chapter_text
+from epub_browser.ai_reading import (
+    AIReadingService,
+    ReadingRequest,
+    _normalize_result,
+    extract_chapter_text,
+)
 from epub_browser.auth import BootstrapCredentials
 from epub_browser.state import StateStore
 
@@ -110,3 +115,25 @@ class ChapterExtractionTests(unittest.TestCase):
             path = Path(temporary) / "chapter.html"
             path.write_text("<p>Hello</p><script>secret</script><style>x</style><p>World</p>")
             self.assertEqual(extract_chapter_text(path), "Hello\nWorld")
+
+
+class ResultNormalizationTests(unittest.TestCase):
+    def test_deep_report_items_remain_structured_instead_of_becoming_json_text(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Summary"},
+            "deep": {
+                "themes": [{"theme": "Trade-off", "analysis": "Safety and autonomy are balanced."}],
+                "questions": [{"question": "Who decides?", "why": "It exposes the decision boundary."}],
+                "applications": [{"context": "School policy", "advice": "Pair limits with support."}],
+            },
+        }))
+
+        self.assertEqual(result["deep"]["themes"], [{
+            "title": "Trade-off", "analysis": "Safety and autonomy are balanced.",
+        }])
+        self.assertEqual(result["deep"]["questions"], [{
+            "question": "Who decides?", "why": "It exposes the decision boundary.",
+        }])
+        self.assertEqual(result["deep"]["applications"], [{
+            "context": "School policy", "advice": "Pair limits with support.",
+        }])

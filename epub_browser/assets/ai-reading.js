@@ -59,7 +59,7 @@
     overlay.hidden = true;
     panel = el('section', 'ai-reading-panel');
     panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-modal', 'false');
     panel.setAttribute('aria-label', t('ai.title'));
     panel.tabIndex = -1;
     overlay.appendChild(panel);
@@ -184,9 +184,9 @@
       map.appendChild(item);
     });
     body.appendChild(map);
-    addList(body, 'ai.deepThemes', deep.themes || []);
-    addList(body, 'ai.deepQuestions', deep.questions || []);
-    addList(body, 'ai.deepApplications', deep.applications || []);
+    addInsightCards(body, 'ai.deepThemes', deep.themes || [], ['title', 'theme'], ['analysis', 'explanation']);
+    addInsightCards(body, 'ai.deepQuestions', deep.questions || [], ['question'], ['why', 'context', 'reflection']);
+    addInsightCards(body, 'ai.deepApplications', deep.applications || [], ['context', 'scenario'], ['advice', 'application', 'suggestion']);
     var evidence = content.evidence || [];
     if (evidence.length) {
       body.appendChild(el('h4', '', t('ai.evidence')));
@@ -213,6 +213,61 @@
     var list = el('ul', 'ai-reading-list');
     values.forEach(function(value) { list.appendChild(el('li', '', value)); });
     parent.appendChild(list);
+  }
+
+  function addInsightCards(parent, label, values, titleKeys, detailKeys) {
+    if (!values || !values.length) return;
+    parent.appendChild(el('h4', '', t(label)));
+    var group = el('div', 'ai-reading-insight-list');
+    values.forEach(function(value) {
+      var item = normaliseInsight(value, titleKeys, detailKeys);
+      if (!item.title && !item.detail) return;
+      var card = el('article', 'ai-reading-insight');
+      if (item.title) card.appendChild(el('strong', '', item.title));
+      if (item.detail) card.appendChild(el('p', '', item.detail));
+      group.appendChild(card);
+    });
+    if (group.childNodes.length) parent.appendChild(group);
+  }
+
+  function normaliseInsight(value, titleKeys, detailKeys) {
+    var item = value;
+    if (typeof value === 'string') item = parseLegacyObject(value, titleKeys.concat(detailKeys));
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { title: '', detail: String(value || '').trim() };
+    }
+    return {
+      title: firstInsightValue(item, titleKeys),
+      detail: firstInsightValue(item, detailKeys)
+    };
+  }
+
+  function firstInsightValue(item, keys) {
+    for (var index = 0; index < keys.length; index += 1) {
+      var value = item[keys[index]];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+  }
+
+  function parseLegacyObject(value, keys) {
+    try {
+      var parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch (ignore) {
+      // AI results created before the typed report contract used Python-style
+      // dictionary strings. Extract only the known display fields; never eval.
+    }
+    var source = String(value || '').trim();
+    if (source.charAt(0) !== '{') return null;
+    var parsedLegacy = {};
+    keys.forEach(function(key) {
+      var escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var expression = new RegExp("['\\\"]" + escaped + "['\\\"]\\s*:\\s*['\\\"]([\\s\\S]*?)['\\\"](?=\\s*,\\s*['\\\"][A-Za-z_]+['\\\"]\\s*:|\\s*}\\s*$)");
+      var match = source.match(expression);
+      if (match && match[1]) parsedLegacy[key] = match[1].replace(/\\\\(['\\\"])/g, '$1').trim();
+    });
+    return Object.keys(parsedLegacy).length ? parsedLegacy : null;
   }
 
   function addFollowup(parent, resultId) {
