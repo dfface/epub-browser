@@ -180,9 +180,17 @@ class AIReadingService:
         self.store = store
         self.public_dir = Path(public_dir)
         self._client_factory = client_factory
-        self._call_condition = asyncio.Condition()
-        self._active_calls = 0
+        self._call_controls = {}
         self._tasks: set[asyncio.Task] = set()
+
+    def _call_control(self):
+        """Create asyncio primitives inside, rather than before, an event loop."""
+        loop = asyncio.get_running_loop()
+        control = self._call_controls.get(loop)
+        if control is None:
+            control = (asyncio.Condition(), 0)
+            self._call_controls[loop] = control
+        return loop, control
 
     def _chapter_path(self, book_id: str, chapter_index: int) -> Path:
         if chapter_index < 0:
@@ -306,10 +314,13 @@ class AIReadingService:
     ) -> str:
         if not self.store.reserve_ai_usage(principal, date.today().isoformat()):
             raise AIReadingError("ai_quota_exhausted")
-        async with self._call_condition:
-            while self._active_calls >= config.max_concurrency:
-                await self._call_condition.wait()
-            self._active_calls += 1
+        loop, control = self._call_control()
+        condition, active_calls = control
+        async with condition:
+            while active_calls >= config.max_concurrency:
+                await condition.wait()
+                condition, active_calls = self._call_controls[loop]
+            self._call_controls[loop] = (condition, active_calls + 1)
         try:
             client = self._client_factory(config)
             try:
@@ -325,9 +336,10 @@ class AIReadingService:
                         raise AIReadingError(retry_error.code) from None
                 raise AIReadingError(error.code) from None
         finally:
-            async with self._call_condition:
-                self._active_calls -= 1
-                self._call_condition.notify_all()
+            condition, active_calls = self._call_controls[loop]
+            async with condition:
+                self._call_controls[loop] = (condition, active_calls - 1)
+                condition.notify_all()
 
     def _prompt(self, request: ReadingRequest, metadata: dict, profile: str, material: str) -> list[dict]:
         language = "Chinese (Simplified)" if request.language == "zh-CN" else "English"

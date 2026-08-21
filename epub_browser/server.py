@@ -34,6 +34,8 @@ from .auth import (
     hash_password,
     session_cookie_options,
 )
+from .ai_client import validate_provider_base_url
+from .ai_reading import AIReadingError, AIReadingService, ReadingRequest
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
 from .processor import (
@@ -446,6 +448,8 @@ def create_app(
     store = state_store
     runtime_status = status or _CompatibilityRuntimeStatus()
     public_files = CachedStaticFiles(directory=base_directory, html=False)
+    ai_reading = AIReadingService(store, base_directory)
+    store.mark_incomplete_ai_jobs_interrupted()
 
     def response(data, status=200, cache_control='no-cache'):
         return JSONResponse(
@@ -580,6 +584,9 @@ def create_app(
             'title': metadata.get('title') or 'EPUB Book',
             'visibility': book.visibility,
             'grants': list(store.book_grants(book.book_id)),
+            'ai_profile': store.get_book_ai_profile(book.book_id),
+            'ai_tags': list(store.book_ai_tags(book.book_id)),
+            'effective_tags': list(store.effective_book_tags(book.book_id)),
         }
 
     def admin_identity_data(identity):
@@ -1529,10 +1536,268 @@ window.location.assign(payload.redirect||'/');
             }
         )
 
+    async def admin_ai_settings(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response({'settings': store.get_ai_settings()})
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        required = {
+            'enabled', 'base_url', 'model', 'timeout_seconds',
+            'max_concurrency', 'daily_limit',
+        }
+        if not required.issubset(data):
+            return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
+        api_key = data.get('api_key') if 'api_key' in data else None
+        clear_api_key = data.get('clear_api_key', False)
+        if (
+            not isinstance(data['enabled'], bool)
+            or not isinstance(data['base_url'], str)
+            or not isinstance(data['model'], str)
+            or (api_key is not None and not isinstance(api_key, str))
+            or not isinstance(clear_api_key, bool)
+            or isinstance(data['timeout_seconds'], bool)
+            or not isinstance(data['timeout_seconds'], int)
+            or isinstance(data['max_concurrency'], bool)
+            or not isinstance(data['max_concurrency'], int)
+            or isinstance(data['daily_limit'], bool)
+            or not isinstance(data['daily_limit'], int)
+        ):
+            return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
+        try:
+            if data['enabled']:
+                validate_provider_base_url(data['base_url'])
+            settings = store.set_ai_settings(
+                enabled=data['enabled'],
+                base_url=data['base_url'],
+                api_key=api_key,
+                model=data['model'],
+                timeout_seconds=data['timeout_seconds'],
+                max_concurrency=data['max_concurrency'],
+                daily_limit=data['daily_limit'],
+                clear_api_key=clear_api_key,
+            )
+        except ValueError:
+            return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
+        return response({'settings': settings})
+
+    async def admin_ai_user_access(request):
+        require_admin(request)
+        user_id = request.path_params['user_id']
+        try:
+            user = store.get_user(user_id)
+        except (KeyError, ValueError):
+            user = None
+        if user is None:
+            return response(error_payload('not_found', 'User not found'), 404)
+        if request.method == 'GET':
+            return response({'access': store.get_ai_user_access(user_id)})
+        data = await json_object(request)
+        limit = data.get('daily_limit') if isinstance(data, dict) else None
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get('enabled'), bool)
+            or (
+                'daily_limit' in data
+                and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0)
+            )
+        ):
+            return response(error_payload('invalid_ai_access', 'Invalid AI access'), 400)
+        try:
+            store.set_ai_user_access(
+                user_id,
+                enabled=data['enabled'],
+                daily_limit=limit if 'daily_limit' in data else None,
+            )
+        except ValueError:
+            return response(error_payload('invalid_ai_access', 'Invalid AI access'), 400)
+        return response({'access': store.get_ai_user_access(user_id)})
+
+    async def admin_ai_tags(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response({'tags': list(store.list_ai_tags())})
+        data = await json_object(request)
+        name = data.get('name') if isinstance(data, dict) else None
+        if not isinstance(name, str):
+            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+        try:
+            tag = store.create_ai_tag(name)
+        except ValueError:
+            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+        return response({'tag': tag}, 201)
+
+    async def admin_ai_tag(request):
+        require_admin(request)
+        tag_id = request.path_params['tag_id']
+        if request.method == 'DELETE':
+            if not store.delete_ai_tag(tag_id):
+                return response(error_payload('not_found', 'AI tag not found'), 404)
+            return response({'message': 'AI tag deleted'})
+        data = await json_object(request)
+        name = data.get('name') if isinstance(data, dict) else None
+        if not isinstance(name, str):
+            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+        try:
+            tag = store.rename_ai_tag(tag_id, name)
+        except KeyError:
+            return response(error_payload('not_found', 'AI tag not found'), 404)
+        except ValueError:
+            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+        return response({'tag': tag})
+
+    async def admin_book_ai(request):
+        require_admin(request)
+        book_id = request.path_params['book_id']
+        try:
+            store.get_book(book_id)
+        except KeyError:
+            return response(error_payload('not_found', 'Book not found'), 404)
+        if request.method == 'GET':
+            return response({
+                'profile': store.get_book_ai_profile(book_id),
+                'tags': list(store.book_ai_tags(book_id)),
+                'effective_tags': list(store.effective_book_tags(book_id)),
+            })
+        data = await json_object(request)
+        if data is None or not {'profile', 'tag_ids'}.issubset(data):
+            return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
+        profile = data['profile']
+        tag_ids = data['tag_ids']
+        if (
+            profile not in {'auto', 'technical', 'fiction', 'general'}
+            or not isinstance(tag_ids, list)
+            or any(not isinstance(tag_id, str) or not tag_id for tag_id in tag_ids)
+        ):
+            return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
+        try:
+            store.set_book_ai_profile(book_id, profile)
+            tags = store.replace_book_ai_tags(book_id, tag_ids)
+        except (ValueError, KeyError):
+            return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
+        return response({
+            'profile': store.get_book_ai_profile(book_id),
+            'tags': list(tags),
+            'effective_tags': list(store.effective_book_tags(book_id)),
+        })
+
+    async def admin_ai_results(request):
+        require_admin(request)
+        data = await json_object(request)
+        if data is None:
+            data = {}
+        book_id = data.get('book_id')
+        revision = data.get('config_revision')
+        if (
+            (book_id is not None and not isinstance(book_id, str))
+            or (revision is not None and (isinstance(revision, bool) or not isinstance(revision, int)))
+        ):
+            return response(error_payload('invalid_ai_cache_scope', 'Invalid AI cache scope'), 400)
+        if book_id is not None and store.book_by_id(book_id) is None:
+            return response(error_payload('not_found', 'Book not found'), 404)
+        return response({
+            'deleted': store.clear_ai_reading_results(
+                book_id=book_id, config_revision=revision
+            )
+        })
+
+    def ai_error_response(error):
+        status = {
+            'ai_disabled': 503,
+            'ai_not_authorized': 403,
+            'ai_quota_exhausted': 429,
+            'book_not_found': 404,
+            'chapter_not_found': 404,
+            'ai_result_not_found': 404,
+        }.get(error.code, 400)
+        return response(error_payload(error.code, 'AI reading request failed'), status)
+
+    async def ai_status(request):
+        principal = require_principal(request)
+        settings = store.get_ai_settings()
+        return response({
+            'enabled': settings['enabled'],
+            'authorized': settings['enabled'] and store.can_use_ai(principal),
+            'daily_limit': store.ai_daily_limit(principal) if store.can_use_ai(principal) else None,
+        })
+
+    async def ai_reading_request(request):
+        principal = require_principal(request)
+        data, error = await bounded_public_json_object(request)
+        if error:
+            return response(error_payload(error, 'Invalid AI reading request'), 400)
+        scope = data.get('scope')
+        book_id = data.get('book_id')
+        chapter_index = data.get('chapter_index')
+        mode = data.get('mode', 'chapter')
+        language = data.get('language', 'en')
+        force = data.get('force', False)
+        if (
+            scope not in {'book', 'chapter'}
+            or not isinstance(book_id, str)
+            or not book_id
+            or (scope == 'chapter' and (isinstance(chapter_index, bool) or not isinstance(chapter_index, int)))
+            or (scope == 'book' and chapter_index is not None)
+            or (scope == 'chapter' and mode != 'chapter')
+            or (scope == 'book' and mode not in {'spoiler_free', 'read_so_far', 'full_review'})
+            or language not in {'en', 'zh-CN'}
+            or not isinstance(force, bool)
+        ):
+            return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        try:
+            result = await ai_reading.submit(
+                principal,
+                ReadingRequest(scope, book_id, chapter_index, mode, language, force),
+            )
+        except AIReadingError as error:
+            return ai_error_response(error)
+        return response(result, 200 if result['status'] == 'complete' else 202)
+
+    async def ai_job(request):
+        principal = require_principal(request)
+        job = store.get_ai_job(request.path_params['job_id'], principal.user_id)
+        if job is None:
+            return response(error_payload('not_found', 'AI job not found'), 404)
+        return response({'job': job})
+
+    async def ai_followups(request):
+        principal = require_principal(request)
+        if request.method == 'GET':
+            result_id = request.path_params['result_id']
+            result = store.get_ai_reading_result(result_id)
+            if result is None:
+                return response(error_payload('not_found', 'AI result not found'), 404)
+            if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+            return response({'followups': list(store.list_ai_followups(result_id, principal.user_id))})
+        data, error = await bounded_public_json_object(request)
+        if error:
+            return response(error_payload(error, 'Invalid AI follow-up'), 400)
+        result_id = data.get('result_id')
+        question = data.get('question')
+        language = data.get('language', 'en')
+        if not isinstance(result_id, str) or not isinstance(question, str) or language not in {'en', 'zh-CN'}:
+            return response(error_payload('invalid_ai_followup', 'Invalid AI follow-up'), 400)
+        result = store.get_ai_reading_result(result_id)
+        if result is None:
+            return response(error_payload('not_found', 'AI result not found'), 404)
+        if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        try:
+            followup = await ai_reading.follow_up(principal, result_id, question, language)
+        except AIReadingError as error:
+            return ai_error_response(error)
+        return response({'followup': followup}, 202)
+
     async def filtered_library_metadata(request):
         principal = require_principal(request)
         return response(
-            library_metadata(store.visible_books(principal), base_directory)
+            library_metadata(
+                store.visible_books(principal), base_directory, state_store=store
+            )
         )
 
     async def library_index(request):
@@ -1976,6 +2241,12 @@ window.location.assign(payload.redirect||'/');
         ),
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/{book_id}', admin_book, methods=['PUT']),
+        Route('/api/admin/ai/settings', admin_ai_settings, methods=['GET', 'PUT']),
+        Route('/api/admin/ai/users/{user_id}', admin_ai_user_access, methods=['GET', 'PUT']),
+        Route('/api/admin/ai/tags', admin_ai_tags, methods=['GET', 'POST']),
+        Route('/api/admin/ai/tags/{tag_id}', admin_ai_tag, methods=['PUT', 'DELETE']),
+        Route('/api/admin/books/{book_id}/ai', admin_book_ai, methods=['GET', 'PUT']),
+        Route('/api/admin/ai/results', admin_ai_results, methods=['DELETE']),
         Route(
             '/api/admin/books/{book_id}/grants',
             admin_book_grants,
@@ -1995,6 +2266,11 @@ window.location.assign(payload.redirect||'/');
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
+        Route('/api/ai/status', ai_status, methods=['GET']),
+        Route('/api/ai/reading', ai_reading_request, methods=['POST']),
+        Route('/api/ai/jobs/{job_id}', ai_job, methods=['GET']),
+        Route('/api/ai/followups', ai_followups, methods=['POST']),
+        Route('/api/ai/results/{result_id}/followups', ai_followups, methods=['GET']),
         Route('/api/{path:path}', annotations, methods=['GET', 'POST', 'PUT', 'DELETE']),
         Route('/sync', sync, methods=['POST']),
         Route('/{path:path}', protected_public_file, methods=['GET']),
