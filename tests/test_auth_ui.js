@@ -278,6 +278,8 @@ test('account settings and administration open as separate surfaces', async () =
     '/api/account/sessions',
     '/api/admin/users',
     '/api/admin/books',
+    '/api/admin/ai/settings',
+    '/api/admin/ai/tags',
   ]);
 });
 
