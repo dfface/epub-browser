@@ -348,6 +348,36 @@ class StateStore:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_usage (
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                usage_day TEXT NOT NULL,
+                provider_calls INTEGER NOT NULL DEFAULT 0
+                    CHECK(provider_calls >= 0),
+                PRIMARY KEY (user_id, usage_day)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_reading_jobs (
+                id TEXT PRIMARY KEY,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                cache_key TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_owner "
+            "ON ai_reading_jobs(owner_user_id, created_at DESC)"
+        )
 
     @staticmethod
     def _create_account_schema(connection) -> None:
@@ -1974,6 +2004,82 @@ class StateStore:
                 (book_id,),
             ).fetchone()
         return row["profile"] if row is not None else "auto"
+
+    def reserve_ai_usage(self, principal: Principal, usage_day: str) -> bool:
+        """Atomically reserve one billable Provider attempt for a calendar day."""
+        if principal.role == "admin":
+            return True
+        if not self.can_use_ai(principal):
+            return False
+        limit = self.ai_daily_limit(principal)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT provider_calls FROM ai_usage WHERE user_id = ? AND usage_day = ?",
+                (principal.user_id, usage_day),
+            ).fetchone()
+            used = int(row["provider_calls"]) if row is not None else 0
+            if limit and used >= limit:
+                connection.execute("COMMIT")
+                return False
+            connection.execute(
+                """
+                INSERT INTO ai_usage (user_id, usage_day, provider_calls)
+                VALUES (?, ?, 1)
+                ON CONFLICT(user_id, usage_day) DO UPDATE SET
+                    provider_calls = ai_usage.provider_calls + 1
+                """,
+                (principal.user_id, usage_day),
+            )
+            connection.execute("COMMIT")
+        return True
+
+    def create_ai_job(self, job_id: str, owner_user_id: str, cache_key: str) -> None:
+        with self._connection() as connection:
+            self._require_user(connection, owner_user_id)
+            connection.execute(
+                """
+                INSERT INTO ai_reading_jobs (id, owner_user_id, cache_key, status)
+                VALUES (?, ?, ?, 'queued')
+                """,
+                (job_id, owner_user_id, cache_key),
+            )
+
+    def start_ai_job(self, job_id: str) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_jobs SET status = 'running',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'queued'
+                """,
+                (job_id,),
+            )
+        return cursor.rowcount == 1
+
+    def mark_incomplete_ai_jobs_interrupted(self) -> int:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_jobs SET status = 'interrupted',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE status IN ('queued', 'running')
+                """
+            )
+        return cursor.rowcount
+
+    def get_ai_job(self, job_id: str, owner_user_id: str) -> Optional[dict]:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT id, owner_user_id, cache_key, status, error_code,
+                       created_at, updated_at
+                FROM ai_reading_jobs
+                WHERE id = ? AND owner_user_id = ?
+                """,
+                (job_id, owner_user_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     def resolve_book(
         self,

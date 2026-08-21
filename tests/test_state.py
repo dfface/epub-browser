@@ -886,6 +886,24 @@ class StateStoreTests(unittest.TestCase):
             ("DDD", "Domain driven design", "History"),
         )
 
+    def test_ai_usage_is_atomic_and_incomplete_jobs_are_marked_interrupted(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)
+
+        self.assertTrue(self.store.reserve_ai_usage(member, "2026-08-21"))
+        self.assertTrue(self.store.reserve_ai_usage(member, "2026-08-21"))
+        self.assertFalse(self.store.reserve_ai_usage(member, "2026-08-21"))
+        self.assertTrue(self.store.reserve_ai_usage(member, "2026-08-22"))
+
+        self.store.create_ai_job("job-running", member.user_id, "cache-key")
+        self.store.start_ai_job("job-running")
+        self.store.mark_incomplete_ai_jobs_interrupted()
+
+        self.assertEqual(
+            self.store.get_ai_job("job-running", member.user_id)["status"],
+            "interrupted",
+        )
+
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,
         username,
