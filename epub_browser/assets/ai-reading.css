@@ -2,11 +2,13 @@
     position: fixed;
     z-index: 10050;
     inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 14px;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 84px 18px 18px;
     box-sizing: border-box;
-    background: rgba(0, 0, 0, .48);
+    pointer-events: none;
+    background: transparent;
 }
 
 .ai-reading-overlay[hidden] {
@@ -14,21 +16,24 @@
 }
 
 body.ai-reading-open {
-    overflow: hidden;
+    --ai-reading-drawer-width: min(460px, calc(100vw - 36px));
 }
 
 .ai-reading-panel {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    width: min(680px, calc(100vw - 28px));
-    max-height: min(82vh, 760px);
+    width: var(--ai-reading-drawer-width, min(460px, calc(100vw - 36px)));
+    max-height: none;
     min-height: 0;
     overflow: hidden;
     border: 1px solid var(--border, #ddd);
-    border-radius: 16px;
-    background: var(--card-bg, #fff);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--card-bg, #fff) 97%, transparent);
     box-shadow: 0 24px 70px rgba(0, 0, 0, .24);
     color: var(--text, #333);
+    pointer-events: auto;
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 
 .ai-reading-header {
@@ -92,6 +97,10 @@ body.ai-reading-open {
 .ai-reading-map-node { display: grid; gap: 4px; padding: 10px; border-left: 3px solid var(--button-bg, #4361ee); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--button-bg, #4361ee) 7%, var(--card-bg, #fff)); font-size: .86rem; }
 .ai-reading-map-node span { color: var(--text-secondary, #666); line-height: 1.5; }
 .ai-reading-list { display: grid; gap: 7px; margin: 0; padding-left: 20px; line-height: 1.55; }
+.ai-reading-insight-list { display: grid; gap: 8px; }
+.ai-reading-insight { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 16%, var(--border, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--button-bg, #4361ee) 5%, var(--card-bg, #fff)); }
+.ai-reading-insight strong { line-height: 1.45; }
+.ai-reading-insight p { color: var(--text-secondary, #666); font-size: .92rem; }
 .ai-reading-evidence { display: grid; gap: 7px; margin: 0; padding: 12px 14px; border-left: 3px solid var(--secondary, #4cc9f0); background: color-mix(in srgb, var(--secondary, #4cc9f0) 8%, var(--card-bg, #fff)); }
 .ai-reading-evidence p { font-style: italic; }
 .ai-reading-evidence footer { color: var(--text-secondary, #666); font-size: .84rem; }
@@ -100,9 +109,10 @@ body.ai-reading-open {
 .ai-reading-followup input { flex: 1; min-width: 0; }
 .ai-reading-answer { display: grid; gap: 8px; padding: 12px; border-radius: 9px; background: color-mix(in srgb, var(--button-bg, #4361ee) 6%, var(--card-bg, #fff)); }
 
-@media (max-width: 560px) {
-    .ai-reading-overlay { padding: 12px; }
-    .ai-reading-panel { width: 100%; max-height: calc(100dvh - 24px); }
+@media (max-width: 700px) {
+    .ai-reading-overlay { align-items: flex-end; padding: 0; pointer-events: auto; background: rgba(0, 0, 0, .42); }
+    body.ai-reading-open { overflow: hidden; }
+    .ai-reading-panel { width: 100%; max-height: min(86dvh, 760px); border-radius: 20px 20px 0 0; }
     .ai-reading-body { padding: 16px; }
     .ai-reading-followup { flex-direction: column; }
 }
