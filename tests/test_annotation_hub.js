@@ -1,6 +1,21 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const childProcess = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const Hub = require('../epub_browser/assets/annotation-hub.js');
+
+function layoutBrowser() {
+  return [
+    process.env.EPUB_BROWSER_TEST_BROWSER,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].find(candidate => candidate && fs.existsSync(candidate));
+}
 
 function withI18n(runtime, callback) {
   const original = global.EpubBrowserI18n;
@@ -130,6 +145,44 @@ test('renders an icon-only delete action outside the annotation card content', a
     assert.equal(deleteButton.attributes.title, 'Delete annotation');
     assert.deepEqual(deleteButton.children.map(child => child.className), ['fas fa-trash-alt']);
   });
+});
+
+test('keeps the annotation color stripe visible beside the card content', {
+  skip: layoutBrowser() ? false : 'Chrome, Edge, or Chromium is required for the layout assertion',
+}, () => {
+  const browser = layoutBrowser();
+  const assetDirectory = path.join(__dirname, '..', 'epub_browser', 'assets');
+  const css = fs.readFileSync(path.join(assetDirectory, 'annotation-hub.css'), 'utf8');
+  const script = fs.readFileSync(path.join(assetDirectory, 'annotation-hub.js'), 'utf8');
+  const html = '<!doctype html><style>' + css + '</style>' +
+    '<main id="fixture"></main>' +
+    '<script>window.EpubBrowserI18n={t:function(key){return key},formatDate:function(){return ""}}</script>' +
+    '<script>' + script + '</script>' +
+    '<script>' +
+      'var row=window.AnnotationHub.annotationCard({' +
+        'id:"annotation-1",book_hash:"book",chapter_index:1,' +
+        'text:"Highlighted text",color:"#42a5f5"' +
+      '});' +
+      'document.getElementById("fixture").appendChild(row);' +
+      'var stripe=document.querySelector(".annotation-card-color");' +
+      'document.body.dataset.stripeHeight=stripe.getBoundingClientRect().height;' +
+      'document.body.dataset.stripeColor=getComputedStyle(stripe).backgroundColor;' +
+    '</script>';
+  const result = childProcess.spawnSync(browser, [
+    '--headless=new',
+    '--disable-gpu',
+    '--no-sandbox',
+    '--dump-dom',
+    'data:text/html;charset=utf-8,' + encodeURIComponent(html),
+  ], { encoding: 'utf8', timeout: 10000 });
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  const height = result.stdout.match(/data-stripe-height="([^"]+)"/);
+  const color = result.stdout.match(/data-stripe-color="([^"]+)"/);
+  assert.ok(height, 'browser did not report the annotation color stripe height');
+  assert.ok(Number(height[1]) > 0, 'annotation color stripe collapsed to zero height');
+  assert.equal(color && color[1], 'rgb(66, 165, 245)');
 });
 
 test('deletes an annotation after destructive confirmation and announces success', async () => {

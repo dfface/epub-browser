@@ -110,6 +110,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertEqual(converted.metadata.epub_identifier, "urn:test:stable")
             self.assertEqual(converted.chapter_count, 1)
 
+    def test_server_processor_preserves_root_relative_navigation_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "root-relative-link.epub"
+            navigation_path = (
+                "/leetcode/ChapterFour/0001~0099/0001.Two-Sum/"
+            )
+            self._write_minimal_epub(
+                source,
+                chapter_body=f'<a href="{navigation_path}">Two Sum</a>',
+            )
+            processor = EPUBProcessor(
+                str(source),
+                str(root / "staging"),
+                book_id="stable_id",
+                deployment_mode="server",
+            )
+
+            converted = processor.convert()
+            chapter = Path(converted.output_dir, "chapter_0.html").read_text(
+                encoding="utf-8"
+            )
+
+            self.assertIn(f'href="{navigation_path}"', chapter)
+
     def test_processor_rejects_zip_entries_that_escape_extraction_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -597,6 +622,23 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
             self.assertNotIn('EpubBrowserAuth.init', html)
             self.assertNotIn('syncShelfBtn', html)
+
+    def test_reader_pages_load_pinyin_before_bookshelf_search(self):
+        for html in (self._book_html(), self._chapter_html()):
+            pinyin_script = re.search(
+                r'/assets/immutable/pinyin-pro\.min\.[0-9a-f]{12}\.js',
+                html,
+            )
+            bookshelf_script = re.search(
+                r'/assets/immutable/bookshelf\.[0-9a-f]{12}\.js',
+                html,
+            )
+            self.assertIsNotNone(pinyin_script)
+            self.assertIsNotNone(bookshelf_script)
+            self.assertLess(
+                pinyin_script.start(),
+                bookshelf_script.start(),
+            )
 
     def test_dynamic_browser_urls_use_the_generated_base_path_runtime(self):
         scripts = {

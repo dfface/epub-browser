@@ -2038,7 +2038,7 @@ window.location.assign(payload.redirect||'/');
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
         is_public_auth = route_is_public_auth_endpoint(path)
         if principal is None:
-            if is_public_auth:
+            if is_public_auth or path in {'/api/health', '/api/ready'}:
                 return await call_next(request)
             return unauthenticated_response(request)
         if request.method not in SAFE_METHODS:

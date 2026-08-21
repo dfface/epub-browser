@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Metadata = require('../epub_browser/assets/bookshelf.js');
+const Pinyin = require('../epub_browser/assets/pinyin-pro.min.js');
 
 test('bookshelf metadata follows the generated base path and published cover URL', () => {
   assert.equal(Metadata.metadataUrl('/project/'), '/project/book-metadata.json');
@@ -9,6 +10,19 @@ test('bookshelf metadata follows the generated base path and published cover URL
     Metadata.coverUrl({ cover: '/project/book/stable/resources/cover.jpg' }),
     '/project/book/stable/resources/cover.jpg',
   );
+});
+
+test('add-book search matches Chinese titles and authors by pinyin', () => {
+  const book = {
+    title: '三国演义',
+    authors: ['罗贯中'],
+    tags: ['古典名著'],
+  };
+
+  assert.equal(typeof Metadata.bookMatchesSearch, 'function');
+  assert.equal(Metadata.bookMatchesSearch(book, 'sanguo', Pinyin), true);
+  assert.equal(Metadata.bookMatchesSearch(book, 'luoguanzhong', Pinyin), true);
+  assert.equal(Metadata.bookMatchesSearch(book, 'hongloumeng', Pinyin), false);
 });
 
 test('server bookshelf storage reads and writes the versioned cloud document without localStorage', async () => {

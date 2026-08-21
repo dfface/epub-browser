@@ -436,15 +436,21 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(self.client.get("/assets/reader.js").status_code, 403)
         self.assertEqual(self.client.get("/assets/auth.js").status_code, 200)
         self.assertEqual(self.client.get("/api/library-events").status_code, 401)
-        self.assertEqual(self.client.get("/api/health").status_code, 401)
-        self.assertEqual(
-            self.client.get(
-                "/api/health",
-                headers={"Accept": "text/html"},
-            ).status_code,
-            401,
+
+    def test_health_and_readiness_are_public_after_setup(self):
+        health = self.client.get(
+            "/api/health",
+            headers={"Accept": "text/html"},
         )
-        self.assertEqual(self.client.get("/api/ready").status_code, 401)
+        ready = self.client.get("/api/ready")
+
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.json()["status"], "ok")
+        self.assertEqual(health.json()["state"], "ready")
+        self.assertEqual(health.headers["cache-control"], "no-cache")
+        self.assertEqual(ready.status_code, 200)
+        self.assertEqual(ready.json()["state"], "ready")
+        self.assertEqual(ready.headers["cache-control"], "no-cache")
 
     def test_password_login_sets_session_and_requires_csrf_to_write(self):
         response = _json_login(

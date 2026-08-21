@@ -78,6 +78,27 @@ function bookshelfCoverUrl(book) {
     return book && book.cover ? book.cover : null;
 }
 
+function bookshelfBookMatchesSearch(book, query, pinyinRuntime) {
+    var searchTerm = String(query || '').trim().toLocaleLowerCase();
+    var title = String(book && book.title || '').toLocaleLowerCase();
+    var author = (book && book.authors || []).join(' ').toLocaleLowerCase();
+    var tags = (book && book.tags || []).join(' ').toLocaleLowerCase();
+    var runtime = pinyinRuntime;
+    if (!searchTerm) return true;
+    if ([title, author, tags].join(' ').indexOf(searchTerm) !== -1) return true;
+    if (!runtime && typeof pinyinPro !== 'undefined') runtime = pinyinPro;
+    if (!runtime || typeof runtime.pinyin !== 'function') return false;
+    try {
+        var options = { toneType: 'none' };
+        var titlePinyin = runtime.pinyin(title, options).toLocaleLowerCase().replace(/\s/g, '');
+        var authorPinyin = runtime.pinyin(author, options).toLocaleLowerCase().replace(/\s/g, '');
+        var searchPinyin = runtime.pinyin(searchTerm, options).toLocaleLowerCase().replace(/\s/g, '');
+        return titlePinyin.indexOf(searchPinyin) !== -1 || authorPinyin.indexOf(searchPinyin) !== -1;
+    } catch (error) {
+        return false;
+    }
+}
+
 function bookshelfSyncRequest(root, version, data) {
     if (!root || root.EpubBrowserMode !== 'server') return Promise.resolve(null);
     if (!root.EpubBrowserAuth || typeof root.EpubBrowserAuth.fetch !== 'function') {
@@ -578,8 +599,7 @@ function initBookshelf() {
                 });
                 if (query) {
                     available = available.filter(function(book) {
-                        return [book.title, (book.authors || []).join(' '), (book.tags || []).join(' ')]
-                            .join(' ').toLocaleLowerCase().indexOf(query) !== -1;
+                        return bookshelfBookMatchesSearch(book, query);
                     });
                 }
                 results.textContent = '';
@@ -1379,6 +1399,7 @@ if (typeof module === 'object' && module.exports) {
     module.exports = {
         metadataUrl: bookshelfMetadataUrl,
         coverUrl: bookshelfCoverUrl,
+        bookMatchesSearch: bookshelfBookMatchesSearch,
         syncRequest: bookshelfSyncRequest
     };
 }
