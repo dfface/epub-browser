@@ -1075,6 +1075,18 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotIn('id="loadingOverlay"', html)
         self.assertIn('id="contentLoading"', self._chapter_html())
 
+    def test_chapter_initial_layout_reflow_stays_behind_the_content_mask(self):
+        html = self._chapter_html()
+        loading_css = Path("epub_browser/assets/loading.css").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertRegex(
+            html,
+            r'class="content-loading is-visible"[^>]+id="contentLoading"',
+        )
+        self.assertIn('backdrop-filter: blur(12px)', loading_css)
+
     def _library_html(self):
         with tempfile.TemporaryDirectory() as directory:
             library = EPUBLibrary(directory)
