@@ -1553,6 +1553,30 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('data-i18n="reader.theme"', html)
         self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
 
+    def test_ai_reading_controls_expose_a_label_and_accessible_progress_panel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub", directory, deployment_mode="server"
+            )
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            chapter = processor.create_chapter_template("<p>Text</p>", "", 0, "One")
+        script = Path('epub_browser/assets/ai-reading.js').read_text(encoding='utf-8')
+        stylesheet = Path('epub_browser/assets/ai-reading.css').read_text(encoding='utf-8')
+
+        self.assertIn('data-ai-reading-chapter', chapter)
+        self.assertIn('aria-label="AI reading"', chapter)
+        self.assertIn('data-i18n-aria-label="ai.chapterRead"', chapter)
+        self.assertIn("event.key === 'Escape'", script)
+        self.assertIn("event.target === overlay", script)
+        self.assertIn("setProgress(", script)
+        self.assertIn("progress_total", script)
+        self.assertIn("focusReturn.focus()", script)
+        self.assertIn('.ai-reading-overlay {', stylesheet)
+        self.assertIn('grid-template-rows: auto minmax(0, 1fr);', stylesheet)
+        self.assertIn('overflow-y: auto;', stylesheet)
+        self.assertIn('min-height: 0;', stylesheet)
+
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

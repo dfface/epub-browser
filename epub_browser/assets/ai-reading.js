@@ -4,7 +4,10 @@
 
   var document = root.document;
   var panel;
+  var overlay;
   var requestContext;
+  var activeRun = 0;
+  var focusReturn;
 
   function t(key, params) {
     var i18n = root.EpubBrowserI18n;
@@ -41,32 +44,92 @@
 
   function showError(error) {
     var status = panel && panel.querySelector('[data-ai-status]');
+    if (!status && panel) {
+      status = el('p', 'ai-reading-status ai-reading-status-error');
+      status.setAttribute('data-ai-status', '');
+      status.setAttribute('role', 'alert');
+      panel.querySelector('.ai-reading-body').prepend(status);
+    }
     if (status) status.textContent = t('ai.error.' + (error && error.code || 'unknown'));
   }
 
   function ensurePanel() {
     if (panel) return panel;
+    overlay = el('div', 'ai-reading-overlay');
+    overlay.hidden = true;
     panel = el('section', 'ai-reading-panel');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', t('ai.title'));
-    panel.hidden = true;
-    document.body.appendChild(panel);
+    panel.tabIndex = -1;
+    overlay.appendChild(panel);
+    overlay.addEventListener('click', function(event) {
+      if (event.target === overlay) closePanel();
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && overlay && !overlay.hidden) closePanel();
+    });
+    document.body.appendChild(overlay);
     return panel;
   }
 
-  function openPanel(context) {
+  function closeButton() {
+    var button = el('button', 'ai-reading-close');
+    button.type = 'button';
+    button.setAttribute('aria-label', t('ai.close'));
+    button.setAttribute('title', t('ai.close'));
+    var icon = el('i', 'fas fa-times');
+    icon.setAttribute('aria-hidden', 'true');
+    button.appendChild(icon);
+    button.addEventListener('click', closePanel);
+    return button;
+  }
+
+  function addProgress(body) {
+    var progress = el('div', 'ai-reading-progress');
+    var status = el('p', 'ai-reading-status', '');
+    var meter = el('progress', 'ai-reading-progress-meter');
+    status.setAttribute('data-ai-status', '');
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    meter.max = 1;
+    meter.value = 0;
+    meter.setAttribute('aria-label', t('ai.progress'));
+    progress.appendChild(status);
+    progress.appendChild(meter);
+    body.appendChild(progress);
+    return { root: progress, status: status, meter: meter };
+  }
+
+  function setProgress(progress, status, current, total) {
+    if (!progress) return;
+    var safeTotal = Math.max(1, Number(total) || 1);
+    var safeCurrent = Math.min(safeTotal, Math.max(0, Number(current) || 0));
+    var key = status === 'queued' ? 'ai.queued' : 'ai.generating';
+    var message = t(key, { current: safeCurrent, total: safeTotal });
+    progress.root.hidden = false;
+    progress.status.textContent = message;
+    progress.meter.max = safeTotal;
+    progress.meter.value = safeCurrent;
+    progress.meter.setAttribute('aria-valuetext', message);
+  }
+
+  function openPanel(context, trigger) {
+    activeRun += 1;
     requestContext = context;
+    focusReturn = trigger || document.activeElement;
     var target = ensurePanel();
     target.textContent = '';
     var header = el('div', 'ai-reading-header');
-    header.appendChild(el('h2', '', t(context.scope === 'book' ? 'ai.bookGuide' : 'ai.chapterRead')));
-    header.appendChild(action('ai.close', closePanel));
+    var title = el('h2', '', t(context.scope === 'book' ? 'ai.bookGuide' : 'ai.chapterRead'));
+    title.id = 'aiReadingTitle';
+    target.setAttribute('aria-labelledby', title.id);
+    header.appendChild(title);
+    var close = closeButton();
+    header.appendChild(close);
     target.appendChild(header);
     var body = el('div', 'ai-reading-body');
-    var status = el('p', 'ai-reading-status', '');
-    status.setAttribute('data-ai-status', '');
-    body.appendChild(status);
+    context.progress = addProgress(body);
     if (context.scope === 'book') {
       body.appendChild(el('p', 'ai-reading-copy', t('ai.bookModeHelp')));
       var select = el('select', 'ai-reading-mode');
@@ -77,19 +140,26 @@
         select.appendChild(option);
       });
       body.appendChild(select);
-      body.appendChild(action('ai.generate', function() {
+      var generate = action('ai.generate', function() {
         context.mode = select.value;
         startGeneration(context, false);
-      }, true));
+      }, true);
+      context.generateButton = generate;
+      body.appendChild(generate);
     } else {
       startGeneration(context, false);
     }
     target.appendChild(body);
-    target.hidden = false;
+    overlay.hidden = false;
+    document.body.classList.add('ai-reading-open');
+    close.focus();
   }
 
   function closePanel() {
-    if (panel) panel.hidden = true;
+    activeRun += 1;
+    if (overlay) overlay.hidden = true;
+    document.body.classList.remove('ai-reading-open');
+    if (focusReturn && typeof focusReturn.focus === 'function') focusReturn.focus();
   }
 
   function addResult(result) {
@@ -180,26 +250,44 @@
     poll();
   }
 
-  function pollJob(jobId, context) {
-    var status = panel.querySelector('[data-ai-status]');
+  function pollJob(jobId, context, run) {
     function poll() {
+      if (run !== activeRun || !overlay || overlay.hidden) return;
       fetchApi('/api/ai/jobs/' + encodeURIComponent(jobId)).then(function(payload) {
+        if (run !== activeRun || overlay.hidden) return;
         var job = payload.job || {};
         if (job.status === 'queued' || job.status === 'running') {
-          status.textContent = t('ai.generating', { current: job.progress_current || 0, total: job.progress_total || 1 });
+          setProgress(
+            context.progress,
+            job.status,
+            job.progress_current || 0,
+            job.progress_total || 1
+          );
           return root.setTimeout(poll, 700);
         }
         if (job.status !== 'complete') throw Object.assign(new Error(job.error_code), { code: job.error_code });
         if (!payload.result) throw Object.assign(new Error('ai_result_not_found'), { code: 'ai_result_not_found' });
+        if (context.generateButton) context.generateButton.disabled = false;
         addResult(payload.result);
-      }).catch(showError);
+      }).catch(function(error) {
+        if (run === activeRun) {
+          if (context.generateButton) context.generateButton.disabled = false;
+          showError(error);
+        }
+      });
     }
     poll();
   }
 
   function startGeneration(context, force) {
-    var status = panel.querySelector('[data-ai-status]');
-    if (status) status.textContent = t('ai.generating', { current: 0, total: 1 });
+    var run = activeRun;
+    if (!context.progress || !panel.contains(context.progress.root)) {
+      var body = panel.querySelector('.ai-reading-body');
+      body.textContent = '';
+      context.progress = addProgress(body);
+    }
+    if (context.generateButton) context.generateButton.disabled = true;
+    setProgress(context.progress, 'queued', 0, 1);
     fetchApi('/api/ai/reading', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -207,9 +295,15 @@
         mode: context.mode || 'chapter', language: locale(), force: Boolean(force)
       })
     }).then(function(payload) {
+      if (run !== activeRun || !overlay || overlay.hidden) return;
       if (payload.status === 'complete') return addResult(payload.result);
-      pollJob(payload.job.id, context);
-    }).catch(showError);
+      pollJob(payload.job.id, context, run);
+    }).catch(function(error) {
+      if (run === activeRun) {
+        if (context.generateButton) context.generateButton.disabled = false;
+        showError(error);
+      }
+    });
   }
 
   function locale() {
@@ -228,10 +322,10 @@
         return;
       }
       if (chapter) chapter.addEventListener('click', function() {
-        openPanel({ scope: 'chapter', bookId: chapter.getAttribute('data-book-id'), chapterIndex: Number(chapter.getAttribute('data-chapter-index')), mode: 'chapter' });
+        openPanel({ scope: 'chapter', bookId: chapter.getAttribute('data-book-id'), chapterIndex: Number(chapter.getAttribute('data-chapter-index')), mode: 'chapter' }, chapter);
       });
       if (book) book.addEventListener('click', function() {
-        openPanel({ scope: 'book', bookId: book.getAttribute('data-book-id'), mode: 'spoiler_free' });
+        openPanel({ scope: 'book', bookId: book.getAttribute('data-book-id'), mode: 'spoiler_free' }, book);
       });
     }
     if (!chapter && !book) return;

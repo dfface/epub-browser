@@ -1890,7 +1890,8 @@ document.addEventListener('DOMContentLoaded', function() {{
                     </button>'''
         )
         ai_chapter_button = (
-            '<button class="control-btn" type="button" data-ai-reading-chapter '
+            '<button class="control-btn" type="button" aria-label="AI reading" '
+            'data-i18n-aria-label="ai.chapterRead" data-ai-reading-chapter '
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.chapterRead">AI reading</span></button>'
