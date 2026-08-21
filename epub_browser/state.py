@@ -2709,6 +2709,13 @@ class StateStore:
             ).fetchall()
         return tuple(self._book_record(row) for row in rows)
 
+    def book_by_id(self, book_id: str) -> Optional[BookRecord]:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM books WHERE book_id = ? AND active = 1", (book_id,)
+            ).fetchone()
+        return self._book_record(row) if row else None
+
     def book_by_source(self, source_path: Path) -> Optional[BookRecord]:
         canonical_path = str(Path(source_path).expanduser().resolve())
         with self._connection() as connection:
