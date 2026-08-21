@@ -112,6 +112,37 @@
     }
     function labelCount(count) { return tr('annotationCount', { count: count }); }
 
+    function notify(key, type, params) {
+        if (root.EpubBrowserNotification && typeof root.EpubBrowserNotification.show === 'function') {
+            root.EpubBrowserNotification.show(tr(key, params), type);
+        }
+    }
+
+    function deleteAnnotation(annotation, onDeleted) {
+        if (!annotation || !annotation.id || !root.EpubDialog || typeof root.EpubDialog.confirm !== 'function' ||
+                !root.AnnotationStorage || typeof root.AnnotationStorage.delete !== 'function') {
+            return Promise.resolve(false);
+        }
+        return Promise.resolve().then(function() {
+            return root.EpubDialog.confirm({
+                title: tr('deleteAnnotation'),
+                message: tr('confirmDelete'),
+                confirmText: tr('delete'),
+                destructive: true
+            });
+        }).then(function(confirmed) {
+            if (!confirmed) return false;
+            return Promise.resolve(root.AnnotationStorage.delete(annotation.id)).then(function() {
+                if (typeof onDeleted === 'function') onDeleted(annotation);
+                notify('deleted', 'success');
+                return true;
+            });
+        }).catch(function(error) {
+            notify('deleteFailed', 'error', { error: error && error.message ? error.message : String(error) });
+            return false;
+        });
+    }
+
     function translateChrome() {
         if (!modalState.modal) return;
         modalState.back.querySelector('span').textContent = tr('allAnnotatedBooks');
@@ -241,15 +272,39 @@
             var section = element('section', 'annotation-chapter-group');
             section.appendChild(element('h2', '', group.title));
             group.annotations.forEach(function(annotation) {
-                var card = element('a', 'annotation-card');
-                card.href = annotationHref(annotation); card.addEventListener('click', close);
+                var card = element('article', 'annotation-card');
+                var link = element('a', 'annotation-card-link');
+                link.href = annotationHref(annotation); link.addEventListener('click', close);
                 var stripe = element('span', 'annotation-card-color');
-                stripe.style.backgroundColor = annotation.color || '#FFEB3B'; card.appendChild(stripe);
+                stripe.style.backgroundColor = annotation.color || '#FFEB3B'; link.appendChild(stripe);
                 var content = element('div', 'annotation-card-content');
                 content.appendChild(element('blockquote', '', annotation.text || ''));
                 if (annotation.note && annotation.note.trim()) content.appendChild(element('p', 'annotation-card-note', annotation.note));
                 content.appendChild(element('p', 'annotation-card-meta', formatTimestamp(annotationTime(annotation))));
-                card.appendChild(content); section.appendChild(card);
+                link.appendChild(content); card.appendChild(link);
+                var deleteButton = element('button', 'annotation-card-delete');
+                deleteButton.type = 'button';
+                deleteButton.setAttribute('aria-label', tr('deleteAnnotation'));
+                var deleteIcon = element('i', 'fas fa-trash-alt');
+                deleteIcon.setAttribute('aria-hidden', 'true');
+                deleteButton.appendChild(deleteIcon);
+                deleteButton.appendChild(element('span', '', tr('delete')));
+                deleteButton.addEventListener('click', function(event) {
+                    event.preventDefault(); event.stopPropagation();
+                    if (deleteButton.disabled) return;
+                    deleteButton.disabled = true;
+                    deleteButton.setAttribute('aria-busy', 'true');
+                    deleteAnnotation(annotation, function() {
+                        modalState.data.annotations = modalState.data.annotations.filter(function(item) { return item.id !== annotation.id; });
+                        renderCurrentView();
+                    }).then(function(deleted) {
+                        if (!deleted) {
+                            deleteButton.disabled = false;
+                            deleteButton.removeAttribute('aria-busy');
+                        }
+                    });
+                });
+                card.appendChild(deleteButton); section.appendChild(card);
             });
             container.appendChild(section);
         });
@@ -334,5 +389,5 @@
         else bind();
     }
 
-    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, open: open, close: close, bind: bind };
+    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
 });

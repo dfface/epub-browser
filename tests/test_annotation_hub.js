@@ -12,6 +12,22 @@ function withI18n(runtime, callback) {
   }
 }
 
+async function withHubGlobals(overrides, callback) {
+  const previous = {};
+  for (const [name, value] of Object.entries(overrides)) {
+    previous[name] = global[name];
+    global[name] = value;
+  }
+  try {
+    return await callback();
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete global[name];
+      else global[name] = value;
+    }
+  }
+}
+
 const englishI18n = {
   t: (key, params = {}) => ({
     'annotations.chapterNumber': `Chapter ${params.number}`,
@@ -66,4 +82,84 @@ test('uses shared i18n for chapter fallback, counts, and timestamps', () => {
 
 test('builds a chapter deep link with an encoded annotation id', () => {
   assert.equal(Hub.annotationHref({ book_hash: 'book', chapter_index: 3, id: 'note / 1' }), '/book/book/chapter_3.html?annotation=note%20%2F%201');
+});
+
+test('deletes an annotation after destructive confirmation and announces success', async () => {
+  const deleted = [];
+  const notifications = [];
+  let removed = null;
+
+  await withHubGlobals({
+    EpubBrowserI18n: {
+      t: (key) => ({
+        'annotations.delete': 'Delete',
+        'annotations.deleteAnnotation': 'Delete annotation',
+        'annotations.confirmDelete': 'Delete this annotation?',
+        'annotations.deleted': 'Annotation deleted',
+      }[key] || key),
+    },
+    EpubDialog: {
+      confirm: async (options) => {
+        assert.deepEqual(options, {
+          title: 'Delete annotation',
+          message: 'Delete this annotation?',
+          confirmText: 'Delete',
+          destructive: true,
+        });
+        return true;
+      },
+    },
+    AnnotationStorage: {
+      delete: async (id) => deleted.push(id),
+    },
+    EpubBrowserNotification: {
+      show: (message, type) => notifications.push([message, type]),
+    },
+  }, async () => {
+    const result = await Hub.deleteAnnotation({ id: 'annotation-1' }, (annotation) => { removed = annotation; });
+    assert.equal(result, true);
+  });
+
+  assert.deepEqual(deleted, ['annotation-1']);
+  assert.deepEqual(removed, { id: 'annotation-1' });
+  assert.deepEqual(notifications, [['Annotation deleted', 'success']]);
+});
+
+test('keeps an annotation when deletion is cancelled', async () => {
+  let deleteCalls = 0;
+  let removeCalls = 0;
+
+  await withHubGlobals({
+    EpubBrowserI18n: { t: (key) => key },
+    EpubDialog: { confirm: async () => false },
+    AnnotationStorage: { delete: async () => { deleteCalls += 1; } },
+  }, async () => {
+    const result = await Hub.deleteAnnotation({ id: 'annotation-1' }, () => { removeCalls += 1; });
+    assert.equal(result, false);
+  });
+
+  assert.equal(deleteCalls, 0);
+  assert.equal(removeCalls, 0);
+});
+
+test('keeps an annotation and uses the standard error notification when deletion fails', async () => {
+  const notifications = [];
+  let removeCalls = 0;
+
+  await withHubGlobals({
+    EpubBrowserI18n: {
+      t: (key, params = {}) => key === 'annotations.deleteFailed' ? `Failed to delete: ${params.error}` : key,
+    },
+    EpubDialog: { confirm: async () => true },
+    AnnotationStorage: { delete: async () => { throw new Error('offline'); } },
+    EpubBrowserNotification: {
+      show: (message, type) => notifications.push([message, type]),
+    },
+  }, async () => {
+    const result = await Hub.deleteAnnotation({ id: 'annotation-1' }, () => { removeCalls += 1; });
+    assert.equal(result, false);
+  });
+
+  assert.equal(removeCalls, 0);
+  assert.deepEqual(notifications, [['Failed to delete: offline', 'error']]);
 });

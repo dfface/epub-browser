@@ -2294,8 +2294,8 @@
         }
     };
 
-    // Read-only storage facade for pages that must share annotation data without
-    // starting the reader's highlighter, selection handlers, or settings panel.
+    // Storage facade for pages that must share annotation data without starting
+    // the reader's highlighter, selection handlers, or settings panel.
     var AnnotationStorage = {
         init: function() {
             return StorageManager.init();
@@ -2305,6 +2305,9 @@
         },
         getByBook: function(bookHash) {
             return StorageManager.getByBook(bookHash);
+        },
+        delete: function(id) {
+            return StorageManager.delete(id);
         },
         getStorageType: function() {
             return StorageManager.currentType;

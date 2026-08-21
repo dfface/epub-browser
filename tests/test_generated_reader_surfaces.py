@@ -1509,6 +1509,19 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn("'No annotations yet'", script)
         self.assertNotIn("'No annotations in this book'", script)
 
+    def test_annotation_hub_offers_accessible_confirmed_deletion(self):
+        script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation-hub.css").read_text(encoding="utf-8")
+
+        self.assertIn("element('button', 'annotation-card-delete'", script)
+        self.assertIn("deleteButton.setAttribute('aria-label', tr('deleteAnnotation'))", script)
+        self.assertIn("root.EpubDialog.confirm({", script)
+        self.assertIn("destructive: true", script)
+        self.assertIn("root.AnnotationStorage.delete(annotation.id)", script)
+        self.assertIn("notify('deleted', 'success')", script)
+        self.assertIn('.annotation-card-delete:focus-visible', css)
+        self.assertIn('@media (max-width: 600px)', css)
+
     def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
         html = self._chapter_html()
 
