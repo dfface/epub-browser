@@ -59,7 +59,7 @@ body.ai-reading-open {
 .ai-reading-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 14px;
     padding: 17px 20px;
     border-bottom: 1px solid var(--border, #ddd);
@@ -80,13 +80,30 @@ body.ai-reading-open {
     transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
+.ai-reading-expand {
+    display: grid;
+    flex: 0 0 42px;
+    width: 42px;
+    min-height: 42px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 9px;
+    background: var(--card-bg, #fff);
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+}
+
 .ai-reading-close:hover {
     border-color: color-mix(in srgb, var(--button-bg, #4361ee) 45%, var(--border, #ddd));
     background: color-mix(in srgb, var(--button-bg, #4361ee) 8%, var(--card-bg, #fff));
     color: var(--text, #333);
 }
 
+.ai-reading-expand:hover { border-color: color-mix(in srgb, var(--button-bg, #4361ee) 45%, var(--border, #ddd)); background: color-mix(in srgb, var(--button-bg, #4361ee) 8%, var(--card-bg, #fff)); color: var(--text, #333); }
+
 .ai-reading-close:focus-visible,
+.ai-reading-expand:focus-visible,
 .ai-reading-primary:focus-visible,
 .ai-reading-action:focus-visible,
 .ai-reading-mode:focus-visible,
@@ -98,7 +115,7 @@ body.ai-reading-open {
 .ai-reading-header h2,
 .ai-reading-body h3,
 .ai-reading-body h4 { margin: 0; }
-.ai-reading-header h2 { font-size: 1.05rem; }
+.ai-reading-header h2 { margin-right: auto; font-size: 1.05rem; }
 .ai-reading-body { display: grid; min-height: 0; gap: 14px; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }
 .ai-reading-copy, .ai-reading-status, .ai-reading-body p { margin: 0; line-height: 1.65; }
 .ai-reading-status { color: var(--text-secondary, #666); font-size: .88rem; }
@@ -144,24 +161,43 @@ body.ai-reading-open {
 .ai-evidence-popover-close { display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid var(--border, #ddd); border-radius: 7px; background: var(--card-bg, #fff); color: var(--text-secondary, #666); cursor: pointer; }
 .ai-evidence-popover-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg, #4361ee) 36%, transparent); outline-offset: 2px; }
 .ai-reading-chat { display: grid; gap: 10px; padding: 12px; border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 18%, var(--border, #ddd)); border-radius: 12px; background: color-mix(in srgb, var(--button-bg, #4361ee) 4%, var(--card-bg, #fff)); }
-.ai-reading-chat-log { display: grid; gap: 10px; max-height: min(38dvh, 340px); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.ai-reading-chat-log { display: grid; gap: 10px; max-height: min(52dvh, 560px); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
 .ai-reading-chat-turn { display: grid; gap: 7px; }
 .ai-reading-chat-message { display: grid; gap: 3px; width: fit-content; max-width: 94%; padding: 9px 11px; border-radius: 11px; line-height: 1.55; }
 .ai-reading-chat-message strong { font-size: .74rem; letter-spacing: .01em; }
 .ai-reading-chat-message p { margin: 0; white-space: pre-wrap; }
+.ai-reading-markdown { display: grid; gap: 9px; }
+.ai-reading-markdown p, .ai-reading-markdown ul, .ai-reading-markdown ol, .ai-reading-markdown blockquote, .ai-reading-markdown pre { margin: 0; }
+.ai-reading-markdown ul, .ai-reading-markdown ol { padding-left: 20px; }
+.ai-reading-markdown li + li { margin-top: 5px; }
+.ai-reading-markdown h5, .ai-reading-markdown h6 { margin: 4px 0 0; font-size: .92rem; }
+.ai-reading-markdown blockquote { padding-left: 10px; border-left: 3px solid color-mix(in srgb, var(--button-bg, #4361ee) 45%, var(--border, #ddd)); color: var(--text-secondary, #666); }
+.ai-reading-markdown code { padding: .08em .28em; border-radius: 4px; background: color-mix(in srgb, var(--text, #333) 8%, var(--card-bg, #fff)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+.ai-reading-markdown pre { overflow-x: auto; padding: 10px; border-radius: 8px; background: color-mix(in srgb, var(--text, #333) 8%, var(--card-bg, #fff)); }
+.ai-reading-markdown pre code { padding: 0; background: transparent; }
+.ai-reading-markdown a { color: var(--button-bg, #4361ee); text-decoration: underline; }
 .ai-reading-chat-question { justify-self: end; background: var(--button-bg, #4361ee); color: #fff; border-bottom-right-radius: 3px; }
 .ai-reading-chat-answer { justify-self: start; background: var(--card-bg, #fff); border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 16%, var(--border, #ddd)); border-bottom-left-radius: 3px; }
 .ai-reading-chat-pending { color: var(--text-secondary, #666); font-style: italic; }
 .ai-reading-followup { display: flex; gap: 8px; }
 .ai-reading-followup input { flex: 1; min-width: 0; }
 
+@media (min-width: 961px) {
+    body.ai-reading-fullscreen .ai-reading-panel { width: 100vw; border-left: 0; box-shadow: none; }
+    body.ai-reading-fullscreen .ai-reading-body { padding: 28px max(24px, calc((100vw - 900px) / 2)); }
+    body.ai-reading-fullscreen .ai-reading-chat-log { max-height: min(62dvh, 760px); }
+}
+
 @media (max-width: 960px) {
     .ai-reading-overlay { align-items: flex-end; padding: 0; pointer-events: auto; background: rgba(0, 0, 0, .42); }
     body.ai-reading-open { overflow: hidden; }
     .ai-reading-panel { width: 100%; height: auto; max-height: min(86dvh, 760px); border: 1px solid var(--border, #ddd); border-bottom: 0; border-radius: 20px 20px 0 0; box-shadow: 0 -18px 42px color-mix(in srgb, var(--text, #333) 18%, transparent); }
+    body.ai-reading-fullscreen .ai-reading-overlay { align-items: stretch; background: transparent; }
+    body.ai-reading-fullscreen .ai-reading-panel { width: 100vw; height: 100dvh; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
     .ai-reading-body { padding: 16px; }
     .ai-reading-followup { flex-direction: column; }
-    .ai-reading-chat-log { max-height: min(31dvh, 280px); }
+    .ai-reading-chat-log { max-height: min(42dvh, 420px); }
+    body.ai-reading-fullscreen .ai-reading-chat-log { max-height: min(62dvh, 720px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
