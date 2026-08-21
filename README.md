@@ -1,6 +1,8 @@
 # EPUB Browser
 
-> A personal EPUB reader and static-site generator. Read privately. Publish anywhere.
+> A private EPUB reading service and a self-contained static-site generator.
+
+[English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md)
 
 <p align="center">
   <img src="https://github.com/dfface/epub-browser/blob/aff1def01252481f74c25ebf5b17d142b7db3c5e/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
@@ -10,31 +12,49 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
 
-EPUB Browser v2 has two explicit product modes:
+EPUB Browser has two explicit modes:
 
-- `ssg` generates a complete static-site snapshot for Pages, object storage, Nginx, or any other static host.
-- `server` runs a stateful reading service with durable SQLite data, an incremental generated cache, optional file watching, and browser APIs.
+| | `ssg` | `server` |
+| --- | --- | --- |
+| Deployment | Static hosting, Pages, object storage, Nginx | A persistent private reading service |
+| Accounts | None | Local accounts; optional trusted-proxy identity |
+| Progress, annotations, bookshelf | This browser only | Authenticated account in SQLite |
+| Source updates | Run `ssg` again | Restart or use `--watch` |
+| Runtime database | None | Required |
 
-Choose the mode from what you are deploying—not from whether a build step happens internally.
+Use `ssg` when the result must be ordinary static files. Use `server` when readers need accounts, cross-device data, access control, or automatic source reconciliation.
 
-## Install
+## Requirements and installation
+
+- Python 3.9 or newer
+- One or more `.epub` files, files in nested directories, or a Calibre-style library directory
+
+Install from PyPI:
 
 ```bash
 pip install epub-browser
 ```
 
-Python 3.9 or newer is required.
+Show the mode-specific command reference:
 
-## SSG: generate a static site
+```bash
+epub-browser --help
+epub-browser ssg --help
+epub-browser server --help
+```
 
-Generate a site for a domain root:
+## Quick start
+
+### Generate a static site
 
 ```bash
 epub-browser ssg /path/to/books \
   --output-dir /path/to/dist
 ```
 
-For GitHub Pages or another project subpath, set the public URL prefix explicitly:
+Serve `dist/` over HTTP. Opening generated pages directly through `file://` is not supported because browser storage, modules, manifests, and Service Workers require an HTTP origin.
+
+For a site hosted below a URL prefix, set the public path separately from the filesystem destination:
 
 ```bash
 epub-browser ssg /path/to/books \
@@ -42,35 +62,9 @@ epub-browser ssg /path/to/books \
   --base-path /my-repository/
 ```
 
-`--base-path` changes generated browser URLs; it does not change the output directory. For example, `--base-path /my-repository/` makes links, manifests, icons, book metadata, and Service Worker entries start with `/my-repository/` while files are still written directly inside `dist/`.
+`--base-path` changes generated URLs, not where files are written. With `/my-repository/`, links, icons, manifests, book metadata, and Service Worker entries all use that prefix while the files remain directly inside `dist/`.
 
-SSG activation is transactional: EPUB Browser builds and validates a sibling staging snapshot, then replaces the destination. A failed conversion leaves the previous output untouched. SSG output contains no Server database, migration state, or runtime cache metadata.
-
-Browser-local bookshelf data remains local unless you use the existing manual Sync action against a compatible endpoint. Static reading progress and annotations stay in browser storage and do not probe EPUB Browser Server APIs.
-
-## Book identity storage
-
-EPUB Browser gives every book a stable `book_id`; this is the same value exposed as `book_hash` in generated URLs and browser data. The default for SSG, Server, `--watch`, and legacy command syntax is:
-
-```bash
---book-id-storage sidecar
-```
-
-Sidecar mode stores the identity in a visible file beside the source, for example `BOOK.epub.epub-browser.json`. It preserves the EPUB byte-for-byte. The sidecar also records a verified SHA-256 source fingerprint, which Server combines with database state and cache validation when deciding whether generated content can be reused.
-
-To store the same ID inside OPF metadata instead, opt in for the entire command invocation:
-
-```bash
---book-id-storage embedded
-```
-
-Embedded mode may rebuild the EPUB ZIP and is refused for sources that cannot be changed safely. There is no database-only fallback: the selected carrier must already be valid or be writable. EPUB Browser reads both carrier types before writing and stops on disagreeing IDs, duplicate active IDs, or ambiguous move candidates.
-
-When upgrading from v2.0.4, an existing embedded ID is copied to the default sidecar without rewriting the EPUB or deleting its OPF metadata. Switching storage modes likewise creates the selected carrier with the existing ID and leaves the other carrier intact.
-
-## Server: run a persistent reading library
-
-For a private local library:
+### Run a persistent Server library
 
 ```bash
 epub-browser server /path/to/books \
@@ -78,48 +72,136 @@ epub-browser server /path/to/books \
   --watch
 ```
 
-On the first visit, `/setup` prompts for a username, password, confirmation,
-and language, then creates the sole initial superuser and signs it in. Until
-setup completes, EPUB Browser does not scan or expose the library: normal HTML
-redirects to `/setup`, while APIs, event streams, books, and generated assets
-return a minimal setup-required response.
+Open `http://127.0.0.1:8000/`. On first access, EPUB Browser prompts you to create the initial administrator. The library is not scanned or exposed until this one-time setup finishes.
 
-The setup page is a one-time claim. Complete it over loopback or another
-trusted/private path before exposing the port, because the first visitor who
-submits the form becomes the administrator. Trusted-proxy identity headers do
-not bypass or complete setup.
+## Sources and stable book identity
 
-For unattended deployment, provide `--admin-username` and preferably a
-mode-`0600` `--admin-password-file`. EPUB Browser removes exactly one trailing
-newline, creates the administrator with an Argon2id password hash, and never
-prints the secret. An incomplete unattended configuration or an empty or
-unreadable configured file stops startup. Once setup is complete, later starts
-do not read or require the bootstrap secret.
+Every positional `SOURCE` may be an EPUB file or a directory. Directories are searched recursively. Multiple sources can be passed to one command:
 
-The equivalent environment settings are
-`EPUB_BROWSER_ADMIN_USERNAME` and
-`EPUB_BROWSER_ADMIN_PASSWORD_FILE`. `EPUB_BROWSER_ADMIN_PASSWORD` is a
-plaintext environment fallback only when no password file is configured; a CLI
-password-file path takes priority over both environment password sources.
+```bash
+epub-browser server book.epub /srv/library /srv/periodicals \
+  --server-dir /srv/epub-browser \
+  --watch
+```
 
-Server binds to `127.0.0.1` by default. This is the safe default for one machine. To make it reachable on a trusted LAN, opt in explicitly:
+Each book receives a stable `book_id`, also exposed as `book_hash` in generated URLs and browser data. The general CLI default is:
+
+```bash
+--book-id-storage sidecar
+```
+
+Sidecar mode writes a visible identity file beside the EPUB, such as `BOOK.epub.epub-browser.json`, and leaves the EPUB bytes unchanged. The sidecar contains the stable ID and a verified SHA-256 source fingerprint.
+
+To place the ID in OPF metadata instead, select embedded storage for the entire invocation:
+
+```bash
+--book-id-storage embedded
+```
+
+Embedded mode can rebuild the EPUB ZIP, so the source must be writable and safe to modify. EPUB Browser does not silently fall back to a database-only identity. It stops when IDs disagree, active sources duplicate an ID, a carrier is invalid, or a required carrier cannot be written.
+
+When migrating storage modes, the existing ID is copied to the selected carrier; the other valid carrier is retained. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB.
+
+## SSG mode
+
+SSG builds a complete snapshot in a sibling staging directory, validates it, and then replaces the destination. If any conversion fails, the previous destination remains unchanged. Generated output contains no Server database, migration state, account page, or runtime cache metadata.
+
+SSG behavior is intentionally local and account-free:
+
+- Reading progress and annotations use browser storage on the current origin.
+- The bookshelf supports local JSON Import and Export; it has no cloud Sync action.
+- Login, account settings, Server APIs, and user-dependent controls are absent.
+- The storage destination is fixed to local browser storage and is not presented as a setting.
+- Static output includes the Service Worker required for offline-capable assets.
+
+All required application JavaScript, CSS, fonts, and icons are included in the output. See [Self-contained and network behavior](#self-contained-and-network-behavior) for the only optional network request.
+
+## Server mode
+
+### Initial setup, accounts, and permissions
+
+On a fresh persistent state directory, normal pages redirect to `/setup`. APIs, event streams, generated assets, and books return a setup-required response until the initial administrator is created. Complete setup over loopback or another trusted private path before exposing the port: the first successful setup submission claims the administrator account.
+
+After setup:
+
+- Public registration is closed. Administrators create and manage users.
+- Accounts have either the `administrator` or `member` role.
+- Ordinary books are visible to every authenticated account.
+- Restricted books are visible only to administrators and explicitly selected users.
+- Each user owns their bookshelf, progress, annotations, and active sessions.
+- Users can change their password and revoke their sessions.
+- Administrators can manage users, roles, passwords, sessions, external identities, and book grants.
+- Sessions use an HttpOnly cookie, CSRF protection, and a 30-day sliding lifetime.
+
+For unattended first start, provide a username and password file:
 
 ```bash
 epub-browser server /path/to/books \
-  --server-dir /path/to/epub-browser-state \
+  --server-dir /path/to/state \
+  --admin-username admin \
+  --admin-password-file /run/secrets/epub-browser-admin-password \
+  --no-browser
+```
+
+The password file should be mode `0600`. EPUB Browser removes one trailing newline, stores an Argon2id hash, and never prints the secret. An incomplete configuration, empty file, or unreadable file stops startup. Once setup is complete, subsequent starts do not read the bootstrap secret.
+
+Environment equivalents are `EPUB_BROWSER_ADMIN_USERNAME` and `EPUB_BROWSER_ADMIN_PASSWORD_FILE`. `EPUB_BROWSER_ADMIN_PASSWORD` is a plaintext fallback only when no password file is configured. A CLI password-file path has priority over environment password sources.
+
+### Browser launch and logging
+
+By default, Server tries to open the operating system's default browser after the HTTP listener has started. `--no-browser` prevents that local launch. It **does not disable the web interface or browser access**; it only suppresses the local `webbrowser.open(...)` call. Use it for Docker, systemd, SSH sessions, headless machines, and scripts.
+
+Without `--log`, the CLI avoids routine output so terminal progress displays are not corrupted. An interactive terminal prints the bound URL once; non-interactive Docker and service runs remain quiet. `--log` enables operational and HTTP access logging.
+
+Initial and watch scans appear in the web interface rather than terminal `tqdm`. A successful summary closes automatically; failures stay visible until dismissed. With `--watch`, fixing or replacing a source starts another scan without a manual retry action.
+
+### Persistent and ephemeral state
+
+Persistent Server mode requires `--server-dir`. For a disposable run, use `--ephemeral` instead:
+
+```bash
+epub-browser server book.epub --ephemeral
+```
+
+Ephemeral state is deleted at shutdown. Because its database is new on every run, setup also repeats unless unattended bootstrap credentials are supplied.
+
+Persistent layout:
+
+```text
+<server-dir>/
+├── .server.lock                 # reusable process-lock metadata
+├── data/
+│   ├── epub-browser.db          # authoritative accounts, books, grants, reading data
+│   ├── migration-state.json     # restart-safe migration state
+│   └── backups/                 # verified pre-migration database copies
+└── cache/
+    ├── catalog.json             # generated-cache status
+    ├── public/                  # served application and converted books
+    └── staging/                 # replaceable conversion work
+```
+
+Only `data/` is authoritative. `cache/` may be deleted and will be rebuilt. Preserve `data/` across upgrades and container replacement. An operating-system lock controls exclusivity; `.server.lock` may remain after a normal shutdown as diagnostic metadata.
+
+### LAN, reverse proxy, and OIDC
+
+Server binds to `127.0.0.1:8000` by default. For a trusted LAN:
+
+```bash
+epub-browser server /path/to/books \
+  --server-dir /path/to/state \
   --watch \
   --host 0.0.0.0 \
   --port 8080 \
   --no-browser
 ```
 
-Do not expose the built-in Server directly to the public internet. Put it
-behind a TLS reverse proxy with appropriate network controls and enable secure
-cookies:
+Do not expose the built-in HTTP server directly to the public internet. Terminate TLS at a reverse proxy, apply network controls, and enable secure cookies.
+
+EPUB Browser is not an OAuth/OIDC client. To use OIDC, place an OIDC-aware authentication proxy in front of it and pass a stable authenticated subject:
 
 ```bash
 epub-browser server /path/to/books \
-  --server-dir /path/to/epub-browser-state \
+  --server-dir /path/to/state \
   --watch \
   --host 0.0.0.0 \
   --cookie-secure \
@@ -130,66 +212,22 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-The trusted CIDR must describe the reverse proxy's direct network, not a public
-client range. Configure that proxy to remove inbound copies of the identity
-headers and set its own authenticated values. EPUB Browser ignores proxy
-identity headers from every peer outside the configured CIDRs. TLS terminates
-at the reverse proxy; `--cookie-secure` ensures the session cookie is returned
-only over the browser-facing HTTPS connection. The local administrator remains
-the recovery account even when proxy identity is enabled. Proxy trust always
-uses the direct socket peer; EPUB Browser disables Uvicorn processing of
-`X-Forwarded-For`/`Forwarded`, and `FORWARDED_ALLOW_IPS` cannot expand the
-trusted CIDR boundary.
+The trusted CIDR must identify the reverse proxy's **direct socket network**, not the public client range. Configure the proxy to remove client-supplied copies of the identity headers and set its own authenticated values. Headers from untrusted peers are ignored. Uvicorn forwarded-address processing is disabled, so `X-Forwarded-For`, `Forwarded`, and `FORWARDED_ALLOW_IPS` cannot expand this trust boundary.
 
-EPUB Browser is not itself an OAuth/OIDC client. To use OIDC, place an
-OIDC-aware authentication proxy in front of it. That proxy completes the
-provider login and forwards a stable provider subject in the configured
-`--proxy-subject-header`; `--proxy-issuer` identifies the provider/security
-domain and must stay stable. Do not use a mutable display name as the subject.
-An unknown trusted-proxy identity can be linked to an existing local account by
-proving that account's password, or an administrator can create the same
-issuer/subject mapping in Account settings. Local administrator/password login
-remains the recovery path.
-
-For a disposable session, use `--ephemeral` instead of `--server-dir`:
-
-```bash
-epub-browser server book.epub \
-  --ephemeral
-```
-
-Because an ephemeral database is new on every run, web setup repeats on every
-run. Supply unattended bootstrap credentials if an interactive setup is not
-appropriate.
-
-- Initial and watch scans appear in the Server library page; Server mode does not use terminal tqdm.
-- Interactive terminals print the bound URL once. Docker/systemd runs stay quiet unless `--log` is enabled.
-- A successful scan summary closes automatically; failures remain visible until dismissed. Fixing or replacing the EPUB lets `--watch` start the next scan—there is no manual retry endpoint.
-
-### Server storage contract
-
-```text
-<server-dir>/
-├── .server.lock                 # reusable process-lock metadata
-├── data/
-│   ├── epub-browser.db          # durable books, annotations, bookshelf sync, progress
-│   ├── migration-state.json     # restart-safe v2 migration state
-│   └── backups/                 # verified pre-migration database copies
-└── cache/
-    ├── catalog.json             # generated-cache status
-    ├── public/                  # served HTML, assets, and converted books
-    └── staging/                 # replaceable conversion work
-```
-
-Only `data/` is authoritative. `cache/` can be deleted: the next start rebuilds it while retaining durable book IDs and user data. `.server.lock` remains as harmless diagnostic metadata after shutdown; an operating-system lock, rather than its recorded PID, controls exclusivity. Public files are never written at the Server root in the v2 layout.
-
-In Server mode, the bookshelf is stored as a versioned cloud document in the Server database and saves automatically after every change. Users must sign in with the existing username setting before using it. SSG mode keeps local bookshelf data and provides Import and Export; it has no Sync action.
+Use an immutable provider subject, not a display name, in `--proxy-subject-header`. Keep `--proxy-issuer` stable for that identity domain. A user can link an unknown trusted identity by proving a local account password, or an administrator can create the mapping. Local administrator/password login remains the recovery path.
 
 ## Docker
 
-The image runs persistent Server mode and defaults to
-`--book-id-storage embedded`. Mount EPUB input read-write so a stable book ID
-can be written into each EPUB, and mount Server state read-write:
+The image runs persistent Server mode with these defaults:
+
+- `/app/Library` as the source
+- `/app/EpubBrowserFiles` as persistent state
+- `--watch`
+- `--no-browser`
+- `--host 0.0.0.0 --port 80`
+- `--book-id-storage embedded`
+
+Because embedded identity may rewrite an EPUB, mount the library read-write. Mount Server state read-write and keep it across container replacement:
 
 ```bash
 docker run -d \
@@ -197,103 +235,142 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.0.5
+  epub-browser:2.1.0
 ```
 
-Visit `http://127.0.0.1:8080/setup` and complete setup before changing the port
-binding or proxy rules. For an unattended first start, add:
+Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
+
+For unattended setup:
 
 ```bash
--e EPUB_BROWSER_ADMIN_USERNAME=admin \
--e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
---mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly
+docker run -d \
+  --name epub-browser \
+  -p 127.0.0.1:8080:80 \
+  -v /path/to/books:/app/Library:rw \
+  -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
+  -e EPUB_BROWSER_ADMIN_USERNAME=admin \
+  -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
+  --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
+  epub-browser:2.1.0
 ```
 
-`/app/EpubBrowserFiles` must be writable and persistent. The Docker image
-selects embedded identity storage even though the general CLI default remains
-`sidecar`; `/app/Library:rw` permits the image to rebuild an EPUB when its ID
-must be embedded. A read-only input mount works only when every selected
-embedded carrier already exists and matches; EPUB Browser no longer falls back
-to a database-only ID. Embedded writes may be refused for signed, linked,
-read-only, or unsupported sources. Existing sidecars are left intact when the
-same ID is embedded. Mount
-`/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
+After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.
+
+Mount `/app/SyncData:ro` only while importing legacy bookshelf JSON:
 
 ```bash
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-The image command includes `--watch`, so changes under `/app/Library` are
-reconciled automatically. Keep `/app/EpubBrowserFiles` across container
-replacement; a restart with an existing administrator succeeds even when the
-one-time secret mount has been removed.
+The loopback published port in the examples keeps the container behind the host boundary. For remote access, use a TLS reverse proxy and configure its actual container-network CIDR, identity headers, and `--cookie-secure`.
 
-The container intentionally binds the process to `0.0.0.0`. The loopback-only
-published port above keeps the built-in HTTP server behind the host boundary.
-For remote access, terminate TLS at a reverse proxy and configure
-`--cookie-secure` plus the proxy's actual container-network CIDR and identity
-headers as described above. Do not trust arbitrary forwarded headers or expose
-port 80 directly to the internet.
+## Complete command reference
 
-## Legacy v1 command compatibility
+### `epub-browser ssg SOURCE [SOURCE ...]`
 
-v2 accepts the v1 syntax for the full v2 major line and maps it to one of the new modes:
+| Option | Meaning |
+| --- | --- |
+| `--output-dir DIR`, `-o DIR` | Required destination for the atomic static snapshot. |
+| `--base-path PATH` | Public URL prefix; default `/`. It must begin and end with `/`. |
+| `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
+| `--log` | Print conversion detail. Without it, routine output stays quiet. |
 
-| v1 command shape | v2 equivalent |
+### `epub-browser server SOURCE [SOURCE ...]`
+
+Exactly one of `--server-dir` and `--ephemeral` is required.
+
+| Option | Meaning |
+| --- | --- |
+| `--server-dir DIR` | Persistent authoritative data and replaceable cache root. |
+| `--ephemeral` | Use disposable state; mutually exclusive with `--server-dir`. |
+| `--watch`, `-w` | Watch sources and reconcile additions, updates, moves, and deletions. |
+| `--host ADDRESS` | Bind address; default `127.0.0.1`. |
+| `--port PORT`, `-p PORT` | Bind port; default `8000`. |
+| `--no-browser` | Do not launch the local default browser. The web UI remains available. |
+| `--log` | Enable operational and HTTP access logs. |
+| `--legacy-sync-dir DIR` | Read legacy bookshelf JSON during startup migration. |
+| `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
+| `--admin-username NAME` | Initial unattended administrator; fallback `EPUB_BROWSER_ADMIN_USERNAME`. |
+| `--admin-password-file FILE` | Preferred initial secret file; fallback `EPUB_BROWSER_ADMIN_PASSWORD_FILE`, then `EPUB_BROWSER_ADMIN_PASSWORD` when no file is set. |
+| `--trusted-proxy-cidr CIDR` | Repeatable direct-proxy network trust boundary. Requires subject header and issuer. |
+| `--proxy-subject-header NAME` | Header containing the immutable authenticated external subject. |
+| `--proxy-display-name-header NAME` | Optional header containing a display name. |
+| `--proxy-issuer VALUE` | Stable issuer/security-domain identifier for proxy subjects. |
+| `--cookie-secure` | Send the session cookie only over browser-facing HTTPS. |
+
+### Legacy v1 syntax
+
+Legacy syntax is supported throughout the v2 major line:
+
+| v1 command | v2 mapping |
 | --- | --- |
 | `epub-browser BOOKS` | `epub-browser server BOOKS --ephemeral` |
 | `epub-browser BOOKS --output-dir STATE` | `epub-browser server BOOKS --server-dir STATE` |
 | `epub-browser BOOKS --no-server --output-dir DIST` | `epub-browser ssg BOOKS --output-dir DIST` |
 | `--sync-dir DIR` | `server --legacy-sync-dir DIR` |
 
-With `--log`, legacy invocation prints the equivalent v2 command. Without `--log`, the adapter stays quiet. Legacy temporary `--keep-files` is retained; persistent Server directories are already permanent.
+Legacy-only `--keep-files` retains a temporary Server directory. Persistent Server directories are already permanent. With `--log`, the compatibility adapter prints the equivalent v2 command; otherwise it remains quiet.
 
-See [Migrating to v2](docs/migration-v2.md) for backup, automatic data migration, conflict recovery, and rollback details.
+## Reading features and data placement
 
-## Useful options
+- Recursive EPUB and Calibre-library discovery, metadata tags, search, and pinyin search
+- Responsive Library, book detail, and chapter-reading interfaces
+- Scrolling, page turning, continuous reading, adjustable content width, fonts, custom CSS, themes, and pure reading mode
+- Highlights, notes, annotation browsing, nested bookshelf groups, tags, and JSON Import/Export
+- English and Simplified Chinese interfaces
+- E-reader-friendly behavior for Kindle/Silk browsers; browser-heavy features may be reduced
 
-```bash
-epub-browser ssg --help
-epub-browser server --help
-```
-
-| Mode | Option | Purpose |
+| Data | SSG | Server |
 | --- | --- | --- |
-| SSG | `--output-dir`, `-o` | Required static snapshot destination. |
-| SSG | `--base-path` | Public URL prefix, default `/`. |
-| Server | `--server-dir` | Persistent data and cache root. |
-| Server | `--ephemeral` | Disposable Server root; mutually exclusive with `--server-dir`. |
-| Server | `--watch`, `-w` | Reconcile source changes automatically. |
-| Server | `--host` | Bind address, default `127.0.0.1`. |
-| Server | `--port`, `-p` | Bind port, default `8000`. |
-| Server | `--legacy-sync-dir` | Read legacy bookshelf JSON during migration. |
-| Both | `--book-id-storage sidecar\|embedded` | Select one identity carrier for the entire invocation; default `sidecar`. |
-| Server | `--admin-username` | First-start administrator; environment fallback is supported. |
-| Server | `--admin-password-file` | Preferred optional unattended first-start secret source. |
-| Server | `--trusted-proxy-cidr` | Repeatable direct-proxy trust boundary; requires proxy header and issuer options. |
-| Server | `--cookie-secure` | Mark session cookies HTTPS-only. |
-| Both | `--log` | Show operational detail without corrupting progress output. |
+| Reading progress | Browser-local | Authenticated user's SQLite record |
+| Highlights and notes | Browser-local | Authenticated user's SQLite records |
+| Bookshelf | Browser-local; Import/Export | Authenticated user's versioned cloud document; automatic save |
+| Accounts and sessions | Not present | SQLite under `<server-dir>/data` |
+| Book grants | Not present | SQLite under `<server-dir>/data` |
 
-## Reading features
+Server does not offer a local/cloud storage selector: authenticated reading data is always stored on the Server. SSG never probes Server APIs and always uses the current browser origin's local storage.
 
-- Recursive EPUB and Calibre-library discovery, metadata tags, search, and pinyin search.
-- Scrolling, page turning, continuous reading, custom fonts and CSS, themes, and pure reading mode.
-- Highlights and notes stored locally in SSG output and in the authenticated account's Server database in Server mode.
-- Nested bookshelf groups, tags, JSON import/export, and the existing optional manual sync.
-- PWA manifests and content-addressed static assets.
-- English and Simplified Chinese browser UI.
+## Self-contained and network behavior
 
-Kindle/Silk browsers receive an e-reader-friendly mode; browser-heavy features may be reduced.
+The application is self-contained for reading: required JavaScript, CSS, fonts, icons, manifests, and converted EPUB resources are served locally. There are no CDN runtime dependencies. Blocking outbound internet access does not prevent setup, login, browsing, reading, annotations, progress, bookshelf use, administration, or source conversion.
+
+The footer may make an optional request to the GitHub Releases API to discover a newer EPUB Browser version. Failure, blocking, or offline use only suppresses that update hint. OIDC also requires the separately operated authentication proxy and provider you explicitly configure; it is not a built-in dependency.
+
+SSG publishes a static Service Worker. Server deliberately disables and retires the origin-wide Service Worker so one account cannot receive another account's cached protected content.
 
 ## Data safety and migration
 
-Persistent Server startup automatically checks for the v1 root database, verifies it, creates a backup, upgrades a copied database, imports the highest eligible legacy bookshelf JSON into the pending administrator, and only then removes the migrated root database. Ordinary `/sync` requests never scan legacy files or select them by username. Legacy public files are retired in two successful startup phases and are never treated as authoritative data.
+Before upgrading persistent Server installations, back up the source EPUBs and `<server-dir>/data`. Keep the same persistent state volume during container replacement.
 
-If both `epub-browser.db` and `annotations.db` exist at the legacy root, startup stops with a conflict instead of guessing. Corrupt databases are also left untouched. See [docs/migration-v2.md](docs/migration-v2.md).
+Startup migration is automatic and restart-safe. It verifies legacy databases, creates a backup, upgrades a copy, imports eligible legacy bookshelf/progress/annotation data into the pending initial administrator, and only retires legacy files after successful checkpoints. Ordinary requests never scan legacy sync directories. Corrupt databases, invalid password hashes, ambiguous legacy databases, and conflicting IDs fail closed instead of being guessed or overwritten.
+
+If both `epub-browser.db` and `annotations.db` exist at a legacy root, startup stops and leaves them untouched. See [Migrating to v2](docs/migration-v2.md) for backup, rollback, cache rebuilding, and conflict recovery.
+
+## Troubleshooting
+
+### The command started, but no browser opened
+
+Remove `--no-browser` when running on a graphical local machine, or open the printed/bound URL manually. In Docker, systemd, SSH, and non-interactive sessions, opening the URL yourself is expected.
+
+### The CLI appears quiet
+
+Quiet operation is intentional without `--log`, especially in non-interactive environments. Add `--log` for operational and access detail. Server scan progress is shown in the web interface.
+
+### Docker cannot write a stable ID
+
+The image defaults to embedded identity. Mount `/app/Library` read-write or pre-embed valid matching IDs. Use a custom command with `--book-id-storage sidecar` only if a writable sidecar carrier is preferable.
+
+### A generated SSG site has broken links below a subpath
+
+Regenerate it with a normalized `--base-path`, such as `/reader/`, and configure the static host to serve the output at that same prefix.
+
+### Server refuses to start after an upgrade
+
+Read the first logged migration or validation error, preserve the data and source files, and consult [docs/migration-v2.md](docs/migration-v2.md). Do not delete the authoritative `data/` directory to work around an error.
 
 ## Contributing
 
-Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the EPUB when it can be shared, the exact command, browser/device, and reproduction steps.
+Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the exact command, browser/device, reproduction steps, relevant logs, and the EPUB when it can be shared legally.
 
 ## License
 

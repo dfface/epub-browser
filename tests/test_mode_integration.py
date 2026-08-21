@@ -278,7 +278,7 @@ class ModeIntegrationTests(unittest.TestCase):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
         readme = Path("README.md").read_text(encoding="utf-8")
         migration = Path("docs/migration-v2.md")
-        release = Path("docs/releases/v2.0.5.md")
+        release = Path("docs/releases/v2.1.0.md")
 
         self.assertIn('"server"', dockerfile)
         self.assertIn('"--server-dir=/app/EpubBrowserFiles"', dockerfile)
@@ -291,12 +291,41 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertIn("reverse proxy", readme.lower())
         self.assertTrue(migration.is_file())
         self.assertTrue(release.is_file())
-        self.assertIn('VERSION = "2.0.5"', Path("epub_browser/version.py").read_text())
+        self.assertIn('VERSION = "2.1.0"', Path("epub_browser/version.py").read_text())
 
     def test_docker_server_defaults_to_embedded_book_id_storage(self):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
 
         self.assertIn('"--book-id-storage=embedded"', dockerfile)
+
+    def test_english_and_chinese_readmes_document_every_public_mode_option(self):
+        documented_options = {
+            "--output-dir",
+            "--base-path",
+            "--log",
+            "--book-id-storage",
+            "--server-dir",
+            "--ephemeral",
+            "--watch",
+            "--host",
+            "--port",
+            "--no-browser",
+            "--legacy-sync-dir",
+            "--admin-username",
+            "--admin-password-file",
+            "--trusted-proxy-cidr",
+            "--proxy-subject-header",
+            "--proxy-display-name-header",
+            "--proxy-issuer",
+            "--cookie-secure",
+        }
+
+        for readme_path in (Path("README.md"), Path("README.zh-CN.md")):
+            with self.subTest(readme=str(readme_path)):
+                self.assertTrue(readme_path.is_file())
+                readme = readme_path.read_text(encoding="utf-8")
+                for option in documented_options:
+                    self.assertIn(option, readme)
 
     @staticmethod
     def _create_legacy_accountless_database(path, book_id):
