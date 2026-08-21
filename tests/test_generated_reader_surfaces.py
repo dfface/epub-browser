@@ -1638,7 +1638,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('pointer-events: none;', stylesheet)
         self.assertIn("addInsightCards(body, 'ai.deepThemes'", script)
         self.assertIn('parseLegacyObject(value, titleKeys.concat(detailKeys))', script)
-        self.assertIn("addEvidenceHighlightControl(body, evidence)", script)
+        self.assertIn("addEvidenceHighlightControl(body, evidence, result.id)", script)
         self.assertIn("range.surroundContents(mark)", script)
         self.assertIn("clearEvidenceMarks();", script)
         self.assertIn('.ai-evidence-mark {', stylesheet)
