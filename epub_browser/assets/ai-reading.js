@@ -8,6 +8,7 @@
   var requestContext;
   var activeRun = 0;
   var focusReturn;
+  var authorizationRequest;
 
   function t(key, params) {
     var i18n = root.EpubBrowserI18n;
@@ -311,27 +312,69 @@
     return i18n && i18n.getLocale ? i18n.getLocale() : 'en';
   }
 
+  function loadAuthorization() {
+    if (!authorizationRequest) {
+      authorizationRequest = fetchApi('/api/ai/status', { method: 'GET' });
+    }
+    return authorizationRequest;
+  }
+
+  function hideUnavailableControls(chapter, book) {
+    if (chapter) chapter.hidden = true;
+    if (book) book.hidden = true;
+  }
+
+  function bindControl(control, context, chapter, book) {
+    if (!control || control.getAttribute('data-ai-reading-bound') === 'true') return;
+    control.setAttribute('data-ai-reading-bound', 'true');
+    control.addEventListener('click', function() {
+      // Permission is fetched asynchronously.  Bind first so a fast click while
+      // the reader is still initializing is queued rather than silently lost.
+      control.disabled = true;
+      control.setAttribute('aria-busy', 'true');
+      loadAuthorization().then(function(status) {
+        if (!status || !status.authorized) {
+          hideUnavailableControls(chapter, book);
+          return;
+        }
+        openPanel(context(), control);
+      }).catch(function() {
+        hideUnavailableControls(chapter, book);
+      }).finally(function() {
+        control.disabled = false;
+        control.removeAttribute('aria-busy');
+      });
+    });
+  }
+
   function init() {
     var chapter = document.querySelector('[data-ai-reading-chapter]');
     var book = document.querySelector('[data-ai-reading-book]');
-    function allowed(status) {
+    if (!chapter && !book) return;
+
+    bindControl(chapter, function() {
+      return {
+        scope: 'chapter',
+        bookId: chapter.getAttribute('data-book-id'),
+        chapterIndex: Number(chapter.getAttribute('data-chapter-index')),
+        mode: 'chapter'
+      };
+    }, chapter, book);
+    bindControl(book, function() {
+      return {
+        scope: 'book',
+        bookId: book.getAttribute('data-book-id'),
+        mode: 'spoiler_free'
+      };
+    }, chapter, book);
+
+    loadAuthorization().then(function(status) {
       if (book) refreshEffectiveTags(book.getAttribute('data-book-id'));
       if (!status || !status.authorized) {
-        if (chapter) chapter.hidden = true;
-        if (book) book.hidden = true;
-        return;
+        hideUnavailableControls(chapter, book);
       }
-      if (chapter) chapter.addEventListener('click', function() {
-        openPanel({ scope: 'chapter', bookId: chapter.getAttribute('data-book-id'), chapterIndex: Number(chapter.getAttribute('data-chapter-index')), mode: 'chapter' }, chapter);
-      });
-      if (book) book.addEventListener('click', function() {
-        openPanel({ scope: 'book', bookId: book.getAttribute('data-book-id'), mode: 'spoiler_free' }, book);
-      });
-    }
-    if (!chapter && !book) return;
-    fetchApi('/api/ai/status', { method: 'GET' }).then(allowed).catch(function() {
-      if (chapter) chapter.hidden = true;
-      if (book) book.hidden = true;
+    }).catch(function() {
+      hideUnavailableControls(chapter, book);
     });
   }
 
@@ -349,6 +392,10 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     if (!root.EpubBrowserAuth || !root.EpubBrowserAuth.init) return;
-    root.EpubBrowserAuth.init().then(function(session) { if (session) init(); });
+    init();
+    root.EpubBrowserAuth.init().then(function(session) {
+      if (!session) return;
+      loadAuthorization();
+    });
   });
 })(window);
