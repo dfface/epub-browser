@@ -622,6 +622,10 @@
         title.textContent = book.title;
         title.className = 'account-book-title';
         item.appendChild(title);
+        var epubTags = root.document.createElement('p');
+        epubTags.className = 'admin-book-epub-tags';
+        epubTags.textContent = t('admin.ai.epubTags') + ': ' + ((book.epub_tags || []).join(', ') || t('admin.ai.noEpubTags'));
+        item.appendChild(epubTags);
         ['authenticated', 'restricted'].forEach(function(value) {
           var option = root.document.createElement('option');
           option.value = value;
