@@ -904,6 +904,95 @@ class StateStoreTests(unittest.TestCase):
             "interrupted",
         )
 
+    def test_ai_settings_keep_an_existing_key_until_an_admin_clears_it(self):
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        self.store.set_ai_settings(
+            enabled=False,
+            base_url="",
+            api_key=None,
+            model="",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        self.assertTrue(self.store.get_ai_settings()["api_key_configured"])
+        self.store.set_ai_settings(
+            enabled=False,
+            base_url="",
+            api_key=None,
+            model="",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+            clear_api_key=True,
+        )
+        self.assertFalse(self.store.get_ai_settings()["api_key_configured"])
+        with self.assertRaisesRegex(ValueError, "required when enabled"):
+            self.store.set_ai_settings(
+                enabled=True,
+                base_url="https://provider.example/v1",
+                api_key=None,
+                model="reader-model",
+                timeout_seconds=60,
+                max_concurrency=2,
+                daily_limit=20,
+            )
+
+    def test_ai_results_keep_history_and_followups_are_private_to_owner(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "book.epub"),
+            "urn:test:results",
+            "fingerprint",
+            {"title": "Book"},
+        )
+        first = self.store.store_ai_reading_result(
+            cache_key="book:1",
+            book_id=book.book_id,
+            chapter_index=None,
+            scope="book",
+            mode="spoiler_free",
+            profile="technical",
+            config_revision=1,
+            content={"quick": "First result"},
+            created_by_user_id=self.owner.user_id,
+        )
+        second = self.store.store_ai_reading_result(
+            cache_key="book:1",
+            book_id=book.book_id,
+            chapter_index=None,
+            scope="book",
+            mode="spoiler_free",
+            profile="technical",
+            config_revision=2,
+            content={"quick": "Regenerated result"},
+            created_by_user_id=self.owner.user_id,
+        )
+        self.assertEqual(
+            self.store.get_current_ai_reading_result("book:1")["id"], second["id"]
+        )
+        self.assertEqual(self.store.get_ai_reading_result(first["id"])["content"]["quick"], "First result")
+
+        followup = self.store.create_ai_followup(
+            result_id=second["id"], owner_user_id=member.user_id, question="Why?"
+        )
+        self.assertTrue(self.store.start_ai_followup(followup["id"], member.user_id))
+        self.assertTrue(
+            self.store.finish_ai_followup(
+                followup["id"], member.user_id, answer="Because of the evidence."
+            )
+        )
+        self.assertEqual(len(self.store.list_ai_followups(second["id"], member.user_id)), 1)
+        self.assertEqual(self.store.list_ai_followups(second["id"], self.owner.user_id), ())
+
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,
         username,

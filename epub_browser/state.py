@@ -21,7 +21,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 5
+DB_SCHEMA_VERSION = 6
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -377,6 +377,83 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_owner "
             "ON ai_reading_jobs(owner_user_id, created_at DESC)"
+        )
+        self._add_column_if_missing(
+            connection,
+            "ai_reading_jobs",
+            "result_id",
+            "TEXT",
+        )
+        self._add_column_if_missing(
+            connection,
+            "ai_reading_jobs",
+            "progress_current",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(progress_current >= 0)",
+        )
+        self._add_column_if_missing(
+            connection,
+            "ai_reading_jobs",
+            "progress_total",
+            "INTEGER NOT NULL DEFAULT 1 CHECK(progress_total >= 1)",
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_reading_results (
+                id TEXT PRIMARY KEY,
+                cache_key TEXT NOT NULL,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                chapter_index INTEGER,
+                scope TEXT NOT NULL CHECK(scope IN ('book', 'chapter')),
+                mode TEXT NOT NULL CHECK(mode IN (
+                    'spoiler_free', 'read_so_far', 'full_review', 'chapter'
+                )),
+                profile TEXT NOT NULL CHECK(profile IN (
+                    'auto', 'technical', 'fiction', 'general'
+                )),
+                config_revision INTEGER NOT NULL CHECK(config_revision >= 0),
+                content_json TEXT NOT NULL,
+                created_by_user_id TEXT NOT NULL
+                    REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_reading_results_book "
+            "ON ai_reading_results(book_id, created_at DESC)"
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_reading_current_results (
+                cache_key TEXT PRIMARY KEY,
+                result_id TEXT NOT NULL REFERENCES ai_reading_results(id)
+                    ON DELETE CASCADE,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_reading_followups (
+                id TEXT PRIMARY KEY,
+                result_id TEXT NOT NULL REFERENCES ai_reading_results(id)
+                    ON DELETE CASCADE,
+                owner_user_id TEXT NOT NULL REFERENCES users(id)
+                    ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                answer TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_reading_followups_owner "
+            "ON ai_reading_followups(owner_user_id, created_at ASC)"
         )
 
     @staticmethod
@@ -1806,21 +1883,36 @@ class StateStore:
             "api_key_configured": bool(row["api_key"]),
         }
 
+    def _get_ai_provider_settings(self) -> dict:
+        """Return the private Provider snapshot for server-side use only."""
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT enabled, base_url, api_key, model, timeout_seconds,
+                       max_concurrency, daily_limit, config_revision
+                FROM ai_settings WHERE singleton = 1
+                """
+            ).fetchone()
+        return dict(row)
+
     def set_ai_settings(
         self,
         *,
         enabled: bool,
         base_url: str,
-        api_key: str,
+        api_key: Optional[str],
         model: str,
         timeout_seconds: int,
         max_concurrency: int,
         daily_limit: int,
+        clear_api_key: bool = False,
     ) -> dict:
-        if not isinstance(base_url, str) or not isinstance(api_key, str):
+        if not isinstance(base_url, str) or (
+            api_key is not None and not isinstance(api_key, str)
+        ):
             raise ValueError("AI settings must be strings")
-        if not isinstance(model, str) or not model.strip():
-            raise ValueError("AI model is required")
+        if not isinstance(model, str):
+            raise ValueError("AI model must be text")
         if not 5 <= int(timeout_seconds) <= 180:
             raise ValueError("AI timeout is out of range")
         if not 1 <= int(max_concurrency) <= 4:
@@ -1828,6 +1920,18 @@ class StateStore:
         if int(daily_limit) < 0:
             raise ValueError("AI daily limit is out of range")
         with self._connection() as connection:
+            current = connection.execute(
+                "SELECT api_key FROM ai_settings WHERE singleton = 1"
+            ).fetchone()
+            stored_key = "" if clear_api_key else (
+                current["api_key"] if api_key is None else api_key
+            )
+            if enabled and (
+                not base_url.strip() or not model.strip() or not stored_key
+            ):
+                raise ValueError(
+                    "AI base URL, API key, and model are required when enabled"
+                )
             connection.execute(
                 """
                 UPDATE ai_settings
@@ -1840,7 +1944,7 @@ class StateStore:
                 (
                     int(bool(enabled)),
                     base_url.strip(),
-                    api_key,
+                    stored_key,
                     model.strip(),
                     int(timeout_seconds),
                     int(max_concurrency),
@@ -1873,6 +1977,33 @@ class StateStore:
                 """,
                 (user_id, int(bool(enabled)), daily_limit),
             )
+
+    def get_ai_user_access(self, user_id: str) -> dict:
+        with self._connection() as connection:
+            user = self._get_user(connection, user_id)
+            if user.role == "admin":
+                return {"enabled": True, "daily_limit": 0}
+            row = connection.execute(
+                "SELECT enabled, daily_limit FROM ai_user_access WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return {
+            "enabled": bool(row["enabled"]) if row is not None else False,
+            "daily_limit": row["daily_limit"] if row is not None else None,
+        }
+
+    def list_ai_user_access(self) -> dict[str, dict]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT user_id, enabled, daily_limit FROM ai_user_access"
+            ).fetchall()
+        return {
+            row["user_id"]: {
+                "enabled": bool(row["enabled"]),
+                "daily_limit": row["daily_limit"],
+            }
+            for row in rows
+        }
 
     def can_use_ai(self, principal: Principal) -> bool:
         if principal.role == "admin":
@@ -1927,6 +2058,43 @@ class StateStore:
                     "SELECT id, normalized_name, name FROM ai_tags WHERE id = ?",
                     (tag_id,),
                 ).fetchone()
+        return {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
+
+    def list_ai_tags(self) -> tuple[dict, ...]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT id, normalized_name, name FROM ai_tags "
+                "ORDER BY normalized_name, id"
+            ).fetchall()
+        return tuple(
+            {
+                "id": row["id"],
+                "normalized_name": row["normalized_name"],
+                "name": row["name"],
+            }
+            for row in rows
+        )
+
+    def rename_ai_tag(self, tag_id: str, name: str) -> dict:
+        normalized, display = self._normalize_ai_tag(name)
+        with self._connection() as connection:
+            try:
+                cursor = connection.execute(
+                    """
+                    UPDATE ai_tags SET normalized_name = ?, name = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (normalized, display, tag_id),
+                )
+            except sqlite3.IntegrityError as error:
+                raise ValueError("AI tag already exists") from error
+            if cursor.rowcount != 1:
+                raise KeyError("Unknown AI tag")
+            row = connection.execute(
+                "SELECT id, normalized_name, name FROM ai_tags WHERE id = ?",
+                (tag_id,),
+            ).fetchone()
         return {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
 
     def delete_ai_tag(self, tag_id: str) -> bool:
@@ -2034,15 +2202,26 @@ class StateStore:
             connection.execute("COMMIT")
         return True
 
-    def create_ai_job(self, job_id: str, owner_user_id: str, cache_key: str) -> None:
+    def create_ai_job(
+        self,
+        job_id: str,
+        owner_user_id: str,
+        cache_key: str,
+        *,
+        result_id: Optional[str] = None,
+        progress_total: int = 1,
+    ) -> None:
+        if int(progress_total) < 1:
+            raise ValueError("AI job progress total must be positive")
         with self._connection() as connection:
             self._require_user(connection, owner_user_id)
             connection.execute(
                 """
-                INSERT INTO ai_reading_jobs (id, owner_user_id, cache_key, status)
-                VALUES (?, ?, ?, 'queued')
+                INSERT INTO ai_reading_jobs (
+                    id, owner_user_id, cache_key, result_id, status, progress_total
+                ) VALUES (?, ?, ?, ?, 'queued', ?)
                 """,
-                (job_id, owner_user_id, cache_key),
+                (job_id, owner_user_id, cache_key, result_id, int(progress_total)),
             )
 
     def start_ai_job(self, job_id: str) -> bool:
@@ -2068,18 +2247,239 @@ class StateStore:
             )
         return cursor.rowcount
 
+    def update_ai_job_progress(
+        self, job_id: str, progress_current: int, progress_total: int
+    ) -> bool:
+        if int(progress_current) < 0 or int(progress_total) < 1:
+            raise ValueError("AI job progress is invalid")
+        if int(progress_current) > int(progress_total):
+            raise ValueError("AI job progress exceeds its total")
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_jobs SET progress_current = ?, progress_total = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'running'
+                """,
+                (int(progress_current), int(progress_total), job_id),
+            )
+        return cursor.rowcount == 1
+
+    def finish_ai_job(
+        self, job_id: str, *, error_code: Optional[str] = None
+    ) -> bool:
+        status = "failed" if error_code else "complete"
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_jobs SET status = ?, error_code = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'running'
+                """,
+                (status, error_code, job_id),
+            )
+        return cursor.rowcount == 1
+
     def get_ai_job(self, job_id: str, owner_user_id: str) -> Optional[dict]:
         with self._connection() as connection:
             row = connection.execute(
                 """
                 SELECT id, owner_user_id, cache_key, status, error_code,
-                       created_at, updated_at
+                       result_id, progress_current, progress_total, created_at, updated_at
                 FROM ai_reading_jobs
                 WHERE id = ? AND owner_user_id = ?
                 """,
                 (job_id, owner_user_id),
             ).fetchone()
         return dict(row) if row is not None else None
+
+    def store_ai_reading_result(
+        self,
+        *,
+        cache_key: str,
+        book_id: str,
+        chapter_index: Optional[int],
+        scope: str,
+        mode: str,
+        profile: str,
+        config_revision: int,
+        content: dict,
+        created_by_user_id: str,
+    ) -> dict:
+        if scope not in {"book", "chapter"}:
+            raise ValueError("Unsupported AI reading scope")
+        if mode not in {"spoiler_free", "read_so_far", "full_review", "chapter"}:
+            raise ValueError("Unsupported AI reading mode")
+        if profile not in {"auto", "technical", "fiction", "general"}:
+            raise ValueError("Unsupported AI profile")
+        if not isinstance(content, dict):
+            raise ValueError("AI reading result must be an object")
+        if scope == "chapter" and chapter_index is None:
+            raise ValueError("Chapter AI reading results need a chapter index")
+        if scope == "book" and chapter_index is not None:
+            raise ValueError("Book AI reading results cannot have a chapter index")
+        result_id = uuid.uuid4().hex
+        encoded_content = json.dumps(content, ensure_ascii=False, separators=(",", ":"))
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            self._require_user(connection, created_by_user_id)
+            connection.execute(
+                """
+                INSERT INTO ai_reading_results (
+                    id, cache_key, book_id, chapter_index, scope, mode, profile,
+                    config_revision, content_json, created_by_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result_id,
+                    cache_key,
+                    book_id,
+                    chapter_index,
+                    scope,
+                    mode,
+                    profile,
+                    int(config_revision),
+                    encoded_content,
+                    created_by_user_id,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO ai_reading_current_results (cache_key, result_id)
+                VALUES (?, ?)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    result_id = excluded.result_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (cache_key, result_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM ai_reading_results WHERE id = ?", (result_id,)
+            ).fetchone()
+        return self._ai_result_record(row)
+
+    @staticmethod
+    def _ai_result_record(row) -> dict:
+        item = dict(row)
+        item["content"] = json.loads(item.pop("content_json"))
+        return item
+
+    def get_current_ai_reading_result(self, cache_key: str) -> Optional[dict]:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT ai_reading_results.*
+                FROM ai_reading_current_results
+                JOIN ai_reading_results
+                  ON ai_reading_results.id = ai_reading_current_results.result_id
+                WHERE ai_reading_current_results.cache_key = ?
+                """,
+                (cache_key,),
+            ).fetchone()
+        return self._ai_result_record(row) if row is not None else None
+
+    def get_ai_reading_result(self, result_id: str) -> Optional[dict]:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM ai_reading_results WHERE id = ?", (result_id,)
+            ).fetchone()
+        return self._ai_result_record(row) if row is not None else None
+
+    def clear_ai_reading_results(
+        self, *, book_id: Optional[str] = None, config_revision: Optional[int] = None
+    ) -> int:
+        clauses = []
+        params = []
+        if book_id is not None:
+            clauses.append("book_id = ?")
+            params.append(book_id)
+        if config_revision is not None:
+            clauses.append("config_revision = ?")
+            params.append(int(config_revision))
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "DELETE FROM ai_reading_results" + where, tuple(params)
+            )
+        return cursor.rowcount
+
+    def create_ai_followup(
+        self, *, result_id: str, owner_user_id: str, question: str
+    ) -> dict:
+        if not isinstance(question, str) or not question.strip() or len(question) > 2000:
+            raise ValueError("AI follow-up must contain 1 to 2000 characters")
+        followup_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            self._require_user(connection, owner_user_id)
+            if connection.execute(
+                "SELECT 1 FROM ai_reading_results WHERE id = ?", (result_id,)
+            ).fetchone() is None:
+                raise KeyError("Unknown AI reading result")
+            connection.execute(
+                """
+                INSERT INTO ai_reading_followups (
+                    id, result_id, owner_user_id, question, status
+                ) VALUES (?, ?, ?, ?, 'queued')
+                """,
+                (followup_id, result_id, owner_user_id, question.strip()),
+            )
+            row = connection.execute(
+                "SELECT * FROM ai_reading_followups WHERE id = ?", (followup_id,)
+            ).fetchone()
+        return dict(row)
+
+    def start_ai_followup(self, followup_id: str, owner_user_id: str) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_followups SET status = 'running',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND owner_user_id = ? AND status = 'queued'
+                """,
+                (followup_id, owner_user_id),
+            )
+        return cursor.rowcount == 1
+
+    def finish_ai_followup(
+        self,
+        followup_id: str,
+        owner_user_id: str,
+        *,
+        answer: Optional[str] = None,
+        error_code: Optional[str] = None,
+    ) -> bool:
+        if (answer is None) == (error_code is None):
+            raise ValueError("AI follow-up needs exactly one answer or error code")
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_followups SET status = ?, answer = ?, error_code = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND owner_user_id = ? AND status = 'running'
+                """,
+                (
+                    "complete" if answer is not None else "failed",
+                    answer,
+                    error_code,
+                    followup_id,
+                    owner_user_id,
+                ),
+            )
+        return cursor.rowcount == 1
+
+    def list_ai_followups(self, result_id: str, owner_user_id: str) -> tuple[dict, ...]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, result_id, owner_user_id, question, answer, status,
+                       error_code, created_at, updated_at
+                FROM ai_reading_followups
+                WHERE result_id = ? AND owner_user_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+                (result_id, owner_user_id),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
 
     def resolve_book(
         self,
