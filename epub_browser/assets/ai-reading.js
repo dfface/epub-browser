@@ -130,6 +130,9 @@
     target.appendChild(header);
     var body = el('div', 'ai-reading-body');
     context.progress = addProgress(body);
+    // Chapter reading begins immediately, so its progress container must be
+    // attached before startGeneration can look it up again.
+    target.appendChild(body);
     if (context.scope === 'book') {
       body.appendChild(el('p', 'ai-reading-copy', t('ai.bookModeHelp')));
       var select = el('select', 'ai-reading-mode');
@@ -149,7 +152,6 @@
     } else {
       startGeneration(context, false);
     }
-    target.appendChild(body);
     overlay.hidden = false;
     document.body.classList.add('ai-reading-open');
     close.focus();

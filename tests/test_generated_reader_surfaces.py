@@ -1626,6 +1626,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("bindControl(chapter", script)
         self.assertIn("Never make the trigger", script)
         self.assertNotIn("/api/ai/status", script)
+        self.assertLess(
+            script.index('target.appendChild(body);'),
+            script.index('startGeneration(context, false);'),
+        )
         self.assertIn('.ai-reading-overlay {', stylesheet)
         self.assertIn('grid-template-rows: auto minmax(0, 1fr);', stylesheet)
         self.assertIn('overflow-y: auto;', stylesheet)
