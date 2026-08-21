@@ -105,6 +105,17 @@ body.ai-reading-open {
 .ai-reading-evidence p { font-style: italic; }
 .ai-reading-evidence footer { color: var(--text-secondary, #666); font-size: .84rem; }
 .ai-reading-evidence a { color: var(--button-bg, #4361ee); }
+.ai-reading-evidence-toggle { justify-self: start; }
+.ai-evidence-mark { --ai-evidence-line: #6d5dfc; padding: 0 .08em; border-radius: .18em; color: inherit; cursor: pointer; background: linear-gradient(112deg, color-mix(in srgb, var(--ai-evidence-line) 19%, transparent), color-mix(in srgb, var(--secondary, #4cc9f0) 13%, transparent)); box-decoration-break: clone; -webkit-box-decoration-break: clone; border-bottom: 2px solid var(--ai-evidence-line); text-decoration: none; }
+.ai-evidence-mark[data-ai-evidence-color="1"] { --ai-evidence-line: #0f9fbd; }
+.ai-evidence-mark[data-ai-evidence-color="2"] { --ai-evidence-line: #c65ccf; }
+.ai-evidence-mark[data-ai-evidence-color="3"] { --ai-evidence-line: #c28713; }
+.ai-evidence-mark:hover, .ai-evidence-mark:focus-visible { outline: 2px solid var(--ai-evidence-line); outline-offset: 2px; }
+.ai-evidence-popover { position: fixed; z-index: 10060; display: grid; gap: 10px; width: min(320px, calc(100vw - 24px)); padding: 13px; border: 1px solid var(--border, #ddd); border-radius: 12px; background: var(--card-bg, #fff); color: var(--text, #333); box-shadow: 0 16px 42px rgba(0, 0, 0, .23); }
+.ai-evidence-popover p { margin: 0; color: var(--text-secondary, #666); font-size: .9rem; line-height: 1.55; }
+.ai-evidence-popover-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-evidence-popover-close { display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid var(--border, #ddd); border-radius: 7px; background: var(--card-bg, #fff); color: var(--text-secondary, #666); cursor: pointer; }
+.ai-evidence-popover-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg, #4361ee) 36%, transparent); outline-offset: 2px; }
 .ai-reading-followup { display: flex; gap: 8px; }
 .ai-reading-followup input { flex: 1; min-width: 0; }
 .ai-reading-answer { display: grid; gap: 8px; padding: 12px; border-radius: 9px; background: color-mix(in srgb, var(--button-bg, #4361ee) 6%, var(--card-bg, #fff)); }

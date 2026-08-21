@@ -1638,6 +1638,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('pointer-events: none;', stylesheet)
         self.assertIn("addInsightCards(body, 'ai.deepThemes'", script)
         self.assertIn('parseLegacyObject(value, titleKeys.concat(detailKeys))', script)
+        self.assertIn("addEvidenceHighlightControl(body, evidence)", script)
+        self.assertIn("range.surroundContents(mark)", script)
+        self.assertIn("clearEvidenceMarks();", script)
+        self.assertIn('.ai-evidence-mark {', stylesheet)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

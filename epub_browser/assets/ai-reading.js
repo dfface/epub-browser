@@ -8,6 +8,8 @@
   var requestContext;
   var activeRun = 0;
   var focusReturn;
+  var evidenceMarks = [];
+  var insightPopover;
 
   function t(key, params) {
     var i18n = root.EpubBrowserI18n;
@@ -67,7 +69,13 @@
       if (event.target === overlay) closePanel();
     });
     document.addEventListener('keydown', function(event) {
-      if (event.key === 'Escape' && overlay && !overlay.hidden) closePanel();
+      if (event.key === 'Escape') {
+        if (insightPopover) {
+          closeInsightPopover();
+        } else if (overlay && !overlay.hidden) {
+          closePanel();
+        }
+      }
     });
     document.body.appendChild(overlay);
     return panel;
@@ -159,6 +167,7 @@
 
   function closePanel() {
     activeRun += 1;
+    clearEvidenceMarks();
     if (overlay) overlay.hidden = true;
     document.body.classList.remove('ai-reading-open');
     if (focusReturn && typeof focusReturn.focus === 'function') focusReturn.focus();
@@ -190,6 +199,7 @@
     var evidence = content.evidence || [];
     if (evidence.length) {
       body.appendChild(el('h4', '', t('ai.evidence')));
+      if (requestContext.scope === 'chapter') addEvidenceHighlightControl(body, evidence);
       evidence.forEach(function(item) {
         var card = el('blockquote', 'ai-reading-evidence');
         card.appendChild(el('p', '', item.quote || ''));
@@ -205,6 +215,122 @@
     var rerun = action('ai.regenerate', function() { startGeneration(requestContext, true); });
     body.appendChild(rerun);
     addFollowup(body, result.id);
+  }
+
+  function addEvidenceHighlightControl(parent, evidence) {
+    var control = action('ai.showEvidenceHighlights', function() {
+      if (evidenceMarks.length) {
+        clearEvidenceMarks();
+        control.textContent = t('ai.showEvidenceHighlights', { count: evidence.length });
+        return;
+      }
+      var found = showEvidenceMarks(evidence);
+      if (!found) {
+        showEvidenceNotice(parent, 'ai.noEvidenceHighlights');
+        return;
+      }
+      control.textContent = t('ai.hideEvidenceHighlights', { count: found });
+    });
+    control.classList.add('ai-reading-evidence-toggle');
+    control.textContent = t('ai.showEvidenceHighlights', { count: evidence.length });
+    parent.appendChild(control);
+  }
+
+  function showEvidenceNotice(parent, key) {
+    var notice = parent.querySelector('[data-ai-evidence-notice]');
+    if (!notice) {
+      notice = el('p', 'ai-reading-status');
+      notice.setAttribute('data-ai-evidence-notice', '');
+      notice.setAttribute('role', 'status');
+      parent.appendChild(notice);
+    }
+    notice.textContent = t(key);
+  }
+
+  function showEvidenceMarks(evidence) {
+    var article = document.querySelector('#eb-content');
+    if (!article) return 0;
+    evidence.forEach(function(item, index) {
+      var mark = markEvidenceQuote(article, item && item.quote, item && item.reason, index);
+      if (mark) evidenceMarks.push(mark);
+    });
+    if (evidenceMarks.length) {
+      var reduceMotion = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      evidenceMarks[0].scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+    return evidenceMarks.length;
+  }
+
+  function markEvidenceQuote(article, quote, reason, index) {
+    var needle = String(quote || '').trim();
+    if (needle.length < 8) return null;
+    var walker = document.createTreeWalker(article, root.NodeFilter ? root.NodeFilter.SHOW_TEXT : 4);
+    var node;
+    while ((node = walker.nextNode())) {
+      if (!node.parentElement || node.parentElement.closest('.ai-evidence-mark, script, style, noscript')) continue;
+      var start = node.nodeValue.indexOf(needle);
+      if (start < 0) continue;
+      var range = document.createRange();
+      range.setStart(node, start);
+      range.setEnd(node, start + needle.length);
+      var mark = el('mark', 'ai-evidence-mark');
+      mark.setAttribute('data-ai-evidence-color', String(index % 4));
+      mark.setAttribute('data-ai-evidence-reason', String(reason || ''));
+      mark.tabIndex = 0;
+      mark.setAttribute('role', 'button');
+      mark.setAttribute('aria-label', t('ai.evidenceInsight', { reason: reason || '' }));
+      range.surroundContents(mark);
+      mark.addEventListener('click', function() { showInsightPopover(mark); });
+      mark.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          showInsightPopover(mark);
+        }
+      });
+      return mark;
+    }
+    return null;
+  }
+
+  function clearEvidenceMarks() {
+    closeInsightPopover();
+    evidenceMarks.forEach(function(mark) {
+      if (!mark || !mark.parentNode) return;
+      var parent = mark.parentNode;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+      parent.normalize();
+    });
+    evidenceMarks = [];
+  }
+
+  function showInsightPopover(mark) {
+    closeInsightPopover();
+    var popover = el('section', 'ai-evidence-popover');
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-label', t('ai.evidence'));
+    var header = el('div', 'ai-evidence-popover-header');
+    header.appendChild(el('strong', '', t('ai.evidenceInsightLabel')));
+    var close = el('button', 'ai-evidence-popover-close');
+    close.type = 'button';
+    close.setAttribute('aria-label', t('ai.close'));
+    close.appendChild(el('i', 'fas fa-times'));
+    close.addEventListener('click', closeInsightPopover);
+    header.appendChild(close);
+    popover.appendChild(header);
+    popover.appendChild(el('p', '', mark.getAttribute('data-ai-evidence-reason') || t('ai.evidence')));
+    document.body.appendChild(popover);
+    var rect = mark.getBoundingClientRect();
+    popover.style.top = Math.min(root.innerHeight - popover.offsetHeight - 12, rect.bottom + 8) + 'px';
+    popover.style.left = Math.min(root.innerWidth - popover.offsetWidth - 12, Math.max(12, rect.left)) + 'px';
+    insightPopover = popover;
+    close.focus();
+  }
+
+  function closeInsightPopover() {
+    if (!insightPopover) return;
+    insightPopover.remove();
+    insightPopover = null;
   }
 
   function addList(parent, label, values) {
