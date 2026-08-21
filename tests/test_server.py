@@ -955,6 +955,37 @@ class AdminAccountTests(unittest.TestCase):
                     response = getattr(self.member_client, method)(path, json=body)
                 self.assertEqual(response.status_code, 403)
 
+    def test_admin_manages_private_ai_configuration_and_member_access(self):
+        initial = self.admin_client.get("/api/admin/ai/settings")
+        saved = self.admin_client.put(
+            "/api/admin/ai/settings",
+            json={
+                "enabled": True,
+                "base_url": "https://provider.example/v1",
+                "api_key": "never-return-this",
+                "model": "reader-model",
+                "timeout_seconds": 30,
+                "max_concurrency": 2,
+                "daily_limit": 7,
+            },
+        )
+        granted = self.admin_client.put(
+            "/api/admin/ai/users/" + self.member.user_id,
+            json={"enabled": True, "daily_limit": 3},
+        )
+        member_status = self.member_client.get("/api/ai/status")
+
+        self.assertFalse(initial.json()["settings"]["enabled"])
+        self.assertEqual(saved.status_code, 200)
+        self.assertNotIn("api_key", saved.json()["settings"])
+        self.assertTrue(saved.json()["settings"]["api_key_configured"])
+        self.assertEqual(granted.json()["access"], {"enabled": True, "daily_limit": 3})
+        self.assertEqual(member_status.json(), {"enabled": True, "authorized": True, "daily_limit": 3})
+        self.assertEqual(
+            self.member_client.get("/api/admin/ai/settings").status_code,
+            403,
+        )
+
     def test_admin_creates_lists_and_resets_a_member_password(self):
         created = self.admin_client.post(
             "/api/admin/users",

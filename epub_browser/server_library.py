@@ -35,7 +35,9 @@ from .state import BookRecord, StateStore
 from .urls import SiteURLs
 
 
-def library_metadata(records: Sequence[BookRecord], public_dir: Path) -> list[dict]:
+def library_metadata(
+    records: Sequence[BookRecord], public_dir: Path, state_store: Optional[StateStore] = None
+) -> list[dict]:
     """Build the published, principal-filtered catalog without writing it."""
     public_root = Path(public_dir)
     books = []
@@ -53,7 +55,11 @@ def library_metadata(records: Sequence[BookRecord], public_dir: Path) -> list[di
                 "url": f"/book/{record.book_id}/index.html",
                 "title": metadata.get("title") or "EPUB Book",
                 "authors": list(metadata.get("authors") or ()),
-                "tags": list(metadata.get("tags") or ()),
+                "tags": list(
+                    state_store.effective_book_tags(record.book_id)
+                    if state_store is not None
+                    else (metadata.get("tags") or ())
+                ),
                 "cover": (
                     f"/book/{record.book_id}/{cover.lstrip('/')}"
                     if isinstance(cover, str) and cover
