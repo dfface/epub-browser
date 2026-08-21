@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "reader-layout-v14"
+SERVER_OUTPUT_REVISION = "reader-drawers-v15"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -2055,7 +2055,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning"><i class="fas fa-book-open"></i><span class="control-name" data-i18n="reader.turning">Turning</span></button>
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
             <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
-            <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
         </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
             <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
@@ -2122,12 +2122,14 @@ document.addEventListener('DOMContentLoaded', function() {{
         </div>
     </div>
 
-    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay"></div>
-    <div class="settings-modal" id="settingsModal" data-id="settingsModal">
+    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay" aria-hidden="true"></div>
+    <div class="settings-modal" id="settingsModal" data-id="settingsModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settingsModalTitle">
         <div class="settings-header">
-            <i class="fas fa-cog"></i>
-            <span data-i18n="reader.settings">Settings</span>
-            <button class="settings-close-btn" id="settingsCloseBtn" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
+            <h2 class="settings-header-title" id="settingsModalTitle">
+                <i class="fas fa-cog" aria-hidden="true"></i>
+                <span data-i18n="reader.settings">Settings</span>
+            </h2>
+            <button class="settings-close-btn" id="settingsCloseBtn" type="button" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -2278,10 +2280,10 @@ document.addEventListener('DOMContentLoaded', function() {{
             <i class="fas fa-book"></i>
             <span data-i18n="reader.bookChapters">Chapters</span>
         </div>
-        <div class="control-btn" id="mobileSettingsBtn">
+        <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false">
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
-        </div>
+        </button>
         <div class="control-btn" id="mobileTopBtn">
             <i class="fas fa-arrow-up"></i>
             <span data-i18n="reader.top">Top</span>

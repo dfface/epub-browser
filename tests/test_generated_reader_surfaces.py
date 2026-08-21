@@ -1317,6 +1317,39 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             'epub_browser/assets/chapter.js'
         ).read_text(encoding='utf-8'))
 
+    def test_reader_settings_use_the_same_glass_slide_in_drawer_language(self):
+        chapter = self._chapter_html()
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        modal = re.search(
+            r'<div\b(?=[^>]*\bid=(?:["\'])?settingsModal(?:["\' >]))[^>]*>',
+            chapter,
+        ).group(0)
+
+        self.assertRegex(modal, r'\brole=(?:["\'])?dialog(?:["\' >])')
+        self.assertRegex(modal, r'\baria-modal=(?:["\'])?true(?:["\' >])')
+        self.assertRegex(modal, r'\baria-hidden=(?:["\'])?true(?:["\' >])')
+        for control_id in ('settingsControlBtn', 'mobileSettingsBtn'):
+            control = re.search(
+                rf'<button\b(?=[^>]*\bid=(?:["\'])?{control_id}(?:["\' >]))[^>]*>',
+                chapter,
+            ).group(0)
+            self.assertRegex(control, r'\baria-controls=(?:["\'])?settingsModal')
+            self.assertRegex(control, r'\baria-expanded=(?:["\'])?false')
+
+        settings_rules = chapter_css[
+            chapter_css.index('.settings-modal {'):
+            chapter_css.index('}', chapter_css.index('.settings-modal {'))
+        ]
+        self.assertIn('top: 84px;', settings_rules)
+        self.assertIn('right: 18px;', settings_rules)
+        self.assertIn('bottom: 18px;', settings_rules)
+        self.assertIn('transform: translateX(calc(100% + 42px));', settings_rules)
+        self.assertIn('backdrop-filter: blur(18px) saturate(130%);', settings_rules)
+        self.assertNotIn('translate(-50%, -50%)', settings_rules)
+        self.assertIn("settingsModal.setAttribute('aria-hidden', 'false')", chapter_js)
+        self.assertIn('settingsOpener.focus()', chapter_js)
+
     def test_scroll_reader_uses_a_compact_book_level_navigation_bar(self):
         chapter = self._chapter_html()
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')

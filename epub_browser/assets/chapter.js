@@ -1691,6 +1691,7 @@ function initScript() {
     var customFontInput = document.getElementById('customFontInput');
     var applyFontSettings = document.getElementById('applyFontSettings');
     var settingsTabs = document.querySelectorAll('.settings-tab');
+    var settingsOpener = null;
 
     fontFamilySelect.addEventListener('change', function() {
         if (this.value === 'custom') {
@@ -1727,36 +1728,51 @@ function initScript() {
         }
     });
     
-    function showSettingsModal() {
+    function showSettingsModal(opener) {
+        closeReaderDrawers(false);
+        settingsOpener = opener;
         settingsModal.classList.add('show');
+        settingsModal.setAttribute('aria-hidden', 'false');
         settingsOverlay.classList.add('show');
-        document.body.style.overflow = 'hidden';
+        settingsOverlay.setAttribute('aria-hidden', 'false');
+        settingsControlBtn.setAttribute('aria-expanded', 'true');
+        mobileSettingsBtn.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('reader-drawer-open');
+        window.requestAnimationFrame(function() {
+            settingsCloseBtn.focus();
+        });
     }
 
-    function hideSettingsModal() {
+    function hideSettingsModal(restoreFocus) {
         settingsModal.classList.remove('show');
+        settingsModal.setAttribute('aria-hidden', 'true');
         settingsOverlay.classList.remove('show');
-        document.body.style.overflow = '';
+        settingsOverlay.setAttribute('aria-hidden', 'true');
+        settingsControlBtn.setAttribute('aria-expanded', 'false');
+        mobileSettingsBtn.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('reader-drawer-open');
+        if (restoreFocus && settingsOpener) settingsOpener.focus();
+        settingsOpener = null;
     }
 
     settingsControlBtn.addEventListener('click', function() {
-        showSettingsModal();
+        showSettingsModal(settingsControlBtn);
     });
     mobileSettingsBtn.addEventListener('click', function() {
-        showSettingsModal();
+        showSettingsModal(mobileSettingsBtn);
     });
 
     settingsOverlay.addEventListener('click', function() {
-        hideSettingsModal();
+        hideSettingsModal(true);
     });
 
     settingsCloseBtn.addEventListener('click', function() {
-        hideSettingsModal();
+        hideSettingsModal(true);
     });
 
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && settingsModal.classList.contains('show')) {
-            hideSettingsModal();
+            hideSettingsModal(true);
         }
     });
 

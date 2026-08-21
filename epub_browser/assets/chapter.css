@@ -729,44 +729,56 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
 .settings-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--settings-overlay);
-    display: none;
+    inset: 0;
     z-index: 999;
+    display: block;
+    background: color-mix(in srgb, var(--text) 18%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    transition: opacity 180ms ease, visibility 180ms ease;
 }
 
 .settings-overlay.show {
-    display: block;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .settings-modal {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.95);
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 0;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    display: none;
+    top: 84px;
+    right: 18px;
+    bottom: 18px;
+    z-index: 1000;
+    display: flex;
     flex-direction: column;
     gap: 0;
-    width: 90%;
-    max-width: 400px;
-    max-height: 85vh;
-    z-index: 1000;
-    border: 1px solid var(--border);
+    width: min(390px, calc(100vw - 36px));
+    max-width: none;
+    max-height: none;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--card-bg) 96%, transparent);
+    box-shadow: 0 24px 70px color-mix(in srgb, var(--text) 18%, transparent);
     opacity: 0;
-    transition: transform 0.2s ease, opacity 0.2s ease;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(calc(100% + 42px));
+    transition: transform 200ms ease, opacity 180ms ease, visibility 200ms ease;
+    backdrop-filter: blur(18px) saturate(130%);
+    -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 
 .settings-modal.show {
-    display: flex;
-    transform: translate(-50%, -50%) scale(1);
     opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
 }
 
 .settings-header {
@@ -774,11 +786,23 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    font-weight: 600;
+    flex-shrink: 0;
+    min-height: 70px;
+    padding: 12px 14px 12px 18px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
     color: var(--text);
-    font-size: 1.1rem;
+}
+
+.settings-header-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 760;
+    line-height: 1.25;
+    letter-spacing: -.015em;
 }
 
 .settings-close-btn {
@@ -786,8 +810,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 6px;
-    border-radius: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    font: inherit;
     transition: all 0.2s;
     display: flex;
     align-items: center;
@@ -802,7 +829,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 .settings-tabs {
     display: flex;
     border-bottom: 1px solid var(--border);
-    background: var(--bg);
+    background: color-mix(in srgb, var(--background) 72%, transparent);
 }
 
 .settings-tab {
@@ -848,7 +875,10 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     flex-direction: column;
     gap: 0;
     overflow-y: auto;
-    max-height: calc(85vh - 120px);
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overscroll-behavior: contain;
 }
 
 .settings-tab-panel {
@@ -1767,9 +1797,14 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     }
 
     .settings-modal {
-        width: 95%;
-        max-width: 360px;
-        max-height: 80vh;
+        top: 12px;
+        right: 12px;
+        bottom: 82px;
+        left: 12px;
+        width: auto;
+        max-width: none;
+        max-height: none;
+        border-radius: 16px;
     }
 
     .css-controls {
