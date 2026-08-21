@@ -3,6 +3,7 @@ import hmac
 import json
 import sqlite3
 import time
+import unicodedata
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -312,6 +313,37 @@ class StateStore:
                 user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
                 daily_limit INTEGER CHECK(daily_limit IS NULL OR daily_limit >= 0),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_tags (
+                id TEXT PRIMARY KEY,
+                normalized_name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS book_ai_tags (
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                tag_id TEXT NOT NULL REFERENCES ai_tags(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (book_id, tag_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS book_ai_profiles (
+                book_id TEXT PRIMARY KEY REFERENCES books(book_id) ON DELETE CASCADE,
+                profile TEXT NOT NULL DEFAULT 'auto'
+                    CHECK(profile IN ('auto', 'technical', 'fiction', 'general')),
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -1838,6 +1870,110 @@ class StateStore:
                 (principal.user_id,),
             ).fetchone()
         return int(row["daily_limit"])
+
+    @staticmethod
+    def _normalize_ai_tag(name: str) -> tuple[str, str]:
+        if not isinstance(name, str):
+            raise ValueError("AI tag must be text")
+        display = unicodedata.normalize("NFKC", name).strip()
+        if not display or len(display) > 80:
+            raise ValueError("AI tag must contain 1 to 80 characters")
+        return display.casefold(), display
+
+    def create_ai_tag(self, name: str) -> dict:
+        normalized, display = self._normalize_ai_tag(name)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT id, normalized_name, name FROM ai_tags WHERE normalized_name = ?",
+                (normalized,),
+            ).fetchone()
+            if row is None:
+                tag_id = uuid.uuid4().hex
+                connection.execute(
+                    "INSERT INTO ai_tags (id, normalized_name, name) VALUES (?, ?, ?)",
+                    (tag_id, normalized, display),
+                )
+                row = connection.execute(
+                    "SELECT id, normalized_name, name FROM ai_tags WHERE id = ?",
+                    (tag_id,),
+                ).fetchone()
+        return {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
+
+    def delete_ai_tag(self, tag_id: str) -> bool:
+        with self._connection() as connection:
+            cursor = connection.execute("DELETE FROM ai_tags WHERE id = ?", (tag_id,))
+        return cursor.rowcount == 1
+
+    def book_ai_tags(self, book_id: str) -> tuple[dict, ...]:
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            rows = connection.execute(
+                """
+                SELECT ai_tags.id, ai_tags.normalized_name, ai_tags.name
+                FROM book_ai_tags JOIN ai_tags ON ai_tags.id = book_ai_tags.tag_id
+                WHERE book_ai_tags.book_id = ?
+                ORDER BY ai_tags.normalized_name, ai_tags.id
+                """,
+                (book_id,),
+            ).fetchall()
+        return tuple(
+            {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
+            for row in rows
+        )
+
+    def replace_book_ai_tags(self, book_id: str, tag_ids: Sequence[str]) -> tuple[dict, ...]:
+        unique_ids = tuple(dict.fromkeys(tag_ids))
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            for tag_id in unique_ids:
+                if connection.execute("SELECT 1 FROM ai_tags WHERE id = ?", (tag_id,)).fetchone() is None:
+                    raise KeyError("Unknown AI tag")
+            connection.execute("DELETE FROM book_ai_tags WHERE book_id = ?", (book_id,))
+            connection.executemany(
+                "INSERT INTO book_ai_tags (book_id, tag_id) VALUES (?, ?)",
+                ((book_id, tag_id) for tag_id in unique_ids),
+            )
+        return self.book_ai_tags(book_id)
+
+    def effective_book_tags(self, book_id: str) -> tuple[str, ...]:
+        with self._connection() as connection:
+            book = self._get_book(connection, book_id)
+        metadata = json.loads(book.metadata_json)
+        merged = {}
+        for name in tuple(metadata.get("tags") or ()) + tuple(
+            item["name"] for item in self.book_ai_tags(book_id)
+        ):
+            try:
+                normalized, display = self._normalize_ai_tag(name)
+            except ValueError:
+                continue
+            merged.setdefault(normalized, display)
+        return tuple(sorted(merged.values(), key=str.casefold))
+
+    def set_book_ai_profile(self, book_id: str, profile: str) -> None:
+        if profile not in {"auto", "technical", "fiction", "general"}:
+            raise ValueError("Unsupported AI profile")
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            connection.execute(
+                """
+                INSERT INTO book_ai_profiles (book_id, profile)
+                VALUES (?, ?)
+                ON CONFLICT(book_id) DO UPDATE SET
+                    profile = excluded.profile,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (book_id, profile),
+            )
+
+    def get_book_ai_profile(self, book_id: str) -> str:
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            row = connection.execute(
+                "SELECT profile FROM book_ai_profiles WHERE book_id = ?",
+                (book_id,),
+            ).fetchone()
+        return row["profile"] if row is not None else "auto"
 
     def resolve_book(
         self,
