@@ -1665,24 +1665,32 @@ window.location.assign(payload.redirect||'/');
                 'effective_tags': list(store.effective_book_tags(book_id)),
             })
         data = await json_object(request)
-        if data is None or not {'profile', 'tag_ids'}.issubset(data):
+        if data is None:
             return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
-        profile = data['profile']
-        tag_ids = data['tag_ids']
+        has_profile = 'profile' in data
+        has_tag_ids = 'tag_ids' in data
+        if not has_profile and not has_tag_ids:
+            return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
+        profile = data.get('profile') if has_profile else None
+        tag_ids = data.get('tag_ids') if has_tag_ids else None
         if (
-            profile not in {'auto', 'technical', 'fiction', 'general'}
-            or not isinstance(tag_ids, list)
-            or any(not isinstance(tag_id, str) or not tag_id for tag_id in tag_ids)
+            (has_profile and profile not in {'auto', 'technical', 'fiction', 'general'})
+            or (has_tag_ids and (
+                not isinstance(tag_ids, list)
+                or any(not isinstance(tag_id, str) or not tag_id for tag_id in tag_ids)
+            ))
         ):
             return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
         try:
-            store.set_book_ai_profile(book_id, profile)
-            tags = store.replace_book_ai_tags(book_id, tag_ids)
+            if has_profile:
+                store.set_book_ai_profile(book_id, profile)
+            if has_tag_ids:
+                store.replace_book_ai_tags(book_id, tag_ids)
         except (ValueError, KeyError):
             return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
         return response({
             'profile': store.get_book_ai_profile(book_id),
-            'tags': list(tags),
+            'tags': list(store.book_ai_tags(book_id)),
             'effective_tags': list(store.effective_book_tags(book_id)),
         })
 

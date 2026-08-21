@@ -859,12 +859,13 @@ body.auth-page {
 
 .admin-book-settings-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
     gap: 14px;
     padding: 16px 20px;
 }
 
 .admin-book-section,
+.admin-book-tags-settings,
 .admin-book-ai-settings {
     display: grid;
     align-content: start;
@@ -875,6 +876,10 @@ body.auth-page {
     border: 1px solid var(--account-border);
     border-radius: 9px;
     background: var(--account-card);
+}
+
+.admin-book-access {
+    grid-row: span 2;
 }
 
 .admin-book-section-title {
@@ -997,6 +1002,10 @@ body.auth-page {
 
     .admin-book-settings-grid {
         grid-template-columns: 1fr;
+    }
+
+    .admin-book-access {
+        grid-row: auto;
     }
 }
 

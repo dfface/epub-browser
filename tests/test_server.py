@@ -986,6 +986,36 @@ class AdminAccountTests(unittest.TestCase):
             403,
         )
 
+    def test_admin_saves_book_tags_and_ai_profile_independently(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "book.epub",
+            None,
+            "book-fingerprint",
+            {"title": "Book", "authors": [], "tags": [], "cover": None},
+            preferred_book_id="book-id",
+        )
+        tag = self.admin_client.post("/api/admin/ai/tags", json={"name": "History"})
+        profile = self.admin_client.put(
+            "/api/admin/books/" + book.book_id + "/ai",
+            json={"profile": "fiction"},
+        )
+        tags = self.admin_client.put(
+            "/api/admin/books/" + book.book_id + "/ai",
+            json={"tag_ids": [tag.json()["tag"]["id"]]},
+        )
+
+        self.assertEqual(profile.status_code, 200)
+        self.assertEqual(profile.json()["profile"], "fiction")
+        self.assertEqual(tags.status_code, 200)
+        self.assertEqual(tags.json()["profile"], "fiction")
+        self.assertEqual(tags.json()["tags"], [tag.json()["tag"]])
+        self.assertEqual(
+            self.admin_client.put(
+                "/api/admin/books/" + book.book_id + "/ai", json={}
+            ).status_code,
+            400,
+        )
+
     def test_admin_creates_lists_and_resets_a_member_password(self):
         created = self.admin_client.post(
             "/api/admin/users",
