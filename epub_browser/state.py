@@ -20,7 +20,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 4
+DB_SCHEMA_VERSION = 5
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -282,6 +282,39 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_book_access_user_id "
             "ON book_access(user_id)"
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_settings (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
+                base_url TEXT NOT NULL DEFAULT '',
+                api_key TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                timeout_seconds INTEGER NOT NULL DEFAULT 60
+                    CHECK(timeout_seconds BETWEEN 5 AND 180),
+                max_concurrency INTEGER NOT NULL DEFAULT 2
+                    CHECK(max_concurrency BETWEEN 1 AND 4),
+                daily_limit INTEGER NOT NULL DEFAULT 20
+                    CHECK(daily_limit >= 0),
+                config_revision INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO ai_settings (singleton) VALUES (1) "
+            "ON CONFLICT(singleton) DO NOTHING"
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_user_access (
+                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
+                daily_limit INTEGER CHECK(daily_limit IS NULL OR daily_limit >= 0),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
 
     @staticmethod
@@ -1689,6 +1722,122 @@ class StateStore:
                 (book_id, user_id),
             ).fetchone()
         return grant is not None
+
+    def get_ai_settings(self) -> dict:
+        """Return the public administrator configuration without its API key."""
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT enabled, base_url, model, timeout_seconds, max_concurrency,
+                       daily_limit, config_revision, api_key
+                FROM ai_settings WHERE singleton = 1
+                """
+            ).fetchone()
+        return {
+            "enabled": bool(row["enabled"]),
+            "base_url": row["base_url"],
+            "model": row["model"],
+            "timeout_seconds": row["timeout_seconds"],
+            "max_concurrency": row["max_concurrency"],
+            "daily_limit": row["daily_limit"],
+            "config_revision": row["config_revision"],
+            "api_key_configured": bool(row["api_key"]),
+        }
+
+    def set_ai_settings(
+        self,
+        *,
+        enabled: bool,
+        base_url: str,
+        api_key: str,
+        model: str,
+        timeout_seconds: int,
+        max_concurrency: int,
+        daily_limit: int,
+    ) -> dict:
+        if not isinstance(base_url, str) or not isinstance(api_key, str):
+            raise ValueError("AI settings must be strings")
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError("AI model is required")
+        if not 5 <= int(timeout_seconds) <= 180:
+            raise ValueError("AI timeout is out of range")
+        if not 1 <= int(max_concurrency) <= 4:
+            raise ValueError("AI concurrency is out of range")
+        if int(daily_limit) < 0:
+            raise ValueError("AI daily limit is out of range")
+        with self._connection() as connection:
+            connection.execute(
+                """
+                UPDATE ai_settings
+                SET enabled = ?, base_url = ?, api_key = ?, model = ?,
+                    timeout_seconds = ?, max_concurrency = ?, daily_limit = ?,
+                    config_revision = config_revision + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE singleton = 1
+                """,
+                (
+                    int(bool(enabled)),
+                    base_url.strip(),
+                    api_key,
+                    model.strip(),
+                    int(timeout_seconds),
+                    int(max_concurrency),
+                    int(daily_limit),
+                ),
+            )
+        return self.get_ai_settings()
+
+    def set_ai_user_access(
+        self,
+        user_id: str,
+        *,
+        enabled: bool,
+        daily_limit: Optional[int] = None,
+    ) -> None:
+        if daily_limit is not None and int(daily_limit) < 0:
+            raise ValueError("AI daily limit is out of range")
+        with self._connection() as connection:
+            user = self._get_user(connection, user_id)
+            if user.role != "member":
+                raise ValueError("AI member access can only be set for members")
+            connection.execute(
+                """
+                INSERT INTO ai_user_access (user_id, enabled, daily_limit)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    daily_limit = excluded.daily_limit,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, int(bool(enabled)), daily_limit),
+            )
+
+    def can_use_ai(self, principal: Principal) -> bool:
+        if principal.role == "admin":
+            return True
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT enabled FROM ai_user_access WHERE user_id = ?",
+                (principal.user_id,),
+            ).fetchone()
+        return row is not None and bool(row["enabled"])
+
+    def ai_daily_limit(self, principal: Principal) -> int:
+        if principal.role == "admin":
+            return 0
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT COALESCE(ai_user_access.daily_limit, ai_settings.daily_limit)
+                       AS daily_limit
+                FROM ai_settings
+                LEFT JOIN ai_user_access
+                  ON ai_user_access.user_id = ?
+                WHERE ai_settings.singleton = 1
+                """,
+                (principal.user_id,),
+            ).fetchone()
+        return int(row["daily_limit"])
 
     def resolve_book(
         self,

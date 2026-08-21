@@ -818,6 +818,46 @@ class StateStoreTests(unittest.TestCase):
                 ).fetchone()[0]
             )
 
+    def test_ai_administration_defaults_to_disabled_members_and_keeps_keys_private(self):
+        member = self.store.create_user("reader", "hash", role="member")
+
+        settings = self.store.get_ai_settings()
+
+        self.assertEqual(
+            settings,
+            {
+                "enabled": False,
+                "base_url": "",
+                "model": "",
+                "timeout_seconds": 60,
+                "max_concurrency": 2,
+                "daily_limit": 20,
+                "config_revision": 0,
+                "api_key_configured": False,
+            },
+        )
+        self.assertTrue(self.store.can_use_ai(self.owner))
+        self.assertFalse(self.store.can_use_ai(member))
+
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=45,
+            max_concurrency=3,
+            daily_limit=30,
+        )
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=5)
+
+        public = self.store.get_ai_settings()
+        self.assertTrue(public["enabled"])
+        self.assertTrue(public["api_key_configured"])
+        self.assertNotIn("api_key", public)
+        self.assertEqual(public["config_revision"], 1)
+        self.assertTrue(self.store.can_use_ai(member))
+        self.assertEqual(self.store.ai_daily_limit(member), 5)
+
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,
         username,
