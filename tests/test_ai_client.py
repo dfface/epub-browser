@@ -86,3 +86,20 @@ class AIClientTests(unittest.TestCase):
             with self.subTest(unsafe=unsafe):
                 with self.assertRaises(ValueError):
                     validate_provider_base_url(unsafe)
+
+    def test_allows_a_one_hour_provider_timeout(self):
+        long_running = ProviderConfig(
+            base_url="https://provider.example/v1",
+            api_key="test-secret",
+            model="reader-model",
+            timeout_seconds=3600,
+        )
+        OpenAICompatibleClient(long_running)
+        too_long = ProviderConfig(
+            base_url="https://provider.example/v1",
+            api_key="test-secret",
+            model="reader-model",
+            timeout_seconds=3601,
+        )
+        with self.assertRaisesRegex(ValueError, "timeout"):
+            OpenAICompatibleClient(too_long)

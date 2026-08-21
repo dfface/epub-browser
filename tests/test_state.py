@@ -946,6 +946,62 @@ class StateStoreTests(unittest.TestCase):
                 daily_limit=20,
             )
 
+    def test_ai_timeout_allows_a_one_hour_provider_request(self):
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=3600,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+
+        self.assertEqual(self.store.get_ai_settings()["timeout_seconds"], 3600)
+        with self.assertRaisesRegex(ValueError, "timeout"):
+            self.store.set_ai_settings(
+                enabled=False,
+                base_url="",
+                api_key=None,
+                model="",
+                timeout_seconds=3601,
+                max_concurrency=2,
+                daily_limit=20,
+            )
+
+    def test_ai_timeout_constraint_migrates_an_existing_database(self):
+        database = Path(self.temporary.name, "legacy-ai-settings.db")
+        with sqlite3.connect(database) as connection:
+            connection.executescript(
+                """
+                CREATE TABLE ai_settings (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                    enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
+                    base_url TEXT NOT NULL DEFAULT '',
+                    api_key TEXT NOT NULL DEFAULT '',
+                    model TEXT NOT NULL DEFAULT '',
+                    timeout_seconds INTEGER NOT NULL DEFAULT 60
+                        CHECK(timeout_seconds BETWEEN 5 AND 180),
+                    max_concurrency INTEGER NOT NULL DEFAULT 2
+                        CHECK(max_concurrency BETWEEN 1 AND 4),
+                    daily_limit INTEGER NOT NULL DEFAULT 20 CHECK(daily_limit >= 0),
+                    config_revision INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO ai_settings (singleton, timeout_seconds) VALUES (1, 180);
+                PRAGMA user_version = 6;
+                """
+            )
+
+        migrated = StateStore(database)
+        migrated.initialize(bootstrap=BootstrapCredentials("owner", "secret"))
+        migrated.set_ai_settings(
+            enabled=False, base_url="", api_key=None, model="", timeout_seconds=3600,
+            max_concurrency=2, daily_limit=20,
+        )
+
+        self.assertEqual(migrated.get_ai_settings()["timeout_seconds"], 3600)
+
     def test_ai_results_keep_history_and_followups_are_private_to_owner(self):
         member = self.store.create_user("reader", "hash", role="member")
         book = self.store.resolve_book(

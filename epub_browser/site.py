@@ -167,7 +167,7 @@ def _render_library_html(
                     <label><span data-i18n="admin.ai.baseUrl">Provider base URL</span><input type="url" name="base_url" autocomplete="off" placeholder="https://api.example/v1" required></label>
                     <label><span data-i18n="admin.ai.apiKey">API key</span><input type="password" name="api_key" autocomplete="new-password" data-i18n-placeholder="admin.ai.apiKeyPlaceholder" placeholder="Leave blank to keep the configured key"></label>
                     <label><span data-i18n="admin.ai.model">Model</span><input type="text" name="model" autocomplete="off" required></label>
-                    <label><span data-i18n="admin.ai.timeout">Timeout (seconds)</span><input type="number" name="timeout_seconds" min="5" max="180" required></label>
+                    <label><span data-i18n="admin.ai.timeout">Timeout (seconds)</span><input type="number" name="timeout_seconds" min="5" max="3600" required></label>
                     <label><span data-i18n="admin.ai.concurrency">Max concurrency</span><input type="number" name="max_concurrency" min="1" max="4" required></label>
                     <label><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><input type="number" name="daily_limit" min="0" required></label>
                     <label class="admin-ai-clear-key"><input type="checkbox" name="clear_api_key"><span data-i18n="admin.ai.clearKey">Clear stored API key</span></label>
