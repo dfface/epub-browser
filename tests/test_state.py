@@ -1066,6 +1066,11 @@ class StateStoreTests(unittest.TestCase):
         )
         self.assertEqual(len(self.store.list_ai_followups(second["id"], member.user_id)), 1)
         self.assertEqual(self.store.list_ai_followups(second["id"], self.owner.user_id), ())
+        self.assertEqual(
+            self.store.get_ai_followup(followup["id"], member.user_id)["question"],
+            "Why?",
+        )
+        self.assertIsNone(self.store.get_ai_followup(followup["id"], self.owner.user_id))
 
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,

@@ -1051,9 +1051,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 .mobile-controls .control-btn {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     font: inherit;
@@ -1075,11 +1077,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
 .mobile-controls .control-btn i {
     font-size: 1.2rem;
-    margin-bottom: 4px;
+    margin-bottom: 0;
 }
 
 .mobile-controls .control-btn span {
-    font-size: 0.7rem;
+    display: none;
 }
 
 .mobile-controls a {
@@ -1775,6 +1777,40 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
     .mobile-controls > a .control-btn {
         width: 100%;
+    }
+
+    /* The bottom bar has more reader actions than a conventional app tab bar.
+       Keep the targets comfortably tappable while making the visual language
+       icon-first; the accessible name is still present on every action. */
+    .mobile-controls .control-btn::after {
+        content: attr(aria-label);
+        position: absolute;
+        z-index: 2;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        width: max-content;
+        max-width: min(220px, calc(100vw - 24px));
+        padding: 7px 9px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--card-bg);
+        box-shadow: var(--shadow-sm);
+        color: var(--text);
+        font-size: .76rem;
+        font-weight: 600;
+        line-height: 1.2;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, 4px);
+        transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    @media (hover: hover) {
+        .mobile-controls .control-btn:hover::after,
+        .mobile-controls .control-btn:focus-visible::after {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
     }
 
     .mobile-controls #mobileTopBtn {

@@ -58,6 +58,56 @@ def _json_login(testcase, client, username, password, *, next_path="/"):
     )
 
 
+def _first_sse_chunk(app, path, session_token):
+    """Read one SSE frame, then explicitly simulate a browser disconnect."""
+    async def collect():
+        headers = {}
+        chunks = asyncio.Queue()
+        response_started = asyncio.Event()
+        disconnected = asyncio.Event()
+        request_path, _, query_string = path.partition("?")
+
+        async def receive():
+            await disconnected.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                headers["status"] = message["status"]
+                headers.update({
+                    name.decode().lower(): value.decode()
+                    for name, value in message["headers"]
+                })
+                response_started.set()
+            elif message["type"] == "http.response.body" and message.get("body"):
+                await chunks.put(message["body"].decode())
+
+        task = asyncio.create_task(app(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "http",
+                "path": request_path,
+                "raw_path": request_path.encode(),
+                "query_string": query_string.encode(),
+                "headers": [(b"cookie", ("epub_browser_session=" + session_token).encode())],
+                "client": ("testclient", 50000),
+                "server": ("testserver", 80),
+            },
+            receive,
+            send,
+        ))
+        await asyncio.wait_for(response_started.wait(), 1)
+        chunk = await asyncio.wait_for(chunks.get(), 1)
+        disconnected.set()
+        await asyncio.wait_for(task, 1)
+        return headers, chunk
+
+    return asyncio.run(collect())
+
+
 class ServerSetupBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -999,6 +1049,32 @@ class AdminAccountTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["job"]["book_id"], book.book_id)
+
+    def test_ai_job_events_emit_durable_terminal_state_with_sse_headers(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "shared-events.epub",
+            "urn:test:shared-events", "shared-events-fingerprint", {"title": "Book"},
+        )
+        self.store.create_ai_job(
+            "shared-events", self.admin.user_id, "chapter:events", book_id=book.book_id,
+        )
+        self.assertTrue(self.store.start_ai_job("shared-events"))
+        self.store.finish_ai_job("shared-events", error_code="provider_connection_failed")
+
+        headers, chunk = _first_sse_chunk(
+            self.app,
+            "/api/ai/events?job_id=shared-events",
+            self.member_client.cookies.get("epub_browser_session"),
+        )
+
+        self.assertEqual(headers["status"], 200)
+        self.assertEqual(headers["content-type"], "text/event-stream; charset=utf-8")
+        self.assertEqual(headers["cache-control"], "private, no-cache")
+        self.assertEqual(headers["x-accel-buffering"], "no")
+        self.assertIn("event: job", chunk)
+        payload = json.loads(chunk.split("data: ", 1)[1])
+        self.assertEqual(payload["job"]["status"], "failed")
+        self.assertEqual(payload["job"]["error_code"], "provider_connection_failed")
 
     def test_admin_saves_book_tags_and_ai_profile_independently(self):
         book = self.store.resolve_book(

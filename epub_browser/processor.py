@@ -24,7 +24,7 @@ from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
 SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "reader-initial-layout-v25"
+SERVER_OUTPUT_REVISION = "reader-initial-layout-v26"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -1902,8 +1902,8 @@ document.addEventListener('DOMContentLoaded', function() {{
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
         next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
-        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
-        next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
+        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
         bookshelf_data_actions = """
                     <button class="bookshelf-action-btn" id="exportShelfBtn">
                         <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
@@ -2281,34 +2281,34 @@ document.addEventListener('DOMContentLoaded', function() {{
             <i class="fas fa-list"></i>
             <span data-i18n="reader.thisChapterContents">This chapter</span>
         </button>
-        <div class="control-btn" id="mobileThemeBtn">
+        <button class="control-btn" id="mobileThemeBtn" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme">
             <i class="fas fa-moon"></i>
             <span data-i18n="reader.theme">Theme</span>
-        </div>
-        <div class="control-btn" id="mobileTogglePagination">
+        </button>
+        <button class="control-btn" id="mobileTogglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning">
             <i class="fas fa-book-open"></i>
             <span class="control-name" data-i18n="reader.turning">Turning</span>
-        </div>
+        </button>
         {prev_link_mobile}
         <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
-            <div class="control-btn">
+            <div class="control-btn" aria-label="Home" data-i18n-aria-label="reader.home">
                 <i class="fas fa-home"></i>
                 <span data-i18n="reader.home">Home</span>
             </div>
         </a>
         {next_link_mobile}
-        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
+        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
             <i class="fas fa-book"></i>
             <span data-i18n="reader.bookChapters">Chapters</span>
-        </div>
+        </button>
         <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false">
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
         </button>
-        <div class="control-btn" id="mobileTopBtn">
+        <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" data-i18n-aria-label="reader.top">
             <i class="fas fa-arrow-up"></i>
             <span data-i18n="reader.top">Top</span>
-        </div>
+        </button>
     </div>
 
     <!-- 书架弹窗 -->

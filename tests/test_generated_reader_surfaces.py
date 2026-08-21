@@ -959,6 +959,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             chapter_mobile,
             r"\.mobile-controls\s+\.control-btn[^}]*min-height:\s*44px;",
         )
+        self.assertIn(".mobile-controls .control-btn span {\n    display: none;", chapter_css)
+        self.assertIn("content: attr(aria-label);", chapter_mobile)
         self.assertRegex(
             chapter_mobile,
             r"\.mobile-controls\s*\{[^}]*overflow-x:\s*auto;",
@@ -1591,6 +1593,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("range.surroundContents(mark)", script)
         self.assertIn("clearEvidenceMarks();", script)
         self.assertIn("payload.job.progress_current || 0", script)
+        self.assertIn("new root.EventSource('/api/ai/events?job_id='", script)
+        self.assertIn("new root.EventSource('/api/ai/events?followup_id='", script)
+        self.assertIn("loadFollowups(resultId, thread);", script)
+        self.assertIn(".ai-reading-chat-log", stylesheet)
+        self.assertIn("body.ai-reading-open:not(.pagination-mode) .container", stylesheet)
         self.assertIn('.ai-evidence-mark {', stylesheet)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):

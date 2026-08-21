@@ -19,6 +19,24 @@ body.ai-reading-open {
     --ai-reading-drawer-width: min(460px, calc(100vw - 36px));
 }
 
+/* A desktop drawer is a companion to the page, not an overlay that hides the
+ * final part of a line.  Keep a deliberate gutter between the reading column
+ * and the assistant while it is open. */
+@media (min-width: 961px) {
+    body.ai-reading-open:not(.pagination-mode) .container {
+        width: min(
+            var(--reader-page-width, 1000px),
+            calc(100vw - var(--ai-reading-drawer-width) - 68px)
+        );
+        margin-right: auto;
+        margin-left: max(
+            18px,
+            calc((100vw - var(--ai-reading-drawer-width) - var(--reader-page-width, 1000px)) / 2)
+        );
+        transition: width 200ms ease-out, margin-left 200ms ease-out;
+    }
+}
+
 .ai-reading-panel {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -116,16 +134,25 @@ body.ai-reading-open {
 .ai-evidence-popover-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ai-evidence-popover-close { display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid var(--border, #ddd); border-radius: 7px; background: var(--card-bg, #fff); color: var(--text-secondary, #666); cursor: pointer; }
 .ai-evidence-popover-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg, #4361ee) 36%, transparent); outline-offset: 2px; }
+.ai-reading-chat { display: grid; gap: 10px; padding: 12px; border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 18%, var(--border, #ddd)); border-radius: 12px; background: color-mix(in srgb, var(--button-bg, #4361ee) 4%, var(--card-bg, #fff)); }
+.ai-reading-chat-log { display: grid; gap: 10px; max-height: min(38dvh, 340px); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.ai-reading-chat-turn { display: grid; gap: 7px; }
+.ai-reading-chat-message { display: grid; gap: 3px; width: fit-content; max-width: 94%; padding: 9px 11px; border-radius: 11px; line-height: 1.55; }
+.ai-reading-chat-message strong { font-size: .74rem; letter-spacing: .01em; }
+.ai-reading-chat-message p { margin: 0; white-space: pre-wrap; }
+.ai-reading-chat-question { justify-self: end; background: var(--button-bg, #4361ee); color: #fff; border-bottom-right-radius: 3px; }
+.ai-reading-chat-answer { justify-self: start; background: var(--card-bg, #fff); border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 16%, var(--border, #ddd)); border-bottom-left-radius: 3px; }
+.ai-reading-chat-pending { color: var(--text-secondary, #666); font-style: italic; }
 .ai-reading-followup { display: flex; gap: 8px; }
 .ai-reading-followup input { flex: 1; min-width: 0; }
-.ai-reading-answer { display: grid; gap: 8px; padding: 12px; border-radius: 9px; background: color-mix(in srgb, var(--button-bg, #4361ee) 6%, var(--card-bg, #fff)); }
 
-@media (max-width: 700px) {
+@media (max-width: 960px) {
     .ai-reading-overlay { align-items: flex-end; padding: 0; pointer-events: auto; background: rgba(0, 0, 0, .42); }
     body.ai-reading-open { overflow: hidden; }
     .ai-reading-panel { width: 100%; max-height: min(86dvh, 760px); border-radius: 20px 20px 0 0; }
     .ai-reading-body { padding: 16px; }
     .ai-reading-followup { flex-direction: column; }
+    .ai-reading-chat-log { max-height: min(31dvh, 280px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
