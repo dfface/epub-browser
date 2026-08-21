@@ -832,9 +832,9 @@ body.auth-page {
 }
 
 .account-book-item {
-    display: grid;
-    grid-template-columns: minmax(170px, 1fr) minmax(150px, 190px) minmax(260px, 1.5fr) auto;
-    align-items: center;
+    display: block;
+    padding: 0;
+    overflow: hidden;
 }
 
 .account-book-item strong {
@@ -844,15 +844,54 @@ body.auth-page {
     white-space: nowrap;
 }
 
+.admin-book-header {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--account-border);
+    background: color-mix(in srgb, var(--account-primary) 3%, var(--account-card));
+}
+
 .admin-book-epub-tags {
-    grid-column: 1 / -1;
-    margin: -3px 0 2px;
+    margin: 6px 0 0;
     color: var(--account-muted);
     font-size: .78rem;
     line-height: 1.45;
 }
 
-.account-book-item select {
+.admin-book-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    padding: 16px 20px;
+}
+
+.admin-book-section,
+.admin-book-ai-settings {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--account-border);
+    border-radius: 9px;
+    background: var(--account-card);
+}
+
+.admin-book-section-title {
+    margin: 0;
+    color: var(--account-text);
+    font-size: .86rem;
+}
+
+.admin-book-field {
+    display: grid;
+    gap: 7px;
+    color: var(--account-muted);
+    font-size: .76rem;
+    font-weight: 700;
+}
+
+.admin-book-field select {
     width: 100%;
     min-height: 38px;
 }
@@ -909,6 +948,32 @@ body.auth-page {
     cursor: not-allowed;
 }
 
+.admin-book-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.admin-book-actions .account-inline-action {
+    min-width: 122px;
+}
+
+.admin-book-results {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--account-border);
+    background: color-mix(in srgb, var(--account-bg) 55%, var(--account-card));
+}
+
+.admin-book-results-label {
+    color: var(--account-muted);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
 .account-empty {
     color: var(--account-muted);
     font-size: .85rem;
@@ -930,12 +995,8 @@ body.auth-page {
         grid-template-columns: 1fr;
     }
 
-    .account-book-item {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .account-book-grants {
-        grid-column: 1 / -1;
+    .admin-book-settings-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1026,12 +1087,21 @@ body.auth-page {
         max-width: none;
     }
 
-    .account-book-item {
-        grid-template-columns: 1fr;
+    .admin-book-header,
+    .admin-book-settings-grid,
+    .admin-book-results {
+        padding-right: 14px;
+        padding-left: 14px;
     }
 
-    .account-book-grants {
-        grid-column: auto;
+    .admin-book-results {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-book-results .account-danger-action,
+    .admin-book-actions .account-inline-action {
+        width: 100%;
     }
 }
 
