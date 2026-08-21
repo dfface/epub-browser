@@ -293,6 +293,11 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertTrue(release.is_file())
         self.assertIn('VERSION = "2.0.5"', Path("epub_browser/version.py").read_text())
 
+    def test_docker_server_defaults_to_embedded_book_id_storage(self):
+        dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn('"--book-id-storage=embedded"', dockerfile)
+
     @staticmethod
     def _create_legacy_accountless_database(path, book_id):
         with sqlite3.connect(path) as connection:

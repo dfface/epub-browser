@@ -187,7 +187,9 @@ In Server mode, the bookshelf is stored as a versioned cloud document in the Ser
 
 ## Docker
 
-The image runs persistent Server mode. Mount EPUB input read-write so the default sidecars can be created and refreshed, and mount Server state read-write:
+The image runs persistent Server mode and defaults to
+`--book-id-storage embedded`. Mount EPUB input read-write so a stable book ID
+can be written into each EPUB, and mount Server state read-write:
 
 ```bash
 docker run -d \
@@ -207,12 +209,14 @@ binding or proxy rules. For an unattended first start, add:
 --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly
 ```
 
-`/app/EpubBrowserFiles` must be writable and persistent. `/app/Library:rw`
-permits default sidecar creation and fingerprint refresh. A read-only input
-mount works only when every selected sidecar or embedded carrier already exists
-and matches; EPUB Browser no longer falls back to a database-only ID. Using
-`--book-id-storage embedded` opts into EPUB ZIP rebuilding and may be refused
-for signed, linked, read-only, or unsupported sources. Mount
+`/app/EpubBrowserFiles` must be writable and persistent. The Docker image
+selects embedded identity storage even though the general CLI default remains
+`sidecar`; `/app/Library:rw` permits the image to rebuild an EPUB when its ID
+must be embedded. A read-only input mount works only when every selected
+embedded carrier already exists and matches; EPUB Browser no longer falls back
+to a database-only ID. Embedded writes may be refused for signed, linked,
+read-only, or unsupported sources. Existing sidecars are left intact when the
+same ID is embedded. Mount
 `/app/SyncData:ro` only when legacy bookshelf JSON needs to be imported:
 
 ```bash

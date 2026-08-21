@@ -135,12 +135,12 @@ For a v2 retry instead of a downgrade, keep `data/epub-browser.db` and rerun the
 
 The v2 image expects:
 
-- `/app/Library`: EPUB input, read-write for default sidecar creation or refresh;
+- `/app/Library`: EPUB input, read-write because the Docker default embeds book IDs in the EPUB;
 - `/app/EpubBrowserFiles`: required read-write persistent Server directory;
 - `/app/SyncData`: optional read-only legacy JSON import directory.
 - `/run/secrets/epub-browser-admin-password`: optional read-only unattended first-start password file.
 
-The container command now uses `epub-browser server` and listens on `0.0.0.0` inside the container. A read-only Library mount works only when every selected identity carrier already exists and matches the source; there is no database-only fallback. `--book-id-storage embedded` may rebuild the EPUB and is refused when doing so would be unsafe. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
+The container command now uses `epub-browser server --book-id-storage embedded` and listens on `0.0.0.0` inside the container. This Docker-specific default does not change the general CLI default of `sidecar`. A read-only Library mount works only when every embedded identity carrier already exists and matches the source; there is no database-only fallback. Embedded storage may rebuild the EPUB and is refused when doing so would be unsafe. Existing sidecars remain in place. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
 
 For example:
 
