@@ -2266,17 +2266,23 @@ class StateStore:
         return cursor.rowcount == 1
 
     def finish_ai_job(
-        self, job_id: str, *, error_code: Optional[str] = None
+        self,
+        job_id: str,
+        *,
+        result_id: Optional[str] = None,
+        error_code: Optional[str] = None,
     ) -> bool:
+        if result_id is not None and error_code is not None:
+            raise ValueError("AI job cannot have both a result and an error")
         status = "failed" if error_code else "complete"
         with self._connection() as connection:
             cursor = connection.execute(
                 """
-                UPDATE ai_reading_jobs SET status = ?, error_code = ?,
+                UPDATE ai_reading_jobs SET status = ?, result_id = ?, error_code = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND status = 'running'
                 """,
-                (status, error_code, job_id),
+                (status, result_id, error_code, job_id),
             )
         return cursor.rowcount == 1
 

@@ -1725,6 +1725,16 @@ window.location.assign(payload.redirect||'/');
             'daily_limit': store.ai_daily_limit(principal) if store.can_use_ai(principal) else None,
         })
 
+    async def book_effective_metadata(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        return response({
+            'tags': list(store.effective_book_tags(book_id)),
+            'ai_profile': store.get_book_ai_profile(book_id),
+        })
+
     async def ai_reading_request(request):
         principal = require_principal(request)
         data, error = await bounded_public_json_object(request)
@@ -1764,7 +1774,15 @@ window.location.assign(payload.redirect||'/');
         job = store.get_ai_job(request.path_params['job_id'], principal.user_id)
         if job is None:
             return response(error_payload('not_found', 'AI job not found'), 404)
-        return response({'job': job})
+        result = (
+            store.get_ai_reading_result(job['result_id'])
+            if job.get('result_id') else None
+        )
+        if result is not None and not store.can_read_book(
+            principal.user_id, principal.role, result['book_id']
+        ):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        return response({'job': job, 'result': result})
 
     async def ai_followups(request):
         principal = require_principal(request)
@@ -2270,6 +2288,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/ai/status', ai_status, methods=['GET']),
+        Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/ai/reading', ai_reading_request, methods=['POST']),
         Route('/api/ai/jobs/{job_id}', ai_job, methods=['GET']),
         Route('/api/ai/followups', ai_followups, methods=['POST']),
