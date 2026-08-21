@@ -21,12 +21,17 @@ COPY --from=builder /build/epub-browser/dist/*.whl /tmp/packages/
 RUN pip install --no-cache-dir /tmp/packages/*.whl \
     && rm -rf /tmp/packages
 
-# /app/Library is EPUB input. Mount it read-only when possible.
+# /app/Library is EPUB input. The Docker default stores book IDs in the EPUB,
+# so the mount must be writable when an ID needs to be embedded or refreshed.
 # /app/EpubBrowserFiles is durable Server data and must be writable/persistent.
 # /app/SyncData is optional, read-only legacy bookshelf import data.
-RUN mkdir -p /app/Library /app/EpubBrowserFiles /app/SyncData
+# Interactive first start uses the one-time /setup page. Keep the published
+# port private until it is complete. For unattended setup, provide
+# EPUB_BROWSER_ADMIN_USERNAME and mount a read-only
+# EPUB_BROWSER_ADMIN_PASSWORD_FILE under /run/secrets.
+RUN mkdir -p /app/Library /app/EpubBrowserFiles /app/SyncData /run/secrets
 VOLUME ["/app/EpubBrowserFiles"]
 
 EXPOSE 80
 
-CMD ["epub-browser", "server", "/app/Library", "--server-dir=/app/EpubBrowserFiles", "--legacy-sync-dir=/app/SyncData", "--watch", "--host=0.0.0.0", "--no-browser", "--port=80"]
+CMD ["epub-browser", "server", "/app/Library", "--book-id-storage=embedded", "--server-dir=/app/EpubBrowserFiles", "--legacy-sync-dir=/app/SyncData", "--watch", "--host=0.0.0.0", "--no-browser", "--port=80"]

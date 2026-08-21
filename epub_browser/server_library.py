@@ -11,15 +11,57 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from .asset_publisher import AssetPublisher, PublishedAssets
+from .book_identity import (
+    BOOK_ID_STORAGE_SIDECAR,
+    ExternalBookIdentity,
+    KnownSourceFingerprint,
+    inspect_book_identity,
+    resolve_book_identity,
+    validate_book_id_storage,
+)
 from .identity import source_sha256
 from .library_progress import LibraryProgressBroker
 from .migration import MigrationManager
 from .models import BookMetadata, ConvertedBook
-from .processor import EPUBProcessor
+from .processor import (
+    EPUBProcessor,
+    SERVER_OUTPUT_REVISION,
+    SERVER_OUTPUT_REVISION_FILE,
+)
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
+from .sidecar_identity import discover_orphan_sidecars
 from .state import BookRecord, StateStore
 from .urls import SiteURLs
+
+
+def library_metadata(records: Sequence[BookRecord], public_dir: Path) -> list[dict]:
+    """Build the published, principal-filtered catalog without writing it."""
+    public_root = Path(public_dir)
+    books = []
+    for record in records:
+        if not (public_root / "book" / record.book_id / "index.html").is_file():
+            continue
+        try:
+            metadata = json.loads(record.metadata_json)
+        except json.JSONDecodeError:
+            continue
+        cover = metadata.get("cover")
+        books.append(
+            {
+                "hash": record.book_id,
+                "url": f"/book/{record.book_id}/index.html",
+                "title": metadata.get("title") or "EPUB Book",
+                "authors": list(metadata.get("authors") or ()),
+                "tags": list(metadata.get("tags") or ()),
+                "cover": (
+                    f"/book/{record.book_id}/{cover.lstrip('/')}"
+                    if isinstance(cover, str) and cover
+                    else None
+                ),
+            }
+        )
+    return books
 
 
 @dataclass(frozen=True)
@@ -79,6 +121,7 @@ class ServerLibraryManager:
         converter_factory: Callable = EPUBProcessor,
         max_workers: int = 4,
         progress_broker: Optional[LibraryProgressBroker] = None,
+        book_id_storage: str = BOOK_ID_STORAGE_SIDECAR,
     ):
         self.server_dir = Path(server_dir).expanduser().resolve()
         self._source_inputs = tuple(
@@ -91,6 +134,7 @@ class ServerLibraryManager:
         self.converter_factory = converter_factory
         self.max_workers = max(1, max_workers)
         self.progress_broker = progress_broker or LibraryProgressBroker()
+        self.book_id_storage = validate_book_id_storage(book_id_storage)
         self.urls = SiteURLs()
         self.cache_dir = self.server_dir / "cache"
         self.public_dir = self.cache_dir / "public"
@@ -139,7 +183,9 @@ class ServerLibraryManager:
                 assets_dir,
                 self.public_dir,
                 urls=self.urls,
+                publish_service_worker=False,
             ).publish()
+            (self.public_dir / "sw.js").unlink(missing_ok=True)
             self._refresh_public_shell()
             active_records = self._valid_active_records()
             signature = self._library_signature(active_records)
@@ -167,7 +213,7 @@ class ServerLibraryManager:
                 return self._stopped_summary()
             if self._stop_event.is_set():
                 return self._stopped_summary()
-            discovered_set = {str(path) for path in discovered}
+            discovered_set = {str(path.resolve()) for path in discovered}
             removed = 0
             with self._commit_lock:
                 if self._stop_event.is_set():
@@ -176,6 +222,11 @@ class ServerLibraryManager:
                     if record.source_path not in discovered_set:
                         self.state_store.mark_missing(record.book_id)
                         removed += 1
+
+            orphan_sidecars = discover_orphan_sidecars(
+                self._source_inputs,
+                discovered,
+            )
 
             self.progress_broker.mark_discovered(len(discovered), removed)
             self.reporter.detail(
@@ -198,75 +249,171 @@ class ServerLibraryManager:
                 if self._stop_event.is_set():
                     break
                 existing = self.state_store.book_by_source(source)
+                resolved_book_id = existing.book_id if existing else None
                 try:
-                    stat = source.stat()
-                except OSError as error:
-                    failures.append(
-                        ConversionFailure(source, None, str(error), False)
+                    source_stat = source.stat()
+                    existing_cache_valid = bool(
+                        existing and self._cache_valid(existing)
                     )
-                    self._mark_missing_if_deleted(source, existing)
-                    self.progress_broker.record_failure(source, error)
-                    continue
+                    known_fingerprint = None
+                    if (
+                        existing
+                        and existing_cache_valid
+                        and existing.source_size == source_stat.st_size
+                        and existing.source_mtime_ns == source_stat.st_mtime_ns
+                    ):
+                        known_fingerprint = KnownSourceFingerprint(
+                            existing.source_fingerprint,
+                            source_stat.st_size,
+                            source_stat.st_mtime_ns,
+                        )
 
-                if (
-                    existing
-                    and existing.source_size == stat.st_size
-                    and existing.source_mtime_ns == stat.st_mtime_ns
-                    and self._cache_valid(existing)
-                ):
-                    try:
+                    inspection = inspect_book_identity(
+                        source,
+                        known_fingerprint=known_fingerprint,
+                        orphan_sidecars=orphan_sidecars,
+                    )
+                    external_candidates = []
+                    legacy_book_id = legacy_ids.get(source)
+                    if existing:
+                        external_candidates.append(
+                            ExternalBookIdentity(
+                                "Server database",
+                                existing.book_id,
+                                True,
+                            )
+                        )
+                    elif legacy_book_id:
+                        external_candidates.append(
+                            ExternalBookIdentity(
+                                "legacy migration",
+                                legacy_book_id,
+                                True,
+                            )
+                        )
+
+                    metadata = None
+                    if (
+                        existing is None
+                        and legacy_book_id is None
+                        and not inspection.has_current_carrier
+                    ):
+                        metadata = self._probe_metadata(source)
+                        inactive_matches = self.state_store.inactive_book_matches(
+                            metadata.epub_identifier,
+                            inspection.source_fingerprint,
+                        )
+                        if len(inactive_matches) > 1:
+                            raise ValueError(
+                                "Multiple inactive books match the same EPUB "
+                                "identifier and fingerprint"
+                            )
+                        if inactive_matches:
+                            external_candidates.append(
+                                ExternalBookIdentity(
+                                    "inactive Server record",
+                                    inactive_matches[0].book_id,
+                                    False,
+                                )
+                            )
+
+                    resolved = resolve_book_identity(
+                        inspection,
+                        self.book_id_storage,
+                        external_candidates=external_candidates,
+                    )
+                    resolved_book_id = resolved.book_id
+
+                    if (
+                        existing
+                        and existing_cache_valid
+                        and existing.book_id == resolved.book_id
+                        and existing.source_fingerprint
+                        == resolved.source_fingerprint
+                        and existing.source_size == resolved.source_size
+                        and existing.source_mtime_ns == resolved.source_mtime_ns
+                    ):
                         with self._commit_lock:
                             if self._stop_event.is_set():
                                 break
-                            self._require_source_stat(source, stat)
+                            self._require_source_stat(source, resolved)
                             record = self.state_store.resolve_book(
                                 source,
                                 existing.epub_identifier,
-                                existing.source_fingerprint,
+                                resolved.source_fingerprint,
                                 json.loads(existing.metadata_json),
-                                source_size=stat.st_size,
-                                source_mtime_ns=stat.st_mtime_ns,
+                                source_size=resolved.source_size,
+                                source_mtime_ns=resolved.source_mtime_ns,
+                                authoritative_book_id=resolved.book_id,
                             )
-                    except (OSError, _StaleSourceError) as error:
-                        failures.append(
-                            ConversionFailure(source, existing.book_id, str(error), True)
-                        )
-                        self._mark_missing_if_deleted(source, existing)
-                        self.progress_broker.record_failure(source, error)
+                        reused_records.append(record)
+                        self.progress_broker.record_reused(source)
                         continue
-                    reused_records.append(record)
-                    self.progress_broker.record_reused(source)
-                    continue
 
-                try:
-                    fingerprint = source_sha256(source)
                     if self._stop_event.is_set():
                         break
-                    metadata = self._probe_metadata(source)
+                    if metadata is None:
+                        metadata = self._probe_metadata(source)
                     if self._stop_event.is_set():
                         break
-                    with self._commit_lock:
-                        if self._stop_event.is_set():
-                            break
-                        self._require_source_stat(source, stat)
-                        if existing:
-                            record = existing
-                        else:
+                    if existing:
+                        record = existing
+                    else:
+                        with self._commit_lock:
+                            if self._stop_event.is_set():
+                                break
+                            self._require_source_stat(source, resolved)
                             record = self.state_store.resolve_book(
                                 source,
                                 metadata.epub_identifier,
-                                fingerprint,
+                                resolved.source_fingerprint,
                                 metadata,
-                                source_size=stat.st_size,
-                                source_mtime_ns=stat.st_mtime_ns,
-                                preferred_book_id=legacy_ids.get(source),
+                                source_size=resolved.source_size,
+                                source_mtime_ns=resolved.source_mtime_ns,
+                                authoritative_book_id=resolved.book_id,
                             )
+
+                    if (
+                        record.source_fingerprint == resolved.source_fingerprint
+                        and self._cache_valid(record)
+                    ):
+                        with self._commit_lock:
+                            if self._stop_event.is_set():
+                                break
+                            self._require_source_stat(source, resolved)
+                            record = self.state_store.resolve_book(
+                                source,
+                                metadata.epub_identifier,
+                                resolved.source_fingerprint,
+                                metadata,
+                                source_size=resolved.source_size,
+                                source_mtime_ns=resolved.source_mtime_ns,
+                                authoritative_book_id=resolved.book_id,
+                            )
+                        reused_records.append(record)
+                        self.progress_broker.record_reused(source)
+                        continue
+
+                    with self._commit_lock:
+                        if self._stop_event.is_set():
+                            break
+                        self._invalidate_public_output(record.book_id)
+                    plans.append(
+                        _ConversionPlan(
+                            source=source,
+                            record=record,
+                            fingerprint=resolved.source_fingerprint,
+                            metadata=metadata,
+                            source_size=resolved.source_size,
+                            source_mtime_ns=resolved.source_mtime_ns,
+                        )
+                    )
                 except Exception as error:
                     kept = bool(existing and self._cache_valid(existing))
                     failures.append(
                         ConversionFailure(
                             source,
-                            existing.book_id if existing else None,
+                            resolved_book_id,
                             str(error),
                             kept,
                         )
@@ -274,49 +421,6 @@ class ServerLibraryManager:
                     self._mark_missing_if_deleted(source, existing)
                     self.progress_broker.record_failure(source, error)
                     continue
-
-                if (
-                    record.source_fingerprint == fingerprint
-                    and self._cache_valid(record)
-                ):
-                    try:
-                        with self._commit_lock:
-                            if self._stop_event.is_set():
-                                break
-                            self._require_source_stat(source, stat)
-                            record = self.state_store.resolve_book(
-                                source,
-                                metadata.epub_identifier,
-                                fingerprint,
-                                metadata,
-                                source_size=stat.st_size,
-                                source_mtime_ns=stat.st_mtime_ns,
-                            )
-                    except (OSError, _StaleSourceError) as error:
-                        failures.append(
-                            ConversionFailure(
-                                source,
-                                record.book_id,
-                                str(error),
-                                True,
-                            )
-                        )
-                        self._mark_missing_if_deleted(source, record)
-                        self.progress_broker.record_failure(source, error)
-                        continue
-                    reused_records.append(record)
-                    self.progress_broker.record_reused(source)
-                    continue
-                plans.append(
-                    _ConversionPlan(
-                        source=source,
-                        record=record,
-                        fingerprint=fingerprint,
-                        metadata=metadata,
-                        source_size=stat.st_size,
-                        source_mtime_ns=stat.st_mtime_ns,
-                    )
-                )
 
             if self._stop_event.is_set():
                 return self._stopped_summary(
@@ -520,12 +624,12 @@ class ServerLibraryManager:
 
     def _discover_sources(self) -> tuple[Path, ...]:
         discovered = set()
-        for source in self.sources:
+        for logical_source, source in zip(self._source_inputs, self.sources):
             if self._stop_event.is_set():
                 raise _ConversionCancelled("Server is stopping")
             if source.is_file():
-                if source.suffix.lower() == ".epub":
-                    discovered.add(source)
+                if logical_source.suffix.lower() == ".epub":
+                    discovered.add(logical_source)
                 continue
             if not source.is_dir():
                 continue
@@ -576,8 +680,8 @@ class ServerLibraryManager:
             source_aliases = []
             for original, canonical in zip(self._source_inputs, self.sources):
                 if canonical.is_file():
-                    if source == canonical and original != canonical:
-                        source_aliases.append(original)
+                    if source.resolve() == canonical and source != canonical:
+                        source_aliases.append(canonical)
                     continue
                 try:
                     relative = source.relative_to(canonical)
@@ -681,6 +785,16 @@ class ServerLibraryManager:
     @staticmethod
     def _validate_converted_book(converted: ConvertedBook) -> None:
         directory = Path(converted.output_dir)
+        try:
+            revision = (directory / SERVER_OUTPUT_REVISION_FILE).read_text(
+                encoding="utf-8"
+            ).strip()
+        except OSError as error:
+            raise ValueError(
+                "converted book is missing its Server output revision"
+            ) from error
+        if revision != SERVER_OUTPUT_REVISION:
+            raise ValueError("converted book has an outdated Server output revision")
         for name in ("index.html", "toc.json"):
             if not (directory / name).is_file():
                 raise ValueError(f"converted book is missing {name}")
@@ -698,6 +812,14 @@ class ServerLibraryManager:
 
     def _cache_valid(self, record: BookRecord) -> bool:
         directory = self.public_dir / "book" / record.book_id
+        try:
+            revision = (directory / SERVER_OUTPUT_REVISION_FILE).read_text(
+                encoding="utf-8"
+            ).strip()
+        except OSError:
+            return False
+        if revision != SERVER_OUTPUT_REVISION:
+            return False
         if not (directory / "index.html").is_file() or not (
             directory / "toc.json"
         ).is_file():
@@ -713,6 +835,10 @@ class ServerLibraryManager:
                 return False
         cover = metadata.get("cover")
         return not cover or (directory / cover).is_file()
+
+    def _invalidate_public_output(self, book_id: str) -> None:
+        directory = self.public_dir / "book" / book_id
+        (directory / SERVER_OUTPUT_REVISION_FILE).unlink(missing_ok=True)
 
     def _valid_active_records(self) -> tuple[BookRecord, ...]:
         return tuple(
@@ -735,29 +861,9 @@ class ServerLibraryManager:
     def _refresh_public_shell(self) -> None:
         if self._assets is None:
             return
-        books = []
-        for record in self._valid_active_records():
-            try:
-                metadata = json.loads(record.metadata_json)
-            except json.JSONDecodeError:
-                continue
-            cover = metadata.get("cover")
-            books.append(
-                LibraryBook(
-                    book_id=record.book_id,
-                    title=metadata.get("title") or "EPUB Book",
-                    authors=tuple(metadata.get("authors") or ()),
-                    tags=tuple(metadata.get("tags") or ()),
-                    cover=(
-                        f"/book/{record.book_id}/{cover}"
-                        if cover
-                        else None
-                    ),
-                )
-            )
         publish_library_shell(
             self.public_dir,
-            tuple(books),
+            (),
             self._assets,
             self.urls,
             deployment_mode="server",

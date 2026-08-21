@@ -280,42 +280,6 @@ body {
     }
 }
 
-/* 通知样式 */
-.custom-css-notification {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);        
-    padding: 12px 20px;
-    border-radius: 6px;
-    color: white;
-    font-weight: 600;
-    z-index: 10003;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
-}
-
-.custom-css-notification.success {
-    background: var(--notification-success);
-}
-
-.custom-css-notification.info {
-    background: var(--notification-info);
-}
-
-.custom-css-notification.warning {
-    background: var(--notification-warning);
-}
-
-.custom-css-notification.error {
-    background: #f44336;
-}
-
-.custom-css-notification.fade-out {
-    opacity: 0;
-    transform: translateY(-10px);
-}
-
 .breadcrumb {
     display: flex;
     align-items: center;

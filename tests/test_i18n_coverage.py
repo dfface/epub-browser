@@ -10,11 +10,13 @@ FIRST_PARTY = [
     *[
         Path('epub_browser/assets', name)
         for name in (
+            'auth.js',
             'library.js',
             'library-progress.js',
             'bookshelf.js',
             'book.js',
             'chapter.js',
+            'dialog.js',
             'theme.js',
             'annotation.js',
             'annotation-hub.js',
@@ -33,7 +35,7 @@ PROPERTY_ASSIGNMENT = re.compile(
 SET_ATTRIBUTE_START = re.compile(r"\.\s*setAttribute\s*\(")
 VISIBLE_LITERAL = re.compile(r"(?P<quote>['\"])(?P<text>[A-Za-z][^'\"\r\n]*)(?P=quote)")
 TRANSLATION_KEY_ARGUMENT = re.compile(
-    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t))\s*\(\s*$"
+    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t|localized))\s*\(\s*$"
 )
 DICTIONARY_KEY = re.compile(r"^\s*'(?P<key>[^']+)':", re.MULTILINE)
 KNOWN_TRANSLATION_KEYS = {
@@ -46,6 +48,7 @@ TR_NAMESPACES = {
     'bookshelf.js': 'bookshelf.',
     'annotation.js': 'annotations.',
     'annotation-hub.js': 'annotations.',
+    'dialog.js': 'dialog.',
 }
 HTML_TAG = re.compile(r"<(?P<name>[A-Za-z][\w:-]*)\b(?P<attributes>[^>]*)>", re.DOTALL)
 HTML_ATTRIBUTE = re.compile(
@@ -88,7 +91,7 @@ def is_known_translation_key(value, literal, path):
         return False
     key = literal.group('text')
     function = call.group('function').replace(' ', '')
-    if function == 'tr':
+    if function in {'tr', 'localized'}:
         namespace = TR_NAMESPACES.get(path.name)
         return namespace is not None and namespace + key in KNOWN_TRANSLATION_KEYS
     return key in KNOWN_TRANSLATION_KEYS
@@ -231,6 +234,64 @@ def find_literal_ui_sinks(path):
 
 
 class I18nCoverageTests(unittest.TestCase):
+    def test_account_and_administration_copy_exists_in_both_locales(self):
+        required = {
+            'account.menu',
+            'library.navigation',
+            'book.navigation',
+            'reader.navigation',
+            'account.signIn',
+            'account.associationTitle',
+            'account.associationOidcHelp',
+            'account.associationSucceeded',
+            'account.changePassword',
+            'account.passwordChanged',
+            'account.sessions',
+            'account.sessionRevoked',
+            'account.sessionTimes',
+            'account.logout',
+            'account.error.authentication_required',
+            'account.error.csrf_required',
+            'account.error.invalid_credentials',
+            'account.error.identity_already_linked',
+            'account.error.unknown',
+            'admin.menu',
+            'admin.title',
+            'admin.close',
+            'admin.description',
+            'admin.usersDescription',
+            'admin.manageUser',
+            'admin.accountAccess',
+            'admin.security',
+            'admin.createUser',
+            'admin.resetPassword',
+            'admin.revokeSessions',
+            'admin.identities',
+            'admin.identityHelp',
+            'admin.identityIssuer',
+            'admin.identitySubject',
+            'admin.identityDisplayName',
+            'admin.identityUser',
+            'admin.createIdentity',
+            'admin.deleteIdentity',
+            'admin.identityCreated',
+            'admin.identityDeleted',
+            'admin.restrictedBook',
+            'admin.grantBook',
+            'admin.grantUsers',
+            'admin.noGrantableUsers',
+            'admin.saveBookGrants',
+            'admin.bookGrantsSaved',
+            'admin.revokeBook',
+            'admin.error.last_enabled_admin',
+            'admin.error.user_disabled',
+            'admin.error.unknown',
+        }
+        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+        keys = set(DICTIONARY_KEY.findall(source))
+
+        self.assertEqual(required - keys, set())
+
     def test_first_party_ui_sinks_do_not_embed_english_copy(self):
         failures = []
         for path in FIRST_PARTY:

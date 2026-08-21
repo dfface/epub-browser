@@ -76,7 +76,7 @@ function assertValidSelector(selector) {
   }
 }
 
-function createLibraryHarness(responses) {
+function createLibraryHarness(responses, mode = 'server') {
   const bookGrid = element('div');
   bookGrid.className = 'book-grid';
   const loading = element('div');
@@ -164,6 +164,7 @@ function createLibraryHarness(responses) {
   const window = {
     navigator: { userAgent: 'Kindle' },
     EpubBrowserBasePath: '/reader/',
+    EpubBrowserMode: mode,
     document,
     localStorage,
     addEventListener() {},
@@ -180,6 +181,7 @@ function createLibraryHarness(responses) {
     card(id) { return bookGrid.children.find((card) => card.getAttribute('data-id') === id) || null; },
     tag(id) { return tagCloud.children.find((tagItem) => tagItem.getAttribute('data-id') === id) || null; },
     tagIds() { return tagCloud.children.map((tagItem) => tagItem.getAttribute('data-id')); },
+    state(variant) { return bookGrid.querySelector('.library-state--' + variant); },
     setSavedOrder(key, order) { localStorage.setItem(key, order); },
     pendingResponseCount() { return pendingResponses.length; },
     resolveNextResponse() {
@@ -299,6 +301,37 @@ test('incremental metadata refresh replaces cards and preserves filters', async 
   assert.equal(harness.card('one').style.display, 'none');
   assert.equal(harness.card('two').style.display, 'block');
   assert.equal(harness.bookshelfModal.classList.contains('active'), true);
+});
+
+test('empty Server library renders a structured watched-folder state', () => {
+  const harness = createLibraryHarness([[]], 'server');
+
+  harness.window.initScriptLibrary();
+
+  const state = harness.state('empty');
+  assert.ok(state);
+  assert.equal(state.tagName, 'section');
+  assert.equal(state.attributes.role, 'status');
+  assert.equal(state.children[1].attributes['data-i18n'], 'library.emptyTitle');
+  assert.equal(
+    state.children[2].attributes['data-i18n'],
+    'library.emptyServerDescription',
+  );
+});
+
+test('a filter with no matches renders a distinct search empty state', () => {
+  const harness = createLibraryHarness([[
+    { hash: 'one', title: 'One', authors: [], tags: [], url: '/book/one/', cover: null },
+  ]]);
+  harness.window.initScriptLibrary();
+  harness.searchBox.value = 'missing';
+
+  harness.window.initBookCardsEvents();
+
+  const state = harness.state('filtered');
+  assert.ok(state);
+  assert.equal(state.children[1].attributes['data-i18n'], 'library.noResultsTitle');
+  assert.equal(state.children[2].attributes['data-i18n'], 'library.noResultsDescription');
 });
 
 test('coalesces out-of-order revision requests so the final grid uses the newest metadata', async () => {

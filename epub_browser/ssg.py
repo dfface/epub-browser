@@ -13,12 +13,13 @@ from typing import Callable, Optional, Sequence
 from tqdm import tqdm
 
 from .asset_publisher import AssetPublisher, PublishedAssets
+from .book_identity import inspect_book_identity, resolve_book_identity
 from .cli import SSGConfig
-from .identity import derive_ssg_book_id
-from .models import BookMetadata, ConvertedBook
+from .models import ConvertedBook
 from .processor import EPUBProcessor
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
+from .sidecar_identity import discover_orphan_sidecars
 from .urls import SiteURLs
 
 
@@ -50,8 +51,10 @@ class SSGPublisher:
         self.show_progress = sys.stderr.isatty() if show_progress is None else show_progress
 
     def build(self) -> Path:
-        prepared = self._prepare_books()
-        self._validate_output_target(tuple(book.source for book in prepared))
+        sources = self._discover_sources()
+        self._validate_output_target(sources)
+        orphan_sidecars = discover_orphan_sidecars(self.config.sources, sources)
+        prepared = self._prepare_books(sources, orphan_sidecars)
 
         self.output_dir.parent.mkdir(parents=True, exist_ok=True)
         staging = Path(
@@ -72,21 +75,34 @@ class SSGPublisher:
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
 
-    def _prepare_books(self) -> tuple[_PreparedBook, ...]:
-        sources = self._discover_sources()
+    def _prepare_books(
+        self,
+        sources: Sequence[Path],
+        orphan_sidecars: Sequence[Path],
+    ) -> tuple[_PreparedBook, ...]:
         failures = []
         prepared = []
         with tempfile.TemporaryDirectory(prefix="epub-browser-ssg-probe-") as directory:
             probe_root = Path(directory)
             for source in sources:
-                processor = EPUBProcessor(
-                    source,
-                    probe_root,
-                    PublishedAssets({}),
-                    urls=self.urls,
-                    reporter=self.reporter,
-                )
+                processor = None
                 try:
+                    inspection = inspect_book_identity(
+                        source,
+                        orphan_sidecars=orphan_sidecars,
+                    )
+                    identity = resolve_book_identity(
+                        inspection,
+                        self.config.book_id_storage,
+                    )
+                    book_id = identity.book_id
+                    processor = EPUBProcessor(
+                        source,
+                        probe_root,
+                        PublishedAssets({}),
+                        urls=self.urls,
+                        reporter=self.reporter,
+                    )
                     if not processor.extract_epub():
                         raise ValueError("unable to extract EPUB archive")
                     opf_path = processor.parse_container()
@@ -94,13 +110,12 @@ class SSGPublisher:
                         raise ValueError("unable to locate EPUB package")
                     if not processor.parse_opf(opf_path):
                         raise ValueError("unable to parse EPUB package")
-                    structure = self._book_structure(processor)
-                    book_id = derive_ssg_book_id(processor.get_metadata(), structure)
                     prepared.append(_PreparedBook(source=source, book_id=book_id))
                 except Exception as error:
                     failures.append((source, str(error)))
                 finally:
-                    processor.cleanup()
+                    if processor is not None:
+                        processor.cleanup()
 
         if failures:
             raise SSGBuildError(self._format_failures("Unable to inspect EPUB inputs", failures))
@@ -114,7 +129,7 @@ class SSGPublisher:
             if len(paths) > 1
         }
         if duplicate_groups:
-            lines = ["Duplicate deterministic SSG book IDs:"]
+            lines = ["Duplicate SSG book IDs:"]
             for book_id in sorted(duplicate_groups):
                 lines.append(f"  {book_id}:")
                 lines.extend(
@@ -131,13 +146,14 @@ class SSGPublisher:
             if not source.exists():
                 failures.append((source, "path does not exist"))
                 continue
-            resolved = source.resolve()
-            if resolved.is_file():
-                if resolved.suffix.lower() == ".epub":
-                    discovered.append(resolved)
+            absolute = source.absolute()
+            if absolute.is_file():
+                if absolute.suffix.lower() == ".epub":
+                    discovered.append(absolute)
                 else:
-                    failures.append((resolved, "file is not an EPUB"))
+                    failures.append((absolute, "file is not an EPUB"))
                 continue
+            resolved = source.resolve()
             if not resolved.is_dir():
                 failures.append((resolved, "path is not a regular file or directory"))
                 continue
@@ -168,26 +184,14 @@ class SSGPublisher:
                     f"Output directory cannot be an input source: {self.output_dir}"
                 )
         for source in sources:
-            if source == self.output_dir or source.is_relative_to(self.output_dir):
+            resolved_source = source.resolve()
+            if (
+                resolved_source == self.output_dir
+                or resolved_source.is_relative_to(self.output_dir)
+            ):
                 raise SSGBuildError(
                     f"Output directory would own an input EPUB: {self.output_dir}"
                 )
-
-    @staticmethod
-    def _book_structure(processor: EPUBProcessor):
-        if processor.toc:
-            return tuple(
-                (
-                    item.get("title") or "",
-                    item.get("src") or "",
-                    int(item.get("level") or 0),
-                )
-                for item in processor.toc
-            )
-        return tuple(
-            (chapter.get("title") or "", chapter.get("path") or "", 0)
-            for chapter in processor.chapters
-        )
 
     def _convert_all(
         self,

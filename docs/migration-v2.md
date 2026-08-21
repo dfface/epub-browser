@@ -11,6 +11,7 @@ EPUB Browser v2 separates static-site generation (`ssg`) from the stateful readi
 | `epub-browser BOOKS --output-dir DIST --no-server` | `epub-browser ssg BOOKS --output-dir DIST` |
 | `--sync-dir DIR` | `server --legacy-sync-dir DIR` |
 | temporary `--keep-files` | retained by the compatibility adapter |
+| `--book-id-storage sidecar\|embedded` | invocation-wide identity carrier; default `sidecar` |
 
 The v1 `--output-dir` had two meanings. v2 removes that ambiguity: SSG output is a deployable snapshot, while Server storage contains durable data plus a replaceable cache.
 
@@ -21,18 +22,38 @@ Migration runs only for persistent Server mode. Given an existing v1 directory:
 ```bash
 epub-browser server /path/to/books \
   --server-dir /path/to/existing-v1-directory \
-  --legacy-sync-dir /path/to/legacy-sync
+  --legacy-sync-dir /path/to/legacy-sync \
+  --watch
 ```
+
+The migration first creates one disabled, unloginable pending administrator
+with a generated stable user ID. All legacy annotations, bookshelf rows, and
+reading progress are assigned to that ID inside the same rollback-safe schema
+upgrade; no legacy username is selected as the new login name. Visit `/setup`
+to choose the username and password. Setup atomically activates that same user
+ID, creates a session, and then allows library reconciliation and publication.
+
+Keep the Server port on loopback or another trusted/private path until setup is
+complete: the first visitor who submits the one-time form claims the
+administrator account. Trusted-proxy identity headers cannot claim it. For an
+unattended migration, add `--admin-username` and preferably a mode-`0600`
+`--admin-password-file`; the environment equivalents are
+`EPUB_BROWSER_ADMIN_USERNAME` and `EPUB_BROWSER_ADMIN_PASSWORD_FILE`.
+`EPUB_BROWSER_ADMIN_PASSWORD` is a less private fallback only when no file is
+configured. A partial unattended configuration or a configured empty or
+unreadable file fails closed and does not fall back to plaintext environment
+content. After setup completes, retries and ordinary restarts no longer read or
+require any bootstrap secret.
 
 Startup performs these steps:
 
 1. Acquire the Server and migration locks.
 2. Reject ambiguous root databases or an unreadable/corrupt SQLite file.
 3. Copy the v1 root `epub-browser.db` or `annotations.db` to a verified backup under `data/backups/`.
-4. Upgrade a temporary copy and atomically activate it as `data/epub-browser.db`.
+4. Upgrade a temporary root-database copy and atomically activate it as `data/epub-browser.db`. If an authoritative `data/epub-browser.db` already exists at an older supported schema version, integrity-check it and make a verified `data/backups/` copy before upgrading it in place.
 5. Preserve annotations, bookshelf rows, reading progress, and legacy book IDs.
-6. Import the highest valid `epub-browser-bookshelf-<username>-<version>.json` per user when it is newer than SQLite. JSON source files are not deleted.
-7. Reconcile every EPUB into `cache/public/`.
+6. Import the single highest valid `epub-browser-bookshelf-<username>-<version>.json`, regardless of the legacy filename username, into the pending administrator when it is newer than SQLite. JSON source files are not deleted. This scan happens only during startup migration; ordinary `/sync` requests never inspect legacy files.
+7. Wait for web or unattended administrator setup, then reconcile every EPUB into `cache/public/`.
 8. After a complete reconciliation, move old root `index.html`, `book-metadata.json`, `sw.js`, `assets/`, and `book/` into `cache/legacy-public/`.
 9. Remove `cache/legacy-public/` only after the next successful startup.
 
@@ -44,7 +65,9 @@ Backups use a name such as:
 data/backups/epub-browser.db.20260818T120000Z.0123456789ab.bak
 ```
 
-The backup is verified before the v1 root database is removed.
+The backup is byte-digest verified and passes SQLite integrity checking before
+the v1 root database is removed or an authoritative older schema is changed.
+A current-schema restart creates no repeated backup.
 
 ## Book identity and user data
 
@@ -52,7 +75,15 @@ During migration, v1 hashes found in `book-metadata.json` and `book/<hash>/` are
 
 Deleting a source marks its book inactive but does not delete its durable registry row, annotations, bookshelf records, or reading progress. Deleting `cache/` is safe; a later start regenerates it with the same Server book IDs.
 
-The bookshelf product behavior is unchanged: it remains browser-local until the user invokes the existing manual Sync action. A database with no bookshelf row is therefore normal before the first Sync.
+Starting with v2.0.5, the default identity carrier is the visible adjacent file `BOOK.epub.epub-browser.json`. Its `book_id` is the same value used as URL/client `book_hash`, and the EPUB itself is not rewritten. `--book-id-storage embedded` instead stores that ID in OPF metadata for the whole invocation and may rebuild the EPUB ZIP.
+
+Both carriers are checked before mutation. Conflicting IDs, duplicate active copies, or ambiguous inactive/move candidates stop that source instead of guessing. Server only reuses generated content when the established source fingerprint agrees with its database record and the cache remains valid; a sidecar fingerprint alone is not reuse evidence.
+
+Existing v2.0.4 OPF IDs migrate without an EPUB write: v2.0.5 creates a same-ID sidecar and leaves the embedded metadata intact. Switching in either direction creates the selected carrier but never removes or refreshes the non-selected carrier. No SQLite schema migration is required for this change.
+
+In Server mode the bookshelf is a versioned document owned by the authenticated
+account and saves automatically after changes. Startup migration is the only
+legacy JSON import path; requests never select legacy files by username.
 
 ## Conflict and corruption handling
 
@@ -65,7 +96,12 @@ annotations.db
 
 Move the non-authoritative file aside and retry. EPUB Browser never chooses one automatically.
 
-If SQLite integrity checks fail, the source file is left in place. Repair or restore it before retrying. If `data/epub-browser.db` already exists, it is authoritative; any later-discovered root database is left untouched and reported with `--log`.
+If SQLite integrity checks fail, the source file is left in place. Repair or
+restore it before retrying. If an authoritative-database backup cannot be
+created and verified, startup stops before changing the database; its original
+bytes and schema remain intact. If `data/epub-browser.db` already exists, it is
+authoritative; any later-discovered root database is left untouched and
+reported with `--log`.
 
 ## Rollback
 
@@ -75,8 +111,11 @@ To return to v1 after a successful v2 migration:
 
 1. Preserve the entire v2 Server directory as an additional backup.
 2. Select the matching verified `.bak` file under `data/backups/`.
-3. Copy it back to the v1 root as `epub-browser.db` (or `annotations.db` if that was the original name).
-4. Run the previous v1 package against that root.
+3. For a migrated root database, copy it back to the v1 root as
+   `epub-browser.db` (or `annotations.db` if that was the original name). For an
+   in-place authoritative schema upgrade, copy it back to
+   `data/epub-browser.db`.
+4. Run the compatible earlier package against that restored schema.
 
 Example:
 
@@ -88,14 +127,46 @@ cp /path/to/server-dir/data/backups/epub-browser.db.TIMESTAMP.DIGEST.bak \
 
 If multiple backups exist, choose the timestamp and digest recorded in `data/migration-state.json` rather than using a wildcard blindly.
 
+Visible sidecars do not alter the EPUB and can be retained during rollback. v2.0.4 does not understand sidecar-only identities; before rolling back an SSG deployment that must keep identical public URLs, run v2.0.5 once with `--book-id-storage embedded` so the same ID is also present in OPF metadata. EPUBs that already carried a v2.0.4 embedded ID need no identity conversion.
+
 For a v2 retry instead of a downgrade, keep `data/epub-browser.db` and rerun the same `server --server-dir` command. Generated cache files may be removed without touching `data/`.
 
 ## Docker migration
 
 The v2 image expects:
 
-- `/app/Library`: EPUB input, preferably read-only;
+- `/app/Library`: EPUB input, read-write because the Docker default embeds book IDs in the EPUB;
 - `/app/EpubBrowserFiles`: required read-write persistent Server directory;
 - `/app/SyncData`: optional read-only legacy JSON import directory.
+- `/run/secrets/epub-browser-admin-password`: optional read-only unattended first-start password file.
 
-The container command now uses `epub-browser server` and listens on `0.0.0.0` inside the container. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
+The container command now uses `epub-browser server --book-id-storage embedded` and listens on `0.0.0.0` inside the container. This Docker-specific default does not change the general CLI default of `sidecar`. A read-only Library mount works only when every embedded identity carrier already exists and matches the source; there is no database-only fallback. Embedded storage may rebuild the EPUB and is refused when doing so would be unsafe. Existing sidecars remain in place. Bind the host port to `127.0.0.1` unless a protected LAN or authenticated TLS reverse proxy is intended.
+
+For example:
+
+```bash
+docker run -d \
+  -p 127.0.0.1:8080:80 \
+  -v /path/to/books:/app/Library:rw \
+  -v /path/to/existing-v1-directory:/app/EpubBrowserFiles \
+  epub-browser:2.1.0
+```
+
+Complete `/setup` through the loopback binding before exposing the service. For
+unattended setup, add the administrator environment values and read-only secret
+mount shown in the main README Docker example.
+
+The container command uses `epub-browser server --watch`, listens on `0.0.0.0`
+inside the container, and retains authoritative data only through the mounted
+`/app/EpubBrowserFiles` volume. Bind the host port to `127.0.0.1` unless a TLS
+reverse proxy is intended. When a proxy supplies identity headers, enable
+`--cookie-secure`, trust only the direct proxy network with
+`--trusted-proxy-cidr`, configure the subject header and issuer together, and
+make the proxy strip client-supplied copies of those headers. A public client
+network is never an appropriate trusted-proxy CIDR.
+
+Direct OAuth/OIDC protocol handling is not built into EPUB Browser. An
+OIDC-aware reverse proxy performs the provider flow and passes a stable subject
+through the configured trusted header; EPUB Browser maps the proxy's
+issuer/subject pair to a local account. Keep local administrator login available
+as the recovery path.

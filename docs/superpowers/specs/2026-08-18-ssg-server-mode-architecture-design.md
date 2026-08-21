@@ -279,15 +279,18 @@ Deleting a source marks its book record inactive and removes it from the active 
 
 The source fingerprint is a SHA-256 content digest and represents the cached version. Size and nanosecond modification time are stored as a fast unchanged check. When either quick attribute changes, Server recomputes the digest. A changed digest queues conversion while leaving the durable ID unchanged.
 
-### Deterministic SSG book ID
+### Embedded SSG book ID
 
-SSG has no durable registry. It derives a deterministic ID from normalized EPUB metadata:
+SSG reads a durable application ID from the primary OPF package metadata. When the
+metadata is absent, it generates `base64url(UUIDv4.bytes)` without padding and safely
+writes it into the source EPUB as `epub-browser:book-id` before conversion. Metadata,
+spine, TOC, source path, and content changes never change this ID.
 
-1. EPUB package identifier plus normalized spine/TOC structure when an identifier exists;
-2. otherwise title, authors, and normalized spine/TOC structure;
-3. SHA-256 of the normalized record, encoded as unpadded base64url and truncated to 22 characters (132 bits).
-
-The ID does not include an absolute source path. SSG rejects duplicate IDs and identifies all conflicting input files rather than overwriting one book.
+Writing is atomic and changes only the primary OPF ZIP entry. The publisher validates
+the rewritten archive before replacing the source, preserves all non-OPF entries and
+container metadata, and refuses to rewrite signed, read-only, hard-linked, or
+non-conforming containers. SSG rejects duplicate embedded IDs and identifies all
+conflicting input files rather than overwriting one book.
 
 ## SSG build flow
 
@@ -531,7 +534,7 @@ New documentation uses only `ssg` and `server`. Legacy syntax appears only in th
 - new CLI parsing and all legacy mappings;
 - invalid cross-mode option rejection;
 - `base-path` normalization and URL generation;
-- deterministic SSG ID generation and collision reporting;
+- embedded SSG ID generation, safe source rewriting, and collision reporting;
 - durable Server ID and fingerprint separation;
 - database schema version transitions;
 - legacy database detection and conflict handling;

@@ -1,6 +1,8 @@
 import contextlib
 import io
 import json
+import os
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -22,6 +24,25 @@ from epub_browser.ssg import run_ssg
 from epub_browser.state import StateStore
 
 
+def _json_login(client, username, password):
+    page = client.get("/login")
+    match = re.search(
+        r'<meta name="epub-browser-auth-nonce" content="([^"]+)">',
+        page.text,
+    )
+    if page.status_code != 200 or match is None:
+        raise RuntimeError("runtime login page did not provide an authentication nonce")
+    return client.post(
+        "/login",
+        json={"username": username, "password": password, "next": "/"},
+        headers={
+            "X-EPUB-Browser-Auth-Nonce": match.group(1),
+            "Origin": str(client.base_url).rstrip("/"),
+            "Sec-Fetch-Site": "same-origin",
+        },
+    )
+
+
 class ModeIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -31,6 +52,16 @@ class ModeIntegrationTests(unittest.TestCase):
         self.sources.mkdir()
         self.source = self.sources / "book.epub"
         self._write_epub(self.source)
+        self.bootstrap_environment = mock.patch.dict(
+            os.environ,
+            {
+                "EPUB_BROWSER_ADMIN_USERNAME": "admin",
+                "EPUB_BROWSER_ADMIN_PASSWORD": "admin-secret",
+            },
+            clear=True,
+        )
+        self.bootstrap_environment.start()
+        self.addCleanup(self.bootstrap_environment.stop)
 
     def test_legacy_runtime_upgrade_preserves_identity_and_all_user_data(self):
         server_dir = self.root / "legacy-server"
@@ -38,25 +69,10 @@ class ModeIntegrationTests(unittest.TestCase):
         legacy_id = MigrationManager._derive_legacy_book_id(self.source)
         self.assertIsNotNone(legacy_id)
         legacy_database = server_dir / "epub-browser.db"
-        legacy_store = StateStore(legacy_database)
-        legacy_store.initialize()
-        legacy_store.upsert_annotation(
-            {
-                "id": "saved-note",
-                "book_hash": legacy_id,
-                "chapter_index": 0,
-                "text": "Preserved annotation",
-                "color": "#fff",
-                "created_at": "2026",
-                "updated_at": "2026",
-            }
+        self._create_legacy_accountless_database(
+            legacy_database,
+            legacy_id,
         )
-        legacy_store.create_bookshelf(
-            "reader",
-            2,
-            {"items": [legacy_id], "groups": {}},
-        )
-        legacy_store.set_reading_progress("reader", legacy_id, 0)
         (server_dir / "epub-browser-bookshelf-reader-5.json").write_text(
             json.dumps({"items": [legacy_id], "groups": {}, "order": [legacy_id]}),
             encoding="utf-8",
@@ -108,11 +124,22 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertEqual(converter.call_count, 1)
         database_path = server_dir / "data" / "epub-browser.db"
         migrated = StateStore(database_path)
+        administrator = migrated.get_user_by_username("admin")
         record = migrated.active_books()[0]
         self.assertEqual(record.book_id, legacy_id)
-        self.assertEqual(migrated.get_annotation("saved-note")["book_hash"], legacy_id)
-        self.assertEqual(migrated.get_reading_progress("reader", legacy_id), 0)
-        shelf_version, shelf_data = migrated.get_bookshelf("reader")
+        self.assertTrue(administrator.is_admin)
+        self.assertEqual(
+            migrated.get_annotation(
+                "saved-note",
+                user_id=administrator.user_id,
+            )["book_hash"],
+            legacy_id,
+        )
+        self.assertEqual(
+            migrated.get_reading_progress(administrator.user_id, legacy_id),
+            0,
+        )
+        shelf_version, shelf_data = migrated.get_bookshelf(administrator.user_id)
         self.assertEqual(shelf_version, 5)
         self.assertEqual(json.loads(shelf_data)["items"], [legacy_id])
         self.assertTrue(
@@ -179,6 +206,7 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertTrue((server_dir / "cache" / "public" / "index.html").is_file())
 
         store = StateStore(server_dir / "data" / "epub-browser.db")
+        administrator = store.get_user_by_username("admin")
         book_id = store.active_books()[0].book_id
         store.upsert_annotation(
             {
@@ -189,7 +217,8 @@ class ModeIntegrationTests(unittest.TestCase):
                 "color": "#fff",
                 "created_at": "2026",
                 "updated_at": "2026",
-            }
+            },
+            user_id=administrator.user_id,
         )
         shutil.rmtree(server_dir / "cache")
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
@@ -208,7 +237,13 @@ class ModeIntegrationTests(unittest.TestCase):
 
         self.assertEqual(status, 0)
         self.assertEqual(store.active_books()[0].book_id, book_id)
-        self.assertEqual(store.get_annotation("durable")["book_hash"], book_id)
+        self.assertEqual(
+            store.get_annotation(
+                "durable",
+                user_id=administrator.user_id,
+            )["book_hash"],
+            book_id,
+        )
         self.assertTrue(
             (server_dir / "cache" / "public" / "book" / book_id / "index.html").is_file()
         )
@@ -237,13 +272,13 @@ class ModeIntegrationTests(unittest.TestCase):
             )
 
         self.assertEqual(logged_status, 0)
-        self.assertIn(str(self.source.resolve()), logged_stderr.getvalue())
+        self.assertIn(str(self.source.absolute()), logged_stderr.getvalue())
 
     def test_v2_documentation_matches_the_public_mode_contract(self):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
         readme = Path("README.md").read_text(encoding="utf-8")
         migration = Path("docs/migration-v2.md")
-        release = Path("docs/releases/v2.0.0.md")
+        release = Path("docs/releases/v2.1.0.md")
 
         self.assertIn('"server"', dockerfile)
         self.assertIn('"--server-dir=/app/EpubBrowserFiles"', dockerfile)
@@ -256,7 +291,109 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertIn("reverse proxy", readme.lower())
         self.assertTrue(migration.is_file())
         self.assertTrue(release.is_file())
-        self.assertIn('VERSION = "2.0.2"', Path("epub_browser/version.py").read_text())
+        self.assertIn('VERSION = "2.1.0"', Path("epub_browser/version.py").read_text())
+
+    def test_docker_server_defaults_to_embedded_book_id_storage(self):
+        dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn('"--book-id-storage=embedded"', dockerfile)
+
+    def test_english_and_chinese_readmes_document_every_public_mode_option(self):
+        documented_options = {
+            "--output-dir",
+            "--base-path",
+            "--log",
+            "--book-id-storage",
+            "--server-dir",
+            "--ephemeral",
+            "--watch",
+            "--host",
+            "--port",
+            "--no-browser",
+            "--legacy-sync-dir",
+            "--admin-username",
+            "--admin-password-file",
+            "--trusted-proxy-cidr",
+            "--proxy-subject-header",
+            "--proxy-display-name-header",
+            "--proxy-issuer",
+            "--cookie-secure",
+        }
+
+        for readme_path in (Path("README.md"), Path("README.zh-CN.md")):
+            with self.subTest(readme=str(readme_path)):
+                self.assertTrue(readme_path.is_file())
+                readme = readme_path.read_text(encoding="utf-8")
+                for option in documented_options:
+                    self.assertIn(option, readme)
+
+    @staticmethod
+    def _create_legacy_accountless_database(path, book_id):
+        with sqlite3.connect(path) as connection:
+            connection.execute("PRAGMA user_version = 1")
+            connection.execute(
+                """
+                CREATE TABLE annotations (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL DEFAULT '',
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    note TEXT,
+                    start_meta TEXT,
+                    end_meta TEXT,
+                    color TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO annotations (
+                    id, username, book_hash, chapter_index, text, color,
+                    created_at, updated_at
+                ) VALUES ('saved-note', 'reader', ?, 0,
+                          'Preserved annotation', '#fff', '2026', '2026')
+                """,
+                (book_id,),
+            )
+            connection.execute(
+                """
+                CREATE TABLE bookshelves (
+                    username TEXT PRIMARY KEY,
+                    version INTEGER NOT NULL,
+                    data TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO bookshelves (username, version, data)
+                VALUES ('reader', 2, ?)
+                """,
+                (json.dumps({"items": [book_id], "groups": {}}),),
+            )
+            connection.execute(
+                """
+                CREATE TABLE reading_progress (
+                    username TEXT NOT NULL DEFAULT '',
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (username, book_hash)
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO reading_progress (
+                    username, book_hash, chapter_index
+                ) VALUES ('reader', ?, 0)
+                """,
+                (book_id,),
+            )
 
     @staticmethod
     def _write_epub(path):
@@ -292,12 +429,18 @@ class _ReturningServer:
         self.started = True
 
     def run(self):
-        client = TestClient(self.config.app)
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline:
-            if client.get("/api/health").json()["state"] in {"ready", "degraded"}:
-                return None
-            time.sleep(0.01)
+        with TestClient(self.config.app) as client:
+            login = _json_login(client, "admin", "admin-secret")
+            if login.status_code != 200:
+                raise RuntimeError("runtime administrator login failed")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if client.get("/api/health").json()["state"] in {
+                    "ready",
+                    "degraded",
+                }:
+                    return None
+                time.sleep(0.01)
         raise RuntimeError("initial Server reconciliation did not finish")
 
 

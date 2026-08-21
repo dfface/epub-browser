@@ -15,7 +15,7 @@ setup(
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     keywords="epub reader html export browser convert calibre-web calibre kindle web server local",
-    description="A personal EPUB reader and static-site generator. Read privately. Publish anywhere.",  # 简短描述
+    description="A private EPUB reading service and self-contained static-site generator.",  # 简短描述
     long_description=long_description,  # 详细描述，从README.md读取
     long_description_content_type="text/markdown",  # 详细描述格式
     url="https://github.com/dfface/epub-browser",  # 项目主页，如GitHub仓库地址
@@ -34,6 +34,7 @@ setup(
         "watchdog",
         "starlette>=0.37,<1.0",
         "uvicorn[standard]>=0.30,<1.0",
+        "argon2-cffi>=23.1,<26.0",
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
         'console_scripts': [

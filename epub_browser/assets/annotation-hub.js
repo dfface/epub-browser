@@ -115,7 +115,7 @@
     function translateChrome() {
         if (!modalState.modal) return;
         modalState.back.querySelector('span').textContent = tr('allAnnotatedBooks');
-        modalState.modal.querySelector('.annotation-hub-header-label').textContent = tr('hubTitle');
+        modalState.modal.querySelector('.annotation-hub-header-label span').textContent = tr('hubTitle');
         modalState.closeButton.setAttribute('aria-label', tr('closeHub'));
     }
 
@@ -144,7 +144,7 @@
         modal.innerHTML = '<div class="annotation-hub-backdrop" data-annotation-hub-close></div>' +
             '<section class="annotation-hub-dialog"><header class="annotation-hub-modal-header">' +
             '<button type="button" class="annotation-hub-header-button" id="annotationHubBack" hidden><i class="fas fa-arrow-left" aria-hidden="true"></i><span></span></button>' +
-            '<span class="annotation-hub-header-label"></span>' +
+            '<span class="annotation-hub-header-label"><i class="fas fa-highlighter" aria-hidden="true"></i><span></span></span>' +
             '<button type="button" class="annotation-hub-icon-button" id="annotationHubClose"><i class="fas fa-times" aria-hidden="true"></i></button>' +
             '</header><main class="annotation-hub-container" id="annotationHub" tabindex="-1" aria-live="polite"></main></section>';
         document.body.appendChild(modal);

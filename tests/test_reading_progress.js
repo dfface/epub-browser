@@ -125,17 +125,17 @@ test('progress-bar preference defaults to visible and hides only its fixed conta
 });
 
 test('reading progress requests persist only a chapter index', async () => {
-  const originalFetch = global.fetch;
+  const originalAuth = global.EpubBrowserAuth;
   const originalMode = global.EpubBrowserMode;
   let received;
   global.EpubBrowserMode = 'server';
-  global.fetch = (url, options) => {
+  global.EpubBrowserAuth = { fetch(url, options) {
     received = { url, options };
     return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ chapter_index: 5 }) });
-  };
+  } };
 
   const result = await Progress.request('PUT', '/api/reading-progress/book', 5, true);
-  global.fetch = originalFetch;
+  global.EpubBrowserAuth = originalAuth;
   global.EpubBrowserMode = originalMode;
 
   assert.deepEqual(result, { chapter_index: 5 });
@@ -144,53 +144,75 @@ test('reading progress requests persist only a chapter index', async () => {
   assert.deepEqual(JSON.parse(received.options.body), { chapter_index: 5 });
 });
 
-test('reading progress requests identify the signed-in sync user', async () => {
-  const originalFetch = global.fetch;
-  const originalLocalStorage = global.localStorage;
+test('server reading progress uses Cookie authentication and CSRF, never X-Username', async () => {
+  const originalAuth = global.EpubBrowserAuth;
   const originalMode = global.EpubBrowserMode;
   let received;
   global.EpubBrowserMode = 'server';
-  global.localStorage = { getItem: key => key === 'epub_browser_username' ? 'alice' : null };
-  global.fetch = (url, options) => {
-    received = { url, options };
+  global.EpubBrowserAuth = { fetch(url, options = {}) {
+    received = {
+      url,
+      options: Object.assign({}, options, {
+        credentials: 'same-origin',
+        headers: Object.assign({}, options.headers, { 'X-CSRF-Token': 'csrf' }),
+      }),
+    };
     return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ chapter_index: 5 }) });
-  };
+  } };
 
   await Progress.request('GET', '/api/reading-progress/book');
-  global.fetch = originalFetch;
-  global.localStorage = originalLocalStorage;
+  global.EpubBrowserAuth = originalAuth;
   global.EpubBrowserMode = originalMode;
 
-  assert.equal(received.options.headers['X-Username'], 'alice');
+  assert.equal(received.options.credentials, 'same-origin');
+  assert.equal(received.options.headers['X-Username'], undefined);
+  assert.equal(received.options.headers['X-CSRF-Token'], 'csrf');
+});
+
+test('server reading progress identifies the authenticated account', () => {
+  const originalAuth = global.EpubBrowserAuth;
+  const originalMode = global.EpubBrowserMode;
+  global.EpubBrowserMode = 'server';
+  global.EpubBrowserAuth = {
+    getSession() { return { user: { username: 'alice', role: 'member' } }; },
+  };
+
+  try {
+    assert.equal(typeof Progress.getUsername, 'function');
+    assert.equal(Progress.getUsername(), 'alice');
+  } finally {
+    global.EpubBrowserAuth = originalAuth;
+    global.EpubBrowserMode = originalMode;
+  }
 });
 
 test('detailed reading progress requests preserve stable server error codes', async () => {
-  const originalFetch = global.fetch;
+  const originalAuth = global.EpubBrowserAuth;
   const originalMode = global.EpubBrowserMode;
   global.EpubBrowserMode = 'server';
-  global.fetch = () => Promise.resolve({
+  global.EpubBrowserAuth = { fetch: () => Promise.resolve({
     ok: false,
     status: 503,
     json: () => Promise.resolve({ code: 'database_unavailable', message: 'Unavailable' }),
-  });
+  }) };
 
   const result = await Progress.request('DELETE', '/api/reading-progress/book', null, true, true);
-  global.fetch = originalFetch;
+  global.EpubBrowserAuth = originalAuth;
   global.EpubBrowserMode = originalMode;
 
   assert.deepEqual(result, { error: { code: 'database_unavailable', message: 'Unavailable' } });
 });
 
 test('SSG reading progress never calls a server API', async () => {
-  const originalFetch = global.fetch;
+  const originalAuth = global.EpubBrowserAuth;
   const originalMode = global.EpubBrowserMode;
   let calls = 0;
   global.EpubBrowserMode = 'ssg';
-  global.fetch = () => { calls += 1; throw new Error('must not fetch'); };
+  global.EpubBrowserAuth = { fetch: () => { calls += 1; throw new Error('must not fetch'); } };
 
   const result = await Progress.request('PUT', '/api/reading-progress/book', 5);
 
-  global.fetch = originalFetch;
+  global.EpubBrowserAuth = originalAuth;
   global.EpubBrowserMode = originalMode;
   assert.equal(result, null);
   assert.equal(calls, 0);

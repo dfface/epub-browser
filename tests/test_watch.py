@@ -24,6 +24,23 @@ class ImmediateFailureLibrary:
 
 
 class EpubFileHandlerTests(unittest.TestCase):
+    def test_sidecar_events_do_not_queue_reconciliation(self):
+        class Manager:
+            def __init__(self):
+                self.queued = []
+
+            def queue_path(self, path):
+                self.queued.append(Path(path))
+
+        manager = Manager()
+        handler = EpubFileHandler(manager)
+        handler.on_created(
+            FileCreatedEvent("/tmp/book.epub.epub-browser.json")
+        )
+        handler.on_created(FileCreatedEvent("/tmp/.book.epub.sidecar.tmp"))
+        handler.shutdown()
+        self.assertEqual(manager.queued, [])
+
     def test_logged_watch_dispatch_describes_reconcile_for_changes_and_deletions_while_normal_mode_is_silent(self):
         class Manager:
             def queue_path(self, path):

@@ -57,24 +57,7 @@ function bookT(key, params) {
 
 // 显示通知
 function showNotification(message, type) {
-    var existingNotification = document.querySelector('.custom-css-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    var notification = document.createElement('div');
-    notification.className = "custom-css-notification " + type;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    setTimeout(function() {
-        notification.classList.add('fade-out');
-        setTimeout(function() {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
+    return window.EpubBrowserNotification.show(message, type);
 }
 
 // 页面加载时恢复顺序
@@ -164,9 +147,14 @@ function initScript() {
         }
         if (clearBtn && !clearBtn.dataset.bound) {
             clearBtn.dataset.bound = 'true';
-            clearBtn.addEventListener("click", function() {
+            clearBtn.addEventListener("click", async function() {
                 closeClearMenu();
-                if (!window.confirm(bookT('book.clearReadingProgressConfirm'))) return;
+                if (!await window.EpubDialog.confirm({
+                    title: bookT('book.clearReadingProgress'),
+                    message: bookT('book.clearReadingProgressConfirm'),
+                    confirmText: bookT('book.clearReadingProgress'),
+                    destructive: true
+                })) return;
                 function reportClearFailure(result) {
                     var code = result && result.error && result.error.code;
                     var key = code ? 'book.error.' + code : 'book.clearReadingProgressFailed';
@@ -224,8 +212,6 @@ function initScript() {
     }
 
     function bookshelfSupport() {
-        var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {
@@ -321,6 +307,15 @@ function initScript() {
         });
     });
 
+    function updateScrollToTopVisibility() {
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
+        if (scrollTop > threshold) scrollToTopBtn.classList.add('is-visible');
+        else scrollToTopBtn.classList.remove('is-visible');
+    }
+    window.addEventListener('scroll', updateScrollToTopVisibility);
+    updateScrollToTopVisibility();
+
     function hideLoading() {
         var overlay = document.getElementById('loadingOverlay');
         if (overlay) {
@@ -334,11 +329,9 @@ function initScript() {
 }
 
 function getProgressIdentity() {
-    // Static builds persist progress locally.  A username left in localStorage
-    // by a server deployment must not make that local state look cloud-synced.
     if (window.EpubBrowserMode !== 'server') return '';
-    if (!window.EpubReadingProgress || !window.EpubReadingProgress.getUsername) return 'shared';
-    return window.EpubReadingProgress.getUsername() || 'shared';
+    if (!window.EpubReadingProgress || !window.EpubReadingProgress.getUsername) return '';
+    return window.EpubReadingProgress.getUsername();
 }
 
 function markReadingChapter(readKey, username) {
@@ -437,6 +430,7 @@ function setClearReadingProgressAvailability(available) {
 function initBookShelfButton(bookHash) {
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
+    var isServerMode = window.EpubBookshelfStore && window.EpubBookshelfStore.isServerMode();
 
     var toggleShelfBtn = document.getElementById('toggleShelfBtn');
     var toggleShelfBtnText = document.getElementById('toggleShelfBtnText');
@@ -458,6 +452,9 @@ function initBookShelfButton(bookHash) {
     }
 
     function getBookshelf() {
+        if (isServerMode) {
+            return window.EpubBookshelfStore.data() || { items: [], groups: {}, order: [] };
+        }
         var data = localStorage.getItem(BOOKSHELF_KEY);
         if (data) {
             return JSON.parse(data);
@@ -466,8 +463,33 @@ function initBookShelfButton(bookHash) {
     }
 
     function saveBookshelf(data) {
+        if (isServerMode) {
+            return window.EpubBookshelfStore.save(data);
+        }
         localStorage.setItem(BOOKSHELF_KEY, JSON.stringify(data));
         incrementBookshelfVersion();
+        return Promise.resolve({ data: data });
+    }
+
+    function ensureServerBookshelf() {
+        if (!isServerMode) return Promise.resolve(true);
+        return window.EpubBookshelfStore.load().then(function(result) {
+            if (result.error) {
+                showNotification(window.EpubBrowserI18n.t('bookshelf.error.' + (result.error.code || 'unknown')), 'warning');
+                return false;
+            }
+            return true;
+        });
+    }
+
+    function persistBookshelf(data) {
+        return saveBookshelf(data).then(function(result) {
+            if (result.error) {
+                showNotification(window.EpubBrowserI18n.t('bookshelf.error.' + (result.error.code || 'unknown')), 'warning');
+                return false;
+            }
+            return true;
+        });
     }
 
     function isBookInShelf(bookHash, shelfData) {
@@ -640,7 +662,7 @@ function initBookShelfButton(bookHash) {
                 modal.classList.remove('active');
             });
 
-            modal.querySelector('#selectGroupConfirmBtn').addEventListener('click', function() {
+            modal.querySelector('#selectGroupConfirmBtn').addEventListener('click', async function() {
                 var selected = modal.querySelector('.select-group-item.selected');
                 if (selected) {
                     var targetId = selected.dataset.id;
@@ -663,10 +685,11 @@ function initBookShelfButton(bookHash) {
                         }
                     }
 
-                    saveBookshelf(shelfData);
-                    showNotification(bookT('book.addedToShelf'), 'success');
-                    updateButtonState();
-                    modal.classList.remove('active');
+                    if (await persistBookshelf(shelfData)) {
+                        showNotification(bookT('book.addedToShelf'), 'success');
+                        updateButtonState();
+                        modal.classList.remove('active');
+                    }
                 }
             });
 
@@ -727,22 +750,28 @@ function initBookShelfButton(bookHash) {
         return;
     }
     toggleShelfBtn.dataset.bookShelfBound = 'true';
-    toggleShelfBtn.addEventListener('click', function() {
+    toggleShelfBtn.addEventListener('click', async function() {
+        if (!await ensureServerBookshelf()) return;
         var shelfData = getBookshelf();
         var inShelf = isBookInShelf(bookHash, shelfData);
 
         if (inShelf) {
             removeBookFromShelf(bookHash, shelfData);
-            saveBookshelf(shelfData);
-            showNotification(bookT('book.removedFromShelf'), 'success');
-            updateButtonState();
+            if (await persistBookshelf(shelfData)) {
+                showNotification(bookT('book.removedFromShelf'), 'success');
+                updateButtonState();
+            }
         } else {
             showSelectGroupModal();
         }
     });
 
     window.refreshBookShelfButton = updateButtonState;
-    updateButtonState();
+    if (isServerMode) {
+        ensureServerBookshelf().then(function() { updateButtonState(); });
+    } else {
+        updateButtonState();
+    }
 }
 
 window.initScriptBook = initScript;

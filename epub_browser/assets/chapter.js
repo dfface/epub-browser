@@ -117,24 +117,7 @@ function deleteCookie(name) {
 }
 
 function showNotification(message, type) {
-    var existingNotification = document.querySelector('.custom-css-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    var notification = document.createElement('div');
-    notification.className = "custom-css-notification " + type;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    setTimeout(function() {
-        notification.classList.add('fade-out');
-        setTimeout(function() {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
+    return window.EpubBrowserNotification.show(message, type);
 }
 
 function getElementHeight(element) {
@@ -341,6 +324,7 @@ function initScript() {
             if (!buttons[i]) continue;
             buttons[i].innerHTML = '<i class="fas fa-scroll"></i><span class="control-name"></span>';
             buttons[i].querySelector('.control-name').textContent = i18n.t('reader.scrolling');
+            buttons[i].setAttribute('aria-label', i18n.t('reader.scrolling'));
         }
     }
 
@@ -359,6 +343,7 @@ function initScript() {
     var isLoadingChapter = false;  // 防止重复加载
     var maxScrollTopSoFar = 0;  // 连续滚动模式下，跟踪用户向下滚过的最远位置
     var continuousChapterWindow = null;
+    var visibleChapterIndex = parseInt(chapter_index, 10);
 
     function getReadingPreference(key) {
         return isKindleMode() ? getCookie(key) : localStorage.getItem(key);
@@ -380,9 +365,20 @@ function initScript() {
     var showReadingProgressBar = window.EpubReadingProgress
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
         : getReadingPreference('showReadingProgressBar') !== 'false';
+    var showDesktopChapterSidebar = getReadingPreference('desktopChapterSidebar') === 'true';
     applyReadingProgressBarVisibility(showReadingProgressBar);
 
+    function applyDesktopChapterSidebar() {
+        var isVisible = showDesktopChapterSidebar && !isPaginationMode && !isKindleMode();
+        document.body.classList.toggle('desktop-chapter-sidebar', isVisible);
+        var persistentDrawer = document.getElementById('bookHomeFloating');
+        if (persistentDrawer && !persistentDrawer.classList.contains('active')) {
+            persistentDrawer.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+        }
+    }
+
     var fontSize = "3";
+    var pageWidthPreset = "3";
     var fontFamily = "ebook-default";
     var fontFamilyInput = null;
     var supportedFonts = getAvailableFonts();
@@ -432,6 +428,14 @@ function initScript() {
                 window.epubBrowserCache.font_size = fontSize;
             }
         }
+
+        if (window.epubBrowserCache && window.epubBrowserCache.page_width) {
+            pageWidthPreset = window.epubBrowserCache.page_width;
+        } else {
+            pageWidthPreset = localStorage.getItem('page_width') || "3";
+            if (!window.epubBrowserCache) window.epubBrowserCache = {};
+            window.epubBrowserCache.page_width = pageWidthPreset;
+        }
         
         if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
             fontFamily = window.epubBrowserCache.font_family;
@@ -458,9 +462,12 @@ function initScript() {
         var currentPaginationMode = getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
         fontSize = getCookie('font_size') || "3";
+        pageWidthPreset = getCookie('page_width') || "3";
         fontFamily = getCookie('font_family') || "ebook-default";
         fontFamilyInput = getCookie('font_family_input');
     }
+    updatePageWidth(pageWidthPreset, false);
+    applyDesktopChapterSidebar();
     if (isPaginationMode) {
         updateFontSize(fontSize);
     } else {
@@ -709,7 +716,7 @@ function initScript() {
         progressFill.style.width = p+'%';
     }
     
-    function restoreOriginalContent() {
+    async function restoreOriginalContent() {
         document.body.classList.remove('pagination-mode');
         contentContainer.classList.remove('pagination-mode');
         content.style.height = '';
@@ -733,7 +740,11 @@ function initScript() {
         var mtoc = document.getElementById('mobileTocBtn');
         if (mtoc) mtoc.style.display = 'flex';
         
-        if (isKindleMode() || confirm(i18n.t('reader.exitTurningConfirm'))) {
+        if (isKindleMode() || await window.EpubDialog.confirm({
+            title: i18n.t('reader.exitTurning'),
+            message: i18n.t('reader.exitTurningConfirm'),
+            confirmText: i18n.t('reader.exitTurning')
+        })) {
             location.reload();
         } else {
             enablePaginationMode();
@@ -1199,28 +1210,41 @@ function initScript() {
             showNotification(i18n.t('settings.saved'), 'success');
         });
         
-        saveDefaultBtn.addEventListener('click', function() {
-            if (confirm(i18n.t('settings.saveAsDefaultConfirm'))) {
+        saveDefaultBtn.addEventListener('click', async function() {
+            if (await window.EpubDialog.confirm({
+                title: i18n.t('settings.saveAsDefault'),
+                message: i18n.t('settings.saveAsDefaultConfirm'),
+                confirmText: i18n.t('settings.saveAsDefault')
+            })) {
                 localStorage.setItem(defKey, cssInput.value);
                 showNotification(i18n.t('settings.defaultSaved'), 'success');
             }
         });
         
-        loadDefaultBtn.addEventListener('click', function() {
+        loadDefaultBtn.addEventListener('click', async function() {
             var d = localStorage.getItem(defKey);
             if (!d) {
                 showNotification(i18n.t('settings.noDefault'), 'warning');
                 return;
             }
-            if (confirm(i18n.t('settings.loadDefaultConfirm'))) {
+            if (await window.EpubDialog.confirm({
+                title: i18n.t('settings.loadDefault'),
+                message: i18n.t('settings.loadDefaultConfirm'),
+                confirmText: i18n.t('settings.loadDefault')
+            })) {
                 cssInput.value = d;
                 apply(d);
                 showNotification(i18n.t('settings.loaded'), 'success');
             }
         });
         
-        resetBtn.addEventListener('click', function() {
-            if (confirm(i18n.t('settings.resetConfirm'))) {
+        resetBtn.addEventListener('click', async function() {
+            if (await window.EpubDialog.confirm({
+                title: i18n.t('settings.reset'),
+                message: i18n.t('settings.resetConfirm'),
+                confirmText: i18n.t('settings.reset'),
+                destructive: true
+            })) {
                 cssInput.value = '';
                 localStorage.removeItem(key);
                 apply('');
@@ -1267,25 +1291,41 @@ function initScript() {
                     var item = data[i];
                     var li = document.createElement('li');
                     li.className = 'toc-item toc-level-' + Math.min(item.level, 3);
+                    li.setAttribute('data-chapter-index', item.chapter_index);
                     var a = document.createElement('a');
                     var href = window.EpubBrowserURL.publicPath('/book/' + hash + '/' + item.chapter_file);
                     if (item.anchor) href += '#' + item.anchor;
                     a.href = href;
+                    a.setAttribute('data-chapter-index', item.chapter_index);
                     a.textContent = item.title;
                     a.addEventListener('click', function(e) {
                         e.preventDefault();
+                        var targetIndex = parseInt(this.getAttribute('data-chapter-index'), 10);
+                        var loadedChapter = content.querySelector(
+                            '.continuous-chapter[data-chapter-index="' + targetIndex + '"]'
+                        );
+                        if (isContinuousScroll && loadedChapter) {
+                            var target = loadedChapter;
+                            if (this.hash) {
+                                var anchorId = decodeURIComponent(this.hash.substring(1));
+                                var anchoredElements = loadedChapter.querySelectorAll('[id]');
+                                for (var j = 0; j < anchoredElements.length; j++) {
+                                    if (anchoredElements[j].id === anchorId) {
+                                        target = anchoredElements[j];
+                                        break;
+                                    }
+                                }
+                            }
+                            var targetTop = target.getBoundingClientRect().top + window.scrollY - 80;
+                            window.scrollTo({top: targetTop, behavior: 'smooth'});
+                            return;
+                        }
                         window.location.href = this.href;
                     });
                     li.appendChild(a);
                     list.appendChild(li);
                 }
-                var cur = path.split('/').pop();
-                var active = list.querySelector('a[href*="' + cur + '"]');
-                if (active) {
-                    var p = active.parentElement;
-                    p.classList.add('active');
-                    list.scrollTop = p.offsetTop - 150;
-                }
+                setBookTocActiveChapter(visibleChapterIndex, true);
             } else {
                 list.innerHTML = '<li class="toc-item"></li>';
                 list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
@@ -1296,6 +1336,30 @@ function initScript() {
             list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
         };
         xhr.send();
+    }
+
+    function setBookTocActiveChapter(index, keepVisible) {
+        var list = document.getElementById('bookHomeTocList');
+        if (!list) return;
+        var active = list.querySelector('.toc-item[data-chapter-index="' + index + '"]');
+        if (!active) return;
+        list.querySelectorAll('.toc-item.active').forEach(function(item) {
+            item.classList.remove('active');
+            var link = item.querySelector('a');
+            if (link) link.removeAttribute('aria-current');
+        });
+        active.classList.add('active');
+        var activeLink = active.querySelector('a');
+        if (activeLink) {
+            activeLink.setAttribute('aria-current', 'location');
+        }
+        if (keepVisible !== false) {
+            var itemTop = active.offsetTop;
+            var itemBottom = itemTop + active.offsetHeight;
+            if (itemTop < list.scrollTop || itemBottom > list.scrollTop + list.clientHeight) {
+                list.scrollTop = Math.max(0, itemTop - list.clientHeight / 2);
+            }
+        }
     }
     
     if (!isKindleMode()) {
@@ -1413,6 +1477,8 @@ function initScript() {
     var tocClose = document.getElementById('tocClose');
     var bookHomeClose = document.getElementById('bookHomeClose');
     var tocList = document.getElementById('tocList');
+    var readerDrawerBackdrop = document.getElementById('readerDrawerBackdrop');
+    var readerDrawerOpener = null;
     
     generateToc();
     
@@ -1423,42 +1489,88 @@ function initScript() {
     }
 
     function bookHomeFloatingScrolling() {
-        var list = document.getElementById('bookHomeTocList');
-        var cur = window.location.pathname.split('/').pop();
-        var a = list.querySelector('a[href*="' + cur + '"]');
-        if (a) {
-            var li = a.parentElement;
-            list.querySelectorAll('.toc-item').forEach(function(i) { i.classList.remove('active'); });
-            li.classList.add('active');
-            list.scrollTop = li.offsetTop - 150;
-        }
+        setBookTocActiveChapter(visibleChapterIndex, true);
     }
-    
+
+    function isPersistentBookDrawer(panel) {
+        return panel === bookHomeFloating &&
+            document.body.classList.contains('desktop-chapter-sidebar') &&
+            window.innerWidth >= 1360;
+    }
+
+    function closeReaderDrawers(restoreFocus) {
+        [tocFloating, bookHomeFloating].forEach(function(panel) {
+            panel.classList.remove('active');
+            panel.setAttribute('aria-hidden', isPersistentBookDrawer(panel) ? 'false' : 'true');
+        });
+        [tocToggle, bookHomeToggle].forEach(function(toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+        });
+        [mobileTocBtn, mobileBookHomeBtn].forEach(function(toggle) {
+            if (toggle) toggle.classList.remove('active');
+        });
+        document.body.classList.remove('reader-drawer-open');
+        readerDrawerBackdrop.classList.remove('is-active');
+        readerDrawerBackdrop.setAttribute('aria-hidden', 'true');
+        if (restoreFocus && readerDrawerOpener) readerDrawerOpener.focus();
+        readerDrawerOpener = null;
+    }
+
+    function openReaderDrawer(panel, toggle, mobileToggle, afterOpen, opener) {
+        if ((toggle && toggle.disabled) || (opener && opener.disabled)) return;
+        if (isPersistentBookDrawer(panel)) {
+            afterOpen();
+            return;
+        }
+        if (panel.classList.contains('active')) {
+            closeReaderDrawers(true);
+            return;
+        }
+        closeReaderDrawers(false);
+        readerDrawerOpener = opener || toggle;
+        panel.classList.add('active');
+        panel.setAttribute('aria-hidden', 'false');
+        toggle.setAttribute('aria-expanded', 'true');
+        if (mobileToggle) mobileToggle.classList.add('active');
+        document.body.classList.add('reader-drawer-open');
+        readerDrawerBackdrop.classList.add('is-active');
+        readerDrawerBackdrop.setAttribute('aria-hidden', 'false');
+        afterOpen();
+        window.requestAnimationFrame(function() {
+            var closeButton = panel.querySelector('.toc-close');
+            if (closeButton) closeButton.focus();
+        });
+    }
+
+    if (window.EpubReaderLayout) {
+        window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll);
+    }
+
     tocToggle.addEventListener('click', function() {
-        tocFloating.classList.toggle('active');
-        tocFloatingScrolling();
+        openReaderDrawer(tocFloating, tocToggle, mobileTocBtn, tocFloatingScrolling, tocToggle);
     });
     bookHomeToggle.addEventListener('click', function() {
-        bookHomeFloating.classList.toggle('active');
-        if (bookHomeFloating.classList.contains('active')) bookHomeFloatingScrolling();
+        openReaderDrawer(bookHomeFloating, bookHomeToggle, mobileBookHomeBtn, bookHomeFloatingScrolling, bookHomeToggle);
     });
     mobileTocBtn.addEventListener('click', function() {
-        tocFloating.classList.toggle('active');
-        tocFloatingScrolling();
-        mobileTocBtn.classList.toggle('active');
+        openReaderDrawer(tocFloating, tocToggle, mobileTocBtn, tocFloatingScrolling, mobileTocBtn);
     });
     mobileBookHomeBtn.addEventListener('click', function() {
-        bookHomeFloating.classList.toggle('active');
-        mobileBookHomeBtn.classList.toggle('active');
-        if (bookHomeFloating.classList.contains('active')) bookHomeFloatingScrolling();
+        openReaderDrawer(bookHomeFloating, bookHomeToggle, mobileBookHomeBtn, bookHomeFloatingScrolling, mobileBookHomeBtn);
     });
     tocClose.addEventListener('click', function() {
-        tocFloating.classList.remove('active');
-        mobileTocBtn.classList.remove('active');
+        closeReaderDrawers(true);
     });
     bookHomeClose.addEventListener('click', function() {
-        bookHomeFloating.classList.remove('active');
-        mobileBookHomeBtn.classList.remove('active');
+        closeReaderDrawers(true);
+    });
+    readerDrawerBackdrop.addEventListener('click', function() {
+        closeReaderDrawers(true);
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && document.body.classList.contains('reader-drawer-open')) {
+            closeReaderDrawers(true);
+        }
     });
     
     function generateToc() {
@@ -1498,8 +1610,7 @@ function initScript() {
                 } else {
                     window.scrollTo({top: t.offsetTop-100, behavior:'smooth'});
                 }
-                tocFloating.classList.remove('active');
-                if (mobileTocBtn) mobileTocBtn.classList.remove('active');
+                closeReaderDrawers(false);
             });
             li.appendChild(a);
             tocList.appendChild(li);
@@ -1529,10 +1640,23 @@ function initScript() {
     }
     
     var scrollTopBtn = document.getElementById('scrollToTopBtn');
+    var mobileTopBtn = document.getElementById('mobileTopBtn');
     scrollTopBtn.addEventListener('click', function() {
         window.scrollTo(0,0);
     });
-    var mobileTopBtn = document.getElementById('mobileTopBtn');
+    function updateScrollToTopVisibility() {
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
+        if (scrollTop > threshold && !document.body.classList.contains('pagination-mode')) {
+            scrollTopBtn.classList.add('is-visible');
+            mobileTopBtn.classList.add('is-visible');
+        } else {
+            scrollTopBtn.classList.remove('is-visible');
+            mobileTopBtn.classList.remove('is-visible');
+        }
+    }
+    window.addEventListener('scroll', updateScrollToTopVisibility);
+    updateScrollToTopVisibility();
     mobileTopBtn.addEventListener('click', function() {
         window.scrollTo(0,0);
     });
@@ -1567,6 +1691,7 @@ function initScript() {
     var customFontInput = document.getElementById('customFontInput');
     var applyFontSettings = document.getElementById('applyFontSettings');
     var settingsTabs = document.querySelectorAll('.settings-tab');
+    var settingsOpener = null;
 
     fontFamilySelect.addEventListener('change', function() {
         if (this.value === 'custom') {
@@ -1603,36 +1728,51 @@ function initScript() {
         }
     });
     
-    function showSettingsModal() {
+    function showSettingsModal(opener) {
+        closeReaderDrawers(false);
+        settingsOpener = opener;
         settingsModal.classList.add('show');
+        settingsModal.setAttribute('aria-hidden', 'false');
         settingsOverlay.classList.add('show');
-        document.body.style.overflow = 'hidden';
+        settingsOverlay.setAttribute('aria-hidden', 'false');
+        settingsControlBtn.setAttribute('aria-expanded', 'true');
+        mobileSettingsBtn.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('reader-drawer-open');
+        window.requestAnimationFrame(function() {
+            settingsCloseBtn.focus();
+        });
     }
 
-    function hideSettingsModal() {
+    function hideSettingsModal(restoreFocus) {
         settingsModal.classList.remove('show');
+        settingsModal.setAttribute('aria-hidden', 'true');
         settingsOverlay.classList.remove('show');
-        document.body.style.overflow = '';
+        settingsOverlay.setAttribute('aria-hidden', 'true');
+        settingsControlBtn.setAttribute('aria-expanded', 'false');
+        mobileSettingsBtn.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('reader-drawer-open');
+        if (restoreFocus && settingsOpener) settingsOpener.focus();
+        settingsOpener = null;
     }
 
     settingsControlBtn.addEventListener('click', function() {
-        showSettingsModal();
+        showSettingsModal(settingsControlBtn);
     });
     mobileSettingsBtn.addEventListener('click', function() {
-        showSettingsModal();
+        showSettingsModal(mobileSettingsBtn);
     });
 
     settingsOverlay.addEventListener('click', function() {
-        hideSettingsModal();
+        hideSettingsModal(true);
     });
 
     settingsCloseBtn.addEventListener('click', function() {
-        hideSettingsModal();
+        hideSettingsModal(true);
     });
 
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && settingsModal.classList.contains('show')) {
-            hideSettingsModal();
+            hideSettingsModal(true);
         }
     });
 
@@ -1661,6 +1801,32 @@ function initScript() {
         content.classList.add('font-size-' + size);
     }
 
+    function updatePageWidth(preset, reflowPagination) {
+        if (!window.EpubReaderLayout) return;
+        pageWidthPreset = window.EpubReaderLayout.applyPageWidth(
+            document.documentElement,
+            preset
+        );
+        var labels = {
+            '1': 'settings.pageWidthNarrow',
+            '2': 'settings.pageWidthComfortable',
+            '3': 'settings.pageWidthWide',
+            '4': 'settings.pageWidthExtraWide'
+        };
+        var translatedLabel = i18n.t(labels[pageWidthPreset]);
+        var slider = document.getElementById('pageWidthSlider');
+        if (slider) {
+            slider.value = pageWidthPreset;
+            slider.setAttribute('aria-valuetext', translatedLabel);
+        }
+        if (reflowPagination && isPaginationMode) {
+            window.requestAnimationFrame(function() {
+                calculateTotalPages();
+                showPage(Math.min(currentPage, totalPages - 1));
+            });
+        }
+    }
+
     var fontSizeSlider = document.getElementById('fontSizeSlider');
     if (fontSizeSlider) {
         fontSizeSlider.addEventListener('input', function() {
@@ -1668,6 +1834,17 @@ function initScript() {
             if (!isKindleMode()) localStorage.setItem('font_size', s);
             else setCookie('font_size', s);
             updateFontSize(s);
+        });
+    }
+
+    var pageWidthSlider = document.getElementById('pageWidthSlider');
+    if (pageWidthSlider) {
+        pageWidthSlider.addEventListener('input', function() {
+            pageWidthPreset = window.EpubReaderLayout.normalizePageWidth(this.value);
+            setReadingPreference('page_width', pageWidthPreset);
+            if (!window.epubBrowserCache) window.epubBrowserCache = {};
+            window.epubBrowserCache.page_width = pageWidthPreset;
+            updatePageWidth(pageWidthPreset, true);
         });
     }
     
@@ -1688,8 +1865,6 @@ function initScript() {
     });
 
     function bookshelfSupport() {
-        var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {
@@ -1793,7 +1968,6 @@ function initScript() {
     }
 
     function updateContinuousReadingChapter() {
-        if (!readingProgressReporter) return;
         var elements = content.querySelectorAll('.continuous-chapter');
         var sections = [];
         for (var i = 0; i < elements.length; i++) {
@@ -1804,11 +1978,16 @@ function initScript() {
                 bottom: bounds.bottom
             });
         }
-        var currentIdx = window.EpubReadingProgress.activeChapter(sections, window.innerHeight / 2);
+        var currentIdx = window.EpubReadingProgress
+            ? window.EpubReadingProgress.activeChapter(sections, window.innerHeight / 2)
+            : NaN;
         if (isNaN(currentIdx)) return;
+        if (currentIdx === visibleChapterIndex) return;
+        visibleChapterIndex = currentIdx;
         localStorage.setItem(book_hash, 'eb_ci_' + currentIdx);
         updateContinuousScrollUrl(currentIdx);
         selectReadingChapter(currentIdx);
+        setBookTocActiveChapter(currentIdx, true);
     }
     
     function getChapterUrl(idx) {
@@ -1859,9 +2038,7 @@ function initScript() {
                 
                 if (chapterContent) {
                     // 提取章节标题
-                    var chapterTitle = '';
-                    var titleEl = tempDiv.querySelector('.breadcrumb-current');
-                    if (titleEl) chapterTitle = titleEl.textContent.trim();
+                    var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
                     if (!chapterTitle) {
                         var pageTitle = tempDiv.querySelector('title');
                         if (pageTitle) {
@@ -1957,9 +2134,7 @@ function initScript() {
                 if (loaderEl) loaderEl.remove();
                 
                 if (chapterContent) {
-                    var chapterTitle = '';
-                    var titleEl = tempDiv.querySelector('.breadcrumb-current');
-                    if (titleEl) chapterTitle = titleEl.textContent.trim();
+                    var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
                     if (!chapterTitle) {
                         var pageTitle = tempDiv.querySelector('title');
                         if (pageTitle) {
@@ -2065,12 +2240,25 @@ function initScript() {
     var continuousScrollToggle = document.getElementById('continuousScrollToggle');
     var continuousScrollTip = document.getElementById('continuousScrollTip');
     var showReadingProgressBarToggle = document.getElementById('showReadingProgressBarToggle');
+    var desktopChapterSidebarToggle = document.getElementById('desktopChapterSidebarToggle');
     if (showReadingProgressBarToggle) {
         showReadingProgressBarToggle.checked = showReadingProgressBar;
         showReadingProgressBarToggle.addEventListener('change', function() {
             showReadingProgressBar = this.checked;
             setReadingPreference('showReadingProgressBar', showReadingProgressBar ? 'true' : 'false');
             applyReadingProgressBarVisibility(showReadingProgressBar);
+        });
+    }
+    if (desktopChapterSidebarToggle) {
+        desktopChapterSidebarToggle.checked = showDesktopChapterSidebar;
+        desktopChapterSidebarToggle.addEventListener('change', function() {
+            showDesktopChapterSidebar = this.checked;
+            setReadingPreference(
+                'desktopChapterSidebar',
+                showDesktopChapterSidebar ? 'true' : 'false'
+            );
+            applyDesktopChapterSidebar();
+            if (showDesktopChapterSidebar) setBookTocActiveChapter(visibleChapterIndex, true);
         });
     }
     if (continuousScrollToggle) {
@@ -2098,6 +2286,9 @@ function initScript() {
             }
             
             isContinuousScroll = this.checked;
+            if (window.EpubReaderLayout) {
+                window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll);
+            }
             if (!isKindleMode()) {
                 localStorage.setItem('continuousScroll', isContinuousScroll ? 'true' : 'false');
             } else {

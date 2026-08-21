@@ -15,8 +15,8 @@ The first release provides:
 - one local account associated with zero or more external identities;
 - `admin` and `member` roles, user administration, password reset, and
   restricted-book grants;
-- transactional migration of existing server user data to the bootstrap
-  administrator;
+- transactional migration of existing server user data to the pending initial
+  administrator, whose stable ID is completed by web or unattended setup;
 - an SSG mode that remains completely static and has no account dependency.
 
 It does not provide public registration, email delivery, direct OAuth/OIDC
@@ -28,12 +28,12 @@ a trusted reverse proxy; that proxy performs the provider-specific protocol.
 
 | Area | Decision |
 | --- | --- |
-| Account creation | The first Server startup creates an administrator from deployment credentials. Afterwards only administrators create users. |
+| Account creation | A new Server starts in one-time setup-only mode. The first valid web submission atomically activates the pending administrator and signs it in; optional deployment credentials perform the same transition unattended. Afterwards only administrators create users. |
 | Login methods | Local password and trusted-proxy identity methods coexist and can be linked to one account. |
 | Unrecognized SSO identity | It may be linked to an existing account only after that account's password is verified; an administrator may also link it. |
 | Password recovery | An administrator resets passwords; no SMTP service is included. |
 | Library access | All authenticated accounts can read normally visible books. Administrators may restrict an individual book to selected accounts. |
-| Existing user data | All legacy annotations, bookshelves, and progress rows become data of the bootstrap administrator. |
+| Existing user data | All legacy annotations, bookshelves, and progress rows become data of one inactive pending administrator; setup preserves that user ID while assigning its chosen login. |
 | Session lifetime | Browser sessions have a 30-day sliding expiry and may be revoked by the user or an administrator. |
 
 ## Components and boundaries
@@ -57,13 +57,21 @@ Annotations, reading progress, and bookshelves gain `user_id` ownership.
 Their legacy `username` values are retained only during compatibility migration
 and must not participate in authorization after the migration.
 
-All migration work happens in one SQLite `BEGIN IMMEDIATE` transaction.  The
-existing verified database-backup process runs before opening that transaction.
-For an existing database, initialization first creates the bootstrap
-administrator, then assigns every legacy data row to it and rebuilds any
-username-based primary keys or indexes using `user_id`.  A failed migration
-rolls back and leaves the backed-up original database available; startup fails
-closed.
+All migration work happens in one SQLite `BEGIN IMMEDIATE` transaction. The
+verified database-backup process runs before opening that transaction. A root
+legacy database is upgraded through a temporary copy. Before an authoritative
+`data/epub-browser.db` at an older supported schema is upgraded in place, it is
+integrity-checked and copied to `data/backups/`; the copy is digest-verified and
+integrity-checked. A backup failure leaves the authoritative database bytes and
+schema unchanged, while a current-schema restart creates no repeated backup.
+For an existing database without an administrator, initialization creates one
+inactive pending administrator with a generated stable `user_id`, then assigns
+every legacy data row to it and rebuilds any username-based primary keys or
+indexes using `user_id`. The pending row has no usable password and does not
+count as a completed administrator. Web or unattended setup atomically assigns
+the chosen normalized username, password hash, enabled state, and initial
+session to that same row. A failed migration rolls back and leaves the
+backed-up original database available; startup fails closed.
 
 ### Authentication service
 
@@ -85,8 +93,10 @@ The application never reads `X-Username`.  A proxy identity is honored only
 when both of these are configured: a trusted source address range and an
 identity-header definition.  The configured issuer is part of the identity
 key, and a proxy-supplied display name is never used as a key.  Requests from
-any other peer ignore forwarded identity headers.  This prevents a direct
-client from forging an SSO login.
+any other peer ignore forwarded identity headers. Uvicorn forwarded-address
+rewriting is disabled: the CIDR check always uses the direct socket peer and
+never `X-Forwarded-For`, `Forwarded`, or `FORWARDED_ALLOW_IPS`. This prevents a
+direct client from forging an SSO login.
 
 ### Authorization service
 
@@ -105,14 +115,36 @@ the principal can access, so direct URLs cannot bypass the catalog filter.
 
 ## User-facing flows
 
-### Bootstrap and local login
+### Setup, unattended bootstrap, and local login
 
-On the first persistent Server start, the deployment must provide
-`EPUB_BROWSER_ADMIN_USERNAME` and one of
+On the first persistent Server start, no deployment secret is required. The
+Server exposes a localized English/Simplified Chinese `/setup` form for a
+username, password, confirmation, and locale. Until the setup transaction
+completes, normal HTML redirects to `/setup`; APIs, SSE, book resources, and
+generated static assets return a setup-required response without content.
+Health and readiness return only a minimal setup-required status. Library
+scanning waits, no generated library content becomes externally usable, and
+trusted-proxy assertions are ignored for account claiming.
+
+The first valid concurrent submission wins, activates exactly the one pending
+administrator, inserts its initial session in the same transaction, and enters
+the library. A later submission follows the setup-complete/login path. The
+deployment must complete setup before exposing the port to untrusted visitors,
+because the first visitor can otherwise claim the administrator account.
+
+Every setup page load generates a high-entropy nonce, embeds it in the form,
+and sets the matching short-lived `HttpOnly`, `SameSite=Strict` setup cookie.
+Setup submission requires a constant-time nonce match. Origin/Host and
+`Sec-Fetch-Site` validation reject cross-origin claims with the same generic
+response before and after setup, and the setup cookie is cleared when setup
+completes.
+
+Unattended deployments may provide `EPUB_BROWSER_ADMIN_USERNAME` and one of
 `EPUB_BROWSER_ADMIN_PASSWORD_FILE` (preferred) or
-`EPUB_BROWSER_ADMIN_PASSWORD`.  The password file supports a Docker/Kubernetes
-secret mount.  If the database has no administrator and these values are
-absent or invalid, startup fails with a credential-free configuration error.
+`EPUB_BROWSER_ADMIN_PASSWORD`. The password file supports a Docker/Kubernetes
+secret mount and completes the same pending row. A partial or invalid
+unattended configuration fails closed. Once a completed administrator exists,
+restarts do not read or require a bootstrap secret.
 
 The login page posts local credentials over the same origin.  A successful
 login creates a session and redirects to the originally requested safe path.
@@ -158,7 +190,8 @@ public contract contains these operations:
   session revocation;
 - administrator book visibility and grant management.
 
-Unauthenticated HTML requests redirect to login.  Unauthenticated API and SSE
+Before initial setup, normal HTML requests redirect to setup and content/API
+requests return `503 setup_required`. Afterwards, unauthenticated HTML requests redirect to login. Unauthenticated API and SSE
 requests return `401`; unauthorized book/API requests return `403` without
 leaking restricted-book metadata.  Session expiry, logout, disablement, and
 revocation all invalidate subsequent API requests immediately.  CSRF failure
@@ -172,33 +205,41 @@ bootstrap username/password source, cookie security/public URL behavior,
 trusted-proxy CIDRs, proxy subject/display-name header names, and proxy issuer.
 Authentication configuration is rejected for SSG rather than silently ignored.
 
-Docker documentation provides a secure example that mounts the Server data
-directory and an administrator-password secret, runs behind TLS, and configures
-the reverse-proxy trust boundary.  Documentation explicitly states that merely
-setting a forwarding header is insufficient: the Uvicorn port must not be
-directly reachable by untrusted clients when proxy authentication is enabled.
+Docker documentation provides an interactive example with a persistent Server
+data directory and an optional unattended example with a mounted administrator
+password secret. Both use `--watch`. The service stays private until setup is
+complete; remote deployments run behind TLS and configure the reverse-proxy
+trust boundary. Merely setting a forwarding header is insufficient: the
+Uvicorn port must not be directly reachable by untrusted clients when proxy
+authentication is enabled.
 
 ## Compatibility
 
 SSG emits no login, account, administration, proxy, session, or authentication
-API behavior.  Its annotations and reading progress remain browser-local.
+API behavior. Its annotations and reading progress remain browser-local. Server
+annotations always use the authenticated account's database storage; deployment
+mode determines the adapter and the reader does not offer a storage selector.
 
 The Server migration is intentionally a breaking security change: it no longer
 accepts username identity supplied by JavaScript, local storage, or clients.
 Existing browser data is not deleted, but only server-resident data migrates to
-the bootstrap administrator.  Existing manual bookshelf sync begins operating
-under the authenticated session after users log in.
+the pending administrator that setup completes. Existing manual bookshelf sync begins operating
+under the authenticated session after users log in. Legacy bookshelf JSON is
+considered only by startup migration, which selects the highest valid record
+for the pending administrator without treating the filename username as an
+account identity; request-time Sync never scans legacy files.
 
 ## Error handling and observability
 
-- Bootstrap misconfiguration, unsupported newer database schema, migration
+- Partial unattended-bootstrap configuration, unsupported newer database schema, migration
   failure, and password-hash corruption fail startup closed.
 - Repeated login failures receive rate limiting without revealing whether a
   username exists.
 - Login and identity-link errors are deliberately generic to callers but have
   safe operational log entries when `--log` is enabled.
 - Health and readiness endpoints require authentication too; they expose no
-  user, identity, or secret state.
+  user, identity, or secret state. Before setup they expose only the minimal
+  setup-required status.
 - Disabling an account revokes all its sessions in the same transaction.
 
 ## Test strategy
@@ -214,21 +255,25 @@ Unit and integration coverage will verify:
 4. catalog and direct-file authorization for normal and restricted books,
    including covers, resources, reader HTML, APIs, and SSE;
 5. transactional migration of annotations, bookshelf rows, progress, and
-   existing database backups, with rollback on injected failure;
-6. i18n coverage and browser behavior for login/account/admin interfaces;
-7. regression checks that SSG produces no account controls, no authentication
+   existing database backups to a stable pending administrator ID, with
+   rollback on injected failure;
+6. one-time setup concurrency, setup-only routing, proxy non-claiming, and
+   deferred library publication using unit and in-process ASGI/runtime tests;
+7. i18n coverage and browser behavior for setup/login/account/admin interfaces;
+8. regression checks that SSG produces no account controls, no authentication
    calls, and no dependency on `epub_browser_username`.
 
 ## Acceptance criteria
 
 - An unauthenticated request cannot read Server content or impersonate another
   user with `X-Username`.
-- A newly bootstrapped administrator can create a member, reset its password,
+- A newly configured administrator, whether claimed through web setup or
+  completed from an unattended secret, can create a member, reset its password,
   restrict a book, grant that member access, and revoke access again.
 - A configured trusted SSO identity can be linked to a local account; the same
   asserted identity cannot be attached to two accounts.
-- Existing server-resident annotations, bookshelf state, and progress are
-  present under the bootstrap administrator after migration.
+- Existing server-resident annotations, bookshelf state, and progress remain
+  attached to the pending administrator's stable ID after setup.
 - A restricted book is inaccessible by catalog omission and direct resource
   URLs to an unauthorized account.
 - SSG behavior, output, and local annotation/progress storage remain unchanged.

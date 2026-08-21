@@ -14,6 +14,7 @@ import urllib.parse
 import minify_html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 
 from .asset_publisher import AssetPublisher, rewrite_asset_urls
@@ -21,6 +22,516 @@ from .models import BookMetadata, ConvertedBook
 from .reporting import Reporter
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
+
+SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
+SERVER_OUTPUT_REVISION = "reader-initial-layout-v17"
+
+SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
+    "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
+    "jpg", "m4a", "m4v", "mp3", "mp4", "mpeg", "mpg", "oga", "ogg",
+    "ogv", "opus", "otf", "png", "svg", "ttf", "wav", "webm", "webp",
+    "woff", "woff2",
+})
+_GENERATED_READER_PAGE = re.compile(r"^(?:index|chapter_[0-9]+)\.html$")
+
+
+def server_book_public_path_allowed(relative_path):
+    """Return whether a Server book path is generated or a passive resource."""
+    candidate = PurePosixPath(str(relative_path or ""))
+    if candidate.is_absolute() or ".." in candidate.parts:
+        return False
+    parts = candidate.parts
+    if len(parts) == 1:
+        return parts[0] == "toc.json" or bool(
+            _GENERATED_READER_PAGE.fullmatch(parts[0])
+        )
+    if len(parts) < 2 or parts[0] != "resources":
+        return False
+    suffix = candidate.suffix.casefold().lstrip(".")
+    return suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+
+
+_SAFE_HTML_TAGS = frozenset({
+    "a", "abbr", "address", "article", "aside", "b", "bdi", "bdo",
+    "blockquote", "br", "caption", "cite", "code", "col", "colgroup",
+    "dd", "del", "details", "dfn", "div", "dl", "dt", "em",
+    "figcaption", "figure", "footer", "h1", "h2", "h3", "h4", "h5",
+    "h6", "header", "hr", "i", "img", "ins", "kbd", "li", "main",
+    "mark", "nav", "ol", "p", "pre", "q", "rp", "rt", "ruby", "s",
+    "samp", "section", "small", "span", "strong", "sub", "summary",
+    "sup", "table", "tbody", "td", "tfoot", "th", "thead", "time",
+    "tr", "u", "ul", "var", "wbr", "audio", "video", "source",
+})
+_VOID_HTML_TAGS = frozenset({"br", "col", "hr", "img", "source", "wbr"})
+_DROP_HTML_CONTENT_TAGS = frozenset({
+    "applet", "base", "button", "canvas", "embed", "form", "iframe",
+    "input", "math", "meta", "object", "option", "script", "select",
+    "style", "svg", "template", "textarea",
+})
+_GLOBAL_HTML_ATTRIBUTES = frozenset({
+    "class", "dir", "id", "lang", "role", "title", "xml:lang",
+})
+_TAG_HTML_ATTRIBUTES = {
+    "a": frozenset({"href"}),
+    "audio": frozenset({"controls", "loop", "muted", "preload", "src"}),
+    "col": frozenset({"span"}),
+    "colgroup": frozenset({"span"}),
+    "img": frozenset({"alt", "height", "loading", "src", "width"}),
+    "li": frozenset({"value"}),
+    "ol": frozenset({"reversed", "start", "type"}),
+    "source": frozenset({"src", "type"}),
+    "td": frozenset({"colspan", "headers", "rowspan"}),
+    "th": frozenset({"colspan", "headers", "rowspan", "scope"}),
+    "time": frozenset({"datetime"}),
+    "video": frozenset({
+        "controls", "height", "loop", "muted", "poster", "preload", "src",
+        "width",
+    }),
+}
+_URL_HTML_ATTRIBUTES = frozenset({"href", "poster", "src"})
+_SAFE_LINK_SCHEMES = frozenset({"http", "https", "mailto", "tel"})
+_SAFE_MEDIA_SCHEMES = frozenset({"http", "https"})
+_SAFE_DATA_IMAGE = re.compile(
+    r"^data:image/(?:gif|jpe?g|png|webp);base64,[a-z0-9+/=\s]+$",
+    re.IGNORECASE,
+)
+_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_CSS_ESCAPE = re.compile(r"\\(?:([0-9a-fA-F]{1,6})\s?|([^\r\n]))")
+_RISKY_CSS = re.compile(
+    r"(?:@import|@namespace|expression\s*\(|javascript\s*:|behavior\s*:|"
+    r"-moz-binding|(?:-webkit-)?image-set\s*\()",
+    re.IGNORECASE,
+)
+_CSS_DECLARATION_AT_RULES = frozenset({
+    "counter-style", "font-face", "page", "property",
+})
+_CSS_GROUP_AT_RULES = frozenset({
+    "container", "keyframes", "layer", "media", "scope", "supports",
+    "-webkit-keyframes",
+})
+_SVG_NAMESPACE = "http://www.w3.org/2000/svg"
+_SAFE_SVG_TAGS = frozenset({
+    "circle", "clipPath", "defs", "desc", "ellipse", "g", "line",
+    "linearGradient", "mask", "path", "polygon", "polyline", "radialGradient",
+    "rect", "stop", "svg", "symbol", "text", "title", "tspan",
+})
+_SAFE_SVG_ATTRIBUTES = frozenset({
+    "class", "clip-path", "cx", "cy", "d", "dominant-baseline", "dx", "dy",
+    "fill", "fill-opacity", "fill-rule", "font-family", "font-size",
+    "font-style", "font-weight", "gradientTransform", "gradientUnits", "height",
+    "id", "line-height", "mask", "offset", "opacity", "pathLength", "points",
+    "preserveAspectRatio", "r", "rotate", "rx", "ry", "spreadMethod", "stop-color",
+    "stop-opacity", "stroke", "stroke-dasharray", "stroke-dashoffset",
+    "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-opacity",
+    "stroke-width", "text-anchor", "transform", "viewBox", "width", "x", "x1",
+    "x2", "y", "y1", "y2",
+})
+
+
+def _safe_html_url(tag, attribute, value):
+    if not isinstance(value, str):
+        return None
+    candidate = html.unescape(value).strip()
+    if not candidate or any(ord(character) < 32 for character in candidate):
+        return None
+    if candidate.startswith("#"):
+        return candidate
+    parsed = urllib.parse.urlsplit(candidate)
+    scheme = parsed.scheme.casefold()
+    if not scheme:
+        resource_path = PurePosixPath(parsed.path)
+        suffix = resource_path.suffix.casefold().lstrip(".")
+        if attribute in {"src", "poster"}:
+            return (
+                candidate
+                if suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+                else None
+            )
+        if attribute == "href" and suffix:
+            if _GENERATED_READER_PAGE.fullmatch(resource_path.name):
+                return candidate
+            return (
+                candidate
+                if suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+                else None
+            )
+        return candidate
+    if attribute == "href" and scheme in _SAFE_LINK_SCHEMES:
+        return candidate
+    if attribute in {"src", "poster"}:
+        if scheme in _SAFE_MEDIA_SCHEMES:
+            return candidate
+        if tag == "img" and _SAFE_DATA_IMAGE.fullmatch(candidate):
+            return candidate
+    return None
+
+
+class _EPUBHTMLSanitizer(HTMLParser):
+    """Serialize a conservative, inert fragment from untrusted EPUB markup."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.output = []
+        self._suppressed = []
+
+    @staticmethod
+    def _tag_name(tag):
+        return str(tag or "").casefold().rsplit(":", 1)[-1]
+
+    def handle_starttag(self, tag, attrs):
+        name = self._tag_name(tag)
+        if self._suppressed:
+            if name in _DROP_HTML_CONTENT_TAGS:
+                self._suppressed.append(name)
+            return
+        if name in _DROP_HTML_CONTENT_TAGS:
+            self._suppressed.append(name)
+            return
+        if name not in _SAFE_HTML_TAGS:
+            return
+        allowed = _TAG_HTML_ATTRIBUTES.get(name, frozenset())
+        serialized = []
+        for raw_name, raw_value in attrs:
+            attribute = str(raw_name or "").casefold()
+            if attribute.startswith("on") or attribute in {"srcdoc", "formaction"}:
+                continue
+            if attribute == "style":
+                safe_style = sanitize_css_declarations(raw_value)
+                if safe_style:
+                    serialized.append(
+                        " style=\"{}\"".format(html.escape(safe_style, quote=True))
+                    )
+                continue
+            if not (
+                attribute in _GLOBAL_HTML_ATTRIBUTES
+                or attribute in allowed
+                or attribute.startswith("aria-")
+                or attribute.startswith("data-")
+            ):
+                continue
+            value = attribute if raw_value is None else str(raw_value)
+            if attribute in _URL_HTML_ATTRIBUTES:
+                value = _safe_html_url(name, attribute, value)
+                if value is None:
+                    continue
+            serialized.append(
+                " {}=\"{}\"".format(attribute, html.escape(value, quote=True))
+            )
+        self.output.append("<{}{}>".format(name, "".join(serialized)))
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        name = self._tag_name(tag)
+        if self._suppressed:
+            if name == self._suppressed[-1]:
+                self._suppressed.pop()
+            return
+        if name in _SAFE_HTML_TAGS and name not in _VOID_HTML_TAGS:
+            self.output.append("</{}>".format(name))
+
+    def handle_data(self, data):
+        if not self._suppressed:
+            self.output.append(html.escape(data, quote=False))
+
+    def handle_entityref(self, name):
+        if not self._suppressed:
+            self.output.append("&{};".format(name))
+
+    def handle_charref(self, name):
+        if not self._suppressed:
+            self.output.append("&#{};".format(name))
+
+    def fragment(self):
+        return "".join(self.output)
+
+
+class _MetadataTextParser(HTMLParser):
+    """Extract display text from metadata before context-specific escaping."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.output = []
+
+    def handle_data(self, data):
+        self.output.append(data)
+
+
+def metadata_text(value):
+    parser = _MetadataTextParser()
+    parser.feed(str(value or ""))
+    parser.close()
+    return "".join(parser.output)
+
+
+def sanitize_html_fragment(content):
+    sanitizer = _EPUBHTMLSanitizer()
+    sanitizer.feed(str(content or ""))
+    sanitizer.close()
+    return sanitizer.fragment()
+
+
+def _decode_css_escapes(content):
+    def replace(match):
+        if match.group(1):
+            try:
+                codepoint = int(match.group(1), 16)
+                return chr(codepoint) if codepoint else "\ufffd"
+            except (OverflowError, ValueError):
+                return "\ufffd"
+        return match.group(2) or ""
+
+    return _CSS_ESCAPE.sub(replace, str(content or ""))
+
+
+def _safe_css_url(value):
+    candidate = html.unescape(_decode_css_escapes(value)).strip()
+    if len(candidate) >= 2 and candidate[0] == candidate[-1] \
+            and candidate[0] in {'"', "'"}:
+        candidate = candidate[1:-1].strip()
+    if not candidate or any(ord(character) < 32 for character in candidate):
+        return False
+    if candidate.startswith("#"):
+        return True
+    if candidate.casefold().startswith("data:"):
+        return bool(_SAFE_DATA_IMAGE.fullmatch(candidate))
+    parsed = urllib.parse.urlsplit(candidate)
+    if parsed.scheme or parsed.netloc or candidate.startswith(("/", "\\")):
+        return False
+    decoded_path = parsed.path
+    for _ in range(3):
+        unquoted = urllib.parse.unquote(decoded_path)
+        if unquoted == decoded_path:
+            break
+        decoded_path = unquoted
+    suffix = PurePosixPath(decoded_path.replace("\\", "/")).suffix.casefold().lstrip(".")
+    return suffix in SERVER_PASSIVE_RESOURCE_SUFFIXES
+
+
+def _css_urls_are_safe(content):
+    decoded = _decode_css_escapes(content)
+    position = 0
+    while True:
+        match = re.search(r"url\s*\(", decoded[position:], re.IGNORECASE)
+        if match is None:
+            return True
+        start = position + match.end()
+        index = start
+        quote = None
+        escaped = False
+        while index < len(decoded):
+            character = decoded[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif quote:
+                if character == quote:
+                    quote = None
+            elif character in {'"', "'"}:
+                quote = character
+            elif character == ")":
+                break
+            index += 1
+        if index >= len(decoded) or quote is not None:
+            return False
+        if not _safe_css_url(decoded[start:index]):
+            return False
+        position = index + 1
+
+
+def _split_css_declarations(content):
+    parts = []
+    start = 0
+    quote = None
+    escaped = False
+    parentheses = 0
+    for index, character in enumerate(content):
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif character == ";" and not parentheses:
+            parts.append(content[start:index])
+            start = index + 1
+    parts.append(content[start:])
+    return parts
+
+
+def sanitize_css_declarations(content):
+    declarations = []
+    for raw_declaration in _split_css_declarations(str(content or "")):
+        declaration = raw_declaration.strip()
+        if not declaration or ":" not in declaration:
+            continue
+        decoded = _decode_css_escapes(declaration)
+        if _RISKY_CSS.search(decoded) or not _css_urls_are_safe(declaration):
+            continue
+        declarations.append(declaration)
+    return "; ".join(declarations)
+
+
+def _css_at_rule_name(prelude):
+    match = re.match(r"\s*@([\w-]+)", _decode_css_escapes(prelude))
+    return match.group(1).casefold() if match else ""
+
+
+def _find_css_boundary(content, start):
+    quote = None
+    escaped = False
+    parentheses = 0
+    for index in range(start, len(content)):
+        character = content[index]
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif not parentheses and character in "{;":
+            return index, character
+    return len(content), ""
+
+
+def _find_matching_css_brace(content, opening):
+    quote = None
+    escaped = False
+    depth = 1
+    for index in range(opening + 1, len(content)):
+        character = content[index]
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if quote:
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _sanitize_css_stylesheet(content):
+    output = []
+    position = 0
+    while position < len(content):
+        while position < len(content) and content[position].isspace():
+            position += 1
+        boundary, kind = _find_css_boundary(content, position)
+        prelude = content[position:boundary].strip()
+        if not kind:
+            break
+        if kind == ";":
+            rule_name = _css_at_rule_name(prelude)
+            if rule_name not in {"import", "namespace", "charset"} \
+                    and prelude and not _RISKY_CSS.search(_decode_css_escapes(prelude)):
+                output.append(prelude + ";")
+            position = boundary + 1
+            continue
+
+        closing = _find_matching_css_brace(content, boundary)
+        if closing is None:
+            break
+        body = content[boundary + 1:closing]
+        rule_name = _css_at_rule_name(prelude)
+        if rule_name:
+            if rule_name in _CSS_DECLARATION_AT_RULES:
+                safe_body = sanitize_css_declarations(body)
+            elif rule_name in _CSS_GROUP_AT_RULES:
+                safe_body = _sanitize_css_stylesheet(body)
+            else:
+                safe_body = ""
+        elif _RISKY_CSS.search(_decode_css_escapes(prelude)):
+            safe_body = ""
+        else:
+            safe_body = sanitize_css_declarations(body)
+        if prelude and safe_body:
+            output.append("{} {{ {} }}".format(prelude, safe_body))
+        position = closing + 1
+    return "\n".join(output)
+
+
+def sanitize_css_text(content):
+    candidate = _CSS_COMMENT.sub("", str(content or ""))
+    if not _RISKY_CSS.search(_decode_css_escapes(candidate)) \
+            and _css_urls_are_safe(candidate):
+        return candidate
+    return _sanitize_css_stylesheet(candidate)
+
+
+def _xml_local_name(name):
+    return str(name).rsplit("}", 1)[-1].rsplit(":", 1)[-1]
+
+
+def sanitize_svg_content(content):
+    try:
+        source_root = ET.fromstring(content)
+    except ET.ParseError as error:
+        raise ValueError("Unsafe or malformed SVG resource") from error
+    if _xml_local_name(source_root.tag) != "svg":
+        raise ValueError("Unsafe SVG resource root")
+
+    def clean(source):
+        name = _xml_local_name(source.tag)
+        if name not in _SAFE_SVG_TAGS:
+            return None
+        target = ET.Element("{{{}}}{}".format(_SVG_NAMESPACE, name))
+        for raw_name, raw_value in source.attrib.items():
+            attribute = _xml_local_name(raw_name)
+            if attribute not in _SAFE_SVG_ATTRIBUTES:
+                continue
+            value = str(raw_value).strip()
+            if "url(" in value.casefold() and not re.fullmatch(
+                r"url\(#[A-Za-z_][\w.-]*\)",
+                value,
+            ):
+                continue
+            target.set(attribute, value)
+        if source.text:
+            target.text = source.text
+        for child in source:
+            cleaned = clean(child)
+            if cleaned is not None:
+                target.append(cleaned)
+                if child.tail:
+                    cleaned.tail = child.tail
+        return target
+
+    ET.register_namespace("", _SVG_NAMESPACE)
+    return ET.tostring(clean(source_root), encoding="unicode")
+
 
 class EPUBProcessor:
     """处理EPUB文件的类"""
@@ -253,6 +764,11 @@ class EPUBProcessor:
             raise ValueError(f"Unable to parse EPUB package file: {self.epub_path}")
         self.generate_hash()
         self.create_web_interface()
+        if self.deployment_mode == "server":
+            Path(self.web_dir, SERVER_OUTPUT_REVISION_FILE).write_text(
+                SERVER_OUTPUT_REVISION + "\n",
+                encoding="utf-8",
+            )
         return ConvertedBook(
             book_id=self.book_hash,
             source_path=Path(self.epub_path),
@@ -590,8 +1106,40 @@ class EPUBProcessor:
     
     def create_index_page(self):
         """创建章节索引页面"""
+        sync_shelf_button = (
+            ""
+            if self.deployment_mode == "server"
+            else '''<button class="bookshelf-action-btn" id="syncShelfBtn">
+                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                </button>'''
+        )
         book_language = html.escape(self.lang or 'en', quote=True)
-        if self.authors:
+        bookshelf_data_actions = """
+                <button class="bookshelf-action-btn" id="exportShelfBtn">
+                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+                </button>
+                <button class="bookshelf-action-btn" id="importShelfBtn">
+                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+                </button>
+                <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
+        if self.deployment_mode == "server":
+            safe_book_title = metadata_text(self.book_title)
+            book_title_text = html.escape(safe_book_title, quote=False)
+            book_title_attribute = html.escape(safe_book_title, quote=True)
+            book_id_attribute = html.escape(str(self.book_hash), quote=True)
+            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+        else:
+            book_title_text = self.book_title
+            book_title_attribute = self.book_title
+            book_id_attribute = self.book_hash
+            book_id_url = self.book_hash
+        if self.authors and self.deployment_mode == "server":
+            authors_text = " & ".join(
+                html.escape(metadata_text(author), quote=False)
+                for author in self.authors
+            )
+            authors_html = f'<p class="book-info-author" lang="{book_language}">{authors_text}</p>'
+        elif self.authors:
             authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
@@ -601,16 +1149,18 @@ class EPUBProcessor:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#244548">
-    <meta name="description" content="{self.book_title} - EPUB Browser">
+    <meta name="description" content="{book_title_attribute} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
-    <title>{self.book_title}</title>
+    <title>{book_title_text}</title>
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
+    <link rel="stylesheet" href="/assets/notification.css">
+    <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
@@ -693,41 +1243,48 @@ class EPUBProcessor:
     </script>
 </head>
 <body>
-
-<div class="top-controls">
-    <div class="theme-toggle" id="themeToggle">
-        <i class="fas fa-moon"></i>
-        <span class="control-name" data-i18n="book.theme">Theme</span>
-    </div>
-</div>
 """
         index_html += f"""
-<div class="breadcrumb-container">
-    <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="book.breadcrumb" data-id="breadcrumb">
-        <a href="/" aria-label="Library" data-i18n-aria-label="book.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="book.library">Library</span></a>
-        <span class="breadcrumb-separator">/</span>
-        <span class="breadcrumb-current" id="book_home" aria-current="page" lang="{book_language}">{self.book_title}</span>
+<header class="app-header">
+    <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
+        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+        <div class="app-nav-links">
+            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
+        </div>
+        <div class="app-nav-actions">
+            <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="book.theme">Theme</span></button>
+        </div>
     </nav>
-</div>
+</header>
 <div class="container">
-
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover">
-                <img src="{self.get_book_info()['cover']}" alt="">
+                <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
             </div>
             <div class="book-info-content">
-                <h2 class="book-info-title" lang="{book_language}">{self.book_title}</h2>
+                <h2 class="book-info-title" lang="{book_language}">{book_title_text}</h2>
                 {authors_html}"""
         if self.description:
+            description = (
+                sanitize_html_fragment(self.description)
+                if self.deployment_mode == "server"
+                else self.description
+            )
             index_html += f""" 
                 <div class="book-info-desc" lang="{book_language}">
-                    {self.description}
+                    {description}
                 </div>"""
         index_html += f"""
                 <div class="book-info-tags" lang="{book_language}">"""
         if self.tags:
             for tag in self.tags:
-                index_html += f"""<span class="book-tag">{tag}</span>"""        
+                tag_text = (
+                    html.escape(metadata_text(tag), quote=False)
+                    if self.deployment_mode == "server"
+                    else tag
+                )
+                index_html += """<span class="book-tag">{}</span>""".format(tag_text)
         index_html += f"""
                 </div>
                 <div class="css-controls clearReadingProgress">
@@ -738,7 +1295,6 @@ class EPUBProcessor:
                             <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                         </div>
                     </div>
-                    <button type="button" class="css-btn secondary" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{self.book_hash}" aria-haspopup="dialog"><i class="fas fa-highlighter"></i><span data-i18n="book.annotations">Annotations</span></button>
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
             </div>
@@ -765,10 +1321,22 @@ class EPUBProcessor:
                 chapter_index = self._find_chapter_index(toc_src, chapter_index_map, chapter_filename_map)
                 
                 if chapter_index is not None:
+                    toc_title = (
+                        html.escape(
+                            metadata_text(toc_item.get("title")), quote=False
+                        )
+                        if self.deployment_mode == "server"
+                        else toc_item["title"]
+                    )
                     if chapter_anchor is not None:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html#{chapter_anchor}" id="eb_ci_{chapter_index}#{chapter_anchor}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        safe_anchor = (
+                            urllib.parse.quote(str(chapter_anchor), safe='')
+                            if self.deployment_mode == "server"
+                            else chapter_anchor
+                        )
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     else:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{self.book_hash}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_item["title"]}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                     toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
                 else:
                     self.reporter.detail(
@@ -778,55 +1346,43 @@ class EPUBProcessor:
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
-                index_html += f'        <li><a class="chapter-link" href="/book/{self.book_hash}/chapter_{i}.html" id="eb_ci_{i}"><span class="chapter-title" lang="{book_language}">{chapter["title"]}</span></a></li>\n'
+                chapter_title = (
+                    html.escape(
+                        metadata_text(chapter.get("title")), quote=False
+                    )
+                    if self.deployment_mode == "server"
+                    else chapter["title"]
+                )
+                index_html += f'        <li><a class="chapter-link" href="/book/{book_id_url}/chapter_{i}.html" id="eb_ci_{i}"><span class="chapter-title" lang="{book_language}">{chapter_title}</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
 </div>
 <div class="reading-controls" data-id="reading-controls">
-    <div class="control-btn" id="scrollToTopBtn">
+    <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="book.top">
         <i class="fas fa-arrow-up"></i>
         <span class="control-name" data-i18n="book.top">Top</span>
-    </div>
-    <button class="control-btn" id="bookshelfBtn" style="display: none;">
-        <i class="fas fa-bookmark"></i>
-        <span class="control-name" data-i18n="book.shelf">Shelf</span>
     </button>
-    <a href="/" aria-label="Home" data-i18n-aria-label="book.home">
-        <div class="control-btn">
-            <i class="fas fa-home"></i>
-            <span class="control-name" data-i18n="book.home">Home</span>
-        </div>
-    </a>
 </div>
 <!-- 书架弹窗 -->
-<div class="bookshelf-modal" id="bookshelfModal">
-    <div class="bookshelf-content">
+<div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+    <div class="bookshelf-content" tabindex="-1">
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addShelfGroupBtn">
                     <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                 </button>
-                <button class="bookshelf-action-btn" id="syncShelfBtn">
-                    <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                    <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                 </button>
-                <button class="bookshelf-action-btn" id="exportShelfBtn">
-                    <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
-                </button>
-                <button class="bookshelf-action-btn" id="importShelfBtn">
-                    <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
-                </button>
-                <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                {bookshelf_data_actions}
             </div>
-            <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+            <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
             <div class="bookshelf-header-right">
                 <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-        </div>
-        <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
         </div>
         <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
@@ -840,12 +1396,15 @@ class EPUBProcessor:
 </div>
 
 <!-- 分组弹窗 -->
-<div class="bookshelf-modal" id="groupModal">
-    <div class="bookshelf-content">
+<div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+    <div class="bookshelf-content" tabindex="-1">
         <div class="bookshelf-header">
             <div class="bookshelf-header-left">
                 <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
                     <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                </button>
+                <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                    <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                 </button>
                 <button class="bookshelf-action-btn" id="renameGroupBtn">
                     <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
@@ -864,9 +1423,6 @@ class EPUBProcessor:
                 </button>
             </div>
         </div>
-        <div class="bookshelf-tag-filter" id="groupTagFilter">
-            <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
-        </div>
         <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
             <div class="loading-spinner"></div>
         </div>
@@ -879,8 +1435,36 @@ class EPUBProcessor:
 </div>
 {render_footer(datetime.now().year)}"""
 
-        index_html += """
+        cache_boundary_script = (
+            '<script src="/assets/cache-boundary.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        auth_script = (
+            '<script src="/assets/auth.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        startup = (
+            """function startBookClients() {
+    if (!window.EpubBrowserAuth) return;
+    window.EpubBrowserAuth.init().then(function(session) {
+        if (!session) return;
+        if (window.initScriptBook) window.initScriptBook();
+    });
+}
+if (window.EpubBrowserCacheBoundary) {
+    window.EpubBrowserCacheBoundary.start(startBookClients);
+}"""
+            if self.deployment_mode == "server"
+            else "if (window.initScriptBook) window.initScriptBook();"
+        )
+        index_html += f"""
+{cache_boundary_script}
+<script src="/assets/notification.js" defer></script>
+{auth_script}
 <script src="/assets/theme.js" defer></script>
+<script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
@@ -889,9 +1473,9 @@ class EPUBProcessor:
 <script src="/assets/annotation-hub.js" defer></script>
 <script src="/assets/sortable.min.js" defer></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.initScriptBook) window.initScriptBook();
-});
+document.addEventListener('DOMContentLoaded', function() {{
+    {startup}
+}});
 </script>
 </body>
 </html>"""
@@ -1045,12 +1629,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         # 提取body内容
         body_content = self.clean_html_content(content)
+
+        if self.deployment_mode == "server":
+            # Rewrite known spine links before the allowlist rejects arbitrary
+            # HTML documents. Only generated chapter_N.html links survive.
+            body_content = self.fix_html_file_links(body_content, chapter_path)
+            body_content = sanitize_html_fragment(body_content)
         
         # 修复body中的图片链接
         body_content = self.fix_image_links(body_content, chapter_path)
 
         # 修复body 中可能的 html 文件链接，比如有些书有目录页面
-        body_content = self.fix_html_file_links(body_content, chapter_path)
+        if self.deployment_mode != "server":
+            body_content = self.fix_html_file_links(body_content, chapter_path)
         
         # 修复body中的其他资源链接
         body_content = self.fix_other_links(body_content, chapter_path)
@@ -1059,29 +1650,62 @@ document.addEventListener('DOMContentLoaded', function() {
     
     def extract_style_links(self, content, chapter_path):
         """从head中提取样式链接"""
-
-        def add_class_to_link(tag, class_name):
-            # 检查是否已有 class 属性
-            if 'class=' in tag:
-                # 在现有 class 后追加
-                return re.sub(r'class="([^"]*)"', 
-                            f'class="\\1 {class_name}"', 
-                            tag)
-            else:
-                # 插入 class 属性
+        if self.deployment_mode != "server":
+            def add_class_to_link(tag, class_name):
+                if 'class=' in tag:
+                    return re.sub(
+                        r'class="([^"]*)"',
+                        f'class="\\1 {class_name}"',
+                        tag,
+                    )
                 return tag.replace('<link ', f'<link class="{class_name}" ', 1)
-        
-        def add_class_to_style(tag, class_name):
-            # 处理 style 元素
-            if 'class=' in tag:
-                return re.sub(r'class="([^"]*)"', 
-                            f'class="\\1 {class_name}"', 
-                            tag)
-            else:
+
+            def add_class_to_style(tag, class_name):
+                if 'class=' in tag:
+                    return re.sub(
+                        r'class="([^"]*)"',
+                        f'class="\\1 {class_name}"',
+                        tag,
+                    )
                 return tag.replace('<style', f'<style class="{class_name}"', 1)
-            
+
+            style_links = []
+            head_match = re.search(
+                r'<head[^>]*>(.*?)</head>',
+                content,
+                re.DOTALL | re.IGNORECASE,
+            )
+            if head_match:
+                head_content = head_match.group(1)
+                links = re.findall(
+                    r'<link[^>]+rel=["\']stylesheet["\'][^>]*>',
+                    head_content,
+                    re.IGNORECASE,
+                )
+                for link in links:
+                    link = add_class_to_link(link, "eb")
+                    href_match = re.search(r'href=["\']([^"\']+)["\']', link)
+                    if not href_match:
+                        continue
+                    href = href_match.group(1)
+                    if self._is_external_reference(href):
+                        style_links.append(link)
+                    else:
+                        chapter_dir = posixpath.dirname(chapter_path)
+                        web_href = self._resource_reference(href, chapter_dir)
+                        style_links.append(
+                            link.replace(f'href="{href}"', f'href="{web_href}"')
+                        )
+                styles = re.findall(
+                    r'<style[^>]*>.*?</style>',
+                    head_content,
+                    re.DOTALL,
+                )
+                for style in styles:
+                    style_links.append(add_class_to_style(style, "eb"))
+            return '\n        '.join(style_links)
+
         style_links = []
-        to_add_class = "eb"
         
         # 匹配head标签
         head_match = re.search(r'<head[^>]*>(.*?)</head>', content, re.DOTALL | re.IGNORECASE)
@@ -1093,29 +1717,31 @@ document.addEventListener('DOMContentLoaded', function() {
             links = re.findall(link_pattern, head_content, re.IGNORECASE)
             
             for link in links:
-                # 添加class属性
-                link = add_class_to_link(link, to_add_class)
                 # 提取href属性
-                href_match = re.search(r'href=["\']([^"\']+)["\']', link)
+                href_match = re.search(
+                    r'href\s*=\s*["\']([^"\']+)["\']',
+                    link,
+                    re.IGNORECASE,
+                )
                 if href_match:
                     href = href_match.group(1)
-                    # 外部网络资源不复制到 EPUB 资源目录。
-                    if self._is_external_reference(href):
-                        style_links.append(link)
-                    else:
+                    safe_href = _safe_html_url("link", "href", href)
+                    if safe_href and not self._is_external_reference(safe_href):
                         chapter_dir = posixpath.dirname(chapter_path)
-                        web_href = self._resource_reference(href, chapter_dir)
-                        
-                        # 替换href属性
-                        fixed_link = link.replace(f'href="{href}"', f'href="{web_href}"')
-                        style_links.append(fixed_link)
+                        web_href = self._resource_reference(safe_href, chapter_dir)
+                        style_links.append(
+                            '<link class="eb" rel="stylesheet" href="{}">'.format(
+                                html.escape(web_href, quote=True)
+                            )
+                        )
             
             # 匹配style标签
-            style_pattern = r'<style[^>]*>.*?</style>'
-            styles = re.findall(style_pattern, head_content, re.DOTALL)
+            style_pattern = r'<style[^>]*>(.*?)</style>'
+            styles = re.findall(style_pattern, head_content, re.DOTALL | re.IGNORECASE)
             for style in styles:
-                style = add_class_to_style(style, to_add_class)
-                style_links.append(style)
+                safe_style = sanitize_css_text(style)
+                if safe_style:
+                    style_links.append('<style class="eb">{}</style>'.format(safe_style))
         
         return '\n        '.join(style_links)
     
@@ -1172,6 +1798,13 @@ document.addEventListener('DOMContentLoaded', function() {
             # 如果已经是绝对路径或数据URI，则不处理
             if self._is_external_reference(src):
                 return match.group(0)
+            if (
+                self.deployment_mode == "server"
+                and urllib.parse.urlsplit(html.unescape(src).strip()).scheme
+            ):
+                # The final allowlist removes active schemes. Avoid resolving
+                # them as EPUB-internal paths before that pass.
+                return match.group(0)
 
             chapter_dir = posixpath.dirname(chapter_path)
             self._resolve_internal_path(src, chapter_dir)
@@ -1221,12 +1854,44 @@ document.addEventListener('DOMContentLoaded', function() {
     
     def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
         """创建章节页面模板"""
-        prev_href = f'href="/book/{self.book_hash}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
-        next_href = f'href="/book/{self.book_hash}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
+        if self.deployment_mode == "server":
+            content = sanitize_html_fragment(content)
+            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+            book_id_attribute = html.escape(str(self.book_hash), quote=True)
+            safe_book_title = metadata_text(self.book_title)
+            safe_chapter_title = metadata_text(chapter_title)
+            book_title_text = html.escape(safe_book_title, quote=False)
+            book_title_attribute = html.escape(safe_book_title, quote=True)
+            chapter_title_text = html.escape(safe_chapter_title, quote=False)
+            chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
+        else:
+            book_id_url = self.book_hash
+            book_id_attribute = self.book_hash
+            book_title_text = self.book_title
+            book_title_attribute = self.book_title
+            chapter_title_text = chapter_title
+            chapter_title_attribute = chapter_title
+        sync_shelf_button = (
+            ""
+            if self.deployment_mode == "server"
+            else '''<button class="bookshelf-action-btn" id="syncShelfBtn">
+                        <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                    </button>'''
+        )
+        prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
+        next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
         next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
         prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
         next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
+        bookshelf_data_actions = """
+                    <button class="bookshelf-action-btn" id="exportShelfBtn">
+                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="importShelfBtn">
+                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+                    </button>
+                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
         
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="en">
@@ -1234,11 +1899,11 @@ document.addEventListener('DOMContentLoaded', function() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#244548">
-    <meta name="description" content="{chapter_title} - {self.book_title} - EPUB Browser">
+    <meta name="description" content="{chapter_title_attribute} - {book_title_attribute} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
-    <title>{chapter_title} - {self.book_title}</title>
+    <title>{chapter_title_text} - {book_title_text}</title>
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
@@ -1247,10 +1912,13 @@ document.addEventListener('DOMContentLoaded', function() {
     <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
+    <link rel="stylesheet" href="/assets/notification.css">
+    <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
+    <link rel="stylesheet" href="/assets/annotation-hub.css">
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -1333,35 +2001,15 @@ document.addEventListener('DOMContentLoaded', function() {
         chapter_html +=f"""
 <body>
 
+    <a class="skip-link" href="#eb-content" data-i18n="reader.skipToContent">Skip to reading content</a>
+
     <div class="reading-progress-container">
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
-    <div class="top-controls">
-        <div class="theme-toggle" id="themeToggle">
-            <i class="fas fa-moon"></i>
-            <span class="control-name" data-i18n="reader.theme">Theme</span>
-        </div>
-
-        <div class="control-btn" id="togglePagination">
-            <i class="fas fa-book-open"></i>
-            <span class="control-name" data-i18n="reader.turning">Turning</span>
-        </div>
-
-        <div class="control-btn" id="bookHomeToggle" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
-            <i class="fas fa-book"></i>
-            <span class="control-name" data-i18n="reader.book">Book</span>
-        </div>
-
-        <div class="control-btn" id="tocToggle">
-            <i class="fas fa-list"></i>
-            <span class="control-name" data-i18n="reader.tableOfContents">Table of contents</span>
-        </div>
-    </div>
-
-    <div class="toc-floating" id="bookHomeFloating">
+    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true">
         <div class="toc-header">
-            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
+            <h3 data-i18n="reader.bookChapters">Chapters</h3>
             <div class="toc-header-actions">
                 <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
                     <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
@@ -1374,11 +2022,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <ul class="toc-list" id="bookHomeTocList">
             <!-- 动态生成的书籍目录将放在这里 -->
         </ul>
-    </div>
+    </nav>
 
-    <div class="toc-floating" id="tocFloating">
+    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true">
         <div class="toc-header">
-            <h3 data-i18n="reader.tableOfContents">Table of contents</h3>
+            <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
             <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
                 <i class="fas fa-times"></i>
             </button>
@@ -1386,33 +2034,44 @@ document.addEventListener('DOMContentLoaded', function() {
         <ul class="toc-list" id="tocList">
             <!-- 动态生成的目录将放在这里 -->
         </ul>
-    </div>
+    </nav>
 
-    <div class="chapter-top-bar">
-        <nav class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="reader.breadcrumb" data-id="breadcrumb">
-            <a href="/" aria-label="Library" data-i18n-aria-label="reader.library"><img class="breadcrumb-brand-mark" src="/assets/logo-mark-color.png" alt=""><span class="breadcrumb-library-label" data-i18n="reader.library">Library</span></a>
-            <span class="breadcrumb-separator">/</span>
-            <a href="/book/{self.book_hash}/index.html" class="a-book-home">{self.book_title}</a>
-            <span class="breadcrumb-separator">/</span>
-            <span class="breadcrumb-current" aria-current="page">{chapter_title}</span>
+    <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
+
+    <header class="chapter-top-bar app-header">
+        <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
+            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            <div class="app-nav-links">
+                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+                <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+            </div>
+            <div class="app-nav-actions">
+                <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
+            </div>
         </nav>
-    </div>
+    </header>
     <div class="container">
+        <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
+            <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning"><i class="fas fa-book-open"></i><span class="control-name" data-i18n="reader.turning">Turning</span></button>
+            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
+            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
+            <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+        </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
-            <div class="content-loading" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
+            <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-book-hash="{self.book_hash}" data-total-chapters="{len(self.chapters)}">
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
         </div>
 
         <div class="navigation" data-id="navigation">
             {prev_link}
-            <a href="/" aria-label="Home" data-i18n-aria-label="reader.home" id="navigationHomeBtn">
+            <a href="/book/{book_id_url}/index.html" aria-label="Book" data-i18n-aria-label="reader.book" id="navigationHomeBtn">
                 <div class="control-btn">
-                    <i class="fas fa-home"></i>
-                    <span class="control-name" data-i18n="reader.home">Home</span>
+                    <i class="fas fa-book-open"></i>
+                    <span class="control-name" data-i18n="reader.book">Book</span>
                 </div>
             </a>
 
@@ -1463,12 +2122,14 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 
-    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay"></div>
-    <div class="settings-modal" id="settingsModal" data-id="settingsModal">
+    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay" aria-hidden="true"></div>
+    <div class="settings-modal" id="settingsModal" data-id="settingsModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settingsModalTitle">
         <div class="settings-header">
-            <i class="fas fa-cog"></i>
-            <span data-i18n="reader.settings">Settings</span>
-            <button class="settings-close-btn" id="settingsCloseBtn" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
+            <h2 class="settings-header-title" id="settingsModalTitle">
+                <i class="fas fa-cog" aria-hidden="true"></i>
+                <span data-i18n="reader.settings">Settings</span>
+            </h2>
+            <button class="settings-close-btn" id="settingsCloseBtn" type="button" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -1519,11 +2180,28 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
+                    <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
+                    <div class="page-width-control">
+                        <input type="range" id="pageWidthSlider" min="1" max="4" value="3" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                        <div class="page-width-scale" aria-hidden="true">
+                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
+                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
+                            <span data-i18n="settings.pageWidthWide">Wide</span>
+                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group">
                     <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
                     <label class="settings-switch">
                         <input type="checkbox" id="showReadingProgressBarToggle" checked>
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
+                    </label>
+                    <label class="settings-switch desktop-setting-only">
+                        <input type="checkbox" id="desktopChapterSidebarToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar on desktop</span>
                     </label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
@@ -1569,32 +2247,18 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <div class="reading-controls" data-id="reading-controls">
-        <div class="control-btn" id="scrollToTopBtn">
+        <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="reader.top">
             <i class="fas fa-arrow-up"></i>
             <span class="control-name" data-i18n="reader.top">Top</span>
-        </div>
-        <div class="control-btn" id="settingsControlBtn">
-            <i class="fas fa-cog"></i>
-            <span class="control-name" data-i18n="reader.settings">Settings</span>
-        </div>
-        <button class="control-btn" id="bookshelfBtn" style="display: none;">
-            <i class="fas fa-bookmark"></i>
-            <span class="control-name" data-i18n="reader.shelf">Shelf</span>
         </button>
-        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
-            <div class="control-btn">
-                <i class="fas fa-home"></i>
-                <span class="control-name" data-i18n="reader.home">Home</span>
-            </div>
-        </a>
     </div>
 
     <!-- 移动端控件 -->
     <div class="mobile-controls" data-id="mobile-controls">
-        <div class="control-btn" id="mobileTocBtn">
+        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
             <i class="fas fa-list"></i>
-            <span data-i18n="reader.tableOfContents">Table of contents</span>
-        </div>
+            <span data-i18n="reader.thisChapterContents">This chapter</span>
+        </button>
         <div class="control-btn" id="mobileThemeBtn">
             <i class="fas fa-moon"></i>
             <span data-i18n="reader.theme">Theme</span>
@@ -1611,14 +2275,14 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         </a>
         {next_link_mobile}
-        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+        <div class="control-btn" id="mobileBookHomeBtn" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
             <i class="fas fa-book"></i>
-            <span data-i18n="reader.book">Book</span>
+            <span data-i18n="reader.bookChapters">Chapters</span>
         </div>
-        <div class="control-btn" id="mobileSettingsBtn">
+        <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false">
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
-        </div>
+        </button>
         <div class="control-btn" id="mobileTopBtn">
             <i class="fas fa-arrow-up"></i>
             <span data-i18n="reader.top">Top</span>
@@ -1626,33 +2290,24 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <!-- 书架弹窗 -->
-    <div class="bookshelf-modal" id="bookshelfModal">
-        <div class="bookshelf-content">
+    <div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addShelfGroupBtn">
                         <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
                     </button>
-                    <button class="bookshelf-action-btn" id="syncShelfBtn">
-                        <i class="fas fa-sync" aria-hidden="true"></i> <span data-i18n="bookshelf.sync">Sync</span>
+                    <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                     </button>
-                    <button class="bookshelf-action-btn" id="exportShelfBtn">
-                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
-                    </button>
-                    <button class="bookshelf-action-btn" id="importShelfBtn">
-                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
-                    </button>
-                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                    {bookshelf_data_actions}
                 </div>
-                <h2 class="bookshelf-title"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+                <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
                 <div class="bookshelf-header-right">
                     <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-            </div>
-            <div class="bookshelf-tag-filter" id="bookshelfTagFilter">
-                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
             </div>
             <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
@@ -1666,12 +2321,15 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <!-- 分组弹窗 -->
-    <div class="bookshelf-modal" id="groupModal">
-        <div class="bookshelf-content">
+    <div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
             <div class="bookshelf-header">
                 <div class="bookshelf-header-left">
                     <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
                         <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
                     </button>
                     <button class="bookshelf-action-btn" id="renameGroupBtn">
                         <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
@@ -1690,9 +2348,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     </button>
                 </div>
             </div>
-            <div class="bookshelf-tag-filter" id="groupTagFilter">
-                <span class="bookshelf-tag active" data-tag="All" data-i18n="bookshelf.all">All</span>
-            </div>
             <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
                 <div class="loading-spinner"></div>
             </div>
@@ -1705,8 +2360,36 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     {render_footer(datetime.now().year)}
 """
-        chapter_html += """
+        cache_boundary_script = (
+            '<script src="/assets/cache-boundary.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        auth_script = (
+            '<script src="/assets/auth.js" defer></script>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        startup = (
+            """function startChapterClients() {
+        if (!window.EpubBrowserAuth) return;
+        window.EpubBrowserAuth.init().then(function(session) {
+            if (!session) return;
+            if (window.initScriptChapter) window.initScriptChapter();
+        });
+    }
+    if (window.EpubBrowserCacheBoundary) {
+        window.EpubBrowserCacheBoundary.start(startChapterClients);
+    }"""
+            if self.deployment_mode == "server"
+            else "if (window.initScriptChapter) window.initScriptChapter();"
+        )
+        chapter_html += f"""
+    {cache_boundary_script}
+    <script src="/assets/notification.js" defer></script>
+    {auth_script}
     <script src="/assets/theme.js" defer></script>
+    <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
     <script src="/assets/fancybox.min.js"></script>
     <script src="/assets/web-highlighter.min.js"></script>
@@ -1714,16 +2397,18 @@ document.addEventListener('DOMContentLoaded', function() {
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
     <script src="/assets/reading-progress.js" defer></script>
+    <script src="/assets/reader-layout.js" defer></script>
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
+    <script src="/assets/annotation-hub.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
     <script src="/assets/bookshelf.js" defer></script>
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        if (window.initScriptChapter) window.initScriptChapter();
-    });
+    document.addEventListener('DOMContentLoaded', function() {{
+        {startup}
+    }});
     </script>
 </body>
 </html>
@@ -1757,10 +2442,17 @@ document.addEventListener('DOMContentLoaded', function() {
         # 复制整个提取目录
         for root, dirs, files in os.walk(self.extract_dir):
             for file in files:
-                suffix = file.split(".")[-1]
-                if suffix in ("html", "xhtml", "xml", "txt", "opf", "ncx", "mimetype"):
-                    # html 不需要了，已经重新生成了
-                    continue
+                if self.deployment_mode == "server":
+                    suffix = file.rsplit(".", 1)[-1].casefold()
+                    if suffix not in SERVER_PASSIVE_RESOURCE_SUFFIXES:
+                        continue
+                else:
+                    suffix = file.split(".")[-1]
+                    if suffix in (
+                        "html", "xhtml", "xml", "txt", "opf", "ncx", "mimetype"
+                    ):
+                        # SSG retains the historical resource-copy behavior.
+                        continue
 
                 src_path = os.path.join(root, file)
                 # 计算相对于提取目录的相对路径
@@ -1769,7 +2461,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 # 确保目标目录存在
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                shutil.copy2(src_path, dst_path)
+                if self.deployment_mode == "server" and suffix == "svg":
+                    source = Path(src_path).read_text(encoding="utf-8")
+                    Path(dst_path).write_text(
+                        sanitize_svg_content(source),
+                        encoding="utf-8",
+                    )
+                elif self.deployment_mode == "server" and suffix == "css":
+                    source = Path(src_path).read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+                    Path(dst_path).write_text(
+                        sanitize_css_text(source),
+                        encoding="utf-8",
+                    )
+                else:
+                    shutil.copy2(src_path, dst_path)
         
         # 删除原来的 extracted，以后都不用了
         if os.path.exists(self.extract_dir):

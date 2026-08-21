@@ -77,8 +77,28 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r'data-progress-close[^>]*disabled')
         self.assertRegex(html, r'data-progress-close[^>]*hidden')
         self.assertIn('window.EpubLibraryProgress.start(window)', html)
-        self.assertIn('id=loginCard', html)
-        self.assertIn('id=syncShelfBtn', html)
+        self.assertIn(
+            'window.EpubBrowserCacheBoundary.start(startLibraryClients)',
+            html,
+        )
+        self.assertIn('id=accountMenu', html)
+        self.assertIn('id=accountPanel', html)
+        self.assertIn('id=adminMenu', html)
+        self.assertIn('id=adminPanel', html)
+        account_surface = html[
+            html.index('id=accountPanel'):html.index('id=adminPanel')
+        ]
+        self.assertNotIn('id=adminUserForm', account_surface)
+        self.assertNotIn('id=loginCard', html)
+        self.assertNotIn('id=exportShelfBtn', html)
+        self.assertNotIn('id=importShelfBtn', html)
+        self.assertNotIn('id=syncShelfBtn', html)
+        self.assertRegex(html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+        self.assertRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
+        self.assertRegex(html, r'/assets/immutable/notification\.[0-9a-f]{12}\.js')
+        self.assertRegex(html, r'/assets/immutable/notification\.[0-9a-f]{12}\.css')
+        self.assertRegex(html, r'(?:hidden id=associationCard|id=associationCard hidden)')
+        self.assertIn('id=adminIdentitiesSection', html)
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -90,6 +110,10 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('id=libraryProgress', html)
         self.assertNotIn('library-progress', html)
         self.assertNotIn('id=loginCard', html)
+        self.assertNotRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
+        self.assertRegex(html, r'/assets/immutable/notification\.[0-9a-f]{12}\.js')
+        self.assertIn('id=exportShelfBtn', html)
+        self.assertIn('id=importShelfBtn', html)
         self.assertNotIn('id=syncShelfBtn', html)
 
     def test_publish_library_shell_atomically_replaces_both_outputs(self):

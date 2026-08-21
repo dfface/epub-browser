@@ -291,34 +291,6 @@
             document.cookie = key + '=' + value + '; expires=' + date.toUTCString() + '; path=/;';
         },
         
-        // 与首页 Login 保持一致的用户名管理
-        USERNAME_KEY: 'epub_browser_username',
-        
-        getAnnotationUsername: function() {
-            if (this.isKindleMode()) {
-                return this.getCookie(this.USERNAME_KEY) || '';
-            }
-            try {
-                return localStorage.getItem(this.USERNAME_KEY) || '';
-            } catch (e) {
-                return '';
-            }
-        },
-        
-        setAnnotationUsername: function(username) {
-            if (this.isKindleMode()) {
-                this.setCookie(this.USERNAME_KEY, username);
-            } else {
-                try {
-                    localStorage.setItem(this.USERNAME_KEY, username);
-                } catch (e) {}
-            }
-            // 同步更新首页 Login 显示
-            if (typeof window.updateLoginDisplay === 'function') {
-                window.updateLoginDisplay();
-            }
-        },
-        
         // Add alpha to hex color
         addColorAlpha: function(hex, alpha) {
             // Convert hex to rgba
@@ -557,81 +529,64 @@
                 self.available = false;
                 return Promise.resolve({ available: false });
             }
-            return new Promise(function(resolve) {
-                var xhr = new XMLHttpRequest();
-                xhr.open('GET', self.baseUrl + '/health', true);
-                xhr.timeout = CONFIG.HEALTH_TIMEOUT;
-                
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
+            if (!window.EpubBrowserAuth || typeof window.EpubBrowserAuth.fetch !== 'function') {
+                self.available = false;
+                return Promise.resolve({ available: false });
+            }
+            try {
+                return Promise.resolve(window.EpubBrowserAuth.fetch(self.baseUrl + '/health')).then(function(response) {
+                    if (!response.ok) return null;
+                    return response.text().then(function(responseText) {
                         try {
-                            var resp = JSON.parse(xhr.responseText);
-                            self.available = resp.status === 'ok';
+                            return JSON.parse(responseText);
                         } catch (e) {
-                            self.available = false;
+                            return null;
                         }
-                    } else {
-                        self.available = false;
-                    }
-                    resolve({ available: self.available });
-                };
-                
-                xhr.onerror = function() {
+                    });
+                }).then(function(payload) {
+                    self.available = !!payload && payload.status === 'ok';
+                    return { available: self.available };
+                }, function() {
                     self.available = false;
-                    resolve({ available: false });
-                };
-                
-                xhr.ontimeout = function() {
-                    self.available = false;
-                    resolve({ available: false });
-                };
-                
-                try {
-                    xhr.send();
-                } catch (e) {
-                    self.available = false;
-                    resolve({ available: false });
-                }
-            });
+                    return { available: false };
+                });
+            } catch (e) {
+                self.available = false;
+                return Promise.resolve({ available: false });
+            }
         },
         
         // 发送请求
         _request: function(method, path, data) {
             var self = this;
-            var username = Utils.getAnnotationUsername();
-            return new Promise(function(resolve, reject) {
-                var xhr = new XMLHttpRequest();
-                xhr.open(method, self.baseUrl + path, true);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.setRequestHeader('X-Username', username);
-                xhr.timeout = 10000;
-                
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            resolve(JSON.parse(xhr.responseText));
-                        } catch (e) {
-                            resolve(xhr.responseText);
+            if (!window.EpubBrowserAuth || typeof window.EpubBrowserAuth.fetch !== 'function') {
+                return Promise.reject(backendRequestError('network'));
+            }
+            var options = {
+                method: method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (data !== undefined && data !== null) {
+                options.body = JSON.stringify(data);
+            }
+            try {
+                return Promise.resolve(window.EpubBrowserAuth.fetch(self.baseUrl + path, options)).then(function(response) {
+                    return response.text().then(function(responseText) {
+                        if (!response.ok) {
+                            throw backendRequestError(errorCodeFromPayload(responseText));
                         }
-                    } else {
-                        reject(backendRequestError(errorCodeFromPayload(xhr.responseText)));
-                    }
-                };
-                
-                xhr.onerror = function() {
-                    reject(backendRequestError('network'));
-                };
-                
-                xhr.ontimeout = function() {
-                    reject(backendRequestError('timeout'));
-                };
-                
-                try {
-                    xhr.send(data ? JSON.stringify(data) : null);
-                } catch (e) {
-                    reject(backendRequestError('network'));
-                }
-            });
+                        try {
+                            return JSON.parse(responseText);
+                        } catch (e) {
+                            return responseText;
+                        }
+                    });
+                }, function() {
+                    throw backendRequestError('network');
+                });
+            } catch (e) {
+                return Promise.reject(backendRequestError('network'));
+            }
         },
         
         // 创建标注
@@ -743,17 +698,14 @@
         // 初始化
         init: function() {
             var self = this;
-            return IDBStorage.init().then(function() {
-                if (window.EpubBrowserMode !== 'server') {
-                    self.currentType = 'idb';
-                    return;
-                }
-                // 从 localStorage 加载 storageType
-                var storageType = Utils.getStorage('annotation_storage_type');
-                if (storageType) {
-                    self.currentType = storageType;
-                }
-            });
+            if (window.EpubBrowserMode === 'server') {
+                self.currentType = 'backend';
+                Settings.storageType = 'backend';
+                return Promise.resolve();
+            }
+            self.currentType = 'idb';
+            Settings.storageType = 'idb';
+            return IDBStorage.init();
         },
         
         // 获取当前适配器
@@ -845,18 +797,13 @@
         load: function() {
             var enabled = Utils.getStorage('annotation_enabled');
             var color = Utils.getStorage('annotation_default_color');
-            var storageType = Utils.getStorage('annotation_storage_type');
             var colorOrder = Utils.getStorage('annotation_color_order');
             var customColors = Utils.getStorage('annotation_custom_colors');
             var deletedColors = Utils.getStorage('annotation_deleted_colors');
             
             if (enabled !== null) this.enabled = enabled === 'true';
             if (color) this.defaultColor = color;
-            if (window.EpubBrowserMode !== 'server') {
-                this.storageType = 'idb';
-            } else if (storageType) {
-                this.storageType = storageType;
-            }
+            this.storageType = window.EpubBrowserMode === 'server' ? 'backend' : 'idb';
             if (colorOrder) {
                 try { this.colorOrder = JSON.parse(colorOrder); } catch (e) { this.colorOrder = []; }
             }
@@ -872,7 +819,6 @@
         save: function() {
             Utils.setStorage('annotation_enabled', this.enabled.toString());
             Utils.setStorage('annotation_default_color', this.defaultColor);
-            Utils.setStorage('annotation_storage_type', this.storageType);
             Utils.setStorage('annotation_color_order', JSON.stringify(this.colorOrder));
             Utils.setStorage('annotation_custom_colors', JSON.stringify(this.customColors));
             Utils.setStorage('annotation_deleted_colors', JSON.stringify(this.deletedColors));
@@ -1305,8 +1251,13 @@
                 dialog.querySelector('.annotation-dialog-close').addEventListener('click', function() {
                     self.closeDialog();
                 });
-                dialog.querySelector('.annotation-btn-delete').addEventListener('click', function() {
-                    if (confirm(tr('confirmDelete'))) {
+                dialog.querySelector('.annotation-btn-delete').addEventListener('click', async function() {
+                    if (await window.EpubDialog.confirm({
+                        title: tr('confirmDelete'),
+                        message: tr('confirmDelete'),
+                        confirmText: tr('delete'),
+                        destructive: true
+                    })) {
                         self.deleteAnnotation(annotation.id);
                         self.closeDialog();
                     }
@@ -1716,20 +1667,6 @@
                     </label>\
                 </div>\
                 <div class="settings-group">\
-                    <label class="settings-label">' + tr('storageLocation') + '</label>\
-                    <div class="storage-options">\
-                        <label class="storage-option" id="storageOptionIdb">\
-                            <input type="radio" name="annotationStorage" value="idb" ' + (Settings.storageType === 'idb' ? 'checked' : '') + '>\
-                            <span class="storage-option-text">' + tr('localStorage') + '</span>\
-                        </label>\
-                        <label class="storage-option" id="storageOptionBackend">\
-                            <input type="radio" name="annotationStorage" value="backend" ' + (Settings.storageType === 'backend' ? 'checked' : '') + '>\
-                            <span class="storage-option-text">' + tr('cloudStorage') + '</span>\
-                            <span class="storage-option-status" id="backendStatus">' + tr('checking') + '</span>\
-                        </label>\
-                    </div>\
-                </div>\
-                <div class="settings-group">\
                     <label class="settings-label">\
                         ' + tr('defaultColor') + '\
                         <span class="color-tip-default" data-tooltip="' + tr('defaultColorTip') + '" aria-label="' + tr('defaultColorTip') + '"><i class="fas fa-info-circle"></i></span>\
@@ -1758,7 +1695,6 @@
                 
                 this.bindEvents(tabBtn, tabPanel);
                 this.initColorPicker(tabPanel);
-                this.checkBackendStatus();
                 
                 // Re-bind tab switch events for all tabs (including the new one)
                 this.rebindTabEvents();
@@ -1828,53 +1764,6 @@
                     HighlightInteraction.clearHighlights();
                 }
                 Utils.showNotification(tr(Settings.enabled ? 'enabledNotice' : 'disabledNotice'), 'info');
-            });
-            
-            // Storage toggle
-            var storageRadios = tabPanel.querySelectorAll('input[name="annotationStorage"]');
-            storageRadios.forEach(function(radio) {
-                radio.addEventListener('change', function() {
-                    var targetType = this.value;
-                    
-                    // 如果选择的是当前存储类型，不处理
-                    if (targetType === Settings.storageType) return;
-                    
-                    // 切换到云端存储
-                    if (targetType === 'backend') {
-                        if (!Settings.backendAvailable) {
-                            Utils.showNotification(tr('cloudUnavailable'), 'warning');
-                            self.revertStorageRadio(Settings.storageType);
-                            return;
-                        }
-                        
-                        // 检查是否已登录，提示用户
-                        var currentUsername = Utils.getAnnotationUsername();
-                        if (!currentUsername) {
-                            var msg = tr('usernamePrompt');
-                            var username = prompt(msg, '');
-                            if (username === null) {
-                                // 用户取消 → 使用共享模式
-                                Utils.showNotification(tr('usingSharedStorage'), 'info');
-                            } else {
-                                username = username.trim();
-                                if (username) {
-                                    Utils.setAnnotationUsername(username);
-                                    Utils.showNotification(tr('loggedInAs', { username: username }), 'success');
-                                    self.checkBackendStatus();
-                                } else {
-                                    Utils.showNotification(tr('usingSharedStorage'), 'info');
-                                }
-                            }
-                        }
-                        
-                        // 继续迁移流程
-                        self.showMigrationDialog(Settings.storageType, targetType);
-                        return;
-                    }
-                    
-                    // 切换到本地存储
-                    self.showMigrationDialog(Settings.storageType, targetType);
-                });
             });
             
             // 导出按钮
@@ -2152,12 +2041,12 @@
                 self.backendChecking = false;
                 
                 if (available) {
-                    var username = Utils.getAnnotationUsername();
-                    if (username) {
-                        statusEl.textContent = tr('connectedUser', { username: username });
-                    } else {
-                        statusEl.textContent = tr('connectedShared');
-                    }
+                    var session = window.EpubBrowserAuth && window.EpubBrowserAuth.getSession
+                        ? window.EpubBrowserAuth.getSession()
+                        : null;
+                    statusEl.textContent = session && session.user
+                        ? tr('connectedUser', { username: session.user.username })
+                        : tr('connectedAccount');
                     statusEl.className = 'storage-option-status connected';
                     backendOption.classList.remove('disabled');
                 } else {

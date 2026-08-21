@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -12,13 +13,42 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from starlette.testclient import TestClient
+
+from epub_browser.asset_publisher import AssetPublisher
+from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials
+from epub_browser.epub_identity import (
+    ensure_embedded_book_id,
+    read_embedded_book_id,
+)
 from epub_browser.identity import source_sha256
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import EPUBProcessor
 from epub_browser.reporting import Reporter
+from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
+from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
+
+
+def _json_login(client, username, password):
+    page = client.get("/login")
+    match = re.search(
+        r'<meta name="epub-browser-auth-nonce" content="([^"]+)">',
+        page.text,
+    )
+    if page.status_code != 200 or match is None:
+        raise RuntimeError("login page did not provide an authentication nonce")
+    return client.post(
+        "/login",
+        json={"username": username, "password": password, "next": "/"},
+        headers={
+            "X-EPUB-Browser-Auth-Nonce": match.group(1),
+            "Origin": str(client.base_url).rstrip("/"),
+            "Sec-Fetch-Site": "same-origin",
+        },
+    )
 
 
 class ServerLibraryManagerTests(unittest.TestCase):
@@ -31,7 +61,11 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.source_dir.mkdir()
         self.source = self.source_dir / "book.epub"
         self._write_epub(self.source, "Original")
-        self.migration = MigrationManager(self.server_dir, None)
+        self.migration = MigrationManager(
+            self.server_dir,
+            None,
+            bootstrap=BootstrapCredentials("admin", "secret"),
+        )
         result = self.migration.prepare_data()
         self.store = StateStore(result.database_path)
 
@@ -53,6 +87,115 @@ class ServerLibraryManagerTests(unittest.TestCase):
         while not subscription.queue.empty():
             latest = subscription.queue.get_nowait()
         return latest
+
+    def test_first_reconcile_creates_sidecar_without_modifying_epub(self):
+        before = self.source.read_bytes()
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        self.assertEqual(read_exact_sidecar(self.source).book_id, record.book_id)
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertIsNone(read_embedded_book_id(self.source))
+        manager.shutdown()
+
+    def test_v204_embedded_id_migrates_to_sidecar_without_epub_write(self):
+        ensure_embedded_book_id(
+            self.source, preferred_book_id="v204_embedded_id"
+        )
+        before = self.source.read_bytes()
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        self.assertEqual(record.book_id, "v204_embedded_id")
+        self.assertEqual(read_exact_sidecar(self.source).book_id, record.book_id)
+        self.assertEqual(self.source.read_bytes(), before)
+        manager.shutdown()
+
+    def test_content_edit_retains_exact_sidecar_id(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        self._write_epub(self.source, "Changed")
+        second = manager.reconcile().active_books[0]
+        self.assertEqual(second.book_id, first.book_id)
+        self.assertEqual(read_exact_sidecar(self.source).book_id, first.book_id)
+        manager.shutdown()
+
+    def test_offline_epub_only_move_adopts_orphan_and_database_id(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        orphan = sidecar_path_for(self.source)
+        moved = self.source_dir / "moved.epub"
+        self.source.rename(moved)
+        second = manager.reconcile().active_books[0]
+        self.assertEqual(second.book_id, first.book_id)
+        self.assertEqual(Path(second.source_path), moved.resolve())
+        self.assertFalse(orphan.exists())
+        self.assertEqual(read_exact_sidecar(moved).book_id, first.book_id)
+        manager.shutdown()
+
+    def test_epub_only_copy_gets_distinct_id_while_original_is_active(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        copied = self.source_dir / "copied.epub"
+        shutil.copy2(self.source, copied)
+        summary = manager.reconcile()
+        self.assertEqual(len(summary.active_books), 2)
+        self.assertEqual(len({record.book_id for record in summary.active_books}), 2)
+        self.assertNotEqual(read_exact_sidecar(copied).book_id, first.book_id)
+        manager.shutdown()
+
+    def test_explicit_embedded_mode_writes_once_then_reuses(self):
+        converter = mock.Mock(side_effect=EPUBProcessor)
+        manager = self._manager(converter, book_id_storage="embedded")
+        first = manager.reconcile()
+        converter.reset_mock()
+        second = manager.reconcile()
+        self.assertEqual(first.converted, 1)
+        self.assertEqual(second.reused, 1)
+        self.assertIsNotNone(read_embedded_book_id(self.source))
+        self.assertFalse(sidecar_path_for(self.source).exists())
+        converter.assert_not_called()
+        manager.shutdown()
+
+    def test_epub_and_sidecar_copy_reports_duplicate_active_id(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        copied = self.source_dir / "copied.epub"
+        shutil.copy2(self.source, copied)
+        shutil.copy2(sidecar_path_for(self.source), sidecar_path_for(copied))
+        summary = manager.reconcile()
+        self.assertEqual(summary.failed, 1)
+        self.assertIn("already used by another source", summary.failures[0].message)
+        self.assertEqual(
+            [record.book_id for record in summary.active_books],
+            [first.book_id],
+        )
+        manager.shutdown()
+
+    def test_carrier_database_conflict_keeps_previous_cache(self):
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        ensure_embedded_book_id(
+            self.source, preferred_book_id="conflicting_id"
+        )
+        summary = manager.reconcile()
+        self.assertTrue(summary.degraded)
+        self.assertTrue(summary.failures[0].kept_previous_cache)
+        self.assertTrue(
+            (manager.public_dir / "book" / first.book_id / "index.html").is_file()
+        )
+        manager.shutdown()
+
+    def test_sidecar_replace_failure_has_no_database_only_fallback(self):
+        manager = self._manager()
+        with mock.patch(
+            "epub_browser.book_identity.write_sidecar",
+            side_effect=OSError("sidecar replace failed"),
+        ):
+            summary = manager.reconcile()
+        self.assertEqual(summary.failed, 1)
+        self.assertIn("sidecar replace failed", summary.failures[0].message)
+        self.assertEqual(summary.active_books, ())
+        self.assertEqual(self.store.active_books(), ())
+        manager.shutdown()
 
     def test_reconcile_reports_incremental_progress_and_catalog_publication(self):
         broker = LibraryProgressBroker()
@@ -224,6 +367,143 @@ class ServerLibraryManagerTests(unittest.TestCase):
         converter.assert_not_called()
         manager.shutdown()
 
+    def test_reconcile_upgrades_unchanged_legacy_generated_output(self):
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        book_dir = manager.public_dir / "book" / record.book_id
+        toc = json.loads((book_dir / "toc.json").read_text(encoding="utf-8"))
+        generated_pages = [book_dir / "index.html"] + [
+            book_dir / item["chapter_file"]
+            for item in toc
+            if item.get("chapter_file")
+        ]
+        (book_dir / ".server-output-revision").unlink(missing_ok=True)
+        for page in generated_pages:
+            page.write_text("<html><body>legacy reader</body></html>", encoding="utf-8")
+
+        upgraded = manager.reconcile()
+
+        self.assertGreater(upgraded.converted, 0)
+        self.assertEqual(upgraded.reused, 0)
+        for page in generated_pages:
+            self.assertRegex(
+                page.read_text(encoding="utf-8"),
+                r'/assets/immutable/cache-boundary\.[0-9a-f]{12}\.js',
+            )
+        manager.shutdown()
+
+    def test_direct_reader_is_denied_while_legacy_output_reconverts(self):
+        class BlockingProcessor(EPUBProcessor):
+            started = threading.Event()
+            release = threading.Event()
+
+            def convert(self):
+                self.started.set()
+                self.release.wait(timeout=5)
+                return super().convert()
+
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        book_dir = manager.public_dir / "book" / record.book_id
+        (book_dir / ".server-output-revision").write_text(
+            "legacy\n",
+            encoding="utf-8",
+        )
+        manager.converter_factory = BlockingProcessor
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        login = _json_login(client, "admin", "secret")
+        self.assertEqual(login.status_code, 200)
+        results = []
+        reconcile_thread = threading.Thread(
+            target=lambda: results.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(BlockingProcessor.started.wait(timeout=2))
+            for name in ("index.html", "chapter_0.html"):
+                with self.subTest(state="stale", name=name):
+                    stale = client.get(f"/book/{record.book_id}/{name}")
+                    self.assertEqual(stale.status_code, 404)
+        finally:
+            BlockingProcessor.release.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(results[0].converted, 1)
+        for name in ("index.html", "chapter_0.html"):
+            with self.subTest(state="current", name=name):
+                current = client.get(f"/book/{record.book_id}/{name}")
+                self.assertEqual(current.status_code, 200)
+                self.assertIn("cache-boundary.", current.text)
+        manager.shutdown()
+
+    def test_changed_source_output_is_denied_during_reconversion(self):
+        class BlockingProcessor(EPUBProcessor):
+            started = threading.Event()
+            release = threading.Event()
+
+            def convert(self):
+                self.started.set()
+                self.release.wait(timeout=5)
+                return super().convert()
+
+        self._write_epub(self.source, "Original", include_cover=True)
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        metadata = json.loads(record.metadata_json)
+        paths = (
+            "index.html",
+            "chapter_0.html",
+            metadata["cover"],
+        )
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        login = _json_login(client, "admin", "secret")
+        self.assertEqual(login.status_code, 200)
+        self._write_epub(self.source, "Changed", include_cover=True)
+        manager.converter_factory = BlockingProcessor
+        results = []
+        reconcile_thread = threading.Thread(
+            target=lambda: results.append(manager.reconcile()),
+            daemon=True,
+        )
+        reconcile_thread.start()
+        try:
+            self.assertTrue(BlockingProcessor.started.wait(timeout=2))
+            for path in paths:
+                with self.subTest(state="converting", path=path):
+                    response = client.get(f"/book/{record.book_id}/{path}")
+                    self.assertEqual(response.status_code, 404)
+        finally:
+            BlockingProcessor.release.set()
+            reconcile_thread.join(timeout=5)
+
+        self.assertFalse(reconcile_thread.is_alive())
+        self.assertEqual(results[0].converted, 1)
+        for path in paths:
+            with self.subTest(state="current", path=path):
+                response = client.get(f"/book/{record.book_id}/{path}")
+                self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "Changed",
+            client.get(f"/book/{record.book_id}/chapter_0.html").text,
+        )
+        manager.shutdown()
+
     def test_metadata_only_stat_change_is_recorded_after_one_recheck(self):
         manager = self._manager()
         manager.reconcile()
@@ -286,7 +566,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         metadata = json.loads(
             (manager.public_dir / "book-metadata.json").read_text(encoding="utf-8")
         )
-        self.assertEqual([book["hash"] for book in metadata], [original.book_id])
+        self.assertEqual(metadata, [])
         manager.shutdown()
 
     def test_delete_between_validation_and_commit_cannot_reactivate_book(self):
@@ -437,6 +717,43 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )
         manager.shutdown()
 
+    def test_generated_server_shell_contains_no_shared_book_catalog(self):
+        manager = self._manager()
+
+        record = manager.reconcile().active_books[0]
+        metadata_path = manager.public_dir / "book-metadata.json"
+        library_html = (manager.public_dir / "index.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertEqual(json.loads(metadata_path.read_text(encoding="utf-8")), [])
+        self.assertNotIn(record.book_id, library_html)
+        self.assertNotIn("Server Book", library_html)
+        manager.shutdown()
+
+    def test_generated_server_cache_does_not_publish_a_service_worker(self):
+        manager = self._manager()
+        stale_worker = manager.public_dir / "sw.js"
+        stale_worker.parent.mkdir(parents=True, exist_ok=True)
+        stale_worker.write_text("stale worker", encoding="utf-8")
+
+        manager.prepare_public_shell()
+
+        self.assertFalse(stale_worker.exists())
+        manager.shutdown()
+
+    def test_server_asset_publication_never_invokes_the_worker_writer(self):
+        manager = self._manager()
+
+        with mock.patch.object(
+            AssetPublisher,
+            "_write_service_worker",
+            side_effect=AssertionError("Server attempted to write sw.js"),
+        ):
+            manager.reconcile()
+
+        manager.shutdown()
+
     def test_cache_deletion_rebuilds_without_changing_book_id(self):
         manager = self._manager()
         original = manager.reconcile().active_books[0]
@@ -457,7 +774,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         manager.shutdown()
 
-    def test_failed_update_keeps_previous_cache_and_reports_degraded(self):
+    def test_failed_source_update_keeps_stale_output_denied_and_reports_degraded(self):
         broker = LibraryProgressBroker()
         loop = asyncio.new_event_loop()
         self.addCleanup(loop.close)
@@ -476,6 +793,16 @@ class ServerLibraryManagerTests(unittest.TestCase):
             / "chapter_0.html"
         )
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        login = _json_login(client, "admin", "secret")
+        self.assertEqual(login.status_code, 200)
         self._write_epub(self.source, "Changed")
 
         class FailingProcessor:
@@ -490,8 +817,12 @@ class ServerLibraryManagerTests(unittest.TestCase):
 
         self.assertTrue(summary.degraded)
         self.assertEqual(summary.failed, 1)
+        self.assertFalse(summary.failures[0].kept_previous_cache)
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
-        self.assertEqual(self.store.active_books()[0].book_id, first.book_id)
+        self.assertIn(
+            client.get(f"/book/{first.book_id}/chapter_0.html").status_code,
+            (403, 404),
+        )
         snapshot = self._latest_subscription_snapshot(loop, subscription)
         self.assertEqual(snapshot.phase, "degraded")
         self.assertEqual(snapshot.failures[0].filename, self.source.name)
@@ -503,6 +834,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(retried.converted, 1)
         self.assertFalse(retried.degraded)
         self.assertIn("Changed", chapter_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            client.get(f"/book/{first.book_id}/chapter_0.html").status_code,
+            200,
+        )
         manager.shutdown()
 
     def test_reconciliation_callbacks_report_each_scan_result(self):
@@ -564,16 +899,31 @@ class ServerLibraryManagerTests(unittest.TestCase):
             snapshot = self._latest_subscription_snapshot(loop, subscription)
             self.assertGreater(snapshot.in_flight, 0)
             deadline = time.monotonic() + 2
-            published = []
+            published_books = []
             while time.monotonic() < deadline:
-                metadata_path = manager.public_dir / "book-metadata.json"
-                if metadata_path.is_file():
-                    published = json.loads(metadata_path.read_text(encoding="utf-8"))
-                    if published:
-                        break
+                book_root = manager.public_dir / "book"
+                published_books = (
+                    [
+                        path
+                        for path in book_root.iterdir()
+                        if (path / "index.html").is_file()
+                    ]
+                    if book_root.is_dir()
+                    else []
+                )
+                if published_books:
+                    break
                 time.sleep(0.02)
 
-            self.assertEqual(len(published), 1)
+            self.assertEqual(len(published_books), 1)
+            self.assertEqual(
+                json.loads(
+                    (manager.public_dir / "book-metadata.json").read_text(
+                        encoding="utf-8"
+                    )
+                ),
+                [],
+            )
             self.assertTrue(reconcile_thread.is_alive())
             snapshot = self._latest_subscription_snapshot(loop, subscription)
             self.assertGreater(snapshot.catalog_revision, baseline_revision)
@@ -588,6 +938,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
     def test_delete_hides_book_but_preserves_data_and_restore_reuses_id(self):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
+        administrator = self.store.list_users()[0]
         self.store.upsert_annotation(
             {
                 "id": "saved",
@@ -597,7 +948,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 "color": "#fff",
                 "created_at": "2026",
                 "updated_at": "2026",
-            }
+            },
+            user_id=administrator.user_id,
         )
         self.source.unlink()
 
@@ -612,7 +964,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(metadata, [])
         self.assertEqual(self.store.active_books(), ())
         self.assertEqual(
-            self.store.get_annotation("saved")["book_hash"],
+            self.store.get_annotation(
+                "saved",
+                user_id=administrator.user_id,
+            )["book_hash"],
             record.book_id,
         )
 
@@ -655,19 +1010,26 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )
 
     @staticmethod
-    def _write_epub(path, chapter_text):
+    def _write_epub(path, chapter_text, include_cover=False):
         container = """<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
 </container>
 """
-        package = """<?xml version="1.0" encoding="UTF-8"?>
+        cover_meta = '<meta name="cover" content="cover" />' if include_cover else ""
+        cover_item = (
+            '<item id="cover" href="cover.jpg" media-type="image/jpeg" />'
+            if include_cover
+            else ""
+        )
+        package = f"""<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="book-id">urn:test:server-library</dc:identifier>
     <dc:title>Server Book</dc:title><dc:creator>Author</dc:creator><dc:language>en</dc:language>
+    {cover_meta}
   </metadata>
-  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
+  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>{cover_item}</manifest>
   <spine><itemref idref="chapter"/></spine>
 </package>
 """
@@ -680,6 +1042,21 @@ class ServerLibraryManagerTests(unittest.TestCase):
             archive.writestr("META-INF/container.xml", container)
             archive.writestr("OEBPS/content.opf", package)
             archive.writestr("OEBPS/chapter.xhtml", chapter)
+            if include_cover:
+                archive.writestr("OEBPS/cover.jpg", b"cover")
+
+    @staticmethod
+    def _replace_archive_text(path, member_name, before, after):
+        temporary = path.with_suffix(".rewritten.epub")
+        with zipfile.ZipFile(path, "r") as source:
+            with zipfile.ZipFile(temporary, "w") as destination:
+                destination.comment = source.comment
+                for info in source.infolist():
+                    data = source.read(info)
+                    if info.filename == member_name:
+                        data = data.replace(before, after)
+                    destination.writestr(info, data)
+        temporary.replace(path)
 
 
 if __name__ == "__main__":

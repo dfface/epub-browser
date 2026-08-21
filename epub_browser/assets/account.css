@@ -1,0 +1,951 @@
+/* Account surfaces share the library's quiet card-and-accent visual language. */
+:root {
+    --account-primary: var(--button-bg, #4361ee);
+    --account-primary-hover: var(--button-hover, #3f37c9);
+    --account-accent: var(--secondary, #4cc9f0);
+    --account-bg: var(--background, #f5f5f5);
+    --account-card: var(--card-bg, #fff);
+    --account-text: var(--text, #333);
+    --account-muted: var(--text-secondary, #666);
+    --account-border: var(--border, #ddd);
+    --account-hover: var(--hover, #f0f0f0);
+    --account-danger: var(--notification-error, #e74c3c);
+    --account-success: var(--notification-success, #27ae60);
+    --account-warning: var(--notification-warning, #f39c12);
+    --account-shadow: var(--shadow-md, 0 2px 10px rgba(0, 0, 0, .08));
+    --account-shadow-large: var(--shadow-xl, 0 8px 30px rgba(0, 0, 0, .1));
+    --account-radius: var(--border-radius-xl, 12px);
+    color-scheme: light;
+}
+
+body.auth-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0;
+    color: var(--account-text);
+    background:
+        radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--account-accent) 12%, transparent), transparent 34rem),
+        radial-gradient(circle at 92% 88%, color-mix(in srgb, var(--account-primary) 10%, transparent), transparent 36rem),
+        var(--account-bg);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.auth-shell {
+    display: grid;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    box-sizing: border-box;
+    place-items: center;
+    padding: clamp(24px, 6vw, 72px) 20px;
+}
+
+.auth-stack {
+    display: grid;
+    width: min(100%, 460px);
+    gap: 18px;
+}
+
+.auth-card {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: clamp(24px, 5vw, 38px);
+    border: 1px solid color-mix(in srgb, var(--account-border) 75%, transparent);
+    border-radius: var(--account-radius);
+    background: var(--account-card);
+    box-shadow: var(--account-shadow-large);
+}
+
+.auth-card::before {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 5px;
+    background: linear-gradient(90deg, var(--account-primary), var(--account-accent));
+    content: "";
+}
+
+.auth-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 34px;
+}
+
+.auth-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: var(--account-text);
+    font-size: 1rem;
+    font-weight: 750;
+    letter-spacing: -.015em;
+    text-decoration: none;
+}
+
+.auth-brand-mark {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    font-size: 1.25rem;
+}
+
+.auth-language {
+    display: grid;
+    gap: 4px;
+    color: var(--account-muted);
+    font-size: .72rem;
+    font-weight: 650;
+    letter-spacing: .02em;
+}
+
+.auth-language select {
+    min-height: 38px;
+    box-sizing: border-box;
+    padding: 0 30px 0 10px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+    background: var(--account-card);
+    color: var(--account-text);
+    font: inherit;
+    font-size: .84rem;
+}
+
+.auth-intro {
+    margin-bottom: 28px;
+}
+
+.auth-intro h1 {
+    margin: 0;
+    color: var(--account-text);
+    font-size: clamp(1.75rem, 5vw, 2.25rem);
+    font-weight: 750;
+    letter-spacing: -.04em;
+    line-height: 1.15;
+}
+
+.auth-description {
+    margin: 12px 0 0;
+    color: var(--account-muted);
+    font-size: .95rem;
+    line-height: 1.65;
+}
+
+.auth-form,
+.auth-field {
+    display: grid;
+}
+
+.auth-form {
+    gap: 18px;
+}
+
+.auth-field {
+    gap: 8px;
+    color: var(--account-text);
+    font-size: .84rem;
+    font-weight: 650;
+}
+
+.auth-field input,
+.account-modal input,
+.account-modal select {
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 9px;
+    outline: 0;
+    background: var(--account-card);
+    color: var(--account-text);
+    font: inherit;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.auth-field input:hover,
+.account-modal input:hover,
+.account-modal select:hover {
+    border-color: color-mix(in srgb, var(--account-primary) 45%, var(--account-border));
+}
+
+.auth-field input:focus,
+.auth-language select:focus,
+.account-modal input:focus,
+.account-modal select:focus {
+    border-color: var(--account-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--account-primary) 18%, transparent);
+}
+
+.auth-primary-button,
+.account-modal .account-primary-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    box-sizing: border-box;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--account-primary);
+    color: #fff;
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.auth-primary-button:hover,
+.account-modal .account-primary-action:hover {
+    background: var(--account-primary-hover);
+    color: #fff;
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--account-primary) 24%, transparent);
+    transform: translateY(-1px);
+}
+
+.auth-primary-button:active,
+.account-modal .account-primary-action:active {
+    transform: translateY(0);
+}
+
+.auth-primary-button:focus-visible,
+.account-modal button:focus-visible,
+.account-modal summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--account-primary) 42%, transparent);
+    outline-offset: 3px;
+}
+
+.auth-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    box-sizing: border-box;
+    margin: -2px 0 0;
+    padding: 9px 11px;
+    border: 0;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--account-danger) 7%, var(--account-card));
+    color: var(--account-danger);
+    font-size: .8rem;
+    line-height: 1.5;
+}
+
+.auth-alert::before {
+    display: inline-grid;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--account-danger);
+    color: var(--account-card);
+    content: "!";
+    font-size: .7rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.account-status {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 11px 13px;
+    border: 1px solid color-mix(in srgb, var(--account-danger) 28%, transparent);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--account-danger) 8%, var(--account-card));
+    color: var(--account-danger);
+    font-size: .86rem;
+    line-height: 1.5;
+}
+
+.auth-stack .eb-footer {
+    padding: 10px 0;
+    border-top: 1px solid var(--account-border);
+    color: var(--account-muted);
+    font-size: .8rem;
+    text-align: center;
+}
+
+.auth-stack .eb-footer p {
+    margin: 0;
+    line-height: 1.6;
+}
+
+.auth-stack .eb-footer a {
+    color: var(--account-primary);
+    text-underline-offset: 3px;
+}
+
+.auth-stack .eb-footer a:hover {
+    color: var(--account-primary-hover);
+}
+
+/* Authenticated account settings. */
+.account-modal .bookshelf-header {
+    border-bottom: 1px solid var(--account-border);
+}
+
+.account-modal .account-content {
+    color: var(--account-text);
+    background: var(--account-bg);
+}
+
+.account-modal .account-modal-body {
+    display: block;
+    padding: clamp(22px, 4vw, 46px) 20px 64px;
+}
+
+.account-modal[hidden],
+.account-modal [hidden] {
+    display: none !important;
+}
+
+#adminMenu[hidden] {
+    display: none !important;
+}
+
+.account-layout {
+    display: grid;
+    width: min(100%, 1120px);
+    margin: 0 auto;
+    gap: 22px;
+}
+
+.admin-modal .account-layout {
+    width: min(100%, 1280px);
+}
+
+.account-grid,
+.account-admin-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.account-card,
+.account-admin {
+    box-sizing: border-box;
+    border: 1px solid var(--account-border);
+    border-radius: var(--account-radius);
+    background: var(--account-card);
+    box-shadow: var(--account-shadow);
+}
+
+.account-admin-console {
+    gap: 18px;
+}
+
+.account-admin-intro {
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .92rem;
+    line-height: 1.6;
+}
+
+.account-card {
+    padding: clamp(20px, 3vw, 28px);
+}
+
+.account-card-wide {
+    grid-column: 1 / -1;
+}
+
+.account-profile-card {
+    position: relative;
+    overflow: hidden;
+    padding-left: clamp(76px, 10vw, 92px);
+}
+
+.account-profile-card::before {
+    position: absolute;
+    top: 22px;
+    left: 24px;
+    display: grid;
+    width: 48px;
+    height: 48px;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--account-primary) 12%, var(--account-card));
+    color: var(--account-primary);
+    content: "\1f464";
+    font-size: 1.25rem;
+}
+
+.account-card h3,
+.account-card h4,
+.account-admin > h3 {
+    margin: 0;
+    color: var(--account-text);
+    letter-spacing: -.025em;
+}
+
+.account-card h3,
+.account-admin > h3 {
+    font-size: 1.15rem;
+}
+
+.account-card h4 {
+    font-size: 1rem;
+}
+
+.account-section-copy,
+.account-card > p,
+.account-card details > p,
+#accountIdentity {
+    margin: 8px 0 0;
+    color: var(--account-muted);
+    font-size: .9rem;
+    line-height: 1.6;
+}
+
+.account-form {
+    display: grid;
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.account-form label {
+    display: grid;
+    gap: 7px;
+    color: var(--account-text);
+    font-size: .8rem;
+    font-weight: 650;
+}
+
+.account-form .account-primary-action {
+    justify-self: start;
+}
+
+.account-details {
+    padding: 0;
+    overflow: hidden;
+}
+
+.account-details summary {
+    padding: 20px 24px;
+    color: var(--account-text);
+    font-size: .95rem;
+    font-weight: 700;
+    cursor: pointer;
+    list-style-position: inside;
+}
+
+.account-details[open] summary {
+    border-bottom: 1px solid var(--account-border);
+}
+
+.account-details-body {
+    padding: 0 24px 24px;
+}
+
+.account-admin {
+    display: grid;
+    gap: 22px;
+    padding: clamp(20px, 3vw, 30px);
+}
+
+.account-admin > h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.account-admin > h3::before {
+    display: inline-block;
+    width: 9px;
+    height: 24px;
+    border-radius: 999px;
+    background: linear-gradient(var(--account-primary), var(--account-accent));
+    content: "";
+}
+
+.account-admin-section {
+    min-width: 0;
+    padding: 22px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--account-card) 88%, var(--account-bg));
+}
+
+.account-users-section {
+    padding: clamp(20px, 3vw, 28px);
+}
+
+#adminUserForm {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+}
+
+.account-create-user-form {
+    padding: 18px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: var(--account-card);
+}
+
+#adminIdentityForm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+}
+
+#adminIdentityForm .account-primary-action {
+    align-self: end;
+}
+
+.account-list {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.account-list-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+    min-width: 0;
+    padding: 13px 14px;
+    border: 1px solid var(--account-border);
+    border-radius: 9px;
+    background: var(--account-card);
+}
+
+#adminUserList {
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 14px;
+}
+
+.account-user-item {
+    display: block;
+    align-self: start;
+    padding: 0;
+    overflow: hidden;
+}
+
+.account-user-overview {
+    padding: 17px 18px;
+}
+
+.account-user-profile {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+}
+
+.account-user-avatar {
+    display: grid;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--account-primary) 22%, var(--account-border));
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    color: var(--account-primary);
+    font-size: 1rem;
+    font-weight: 750;
+}
+
+.account-user-identity {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.account-user-name {
+    overflow: hidden;
+    color: var(--account-text);
+    font-size: .92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-user-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.account-user-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+.account-user-role {
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.account-user-status.is-enabled {
+    background: color-mix(in srgb, var(--account-success) 11%, var(--account-card));
+    color: var(--account-success);
+}
+
+.account-user-status.is-disabled {
+    background: color-mix(in srgb, var(--account-danger) 9%, var(--account-card));
+    color: var(--account-danger);
+}
+
+.account-user-details {
+    border-top: 1px solid var(--account-border);
+}
+
+.account-user-details > summary {
+    padding: 12px 18px;
+    color: var(--account-muted);
+    font-size: .76rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.account-user-details > summary:hover {
+    background: color-mix(in srgb, var(--account-primary) 5%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.account-user-details[open] > summary {
+    border-bottom: 1px solid var(--account-border);
+}
+
+.account-user-details-body {
+    display: grid;
+    gap: 0;
+    padding: 4px 18px 18px;
+}
+
+.account-user-action-group {
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+}
+
+.account-user-action-group + .account-user-action-group {
+    margin-top: 14px;
+    border-top: 1px solid var(--account-border);
+}
+
+.account-user-action-title {
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .7rem;
+    font-weight: 750;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.account-user-action-buttons,
+.account-user-password-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.account-user-password-controls .account-inline-input {
+    flex: 1 1 180px;
+    width: auto;
+    max-width: none;
+}
+
+.account-list-summary,
+.account-session-label,
+.admin-identity-summary {
+    flex: 1 1 260px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--account-text);
+    font-size: .86rem;
+    line-height: 1.45;
+}
+
+.account-session-label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 14px;
+}
+
+.account-session-device {
+    overflow: hidden;
+    color: var(--account-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-session-address {
+    color: var(--account-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .74rem;
+}
+
+.account-session-times {
+    grid-column: 1 / -1;
+    color: var(--account-muted);
+    font-size: .76rem;
+}
+
+.account-current-session {
+    flex: 0 0 auto;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-success) 12%, var(--account-card));
+    color: var(--account-success);
+    font-size: .72rem;
+}
+
+.account-modal .account-inline-action,
+.account-modal .account-danger-action {
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--account-border);
+    border-radius: 7px;
+    background: var(--account-card);
+    color: var(--account-text);
+    font-size: .76rem;
+    font-weight: 650;
+}
+
+.account-modal .account-inline-action:hover {
+    border-color: color-mix(in srgb, var(--account-primary) 45%, var(--account-border));
+    background: color-mix(in srgb, var(--account-primary) 7%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.account-modal .account-danger-action {
+    border-color: color-mix(in srgb, var(--account-danger) 28%, var(--account-border));
+    color: var(--account-danger);
+}
+
+.account-modal .account-danger-action:hover {
+    background: color-mix(in srgb, var(--account-danger) 8%, var(--account-card));
+    color: var(--account-danger);
+}
+
+.account-inline-input {
+    flex: 1 1 180px;
+    max-width: 240px;
+    min-height: 38px !important;
+}
+
+.account-book-item {
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) minmax(150px, 190px) minmax(260px, 1.5fr) auto;
+    align-items: center;
+}
+
+.account-book-item strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-book-item select {
+    width: 100%;
+    min-height: 38px;
+}
+
+.account-book-grants {
+    min-width: 0;
+    margin: 0;
+    padding: 8px 10px 10px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+}
+
+.account-book-grants legend {
+    padding: 0 5px;
+    color: var(--account-muted);
+    font-size: .72rem;
+    font-weight: 650;
+}
+
+.account-book-grant-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.account-book-grant-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    box-sizing: border-box;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-primary) 7%, var(--account-card));
+    color: var(--account-text);
+    font-size: .78rem;
+    cursor: pointer;
+}
+
+.account-book-grant-option input {
+    width: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--account-primary);
+}
+
+.account-book-grants:disabled {
+    opacity: .58;
+}
+
+.account-book-grants:disabled .account-book-grant-option {
+    cursor: not-allowed;
+}
+
+.account-empty {
+    color: var(--account-muted);
+    font-size: .85rem;
+}
+
+@media (max-width: 860px) {
+    .account-grid,
+    .account-admin-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #adminUserForm,
+    #adminIdentityForm {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    #adminUserList {
+        grid-template-columns: 1fr;
+    }
+
+    .account-book-item {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .account-book-grants {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 560px) {
+    .auth-shell {
+        padding: 16px;
+    }
+
+    .auth-card {
+        padding: 26px 20px;
+    }
+
+    .auth-card-header {
+        align-items: flex-start;
+        margin-bottom: 28px;
+    }
+
+    .auth-language-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+    }
+
+    .account-modal .bookshelf-header {
+        grid-template-columns: 1fr auto;
+    }
+
+    .account-modal .bookshelf-header-left {
+        grid-column: auto;
+        grid-row: auto;
+        order: initial;
+        overflow: visible;
+    }
+
+    .account-modal .bookshelf-title {
+        display: none;
+    }
+
+    .admin-modal .bookshelf-header-left {
+        display: none;
+    }
+
+    .admin-modal .bookshelf-title {
+        display: flex;
+        justify-content: flex-start;
+    }
+
+    .account-modal .account-modal-body {
+        padding: 16px 12px 44px;
+    }
+
+    .account-profile-card {
+        padding-left: 76px;
+    }
+
+    #adminUserForm,
+    #adminIdentityForm {
+        grid-template-columns: 1fr;
+    }
+
+    .account-form .account-primary-action,
+    .account-modal .account-primary-action {
+        width: 100%;
+    }
+
+    .account-list-item {
+        align-items: stretch;
+    }
+
+    .account-list-item > button,
+    .account-list-item > input,
+    .account-list-item > select {
+        width: 100%;
+        max-width: none;
+    }
+
+    .account-user-password-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .account-user-password-controls .account-inline-input,
+    .account-user-password-controls .account-inline-action {
+        width: 100%;
+        max-width: none;
+    }
+
+    .account-book-item {
+        grid-template-columns: 1fr;
+    }
+
+    .account-book-grants {
+        grid-column: auto;
+    }
+}
+
+.dark-mode body.auth-page {
+    color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-primary-button,
+    .account-modal button,
+    .auth-field input,
+    .account-modal input,
+    .account-modal select {
+        transition-duration: .01ms;
+    }
+}

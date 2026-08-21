@@ -1,22 +1,5 @@
 function showNotification(message, type) {
-    var existingNotification = document.querySelector('.custom-css-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    var notification = document.createElement('div');
-    notification.className = "custom-css-notification " + type;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    setTimeout(function() {
-        notification.classList.add('fade-out');
-        setTimeout(function() {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
+    return window.EpubBrowserNotification.show(message, type);
 }
 
 // 设置 cookie
@@ -172,14 +155,35 @@ function initScript() {
         }
     }
 
-    function showLibraryState(key) {
+    function showLibraryState(titleKey, descriptionKey, variant) {
         var bookGrid = document.querySelector('.book-grid');
         var state;
-        if (!bookGrid || bookGrid.querySelector('.library-state')) return;
-        state = document.createElement('div');
-        state.className = 'empty-state library-state';
-        state.setAttribute('data-i18n', key);
-        state.textContent = t(key);
+        var icon;
+        var iconGlyph;
+        var title;
+        var description;
+        var stateVariant = variant || 'empty';
+        if (!bookGrid || bookGrid.querySelector('.library-state--' + stateVariant)) return;
+        state = document.createElement('section');
+        state.className = 'empty-state library-state library-state--' + stateVariant;
+        state.setAttribute('role', 'status');
+        icon = document.createElement('span');
+        icon.className = 'library-state-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        iconGlyph = document.createElement('i');
+        iconGlyph.className = stateVariant === 'filtered'
+            ? 'fas fa-search'
+            : 'fas fa-book-open';
+        icon.appendChild(iconGlyph);
+        title = document.createElement('h2');
+        title.setAttribute('data-i18n', titleKey);
+        title.textContent = t(titleKey);
+        description = document.createElement('p');
+        description.setAttribute('data-i18n', descriptionKey);
+        description.textContent = t(descriptionKey);
+        state.appendChild(icon);
+        state.appendChild(title);
+        state.appendChild(description);
         bookGrid.appendChild(state);
     }
     
@@ -311,7 +315,13 @@ function initScript() {
         updateLibraryCounts(books, tagCount);
 
         if (!books.length) {
-            showLibraryState('library.empty');
+            showLibraryState(
+                'library.emptyTitle',
+                window.EpubBrowserMode === 'server'
+                    ? 'library.emptyServerDescription'
+                    : 'library.emptySsgDescription',
+                'empty'
+            );
             restoreOrder(storageKeySortableBook, 'book-grid');
             restoreOrder(storageKeySortableTag, 'tag-cloud');
             applyLibraryFilters();
@@ -363,65 +373,11 @@ function initScript() {
         }
     }
 
-    var USERNAME_KEY = 'epub_browser_username';
-
-    function getUsername() {
-        if (isKindleMode()) {
-            return getCookie(USERNAME_KEY);
-        }
-        return localStorage.getItem(USERNAME_KEY);
-    }
-
-    function setUsername(username) {
-        if (isKindleMode()) {
-            setCookie(USERNAME_KEY, username);
-        } else {
-            localStorage.setItem(USERNAME_KEY, username);
-        }
-    }
-
-    function updateLoginDisplay() {
-        var loginValue = document.getElementById('loginValue');
-        var username = getUsername();
-        if (loginValue) {
-            if (username) {
-                loginValue.textContent = username;
-            } else {
-                loginValue.textContent = t('library.login');
-            }
-        }
-    }
-
-    // 暴露给全局，供 annotation.js 同步更新 Login 显示
-    window.updateLoginDisplay = updateLoginDisplay;
-
-    updateLoginDisplay();
-
-    var loginCard = document.getElementById('loginCard');
-    if (loginCard) {
-        loginCard.addEventListener('click', function() {
-            var currentUsername = getUsername();
-            var username = prompt(t('library.usernamePrompt'), currentUsername || '');
-            if (username !== null) {
-                if (username.trim()) {
-                    setUsername(username.trim());
-                    updateLoginDisplay();
-                    showNotification(t('library.usernameSaved', { username: username.trim() }), 'success');
-                } else if (username === '') {
-                    setUsername('');
-                    updateLoginDisplay();
-                    showNotification(t('library.usernameCleared'), 'info');
-                }
-            }
-        });
-    }
-
     if (i18n && document.documentElement.getAttribute('data-library-locale-listener') !== 'true') {
         document.documentElement.setAttribute('data-library-locale-listener', 'true');
         i18n.onLocaleChange(function() {
             var covers = document.querySelectorAll('.book-cover');
             var i;
-            updateLoginDisplay();
             for (i = 0; i < covers.length; i++) {
                 covers[i].setAttribute('alt', t('library.cover'));
             }
@@ -554,11 +510,25 @@ function initScript() {
         var searchTerm = (searchBox.value || '').toLowerCase().trim();
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var tagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
-        document.querySelectorAll('.book-card').forEach(function(card) {
+        var bookGrid = document.querySelector('.book-grid');
+        var filteredState = bookGrid && bookGrid.querySelector('.library-state--filtered');
+        var visibleCount = 0;
+        var cards = document.querySelectorAll('.book-card');
+        if (filteredState) bookGrid.removeChild(filteredState);
+        cards.forEach(function(card) {
             var textMatches = cardMatchesSearch(card, searchTerm);
             var tagMatches = cardMatchesTag(card, tagId);
-            card.style.display = textMatches && tagMatches ? 'block' : 'none';
+            var visible = textMatches && tagMatches;
+            card.style.display = visible ? 'block' : 'none';
+            if (visible) visibleCount += 1;
         });
+        if (cards.length && visibleCount === 0) {
+            showLibraryState(
+                'library.noResultsTitle',
+                'library.noResultsDescription',
+                'filtered'
+            );
+        }
     }
 
     function activateTag(tagId) {
@@ -612,10 +582,20 @@ function initScript() {
         window.scrollTo(0, 0);
     });
 
+    function updateScrollToTopVisibility() {
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
+        if (scrollTop > threshold) scrollToTopBtn.classList.add('is-visible');
+        else scrollToTopBtn.classList.remove('is-visible');
+    }
+    window.addEventListener('scroll', updateScrollToTopVisibility);
+    updateScrollToTopVisibility();
+
     function pwaSupport() {
+        if (window.EpubBrowserMode === 'server') return;
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register(window.EpubBrowserURL.publicPath('/sw.js'))
+                window.EpubBrowserCacheBoundary.registerWorker()
                     .then(function(registration) {
                         console.log('ServiceWorker registration successful');
                     })
@@ -625,21 +605,12 @@ function initScript() {
             });
         }
         var deferredPrompt;
-        var readingControls = document.querySelector('.reading-controls');
-        
-        var installBtn = document.createElement('button');
-        installBtn.id = 'pwa-install-btn';
-        installBtn.className = 'control-btn';
-        installBtn.innerHTML = '<i class="fas fa-download"></i><div class="control-name" data-i18n="library.install">' + t('library.install') + '</div>';
-        installBtn.style.display = 'none';
-        if (readingControls) {
-            readingControls.appendChild(installBtn);
-        }
+        var installBtn = document.getElementById('pwa-install-btn');
 
         window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
-            if (installBtn) installBtn.style.display = 'block';
+            if (installBtn) installBtn.style.display = '';
         });
 
         if (installBtn) {
@@ -667,8 +638,6 @@ function initScript() {
     }
 
     function bookshelfSupport() {
-        var bookshelfBtn = document.getElementById('bookshelfBtn');
-        if (bookshelfBtn) bookshelfBtn.style.display = 'inherit';
         if (window.initBookshelf) {
             window.initBookshelf();
         } else {

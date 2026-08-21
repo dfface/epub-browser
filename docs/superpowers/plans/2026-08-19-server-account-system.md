@@ -4,7 +4,7 @@
 
 **Goal:** Make Server mode a secure multi-user reading library with local-password accounts, trusted-proxy identities, per-book grants, and a safe upgrade path, while leaving SSG fully static.
 
-**Architecture:** A new `auth.py` owns opaque Cookie sessions, Argon2id password verification, CSRF, and proxy-identity resolution. `StateStore` owns users, identities, sessions, scoped user data, and book grants; `server.py` applies authentication and authorization before dynamic or static content is served. The Server runtime supplies bootstrap and trusted-proxy configuration, while SSG never creates or consumes this configuration.
+**Architecture:** A new `auth.py` owns opaque Cookie sessions, Argon2id password verification, CSRF, setup completion, and proxy-identity resolution. `StateStore` owns users, identities, sessions, scoped user data, and book grants; `server.py` applies setup, authentication, and authorization boundaries before dynamic or static content is served. The Server runtime supports web-first or unattended bootstrap and trusted-proxy configuration, while SSG never creates or consumes this configuration.
 
 **Tech Stack:** Python 3.9+, SQLite, Starlette, Uvicorn, `argon2-cffi`, browser JavaScript, Python `unittest`, Node `node:test`.
 
@@ -18,9 +18,11 @@
 - Store only Argon2id password hashes and session-token digests; never log a password, raw token, or bootstrap secret.
 - Trust proxy identity headers only from explicitly configured CIDRs and include a configured issuer in the identity key.
 - Keep SSG free of account routes, auth API calls, cookies, account controls, and `epub_browser_username` dependencies.
-- Existing Server annotations, bookshelves, and progress migrate to the bootstrap administrator in one rollback-safe SQLite upgrade.
+- Existing Server annotations, bookshelves, and progress migrate to one pending administrator ID in a rollback-safe SQLite upgrade; setup completes that same ID.
+- Until one administrator is completed, expose only the localized setup surface, its fixed assets, and minimal setup-required health/readiness status; do not publish the library or honor proxy identities.
 - Preserve the existing `--log` rule: normal Server operation must not print incidental output that corrupts tqdm progress.
 - Every user-facing Server string is present in English and Simplified Chinese catalogs.
+- Do not add browser end-to-end tests; user acceptance is manual. Automated coverage is limited to unit, in-process ASGI integration, static, and JavaScript tests.
 
 ---
 
@@ -31,8 +33,8 @@
 | `epub_browser/auth.py` | `Principal`, `AuthConfig`, cookie/session/CSRF/password/proxy resolution, login throttling. |
 | `epub_browser/state.py` | Schema v2 migration, account/identity/session persistence, `user_id` scoped content, book visibility and grants. |
 | `epub_browser/cli.py` | Server-only account/proxy options and `ServerConfig.auth`. |
-| `epub_browser/runtime.py` | Resolve secret sources, seed bootstrap administrator, construct `AuthConfig`, pass it to `create_app`. |
-| `epub_browser/server.py` | Authentication middleware, local/proxy login routes, account/admin APIs, scoped existing APIs, protected static book delivery. |
+| `epub_browser/runtime.py` | Optionally resolve unattended secrets, gate library publication on setup, construct `AuthConfig`, pass it to `create_app`. |
+| `epub_browser/server.py` | One-time localized setup, authentication middleware, local/proxy login routes, account/admin APIs, scoped existing APIs, protected static book delivery. |
 | `epub_browser/site.py` | Server-only login/account/admin markup and no SSG auth controls. |
 | `epub_browser/assets/auth.js` | Login, logout, session and CSRF helper, account/admin interactions. |
 | `epub_browser/assets/i18n.js` | English/Simplified Chinese strings for auth and administration. |
@@ -79,6 +81,7 @@ class ServerAuthOptions:
     cookie_secure: Optional[bool] = None
 
 class AuthService:
+    def complete_setup(self, username: str, password: str) -> tuple[str, Principal]: ...
     def authenticate_password(self, username: str, password: str, client_key: str) -> Principal: ...
     def create_session(self, principal: Principal) -> tuple[str, str]: ...
     def principal_from_session(self, raw_token: Optional[str]) -> Optional[Principal]: ...
@@ -89,6 +92,8 @@ class AuthService:
 # epub_browser/state.py
 def bootstrap_admin(self, username: str, password_hash: str) -> Principal: ...
 def has_administrator(self) -> bool: ...
+def complete_administrator_setup(self, username: str, password_hash: str,
+                                 token_digest: str, expires_at, *, now=None) -> Principal: ...
 def migrate_user_owned_data(self, administrator_id: str) -> None: ...
 def visible_books(self, principal: Principal) -> tuple[BookRecord, ...]: ...
 def can_read_book(self, user_id: str, role: str, book_id: str) -> bool: ...
@@ -698,77 +703,121 @@ git add epub_browser/site.py epub_browser/assets/auth.js epub_browser/assets/i18
 git commit -m "feat: add localized Server account controls"
 ```
 
-### Task 9: Wire bootstrap secrets into runtime and document secure deployment
+### Task 9: Add one-time setup, optional unattended bootstrap, and secure deployment guidance
 
 **Files:**
 - Modify: `epub_browser/runtime.py`
-- Modify: `epub_browser/cli.py`
-- Modify: `epub_browser/migration.py`
+- Modify: `epub_browser/state.py`
+- Modify: `epub_browser/auth.py`
+- Modify: `epub_browser/server.py`
+- Modify: `epub_browser/assets/i18n.js`
 - Modify: `Dockerfile`
 - Modify: `README.md`
 - Modify: `docs/migration-v2.md`
+- Modify: `docs/superpowers/specs/2026-08-19-server-account-system-design.md`
 - Modify: `tests/test_runtime.py`
-- Modify: `tests/test_cli.py`
+- Modify: `tests/test_state.py`
+- Modify: `tests/test_auth.py`
+- Modify: `tests/test_server.py`
+- Modify: `tests/test_migration.py`
 
 **Consumes:** `BootstrapCredentials`, `AuthConfig`, and `create_app(..., auth_service=...)` from Tasks 1–4.
 
-**Produces:** deployment-ready, fail-closed Server startup and complete migration/configuration documentation.
+**Produces:** a deployment-ready web-first setup boundary, optional fail-closed
+unattended bootstrap, stable legacy-data ownership, and complete secure
+deployment documentation.
 
-- [ ] **Step 1: Write failing bootstrap and secret tests**
-
-```python
-def test_first_persistent_server_start_requires_admin_secret_without_printing_it(self):
-    result = run_server(self.config_without_bootstrap, reporter=self.reporter)
-    self.assertEqual(result, 5)
-    self.assertIn('administrator credentials are required', self.reporter.errors[0])
-    self.assertNotIn('secret-value', '\n'.join(self.reporter.errors))
-
-def test_runtime_reads_password_file_once_and_bootstraps_admin(self):
-    self.password_file.write_text('secret-value\n', encoding='utf-8')
-    run_server(self.config_with_password_file, server_factory=self.server_that_stops)
-    self.assertTrue(self.store.get_user_by_username('admin').is_admin)
-```
-
-- [ ] **Step 2: Run tests and verify failure**
-
-Run: `python3 -m unittest tests.test_runtime.ServerBootstrapTests tests.test_cli`
-
-Expected: FAIL because runtime does not resolve bootstrap sources or fail closed.
-
-- [ ] **Step 3: Implement runtime configuration resolution and fail-closed bootstrap**
+- [ ] **Step 1: Write failing pending-administrator and atomic setup tests**
 
 ```python
-def resolve_bootstrap_credentials(config: ServerConfig, environ: Mapping[str, str]) -> BootstrapCredentials:
-    username = config.admin_username or environ.get('EPUB_BROWSER_ADMIN_USERNAME')
-    password = read_secret_file(config.admin_password_file or environ.get('EPUB_BROWSER_ADMIN_PASSWORD_FILE'))
-    password = password or environ.get('EPUB_BROWSER_ADMIN_PASSWORD')
-    if not username or not password:
-        raise ServerLockError('Server administrator credentials are required for first startup')
-    return BootstrapCredentials(username, password)
+def test_legacy_data_moves_to_pending_administrator_then_setup_keeps_id(self):
+    pending = store.initialize()
+    assert not store.has_administrator()
+    completed = store.initialize(BootstrapCredentials('owner', 'secret'))
+    assert completed.user_id == pending.user_id
+
+def test_setup_activation_and_initial_session_are_one_transaction(self):
+    # Inject a duplicate session digest and verify activation rolls back too.
 ```
 
-Pass bootstrap credentials into `MigrationManager.prepare_data()` so its
-existing `StateStore.initialize()` call upgrades an old persistent database in
-the same backup-managed path. Add `StateStore.has_administrator()` as a
-read-only schema-aware probe; use it to resolve credentials only when the
-database has no administrator, so restarts do not require the secret. Strip one trailing newline from secret files,
-reject empty/unreadable files, and never pass raw secret text to reporters.
-Pass the resulting `AuthService` into `create_app`. Update Docker environment
-examples to mount a password file, retain data volume persistence, use
-`--watch`, and place the service behind TLS plus configured trusted proxy
-networks.
+- [ ] **Step 2: Implement pending identity and atomic setup completion**
 
-- [ ] **Step 4: Run runtime/documentation-adjacent tests**
+Create exactly one disabled, passwordless pending administrator when no
+completed administrator exists. It has a generated stable user ID and does not
+make `has_administrator()` true. Assign all legacy annotations, bookshelf rows,
+and progress to it. Web and unattended setup update its username, Argon2id
+password hash, enabled flag, and pending marker in place. Web setup inserts the
+initial session digest in the same `BEGIN IMMEDIATE` transaction so concurrent
+claims have exactly one winner.
 
-Run: `python3 -m unittest tests.test_runtime tests.test_cli tests.test_mode_integration`
+- [ ] **Step 3: Write and implement the in-process setup-only HTTP boundary**
 
-Expected: PASS.
+Add a localized English/Simplified Chinese `GET /setup` page with username,
+password, confirmation, and locale fields, plus `POST /setup`. Before setup is
+complete:
 
-- [ ] **Step 5: Commit**
+- normal HTML redirects to `/setup`;
+- APIs, SSE, book resources, and generated static assets return `503` with a
+  setup-required error and no content;
+- health/readiness return only `{"status":"setup_required"}`;
+- only the fixed setup/login JavaScript and i18n assets are public;
+- trusted-proxy headers are not evaluated and cannot claim setup.
+
+Validate submitted username/password/confirmation without returning or logging
+the password. Protect the claim with a high-entropy hidden nonce and matching
+short-lived `HttpOnly`, `SameSite=Strict` cookie, checked with
+`compare_digest`. Validate Origin against Host and reject non-same-origin
+`Sec-Fetch-Site` values with the same generic response regardless of setup
+state. Clear the setup cookie after success or setup-complete. A successful
+claim creates the session cookie and redirects to the library; losing
+concurrent claims redirect through login. GET and HEAD render setup (HEAD has no
+body) instead of entering form parsing.
+
+- [ ] **Step 4: Make runtime web-first while retaining unattended setup**
+
+When no credential source is configured, initialize the pending administrator
+and start setup-only mode normally. Keep the public shell inaccessible, do not
+scan EPUBs, and do not start the watcher until `has_administrator()` becomes true. If any unattended
+credential source is configured, require a complete valid username/password
+pair and fail closed otherwise. Prefer the password file, remove exactly one
+trailing newline, never report its contents, and complete a pending row in
+place. Completed restarts do not read any configured secret. Construct the real
+`AuthConfig`/`AuthService` with trusted-proxy and secure-cookie options. Disable
+Uvicorn proxy-header processing so trusted-proxy CIDRs always evaluate the
+direct socket peer, never a forwarded client address. Start the watcher only
+after an explicit successful administrator observation; a polling error must
+not be treated like completed setup.
+
+Before changing an existing authoritative `data/epub-browser.db` from an older
+supported schema, run its integrity check and create a digest- and
+integrity-verified backup under `data/backups/` using the migration naming
+convention. Stop before schema mutation on any backup failure, preserve a
+restorable prior-schema copy, and avoid repeated backups on current-schema
+restarts.
+
+- [ ] **Step 5: Update deployment and migration guidance**
+
+Prefer web setup for interactive README, Docker, and migration examples. Warn
+that the first visitor can claim setup: keep the port private until completion,
+or mount a secret for unattended deployment. Retain persistent data volume,
+`--watch`, TLS termination, secure-cookie, and direct-proxy CIDR/header boundary
+instructions.
+
+- [ ] **Step 6: Run focused and full verification**
+
+Run: `python3 -m unittest tests.test_state tests.test_auth tests.test_server tests.test_runtime tests.test_migration tests.test_cli tests.test_mode_integration`
+
+Run: `python3 -m unittest discover -s tests -p 'test_*.py'`
+
+Run: `node --test tests/test_*.js`
+
+Expected: PASS, with no browser E2E.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add epub_browser/runtime.py epub_browser/cli.py Dockerfile README.md docs/migration-v2.md tests/test_runtime.py tests/test_cli.py
-git commit -m "docs: configure secure Server account bootstrap"
+git add epub_browser/state.py epub_browser/auth.py epub_browser/server.py epub_browser/runtime.py epub_browser/assets/i18n.js tests/test_state.py tests/test_auth.py tests/test_server.py tests/test_runtime.py tests/test_migration.py Dockerfile README.md docs/migration-v2.md docs/superpowers/specs/2026-08-19-server-account-system-design.md docs/superpowers/plans/2026-08-19-server-account-system.md
+git commit -m "feat: add one-time Server administrator setup"
 ```
 
 ### Task 10: Run the security regression matrix and release checks
@@ -781,7 +830,7 @@ git commit -m "docs: configure secure Server account bootstrap"
 
 **Produces:** a verified account-system branch with no SSG or existing Server lifecycle regressions.
 
-- [ ] **Step 1: Add one end-to-end in-process security matrix test**
+- [ ] **Step 1: Add one in-process ASGI security matrix test**
 
 ```python
 def test_member_lifecycle_from_login_to_restricted_book_revocation(self):
