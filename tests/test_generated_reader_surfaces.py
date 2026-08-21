@@ -1181,6 +1181,37 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(library, r'item\.setAttribute\(["\'`]role["\'`],["\'`]menuitemradio["\'`]\)')
         self.assertRegex(library, r'item\.setAttribute\(["\'`]aria-checked["\'`]')
 
+    def test_locale_action_is_a_compact_icon_control(self):
+        library = self._library_html()
+        nav = re.search(
+            r'<nav\b[^>]*\bclass=(?:["\'])?app-nav[^>]*>.*?</nav>',
+            library,
+            re.S,
+        ).group(0)
+        toggle = re.search(
+            r'<button\b(?=[^>]*\bid=(?:["\'])?localeToggle(?:["\' >]))[^>]*>(.*?)</button>',
+            nav,
+            re.S,
+        ).group(1)
+
+        self.assertRegex(toggle, r'\bclass=(?:["\'])?fas fa-globe(?:["\'])?')
+        self.assertRegex(
+            toggle,
+            r'<span\b(?=[^>]*\bid=(?:["\'])?localeCurrentLabel(?:["\' >]))'
+            r'(?=[^>]*\bclass=(?:["\'])?sr-only(?:["\' >]))[^>]*>',
+        )
+        self.assertNotIn('app-nav-menu-chevron', toggle)
+
+        css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        locale_rules = css[
+            css.index('.app-nav .app-nav-locale-toggle {'):
+            css.index('}', css.index('.app-nav .app-nav-locale-toggle {'))
+        ]
+        self.assertIn('width: 44px;', locale_rules)
+        self.assertIn('height: 44px;', locale_rules)
+        self.assertIn('padding: 0;', locale_rules)
+        self.assertNotIn('.app-nav-locale-toggle > .fa-globe', css)
+
     def test_desktop_floating_controls_only_keep_scroll_to_top(self):
         for html in (self._library_html(), self._book_html(), self._chapter_html()):
             floating = re.search(r'class=(?:["\'])?reading-controls(?:["\' >])', html)

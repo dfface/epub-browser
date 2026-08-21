@@ -153,24 +153,17 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    min-height: 42px;
+    min-height: 44px;
     padding: 0;
     border-radius: 10px;
 }
 
 .app-nav .app-nav-locale-toggle {
+    width: 44px;
+    height: 44px;
     min-height: 44px;
-    padding: 0 10px;
-    gap: 8px;
-}
-
-.app-nav-menu-chevron {
-    font-size: .64rem !important;
-    transition: transform 160ms ease;
-}
-
-.app-nav-locale-toggle[aria-expanded="true"] .app-nav-menu-chevron {
-    transform: rotate(180deg);
+    padding: 0;
+    gap: 0;
 }
 
 .app-nav-link:focus-visible,
@@ -392,15 +385,5 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     .reader-toolbar.top-controls,
     .reading-controls {
         display: none;
-    }
-}
-
-@media (max-width: 430px) {
-    .app-nav-locale-toggle > .fa-globe {
-        display: none;
-    }
-
-    .app-nav .app-nav-locale-toggle {
-        padding: 0 8px;
     }
 }

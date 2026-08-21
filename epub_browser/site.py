@@ -309,7 +309,7 @@ if (isKindle) {
         </div>
         <div class="app-nav-actions">
             <div class="library-language app-nav-locale">
-                <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span id="localeCurrentLabel">中文</span><i class="fas fa-chevron-down app-nav-menu-chevron" aria-hidden="true"></i></button>
+                <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" id="localeCurrentLabel">中文</span></button>
                 <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select>
             </div>
             <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
