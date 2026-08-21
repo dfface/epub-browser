@@ -479,6 +479,95 @@ body.auth-page {
     padding: clamp(20px, 3vw, 28px);
 }
 
+.account-ai-section {
+    display: grid;
+    gap: 16px;
+}
+
+.admin-ai-settings-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+}
+
+.admin-ai-settings-form .admin-ai-enabled,
+.admin-ai-settings-form .admin-ai-clear-key {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 2px;
+}
+
+.admin-ai-settings-form input[type="checkbox"] {
+    width: 17px;
+    min-height: 17px;
+    margin: 0;
+    accent-color: var(--account-primary);
+}
+
+.admin-ai-key-notice {
+    margin-top: -8px;
+    font-size: .8rem;
+}
+
+.admin-ai-subsection {
+    padding-top: 16px;
+    border-top: 1px solid var(--account-border);
+}
+
+.admin-ai-subsection h5 {
+    margin: 0;
+    color: var(--account-text);
+    font-size: .86rem;
+}
+
+.admin-ai-tag-form {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.admin-ai-tag-form label {
+    flex: 1 1 220px;
+}
+
+.admin-ai-access-item,
+.admin-ai-tag-item {
+    justify-content: space-between;
+}
+
+.admin-ai-access-controls,
+.admin-ai-tag-actions {
+    display: flex;
+    align-items: center;
+    flex: 1 1 420px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.admin-ai-inline-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--account-muted);
+    font-size: .78rem;
+    font-weight: 650;
+}
+
+.admin-ai-inline-label input[type="number"],
+.admin-ai-tag-item input {
+    width: 116px;
+    min-height: 36px;
+}
+
+.admin-ai-tag-item input {
+    flex: 1 1 220px;
+    width: auto;
+}
+
 #adminUserForm {
     grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
     align-items: end;
@@ -824,7 +913,8 @@ body.auth-page {
     }
 
     #adminUserForm,
-    #adminIdentityForm {
+    #adminIdentityForm,
+    .admin-ai-settings-form {
         grid-template-columns: 1fr 1fr;
     }
 
@@ -896,7 +986,8 @@ body.auth-page {
     }
 
     #adminUserForm,
-    #adminIdentityForm {
+    #adminIdentityForm,
+    .admin-ai-settings-form {
         grid-template-columns: 1fr;
     }
 

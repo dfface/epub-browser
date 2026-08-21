@@ -567,12 +567,15 @@ def create_app(
         return data, None
 
     def user_data(user):
-        return {
+        payload = {
             'id': user.user_id,
             'username': user.username,
             'role': user.role,
             'enabled': user.enabled,
         }
+        if user.role == 'member':
+            payload['ai_access'] = store.get_ai_user_access(user.user_id)
+        return payload
 
     def admin_book_data(book):
         try:

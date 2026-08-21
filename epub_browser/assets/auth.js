@@ -13,6 +13,8 @@
     var users = [];
     var books = [];
     var identities = [];
+    var aiSettings = null;
+    var aiTags = [];
 
     function i18n() {
       return root.EpubBrowserI18n;
@@ -478,6 +480,118 @@
       });
     }
 
+    function renderAiSettings() {
+      var form = element('adminAiSettingsForm');
+      if (!form || !aiSettings) return;
+      var fields = form.elements;
+      fields.enabled.checked = Boolean(aiSettings.enabled);
+      fields.base_url.value = aiSettings.base_url || '';
+      fields.api_key.value = '';
+      fields.model.value = aiSettings.model || '';
+      fields.timeout_seconds.value = String(aiSettings.timeout_seconds || 60);
+      fields.max_concurrency.value = String(aiSettings.max_concurrency || 2);
+      fields.daily_limit.value = String(aiSettings.daily_limit || 0);
+      fields.clear_api_key.checked = false;
+      fields.api_key.placeholder = aiSettings.api_key_configured
+        ? t('admin.ai.apiKeyConfigured') : t('admin.ai.apiKeyPlaceholder');
+    }
+
+    function saveAiUserAccess(user, enabled, dailyLimit) {
+      return authenticatedFetch('/api/admin/ai/users/' + encodeURIComponent(user.id), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: enabled, daily_limit: dailyLimit })
+      }).then(function(response) {
+        if (!response.ok) return showResponseError(response, 'admin');
+        showStatus('admin.ai.accessSaved', 'success');
+        return loadAdminData();
+      }).catch(function() { showStatus('admin.error.network', 'error'); });
+    }
+
+    function renderAiUserAccess() {
+      var list = element('adminAiUserList');
+      if (!list) return;
+      list.textContent = '';
+      var members = users.filter(function(user) { return user.role === 'member'; });
+      members.forEach(function(user) {
+        var item = root.document.createElement('li');
+        var name = root.document.createElement('strong');
+        var controls = root.document.createElement('div');
+        var enabled = root.document.createElement('input');
+        var enabledLabel = root.document.createElement('label');
+        var limit = root.document.createElement('input');
+        var limitLabel = root.document.createElement('label');
+        var access = user.ai_access || {};
+        item.className = 'account-list-item admin-ai-access-item';
+        name.textContent = user.username;
+        controls.className = 'admin-ai-access-controls';
+        enabled.type = 'checkbox';
+        enabled.checked = Boolean(access.enabled);
+        enabledLabel.className = 'admin-ai-inline-label';
+        enabledLabel.appendChild(enabled);
+        enabledLabel.appendChild(root.document.createTextNode(t('admin.ai.allowed')));
+        limit.type = 'number';
+        limit.min = '0';
+        limit.value = access.daily_limit === null || access.daily_limit === undefined ? '' : String(access.daily_limit);
+        limit.placeholder = t('admin.ai.defaultLimit');
+        limitLabel.className = 'admin-ai-inline-label';
+        limitLabel.appendChild(root.document.createTextNode(t('admin.ai.dailyOverride')));
+        limitLabel.appendChild(limit);
+        controls.appendChild(enabledLabel);
+        controls.appendChild(limitLabel);
+        controls.appendChild(actionButton('admin.ai.saveAccess', function() {
+          var parsed = limit.value === '' ? null : Number(limit.value);
+          if (parsed !== null && (!Number.isInteger(parsed) || parsed < 0)) {
+            showStatus('admin.error.invalid_ai_access', 'error');
+            return;
+          }
+          saveAiUserAccess(user, enabled.checked, parsed);
+        }));
+        item.appendChild(name);
+        item.appendChild(controls);
+        list.appendChild(item);
+      });
+      if (!members.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.ai.noMembers'));
+    }
+
+    function renderAiTags() {
+      var list = element('adminAiTagList');
+      if (!list) return;
+      list.textContent = '';
+      aiTags.forEach(function(tag) {
+        var item = root.document.createElement('li');
+        var input = root.document.createElement('input');
+        var actions = root.document.createElement('div');
+        item.className = 'account-list-item admin-ai-tag-item';
+        input.type = 'text';
+        input.maxLength = 80;
+        input.value = tag.name;
+        input.setAttribute('aria-label', t('admin.ai.tagName'));
+        actions.className = 'admin-ai-tag-actions';
+        actions.appendChild(actionButton('admin.ai.renameTag', function() {
+          authenticatedFetch('/api/admin/ai/tags/' + encodeURIComponent(tag.id), {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: input.value })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        }));
+        actions.appendChild(actionButton('admin.ai.deleteTag', function() {
+          authenticatedFetch('/api/admin/ai/tags/' + encodeURIComponent(tag.id), {
+            method: 'DELETE'
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        }, 'danger'));
+        item.appendChild(input);
+        item.appendChild(actions);
+        list.appendChild(item);
+      });
+      if (!aiTags.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.ai.noTags'));
+    }
+
     function renderBooks() {
       var list = element('adminBookList');
       if (!list) return;
@@ -555,6 +669,57 @@
         });
         saveGrants.disabled = book.visibility !== 'restricted';
         item.appendChild(saveGrants);
+        var ai = root.document.createElement('fieldset');
+        var aiLegend = createTextElement('legend', '', 'admin.ai.bookSettings');
+        var profile = root.document.createElement('select');
+        var tagOptions = root.document.createElement('div');
+        ai.className = 'account-book-grants admin-book-ai-settings';
+        profile.setAttribute('aria-label', t('admin.ai.readingProfile'));
+        profile.setAttribute('data-i18n-aria-label', 'admin.ai.readingProfile');
+        ['auto', 'technical', 'fiction', 'general'].forEach(function(value) {
+          var option = root.document.createElement('option');
+          option.value = value;
+          option.textContent = t('admin.ai.profile.' + value);
+          option.selected = value === (book.ai_profile || 'auto');
+          profile.appendChild(option);
+        });
+        tagOptions.className = 'account-book-grant-options';
+        ai.appendChild(aiLegend);
+        ai.appendChild(profile);
+        aiTags.forEach(function(tag) {
+          var label = root.document.createElement('label');
+          var checkbox = root.document.createElement('input');
+          var name = root.document.createElement('span');
+          label.className = 'account-book-grant-option';
+          checkbox.type = 'checkbox';
+          checkbox.value = tag.id;
+          checkbox.checked = (book.ai_tags || []).some(function(assigned) {
+            return assigned.id === tag.id;
+          });
+          name.textContent = tag.name;
+          label.appendChild(checkbox);
+          label.appendChild(name);
+          tagOptions.appendChild(label);
+        });
+        if (!aiTags.length) tagOptions.appendChild(createTextElement(
+          'p', 'account-empty', 'admin.ai.noTags'
+        ));
+        ai.appendChild(tagOptions);
+        item.appendChild(ai);
+        item.appendChild(actionButton('admin.ai.saveBookSettings', function() {
+          var tagIds = [];
+          Array.prototype.forEach.call(tagOptions.querySelectorAll('input[type="checkbox"]'), function(checkbox) {
+            if (checkbox.checked) tagIds.push(checkbox.value);
+          });
+          authenticatedFetch('/api/admin/books/' + encodeURIComponent(book.id) + '/ai', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: profile.value, tag_ids: tagIds })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            showStatus('admin.ai.bookSaved', 'success');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        }));
         list.appendChild(item);
       });
       if (!books.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.noBooks'));
@@ -652,23 +817,34 @@
       );
       var requests = [
         authenticatedFetch('/api/admin/users'),
-        authenticatedFetch('/api/admin/books')
+        authenticatedFetch('/api/admin/books'),
+        authenticatedFetch('/api/admin/ai/settings'),
+        authenticatedFetch('/api/admin/ai/tags')
       ];
       if (proxyEnabled) requests.push(authenticatedFetch('/api/admin/identities'));
       return Promise.all(requests).then(function(responses) {
         if (!responses[0].ok) return showResponseError(responses[0], 'admin');
         if (!responses[1].ok) return showResponseError(responses[1], 'admin');
-        if (proxyEnabled && !responses[2].ok) return showResponseError(responses[2], 'admin');
+        if (!responses[2].ok) return showResponseError(responses[2], 'admin');
+        if (!responses[3].ok) return showResponseError(responses[3], 'admin');
+        if (proxyEnabled && !responses[4].ok) return showResponseError(responses[4], 'admin');
         var payloadRequests = [
           readJson(responses[0]),
-          readJson(responses[1])
+          readJson(responses[1]),
+          readJson(responses[2]),
+          readJson(responses[3])
         ];
-        if (proxyEnabled) payloadRequests.push(readJson(responses[2]));
+        if (proxyEnabled) payloadRequests.push(readJson(responses[4]));
         return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
           books = payloads[1].books || [];
-          identities = proxyEnabled ? (payloads[2].identities || []) : [];
+          aiSettings = payloads[2].settings || null;
+          aiTags = payloads[3].tags || [];
+          identities = proxyEnabled ? (payloads[4].identities || []) : [];
           renderUsers();
+          renderAiSettings();
+          renderAiUserAccess();
+          renderAiTags();
           renderBooks();
           renderIdentities();
         });
@@ -717,6 +893,8 @@
       var associationForm = element('associationForm');
       var createUserForm = element('adminUserForm');
       var createIdentityForm = element('adminIdentityForm');
+      var aiSettingsForm = element('adminAiSettingsForm');
+      var aiTagForm = element('adminAiTagForm');
       if (menu) menu.addEventListener('click', openPanel);
       if (close) close.addEventListener('click', closePanel);
       if (adminMenu) adminMenu.addEventListener('click', openAdminPanel);
@@ -781,11 +959,48 @@
           createIdentityForm.reset();
         });
       });
+      if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var fields = aiSettingsForm.elements;
+        authenticatedFetch('/api/admin/ai/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: fields.enabled.checked,
+            base_url: fields.base_url.value,
+            api_key: fields.api_key.value || undefined,
+            model: fields.model.value,
+            timeout_seconds: Number(fields.timeout_seconds.value),
+            max_concurrency: Number(fields.max_concurrency.value),
+            daily_limit: Number(fields.daily_limit.value),
+            clear_api_key: fields.clear_api_key.checked
+          })
+        }).then(function(response) {
+          if (!response.ok) return showResponseError(response, 'admin');
+          showStatus('admin.ai.settingsSaved', 'success');
+          return loadAdminData();
+        }).catch(function() { showStatus('admin.error.network', 'error'); });
+      });
+      if (aiTagForm) aiTagForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        authenticatedFetch('/api/admin/ai/tags', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: formValue(aiTagForm, 'name') })
+        }).then(function(response) {
+          if (!response.ok) return showResponseError(response, 'admin');
+          aiTagForm.reset();
+          showStatus('admin.ai.tagAdded', 'success');
+          return loadAdminData();
+        }).catch(function() { showStatus('admin.error.network', 'error'); });
+      });
       if (i18n() && i18n().onLocaleChange) {
         i18n().onLocaleChange(function() {
           renderIdentity();
           renderSessions([]);
           renderUsers();
+          renderAiSettings();
+          renderAiUserAccess();
+          renderAiTags();
           renderBooks();
           renderIdentities();
           loadSessions();

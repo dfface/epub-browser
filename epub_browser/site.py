@@ -159,6 +159,34 @@ def _render_library_html(
                 </form>
                 <ul class="account-list" id="adminUserList"></ul>
             </section>
+            <section class="account-admin-section account-card-wide account-ai-section" aria-labelledby="adminAiTitle">
+                <h4 id="adminAiTitle" data-i18n="admin.ai.title">AI reading</h4>
+                <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and server-managed tags. Selected book text is sent to the configured provider.</p>
+                <form class="account-form admin-ai-settings-form" id="adminAiSettingsForm">
+                    <label class="admin-ai-enabled"><span data-i18n="admin.ai.enabled">Enable AI reading</span><input type="checkbox" name="enabled"></label>
+                    <label><span data-i18n="admin.ai.baseUrl">Provider base URL</span><input type="url" name="base_url" autocomplete="off" placeholder="https://api.example/v1" required></label>
+                    <label><span data-i18n="admin.ai.apiKey">API key</span><input type="password" name="api_key" autocomplete="new-password" data-i18n-placeholder="admin.ai.apiKeyPlaceholder" placeholder="Leave blank to keep the configured key"></label>
+                    <label><span data-i18n="admin.ai.model">Model</span><input type="text" name="model" autocomplete="off" required></label>
+                    <label><span data-i18n="admin.ai.timeout">Timeout (seconds)</span><input type="number" name="timeout_seconds" min="5" max="180" required></label>
+                    <label><span data-i18n="admin.ai.concurrency">Max concurrency</span><input type="number" name="max_concurrency" min="1" max="4" required></label>
+                    <label><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><input type="number" name="daily_limit" min="0" required></label>
+                    <label class="admin-ai-clear-key"><input type="checkbox" name="clear_api_key"><span data-i18n="admin.ai.clearKey">Clear stored API key</span></label>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.ai.save">Save AI settings</button>
+                </form>
+                <p class="account-section-copy admin-ai-key-notice" data-i18n="admin.ai.keyNotice">The API key is stored in this server's SQLite database and is never returned to the browser.</p>
+                <div class="admin-ai-subsection">
+                    <h5 data-i18n="admin.ai.memberAccess">Member AI access</h5>
+                    <ul class="account-list" id="adminAiUserList"></ul>
+                </div>
+                <div class="admin-ai-subsection">
+                    <h5 data-i18n="admin.ai.tags">Server tags</h5>
+                    <form class="account-form admin-ai-tag-form" id="adminAiTagForm">
+                        <label><span data-i18n="admin.ai.tagName">Tag name</span><input type="text" name="name" maxlength="80" required></label>
+                        <button type="submit" class="bookshelf-action-btn" data-i18n="admin.ai.addTag">Add tag</button>
+                    </form>
+                    <ul class="account-list" id="adminAiTagList"></ul>
+                </div>
+            </section>
             <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
                 <p class="account-section-copy" data-i18n="admin.identityHelp">For OIDC, let a trusted reverse proxy complete the protocol and pass a stable subject. Issuer must match --proxy-issuer; subject must match the configured subject header.</p>
