@@ -95,9 +95,23 @@ class StateStore:
 
     def _connect(self):
         connection = self._connection_factory(self.database_path)
+        self._configure_connection(connection)
+        return connection
+
+    @staticmethod
+    def _configure_connection(connection) -> None:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        connection.execute("PRAGMA busy_timeout = 5000")
+        connection.execute("PRAGMA synchronous = NORMAL")
+
+    def _configure_database(self) -> str:
+        with self._connection() as connection:
+            mode = str(
+                connection.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+            )
+            connection.execute("PRAGMA optimize")
+        return mode
 
     @contextmanager
     def _connection(self):
@@ -166,6 +180,7 @@ class StateStore:
             raise
         finally:
             connection.close()
+        self._configure_database()
         return administrator.principal if administrator is not None else None
 
     def _create_compatible_schema(self, connection) -> None:

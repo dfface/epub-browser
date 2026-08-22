@@ -19,6 +19,21 @@ class StateStoreTests(unittest.TestCase):
             bootstrap=BootstrapCredentials("owner", "secret")
         )
 
+    def test_connections_enable_busy_timeout_foreign_keys_and_normal_sync(self):
+        with self.store._connection() as connection:
+            busy_timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+            foreign_keys_enabled = connection.execute(
+                "PRAGMA foreign_keys"
+            ).fetchone()[0]
+            synchronous = connection.execute("PRAGMA synchronous").fetchone()[0]
+        self.assertEqual(busy_timeout, 5000)
+        self.assertEqual(foreign_keys_enabled, 1)
+        self.assertEqual(synchronous, 1)
+
+    def test_initialize_requests_wal_and_records_sqlite_fallback(self):
+        journal_mode = self.store._configure_database()
+        self.assertIn(journal_mode.lower(), {"wal", "delete", "memory"})
+
     def test_initialize_creates_versioned_existing_and_books_tables(self):
         with sqlite3.connect(self.database) as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
