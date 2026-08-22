@@ -302,7 +302,14 @@
       if (typeof value !== 'string' && typeof value !== 'number') {
         return t('admin.ai.jobs.unknownValue');
       }
-      var parsed = new Date(value);
+      var normalized = value;
+      if (
+        typeof value === 'string'
+        && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,3})?$/.test(value)
+      ) {
+        normalized = value.replace(' ', 'T') + 'Z';
+      }
+      var parsed = new Date(normalized);
       if (!isFinite(parsed.getTime())) return t('admin.ai.jobs.unknownValue');
       try {
         return formatDate(parsed.toISOString());
@@ -349,11 +356,17 @@
         ai_result_not_found: true,
         ai_reading_required: true,
         invalid_ai_chat: true,
-        ai_generation_failed: true
+        ai_generation_failed: 'ai.error.ai_generation_failed',
+        ai_job_not_retryable: 'admin.ai.jobs.error.ai_job_not_retryable',
+        book_not_found: 'admin.ai.jobs.error.book_not_found',
+        chapter_not_found: 'admin.ai.jobs.error.chapter_not_found',
+        source_unavailable: 'admin.ai.jobs.error.source_unavailable',
+        no_reading_material: 'admin.ai.jobs.error.no_reading_material',
+        ai_template_unavailable: 'admin.ai.jobs.error.ai_template_unavailable'
       };
       if (!code) return '';
       return hasOwn(known, code)
-        ? 'ai.error.' + code
+        ? (known[code] === true ? 'ai.error.' + code : known[code])
         : 'admin.ai.jobs.error.unknown';
     }
 

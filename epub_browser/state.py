@@ -25,6 +25,24 @@ from .identity import new_server_book_id
 
 DB_SCHEMA_VERSION = 11
 
+_PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
+    "ai_disabled",
+    "ai_not_authorized",
+    "ai_quota_exhausted",
+    "ai_job_not_retryable",
+    "book_not_found",
+    "chapter_not_found",
+    "source_unavailable",
+    "no_reading_material",
+    "ai_template_unavailable",
+    "provider_connection_failed",
+    "provider_rate_limited",
+    "provider_request_rejected",
+    "provider_server_error",
+    "provider_invalid_response",
+    "ai_generation_failed",
+})
+
 _V11_INDEX_CONTRACTS = (
     ("idx_books_active_book", "books", False,
      (("active", False), ("book_id", False)), None),
@@ -2983,12 +3001,36 @@ class StateStore:
             if metadata is not None and isinstance(metadata.get("title"), str)
             else None
         )
-        for field in (
+        public_fields = (
             "scope", "mode", "language", "chapter_index", "reading_boundary",
+        )
+        valid_replay = False
+        if replay is not None and all(
+            field in replay for field in public_fields + ("book_id",)
         ):
-            values[field] = replay.get(field) if replay is not None else None
+            from .ai_reading import AIReadingError, reading_request_from_job_payload
+
+            try:
+                request = reading_request_from_job_payload(replay)
+            except AIReadingError:
+                pass
+            else:
+                if request.book_id == values["book_id"]:
+                    valid_replay = True
+                    for field in public_fields:
+                        values[field] = getattr(request, field)
+        if not valid_replay:
+            for field in public_fields:
+                values[field] = None
+        error_code = values.get("error_code")
+        values["error_code"] = (
+            error_code
+            if isinstance(error_code, str)
+            and error_code in _PUBLIC_AI_READING_JOB_ERROR_CODES
+            else None
+        )
         values["retryable"] = (
-            values["status"] in {"failed", "interrupted"} and replay is not None
+            values["status"] in {"failed", "interrupted"} and valid_replay
         )
         return values
 

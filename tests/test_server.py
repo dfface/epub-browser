@@ -1084,6 +1084,36 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(empty.json()["jobs"], [])
         self.assertEqual(empty.json()["pagination"]["total_pages"], 0)
 
+    def test_admin_ai_job_api_sanitizes_malformed_allowlisted_values(self):
+        _book, job_id = self._create_failed_ai_job("malformed-admin-api")
+        sentinel = "PRIVATE_ADMIN_API_SENTINEL"
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET request_json = ?, error_code = ? WHERE id = ?",
+                (
+                    json.dumps({
+                        "scope": [sentinel],
+                        "book_id": _book.book_id,
+                        "chapter_index": {"exception": sentinel},
+                        "mode": {"source_path": "/private/" + sentinel},
+                        "language": {"api_key": sentinel},
+                        "reading_boundary": "/private/" + sentinel,
+                    }),
+                    "chapter_not_found:/private/" + sentinel,
+                    job_id,
+                ),
+            )
+
+        response = self.admin_client.get("/api/admin/ai/jobs?status=failed")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(sentinel, response.text)
+        job = response.json()["jobs"][0]
+        self.assertFalse(job["retryable"])
+        self.assertIsNone(job["error_code"])
+        for field in ("scope", "mode", "language", "chapter_index", "reading_boundary"):
+            self.assertIsNone(job[field])
+
     def test_admin_ai_job_query_validation(self):
         invalid_queries = (
             "page=0",
@@ -2010,6 +2040,67 @@ class BookAuthorizationTests(unittest.TestCase):
             ).status_code,
             200,
         )
+
+    def test_ai_reading_route_rejects_unhashable_and_invalid_field_shapes(self):
+        valid = {
+            "scope": "chapter",
+            "book_id": "open-id",
+            "chapter_index": 0,
+            "mode": "chapter",
+            "language": "en",
+            "force": False,
+            "reading_boundary": None,
+        }
+        invalid_fields = (
+            ("scope", []),
+            ("book_id", []),
+            ("language", {}),
+            ("mode", []),
+            ("chapter_index", True),
+            ("force", 1),
+            ("reading_boundary", True),
+            ("reading_boundary", []),
+            ("reading_boundary", -1),
+        )
+
+        with mock.patch.object(
+            self.store, "can_read_book", wraps=self.store.can_read_book
+        ) as can_read_book:
+            for field, value in invalid_fields:
+                with self.subTest(field=field, value=value):
+                    payload = dict(valid)
+                    payload[field] = value
+                    response = self.member_client.post("/api/ai/reading", json=payload)
+                    self.assertEqual(response.status_code, 400)
+                    self.assertEqual(
+                        response.json()["code"], "invalid_ai_reading_request"
+                    )
+            can_read_book.assert_not_called()
+
+    def test_ai_reading_route_forwards_valid_reading_boundary(self):
+        result = {"status": "queued", "cached": False, "job": {"id": "job"}}
+        with mock.patch(
+            "epub_browser.server.AIReadingService.submit",
+            new_callable=mock.AsyncMock,
+            return_value=result,
+        ) as submit:
+            response = self.member_client.post(
+                "/api/ai/reading",
+                json={
+                    "scope": "book",
+                    "book_id": "open-id",
+                    "chapter_index": None,
+                    "mode": "read_so_far",
+                    "language": "en",
+                    "force": False,
+                    "reading_boundary": 0,
+                },
+            )
+
+        self.assertEqual(response.status_code, 202)
+        request = submit.await_args.args[1]
+        self.assertEqual(request.book_id, "open-id")
+        self.assertEqual(request.reading_boundary, 0)
 
     def test_administrator_can_list_restrict_grant_and_revoke_books(self):
         listing = self.admin_client.get("/api/admin/books")

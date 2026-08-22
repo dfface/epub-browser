@@ -2077,6 +2077,121 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(jobs, ())
         self.assertEqual(total, 0)
 
+    def test_admin_ai_job_projection_rejects_malformed_replay_and_error_values(self):
+        member = self.store.create_user("projection-reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "projection-book.epub"),
+            "urn:test:projection-book",
+            "projection-fingerprint",
+            {"title": "Projection Book"},
+        )
+        job_id = "malformed-admin-projection"
+        self.store.create_ai_job(
+            job_id,
+            member.user_id,
+            "malformed-admin-projection-cache",
+            book_id=book.book_id,
+            request_payload={
+                "scope": "chapter",
+                "book_id": book.book_id,
+                "chapter_index": 0,
+                "mode": "chapter",
+                "language": "en",
+                "reading_boundary": 0,
+            },
+        )
+        self.assertTrue(self.store.start_ai_job(job_id))
+        self.assertTrue(self.store.finish_ai_job(job_id, error_code="ai_generation_failed"))
+        sentinel = "PRIVATE_ADMIN_PROJECTION_SENTINEL"
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET request_json = ?, error_code = ? WHERE id = ?",
+                (
+                    json.dumps({
+                        "scope": [sentinel],
+                        "book_id": book.book_id,
+                        "chapter_index": {"exception": sentinel},
+                        "mode": {"source_path": "/private/" + sentinel},
+                        "language": {"api_key": sentinel},
+                        "reading_boundary": "/private/" + sentinel,
+                    }),
+                    "provider_rate_limited:/private/" + sentinel,
+                    job_id,
+                ),
+            )
+
+        jobs, total = self.store.list_admin_ai_jobs(
+            status="failed", page=1, page_size=20
+        )
+
+        self.assertEqual(total, 1)
+        job = jobs[0]
+        self.assertEqual(
+            {field: job[field] for field in (
+                "scope", "mode", "language", "chapter_index", "reading_boundary",
+            )},
+            {
+                "scope": None,
+                "mode": None,
+                "language": None,
+                "chapter_index": None,
+                "reading_boundary": None,
+            },
+        )
+        self.assertIsNone(job["error_code"])
+        self.assertFalse(job["retryable"])
+        self.assertNotIn(sentinel, json.dumps(job))
+
+        invalid_replays = (
+            {
+                "scope": "chapter",
+                "book_id": book.book_id,
+                "chapter_index": 0,
+                "mode": "chapter",
+                "language": "en",
+            },
+            {
+                "scope": "chapter",
+                "book_id": "different-book",
+                "chapter_index": 0,
+                "mode": "chapter",
+                "language": "en",
+                "reading_boundary": 0,
+            },
+            {
+                "scope": "chapter",
+                "book_id": book.book_id,
+                "chapter_index": True,
+                "mode": "chapter",
+                "language": "en",
+                "reading_boundary": 0,
+            },
+            {
+                "scope": "book",
+                "book_id": book.book_id,
+                "chapter_index": None,
+                "mode": "read_so_far",
+                "language": "en",
+                "reading_boundary": True,
+            },
+        )
+        for replay in invalid_replays:
+            with self.subTest(replay=replay):
+                with self.store._connection() as connection:
+                    connection.execute(
+                        "UPDATE ai_reading_jobs SET request_json = ?, error_code = ? WHERE id = ?",
+                        (json.dumps(replay), "provider_rate_limited", job_id),
+                    )
+                projected = self.store.list_admin_ai_jobs(
+                    status="failed", page=1, page_size=20
+                )[0][0]
+                self.assertFalse(projected["retryable"])
+                self.assertEqual(projected["error_code"], "provider_rate_limited")
+                for field in (
+                    "scope", "mode", "language", "chapter_index", "reading_boundary",
+                ):
+                    self.assertIsNone(projected[field])
+
     def test_admin_retry_creates_one_linked_active_attempt(self):
         member = self.store.create_user("reader", "hash", role="member")
         self.store.set_ai_settings(

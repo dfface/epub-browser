@@ -402,7 +402,7 @@ class ReadingRequest:
     reading_boundary: Optional[int] = None
 
 
-def _validate_reading_request_fields(request: ReadingRequest) -> None:
+def validate_reading_request(request: ReadingRequest) -> None:
     if (
         not isinstance(request, ReadingRequest)
         or not isinstance(request.scope, str)
@@ -439,7 +439,7 @@ def _validate_reading_request_fields(request: ReadingRequest) -> None:
         raise AIReadingError("invalid_ai_reading_request")
 
 
-def _reading_request_from_job_payload(payload: object) -> ReadingRequest:
+def reading_request_from_job_payload(payload: object) -> ReadingRequest:
     if not isinstance(payload, dict):
         raise AIReadingError("ai_job_not_retryable")
     request = ReadingRequest(
@@ -452,7 +452,7 @@ def _reading_request_from_job_payload(payload: object) -> ReadingRequest:
         reading_boundary=payload.get("reading_boundary"),
     )
     try:
-        _validate_reading_request_fields(request)
+        validate_reading_request(request)
     except AIReadingError:
         raise AIReadingError("ai_job_not_retryable") from None
     return request
@@ -641,7 +641,7 @@ class AIReadingService:
         )
 
     async def submit(self, principal: Principal, request: ReadingRequest) -> dict:
-        _validate_reading_request_fields(request)
+        validate_reading_request(request)
         settings = self.store._get_ai_provider_settings()
         if not settings["enabled"]:
             raise AIReadingError("ai_disabled")
@@ -721,7 +721,7 @@ class AIReadingService:
             payload = json.loads(source.get("request_json"))
         except (TypeError, ValueError):
             raise AIReadingError("ai_job_not_retryable") from None
-        request = _reading_request_from_job_payload(payload)
+        request = reading_request_from_job_payload(payload)
         if request.book_id != source.get("book_id"):
             raise AIReadingError("ai_job_not_retryable")
         for snapshot_attempt in range(_ADMIN_RETRY_SNAPSHOT_ATTEMPTS):
@@ -883,7 +883,7 @@ class AIReadingService:
     async def _run_queued_job(self, job: dict) -> None:
         try:
             payload = json.loads(job["request_json"])
-            request = _reading_request_from_job_payload(payload)
+            request = reading_request_from_job_payload(payload)
             principal = self.store.get_user(job["owner_user_id"]).principal
             material, metadata, _total, full_book_segments = self._material_for_request(principal, request)
             if not material:

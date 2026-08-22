@@ -915,6 +915,63 @@ test('administrator AI job renderer uses safe DOM, progress, timestamps, and err
   assert.doesNotMatch(scopes[1].textContent, /#0/);
 });
 
+test('administrator AI job timestamps treat SQLite shapes as UTC in Asia Shanghai', async () => {
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'Asia/Shanghai';
+  try {
+    const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload([
+      aiJob({
+        created_at: '2026-08-23 08:00:00.125',
+        updated_at: 'invalid timestamp',
+      }),
+    ]))));
+    const auth = AuthModule.create(harness.root);
+    auth.setSession({
+      user: { id: 'admin', username: 'admin', role: 'admin' },
+      csrf_token: 'admin-csrf',
+    });
+
+    await auth.loadAiJobs();
+
+    const times = descendants(harness.elements.adminAiJobsBody)
+      .filter(node => node.className === 'admin-ai-job-time')
+      .map(node => node.textContent);
+    assert.deepEqual(times, [
+      'date:2026-08-23T08:00:00.125Z',
+      '[admin.ai.jobs.unknownValue]',
+    ]);
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
+
+test('administrator AI job renderer localizes known material and template errors', async () => {
+  const codes = [
+    'ai_job_not_retryable',
+    'book_not_found',
+    'chapter_not_found',
+    'source_unavailable',
+    'no_reading_material',
+    'ai_template_unavailable',
+  ];
+  const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload(
+    codes.map((code, index) => aiJob({ id: `known-material-${index}`, error_code: code })),
+  ))));
+  const auth = AuthModule.create(harness.root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.loadAiJobs();
+
+  const errors = descendants(harness.elements.adminAiJobsBody)
+    .filter(node => node.className === 'admin-ai-job-error')
+    .map(node => node.textContent);
+  assert.deepEqual(errors, codes.map(code => `[admin.ai.jobs.error.${code}]`));
+});
+
 test('administrator AI job scope and language use the active Chinese runtime', async () => {
   const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload([
     aiJob({ id: 'chapter-job', scope: 'chapter', language: 'en', chapter_index: 2 }),

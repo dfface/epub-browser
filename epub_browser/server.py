@@ -36,7 +36,12 @@ from .auth import (
     session_cookie_options,
 )
 from .ai_client import validate_provider_base_url
-from .ai_reading import AIReadingError, AIReadingService, ReadingRequest
+from .ai_reading import (
+    AIReadingError,
+    AIReadingService,
+    ReadingRequest,
+    validate_reading_request,
+)
 from .asset_publisher import PublishedAssets
 from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
@@ -1858,31 +1863,25 @@ window.location.assign(payload.redirect||'/');
         data, error = await bounded_public_json_object(request)
         if error:
             return response(error_payload(error, 'Invalid AI reading request'), 400)
-        scope = data.get('scope')
-        book_id = data.get('book_id')
-        chapter_index = data.get('chapter_index')
-        mode = data.get('mode', 'chapter')
-        language = data.get('language', 'en')
-        force = data.get('force', False)
-        if (
-            scope not in {'book', 'chapter'}
-            or not isinstance(book_id, str)
-            or not book_id
-            or (scope == 'chapter' and (isinstance(chapter_index, bool) or not isinstance(chapter_index, int)))
-            or (scope == 'book' and chapter_index is not None)
-            or (scope == 'chapter' and mode != 'chapter')
-            or (scope == 'book' and mode not in {'spoiler_free', 'read_so_far', 'full_review'})
-            or language not in {'en', 'zh-CN'}
-            or not isinstance(force, bool)
-        ):
+        reading_request = ReadingRequest(
+            scope=data.get('scope'),
+            book_id=data.get('book_id'),
+            chapter_index=data.get('chapter_index'),
+            mode=data.get('mode', 'chapter'),
+            language=data.get('language', 'en'),
+            force=data.get('force', False),
+            reading_boundary=data.get('reading_boundary'),
+        )
+        try:
+            validate_reading_request(reading_request)
+        except AIReadingError:
             return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not store.can_read_book(
+            principal.user_id, principal.role, reading_request.book_id
+        ):
             return response(error_payload('forbidden', 'Forbidden'), 403)
         try:
-            result = await ai_reading.submit(
-                principal,
-                ReadingRequest(scope, book_id, chapter_index, mode, language, force),
-            )
+            result = await ai_reading.submit(principal, reading_request)
         except AIReadingError as error:
             return ai_error_response(error)
         return response(result, 200 if result['status'] == 'complete' else 202)
