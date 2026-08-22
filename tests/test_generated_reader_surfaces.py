@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 import subprocess
@@ -110,6 +111,35 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertEqual(processor.book_hash, "stable_id")
             self.assertEqual(converted.metadata.epub_identifier, "urn:test:stable")
             self.assertEqual(converted.chapter_count, 1)
+
+    def test_server_processor_preserves_root_relative_navigation_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "root-relative-link.epub"
+            navigation_path = (
+                "/leetcode/ChapterFour/0001~0099/0001.Two-Sum/"
+            )
+            self._write_minimal_epub(
+                source,
+                chapter_body=f'<a href="{navigation_path}">Two Sum</a>',
+            )
+            processor = EPUBProcessor(
+                str(source),
+                str(root / "staging"),
+                book_id="stable_id",
+                deployment_mode="server",
+            )
+
+            converted = processor.convert()
+            chapter = json.loads(
+                Path(
+                    converted.output_dir,
+                    "content",
+                    "chapter_0.json",
+                ).read_text(encoding="utf-8")
+            )
+
+            self.assertIn(f'href="{navigation_path}"', chapter["content"])
 
     def test_processor_skips_non_linear_spine_items_from_public_chapters(self):
         with tempfile.TemporaryDirectory() as directory:

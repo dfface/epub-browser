@@ -105,6 +105,29 @@ class EPUBIdentityTests(unittest.TestCase):
             },
         )
 
+    def test_embedding_accepts_mimetype_with_trailing_crlf(self):
+        self._write_epub(
+            self.source,
+            mimetype_compressed=True,
+            mimetype_content="application/epub+zip\r\n",
+        )
+
+        self._require_api()
+        book_id = ensure_embedded_book_id(
+            self.source,
+            preferred_book_id="stable_book_id",
+        )
+
+        self.assertEqual(book_id, "stable_book_id")
+        self.assertEqual(read_embedded_book_id(self.source), "stable_book_id")
+        with zipfile.ZipFile(self.source) as archive:
+            mimetype = archive.getinfo("mimetype")
+            self.assertEqual(
+                archive.read(mimetype),
+                b"application/epub+zip\r\n",
+            )
+            self.assertEqual(mimetype.compress_type, zipfile.ZIP_DEFLATED)
+
     def test_new_identity_is_url_safe_uuid_value(self):
         self._write_epub(self.source)
         self._require_api()
@@ -249,6 +272,7 @@ class EPUBIdentityTests(unittest.TestCase):
         embedded_meta="",
         mimetype_first=True,
         mimetype_compressed=False,
+        mimetype_content="application/epub+zip",
     ):
         container = """<?xml version="1.0"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
@@ -277,14 +301,14 @@ class EPUBIdentityTests(unittest.TestCase):
             if mimetype_compressed:
                 mimetype.extra = b"\x55\x54\x05\x00\x01\x00\x00\x00\x00"
             if mimetype_first:
-                archive.writestr(mimetype, "application/epub+zip")
+                archive.writestr(mimetype, mimetype_content)
             archive.writestr(
                 "META-INF/container.xml",
                 container,
                 compress_type=zipfile.ZIP_DEFLATED,
             )
             if not mimetype_first:
-                archive.writestr(mimetype, "application/epub+zip")
+                archive.writestr(mimetype, mimetype_content)
             opf = zipfile.ZipInfo("OEBPS/content.opf", (2021, 2, 3, 4, 5, 6))
             opf.compress_type = zipfile.ZIP_DEFLATED
             opf.external_attr = 0o100640 << 16

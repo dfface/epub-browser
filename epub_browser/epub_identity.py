@@ -225,7 +225,7 @@ def _validate_container_for_rewrite(
     )
     if mimetype is None:
         raise EPUBIdentityWriteRefused("EPUB has no mimetype entry")
-    if archive.read(mimetype) != b"application/epub+zip":
+    if archive.read(mimetype).rstrip(b"\r\n") != b"application/epub+zip":
         raise EPUBIdentityWriteRefused("EPUB mimetype content is invalid")
     for info in infos:
         if info.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}:

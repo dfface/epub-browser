@@ -149,6 +149,12 @@ def _safe_html_url(tag, attribute, value):
     parsed = urllib.parse.urlsplit(candidate)
     scheme = parsed.scheme.casefold()
     if not scheme:
+        if (
+            attribute == "href"
+            and not parsed.netloc
+            and parsed.path.startswith("/")
+        ):
+            return candidate
         resource_path = PurePosixPath(parsed.path)
         suffix = resource_path.suffix.casefold().lstrip(".")
         if attribute in {"src", "poster"}:
@@ -2086,14 +2092,21 @@ document.addEventListener('DOMContentLoaded', function() {{
 
         def replace_a_link(match):
             src = match.group(1)
+            parsed_src = urllib.parse.urlsplit(html.unescape(src).strip())
+
+            # Root-relative anchors navigate the web origin rather than the
+            # extracted EPUB archive, so they must not enter path resolution.
+            if (
+                not parsed_src.scheme
+                and not parsed_src.netloc
+                and parsed_src.path.startswith("/")
+            ):
+                return match.group(0)
 
             # 如果已经是绝对路径或数据URI，则不处理
             if self._is_external_reference(src):
                 return match.group(0)
-            if (
-                self.deployment_mode == "server"
-                and urllib.parse.urlsplit(html.unescape(src).strip()).scheme
-            ):
+            if self.deployment_mode == "server" and parsed_src.scheme:
                 # The final allowlist removes active schemes. Avoid resolving
                 # them as EPUB-internal paths before that pass.
                 return match.group(0)
