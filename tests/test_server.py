@@ -1195,6 +1195,36 @@ class AdminAccountTests(unittest.TestCase):
                 self.assertEqual(response.status_code, expected_status)
                 self.assertEqual(response.json()["code"], code)
 
+    def test_admin_retry_route_preserves_encoded_slash_job_ids(self):
+        queued = {
+            "status": "queued",
+            "cached": False,
+            "shared": False,
+            "job": {"id": "new-job", "status": "queued"},
+        }
+        with mock.patch(
+            "epub_browser.server.AIReadingService.retry_job",
+            new_callable=mock.AsyncMock,
+            return_value=queued,
+        ) as retry_job:
+            slash = self.admin_client.post(
+                "/api/admin/ai/jobs/failed%2Fjob/retry"
+            )
+            multiple_slashes = self.admin_client.post(
+                "/api/admin/ai/jobs/failed%2F%2Fjob/retry"
+            )
+            empty = self.admin_client.post("/api/admin/ai/jobs//retry")
+
+        self.assertEqual(slash.status_code, 202)
+        self.assertEqual(multiple_slashes.status_code, 202)
+        self.assertEqual(empty.status_code, 404)
+        retry_job.assert_has_awaits([
+            mock.call(self.admin, "failed/job"),
+            mock.call(self.admin, "failed//job"),
+        ])
+        self.assertEqual(retry_job.await_count, 2)
+        self.assertEqual(self.admin_client.get("/api/admin/ai/jobs").status_code, 200)
+
     def test_admin_disables_member_and_revokes_all_member_sessions(self):
         second_member_client = self._login("member", "member-secret")
 

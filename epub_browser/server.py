@@ -1810,10 +1810,11 @@ window.location.assign(payload.redirect||'/');
 
     async def admin_ai_job_retry(request):
         principal = require_admin(request)
+        job_id = request.path_params['job_id']
+        if not job_id:
+            return response(error_payload('ai_job_not_found', 'AI job not found'), 404)
         try:
-            result = await ai_reading.retry_job(
-                principal, request.path_params['job_id']
-            )
+            result = await ai_reading.retry_job(principal, job_id)
         except AIReadingError as error:
             return admin_ai_job_retry_error_response(error)
         status = 202 if (
@@ -2682,7 +2683,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/books/{book_id}/ai', admin_book_ai, methods=['GET', 'PUT']),
         Route('/api/admin/ai/results', admin_ai_results, methods=['DELETE']),
         Route('/api/admin/ai/jobs', admin_ai_jobs, methods=['GET']),
-        Route('/api/admin/ai/jobs/{job_id}/retry', admin_ai_job_retry, methods=['POST']),
+        Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
         Route(
             '/api/admin/books/{book_id}/grants',
             admin_book_grants,
