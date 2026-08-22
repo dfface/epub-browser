@@ -146,6 +146,37 @@ test('unsafe calls load the session once before sending the CSRF-protected reque
   assert.equal(calls[1].options.headers['X-CSRF-Token'], 'fresh-token');
 });
 
+test('unsafe calls refresh a stale CSRF token once before reporting failure', async () => {
+  const calls = [];
+  const root = rootWithFetch((url, options) => {
+    calls.push({ url, options });
+    if (url === '/api/session') {
+      return Promise.resolve(response(200, {
+        user: { id: 'user-1', username: 'reader', role: 'member' },
+        csrf_token: 'fresh-token',
+      }));
+    }
+    if (calls.filter(call => call.url === '/api/ai/followups').length === 1) {
+      return Promise.resolve(response(403, { code: 'csrf_required' }));
+    }
+    return Promise.resolve(response(202, { followup: { id: 'followup-1' } }));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'user-1', username: 'reader', role: 'member' },
+    csrf_token: 'stale-token',
+  });
+
+  const result = await auth.fetch('/api/ai/followups', { method: 'POST', body: '{}' });
+
+  assert.equal(result.status, 202);
+  assert.deepEqual(calls.map(call => call.url), [
+    '/api/ai/followups', '/api/session', '/api/ai/followups',
+  ]);
+  assert.equal(calls[0].options.headers['X-CSRF-Token'], 'stale-token');
+  assert.equal(calls[2].options.headers['X-CSRF-Token'], 'fresh-token');
+});
+
 test('SSG initialization returns before any account request or UI binding', async () => {
   let calls = 0;
   const root = rootWithFetch(() => {

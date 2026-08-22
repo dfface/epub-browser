@@ -268,6 +268,55 @@ body.reader-drawer-open {
     transition: var(--transition);
 }
 
+.toc-item.toc-section {
+    padding: 12px;
+    color: var(--text-secondary);
+    cursor: default;
+}
+
+.toc-item.toc-section:hover {
+    background: transparent;
+}
+
+.toc-item .chapter-section-title {
+    display: block;
+    font-size: .72rem;
+    font-weight: 760;
+    letter-spacing: .075em;
+    text-transform: uppercase;
+}
+
+/* The book-level TOC can carry an AI-reading badge next to its title. */
+#bookHomeTocList .toc-item > a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#bookHomeTocList .toc-item > a > .chapter-title,
+#bookHomeTocList .toc-item > a > .chapter-title-with-sync {
+    min-width: 0;
+}
+
+#bookHomeTocList .toc-item > a > .chapter-title-with-sync {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#bookHomeTocList .toc-item > a > .chapter-title,
+#bookHomeTocList .toc-item > a > .chapter-title-with-sync > .chapter-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+}
+
 .toc-item:hover {
     background: var(--hover);
 }
@@ -279,7 +328,7 @@ body.reader-drawer-open {
 
 .toc-item.active {
     background: color-mix(in srgb, var(--button-bg) 10%, transparent);
-    box-shadow: inset 3px 0 0 var(--button-bg);
+    box-shadow: none;
 }
 
 .toc-item.active a {
@@ -332,7 +381,7 @@ body.reader-drawer-open {
 
     body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
         background: var(--hover);
-        box-shadow: inset 3px 0 0 var(--button-bg);
+        box-shadow: none;
     }
 }
 
@@ -614,7 +663,7 @@ body:not(.pagination-mode) .navigation .control-btn {
     border-radius: 10px;
     background: transparent;
     color: var(--text-secondary);
-    font-size: .82rem;
+    font-size: .94rem;
 }
 
 body:not(.pagination-mode) .navigation .control-btn:hover {
@@ -1663,6 +1712,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     body:not(.pagination-mode) .navigation .control-btn {
         min-height: 42px;
         padding: 0 8px;
+        font-size: .9rem;
     }
     
     .navigation::-webkit-scrollbar {
@@ -1694,7 +1744,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
         flex-shrink: 0;
     }
     
-    .navigation .control-btn i {
+.navigation .control-btn i {
         font-size: 0.9rem;
     }
     
@@ -1805,12 +1855,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
         transition: opacity 140ms ease, transform 140ms ease;
     }
 
-    @media (hover: hover) {
-        .mobile-controls .control-btn:hover::after,
-        .mobile-controls .control-btn:focus-visible::after {
-            opacity: 1;
-            transform: translate(-50%, 0);
-        }
+    .mobile-controls .control-btn:hover::after,
+    .mobile-controls .control-btn:focus-visible::after,
+    .mobile-controls > a:focus-visible .control-btn::after {
+        opacity: 1;
+        transform: translate(-50%, 0);
     }
 
     .mobile-controls #mobileTopBtn {
@@ -1860,6 +1909,12 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     .pagination-page {
         transition: none;
     }
+}
+
+body.continuous-scroll-mode .reading-controls,
+body.continuous-scroll-mode #scrollToTopBtn,
+body.continuous-scroll-mode #mobileTopBtn {
+    display: none !important;
 }
 
 @media (max-width: 480px) {

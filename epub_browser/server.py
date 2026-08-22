@@ -8,6 +8,7 @@ import posixpath
 import re
 import secrets
 import sqlite3
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -36,6 +37,8 @@ from .auth import (
 )
 from .ai_client import validate_provider_base_url
 from .ai_reading import AIReadingError, AIReadingService, ReadingRequest
+from .asset_publisher import PublishedAssets
+from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
 from .processor import (
@@ -44,6 +47,9 @@ from .processor import (
     server_book_public_path_allowed,
 )
 from .server_library import library_metadata
+from .server_pages import ServerPageError, ServerPageRenderer
+from .site import render_library_shell
+from .urls import SiteURLs
 from .version import render_footer
 
 DATABASE_FILENAME = 'epub-browser.db'
@@ -449,7 +455,9 @@ def create_app(
     runtime_status = status or _CompatibilityRuntimeStatus()
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     ai_reading = AIReadingService(store, base_directory)
-    store.mark_incomplete_ai_jobs_interrupted()
+    store.requeue_running_ai_jobs()
+    store.requeue_running_ai_followups()
+    store.requeue_running_ai_book_chat_turns()
 
     def response(data, status=200, cache_control='no-cache'):
         return JSONResponse(
@@ -458,11 +466,12 @@ def create_app(
             headers={'Cache-Control': cache_control},
         )
 
-    def apply_reader_security_headers(target_response, file_path):
-        try:
-            markup = Path(file_path).read_text(encoding='utf-8')
-        except (OSError, UnicodeDecodeError):
-            return target_response
+    def apply_reader_security_headers(target_response, file_path=None, markup=None):
+        if markup is None:
+            try:
+                markup = Path(file_path).read_text(encoding='utf-8')
+            except (OSError, UnicodeDecodeError, TypeError):
+                return target_response
         target_response.headers[
             'Content-Security-Policy'
         ] = reader_content_security_policy(markup)
@@ -1555,6 +1564,11 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
         api_key = data.get('api_key') if 'api_key' in data else None
         clear_api_key = data.get('clear_api_key', False)
+        current_settings = store.get_ai_settings()
+        model_context_window = data.get(
+            'model_context_window',
+            data.get('chat_context_tokens', current_settings['model_context_window']),
+        )
         if (
             not isinstance(data['enabled'], bool)
             or not isinstance(data['base_url'], str)
@@ -1563,6 +1577,8 @@ window.location.assign(payload.redirect||'/');
             or not isinstance(clear_api_key, bool)
             or isinstance(data['timeout_seconds'], bool)
             or not isinstance(data['timeout_seconds'], int)
+            or isinstance(model_context_window, bool)
+            or not isinstance(model_context_window, int)
             or isinstance(data['max_concurrency'], bool)
             or not isinstance(data['max_concurrency'], int)
             or isinstance(data['daily_limit'], bool)
@@ -1578,6 +1594,7 @@ window.location.assign(payload.redirect||'/');
                 api_key=api_key,
                 model=data['model'],
                 timeout_seconds=data['timeout_seconds'],
+                model_context_window=model_context_window,
                 max_concurrency=data['max_concurrency'],
                 daily_limit=data['daily_limit'],
                 clear_api_key=clear_api_key,
@@ -1722,6 +1739,7 @@ window.location.assign(payload.redirect||'/');
             'book_not_found': 404,
             'chapter_not_found': 404,
             'ai_result_not_found': 404,
+            'ai_reading_required': 409,
         }.get(error.code, 400)
         return response(error_payload(error.code, 'AI reading request failed'), status)
 
@@ -1800,6 +1818,108 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('forbidden', 'Forbidden'), 403)
         return response({'job': job, 'result': result})
 
+    async def ai_book_results(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        chapter_index_raw = request.query_params.get('chapter_index')
+        language = request.query_params.get('language')
+        if language not in {None, 'en', 'zh-CN'}:
+            return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
+        chapter_index = None
+        if chapter_index_raw is not None:
+            try:
+                chapter_index = int(chapter_index_raw)
+            except ValueError:
+                return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
+            if chapter_index < 0:
+                return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
+        return response({
+            'results': list(store.list_ai_reading_results(
+                book_id, chapter_index=chapter_index, language=language
+            )),
+            # Clients use this to avoid treating an older result schema as
+            # the active reading layer while retaining it in the history hub.
+            'current_template_version': template_for('chapter', 'chapter')['version'],
+        })
+
+    async def ai_reading_library(request):
+        """Return every readable book's retained shared AI layers, never private chats."""
+        principal = require_principal(request)
+        books = []
+        for book in store.visible_books(principal):
+            # A shared layer belongs to the book rather than to the user who
+            # generated it.  Retain historic results here too: a newer model
+            # configuration must not make an earlier, still-useful reading
+            # disappear from the user's AI-reading library.
+            results = list(store.list_ai_reading_results(book.book_id))
+            if not results:
+                continue
+            try:
+                metadata = json.loads(book.metadata_json)
+            except (TypeError, ValueError):
+                metadata = {}
+            chapter_titles = {}
+            try:
+                toc_path = Path(base_directory, 'book', book.book_id, 'toc.json')
+                toc_items = json.loads(toc_path.read_text(encoding='utf-8'))
+                if isinstance(toc_items, list):
+                    for toc_item in toc_items:
+                        if not isinstance(toc_item, dict):
+                            continue
+                        chapter_index = toc_item.get('chapter_index')
+                        chapter_title = toc_item.get('title')
+                        if isinstance(chapter_index, int) and isinstance(chapter_title, str):
+                            chapter_titles[chapter_index] = chapter_title
+            except (OSError, TypeError, ValueError):
+                # The generated TOC is an optional presentation enhancement.
+                # AI results remain readable when a book is being regenerated.
+                pass
+            enriched_results = []
+            for result in results:
+                enriched_result = dict(result)
+                enriched_result['can_delete'] = (
+                    principal.role == 'admin'
+                    or result.get('created_by_user_id') == principal.user_id
+                )
+                # The UI only needs a permission bit.  Do not disclose which
+                # member generated another reader's shared learning layer.
+                enriched_result.pop('created_by_user_id', None)
+                chapter_index = enriched_result.get('chapter_index')
+                if isinstance(chapter_index, int) and chapter_index in chapter_titles:
+                    enriched_result['chapter_title'] = chapter_titles[chapter_index]
+                enriched_results.append(enriched_result)
+            cover = metadata.get('cover')
+            books.append({
+                'book_id': book.book_id,
+                'title': str(metadata.get('title') or book.book_id),
+                'authors': list(metadata.get('authors') or []),
+                'cover': (
+                    f"/book/{book.book_id}/{cover.lstrip('/')}"
+                    if isinstance(cover, str) and cover.strip() else None
+                ),
+                'results': enriched_results,
+            })
+        return response({'books': books})
+
+    async def ai_result(request):
+        principal = require_principal(request)
+        result = store.get_ai_reading_result(request.path_params['result_id'])
+        if result is None:
+            return response(error_payload('not_found', 'AI result not found'), 404)
+        if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        if request.method == 'DELETE':
+            # Shared learning layers remain readable by every authorized
+            # reader, but their lifecycle is controlled by administrators or
+            # by the member who generated the specific retained version.
+            if principal.role != 'admin' and result['created_by_user_id'] != principal.user_id:
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+            store.delete_ai_reading_result(result['id'])
+            return response({'deleted': result['id']})
+        return response({'result': result})
+
     async def ai_events(request):
         """Push AI task state for a reader's open assistant panel.
 
@@ -1811,7 +1931,8 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         job_id = request.query_params.get('job_id')
         followup_id = request.query_params.get('followup_id')
-        if bool(job_id) == bool(followup_id):
+        chat_id = request.query_params.get('chat_id')
+        if sum(bool(value) for value in (job_id, followup_id, chat_id)) != 1:
             return response(error_payload('invalid_ai_event_request', 'Invalid AI event request'), 400)
 
         if job_id:
@@ -1834,7 +1955,7 @@ window.location.assign(payload.redirect||'/');
 
             event_name = 'job'
             terminal = lambda payload: payload is None or payload['job']['status'] not in {'queued', 'running'}
-        else:
+        elif followup_id:
             followup = store.get_ai_followup(followup_id, principal.user_id)
             if followup is None:
                 return response(error_payload('not_found', 'AI follow-up not found'), 404)
@@ -1850,6 +1971,19 @@ window.location.assign(payload.redirect||'/');
 
             event_name = 'followup'
             terminal = lambda payload: payload is None or payload['followup']['status'] not in {'queued', 'running'}
+        else:
+            turn = store.get_ai_book_chat_turn(chat_id, principal.user_id)
+            if turn is None:
+                return response(error_payload('not_found', 'AI chat turn not found'), 404)
+            if not store.can_read_book(principal.user_id, principal.role, turn['book_id']):
+                return response(error_payload('forbidden', 'Forbidden'), 403)
+
+            def snapshot():
+                current = store.get_ai_book_chat_turn(chat_id, principal.user_id)
+                return {'chat': current} if current is not None else None
+
+            event_name = 'chat'
+            terminal = lambda payload: payload is None or payload['chat']['status'] not in {'queued', 'running'}
 
         async def events():
             previous = None
@@ -1901,6 +2035,37 @@ window.location.assign(payload.redirect||'/');
             return ai_error_response(error)
         return response({'followup': followup}, 202)
 
+    async def ai_book_chat(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        if request.method == 'GET':
+            return response({'turns': list(store.list_ai_book_chat_turns(book_id, principal.user_id))})
+        data, error = await bounded_public_json_object(request)
+        if error:
+            return response(error_payload(error, 'Invalid AI chat'), 400)
+        chapter_index = data.get('chapter_index')
+        question = data.get('question')
+        language = data.get('language', 'en')
+        context_mode = data.get('context_mode', 'chapter_source')
+        book_context = context_mode == 'book_overview'
+        if (
+            (not book_context and (isinstance(chapter_index, bool) or not isinstance(chapter_index, int)))
+            or (book_context and chapter_index not in {None, ''})
+            or not isinstance(question, str) or language not in {'en', 'zh-CN'}
+            or context_mode not in {'shared_layer', 'chapter_source', 'book_overview'}
+        ):
+            return response(error_payload('invalid_ai_chat', 'Invalid AI chat'), 400)
+        try:
+            turn = await ai_reading.ask_book(
+                principal, book_id=book_id, chapter_index=None if book_context else chapter_index,
+                question=question, language=language, context_mode=context_mode,
+            )
+        except AIReadingError as error:
+            return ai_error_response(error)
+        return response({'chat': turn}, 202)
+
     async def filtered_library_metadata(request):
         principal = require_principal(request)
         return response(
@@ -1910,6 +2075,28 @@ window.location.assign(payload.redirect||'/');
         )
 
     async def library_index(request):
+        # Server's library is an authenticated SPA shell.  Render it from the
+        # current asset manifest so a UI or i18n deployment is visible after a
+        # restart without regenerating every EPUB or a checked-in index.html.
+        # Keep the static fallback for partially initialized/legacy installs
+        # where no manifest has been published yet.
+        try:
+            manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            if not isinstance(manifest, dict) or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in manifest.items()
+            ):
+                raise ValueError('Invalid asset manifest')
+            markup = render_library_shell(
+                (), PublishedAssets(manifest), SiteURLs(), deployment_mode='server'
+            )
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            markup = None
+        if markup is not None:
+            target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
+            return apply_reader_security_headers(target, markup=markup)
+
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
             return response(error_payload('not_found', 'Library index not found'), 404)
@@ -1954,6 +2141,50 @@ window.location.assign(payload.redirect||'/');
             book_relative_path = '/'.join(path.split('/')[2:])
             if not server_book_public_path_allowed(book_relative_path):
                 return response(error_payload('not_found', 'Not Found'), 404)
+            renderer = ServerPageRenderer(base_directory, book_id)
+            # Retain a narrow compatibility path for manually-created test
+            # fixtures and legacy caches that still have an accepted marker.
+            # Fresh Server conversions always carry content/metadata.json and
+            # therefore take the dynamic path below.
+            has_content_cache = (
+                Path(base_directory, 'book', book_id, 'content', 'metadata.json')
+                .is_file()
+            )
+            if has_content_cache:
+                try:
+                    if book_relative_path == 'index.html':
+                        markup = renderer.render_index()
+                        dynamic_response = HTMLResponse(
+                            markup,
+                            headers={'Cache-Control': 'no-cache'},
+                        )
+                        return apply_reader_security_headers(
+                            dynamic_response,
+                            markup=markup,
+                        )
+                    chapter_match = re.fullmatch(
+                        r'chapter_([0-9]+)\.html',
+                        book_relative_path,
+                        re.IGNORECASE,
+                    )
+                    if chapter_match:
+                        markup = renderer.render_chapter(int(chapter_match.group(1)))
+                        dynamic_response = HTMLResponse(
+                            markup,
+                            headers={'Cache-Control': 'no-cache'},
+                        )
+                        return apply_reader_security_headers(
+                            dynamic_response,
+                            markup=markup,
+                        )
+                    if book_relative_path == 'toc.json':
+                        return Response(
+                            renderer.toc_bytes(),
+                            media_type='application/json',
+                            headers={'Cache-Control': 'no-cache'},
+                        )
+                except ServerPageError:
+                    return response(error_payload('not_found', 'Not Found'), 404)
         static_response = await public_files.get_response(path, request.scope)
         if book_relative_path and re.fullmatch(
             r'(?:index|chapter_[0-9]+)\.html',
@@ -2378,7 +2609,11 @@ window.location.assign(payload.redirect||'/');
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/ai/reading', ai_reading_request, methods=['POST']),
+        Route('/api/ai/library', ai_reading_library, methods=['GET']),
+        Route('/api/ai/books/{book_id}/results', ai_book_results, methods=['GET']),
+        Route('/api/ai/books/{book_id}/chat', ai_book_chat, methods=['GET', 'POST']),
         Route('/api/ai/jobs/{job_id}', ai_job, methods=['GET']),
+        Route('/api/ai/results/{result_id}', ai_result, methods=['GET', 'DELETE']),
         Route('/api/ai/events', ai_events, methods=['GET']),
         Route('/api/ai/followups', ai_followups, methods=['POST']),
         Route('/api/ai/results/{result_id}/followups', ai_followups, methods=['GET']),
@@ -2386,12 +2621,23 @@ window.location.assign(payload.redirect||'/');
         Route('/sync', sync, methods=['POST']),
         Route('/{path:path}', protected_public_file, methods=['GET']),
     ]
+    @asynccontextmanager
+    async def ai_worker_lifespan(application):
+        """Keep the AI worker lifecycle aligned with the ASGI application."""
+        await ai_reading.start_worker()
+        ai_reading.wake_worker()
+        try:
+            yield
+        finally:
+            await ai_reading.stop_worker()
+
     app = Starlette(
         routes=routes,
         exception_handlers={
             StarletteHTTPException: http_exception,
             Exception: server_error,
         },
+        lifespan=ai_worker_lifespan,
     )
 
     async def auth_middleware(request, call_next):
@@ -2451,4 +2697,5 @@ window.location.assign(payload.redirect||'/');
         return authorized
 
     app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
+
     return app

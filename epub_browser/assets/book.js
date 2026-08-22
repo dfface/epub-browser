@@ -102,6 +102,30 @@ function initScript() {
     var book_hash = pathParts[pathParts.indexOf('book') + 1];
     var readingProgressLoadVersion = 0;
 
+    function renderEffectiveBookTags(tags) {
+        var container = document.querySelector('.book-info-tags');
+        if (!container || !Array.isArray(tags)) return;
+        container.textContent = '';
+        tags.forEach(function(tag) {
+            if (typeof tag !== 'string' || !tag.trim()) return;
+            var chip = document.createElement('span');
+            chip.className = 'book-tag';
+            chip.textContent = tag;
+            container.appendChild(chip);
+        });
+    }
+
+    function loadEffectiveBookTags() {
+        if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
+        window.EpubBrowserAuth.fetch('/api/books/' + encodeURIComponent(book_hash) + '/metadata')
+            .then(function(response) {
+                if (!response.ok) throw new Error('book_metadata_unavailable');
+                return response.json();
+            })
+            .then(function(metadata) { renderEffectiveBookTags(metadata && metadata.tags); })
+            .catch(function() {});
+    }
+
     function loadReadingProgress() {
         if (isKindleMode() || !window.EpubReadingProgress || !window.EpubReadingProgress.isServerMode()) return;
         var version = ++readingProgressLoadVersion;
@@ -117,6 +141,7 @@ function initScript() {
 
     updateContinueReadingButton(book_hash);
     loadReadingProgress();
+    loadEffectiveBookTags();
 
     if (!isKindleMode()) {
         var clearBtn = document.querySelector("#clearReadingProgressBtn");
@@ -364,12 +389,19 @@ function markReadingChapter(readKey, username) {
         syncTag.textContent = bookT('book.cloudSyncUser', { username: displayUsername });
         syncTag.setAttribute('aria-label', bookT('book.cloudSyncUserAria', { username: displayUsername }));
         var title = chapterElement.querySelector('.chapter-title');
+        var titleWithSync = chapterElement.querySelector('.chapter-title-with-sync');
         if (title) {
-            var titleWithSync = document.createElement('span');
-            titleWithSync.className = 'chapter-title-with-sync';
-            title.parentNode.insertBefore(titleWithSync, title);
-            titleWithSync.appendChild(title);
-            titleWithSync.appendChild(syncTag);
+            if (!titleWithSync) {
+                titleWithSync = document.createElement('span');
+                titleWithSync.className = 'chapter-title-with-sync';
+                title.parentNode.insertBefore(titleWithSync, title);
+                titleWithSync.appendChild(title);
+            }
+            // AI reading is a chapter state, so keep its label adjacent to the
+            // title and put cloud synchronization after it.
+            var aiBadge = titleWithSync.querySelector('.ai-reading-chapter-badge');
+            if (aiBadge) titleWithSync.insertBefore(syncTag, aiBadge.nextSibling);
+            else titleWithSync.appendChild(syncTag);
         } else {
             chapterElement.appendChild(syncTag);
         }

@@ -24,6 +24,62 @@ EPUB Browser has two explicit modes:
 
 Use `ssg` when the result must be ordinary static files. Use `server` when readers need accounts, cross-device data, access control, or automatic source reconciliation.
 
+## AI-native reading (Server only)
+
+**Turn an EPUB library into a source-aware learning workspace.** AI reading is
+not a generic summary bolted beside a book. It builds a shared, reviewable
+learning layer *on the original chapter*: a reading route before the text,
+explanations exactly where evidence appears, a chapter mind map, and questions
+that help the reader carry the argument forward.
+
+![A chapter guide stays with the original text while Ask AI remains available in a private drawer.](docs/releases/assets/v2.2.0-chapter-guide-ask-ai.png)
+
+### Read with the text, not away from it
+
+- **Chapter guide and mind map**: Start with the chapter's central question,
+  key claims, and a Mermaid mind map. The map opens only when wanted, so the
+  book remains the primary surface.
+- **Evidence-aware AI annotations**: AI highlights precisely quoted sentences.
+  Select one to open a focused Markdown explanation below the passage rather
+  than losing your place in a detached report.
+- **Paragraph-role notes**: A compact, colour-coded `!` beside a paragraph
+  explains why that paragraph matters to the chapter's reasoning or story.
+- **Think further**: Finish with a small set of chapter-end prompts that turn
+  passive reading into reflection.
+
+<p align="center">
+  <img src="docs/releases/assets/v2.2.0-inline-claim.png" alt="An AI explanation opens from a highlighted claim" width="48%">
+  <img src="docs/releases/assets/v2.2.0-paragraph-note.png" alt="A paragraph-role note remains tied to its original text" width="48%">
+</p>
+
+### Ask AI, without losing the book
+
+The **Ask AI** drawer is a persistent private conversation for the current
+chapter or the whole book. It keeps the reader's own history, retains exact
+chapter scope, can use the book's shared learning layer as context, and renders
+safe Markdown, KaTeX mathematics, and Mermaid diagrams locally. It is designed
+for the moment a reader wants to challenge a claim, compare chapters, or follow
+a thread—without navigating away from the page.
+
+### Shared learning, governed by the library
+
+Generated chapter layers are shared by readers who can access the book, cached
+in SQLite, and processed as durable background tasks. The **AI readings** hub
+collects those results by book, chapter, language, generated time, template, and
+configuration version. Administrators can manage model access and results;
+members can only manage their own eligible output. Every AI capability respects
+the existing book-access rules.
+
+![The AI readings hub groups shared learning layers by book and chapter.](docs/releases/assets/v2.2.0-ai-reading-library.png)
+
+AI reading is intentionally a **Server-mode feature**. Configure an
+OpenAI-compatible provider and explicitly grant member access before enabling
+it. SSG stays fully static and contains none of the AI controls, background
+jobs, account data, or provider configuration. See the
+[AI-native reading design](docs/ai-native-reading.md) and
+[local rich-text renderer notes](docs/third-party-ai-renderers.md) for the
+interaction model and safety boundary.
+
 ## Requirements and installation
 
 - Python 3.9 or newer
@@ -133,29 +189,26 @@ After setup:
 - Administrators can manage users, roles, passwords, sessions, external identities, and book grants.
 - Sessions use an HttpOnly cookie, CSRF protection, and a 30-day sliding lifetime.
 
-### AI reading (Server only)
+### Configure and govern AI reading
 
-Administrators configure AI reading in **Administration**, immediately after user
-management and before book access. The page stores one OpenAI-compatible Base
-URL, API key, model, timeout, concurrency cap, and default daily provider-call
-limit in the Server SQLite database. The API key is intentionally stored as
-plaintext SQLite configuration for this first release because only an
-administrator can set it; it is never returned to a browser or exposed by an
-API. Protect the Server state directory accordingly.
+Administrators configure AI reading in **Administration**, immediately after
+user management and before book management. The page stores an
+OpenAI-compatible Base URL, API key, model, timeout, context budget,
+concurrency cap, and default daily provider-call limit in the Server SQLite
+database. AI starts disabled for members; an administrator must grant access per
+member and may set an individual daily limit (`0` means unlimited).
 
-AI reading starts disabled for members. An administrator grants it per member
-and can set an individual daily limit (`0` means unlimited). Administrators are
-always allowed. The book page offers a spoiler-free guide, an already-read
-pathway, or a whole-book review that includes spoilers; chapter pages offer a
-chapter-level reading guide. Results, task state, custom tags, book reading
-classification, and private follow-ups are stored in SQLite. Existing results
-remain available after a model configuration change until a reader explicitly
-regenerates them.
+Chapter learning layers and book-level reviews are shared per eligible language,
+while follow-up conversations remain private to each account. Results, task
+state, custom tags, book reading classification, and private follow-ups are
+stored in SQLite. Old results remain available after a model configuration
+change until an administrator explicitly regenerates them.
 
-When a reader requests an AI guide, the selected EPUB text is sent to the
-configured external provider. Do not enable this feature unless readers are
-permitted to send that content to the provider. SSG output contains no AI
-reading controls or provider configuration.
+When a reader requests an AI guide or asks a question, selected EPUB text and
+the compressed conversation context are sent to the configured external
+provider. Do not enable the feature unless readers are permitted to send that
+content to the provider. The API key is never returned to a browser or exposed
+by an API; protect the Server state directory accordingly.
 
 For unattended first start, provide a username and password file:
 
@@ -259,7 +312,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.1.1
+  epub-browser:2.2.0
 ```
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
@@ -275,7 +328,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.1.1
+  epub-browser:2.2.0
 ```
 
 After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.

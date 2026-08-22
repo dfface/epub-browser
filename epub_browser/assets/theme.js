@@ -84,7 +84,6 @@ function initTheme() {
         
         // 更新theme-toggle图标
         var themeToggle = document.getElementById('themeToggle');
-        var mobileThemeBtn = document.getElementById('mobileThemeBtn');
         var currentTheme = null;
         for (var i = 0; i < themes.length; i++) {
             if (themes[i].id === theme) {
@@ -95,13 +94,6 @@ function initTheme() {
         
         if (themeToggle && currentTheme) {
             var icon = themeToggle.querySelector('i');
-            if (icon) {
-                icon.className = 'fas ' + currentTheme.icon;
-            }
-        }
-        
-        if (mobileThemeBtn && currentTheme) {
-            var icon = mobileThemeBtn.querySelector('i');
             if (icon) {
                 icon.className = 'fas ' + currentTheme.icon;
             }
@@ -150,21 +142,13 @@ function initTheme() {
     
     // 更新主题菜单位置
     function updateThemeMenuPosition(menu, toggleBtn) {
-        var mobileControls = document.querySelector('.mobile-controls');
-        var isMobile = mobileControls && window.getComputedStyle(mobileControls).display !== 'none';
-        
-        if (isMobile) {
-            // 移动端：固定在右下角，类似于 settings-modal
-            menu.style.bottom = '80px';
-            menu.style.left = '20px';
-            menu.style.top = 'auto';
-        } else {
-            // 桌面端：相对于按钮定位
-            var rect = toggleBtn.getBoundingClientRect();
-            menu.style.top = (rect.bottom + 8) + 'px';
-            menu.style.right = (window.innerWidth - rect.right) + 'px';
-            menu.style.bottom = 'auto';
-        }
+        // Theme selection belongs to the persistent top-right action on every
+        // viewport.  Do not detach it into the reader's bottom action bar.
+        var rect = toggleBtn.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 8) + 'px';
+        menu.style.right = (window.innerWidth - rect.right) + 'px';
+        menu.style.bottom = 'auto';
+        menu.style.left = 'auto';
     }
 
     // 初始化主题
@@ -172,7 +156,6 @@ function initTheme() {
         var themeToggle = document.getElementById('themeToggle');
         if (!themeToggle) return;
 
-        var mobileThemeBtn = document.getElementById('mobileThemeBtn');
         var isKindle = isKindleDevice();
 
         // 应用初始主题
@@ -219,35 +202,9 @@ function initTheme() {
 
         // 绑定主题切换事件
         themeToggle.addEventListener('click', handleThemeToggle);
-        if (mobileThemeBtn) {
-            mobileThemeBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                var isKindle = isKindleDevice();
-                if (isKindle) {
-                    var currentTheme = getCurrentTheme();
-                    var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                    applyTheme(newTheme);
-                } else {
-                    if (!themeMenu) {
-                        themeMenu = createThemeMenu();
-                        document.body.appendChild(themeMenu);
-                    }
-                    
-                    currentToggleBtn = mobileThemeBtn;
-                    
-                    if (themeMenu.style.display === 'none') {
-                        updateThemeMenuPosition(themeMenu, mobileThemeBtn);
-                        themeMenu.style.display = 'block';
-                    } else {
-                        themeMenu.style.display = 'none';
-                    }
-                }
-            });
-        }
-
         // 点击其他地方关闭主题菜单
         document.addEventListener('click', function(e) {
-            if (themeMenu && !themeToggle.contains(e.target) && !themeMenu.contains(e.target) && (!mobileThemeBtn || !mobileThemeBtn.contains(e.target))) {
+            if (themeMenu && !themeToggle.contains(e.target) && !themeMenu.contains(e.target)) {
                 themeMenu.style.display = 'none';
             }
         });

@@ -24,10 +24,14 @@ from epub_browser.epub_identity import (
 from epub_browser.identity import source_sha256
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.migration import MigrationManager
-from epub_browser.processor import EPUBProcessor
+from epub_browser.processor import (
+    EPUBProcessor,
+    SERVER_OUTPUT_REVISION_FILE,
+)
 from epub_browser.reporting import Reporter
 from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
+from epub_browser.server_pages import ServerPageRenderer
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
 
@@ -180,7 +184,13 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertTrue(summary.degraded)
         self.assertTrue(summary.failures[0].kept_previous_cache)
         self.assertTrue(
-            (manager.public_dir / "book" / first.book_id / "index.html").is_file()
+            (
+                manager.public_dir
+                / "book"
+                / first.book_id
+                / "content"
+                / "metadata.json"
+            ).is_file()
         )
         manager.shutdown()
 
@@ -371,25 +381,14 @@ class ServerLibraryManagerTests(unittest.TestCase):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
         book_dir = manager.public_dir / "book" / record.book_id
-        toc = json.loads((book_dir / "toc.json").read_text(encoding="utf-8"))
-        generated_pages = [book_dir / "index.html"] + [
-            book_dir / item["chapter_file"]
-            for item in toc
-            if item.get("chapter_file")
-        ]
-        (book_dir / ".server-output-revision").unlink(missing_ok=True)
-        for page in generated_pages:
-            page.write_text("<html><body>legacy reader</body></html>", encoding="utf-8")
+        (book_dir / SERVER_OUTPUT_REVISION_FILE).unlink(missing_ok=True)
 
         upgraded = manager.reconcile()
 
         self.assertGreater(upgraded.converted, 0)
         self.assertEqual(upgraded.reused, 0)
-        for page in generated_pages:
-            self.assertRegex(
-                page.read_text(encoding="utf-8"),
-                r'/assets/immutable/cache-boundary\.[0-9a-f]{12}\.js',
-            )
+        self.assertTrue((book_dir / "content" / "metadata.json").is_file())
+        self.assertFalse((book_dir / "index.html").exists())
         manager.shutdown()
 
     def test_direct_reader_is_denied_while_legacy_output_reconverts(self):
@@ -405,7 +404,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
         book_dir = manager.public_dir / "book" / record.book_id
-        (book_dir / ".server-output-revision").write_text(
+        (book_dir / SERVER_OUTPUT_REVISION_FILE).write_text(
             "legacy\n",
             encoding="utf-8",
         )
@@ -703,18 +702,45 @@ class ServerLibraryManagerTests(unittest.TestCase):
 
         record = manager.reconcile().active_books[0]
         library_html = (manager.public_dir / "index.html").read_text(encoding="utf-8")
-        book_html = (
-            manager.public_dir / "book" / record.book_id / "index.html"
-        ).read_text(encoding="utf-8")
-        chapter_html = (
-            manager.public_dir / "book" / record.book_id / "chapter_0.html"
-        ).read_text(encoding="utf-8")
+        renderer = ServerPageRenderer(manager.public_dir, record.book_id)
+        book_html = renderer.render_index()
+        chapter_html = renderer.render_chapter(0)
 
         for html in (library_html, book_html, chapter_html):
             self.assertRegex(
                 html,
                 r"window\.EpubBrowserMode=(?:[\"'`])server(?:[\"'`])",
             )
+        manager.shutdown()
+
+    def test_server_reader_pages_are_rendered_from_content_cache(self):
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        book_dir = manager.public_dir / "book" / record.book_id
+        self.assertTrue((book_dir / "content" / "metadata.json").is_file())
+        self.assertFalse((book_dir / "index.html").exists())
+        self.assertFalse((book_dir / "chapter_0.html").exists())
+
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+
+        index = client.get(f"/book/{record.book_id}/index.html")
+        chapter = client.get(f"/book/{record.book_id}/chapter_0.html")
+        toc = client.get(f"/book/{record.book_id}/toc.json")
+        self.assertEqual(index.status_code, 200)
+        self.assertEqual(chapter.status_code, 200)
+        self.assertEqual(toc.status_code, 200)
+        self.assertIn("window.EpubBrowserMode=\"server\"", index.text)
+        self.assertIn("window.EpubBrowserMode=\"server\"", chapter.text)
+        self.assertEqual(toc.json()[0]["chapter_index"], 0)
+        self.assertIn("content-security-policy", chapter.headers)
         manager.shutdown()
 
     def test_generated_server_shell_contains_no_shared_book_catalog(self):
@@ -729,6 +755,31 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(json.loads(metadata_path.read_text(encoding="utf-8")), [])
         self.assertNotIn(record.book_id, library_html)
         self.assertNotIn("Server Book", library_html)
+        manager.shutdown()
+
+    def test_server_library_index_is_rendered_from_the_current_spa_shell(self):
+        manager = self._manager()
+        manager.reconcile()
+        # A Server deployment must not need a regenerated root index just to
+        # serve its current UI and hashed assets.
+        (manager.public_dir / "index.html").unlink()
+
+        auth_config = AuthConfig.from_values([], None, None)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, auth_config),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+
+        index = client.get("/")
+
+        self.assertEqual(index.status_code, 200)
+        self.assertIn('window.EpubBrowserMode="server"', index.text)
+        self.assertIn('window.initScriptLibrary', index.text)
+        self.assertIn('data-id=book-grid', index.text)
         manager.shutdown()
 
     def test_generated_server_cache_does_not_publish_a_service_worker(self):
@@ -762,16 +813,16 @@ class ServerLibraryManagerTests(unittest.TestCase):
         rebuilt = manager.reconcile().active_books[0]
 
         self.assertEqual(rebuilt.book_id, original.book_id)
-        self.assertTrue(
-            (
-                self.server_dir
-                / "cache"
-                / "public"
-                / "book"
-                / original.book_id
-                / "index.html"
-            ).is_file()
+        content_dir = (
+            self.server_dir
+            / "cache"
+            / "public"
+            / "book"
+            / original.book_id
+            / "content"
         )
+        self.assertTrue((content_dir / "metadata.json").is_file())
+        self.assertFalse((content_dir.parent / "index.html").exists())
         manager.shutdown()
 
     def test_failed_source_update_keeps_stale_output_denied_and_reports_degraded(self):
@@ -790,7 +841,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
             / "public"
             / "book"
             / first.book_id
-            / "chapter_0.html"
+            / "content"
+            / "chapter_0.json"
         )
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
         auth_config = AuthConfig.from_values([], None, None)
@@ -906,7 +958,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
                     [
                         path
                         for path in book_root.iterdir()
-                        if (path / "index.html").is_file()
+                        if (path / "content" / "metadata.json").is_file()
                     ]
                     if book_root.is_dir()
                     else []

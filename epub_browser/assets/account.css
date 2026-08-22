@@ -420,6 +420,65 @@ body.auth-page {
     font-weight: 650;
 }
 
+.admin-ai-field-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-ai-help {
+    position: relative;
+    display: inline-grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    color: var(--account-primary);
+    background: color-mix(in srgb, var(--account-primary) 12%, transparent);
+    cursor: help;
+    font-size: .7rem;
+    line-height: 1;
+}
+
+.admin-ai-help::after {
+    position: absolute;
+    z-index: 20;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    width: min(300px, 70vw);
+    padding: 9px 11px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+    color: var(--account-text);
+    background: var(--account-card);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .16);
+    content: attr(data-tip);
+    font-size: .78rem;
+    font-weight: 500;
+    line-height: 1.45;
+    opacity: 0;
+    pointer-events: none;
+    text-align: start;
+    transform: translate(-50%, 4px);
+    transition: opacity .16s ease, transform .16s ease;
+    visibility: hidden;
+}
+
+.admin-ai-help:hover::after,
+.admin-ai-help:focus-visible::after,
+.admin-ai-help.is-open::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    visibility: visible;
+}
+
+.admin-ai-help:focus-visible {
+    outline: 2px solid var(--account-primary);
+    outline-offset: 2px;
+}
+
 .account-form .account-primary-action {
     justify-self: start;
 }

@@ -1,0 +1,20 @@
+.ai-canvas-rich-block,
+.ai-chat-rich-block {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--text, #333) 8%, transparent);
+}
+
+.ai-canvas-rich-block .katex-display,
+.ai-chat-rich-block .katex-display { margin: 0; }
+
+.ai-canvas-rich-block svg,
+.ai-chat-rich-block svg { max-width: 100%; height: auto; }
+
+.ai-rich-render-error small {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--notification-error, #c0392b);
+}

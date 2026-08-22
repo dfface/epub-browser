@@ -17,14 +17,24 @@ from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 
-from .asset_publisher import AssetPublisher, rewrite_asset_urls
+from .asset_publisher import (
+    AssetPublisher,
+    SERVER_ONLY_ASSET_PATHS,
+    SERVER_ONLY_ASSET_PREFIXES,
+    rewrite_asset_urls,
+)
 from .models import BookMetadata, ConvertedBook
 from .reporting import Reporter
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
-SERVER_OUTPUT_REVISION_FILE = ".server-output-revision"
-SERVER_OUTPUT_REVISION = "reader-initial-layout-v28"
+# Server mode stores only EPUB-derived content. Reader HTML is rendered from
+# that cache for each request, so changes to UI, i18n, permissions, or hashed
+# assets never require reconverting unchanged EPUB files.
+SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
+# Bump whenever the EPUB-derived server cache schema or chapter semantics change.
+# Server reader chrome and assets are deliberately outside this revision.
+SERVER_OUTPUT_REVISION = "server-content-v7"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
@@ -139,12 +149,6 @@ def _safe_html_url(tag, attribute, value):
     parsed = urllib.parse.urlsplit(candidate)
     scheme = parsed.scheme.casefold()
     if not scheme:
-        if (
-            attribute == "href"
-            and not parsed.netloc
-            and parsed.path.startswith("/")
-        ):
-            return candidate
         resource_path = PurePosixPath(parsed.path)
         suffix = resource_path.suffix.casefold().lstrip(".")
         if attribute in {"src", "poster"}:
@@ -541,6 +545,56 @@ def sanitize_svg_content(content):
 
 class EPUBProcessor:
     """处理EPUB文件的类"""
+
+    @classmethod
+    def from_server_content_cache(
+        cls,
+        *,
+        book_id,
+        metadata,
+        asset_manifest,
+        urls=None,
+        reporter=None,
+    ):
+        """Restore the minimal render state for a Server content cache.
+
+        Server mode deliberately persists EPUB-derived content rather than
+        rendered HTML.  This named constructor keeps the cache hydration
+        contract beside the shared templates, so ServerPageRenderer remains a
+        thin adapter instead of becoming a second page implementation.
+        """
+        if not isinstance(metadata, dict):
+            raise ValueError("Server content metadata must be an object")
+        title = metadata.get("title")
+        chapters = metadata.get("chapters")
+        toc = metadata.get("toc")
+        if not isinstance(title, str) or not isinstance(chapters, list) or not isinstance(toc, list):
+            raise ValueError("Server content metadata is invalid")
+
+        processor = cls.__new__(cls)
+        processor.epub_path = ""
+        processor.output_dir = None
+        processor.urls = urls or SiteURLs()
+        processor.reporter = reporter or Reporter(False)
+        processor.deployment_mode = "server"
+        processor._caller_supplied_book_id = True
+        processor.book_hash = str(book_id)
+        processor.temp_dir = ""
+        processor.extract_dir = ""
+        processor.web_dir = ""
+        processor.book_title = title
+        processor.authors = list(metadata.get("authors") or ())
+        processor.tags = list(metadata.get("tags") or ())
+        processor.description = metadata.get("description")
+        processor.epub_identifier = metadata.get("epub_identifier")
+        processor.cover_info = metadata.get("cover_info")
+        processor.lang = metadata.get("language") or "en"
+        processor.chapters = chapters
+        processor.toc = toc
+        processor.resources_base = metadata.get("resources_base") or "resources"
+        processor._server_chapter_payloads = {}
+        processor.asset_manifest = asset_manifest
+        return processor
     
     def __init__(
         self,
@@ -586,6 +640,7 @@ class EPUBProcessor:
         self.chapters = []
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
+        self._server_chapter_payloads = {}
         if asset_manifest is not None:
             self.asset_manifest = asset_manifest
         else:
@@ -595,6 +650,16 @@ class EPUBProcessor:
                 assets_dir,
                 asset_output_dir,
                 urls=self.urls,
+                excluded_paths=(
+                    SERVER_ONLY_ASSET_PATHS
+                    if self.deployment_mode == "ssg"
+                    else ()
+                ),
+                excluded_prefixes=(
+                    SERVER_ONLY_ASSET_PREFIXES
+                    if self.deployment_mode == "ssg"
+                    else ()
+                ),
             ).publish()
     
     def cleanup(self):
@@ -922,37 +987,61 @@ class EPUBProcessor:
             
             toc = []
             
+            ncx_namespace = 'http://www.daisy.org/z3986/2005/ncx/'
+            ncx_dir = posixpath.dirname(ncx_path)
+
+            def navpoint_target(navpoint):
+                """Return a navPoint's *own* NCX target, if it has one.
+
+                A navPoint is allowed to be a structural grouping node.  Do
+                not use a descendant ``content`` element here: doing so makes
+                a group look like a chapter and consumes a public chapter
+                index that belongs to the OPF spine.
+                """
+                content = navpoint.find(f'{{{ncx_namespace}}}content')
+                if content is None or not content.get('src'):
+                    return None
+                source, anchor = urllib.parse.urldefrag(content.get('src'))
+                if not source:
+                    return None
+                return (
+                    self._resolve_internal_path(source, ncx_dir),
+                    anchor or None,
+                    posixpath.basename(source),
+                )
+
             # 递归处理navPoint
             def process_navpoint(navpoint, level=0):
-                # 获取导航标签和内容源
-                nav_label = navpoint.find('.//{http://www.daisy.org/z3986/2005/ncx/}navLabel/{http://www.daisy.org/z3986/2005/ncx/}text')
-                content = navpoint.find('.//{http://www.daisy.org/z3986/2005/ncx/}content')
-                
-                if nav_label is not None and content is not None:
-                    title = nav_label.text
-                    src = content.get('src')
-                    anchor = None
-
-                    if src:
-                        src, anchor = urllib.parse.urldefrag(src)
-                    
-                    if title and src:
-                        # 将src路径转换为相对于EPUB根目录的完整路径
-                        ncx_dir = posixpath.dirname(ncx_path)
-                        full_src = self._resolve_internal_path(src, ncx_dir)
-                        toc_item = {
-                            'title': title,
-                            'src': full_src,
-                            'level': level
-                        }
-                        # 处理可能的锚点
-                        if anchor:
-                            toc_item['anchor'] = anchor
-                        toc_item['old_file_name'] = posixpath.basename(src) # 老旧的文件名，只取名字
-                        toc.append(toc_item)
-                
                 # 处理子navPoint
-                child_navpoints = navpoint.findall('{http://www.daisy.org/z3986/2005/ncx/}navPoint')
+                child_navpoints = navpoint.findall(f'{{{ncx_namespace}}}navPoint')
+                target = navpoint_target(navpoint)
+                child_targets = [navpoint_target(child) for child in child_navpoints]
+                # Publishers often use a parent navPoint as a section label
+                # and repeat its first child's target.  It is not another OPF
+                # chapter; retain it for hierarchy, but make it non-navigable.
+                is_section = target is not None and any(
+                    child_target is not None
+                    and child_target[0] == target[0]
+                    and child_target[1] == target[1]
+                    for child_target in child_targets
+                )
+                nav_label = navpoint.find(
+                    f'{{{ncx_namespace}}}navLabel/{{{ncx_namespace}}}text'
+                )
+
+                if nav_label is not None and nav_label.text and target is not None:
+                    full_src, anchor, old_file_name = target
+                    toc_item = {
+                        'title': nav_label.text,
+                        'src': full_src,
+                        'level': level,
+                        'kind': 'section' if is_section else 'chapter',
+                        'old_file_name': old_file_name,
+                    }
+                    if anchor:
+                        toc_item['anchor'] = anchor
+                    toc.append(toc_item)
+
                 for child in child_navpoints:
                     process_navpoint(child, level + 1)
             
@@ -1051,13 +1140,38 @@ class EPUBProcessor:
                         item = manifest[idref]
                         # 只处理HTML/XHTML内容
                         if item['media_type'] in ['application/xhtml+xml', 'text/html']:
+                            # EPUB spine items marked non-linear are auxiliary
+                            # material (most commonly a cover).  They must not
+                            # consume a public chapter index: NCX links point to
+                            # the linear reading sequence.
+                            if itemref.get('linear', 'yes').lower() == 'no':
+                                self.reporter.detail(
+                                    "Skipping non-linear spine item: "
+                                    f"{item['full_path']}"
+                                )
+                                continue
+                            # The OPF spine is the canonical sequence for
+                            # chapter_N.  Some publishers include a real
+                            # section landing page in that sequence, while
+                            # their NCX points the section label at the first
+                            # article instead.  Preserve the landing page as
+                            # its own chapter instead of letting NCX make it
+                            # disappear.
+                            section_index_title = self.find_section_index_title(
+                                item['full_path']
+                            )
                             # 尝试从toc中查找对应的标题
-                            title = self.find_chapter_title(item['full_path'])
+                            title = section_index_title or self.find_chapter_title(
+                                item['full_path']
+                            )
                             
                             self.chapters.append({
                                 'id': idref,
                                 'path': item['full_path'],
-                                'title': title or f"Chapter {len(self.chapters) + 1}"
+                                # The fallback title must agree with the public
+                                # chapter_index used by reader, annotations and AI.
+                                'title': title or f"Chapter {len(self.chapters)}",
+                                'is_section_index': bool(section_index_title),
                             })
             
             # print(f"Found {len(self.chapters)} chapters")
@@ -1069,48 +1183,97 @@ class EPUBProcessor:
         except Exception as e:
             self.reporter.detail(f"Failed to parse OPF file: {e}")
             return False
-    
+
     def find_chapter_title(self, chapter_path):
         """根据章节路径在toc中查找对应的标题"""
+        def title_from_matches(matches):
+            # A section label may intentionally share its target with its
+            # first article.  The article title is the chapter title; the
+            # section remains a TOC-only grouping label.
+            for toc_item in matches:
+                if toc_item.get('kind', 'chapter') != 'section':
+                    return toc_item['title']
+            return matches[0]['title'] if matches else None
+
         # 先尝试精确匹配
-        for toc_item in self.toc:
-            if toc_item['src'] == chapter_path:
-                return toc_item['title']
+        matching = [item for item in self.toc if item['src'] == chapter_path]
+        title = title_from_matches(matching)
+        if title:
+            return title
         
         # 如果直接匹配失败，尝试基于文件名匹配
         chapter_filename = posixpath.basename(chapter_path)
-        for toc_item in self.toc:
-            toc_filename = posixpath.basename(toc_item['src'])
-            if toc_filename == chapter_filename:
-                return toc_item['title']
+        matching = [
+            item for item in self.toc
+            if posixpath.basename(item['src']) == chapter_filename
+        ]
+        title = title_from_matches(matching)
+        if title:
+            return title
         
         # 尝试规范化路径后再匹配
         normalized_chapter_path = posixpath.normpath(chapter_path)
-        for toc_item in self.toc:
-            normalized_toc_path = posixpath.normpath(toc_item['src'])
-            if normalized_toc_path == normalized_chapter_path:
-                return toc_item['title']
+        matching = [
+            item for item in self.toc
+            if posixpath.normpath(item['src']) == normalized_chapter_path
+        ]
+        title = title_from_matches(matching)
+        if title:
+            return title
         
         # print(f"Chapter title not found: {chapter_path}")
         return None
+
+    def find_section_index_title(self, chapter_path):
+        """Return the title of a real EPUB section-index page, when present.
+
+        ``chapter_N`` is defined solely by the linear OPF spine.  A number of
+        EPUBs put a real section landing page in that spine but describe the
+        same section in NCX as a parent node whose target repeats the first
+        article.  Detecting the landing page from its own markup lets the TOC
+        map that parent label to the correct, distinct chapter index.
+        """
+        try:
+            content = self._internal_file(chapter_path).read_text(
+                encoding="utf-8", errors="ignore"
+            )
+        except (OSError, ValueError):
+            return None
+
+        match = re.search(
+            r"<(?P<tag>h[1-6]|div|p)\b(?=[^>]*\bclass\s*=\s*"  # i18n-allow-literal: CSS/HTML syntax
+            r"(?:['\"])[^'\"]*\bsection_index_title\b[^'\"]*"
+            r"(?:['\"]))[^>]*>(?P<content>.*?)</(?P=tag)\s*>",
+            content,
+            flags=re.IGNORECASE | re.DOTALL | re.VERBOSE,
+        )
+        if not match:
+            return None
+        title = re.sub(r"<[^>]+>", " ", match.group("content"))
+        title = " ".join(metadata_text(html.unescape(title)).split())
+        return title or None
     
     def create_web_interface(self):
         """创建网页界面"""
         os.makedirs(self.web_dir, exist_ok=True)
         
-        # 创建主页面
-        self.create_index_page()
+        # Server mode deliberately keeps page chrome out of the conversion
+        # cache. The current application code renders it at request time.
+        self.create_index_page(write=self.deployment_mode != "server")
         
         # 创建章节页面
-        self.create_chapter_pages()
+        self.create_chapter_pages(write=self.deployment_mode != "server")
         
         # 复制资源文件（CSS、图片、字体等）并删除 extracted 文件夹
         self.copy_resources()
+
+        if self.deployment_mode == "server":
+            self._write_server_content_cache()
         
         # print(f"Web interface created at: {self.web_dir}")
         return self.web_dir
     
-    def create_index_page(self):
+    def create_index_page(self, write=True):
         """创建章节索引页面"""
         sync_shelf_button = (
             ""
@@ -1149,6 +1312,44 @@ class EPUBProcessor:
             authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
+        ai_reading_stylesheet = (
+            '<link rel="stylesheet" href="/assets/ai-reading-hub.css">'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_reading_navigation = (
+            f'<button type="button" class="app-nav-link" data-ai-reading-hub '
+            f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
+            '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
+            '<span data-i18n="ai.library">AI readings</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_reading_indicators = (
+            f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_reading_script = (
+            '<script src="/assets/ai-reading-hub.js" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_book_chat_styles = (
+            '''<link rel="stylesheet" href="/assets/ai-chat.css">
+    <link rel="stylesheet" href="/assets/vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="/assets/ai-rich-text.css">'''
+            if self.deployment_mode == "server" else ""
+        )
+        ai_book_chat_button = (
+            f'<button type="button" class="css-btn secondary" data-ai-book-chat '
+            f'data-book-id="{book_id_attribute}"><i class="fas fa-comments" aria-hidden="true"></i>'
+            '<span data-i18n="ai.askBook">Ask AI</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_book_chat_script = (
+            '''<script src="/assets/vendor/katex/katex.min.js" defer></script>
+<script src="/assets/vendor/mermaid/mermaid.min.js" defer></script>
+<script src="/assets/ai-rich-text.js" defer></script>
+<script src="/assets/ai-chat.js" defer></script>'''
+            if self.deployment_mode == "server" else ""
+        )
         index_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1174,7 +1375,8 @@ class EPUBProcessor:
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
-    <link rel="stylesheet" href="/assets/ai-reading.css">
+    {ai_reading_stylesheet}
+    {ai_book_chat_styles}
 """
         index_html += """
     <script>
@@ -1251,14 +1453,6 @@ class EPUBProcessor:
 </head>
 <body>
 """
-        ai_book_button = (
-            '<button class="css-btn secondary" type="button" '
-            f'data-ai-reading-book data-book-id="{book_id_attribute}">'
-            '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
-            '<span data-i18n="ai.bookGuide">AI guide</span></button>'
-            if self.deployment_mode == "server"
-            else ""
-        )
         index_html += f"""
 <header class="app-header">
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
@@ -1266,6 +1460,7 @@ class EPUBProcessor:
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
+            {ai_reading_navigation}
         </div>
         <div class="app-nav-actions">
             <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="book.theme">Theme</span></button>
@@ -1310,13 +1505,12 @@ class EPUBProcessor:
                             <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                         </div>
                     </div>
-                    {ai_book_button}
+                    {ai_book_chat_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
             </div>
-        </div>
-    
-    <div class="toc-container" data-id="toc-container">
+    </div>
+    <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
         <div class="toc-header">
             <h2 data-i18n="book.tableOfContents">Table of contents</h2>
             <div class="chapter-count" data-i18n="book.totalChapters" data-i18n-params='{{"count": {len(self.chapters)}}}'>Total: {len(self.chapters)}</div>
@@ -1324,52 +1518,30 @@ class EPUBProcessor:
         <ul class="chapter-list">
 """
         
-        # 如果有详细的toc信息，使用toc生成目录
-        if self.toc:
-            chapter_index_map, chapter_filename_map = self._build_chapter_index_maps()
-            
-            # 根据toc生成目录
-            for toc_item in self.toc:
-                level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
-                chapter_anchor = toc_item.get('anchor', None)
-                toc_src = toc_item['src']
-                
-                chapter_index = self._find_chapter_index(toc_src, chapter_index_map, chapter_filename_map)
-                
-                if chapter_index is not None:
-                    toc_title = (
-                        html.escape(
-                            metadata_text(toc_item.get("title")), quote=False
-                        )
-                        if self.deployment_mode == "server"
-                        else toc_item["title"]
-                    )
-                    if chapter_anchor is not None:
-                        safe_anchor = (
-                            urllib.parse.quote(str(chapter_anchor), safe='')
-                            if self.deployment_mode == "server"
-                            else chapter_anchor
-                        )
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
-                    else:
-                        index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
-                    toc_item['new_file_name'] = f'chapter_{chapter_index}.html'
-                else:
-                    self.reporter.detail(
-                        f"Chapter index not found for toc item: "
-                        f"{toc_item['title']} (src: {toc_src})"
-                    )
-        else:
-            # 回退到简单章节列表
-            for i, chapter in enumerate(self.chapters):
-                chapter_title = (
-                    html.escape(
-                        metadata_text(chapter.get("title")), quote=False
-                    )
+        # OPF spine owns public chapter indexes.  NCX only contributes titles,
+        # anchors and non-navigable grouping nodes to that sequence.
+        for toc_item in self._build_toc_data():
+            level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
+            toc_title = (
+                html.escape(metadata_text(toc_item.get("title")), quote=False)
+                if self.deployment_mode == "server"
+                else toc_item["title"]
+            )
+            if toc_item.get('kind') == 'section':
+                index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}">{toc_title}</span></li>\n'
+                continue
+
+            chapter_index = toc_item['chapter_index']
+            chapter_anchor = toc_item.get('anchor')
+            if chapter_anchor is not None:
+                safe_anchor = (
+                    urllib.parse.quote(str(chapter_anchor), safe='')
                     if self.deployment_mode == "server"
-                    else chapter["title"]
+                    else chapter_anchor
                 )
-                index_html += f'        <li><a class="chapter-link" href="/book/{book_id_url}/chapter_{i}.html" id="eb_ci_{i}"><span class="chapter-title" lang="{book_language}">{chapter_title}</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+            else:
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
@@ -1483,12 +1655,12 @@ if (window.EpubBrowserCacheBoundary) {
 <script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
-<script src="/assets/book.js?v=13" defer></script>
-<script src="/assets/pinyin-pro.min.js" defer></script>
-<script src="/assets/ai-reading.js" defer></script>
+    <script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
 <script src="/assets/annotation.js" defer></script>
 <script src="/assets/annotation-hub.js" defer></script>
+{ai_reading_script}
+{ai_book_chat_script}
 <script src="/assets/sortable.min.js" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {{
@@ -1502,11 +1674,12 @@ document.addEventListener('DOMContentLoaded', function() {{
         index_html = rewrite_root_urls(index_html, self.urls)
         # kindle 支持，不能压缩 css 和 js
         index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
-        with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
-            f.write(index_html)
-        
-        # 生成目录 JSON 文件
-        self.create_toc_json()
+        if write:
+            with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
+                f.write(index_html)
+            # 生成目录 JSON 文件
+            self.create_toc_json()
+        return index_html
     
     def _build_chapter_index_maps(self):
         """构建章节路径到索引的映射（支持多种路径格式）
@@ -1557,46 +1730,100 @@ document.addEventListener('DOMContentLoaded', function() {{
             return chapter_filename_map[posixpath.basename(urllib.parse.unquote(toc_src))]
         return None
     
-    def create_toc_json(self):
-        """生成目录 JSON 文件到书籍自己的文件夹下"""
+    def _build_toc_data(self):
+        """Return the EPUB-derived table of contents for either publisher."""
         toc_data = []
+
+        def title_key(value):
+            return " ".join(metadata_text(value).split()).casefold()
+
+        def chapter_record(title, level, chapter_index, anchor=None):
+            record = {
+                'title': title,
+                'level': level,
+                'kind': 'chapter',
+                'chapter_index': chapter_index,
+                'chapter_file': f'chapter_{chapter_index}.html',
+            }
+            if anchor is not None:
+                record['anchor'] = anchor
+            return record
         
         # 如果有详细的toc信息，使用toc生成目录
         if self.toc:
             chapter_index_map, chapter_filename_map = self._build_chapter_index_maps()
+            section_indexes_by_title = {}
+            for index, chapter in enumerate(self.chapters):
+                if chapter.get('is_section_index'):
+                    section_indexes_by_title.setdefault(
+                        title_key(chapter['title']), []
+                    ).append(index)
+
+            used_section_indexes = set()
+            represented_indexes = set()
             
             # 根据toc生成目录
-            for toc_item in self.toc:
-                chapter_anchor = toc_item.get('anchor', None)
+            for order, toc_item in enumerate(self.toc):
                 toc_src = toc_item['src']
-                
-                chapter_index = self._find_chapter_index(toc_src, chapter_index_map, chapter_filename_map)
-                
-                if chapter_index is not None:
-                    chapter_data = {
-                        'title': toc_item['title'],
-                        'level': toc_item.get('level', 0),
-                        'chapter_index': chapter_index,
-                        'chapter_file': f'chapter_{chapter_index}.html'
-                    }
-                    if chapter_anchor is not None:
-                        chapter_data['anchor'] = chapter_anchor
-                    toc_data.append(chapter_data)
+                target_index = self._find_chapter_index(
+                    toc_src, chapter_index_map, chapter_filename_map
+                )
+                if toc_item.get('kind', 'chapter') == 'section':
+                    # A repeated NCX target is normally only a grouping node.
+                    # However, if OPF has a separate linear section-index page
+                    # with the same label, that page is a real chapter and
+                    # must own its own chapter_N slot.
+                    candidates = section_indexes_by_title.get(
+                        title_key(toc_item['title']), []
+                    )
+                    section_index = next(
+                        (
+                            candidate for candidate in candidates
+                            if candidate not in used_section_indexes
+                            and (target_index is None or candidate < target_index)
+                        ),
+                        None,
+                    )
+                    if section_index is not None:
+                        used_section_indexes.add(section_index)
+                        represented_indexes.add(section_index)
+                        toc_data.append(chapter_record(
+                            toc_item['title'],
+                            toc_item.get('level', 0),
+                            section_index,
+                        ))
+                    else:
+                        # Keep genuinely structural groups, but never let one
+                        # claim an OPF chapter index belonging to its child.
+                        toc_data.append({
+                            'title': toc_item['title'],
+                            'level': toc_item.get('level', 0),
+                            'kind': 'section',
+                        })
+                    continue
+                chapter_anchor = toc_item.get('anchor', None)
+                if target_index is not None:
+                    represented_indexes.add(target_index)
+                    toc_data.append(chapter_record(
+                        toc_item['title'], toc_item.get('level', 0),
+                        target_index, chapter_anchor,
+                    ))
                 else:
                     self.reporter.detail(
                         f"Chapter index not found for toc item: "
                         f"{toc_item['title']} (src: {toc_src})"
                     )
+
         else:
             # 回退到简单章节列表
             for i, chapter in enumerate(self.chapters):
-                toc_data.append({
-                    'title': chapter['title'],
-                    'level': 0,
-                    'chapter_index': i,
-                    'chapter_file': f'chapter_{i}.html'
-                })
+                toc_data.append(chapter_record(chapter['title'], 0, i))
         
+        return toc_data
+
+    def create_toc_json(self):
+        """生成目录 JSON 文件到书籍自己的文件夹下"""
+        toc_data = self._build_toc_data()
         # 保存为 JSON 文件到书籍自己的文件夹下
         toc_json_path = os.path.join(self.web_dir, 'toc.json')
         with open(toc_json_path, 'w', encoding='utf-8') as f:
@@ -1604,7 +1831,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         
         # print(f"TOC JSON file created: {toc_json_path} with {len(toc_data)} items")
     
-    def create_chapter_pages(self):
+    def create_chapter_pages(self, write=True):
         """创建章节页面"""
         def create_chapter_page(chapter_path, chapter, i):
             try:
@@ -1615,11 +1842,21 @@ document.addEventListener('DOMContentLoaded', function() {{
                 # 处理HTML内容，修复资源链接并提取样式
                 body_content, style_links = self.process_html_content(content, chapter['path'])
                 
-                # 创建章节页面
-                chapter_html = self.create_chapter_template(body_content, style_links, i, chapter['title'])
-                
-                with open(os.path.join(self.web_dir, f'chapter_{i}.html'), 'w', encoding='utf-8') as f:
-                    f.write(chapter_html)
+                if self.deployment_mode == "server":
+                    self._server_chapter_payloads[i] = {
+                        "index": i,
+                        "title": chapter['title'],
+                        "content": body_content,
+                        "style_links": style_links,
+                    }
+                if write:
+                    # Static builds remain self-contained and write their
+                    # complete reader page during EPUB conversion.
+                    chapter_html = self.create_chapter_template(
+                        body_content, style_links, i, chapter['title']
+                    )
+                    with open(os.path.join(self.web_dir, f'chapter_{i}.html'), 'w', encoding='utf-8') as f:
+                        f.write(chapter_html)
                     
             except Exception as e:
                 self.reporter.detail(
@@ -1638,6 +1875,43 @@ document.addEventListener('DOMContentLoaded', function() {{
                     futures.append(future)
             for future in futures:
                 future.result()
+
+    def _write_server_content_cache(self):
+        """Persist only immutable EPUB-derived data for Server mode.
+
+        HTML shells, application navigation, i18n attributes, and app assets
+        intentionally stay out of this cache. They are rendered from current
+        code for every authenticated reader-page request.
+        """
+        content_dir = Path(self.web_dir, "content")
+        content_dir.mkdir(parents=True, exist_ok=True)
+        book_payload = {
+            "title": self.book_title,
+            "authors": list(self.authors or ()),
+            "tags": list(self.tags or ()),
+            "description": self.description,
+            "epub_identifier": self.epub_identifier,
+            "cover_info": self.cover_info,
+            "language": self.lang or "en",
+            "chapters": self.chapters,
+            "toc": self.toc,
+            "resources_base": self.resources_base,
+        }
+        (content_dir / "metadata.json").write_text(
+            json.dumps(book_payload, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        (content_dir / "toc.json").write_text(
+            json.dumps(self._build_toc_data(), ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        if len(self._server_chapter_payloads) != len(self.chapters):
+            raise ValueError("Server content cache is missing one or more chapters")
+        for index, payload in self._server_chapter_payloads.items():
+            (content_dir / f"chapter_{index}.json").write_text(
+                json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                encoding="utf-8",
+            )
                 
     
     def process_html_content(self, content, chapter_path):
@@ -1812,21 +2086,14 @@ document.addEventListener('DOMContentLoaded', function() {{
 
         def replace_a_link(match):
             src = match.group(1)
-            parsed_src = urllib.parse.urlsplit(html.unescape(src).strip())
-
-            # A root-relative anchor navigates the web origin; it is not a
-            # path to a file inside the extracted EPUB archive.
-            if (
-                not parsed_src.scheme
-                and not parsed_src.netloc
-                and parsed_src.path.startswith("/")
-            ):
-                return match.group(0)
 
             # 如果已经是绝对路径或数据URI，则不处理
             if self._is_external_reference(src):
                 return match.group(0)
-            if self.deployment_mode == "server" and parsed_src.scheme:
+            if (
+                self.deployment_mode == "server"
+                and urllib.parse.urlsplit(html.unescape(src).strip()).scheme
+            ):
                 # The final allowlist removes active schemes. Avoid resolving
                 # them as EPUB-internal paths before that pass.
                 return match.group(0)
@@ -1905,19 +2172,62 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         ai_chapter_button = (
             '<button class="control-btn" type="button" aria-label="AI reading" '
-            'data-i18n-aria-label="ai.chapterRead" data-ai-reading-chapter '
+            'data-i18n-aria-label="ai.chapterRead" data-ai-learning-canvas aria-pressed="false" '
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.chapterRead">AI reading</span></button>'
             if self.deployment_mode == "server"
             else ""
         )
+        ai_followup_button = (
+            '<button class="control-btn" type="button" aria-label="Ask AI" '
+            'data-i18n-aria-label="ai.askChapter" data-ai-followup-drawer '
+            f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
+            '<i class="fas fa-comments" aria-hidden="true"></i>'
+            '<span class="control-name" data-i18n="ai.askChapter">Ask AI</span></button>'
+            if self.deployment_mode == "server"
+            else ""
+        )
+        ai_chapter_styles = """
+    <link rel="stylesheet" href="/assets/ai-canvas.css">
+    <link rel="stylesheet" href="/assets/ai-reading-hub.css">
+    <link rel="stylesheet" href="/assets/ai-chat.css">
+    <link rel="stylesheet" href="/assets/vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="/assets/ai-rich-text.css">""" if self.deployment_mode == "server" else ""
+        ai_reading_navigation = (
+            f'<button type="button" class="app-nav-link" data-ai-reading-hub '
+            f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
+            '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
+            '<span data-i18n="ai.library">AI readings</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_reading_indicators = (
+            f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
+            if self.deployment_mode == "server" else ""
+        )
+        mobile_ai_reading_button = (
+            '<button class="control-btn" id="mobileAIReadingBtn" type="button" '
+            'data-ai-learning-canvas aria-pressed="false" '
+            f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}" '
+            'aria-label="AI reading" title="AI reading" '
+            'data-i18n-aria-label="ai.chapterRead" data-i18n-title="ai.chapterRead">'
+            '<i class="fas fa-wand-magic-sparkles"></i>'
+            '<span data-i18n="ai.chapterRead">AI reading</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
+        ai_chapter_scripts = """
+    <script src="/assets/ai-reading-hub.js" defer></script>
+    <script src="/assets/vendor/katex/katex.min.js" defer></script>
+    <script src="/assets/vendor/mermaid/mermaid.min.js" defer></script>
+    <script src="/assets/ai-rich-text.js" defer></script>
+    <script src="/assets/ai-canvas.js" defer></script>
+    <script src="/assets/ai-chat.js" defer></script>""" if self.deployment_mode == "server" else ""
         prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
         next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
-        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
-        next_link_mobile = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
+        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" title="Previous chapter" data-i18n-aria-label="reader.previous" data-i18n-title="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link_mobile = f'<a {next_href} aria-label="Next chapter" title="Next chapter" data-i18n-aria-label="reader.next" data-i18n-title="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
         bookshelf_data_actions = """
                     <button class="bookshelf-action-btn" id="exportShelfBtn">
                         <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
@@ -1953,7 +2263,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
-    <link rel="stylesheet" href="/assets/ai-reading.css">
+    {ai_chapter_styles}
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -2042,7 +2352,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
-    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true">
+    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true"{ai_reading_indicators}>
         <div class="toc-header">
             <h3 data-i18n="reader.bookChapters">Chapters</h3>
             <div class="toc-header-actions">
@@ -2059,7 +2369,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         </ul>
     </nav>
 
-    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true">
+    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true"{ai_reading_indicators}>
         <div class="toc-header">
             <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
             <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
@@ -2079,6 +2389,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <div class="app-nav-links">
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+                {ai_reading_navigation}
             </div>
             <div class="app-nav-actions">
                 <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
@@ -2087,11 +2398,11 @@ document.addEventListener('DOMContentLoaded', function() {{
     </header>
     <div class="container">
         <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
-            <button class="control-btn" id="togglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning"><i class="fas fa-book-open"></i><span class="control-name" data-i18n="reader.turning">Turning</span></button>
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
             <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
             {ai_chapter_button}
+            {ai_followup_button}
         </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
             <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
@@ -2106,12 +2417,16 @@ document.addEventListener('DOMContentLoaded', function() {{
             {prev_link}
             <a href="/book/{book_id_url}/index.html" aria-label="Book" data-i18n-aria-label="reader.book" id="navigationHomeBtn">
                 <div class="control-btn">
-                    <i class="fas fa-book-open"></i>
+                    <i class="fas fa-book"></i>
                     <span class="control-name" data-i18n="reader.book">Book</span>
                 </div>
             </a>
 
             <div id="paginationInfo" style="display: none;">
+                <button class="control-btn pagination-mode-exit" id="exitPaginationMode" type="button" aria-label="Exit page-turning mode" data-i18n-aria-label="settings.exitPaginationMode" title="Exit page-turning mode" data-i18n-title="settings.exitPaginationMode">
+                    <i class="fas fa-scroll"></i>
+                    <span class="control-name" data-i18n="settings.exitPaginationMode">Exit page-turning mode</span>
+                </button>
                 <div class="control-btn" id="prevPage" style="padding-right: 40px;">
                     <i class="fas fa-chevron-left"></i>
                     <span class="control-name" data-i18n="reader.previousPage">Previous page</span>
@@ -2234,6 +2549,11 @@ document.addEventListener('DOMContentLoaded', function() {{
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
                     </label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="paginationModeToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
+                    </label>
                     <label class="settings-switch desktop-setting-only">
                         <input type="checkbox" id="desktopChapterSidebarToggle">
                         <span class="switch-slider"></span>
@@ -2291,35 +2611,28 @@ document.addEventListener('DOMContentLoaded', function() {{
 
     <!-- 移动端控件 -->
     <div class="mobile-controls" data-id="mobile-controls">
-        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
+        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" title="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" data-i18n-title="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
             <i class="fas fa-list"></i>
             <span data-i18n="reader.thisChapterContents">This chapter</span>
         </button>
-        <button class="control-btn" id="mobileThemeBtn" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme">
-            <i class="fas fa-moon"></i>
-            <span data-i18n="reader.theme">Theme</span>
-        </button>
-        <button class="control-btn" id="mobileTogglePagination" type="button" aria-label="Turning" data-i18n-aria-label="reader.turning">
-            <i class="fas fa-book-open"></i>
-            <span class="control-name" data-i18n="reader.turning">Turning</span>
-        </button>
+        {mobile_ai_reading_button}
         {prev_link_mobile}
-        <a href="/" aria-label="Home" data-i18n-aria-label="reader.home">
+        <a href="/" aria-label="Home" title="Home" data-i18n-aria-label="reader.home" data-i18n-title="reader.home">
             <div class="control-btn" aria-label="Home" data-i18n-aria-label="reader.home">
                 <i class="fas fa-home"></i>
                 <span data-i18n="reader.home">Home</span>
             </div>
         </a>
         {next_link_mobile}
-        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters">
+        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
             <i class="fas fa-book"></i>
             <span data-i18n="reader.bookChapters">Chapters</span>
         </button>
-        <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false">
+        <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" title="Settings" data-i18n-aria-label="reader.settings" data-i18n-title="reader.settings" aria-controls="settingsModal" aria-expanded="false">
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
         </button>
-        <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" data-i18n-aria-label="reader.top">
+        <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" title="Top" data-i18n-aria-label="reader.top" data-i18n-title="reader.top">
             <i class="fas fa-arrow-up"></i>
             <span data-i18n="reader.top">Top</span>
         </button>
@@ -2440,9 +2753,8 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/annotation-hub.js" defer></script>
     <script src="/assets/sortable.min.js"></script>
     <script src="/assets/highlight.min.js"></script>
-    <script src="/assets/pinyin-pro.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
-    <script src="/assets/ai-reading.js" defer></script>
+    {ai_chapter_scripts}
     <script>
     document.addEventListener('DOMContentLoaded', function() {{
         {startup}

@@ -4,7 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from epub_browser.asset_publisher import AssetPublisher
+from epub_browser.asset_publisher import (
+    AssetPublisher,
+    SERVER_ONLY_ASSET_PATHS,
+    SERVER_ONLY_ASSET_PREFIXES,
+)
+from epub_browser.asset_publisher import rewrite_asset_urls
 from epub_browser.urls import SiteURLs
 
 
@@ -129,6 +134,38 @@ class AssetPublisherTests(unittest.TestCase):
             stylesheet = Path(output, published.url_for('app.css').lstrip('/')).read_text(encoding='utf-8')
 
             self.assertIn('url(' + json.dumps(published.url_for('font.woff2')) + ')', stylesheet)
+
+    def test_rewrite_html_supports_nested_local_vendor_assets(self):
+        with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
+            self._write_source_assets(source)
+            vendor = Path(source, "vendor", "example")
+            vendor.mkdir(parents=True)
+            (vendor / "renderer.js").write_text("window.renderer=true", encoding="utf-8")
+            published = AssetPublisher(source, output).publish()
+
+            rewritten = rewrite_asset_urls(
+                '<script src="/assets/vendor/example/renderer.js"></script>', published
+            )
+
+            self.assertIn(published.url_for("vendor/example/renderer.js"), rewritten)
+
+    def test_excluded_assets_are_not_written_or_listed(self):
+        with tempfile.TemporaryDirectory() as output:
+            published = AssetPublisher(
+                Path("epub_browser/assets"),
+                output,
+                excluded_paths=SERVER_ONLY_ASSET_PATHS,
+                excluded_prefixes=SERVER_ONLY_ASSET_PREFIXES,
+            ).publish()
+
+            for logical_path in SERVER_ONLY_ASSET_PATHS:
+                self.assertNotIn(logical_path, published.assets)
+                self.assertFalse((Path(output) / "assets" / "immutable" / logical_path).exists())
+            self.assertFalse(any(
+                logical_path.startswith(prefix)
+                for logical_path in published.assets
+                for prefix in SERVER_ONLY_ASSET_PREFIXES
+            ))
 
     def _write_source_assets(self, source):
         root = Path(source)

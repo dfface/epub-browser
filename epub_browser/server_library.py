@@ -42,7 +42,11 @@ def library_metadata(
     public_root = Path(public_dir)
     books = []
     for record in records:
-        if not (public_root / "book" / record.book_id / "index.html").is_file():
+        book_root = public_root / "book" / record.book_id
+        if not (
+            (book_root / "content" / "metadata.json").is_file()
+            or (book_root / "index.html").is_file()
+        ):
             continue
         try:
             metadata = json.loads(record.metadata_json)
@@ -801,14 +805,22 @@ class ServerLibraryManager:
             ) from error
         if revision != SERVER_OUTPUT_REVISION:
             raise ValueError("converted book has an outdated Server output revision")
-        for name in ("index.html", "toc.json"):
-            if not (directory / name).is_file():
+        content_dir = directory / "content"
+        for name in ("metadata.json", "toc.json"):
+            if not (content_dir / name).is_file():
                 raise ValueError(f"converted book is missing {name}")
-        toc = json.loads((directory / "toc.json").read_text(encoding="utf-8"))
-        for item in toc:
-            chapter = item.get("chapter_file")
-            if chapter and not (directory / chapter).is_file():
-                raise ValueError(f"converted book is missing {chapter}")
+        try:
+            content_metadata = json.loads(
+                (content_dir / "metadata.json").read_text(encoding="utf-8")
+            )
+            chapters = content_metadata["chapters"]
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+            raise ValueError("converted book has invalid content metadata") from error
+        if not isinstance(chapters, list):
+            raise ValueError("converted book has invalid chapter metadata")
+        for index in range(len(chapters)):
+            if not (content_dir / f"chapter_{index}.json").is_file():
+                raise ValueError(f"converted book is missing chapter_{index}.json")
         if converted.metadata.cover and not (
             directory / converted.metadata.cover
         ).is_file():
@@ -826,18 +838,23 @@ class ServerLibraryManager:
             return False
         if revision != SERVER_OUTPUT_REVISION:
             return False
-        if not (directory / "index.html").is_file() or not (
-            directory / "toc.json"
+        content_dir = directory / "content"
+        if not (content_dir / "metadata.json").is_file() or not (
+            content_dir / "toc.json"
         ).is_file():
             return False
         try:
-            toc = json.loads((directory / "toc.json").read_text(encoding="utf-8"))
+            content_metadata = json.loads(
+                (content_dir / "metadata.json").read_text(encoding="utf-8")
+            )
+            chapters = content_metadata["chapters"]
             metadata = json.loads(record.metadata_json)
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
             return False
-        for item in toc:
-            chapter = item.get("chapter_file")
-            if chapter and not (directory / chapter).is_file():
+        if not isinstance(chapters, list):
+            return False
+        for index in range(len(chapters)):
+            if not (content_dir / f"chapter_{index}.json").is_file():
                 return False
         cover = metadata.get("cover")
         return not cover or (directory / cover).is_file()

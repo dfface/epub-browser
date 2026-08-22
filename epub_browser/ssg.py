@@ -12,7 +12,12 @@ from typing import Callable, Optional, Sequence
 
 from tqdm import tqdm
 
-from .asset_publisher import AssetPublisher, PublishedAssets
+from .asset_publisher import (
+    AssetPublisher,
+    PublishedAssets,
+    SERVER_ONLY_ASSET_PATHS,
+    SERVER_ONLY_ASSET_PREFIXES,
+)
 from .book_identity import inspect_book_identity, resolve_book_identity
 from .cli import SSGConfig
 from .models import ConvertedBook
@@ -65,7 +70,13 @@ class SSGPublisher:
         )
         try:
             assets_dir = Path(__file__).with_name("assets")
-            assets = AssetPublisher(assets_dir, staging, urls=self.urls).publish()
+            assets = AssetPublisher(
+                assets_dir,
+                staging,
+                urls=self.urls,
+                excluded_paths=SERVER_ONLY_ASSET_PATHS,
+                excluded_prefixes=SERVER_ONLY_ASSET_PREFIXES,
+            ).publish()
             books = self._convert_all(prepared, staging, assets)
             publish_library_shell(staging, books, assets, self.urls)
             self._validate_snapshot(staging, books, assets)

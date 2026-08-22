@@ -21,7 +21,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 8
+DB_SCHEMA_VERSION = 10
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -294,6 +294,8 @@ class StateStore:
                 model TEXT NOT NULL DEFAULT '',
                 timeout_seconds INTEGER NOT NULL DEFAULT 60
                     CHECK(timeout_seconds BETWEEN 5 AND 3600),
+                model_context_window INTEGER NOT NULL DEFAULT 32768
+                    CHECK(model_context_window BETWEEN 2048 AND 100000000),
                 max_concurrency INTEGER NOT NULL DEFAULT 2
                     CHECK(max_concurrency BETWEEN 1 AND 4),
                 daily_limit INTEGER NOT NULL DEFAULT 20
@@ -307,7 +309,17 @@ class StateStore:
             "INSERT INTO ai_settings (singleton) VALUES (1) "
             "ON CONFLICT(singleton) DO NOTHING"
         )
-        self._migrate_ai_settings_timeout_range(connection)
+        added_context_window = self._add_column_if_missing(
+            connection, "ai_settings", "model_context_window",
+            "INTEGER NOT NULL DEFAULT 32768 CHECK(model_context_window BETWEEN 2048 AND 100000000)",
+        )
+        if added_context_window:
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(ai_settings)")}
+            if "chat_context_tokens" in columns:
+                connection.execute(
+                    "UPDATE ai_settings SET model_context_window = chat_context_tokens"
+                )
+        self._migrate_ai_settings_constraints(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ai_user_access (
@@ -367,6 +379,10 @@ class StateStore:
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
                 cache_key TEXT NOT NULL,
+                request_json TEXT,
+                profile TEXT,
+                template_id TEXT,
+                template_version INTEGER,
                 status TEXT NOT NULL CHECK(status IN (
                     'queued', 'running', 'complete', 'failed', 'interrupted'
                 )),
@@ -408,6 +424,10 @@ class StateStore:
             "progress_total",
             "INTEGER NOT NULL DEFAULT 1 CHECK(progress_total >= 1)",
         )
+        self._add_column_if_missing(connection, "ai_reading_jobs", "request_json", "TEXT")
+        self._add_column_if_missing(connection, "ai_reading_jobs", "profile", "TEXT")
+        self._add_column_if_missing(connection, "ai_reading_jobs", "template_id", "TEXT")
+        self._add_column_if_missing(connection, "ai_reading_jobs", "template_version", "INTEGER")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ai_reading_results (
@@ -422,7 +442,11 @@ class StateStore:
                 profile TEXT NOT NULL CHECK(profile IN (
                     'auto', 'technical', 'fiction', 'general'
                 )),
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                reading_boundary INTEGER,
                 config_revision INTEGER NOT NULL CHECK(config_revision >= 0),
+                template_id TEXT NOT NULL DEFAULT 'legacy',
+                template_version INTEGER NOT NULL DEFAULT 0 CHECK(template_version >= 0),
                 content_json TEXT NOT NULL,
                 created_by_user_id TEXT NOT NULL
                     REFERENCES users(id) ON DELETE CASCADE,
@@ -433,6 +457,20 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_reading_results_book "
             "ON ai_reading_results(book_id, created_at DESC)"
+        )
+        self._add_column_if_missing(
+            connection, "ai_reading_results", "template_id", "TEXT NOT NULL DEFAULT 'legacy'"
+        )
+        self._add_column_if_missing(
+            connection, "ai_reading_results", "template_version",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(template_version >= 0)",
+        )
+        self._add_column_if_missing(
+            connection, "ai_reading_results", "language",
+            "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN'))",
+        )
+        self._add_column_if_missing(
+            connection, "ai_reading_results", "reading_boundary", "INTEGER",
         )
         connection.execute(
             """
@@ -453,6 +491,7 @@ class StateStore:
                 owner_user_id TEXT NOT NULL REFERENCES users(id)
                     ON DELETE CASCADE,
                 question TEXT NOT NULL,
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
                 answer TEXT,
                 status TEXT NOT NULL CHECK(status IN (
                     'queued', 'running', 'complete', 'failed', 'interrupted'
@@ -466,6 +505,60 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_reading_followups_owner "
             "ON ai_reading_followups(owner_user_id, created_at ASC)"
+        )
+        self._add_column_if_missing(
+            connection, "ai_reading_followups", "language",
+            "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN'))",
+        )
+        # A book conversation deliberately lives separately from the legacy
+        # result-bound follow-ups.  A reader may ask from a chapter's source
+        # before a shared reading layer exists, while the whole conversation
+        # still needs to remain ordered and resumable for that reader.
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_book_chat_turns (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL,
+                chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
+                context_mode TEXT NOT NULL CHECK(context_mode IN (
+                    'shared_layer', 'chapter_source'
+                )),
+                book_context INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1)),
+                owner_user_id TEXT NOT NULL REFERENCES users(id)
+                    ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                answer TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_turns_owner_book "
+            "ON ai_book_chat_turns(owner_user_id, book_id, created_at ASC, id ASC)"
+        )
+        self._add_column_if_missing(
+            connection, "ai_book_chat_turns", "book_context",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1))",
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_book_chat_summaries (
+                book_id TEXT NOT NULL,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
+                covered_turn_count INTEGER NOT NULL DEFAULT 0 CHECK(covered_turn_count >= 0),
+                summary_text TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (book_id, owner_user_id, language)
+            )
+            """
         )
 
     @staticmethod
@@ -673,14 +766,19 @@ class StateStore:
         connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
         return True
 
-    def _migrate_ai_settings_timeout_range(self, connection) -> None:
-        """Expand the immutable SQLite CHECK constraint without losing settings."""
+    def _migrate_ai_settings_constraints(self, connection) -> None:
+        """Expand immutable SQLite AI-settings constraints without losing settings."""
         definition = connection.execute(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'ai_settings'"
         ).fetchone()["sql"]
-        if "BETWEEN 5 AND 3600" in definition:
+        if (
+            "BETWEEN 5 AND 3600" in definition
+            and "model_context_window INTEGER NOT NULL" in definition
+            and "BETWEEN 2048 AND 100000000" in definition
+            and "chat_context_tokens" not in definition
+        ):
             return
-        temporary_table = "ai_settings_timeout_migration"
+        temporary_table = "ai_settings_constraints_migration"
         self._reject_migration_table(connection, temporary_table)
         connection.execute(
             f"""
@@ -692,6 +790,8 @@ class StateStore:
                 model TEXT NOT NULL DEFAULT '',
                 timeout_seconds INTEGER NOT NULL DEFAULT 60
                     CHECK(timeout_seconds BETWEEN 5 AND 3600),
+                model_context_window INTEGER NOT NULL DEFAULT 32768
+                    CHECK(model_context_window BETWEEN 2048 AND 100000000),
                 max_concurrency INTEGER NOT NULL DEFAULT 2
                     CHECK(max_concurrency BETWEEN 1 AND 4),
                 daily_limit INTEGER NOT NULL DEFAULT 20
@@ -705,10 +805,10 @@ class StateStore:
             f"""
             INSERT INTO {temporary_table} (
                 singleton, enabled, base_url, api_key, model, timeout_seconds,
-                max_concurrency, daily_limit, config_revision, updated_at
+                model_context_window, max_concurrency, daily_limit, config_revision, updated_at
             )
             SELECT singleton, enabled, base_url, api_key, model, timeout_seconds,
-                   max_concurrency, daily_limit, config_revision, updated_at
+                   model_context_window, max_concurrency, daily_limit, config_revision, updated_at
             FROM ai_settings
             """
         )
@@ -1921,7 +2021,7 @@ class StateStore:
         with self._connection() as connection:
             row = connection.execute(
                 """
-                SELECT enabled, base_url, model, timeout_seconds, max_concurrency,
+                SELECT enabled, base_url, model, timeout_seconds, model_context_window, max_concurrency,
                        daily_limit, config_revision, api_key
                 FROM ai_settings WHERE singleton = 1
                 """
@@ -1931,6 +2031,7 @@ class StateStore:
             "base_url": row["base_url"],
             "model": row["model"],
             "timeout_seconds": row["timeout_seconds"],
+            "model_context_window": row["model_context_window"],
             "max_concurrency": row["max_concurrency"],
             "daily_limit": row["daily_limit"],
             "config_revision": row["config_revision"],
@@ -1942,7 +2043,7 @@ class StateStore:
         with self._connection() as connection:
             row = connection.execute(
                 """
-                SELECT enabled, base_url, api_key, model, timeout_seconds,
+                SELECT enabled, base_url, api_key, model, timeout_seconds, model_context_window,
                        max_concurrency, daily_limit, config_revision
                 FROM ai_settings WHERE singleton = 1
                 """
@@ -1959,6 +2060,7 @@ class StateStore:
         timeout_seconds: int,
         max_concurrency: int,
         daily_limit: int,
+        model_context_window: int = 32768,
         clear_api_key: bool = False,
     ) -> dict:
         if not isinstance(base_url, str) or (
@@ -1969,6 +2071,8 @@ class StateStore:
             raise ValueError("AI model must be text")
         if not 5 <= int(timeout_seconds) <= 3600:
             raise ValueError("AI timeout is out of range")
+        if not 2048 <= int(model_context_window) <= 100000000:
+            raise ValueError("AI model context window is out of range")
         if not 1 <= int(max_concurrency) <= 4:
             raise ValueError("AI concurrency is out of range")
         if int(daily_limit) < 0:
@@ -1990,7 +2094,7 @@ class StateStore:
                 """
                 UPDATE ai_settings
                 SET enabled = ?, base_url = ?, api_key = ?, model = ?,
-                    timeout_seconds = ?, max_concurrency = ?, daily_limit = ?,
+                    timeout_seconds = ?, model_context_window = ?, max_concurrency = ?, daily_limit = ?,
                     config_revision = config_revision + 1,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE singleton = 1
@@ -2001,6 +2105,7 @@ class StateStore:
                     stored_key,
                     model.strip(),
                     int(timeout_seconds),
+                    int(model_context_window),
                     int(max_concurrency),
                     int(daily_limit),
                 ),
@@ -2265,6 +2370,10 @@ class StateStore:
         book_id: Optional[str] = None,
         result_id: Optional[str] = None,
         progress_total: int = 1,
+        request_payload: Optional[dict] = None,
+        profile: Optional[str] = None,
+        template_id: Optional[str] = None,
+        template_version: Optional[int] = None,
     ) -> None:
         if int(progress_total) < 1:
             raise ValueError("AI job progress total must be positive")
@@ -2275,10 +2384,15 @@ class StateStore:
             connection.execute(
                 """
                 INSERT INTO ai_reading_jobs (
-                    id, owner_user_id, book_id, cache_key, result_id, status, progress_total
-                ) VALUES (?, ?, ?, ?, ?, 'queued', ?)
+                    id, owner_user_id, book_id, cache_key, request_json, profile,
+                    template_id, template_version, result_id, status, progress_total
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)
                 """,
-                (job_id, owner_user_id, book_id, cache_key, result_id, int(progress_total)),
+                (
+                    job_id, owner_user_id, book_id, cache_key,
+                    json.dumps(request_payload, ensure_ascii=False, separators=(",", ":")) if request_payload else None,
+                    profile, template_id, template_version, result_id, int(progress_total),
+                ),
             )
 
     def create_or_get_active_ai_job(
@@ -2289,6 +2403,10 @@ class StateStore:
         cache_key: str,
         *,
         progress_total: int = 1,
+        request_payload: Optional[dict] = None,
+        profile: Optional[str] = None,
+        template_id: Optional[str] = None,
+        template_version: Optional[int] = None,
     ) -> tuple[dict, bool]:
         """Atomically join an in-flight shared generation or create one.
 
@@ -2303,8 +2421,9 @@ class StateStore:
             self._get_book(connection, book_id)
             existing = connection.execute(
                 """
-                SELECT id, owner_user_id, book_id, cache_key, status, error_code,
-                       result_id, progress_current, progress_total, created_at, updated_at
+                SELECT id, owner_user_id, book_id, cache_key, request_json, profile,
+                       template_id, template_version, status, error_code, result_id,
+                       progress_current, progress_total, created_at, updated_at
                 FROM ai_reading_jobs
                 WHERE cache_key = ? AND status IN ('queued', 'running')
                 ORDER BY created_at DESC, id DESC LIMIT 1
@@ -2317,15 +2436,21 @@ class StateStore:
             connection.execute(
                 """
                 INSERT INTO ai_reading_jobs (
-                    id, owner_user_id, book_id, cache_key, status, progress_total
-                ) VALUES (?, ?, ?, ?, 'queued', ?)
+                    id, owner_user_id, book_id, cache_key, request_json, profile,
+                    template_id, template_version, status, progress_total
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)
                 """,
-                (job_id, owner_user_id, book_id, cache_key, int(progress_total)),
+                (
+                    job_id, owner_user_id, book_id, cache_key,
+                    json.dumps(request_payload, ensure_ascii=False, separators=(",", ":")) if request_payload else None,
+                    profile, template_id, template_version, int(progress_total),
+                ),
             )
             created = connection.execute(
                 """
-                SELECT id, owner_user_id, book_id, cache_key, status, error_code,
-                       result_id, progress_current, progress_total, created_at, updated_at
+                SELECT id, owner_user_id, book_id, cache_key, request_json, profile,
+                       template_id, template_version, status, error_code, result_id,
+                       progress_current, progress_total, created_at, updated_at
                 FROM ai_reading_jobs WHERE id = ?
                 """,
                 (job_id,),
@@ -2355,6 +2480,130 @@ class StateStore:
                 """
             )
         return cursor.rowcount
+
+    def requeue_running_ai_jobs(self) -> int:
+        """Recover durable work after a process restart instead of losing it."""
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_jobs SET status = 'queued', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'running' AND request_json IS NOT NULL
+                """
+            )
+        return cursor.rowcount
+
+    def requeue_running_ai_followups(self) -> int:
+        """Recover private chat turns after a process restart."""
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_followups SET status = 'queued', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'running'
+                """
+            )
+        return cursor.rowcount
+
+    def requeue_running_ai_book_chat_turns(self) -> int:
+        """Recover book-scoped private conversations after a restart."""
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_book_chat_turns SET status = 'queued', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'running'
+                """
+            )
+        return cursor.rowcount
+
+    def claim_next_ai_reading_job(self) -> Optional[dict]:
+        """Atomically lease one persisted queued task to this worker."""
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT * FROM ai_reading_jobs
+                WHERE status = 'queued' AND request_json IS NOT NULL
+                ORDER BY created_at ASC, id ASC LIMIT 1
+                """
+            ).fetchone()
+            if row is None:
+                connection.execute("COMMIT")
+                return None
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_jobs SET status = 'running', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'queued'
+                """,
+                (row["id"],),
+            )
+            if cursor.rowcount != 1:
+                connection.execute("COMMIT")
+                return None
+            claimed = connection.execute(
+                "SELECT * FROM ai_reading_jobs WHERE id = ?", (row["id"],)
+            ).fetchone()
+            connection.execute("COMMIT")
+        return dict(claimed)
+
+    def claim_next_ai_followup(self) -> Optional[dict]:
+        """Atomically lease one private chat turn to the background worker."""
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT * FROM ai_reading_followups
+                WHERE status = 'queued'
+                ORDER BY created_at ASC, id ASC LIMIT 1
+                """
+            ).fetchone()
+            if row is None:
+                connection.execute("COMMIT")
+                return None
+            cursor = connection.execute(
+                """
+                UPDATE ai_reading_followups SET status = 'running', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'queued'
+                """,
+                (row["id"],),
+            )
+            if cursor.rowcount != 1:
+                connection.execute("COMMIT")
+                return None
+            claimed = connection.execute(
+                "SELECT * FROM ai_reading_followups WHERE id = ?", (row["id"],)
+            ).fetchone()
+            connection.execute("COMMIT")
+        return dict(claimed)
+
+    def claim_next_ai_book_chat_turn(self) -> Optional[dict]:
+        """Atomically lease the next book-scoped private question."""
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT * FROM ai_book_chat_turns WHERE status = 'queued'
+                -- CURRENT_TIMESTAMP is second-granular in SQLite. Rowid keeps
+                -- questions submitted within one second in true send order.
+                ORDER BY created_at ASC, rowid ASC LIMIT 1
+                """
+            ).fetchone()
+            if row is None:
+                connection.execute("COMMIT")
+                return None
+            cursor = connection.execute(
+                """
+                UPDATE ai_book_chat_turns SET status = 'running', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'queued'
+                """,
+                (row['id'],),
+            )
+            if cursor.rowcount != 1:
+                connection.execute("COMMIT")
+                return None
+            claimed = connection.execute(
+                "SELECT * FROM ai_book_chat_turns WHERE id = ?", (row['id'],)
+            ).fetchone()
+            connection.execute("COMMIT")
+        return dict(claimed)
 
     def update_ai_job_progress(
         self, job_id: str, progress_current: int, progress_total: int
@@ -2424,6 +2673,10 @@ class StateStore:
         config_revision: int,
         content: dict,
         created_by_user_id: str,
+        template_id: str = "legacy",
+        template_version: int = 0,
+        language: str = "en",
+        reading_boundary: Optional[int] = None,
     ) -> dict:
         if scope not in {"book", "chapter"}:
             raise ValueError("Unsupported AI reading scope")
@@ -2433,6 +2686,18 @@ class StateStore:
             raise ValueError("Unsupported AI profile")
         if not isinstance(content, dict):
             raise ValueError("AI reading result must be an object")
+        if not isinstance(template_id, str) or not template_id or len(template_id) > 100:
+            raise ValueError("AI reading template id is invalid")
+        if isinstance(template_version, bool) or not isinstance(template_version, int) or template_version < 0:
+            raise ValueError("AI reading template version is invalid")
+        if language not in {"en", "zh-CN"}:
+            raise ValueError("AI reading language is invalid")
+        if isinstance(reading_boundary, bool) or (
+            reading_boundary is not None and (
+                not isinstance(reading_boundary, int) or reading_boundary < 0
+            )
+        ):
+            raise ValueError("AI reading boundary is invalid")
         if scope == "chapter" and chapter_index is None:
             raise ValueError("Chapter AI reading results need a chapter index")
         if scope == "book" and chapter_index is not None:
@@ -2446,8 +2711,9 @@ class StateStore:
                 """
                 INSERT INTO ai_reading_results (
                     id, cache_key, book_id, chapter_index, scope, mode, profile,
-                    config_revision, content_json, created_by_user_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    language, reading_boundary, config_revision, template_id, template_version,
+                    content_json, created_by_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     result_id,
@@ -2457,7 +2723,11 @@ class StateStore:
                     scope,
                     mode,
                     profile,
+                    language,
+                    reading_boundary,
                     int(config_revision),
+                    template_id,
+                    template_version,
                     encoded_content,
                     created_by_user_id,
                 ),
@@ -2504,6 +2774,46 @@ class StateStore:
             ).fetchone()
         return self._ai_result_record(row) if row is not None else None
 
+    def list_ai_reading_results(
+        self,
+        book_id: str,
+        *,
+        chapter_index: Optional[int] = None,
+        language: Optional[str] = None,
+    ) -> tuple[dict, ...]:
+        """List shared learning layers for a readable book, newest first."""
+        clauses = ["book_id = ?"]
+        parameters: list[object] = [book_id]
+        if chapter_index is not None:
+            clauses.append("chapter_index = ?")
+            parameters.append(chapter_index)
+        if language is not None:
+            clauses.append("language = ?")
+            parameters.append(language)
+        statement = (
+            "SELECT * FROM ai_reading_results WHERE " + " AND ".join(clauses)
+            + " ORDER BY created_at DESC, id DESC"
+        )
+        with self._connection() as connection:
+            rows = connection.execute(statement, tuple(parameters)).fetchall()
+        return tuple(self._ai_result_record(row) for row in rows)
+
+    def list_current_ai_reading_results(self, book_id: str) -> tuple[dict, ...]:
+        """Return one current shared learning layer for each cache key of a book."""
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT ai_reading_results.*
+                FROM ai_reading_current_results
+                JOIN ai_reading_results
+                  ON ai_reading_results.id = ai_reading_current_results.result_id
+                WHERE ai_reading_results.book_id = ?
+                ORDER BY ai_reading_results.created_at DESC, ai_reading_results.id DESC
+                """,
+                (book_id,),
+            ).fetchall()
+        return tuple(self._ai_result_record(row) for row in rows)
+
     def clear_ai_reading_results(
         self, *, book_id: Optional[str] = None, config_revision: Optional[int] = None
     ) -> int:
@@ -2522,11 +2832,21 @@ class StateStore:
             )
         return cursor.rowcount
 
+    def delete_ai_reading_result(self, result_id: str) -> bool:
+        """Delete one retained shared result and let its SQLite relations clean up."""
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "DELETE FROM ai_reading_results WHERE id = ?", (result_id,)
+            )
+        return cursor.rowcount == 1
+
     def create_ai_followup(
-        self, *, result_id: str, owner_user_id: str, question: str
+        self, *, result_id: str, owner_user_id: str, question: str, language: str = "en"
     ) -> dict:
         if not isinstance(question, str) or not question.strip() or len(question) > 2000:
             raise ValueError("AI follow-up must contain 1 to 2000 characters")
+        if language not in {"en", "zh-CN"}:
+            raise ValueError("AI follow-up language is invalid")
         followup_id = uuid.uuid4().hex
         with self._connection() as connection:
             self._require_user(connection, owner_user_id)
@@ -2537,10 +2857,10 @@ class StateStore:
             connection.execute(
                 """
                 INSERT INTO ai_reading_followups (
-                    id, result_id, owner_user_id, question, status
-                ) VALUES (?, ?, ?, ?, 'queued')
+                    id, result_id, owner_user_id, question, language, status
+                ) VALUES (?, ?, ?, ?, ?, 'queued')
                 """,
-                (followup_id, result_id, owner_user_id, question.strip()),
+                (followup_id, result_id, owner_user_id, question.strip(), language),
             )
             row = connection.execute(
                 "SELECT * FROM ai_reading_followups WHERE id = ?", (followup_id,)
@@ -2590,11 +2910,13 @@ class StateStore:
         with self._connection() as connection:
             rows = connection.execute(
                 """
-                SELECT id, result_id, owner_user_id, question, answer, status,
+                SELECT id, result_id, owner_user_id, question, language, answer, status,
                        error_code, created_at, updated_at
                 FROM ai_reading_followups
                 WHERE result_id = ? AND owner_user_id = ?
-                ORDER BY created_at ASC, id ASC
+                -- Preserve the reader's actual question-and-answer order even
+                -- when multiple turns share the same timestamp second.
+                ORDER BY created_at ASC, rowid ASC
                 """,
                 (result_id, owner_user_id),
             ).fetchall()
@@ -2607,12 +2929,133 @@ class StateStore:
         with self._connection() as connection:
             row = connection.execute(
                 """
-                SELECT id, result_id, owner_user_id, question, answer, status,
+                SELECT id, result_id, owner_user_id, question, language, answer, status,
                        error_code, created_at, updated_at
                 FROM ai_reading_followups
                 WHERE id = ? AND owner_user_id = ?
                 """,
                 (followup_id, owner_user_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def create_ai_book_chat_turn(
+        self, *, book_id: str, chapter_index: int, owner_user_id: str,
+        question: str, language: str = 'en', context_mode: str = 'chapter_source',
+        result_id: Optional[str] = None, book_context: bool = False,
+    ) -> dict:
+        if not isinstance(question, str) or not question.strip() or len(question) > 2000:
+            raise ValueError('AI chat must contain 1 to 2000 characters')
+        if not isinstance(chapter_index, int) or chapter_index < 0:
+            raise ValueError('AI chat chapter is invalid')
+        if language not in {'en', 'zh-CN'}:
+            raise ValueError('AI chat language is invalid')
+        if context_mode not in {'shared_layer', 'chapter_source'}:
+            raise ValueError('AI chat context is invalid')
+        turn_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            self._require_user(connection, owner_user_id)
+            if result_id is not None and connection.execute(
+                'SELECT 1 FROM ai_reading_results WHERE id = ? AND book_id = ?',
+                (result_id, book_id),
+            ).fetchone() is None:
+                raise KeyError('Unknown AI reading result')
+            connection.execute(
+                """
+                INSERT INTO ai_book_chat_turns (
+                    id, book_id, chapter_index, result_id, context_mode,
+                    book_context, owner_user_id, question, language, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued')
+                """,
+                (turn_id, book_id, chapter_index, result_id, context_mode,
+                 1 if book_context else 0, owner_user_id, question.strip(), language),
+            )
+            row = connection.execute(
+                'SELECT * FROM ai_book_chat_turns WHERE id = ?', (turn_id,)
+            ).fetchone()
+        return dict(row)
+
+    def finish_ai_book_chat_turn(
+        self, turn_id: str, owner_user_id: str, *, answer: Optional[str] = None,
+        error_code: Optional[str] = None,
+    ) -> bool:
+        if (answer is None) == (error_code is None):
+            raise ValueError('AI chat needs exactly one answer or error code')
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ai_book_chat_turns SET status = ?, answer = ?, error_code = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND owner_user_id = ? AND status = 'running'
+                """,
+                ('complete' if answer is not None else 'failed', answer, error_code,
+                 turn_id, owner_user_id),
+            )
+        return cursor.rowcount == 1
+
+    def list_ai_book_chat_turns(self, book_id: str, owner_user_id: str) -> tuple[dict, ...]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, book_id, chapter_index, result_id, context_mode, book_context,
+                       owner_user_id, question, language, answer, status, error_code,
+                       created_at, updated_at
+                FROM ai_book_chat_turns
+                WHERE book_id = ? AND owner_user_id = ?
+                ORDER BY created_at ASC, id ASC
+                """, (book_id, owner_user_id),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
+    def get_ai_book_chat_summary(
+        self, book_id: str, owner_user_id: str, language: str,
+    ) -> Optional[dict]:
+        if language not in {'en', 'zh-CN'}:
+            raise ValueError('AI chat language is invalid')
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT book_id, owner_user_id, language, covered_turn_count,
+                       summary_text, updated_at
+                FROM ai_book_chat_summaries
+                WHERE book_id = ? AND owner_user_id = ? AND language = ?
+                """,
+                (book_id, owner_user_id, language),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def upsert_ai_book_chat_summary(
+        self, *, book_id: str, owner_user_id: str, language: str,
+        covered_turn_count: int, summary_text: str,
+    ) -> None:
+        if language not in {'en', 'zh-CN'} or covered_turn_count < 0:
+            raise ValueError('AI chat summary is invalid')
+        if not isinstance(summary_text, str) or len(summary_text) > 24000:
+            raise ValueError('AI chat summary is invalid')
+        with self._connection() as connection:
+            self._require_user(connection, owner_user_id)
+            connection.execute(
+                """
+                INSERT INTO ai_book_chat_summaries (
+                    book_id, owner_user_id, language, covered_turn_count, summary_text
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(book_id, owner_user_id, language) DO UPDATE SET
+                    covered_turn_count = excluded.covered_turn_count,
+                    summary_text = excluded.summary_text,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (book_id, owner_user_id, language, covered_turn_count, summary_text),
+            )
+
+    def get_ai_book_chat_turn(self, turn_id: str, owner_user_id: str) -> Optional[dict]:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT id, book_id, chapter_index, result_id, context_mode, book_context,
+                       owner_user_id, question, language, answer, status, error_code,
+                       created_at, updated_at
+                FROM ai_book_chat_turns
+                WHERE id = ? AND owner_user_id = ?
+                """, (turn_id, owner_user_id),
             ).fetchone()
         return dict(row) if row is not None else None
 

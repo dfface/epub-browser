@@ -455,6 +455,24 @@ body {
     border-bottom: none;
 }
 
+.chapter-list .toc-section {
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    padding: 14px 20px;
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--hover) 58%, transparent);
+    cursor: default;
+}
+
+.chapter-section-title {
+    display: block;
+    font-size: .78rem;
+    font-weight: 750;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
 .chapter-list a {
     text-decoration: none;
     color: var(--text);
@@ -470,12 +488,12 @@ body {
 
 /* 除了 hashtag 锚点，还支持 active class */
 .chapter-list a:target, .chapter-list a.active  {
-    background: linear-gradient(to right, var(--primary), var(--secondary));
-    color: #e9ecef;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card-bg));
+    color: var(--primary);
 }
 
 .chapter-list a:target .chapter-page, .chapter-list a.active .chapter-page {
-    color: #e9ecef;
+    color: var(--primary);
 }
 
 .chapter-sync-tag {

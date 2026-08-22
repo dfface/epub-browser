@@ -4,7 +4,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2;
+    /* Cover all reader overlays, including Server-mode AI paragraph triggers. */
+    z-index: 10090;
     background: var(--card-bg);
     background: color-mix(in srgb, var(--card-bg) 72%, transparent);
     -webkit-backdrop-filter: blur(12px) saturate(1.05);

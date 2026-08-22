@@ -3,7 +3,11 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from .asset_publisher import AssetPublisher
+from .asset_publisher import (
+    AssetPublisher,
+    SERVER_ONLY_ASSET_PATHS,
+    SERVER_ONLY_ASSET_PREFIXES,
+)
 from .processor import EPUBProcessor
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
@@ -31,6 +35,8 @@ class EPUBLibrary:
             assets_dir,
             self.base_directory,
             urls=self.urls,
+            excluded_paths=SERVER_ONLY_ASSET_PATHS,
+            excluded_prefixes=SERVER_ONLY_ASSET_PREFIXES,
         ).publish()
         self.reporter.detail(f"Library base directory: {self.base_directory}")
     
@@ -140,6 +146,8 @@ class EPUBLibrary:
             assets_dir,
             self.base_directory,
             urls=self.urls,
+            excluded_paths=SERVER_ONLY_ASSET_PATHS,
+            excluded_prefixes=SERVER_ONLY_ASSET_PREFIXES,
         ).publish()
             
     

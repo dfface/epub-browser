@@ -830,6 +830,7 @@ class StateStoreTests(unittest.TestCase):
                 "base_url": "",
                 "model": "",
                 "timeout_seconds": 60,
+                "model_context_window": 32768,
                 "max_concurrency": 2,
                 "daily_limit": 20,
                 "config_revision": 0,
@@ -921,6 +922,55 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(first["id"], "job-first")
         self.assertEqual(second["id"], "job-first")
         self.assertEqual(second["book_id"], book.book_id)
+
+    def test_running_private_followup_is_requeued_with_its_language(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "followup.epub"),
+            "urn:test:followup", "fingerprint", {"title": "Book"},
+        )
+        result = self.store.store_ai_reading_result(
+            cache_key="followup-cache", book_id=book.book_id, chapter_index=0,
+            scope="chapter", mode="chapter", profile="general", config_revision=1,
+            content={"quick": {"summary": "Summary"}}, created_by_user_id=self.owner.user_id,
+        )
+        followup = self.store.create_ai_followup(
+            result_id=result["id"], owner_user_id=member.user_id,
+            question="What matters?", language="zh-CN",
+        )
+        self.assertTrue(self.store.start_ai_followup(followup["id"], member.user_id))
+        self.assertEqual(self.store.requeue_running_ai_followups(), 1)
+        claimed = self.store.claim_next_ai_followup()
+
+        self.assertEqual(claimed["id"], followup["id"])
+        self.assertEqual(claimed["language"], "zh-CN")
+
+    def test_book_chat_is_private_ordered_and_keeps_the_generated_chapter(self):
+        member = self.store.create_user("book-chat-reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "book-chat.epub"),
+            "urn:test:book-chat", "fingerprint", {"title": "Book"},
+        )
+        first = self.store.create_ai_book_chat_turn(
+            book_id=book.book_id, chapter_index=7, owner_user_id=member.user_id,
+            question="What changed here?", language="en", context_mode="chapter_source",
+        )
+        second = self.store.create_ai_book_chat_turn(
+            book_id=book.book_id, chapter_index=9, owner_user_id=member.user_id,
+            question="How does this connect?", language="zh-CN", context_mode="chapter_source",
+        )
+        claimed = self.store.claim_next_ai_book_chat_turn()
+        self.assertIn(claimed["id"], {first["id"], second["id"]})
+        self.assertTrue(self.store.finish_ai_book_chat_turn(claimed["id"], member.user_id, answer="It changes."))
+        self.assertEqual(
+            {item["chapter_index"] for item in self.store.list_ai_book_chat_turns(book.book_id, member.user_id)},
+            {7, 9},
+        )
+        self.assertEqual(self.store.list_ai_book_chat_turns(book.book_id, self.owner.user_id), ())
+        next_turn = self.store.claim_next_ai_book_chat_turn()
+        self.assertNotEqual(next_turn["id"], claimed["id"])
+        self.assertEqual(self.store.requeue_running_ai_book_chat_turns(), 1)
+        self.assertEqual(self.store.claim_next_ai_book_chat_turn()["language"], "zh-CN")
 
     def test_ai_settings_keep_an_existing_key_until_an_admin_clears_it(self):
         self.store.set_ai_settings(
@@ -1033,7 +1083,7 @@ class StateStoreTests(unittest.TestCase):
             book_id=book.book_id,
             chapter_index=None,
             scope="book",
-            mode="spoiler_free",
+            mode="read_so_far",
             profile="technical",
             config_revision=1,
             content={"quick": "First result"},
@@ -1049,11 +1099,19 @@ class StateStoreTests(unittest.TestCase):
             config_revision=2,
             content={"quick": "Regenerated result"},
             created_by_user_id=self.owner.user_id,
+            template_id="reading-layer",
+            template_version=1,
+            language="zh-CN",
+            reading_boundary=4,
         )
         self.assertEqual(
             self.store.get_current_ai_reading_result("book:1")["id"], second["id"]
         )
         self.assertEqual(self.store.get_ai_reading_result(first["id"])["content"]["quick"], "First result")
+        self.assertEqual(second["language"], "zh-CN")
+        self.assertEqual(second["reading_boundary"], 4)
+        self.assertEqual(second["template_id"], "reading-layer")
+        self.assertEqual(second["template_version"], 1)
 
         followup = self.store.create_ai_followup(
             result_id=second["id"], owner_user_id=member.user_id, question="Why?"

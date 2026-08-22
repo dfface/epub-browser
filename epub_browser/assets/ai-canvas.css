@@ -1,0 +1,132 @@
+/* AI reading uses the book's page first; color identifies a reading aid, never a new page. */
+.ai-canvas-status { position: fixed; right: 82px; bottom: 24px; z-index: 10070; max-width: min(22rem, calc(100vw - 112px)); padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 20%, var(--border, #ddd)); border-radius: 9px; background: var(--card-bg, #fff); box-shadow: 0 8px 24px color-mix(in srgb, #111 14%, transparent); color: var(--text-secondary, #666); font-family: system-ui, sans-serif; font-size: 13px !important; line-height: 1.45; opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity 180ms ease-out, transform 180ms ease-out; }.ai-canvas-status-visible { opacity: 1; transform: translateY(0); }.ai-canvas-status-error { border-color: color-mix(in srgb, var(--notification-error, #c0392b) 38%, var(--border, #ddd)); color: var(--notification-error, #c0392b); }
+
+.reader-toolbar.top-controls .control-btn[data-ai-learning-canvas] { transition: background 180ms ease-out, border-color 180ms ease-out, color 180ms ease-out; }.reader-toolbar.top-controls .control-btn[data-ai-learning-canvas]:hover { background: color-mix(in srgb, var(--primary, #4361ee) 8%, var(--card-bg, #fff)); color: var(--primary, #4361ee); }.reader-toolbar.top-controls .control-btn[data-ai-learning-canvas]:focus-visible { background: color-mix(in srgb, var(--primary, #4361ee) 8%, var(--card-bg, #fff)); color: var(--primary, #4361ee); outline: 3px solid color-mix(in srgb, var(--primary, #4361ee) 34%, transparent); outline-offset: 2px; }.reader-toolbar.top-controls .control-btn[data-ai-learning-canvas].is-active { border-color: color-mix(in srgb, var(--primary, #4361ee) 36%, var(--border, #ddd)); background: color-mix(in srgb, var(--primary, #4361ee) 14%, var(--card-bg, #fff)); color: var(--primary, #4361ee); }
+
+.ai-canvas-mark { --ai-canvas: #5b5ce2; padding: 0 .06em; border: 0; border-radius: .12em; color: inherit; cursor: pointer; background: linear-gradient(105deg, color-mix(in srgb, var(--ai-canvas) 20%, transparent), color-mix(in srgb, var(--ai-canvas) 34%, transparent)); box-decoration-break: clone; -webkit-box-decoration-break: clone; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ai-canvas) 75%, transparent); text-decoration-thickness: .12em; text-underline-offset: .18em; }.ai-canvas-mark[data-ai-canvas-color="1"], .ai-annotation-popover[data-ai-canvas-color="1"] { --ai-canvas: #0c8ba6; }.ai-canvas-mark[data-ai-canvas-color="2"], .ai-annotation-popover[data-ai-canvas-color="2"] { --ai-canvas: #b44297; }.ai-canvas-mark[data-ai-canvas-color="3"], .ai-annotation-popover[data-ai-canvas-color="3"] { --ai-canvas: #b57b08; }.ai-canvas-mark[data-ai-canvas-color="4"], .ai-annotation-popover[data-ai-canvas-color="4"] { --ai-canvas: #248e62; }.ai-canvas-mark[data-ai-canvas-kind="question"] { text-decoration-style: dotted; }.ai-canvas-mark[data-ai-canvas-kind="turn"] { text-decoration-style: wavy; }.ai-canvas-mark:focus-visible { outline: 3px solid color-mix(in srgb, var(--ai-canvas) 42%, transparent); outline-offset: 2px; }
+
+/* Opening guide: compact editorial preface, not an independently styled card. */
+.ai-chapter-guide { --ai-guide-primary: var(--primary, #4361ee); position: relative; display: grid; gap: 12px; margin: 0 0 32px; padding: 18px 20px 20px; border: 1px solid color-mix(in srgb, var(--ai-guide-primary) 25%, var(--border, #ddd)); border-left: 3px solid var(--ai-guide-primary); border-radius: 10px; background: linear-gradient(120deg, color-mix(in srgb, var(--ai-guide-primary) 5%, var(--card-bg, #fff)), var(--card-bg, #fff) 58%); box-shadow: 0 5px 18px color-mix(in srgb, #111 6%, transparent); color: var(--text, #333); font-family: system-ui, sans-serif; font-size: 16px !important; line-height: 1.65; }.ai-chapter-guide::before { position: absolute; top: -1px; left: 20px; width: 38px; height: 2px; border-radius: 0 0 3px 3px; background: linear-gradient(90deg, #635bff, #1bb7dd, #d855b1); content: ''; }.ai-chapter-guide header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }.ai-chapter-guide-title { display: grid; gap: 4px; }.ai-chapter-guide h2 { margin: 0; color: var(--text, #333); font-size: 23px !important; font-weight: 700; line-height: 1.28; }.ai-native-note-kicker { color: var(--text-secondary, #666); font-family: system-ui, sans-serif; font-size: 11px !important; font-weight: 750; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }.ai-chapter-guide-summary { margin: 0; max-width: 72ch; font-size: 16px !important; line-height: 1.72; }.ai-chapter-guide-points { display: grid; gap: 7px; margin: 0; padding-left: 20px; font-size: 16px !important; line-height: 1.62; }.ai-chapter-guide-points li { margin: 0; font-size: inherit !important; }.ai-guide-map-trigger { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; min-height: 36px; padding: 0 11px; border: 1px solid color-mix(in srgb, var(--ai-guide-primary) 34%, var(--border, #ddd)); border-radius: 8px; background: var(--card-bg, #fff); box-shadow: none; color: var(--ai-guide-primary); cursor: pointer; font: inherit; font-size: 13px !important; font-weight: 700; line-height: 1; transition: background-color 180ms ease-out, border-color 180ms ease-out, transform 180ms ease-out; }.ai-guide-map-trigger:hover, .ai-guide-map-trigger:focus-visible { border-color: var(--ai-guide-primary); background: color-mix(in srgb, var(--ai-guide-primary) 9%, var(--card-bg, #fff)); transform: translateY(-1px); }.ai-guide-map-trigger:focus-visible { outline: 3px solid color-mix(in srgb, var(--ai-guide-primary) 28%, transparent); outline-offset: 2px; }
+
+/* Paragraph helpers stay beside their paragraph and open one surface only. */
+#eb-content .ai-paragraph-note-anchor { position: relative; padding-right: 2rem; }.ai-paragraph-note-trigger { --ai-note-trigger: #6d5dfc; position: absolute; right: -34px; z-index: 2; display: grid; width: 22px; height: 22px; padding: 0; place-items: center; border: 1px solid color-mix(in srgb, var(--ai-note-trigger) 50%, #fff); border-radius: 50%; background: var(--ai-note-trigger); box-shadow: 0 3px 10px color-mix(in srgb, var(--ai-note-trigger) 28%, transparent); color: #fff; cursor: pointer; font-family: system-ui, sans-serif; font-size: 13px !important; font-weight: 800; line-height: 1; transition: transform 180ms ease-out, box-shadow 180ms ease-out; }.ai-paragraph-note-trigger[data-ai-note-color="1"] { --ai-note-trigger: #0c8ba6; }.ai-paragraph-note-trigger[data-ai-note-color="2"] { --ai-note-trigger: #b44297; }.ai-paragraph-note-trigger[data-ai-note-color="3"] { --ai-note-trigger: #b57b08; }.ai-paragraph-note-trigger:hover, .ai-paragraph-note-trigger:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ai-note-trigger) 18%, transparent), 0 6px 14px color-mix(in srgb, var(--ai-note-trigger) 32%, transparent); transform: scale(1.08); }.ai-paragraph-note-trigger:focus-visible { outline: 3px solid color-mix(in srgb, var(--ai-note-trigger) 40%, transparent); outline-offset: 2px; }
+
+.ai-native-sticky { --ai-canvas-note-accent: #6d5dfc; --ai-canvas-note-wash: #efefff; display: grid; gap: 8px; padding: 15px 16px 16px; border: 1px solid color-mix(in srgb, var(--ai-canvas-note-accent) 38%, var(--border, #ddd)); border-top: 3px solid var(--ai-canvas-note-accent); border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--ai-canvas-note-wash) 80%, var(--card-bg, #fff)), var(--card-bg, #fff)); box-shadow: 0 10px 25px color-mix(in srgb, #111 12%, transparent); color: var(--text, #333); font-family: system-ui, sans-serif; font-size: 16px !important; }.ai-native-sticky[data-ai-note-color="1"] { --ai-canvas-note-accent: #0c8ba6; --ai-canvas-note-wash: #ddf5f7; }.ai-native-sticky[data-ai-note-color="2"] { --ai-canvas-note-accent: #b44297; --ai-canvas-note-wash: #fae7f5; }.ai-native-sticky[data-ai-note-color="3"] { --ai-canvas-note-accent: #b57b08; --ai-canvas-note-wash: #fff3d7; }.ai-native-sticky header { display: grid; gap: 4px; }.ai-paragraph-popover .ai-native-sticky header { grid-template-columns: minmax(0, 1fr) auto; }.ai-paragraph-popover .ai-native-sticky header > .ai-native-note-kicker, .ai-paragraph-popover .ai-native-sticky header > strong { grid-column: 1; }.ai-paragraph-popover-close { grid-column: 2; grid-row: 1 / span 2; display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid color-mix(in srgb, var(--ai-canvas-note-accent) 30%, var(--border, #ddd)); border-radius: 7px; background: var(--card-bg, #fff); color: var(--ai-canvas-note-accent); cursor: pointer; }.ai-paragraph-popover-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--ai-canvas-note-accent) 35%, transparent); outline-offset: 2px; }.ai-native-sticky strong { color: var(--text, #333); font-size: 19px !important; font-weight: 700; line-height: 1.32; }.ai-native-note-body { display: grid; gap: 8px; font-size: 16px !important; line-height: 1.62; }.ai-native-note-body p, .ai-native-note-body h4, .ai-native-note-body ul { margin: 0; font-size: inherit !important; }.ai-native-note-body h4 { font-size: 16px !important; }.ai-native-note-body ul { padding-left: 18px; }.ai-native-note-body pre { max-width: 100%; overflow-x: auto; padding: 8px; border-radius: 5px; background: color-mix(in srgb, var(--ai-canvas-note-accent) 10%, transparent); }
+
+.ai-native-map { display: grid; gap: 10px; margin: 0; padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 25%, var(--border, #ddd)); border-radius: 10px; background: var(--card-bg, #fff); font-family: system-ui, sans-serif; }.ai-native-map figcaption { display: grid; gap: 3px; }.ai-native-map figcaption strong { font-size: 18px !important; }.ai-native-map .ai-canvas-rich-block { padding: 8px 0 0; background: transparent; }.ai-canvas-rich-block { max-width: 100%; overflow-x: auto; }.ai-canvas-rich-block svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+
+/* Color of a sentence explanation follows the exact highlighted sentence. */
+.ai-annotation-popover, .ai-guide-map-popover { position: fixed; z-index: 10080; overflow-y: auto; border-radius: 10px; color: var(--text, #333); font-family: system-ui, sans-serif; }.ai-annotation-popover { --ai-canvas: #5b5ce2; display: grid; gap: 10px; width: min(350px, calc(100vw - 24px)); max-height: min(60dvh, 520px); padding: 15px; border: 1px solid color-mix(in srgb, var(--ai-canvas) 43%, var(--border, #ddd)); border-top: 3px solid var(--ai-canvas); background: linear-gradient(135deg, color-mix(in srgb, var(--ai-canvas) 9%, var(--card-bg, #fff)), var(--card-bg, #fff)); box-shadow: 0 12px 30px color-mix(in srgb, var(--ai-canvas) 18%, transparent); }.ai-paragraph-popover { position: fixed; z-index: 10080; width: min(340px, calc(100vw - 32px)); max-height: min(62dvh, 560px); overflow-y: auto; background: transparent; border: 0; border-radius: 0; box-shadow: none; }.ai-guide-map-popover { width: min(720px, calc(100vw - 32px)); max-height: min(76dvh, 720px); padding: 8px; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 25%, var(--border, #ddd)); background: var(--card-bg, #fff); box-shadow: 0 14px 36px color-mix(in srgb, #111 16%, transparent); }.ai-annotation-popover header { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }.ai-annotation-popover header .ai-native-note-kicker { grid-column: 1; }.ai-annotation-popover header strong { grid-column: 1; font-size: 19px !important; line-height: 1.32; }.ai-annotation-popover-close { grid-column: 2; grid-row: 1 / span 2; display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid color-mix(in srgb, var(--ai-canvas) 25%, var(--border, #ddd)); border-radius: 7px; background: var(--card-bg, #fff); color: var(--ai-canvas); cursor: pointer; }.ai-annotation-popover-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--ai-canvas) 35%, transparent); outline-offset: 2px; }
+
+/* A deliberate pause at the end of the chapter, not another attention-grabbing panel. */
+.ai-chapter-reflection { display: grid; gap: 12px; margin: 42px 0 10px; padding: 24px 0 0; border-top: 1px dashed color-mix(in srgb, var(--primary, #4361ee) 28%, var(--border, #ddd)); color: var(--text, #333); font-family: system-ui, sans-serif; font-size: 16px !important; }.ai-chapter-reflection header { display: grid; gap: 4px; }.ai-chapter-reflection h2 { margin: 0; font-size: 23px !important; line-height: 1.28; }.ai-chapter-reflection-intro { margin: 0; color: var(--text-secondary, #666); font-size: 16px !important; }.ai-chapter-reflection-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: reflection; }.ai-reflection-question { position: relative; padding: 13px 16px 13px 46px; border-left: 3px solid color-mix(in srgb, var(--primary, #4361ee) 70%, transparent); background: color-mix(in srgb, var(--primary, #4361ee) 5%, var(--card-bg, #fff)); counter-increment: reflection; }.ai-reflection-question::before { position: absolute; top: 13px; left: 16px; color: var(--primary, #4361ee); content: counter(reflection, decimal-leading-zero); font-size: 12px; font-weight: 750; }.ai-reflection-question strong { display: block; font-size: 18px !important; line-height: 1.45; }.ai-reflection-question p { margin: 5px 0 0; color: var(--text-secondary, #666); font-size: 15px !important; line-height: 1.55; }
+
+@media (max-width: 720px) { .ai-canvas-status { right: 16px; bottom: 82px; max-width: calc(100vw - 32px); }.ai-chapter-guide { margin-right: -8px; margin-left: -8px; padding: 17px 16px 18px; border-radius: 8px; }.ai-guide-map-trigger span { display: none; }.ai-guide-map-trigger { width: 40px; padding: 0; justify-content: center; }.ai-paragraph-note-trigger { right: 7px; width: 32px; height: 32px; font-size: 15px !important; }.ai-annotation-popover, .ai-paragraph-popover, .ai-guide-map-popover { top: auto !important; right: 0; bottom: 0; left: 0 !important; width: auto; max-height: 62dvh; border-radius: 14px 14px 0 0; }.ai-paragraph-popover { padding: 8px; background: var(--card-bg, #fff); }.ai-chapter-reflection { margin-top: 34px; }.ai-reflection-question { padding-left: 44px; } }
+/* Shared AI marks and generated regions use deliberate, theme-safe colour—not a generic panel. */
+.ai-canvas-mark { background: linear-gradient(105deg, color-mix(in srgb, var(--ai-canvas) 14%, transparent) 0%, color-mix(in srgb, var(--ai-canvas) 42%, transparent) 52%, color-mix(in srgb, var(--ai-canvas) 22%, transparent) 100%); box-shadow: inset 0 -.13em 0 color-mix(in srgb, var(--ai-canvas) 35%, transparent); text-decoration-color: color-mix(in srgb, var(--ai-canvas) 82%, transparent); }
+.ai-native-note-kicker { display: inline-flex; align-items: center; gap: 5px; }
+.ai-native-note-kicker i { font-size: .95em; }
+.ai-guide-map-popover { padding: 48px 8px 8px; }
+.ai-guide-map-popover-close { position: absolute; top: 9px; right: 9px; display: grid; width: 32px; height: 32px; padding: 0; place-items: center; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 25%, var(--border, #ddd)); border-radius: 7px; background: var(--card-bg, #fff); color: var(--primary, #4361ee); cursor: pointer; }
+.ai-guide-map-popover-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary, #4361ee) 35%, transparent); outline-offset: 2px; }
+.ai-chapter-reflection { position: relative; margin: 42px 0 12px; padding: 20px; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 25%, var(--border, #ddd)); border-top: 3px solid var(--primary, #4361ee); border-radius: 10px; background: linear-gradient(120deg, color-mix(in srgb, var(--primary, #4361ee) 7%, var(--card-bg, #fff)), var(--card-bg, #fff) 62%); box-shadow: 0 5px 18px color-mix(in srgb, #111 6%, transparent); }
+.ai-chapter-reflection::before { position: absolute; top: -3px; left: 20px; width: 38px; height: 3px; border-radius: 0 0 3px 3px; background: linear-gradient(90deg, #635bff, #1bb7dd, #d855b1); content: ''; }
+@media (max-width: 720px) { #eb-content .ai-paragraph-note-anchor { padding-right: 46px !important; }.ai-paragraph-note-trigger { right: 5px; width: 28px; height: 28px; font-size: 14px !important; }.ai-guide-map-popover { max-height: 78dvh; padding: 50px 12px calc(16px + env(safe-area-inset-bottom)); }.ai-chapter-reflection { margin-top: 34px; padding: 18px 16px; border-radius: 8px; } }
+@media (prefers-reduced-motion: reduce) { .ai-canvas-status, .ai-guide-map-trigger, .ai-paragraph-note-trigger { transition: none; } }
+
+/* AI reading is editorial margin work: quiet structure, vivid evidence. */
+.ai-chapter-guide,
+.ai-chapter-reflection {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.ai-chapter-guide {
+  gap: 14px;
+  margin: 0 0 36px;
+  padding: 4px 0 4px 22px;
+  border-left: 3px solid transparent;
+  border-image: linear-gradient(180deg, var(--primary, #4361ee), #40d4ff 50%, #dd6fd9) 1;
+}
+.ai-chapter-guide::before { display: none; }
+.ai-chapter-guide header { align-items: center; }
+.ai-chapter-guide h2 { font-size: clamp(1.35rem, 2vw, 1.72rem) !important; letter-spacing: -.02em; }
+.ai-chapter-guide-summary { max-width: 68ch; font-size: 1.02rem !important; }
+.ai-chapter-guide-points { gap: 8px; max-width: 72ch; padding-left: 1.05rem; }
+.ai-guide-map-trigger { min-height: 44px; padding: 0 14px; border-radius: 999px; background: color-mix(in srgb, var(--primary, #4361ee) 7%, var(--card-bg, #fff)); }
+.ai-chapter-reflection {
+  gap: 14px;
+  margin: 52px 0 16px;
+  padding: 26px 0 0 22px;
+  border-top: 1px solid color-mix(in srgb, var(--primary, #4361ee) 26%, var(--border, #ddd));
+  border-left: 3px solid transparent;
+  border-image: linear-gradient(180deg, #ff9e5f, #ef5bc5 52%, var(--primary, #4361ee)) 1;
+}
+.ai-chapter-reflection::before { display: none; }
+.ai-chapter-reflection h2 { font-size: clamp(1.3rem, 2vw, 1.65rem) !important; letter-spacing: -.02em; }
+.ai-chapter-reflection-intro { font-size: 1rem !important; }
+.ai-chapter-reflection-list { gap: 0; max-width: 76ch; }
+.ai-reflection-question {
+  padding: 17px 0 17px 50px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #ddd) 74%, transparent);
+  background: transparent;
+}
+.ai-reflection-question:last-child { border-bottom: 0; }
+.ai-reflection-question::before { top: 19px; left: 0; color: var(--primary, #4361ee); font-size: .76rem; letter-spacing: .08em; }
+.ai-reflection-question strong { font-size: 1.08rem !important; line-height: 1.48; }
+.ai-reflection-question p { margin-top: 7px; font-size: .96rem !important; line-height: 1.62; }
+
+.ai-canvas-mark {
+  --ai-canvas-secondary: #35cff4;
+  background: linear-gradient(108deg,
+    color-mix(in srgb, var(--primary, #4361ee) 18%, transparent) 0%,
+    color-mix(in srgb, var(--ai-canvas-secondary) 29%, transparent) 47%,
+    color-mix(in srgb, var(--ai-canvas) 33%, transparent) 100%);
+  box-shadow: inset 0 -.14em 0 color-mix(in srgb, var(--ai-canvas) 37%, transparent), 0 .04em .16em color-mix(in srgb, var(--primary, #4361ee) 13%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--ai-canvas-secondary) 75%, var(--ai-canvas));
+}
+.ai-canvas-mark[data-ai-canvas-color="1"] { --ai-canvas-secondary: #4dc7ff; }
+.ai-canvas-mark[data-ai-canvas-color="2"] { --ai-canvas-secondary: #8a71ff; }
+.ai-canvas-mark[data-ai-canvas-color="3"] { --ai-canvas-secondary: #ff8f5c; }
+.ai-canvas-mark[data-ai-canvas-color="4"] { --ai-canvas-secondary: #68dc9b; }
+
+.ai-guide-map-popover { display: grid; gap: 8px; padding: 10px; }
+.ai-map-popover-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ai-map-action { display: grid; width: 44px; height: 44px; padding: 0; place-items: center; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 27%, var(--border, #ddd)); border-radius: 10px; background: var(--card-bg, #fff); color: var(--primary, #4361ee); cursor: pointer; font-size: 1rem; }
+.ai-map-action:hover { background: color-mix(in srgb, var(--primary, #4361ee) 9%, var(--card-bg, #fff)); }
+.ai-map-action:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary, #4361ee) 34%, transparent); outline-offset: 2px; }
+.ai-guide-map-popover.is-fullscreen { inset: 16px !important; width: auto; max-height: none; padding: 18px; }
+.ai-guide-map-popover.is-fullscreen .ai-native-map { min-height: calc(100dvh - 110px); align-content: start; }
+.ai-guide-map-popover.is-fullscreen .ai-canvas-rich-block { display: grid; min-height: min(70dvh, 760px); place-items: center; }
+.ai-guide-map-popover .ai-guide-map-popover-close { position: static; display: grid; width: 44px; height: 44px; border-radius: 10px; }
+
+@media (max-width: 720px) {
+  .ai-chapter-guide, .ai-chapter-reflection { margin-right: 0; margin-left: 0; padding-left: 16px; }
+  .ai-chapter-guide { padding-top: 6px; }
+  .ai-guide-map-trigger { width: 44px; }
+  .ai-reflection-question { padding-left: 45px; }
+  .ai-guide-map-popover.is-fullscreen { inset: 0 !important; border-radius: 0; padding: 14px; }
+}
+
+/* Mind maps are a focused reading surface: one modal, one dialog, one canvas.
+   The previous anchored popover and nested card made the diagram look like a
+   window inside another window and left the trigger visually competing with it. */
+body.ai-map-open { overflow: hidden; }
+.ai-guide-map-modal { position: fixed; z-index: 10090; inset: 0; display: grid; place-items: center; padding: 32px; background: color-mix(in srgb, #111 28%, transparent); backdrop-filter: blur(5px); }
+.ai-guide-map-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(980px, calc(100vw - 64px)); max-height: min(84dvh, 880px); overflow: hidden; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 31%, var(--border, #ddd)); border-radius: 16px; background: var(--card-bg, #fff); box-shadow: 0 28px 80px color-mix(in srgb, #111 28%, transparent); color: var(--text, #333); font-family: system-ui, sans-serif; }
+.ai-guide-map-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 22px 16px; border-bottom: 1px solid color-mix(in srgb, var(--primary, #4361ee) 14%, var(--border, #ddd)); }
+.ai-guide-map-heading { display: grid; gap: 5px; min-width: 0; }
+.ai-guide-map-heading h2 { margin: 0; color: var(--text, #333); font-size: clamp(1.1rem, 2vw, 1.45rem) !important; line-height: 1.32; }
+.ai-guide-map-dialog .ai-map-popover-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.ai-guide-map-dialog .ai-map-action { display: grid; width: 40px; height: 40px; padding: 0; place-items: center; border: 1px solid color-mix(in srgb, var(--primary, #4361ee) 30%, var(--border, #ddd)); border-radius: 10px; background: transparent; color: var(--primary, #4361ee); cursor: pointer; }
+.ai-guide-map-dialog .ai-map-action:hover { background: color-mix(in srgb, var(--primary, #4361ee) 9%, var(--card-bg, #fff)); }
+.ai-guide-map-dialog .ai-map-action:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary, #4361ee) 34%, transparent); outline-offset: 2px; }
+.ai-guide-map-dialog .ai-native-map { min-height: 0; margin: 0; padding: 18px 22px 24px; overflow: auto; border: 0; border-radius: 0; background: transparent; }
+.ai-guide-map-dialog .ai-canvas-rich-block { display: grid; min-height: min(54dvh, 600px); place-items: center; padding: 4px; overflow: auto; border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary, #4361ee) 4%, transparent), color-mix(in srgb, var(--secondary, #4cc9f0) 5%, transparent)); }
+.ai-guide-map-dialog .ai-canvas-rich-block svg { min-width: min(100%, 640px); }
+.ai-guide-map-modal.is-fullscreen { padding: 0; }
+.ai-guide-map-modal.is-fullscreen .ai-guide-map-dialog { width: 100vw; height: 100dvh; max-height: none; border: 0; border-radius: 0; }
+.ai-guide-map-modal.is-fullscreen .ai-canvas-rich-block { min-height: calc(100dvh - 108px); }
+@media (max-width: 720px) { .ai-guide-map-modal { padding: 0; place-items: end stretch; } .ai-guide-map-dialog { width: 100%; max-height: 90dvh; border-radius: 16px 16px 0 0; } .ai-guide-map-header { padding: 16px; } .ai-guide-map-dialog .ai-native-map { padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); } .ai-guide-map-dialog .ai-canvas-rich-block { min-height: 48dvh; } .ai-guide-map-modal.is-fullscreen .ai-guide-map-dialog { height: 100dvh; border-radius: 0; } }

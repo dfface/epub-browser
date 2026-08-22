@@ -110,6 +110,15 @@
       return Promise.resolve(response.json()).catch(function() { return {}; });
     }
 
+    function csrfRequired(response) {
+      if (!response || response.status !== 403 || typeof response.clone !== 'function') {
+        return Promise.resolve(false);
+      }
+      return readJson(response.clone()).then(function(payload) {
+        return Boolean(payload && payload.code === 'csrf_required');
+      });
+    }
+
     function setSession(payload) {
       sessionState = payload && payload.user ? payload : null;
       return sessionState;
@@ -132,12 +141,23 @@
     function authenticatedFetch(url, options) {
       if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
       var unsafe = isUnsafe(options && options.method);
-      var needsSession = unsafe && isSameOrigin(url) && !(sessionState && sessionState.csrf_token);
+      var sameOrigin = isSameOrigin(url);
+      var needsSession = unsafe && sameOrigin && !(sessionState && sessionState.csrf_token);
       var ready = needsSession ? loadSession(false) : Promise.resolve(sessionState);
-      return ready.then(function() {
+      function send() {
         var csrfToken = sessionState && sessionState.csrf_token;
         return Promise.resolve(root.fetch(url, requestOptions(options, csrfToken, url)))
           .then(handleUnauthorized);
+      }
+      return ready.then(send).then(function(response) {
+        if (!unsafe || !sameOrigin) return response;
+        return csrfRequired(response).then(function(needsRefresh) {
+          if (!needsRefresh) return response;
+          return loadSession(true).then(function(session) {
+            if (!session || !session.csrf_token) return response;
+            return send();
+          });
+        });
       });
     }
 
@@ -495,6 +515,7 @@
       fields.api_key.value = '';
       fields.model.value = aiSettings.model || '';
       fields.timeout_seconds.value = String(aiSettings.timeout_seconds || 60);
+      fields.model_context_window.value = String(aiSettings.model_context_window || 32768);
       fields.max_concurrency.value = String(aiSettings.max_concurrency || 2);
       fields.daily_limit.value = String(aiSettings.daily_limit || 0);
       fields.clear_api_key.checked = false;
@@ -770,7 +791,7 @@
             body: JSON.stringify({ tag_ids: tagIds })
           }).then(function(response) {
             if (!response.ok) return showResponseError(response, 'admin');
-            showStatus('admin.ai.bookSaved', 'success');
+            showStatus('admin.bookTagsSaved', 'success');
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }));
@@ -782,7 +803,7 @@
             body: JSON.stringify({ profile: profile.value })
           }).then(function(response) {
             if (!response.ok) return showResponseError(response, 'admin');
-            showStatus('admin.ai.bookSaved', 'success');
+            showStatus('admin.bookClassificationSaved', 'success');
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }));
@@ -976,6 +997,27 @@
       var aiTagForm = element('adminAiTagForm');
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
+      var aiHelpButtons = Array.prototype.slice.call(root.document.querySelectorAll('.admin-ai-help'));
+      function closeAiHelpTips(except) {
+        aiHelpButtons.forEach(function(button) {
+          if (button !== except) button.classList.remove('is-open');
+        });
+      }
+      aiHelpButtons.forEach(function(button) {
+        button.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var willOpen = !button.classList.contains('is-open');
+          closeAiHelpTips(button);
+          button.classList.toggle('is-open', willOpen);
+        });
+      });
+      if (aiHelpButtons.length) {
+        root.document.addEventListener('click', function() { closeAiHelpTips(); });
+        root.document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') closeAiHelpTips();
+        });
+      }
       if (menu) menu.addEventListener('click', openPanel);
       if (close) close.addEventListener('click', closePanel);
       if (adminMenu) adminMenu.addEventListener('click', openAdminPanel);
@@ -1052,6 +1094,7 @@
             api_key: fields.api_key.value || undefined,
             model: fields.model.value,
             timeout_seconds: Number(fields.timeout_seconds.value),
+            model_context_window: Number(fields.model_context_window.value),
             max_concurrency: Number(fields.max_concurrency.value),
             daily_limit: Number(fields.daily_limit.value),
             clear_api_key: fields.clear_api_key.checked

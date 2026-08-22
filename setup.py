@@ -14,13 +14,18 @@ setup(
     version=version,
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
-    keywords="epub reader html export browser convert calibre-web calibre kindle web server local",
-    description="A private EPUB reading service and self-contained static-site generator.",  # 简短描述
+    keywords="epub reader ai reading ai assistant mind map annotations html export browser convert calibre-web calibre kindle web server local",
+    description="A private EPUB reader with AI-native learning layers and a self-contained static-site generator.",  # 简短描述
     long_description=long_description,  # 详细描述，从README.md读取
     long_description_content_type="text/markdown",  # 详细描述格式
     url="https://github.com/dfface/epub-browser",  # 项目主页，如GitHub仓库地址
+    project_urls={
+        "Documentation": "https://github.com/dfface/epub-browser#ai-native-reading-server-only",
+        "AI reading guide": "https://github.com/dfface/epub-browser/blob/main/docs/ai-native-reading.md",
+        "Release notes": "https://github.com/dfface/epub-browser/tree/main/docs/releases",
+    },
     packages=find_packages(exclude=("tests", "tests.*")),
-    package_data={'epub_browser': ['assets/*']},
+    package_data={'epub_browser': ['assets/*', 'assets/vendor/katex/*', 'assets/vendor/katex/fonts/*', 'assets/vendor/mermaid/*', 'prompt_templates/*.json']},
     classifiers=[  # 项目分类器，帮助用户找到你的项目
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

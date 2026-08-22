@@ -12,6 +12,7 @@ from epub_browser.ai_reading import (
     extract_chapter_text,
 )
 from epub_browser.auth import BootstrapCredentials
+from epub_browser.prompt_templates import template_for
 from epub_browser.state import StateStore
 
 
@@ -21,7 +22,7 @@ class _FakeClient:
     def __init__(self, config: ProviderConfig):
         self.config = config
 
-    def complete(self, messages):
+    def complete(self, messages, *, max_tokens=None):
         type(self).calls.append(messages)
         return json.dumps(
             {
@@ -36,11 +37,11 @@ class _FakeClient:
 class _FlakyClient(_FakeClient):
     calls = []
 
-    def complete(self, messages):
+    def complete(self, messages, *, max_tokens=None):
         type(self).calls.append(messages)
         if len(type(self).calls) == 1:
             raise AIProviderError("provider_server_error", retryable_without_response=True)
-        answer = super().complete(messages)
+        answer = super().complete(messages, max_tokens=max_tokens)
         type(self).calls.pop()
         return answer
 
@@ -75,6 +76,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.service = AIReadingService(self.store, self.root / "public", _FakeClient)
 
     async def asyncTearDown(self):
+        await self.service.stop_worker()
         self.temporary.cleanup()
 
     async def _wait_for_job(self, job_id):
@@ -104,6 +106,32 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cached["result"]["content"]["quick"]["summary"], "Useful overview")
         self.assertEqual(len(_FakeClient.calls), 1)
 
+    async def test_server_content_cache_is_used_without_generated_reader_html(self):
+        legacy_path = self.root / "public" / "book" / self.book.book_id / "chapter_0.html"
+        legacy_path.unlink()
+        content_dir = legacy_path.parent / "content"
+        content_dir.mkdir()
+        (content_dir / "chapter_0.json").write_text(
+            json.dumps(
+                {
+                    "index": 0,
+                    "title": "Chapter",
+                    "content": "<article><p>Cached source sentence.</p></article>",
+                    "style_links": "",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0, language="en"
+        )
+        started = await self.service.submit(self.member, request)
+        completed = await self._wait_for_job(started["job"]["id"])
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertIn("Cached source sentence.", _FakeClient.calls[0][1]["content"])
+
     async def test_followups_are_private_and_charged_to_the_owner(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
         started = await self.service.submit(self.member, request)
@@ -119,6 +147,89 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.01)
         self.assertEqual(entries[0]["status"], "complete")
         self.assertEqual(self.store.list_ai_followups(cached["result"]["id"], self.owner.user_id), ())
+
+    async def test_book_chat_can_answer_from_a_chapter_without_a_shared_layer(self):
+        turn = await self.service.ask_book(
+            self.member, book_id=self.book.book_id, chapter_index=0,
+            question="What is the key claim?", language="en", context_mode="chapter_source",
+        )
+        for _ in range(100):
+            turns = self.store.list_ai_book_chat_turns(self.book.book_id, self.member.user_id)
+            if turns and turns[0]["status"] in {"complete", "failed"}:
+                break
+            await asyncio.sleep(0.01)
+        self.assertEqual(turns[0]["id"], turn["id"])
+        self.assertEqual(turns[0]["chapter_index"], 0)
+        self.assertEqual(turns[0]["status"], "complete")
+        self.assertEqual(self.store.list_ai_book_chat_turns(self.book.book_id, self.owner.user_id), ())
+
+    async def test_book_chat_sends_this_readers_prior_book_conversation_with_exact_chapter(self):
+        first = await self.service.ask_book(
+            self.member, book_id=self.book.book_id, chapter_index=0,
+            question="What is the key claim?", language="en", context_mode="chapter_source",
+        )
+        for _ in range(100):
+            first_turn = self.store.get_ai_book_chat_turn(first["id"], self.member.user_id)
+            if first_turn and first_turn["status"] in {"complete", "failed"}:
+                break
+            await asyncio.sleep(0.01)
+        self.assertEqual(first_turn["status"], "complete")
+
+        second = await self.service.ask_book(
+            self.member, book_id=self.book.book_id, chapter_index=0,
+            question="How does that evidence support it?", language="en", context_mode="chapter_source",
+        )
+        for _ in range(100):
+            second_turn = self.store.get_ai_book_chat_turn(second["id"], self.member.user_id)
+            if second_turn and second_turn["status"] in {"complete", "failed"}:
+                break
+            await asyncio.sleep(0.01)
+        self.assertEqual(second_turn["status"], "complete")
+        prompt = _FakeClient.calls[-1][1]["content"]
+        self.assertIn("Exact current chapter number: 0", prompt)
+        self.assertIn("Private conversation history for this reader in this book", prompt)
+        self.assertIn("What is the key claim?", prompt)
+        self.assertIn('"chapter_number": 0', prompt)
+
+    async def test_book_chat_preserves_the_stored_chapter_index(self):
+        record = self.service._chat_turn_record(
+            {"book_context": 0, "chapter_index": 7, "question": "Q", "answer": "A"},
+            question_limit=100,
+            answer_limit=100,
+        )
+
+        self.assertEqual(record["chapter_number"], 7)
+        self.assertEqual(record["scope"], "chapter 7")
+
+    async def test_book_overview_chat_uses_compressed_shared_layers_and_private_history(self):
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        started = await self.service.submit(self.member, request)
+        await self._wait_for_job(started["job"]["id"])
+        prior = await self.service.ask_book(
+            self.member, book_id=self.book.book_id, chapter_index=0,
+            question="What should I retain?", language="en", context_mode="shared_layer",
+        )
+        for _ in range(100):
+            current = self.store.get_ai_book_chat_turn(prior["id"], self.member.user_id)
+            if current and current["status"] in {"complete", "failed"}:
+                break
+            await asyncio.sleep(0.01)
+
+        whole_book = await self.service.ask_book(
+            self.member, book_id=self.book.book_id, chapter_index=None,
+            question="What connects this book?", language="en", context_mode="book_overview",
+        )
+        for _ in range(100):
+            current = self.store.get_ai_book_chat_turn(whole_book["id"], self.member.user_id)
+            if current and current["status"] in {"complete", "failed"}:
+                break
+            await asyncio.sleep(0.01)
+        self.assertEqual(current["status"], "complete")
+        self.assertEqual(current["book_context"], 1)
+        prompt = _FakeClient.calls[-1][1]["content"]
+        self.assertIn("Conversation scope: the whole book", prompt)
+        self.assertIn("Compressed shared reading layers", prompt)
+        self.assertIn("What should I retain?", prompt)
 
     async def test_second_opening_joins_the_existing_chapter_job_without_a_provider_call(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
@@ -137,6 +248,57 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(joined["shared"])
         self.assertEqual(joined["job"]["id"], "already-running")
         self.assertEqual(_FakeClient.calls, [])
+
+    async def test_background_worker_claims_a_durable_sqlite_job(self):
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        material, _metadata, progress_total, _segments = self.service._material_for_request(self.member, request)
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(
+            request, material, self.store.get_book_ai_profile(self.book.book_id), template
+        )
+        self.store.create_ai_job(
+            "durable-worker-job", self.member.user_id, cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+            request_payload={
+                "scope": "chapter", "book_id": self.book.book_id,
+                "chapter_index": 0, "mode": "chapter", "language": "en",
+                "reading_boundary": 0,
+            },
+            profile="auto", template_id=template["id"], template_version=template["version"],
+        )
+
+        await self.service.start_worker()
+        self.service.wake_worker()
+        completed = await self._wait_for_job("durable-worker-job")
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertIsNotNone(completed["result_id"])
+
+    async def test_running_durable_job_is_requeued_after_a_service_restart(self):
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        material, _metadata, progress_total, _segments = self.service._material_for_request(self.member, request)
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(
+            request, material, self.store.get_book_ai_profile(self.book.book_id), template
+        )
+        self.store.create_ai_job(
+            "restartable-worker-job", self.member.user_id, cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+            request_payload={
+                "scope": "chapter", "book_id": self.book.book_id,
+                "chapter_index": 0, "mode": "chapter", "language": "en",
+                "reading_boundary": 0,
+            },
+            profile="auto", template_id=template["id"], template_version=template["version"],
+        )
+        self.assertTrue(self.store.start_ai_job("restartable-worker-job"))
+        self.assertEqual(self.store.requeue_running_ai_jobs(), 1)
+
+        await self.service.start_worker()
+        self.service.wake_worker()
+        completed = await self._wait_for_job("restartable-worker-job")
+
+        self.assertEqual(completed["status"], "complete")
 
     async def test_transient_provider_server_error_retries_once_before_failing_the_job(self):
         _FlakyClient.calls = []
@@ -195,3 +357,99 @@ class ResultNormalizationTests(unittest.TestCase):
         self.assertEqual(result["deep"]["applications"], [{
             "context": "School policy", "advice": "Pair limits with support.",
         }])
+
+    def test_shared_canvas_annotations_are_typed_and_require_exact_source_anchors(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Summary"},
+            "annotations": [
+                {
+                    "chapter_index": 0,
+                    "kind": "claim",
+                    "quote": "Source sentence.",
+                    "title": "Central claim",
+                    "body_markdown": "**Why it matters**\n\n```math\na^2+b^2=c^2\n```",
+                },
+                {
+                    "chapter_index": 0,
+                    "kind": "claim",
+                    "quote": "Not present in the source.",
+                    "title": "Must not be placed",
+                    "body_markdown": "This has no reliable anchor.",
+                },
+            ],
+        }))
+        request = ReadingRequest(scope="chapter", book_id="book", chapter_index=0)
+        validated = AIReadingService._validate_learning_layer(
+            result, request, "Source sentence.\nRead this carefully."
+        )
+
+        self.assertEqual(validated["annotations"], [{
+            "chapter_index": 0,
+            "kind": "claim",
+            "quote": "Source sentence.",
+            "title": "Central claim",
+            "body_markdown": "**Why it matters**\n\n```math\na^2+b^2=c^2\n```",
+        }])
+
+    def test_learning_layer_preserves_a_mermaid_mind_map_for_the_native_canvas(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Summary"},
+            "structure": {
+                "diagram_mermaid": "mindmap\n  root((Central idea))\n    Cause\n    Effect",
+                "nodes": [{"label": "Cause", "detail": "Starts the argument."}],
+            },
+        }))
+
+        self.assertEqual(
+            result["structure"]["diagram_mermaid"],
+            "mindmap\n  root((Central idea))\n    Cause\n    Effect",
+        )
+
+    def test_learning_layer_discards_legacy_flowcharts_for_the_mind_map_surface(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Summary"},
+            "structure": {
+                "diagram_mermaid": "flowchart LR\nA[Cause] --> B[Effect]",
+                "nodes": [{"label": "Cause", "detail": "Starts the argument."}],
+            },
+        }))
+
+        self.assertEqual(result["structure"]["diagram_mermaid"], "")
+
+    def test_paragraph_notes_need_exact_source_anchors(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Summary"},
+            "paragraph_notes": [
+                {"chapter_index": 0, "anchor_quote": "Source sentence.", "title": "Opening move", "summary_markdown": "Frames the problem."},
+                {"chapter_index": 0, "anchor_quote": "Not in source", "title": "Discard", "summary_markdown": "Must not be shown."},
+            ],
+        }))
+        request = ReadingRequest(scope="chapter", book_id="book", chapter_index=0)
+        validated = AIReadingService._validate_learning_layer(
+            result, request, "Source sentence.\nRead this carefully."
+        )
+
+        self.assertEqual(validated["paragraph_notes"], [{
+            "chapter_index": 0, "anchor_quote": "Source sentence.",
+            "title": "Opening move", "summary_markdown": "Frames the problem.",
+        }])
+
+    def test_chapter_layer_normalizes_printed_chapter_numbers_to_page_index(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Summary"},
+            "annotations": [{
+                "chapter_index": 10, "kind": "claim", "quote": "Source sentence.",
+                "title": "The actual claim", "body_markdown": "It frames the argument.",
+            }],
+            "paragraph_notes": [{
+                "chapter_index": 10, "anchor_quote": "Read this carefully.",
+                "title": "The paragraph's turn", "summary_markdown": "It changes the stakes.",
+            }],
+        }))
+        request = ReadingRequest(scope="chapter", book_id="book", chapter_index=21)
+        validated = AIReadingService._validate_learning_layer(
+            result, request, "Source sentence.\nRead this carefully."
+        )
+
+        self.assertEqual(validated["annotations"][0]["chapter_index"], 21)
+        self.assertEqual(validated["paragraph_notes"][0]["chapter_index"], 21)

@@ -300,8 +300,8 @@ function initScript() {
     var chapter_index = pathParts[pathParts.indexOf('book') + 2];
     chapter_index = chapter_index.replace("chapter_", "").replace(".html", "");
 
-    var togglePaginationBtn = document.getElementById('togglePagination');
-    var mobileTogglePaginationBtn = document.getElementById('mobileTogglePagination');
+    var paginationModeToggle = document.getElementById('paginationModeToggle');
+    var exitPaginationModeBtn = document.getElementById('exitPaginationMode');
     var navigationHomeBtn = document.getElementById('navigationHomeBtn');
     var paginationInfo = document.getElementById('paginationInfo');
     var currentPageEl = document.getElementById('currentPage');
@@ -317,16 +317,6 @@ function initScript() {
     var pageHeightSetBtn = document.querySelector("#setPageHeight");
     var pageHeightInput = document.querySelector("#pageHeightInput");
     var toggleClickPageBtn = document.getElementById('toggleClickPage');
-
-    function setPaginationToggleLabel() {
-        var buttons = [togglePaginationBtn, mobileTogglePaginationBtn];
-        for (var i = 0; i < buttons.length; i++) {
-            if (!buttons[i]) continue;
-            buttons[i].innerHTML = '<i class="fas fa-scroll"></i><span class="control-name"></span>';
-            buttons[i].querySelector('.control-name').textContent = i18n.t('reader.scrolling');
-            buttons[i].setAttribute('aria-label', i18n.t('reader.scrolling'));
-        }
-    }
 
     function getStorageKey(mode) {
         return mode + '_' + book_hash + '_' + chapter_index;
@@ -528,8 +518,6 @@ function initScript() {
                 item.removeAttribute('href');
             }
         });
-        setPaginationToggleLabel();
-        
         content.addEventListener('scroll', function() {
             var sl = content.scrollLeft;
             var np = Math.round(sl / pageWidth);
@@ -549,8 +537,8 @@ function initScript() {
         }
     }
     
-    function savePaginationModeAndReload() {
-        isPaginationMode = !isPaginationMode;
+    function savePaginationModeAndReload(nextMode) {
+        isPaginationMode = typeof nextMode === 'boolean' ? nextMode : !isPaginationMode;
         if (isPaginationMode) {
             if (!isKindleMode()) localStorage.setItem('turning', 'true');
             else setCookie('turning', 'true');
@@ -563,8 +551,17 @@ function initScript() {
         location.reload();
     }
     
-    togglePaginationBtn.addEventListener('click', savePaginationModeAndReload);
-    mobileTogglePaginationBtn.addEventListener('click', savePaginationModeAndReload);
+    if (paginationModeToggle) {
+        paginationModeToggle.checked = isPaginationMode;
+        paginationModeToggle.addEventListener('change', function() {
+            savePaginationModeAndReload(this.checked);
+        });
+    }
+    if (exitPaginationModeBtn) {
+        exitPaginationModeBtn.addEventListener('click', function() {
+            savePaginationModeAndReload(false);
+        });
+    }
     
     function enablePaginationMode() {
         if (!isKindleMode()) localStorage.setItem('turning', 'true');
@@ -1291,13 +1288,25 @@ function initScript() {
                     var item = data[i];
                     var li = document.createElement('li');
                     li.className = 'toc-item toc-level-' + Math.min(item.level, 3);
+                    if (item.kind === 'section') {
+                        li.classList.add('toc-section');
+                        var sectionTitle = document.createElement('span');
+                        sectionTitle.className = 'chapter-section-title';
+                        sectionTitle.textContent = item.title;
+                        li.appendChild(sectionTitle);
+                        list.appendChild(li);
+                        continue;
+                    }
                     li.setAttribute('data-chapter-index', item.chapter_index);
                     var a = document.createElement('a');
                     var href = window.EpubBrowserURL.publicPath('/book/' + hash + '/' + item.chapter_file);
                     if (item.anchor) href += '#' + item.anchor;
                     a.href = href;
                     a.setAttribute('data-chapter-index', item.chapter_index);
-                    a.textContent = item.title;
+                    var title = document.createElement('span');
+                    title.className = 'chapter-title';
+                    title.textContent = item.title;
+                    a.appendChild(title);
                     a.addEventListener('click', function(e) {
                         e.preventDefault();
                         var targetIndex = parseInt(this.getAttribute('data-chapter-index'), 10);
@@ -1325,6 +1334,12 @@ function initScript() {
                     li.appendChild(a);
                     list.appendChild(li);
                 }
+                // ai-reading-hub may have loaded before this asynchronous TOC.
+                // Notify it explicitly as well as allowing its observer fallback.
+                if (window.EpubBrowserAIReadingHub && window.EpubBrowserAIReadingHub.refreshChapterIndicators) {
+                    window.EpubBrowserAIReadingHub.refreshChapterIndicators(list);
+                }
+                document.dispatchEvent(new CustomEvent('epub-browser:chapter-toc-loaded', { detail: { container: list } }));
                 setBookTocActiveChapter(visibleChapterIndex, true);
             } else {
                 list.innerHTML = '<li class="toc-item"></li>';
@@ -1641,25 +1656,33 @@ function initScript() {
     
     var scrollTopBtn = document.getElementById('scrollToTopBtn');
     var mobileTopBtn = document.getElementById('mobileTopBtn');
-    scrollTopBtn.addEventListener('click', function() {
-        window.scrollTo(0,0);
-    });
+    if (scrollTopBtn) {
+        scrollTopBtn.addEventListener('click', function() {
+            window.scrollTo(0,0);
+        });
+    }
     function updateScrollToTopVisibility() {
+        // Continuous-scroll setup runs before this block is reached. Resolve
+        // lazily so its first visibility update cannot abort reader startup.
+        if (!scrollTopBtn) scrollTopBtn = document.getElementById('scrollToTopBtn');
+        if (!mobileTopBtn) mobileTopBtn = document.getElementById('mobileTopBtn');
         var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
         var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
-        if (scrollTop > threshold && !document.body.classList.contains('pagination-mode')) {
-            scrollTopBtn.classList.add('is-visible');
-            mobileTopBtn.classList.add('is-visible');
+        if (scrollTop > threshold && !document.body.classList.contains('pagination-mode') && !isContinuousScroll) {
+            if (scrollTopBtn) scrollTopBtn.classList.add('is-visible');
+            if (mobileTopBtn) mobileTopBtn.classList.add('is-visible');
         } else {
-            scrollTopBtn.classList.remove('is-visible');
-            mobileTopBtn.classList.remove('is-visible');
+            if (scrollTopBtn) scrollTopBtn.classList.remove('is-visible');
+            if (mobileTopBtn) mobileTopBtn.classList.remove('is-visible');
         }
     }
     window.addEventListener('scroll', updateScrollToTopVisibility);
     updateScrollToTopVisibility();
-    mobileTopBtn.addEventListener('click', function() {
-        window.scrollTo(0,0);
-    });
+    if (mobileTopBtn) {
+        mobileTopBtn.addEventListener('click', function() {
+            window.scrollTo(0,0);
+        });
+    }
     
     var lastScrollTop = 0;
     var mobileControls = document.querySelector('.mobile-controls');
@@ -1922,11 +1945,14 @@ function initScript() {
     // ==================== 连续滚动模式 ====================
 
     function initContinuousScroll() {
+        document.body.classList.add('continuous-scroll-mode');
+        updateScrollToTopVisibility();
         // 标记当前章节已加载
         var currentIdx = parseInt(chapter_index, 10);
         var initialSection = document.createElement('section');
         initialSection.className = 'continuous-chapter';
         initialSection.setAttribute('data-chapter-index', currentIdx);
+        initialSection.setAttribute('data-chapter-title', content.getAttribute('data-chapter-title') || '');
         while (content.firstChild) initialSection.appendChild(content.firstChild);
         content.appendChild(initialSection);
         loadedChapters[currentIdx] = true;
@@ -2050,11 +2076,12 @@ function initScript() {
                     var chapterSection = document.createElement('section');
                     chapterSection.className = 'continuous-chapter';
                     chapterSection.setAttribute('data-chapter-index', nextIdx);
+                    chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
                     separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
-                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: nextIdx + 1 });
-                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: nextIdx + 1 });
+                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: nextIdx });
+                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: nextIdx });
                     chapterSection.appendChild(separator);
                     
                     // 追加章节内容
@@ -2146,13 +2173,14 @@ function initScript() {
                     var chapterSection = document.createElement('section');
                     chapterSection.className = 'continuous-chapter';
                     chapterSection.setAttribute('data-chapter-index', prevIdx);
+                    chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
                     
                     // 章节分隔符放在新内容的末尾
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
                     separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
-                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: prevIdx + 1 });
-                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: prevIdx + 1 });
+                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: prevIdx });
+                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: prevIdx });
                     
                     var childNodes = chapterContent.childNodes;
                     for (var i = 0; i < childNodes.length; i++) {
@@ -2190,18 +2218,14 @@ function initScript() {
         // 保存全局阅读进度：基于已加载的所有章节计算当前阅读百分比
         var totalChapters = parseInt(content.getAttribute('data-total-chapters'), 10);
         if (!totalChapters) return;
-        
-        // 找到当前视口对应的章节
-        var st = window.scrollY;
-        var chapters = content.querySelectorAll('.chapter-separator');
-        var currentVisibleChapter = parseInt(chapter_index, 10);
-        
-        for (var i = chapters.length - 1; i >= 0; i--) {
-            if (chapters[i].offsetTop <= st + 100) {
-                // 根据分隔符位置推断当前章节
-                currentVisibleChapter = parseInt(chapter_index, 10) + i;
-                break;
-            }
+
+        // The OPF spine index is encoded on each loaded chapter.  Never infer
+        // it from separator position: continuous reading can prepend chapters
+        // and prune the window, so separator order is not chapter_N order.
+        updateContinuousReadingChapter();
+        var currentVisibleChapter = visibleChapterIndex;
+        if (isNaN(currentVisibleChapter)) {
+            currentVisibleChapter = parseInt(chapter_index, 10);
         }
         
         var key = 'continuous_' + book_hash;

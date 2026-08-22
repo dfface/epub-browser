@@ -1042,6 +1042,79 @@ class AdminAccountTests(unittest.TestCase):
             403,
         )
 
+    def test_ai_reading_library_lists_retained_shared_results_for_visible_books(self):
+        visible = self.store.resolve_book(
+            Path(self.directory.name) / "visible.epub", "urn:test:visible", "visible-fingerprint",
+            {"title": "Visible book", "authors": ["A Reader"], "cover": "resources/cover.jpg"},
+        )
+        restricted = self.store.resolve_book(
+            Path(self.directory.name) / "restricted.epub", "urn:test:restricted", "restricted-fingerprint",
+            {"title": "Restricted book", "authors": ["Private Author"]},
+        )
+        self.store.set_book_visibility(restricted.book_id, "restricted")
+        visible_output = Path(self.directory.name) / "book" / visible.book_id
+        visible_output.mkdir(parents=True)
+        (visible_output / "toc.json").write_text(
+            json.dumps([{"chapter_index": 0, "title": "Opening chapter"}]),
+            encoding="utf-8",
+        )
+        for book, key in ((visible, "visible-layer"), (restricted, "restricted-layer")):
+            self.store.store_ai_reading_result(
+                cache_key=key, book_id=book.book_id, chapter_index=0, scope="chapter",
+                mode="chapter", profile="auto", config_revision=1,
+                content={"quick": {"title": "Chapter guide", "summary": "A shared guide"}},
+                created_by_user_id=self.admin.user_id, template_id="chapter-learning-layer",
+                template_version=5, language="en",
+            )
+        # The older result deliberately shares a cache key with the current
+        # result. It remains a usable shared reading and must not vanish from
+        # the AI-reading library merely because it is no longer the cache head.
+        self.store.store_ai_reading_result(
+            cache_key="visible-layer", book_id=visible.book_id, chapter_index=0,
+            scope="chapter", mode="chapter", profile="auto", config_revision=0,
+            content={"quick": {"title": "Earlier guide", "summary": "Still useful"}},
+            created_by_user_id=self.admin.user_id, template_id="legacy",
+            template_version=0, language="en",
+        )
+
+        member = self.member_client.get("/api/ai/library")
+        admin = self.admin_client.get("/api/ai/library")
+
+        self.assertEqual(member.status_code, 200)
+        self.assertEqual([book["book_id"] for book in member.json()["books"]], [visible.book_id])
+        self.assertEqual(len(member.json()["books"][0]["results"]), 2)
+        self.assertTrue(all(result["chapter_index"] == 0 for result in member.json()["books"][0]["results"]))
+        self.assertTrue(all(result["chapter_title"] == "Opening chapter" for result in member.json()["books"][0]["results"]))
+        self.assertEqual(member.json()["books"][0]["cover"], f"/book/{visible.book_id}/resources/cover.jpg")
+        self.assertEqual(
+            {book["book_id"] for book in admin.json()["books"]},
+            {visible.book_id, restricted.book_id},
+        )
+
+    def test_ai_reading_result_deletion_is_admin_or_generator_only(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "deletable.epub", "urn:test:deletable", "deletable",
+            {"title": "Deletable"},
+        )
+        admin_result = self.store.store_ai_reading_result(
+            cache_key="admin-layer", book_id=book.book_id, chapter_index=0,
+            scope="chapter", mode="chapter", profile="auto", config_revision=1,
+            content={"quick": {"title": "Admin"}}, created_by_user_id=self.admin.user_id,
+        )
+        member_result = self.store.store_ai_reading_result(
+            cache_key="member-layer", book_id=book.book_id, chapter_index=1,
+            scope="chapter", mode="chapter", profile="auto", config_revision=1,
+            content={"quick": {"title": "Member"}}, created_by_user_id=self.member.user_id,
+        )
+
+        denied = self.member_client.delete("/api/ai/results/" + admin_result["id"])
+        deleted_own = self.member_client.delete("/api/ai/results/" + member_result["id"])
+        deleted_other = self.admin_client.delete("/api/ai/results/" + admin_result["id"])
+
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(deleted_own.json(), {"deleted": member_result["id"]})
+        self.assertEqual(deleted_other.json(), {"deleted": admin_result["id"]})
+
     def test_authorized_member_can_poll_a_shared_ai_generation_job(self):
         book = self.store.resolve_book(
             Path(self.directory.name) / "shared-job.epub",
@@ -1099,12 +1172,17 @@ class AdminAccountTests(unittest.TestCase):
             "/api/admin/books/" + book.book_id + "/ai",
             json={"tag_ids": [tag.json()["tag"]["id"]]},
         )
+        effective_metadata = self.member_client.get(
+            "/api/books/" + book.book_id + "/metadata"
+        )
 
         self.assertEqual(profile.status_code, 200)
         self.assertEqual(profile.json()["profile"], "fiction")
         self.assertEqual(tags.status_code, 200)
         self.assertEqual(tags.json()["profile"], "fiction")
         self.assertEqual(tags.json()["tags"], [tag.json()["tag"]])
+        self.assertEqual(effective_metadata.status_code, 200)
+        self.assertEqual(effective_metadata.json()["tags"], ["History"])
         self.assertEqual(
             self.admin_client.put(
                 "/api/admin/books/" + book.book_id + "/ai", json={}

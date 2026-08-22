@@ -6,6 +6,7 @@ import re
 import zipfile
 from pathlib import Path
 
+from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
 from epub_browser.processor import EPUBProcessor
@@ -110,30 +111,237 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertEqual(converted.metadata.epub_identifier, "urn:test:stable")
             self.assertEqual(converted.chapter_count, 1)
 
-    def test_server_processor_preserves_root_relative_navigation_links(self):
+    def test_processor_skips_non_linear_spine_items_from_public_chapters(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / "root-relative-link.epub"
-            navigation_path = (
-                "/leetcode/ChapterFour/0001~0099/0001.Two-Sum/"
+            source = root / "non-linear-spine.epub"
+            container = """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>
+"""
+            package = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Indexed</dc:title></metadata>
+  <manifest>
+    <item id="first" href="first.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="leaders" href="leaders-one.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="cover" linear="no"/><itemref idref="first"/><itemref idref="leaders"/></spine>
+</package>
+"""
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("mimetype", "application/epub+zip")
+                archive.writestr("META-INF/container.xml", container)
+                archive.writestr("OEBPS/content.opf", package)
+                archive.writestr("OEBPS/first.xhtml", "<html><body><p>First</p></body></html>")
+                archive.writestr(
+                    "OEBPS/cover.xhtml",
+                    "<html><body><p>Cover</p></body></html>",
+                )
+                archive.writestr("OEBPS/leaders-one.xhtml", "<html><body><p>Leader article</p></body></html>")
+
+            processor = EPUBProcessor(str(source), str(root / "staging"))
+            processor.extract_epub()
+            self.assertTrue(processor.parse_opf("OEBPS/content.opf"))
+
+            self.assertEqual(
+                [chapter["path"] for chapter in processor.chapters],
+                ["OEBPS/first.xhtml", "OEBPS/leaders-one.xhtml"],
             )
-            self._write_minimal_epub(
-                source,
-                chapter_body=f'<a href="{navigation_path}">Two Sum</a>',
-            )
-            processor = EPUBProcessor(
-                str(source),
-                str(root / "staging"),
-                book_id="stable_id",
-                deployment_mode="server",
+            self.assertEqual(
+                [chapter["title"] for chapter in processor.chapters],
+                ["Chapter 0", "Chapter 1"],
             )
 
-            converted = processor.convert()
-            chapter = Path(converted.output_dir, "chapter_0.html").read_text(
-                encoding="utf-8"
+    def test_ncx_section_that_repeats_first_article_target_does_not_consume_chapter_index(self):
+        """OPF spine, not NCX grouping nodes, owns chapter_N indexes."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "grouped-toc.epub"
+            container = """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>
+"""
+            package = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Grouped</dc:title></metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="article" href="article.xhtml" media-type="application/xhtml+xml"/>
+    <item id="next" href="next.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="article"/><itemref idref="next"/></spine>
+</package>
+"""
+            ncx = """<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <navMap>
+    <navPoint id="section"><navLabel><text>Leaders</text></navLabel><content src="article.xhtml"/>
+      <navPoint id="article"><navLabel><text>First article</text></navLabel><content src="article.xhtml"/></navPoint>
+    </navPoint>
+    <navPoint id="next"><navLabel><text>Next article</text></navLabel><content src="next.xhtml"/></navPoint>
+  </navMap>
+</ncx>
+"""
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("mimetype", "application/epub+zip")
+                archive.writestr("META-INF/container.xml", container)
+                archive.writestr("OEBPS/content.opf", package)
+                archive.writestr("OEBPS/toc.ncx", ncx)
+                archive.writestr("OEBPS/article.xhtml", "<html><body>Article</body></html>")
+                archive.writestr("OEBPS/next.xhtml", "<html><body>Next</body></html>")
+
+            processor = EPUBProcessor(str(source), str(root / "staging"))
+            processor.extract_epub()
+            self.assertTrue(processor.parse_opf("OEBPS/content.opf"))
+
+            self.assertEqual(
+                [(chapter["title"], chapter["path"]) for chapter in processor.chapters],
+                [
+                    ("First article", "OEBPS/article.xhtml"),
+                    ("Next article", "OEBPS/next.xhtml"),
+                ],
+            )
+            self.assertEqual(
+                processor._build_toc_data(),
+                [
+                    {"title": "Leaders", "level": 0, "kind": "section"},
+                    {
+                        "title": "First article", "level": 1,
+                        "kind": "chapter", "chapter_index": 0,
+                        "chapter_file": "chapter_0.html",
+                    },
+                    {
+                        "title": "Next article", "level": 0,
+                        "kind": "chapter", "chapter_index": 1,
+                        "chapter_file": "chapter_1.html",
+                    },
+                ],
             )
 
-            self.assertIn(f'href="{navigation_path}"', chapter)
+    def test_real_section_index_page_keeps_its_own_opf_chapter_index(self):
+        """A spine page must not vanish because NCX repeats its first child."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "section-index.epub"
+            container = """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>
+"""
+            package = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Section index</dc:title></metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="section" href="leaders.xhtml" media-type="application/xhtml+xml"/>
+    <item id="article" href="article.xhtml" media-type="application/xhtml+xml"/>
+    <item id="next" href="next.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="section"/><itemref idref="article"/><itemref idref="next"/></spine>
+</package>
+"""
+            ncx = """<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <navMap>
+    <navPoint id="section"><navLabel><text>Leaders</text></navLabel><content src="article.xhtml"/>
+      <navPoint id="article"><navLabel><text>First article</text></navLabel><content src="article.xhtml"/></navPoint>
+    </navPoint>
+    <navPoint id="next"><navLabel><text>Next article</text></navLabel><content src="next.xhtml"/></navPoint>
+  </navMap>
+</ncx>
+"""
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("mimetype", "application/epub+zip")
+                archive.writestr("META-INF/container.xml", container)
+                archive.writestr("OEBPS/content.opf", package)
+                archive.writestr("OEBPS/toc.ncx", ncx)
+                archive.writestr(
+                    "OEBPS/leaders.xhtml",
+                    '<html><body><h2 class="section_index_title">Leaders</h2></body></html>',
+                )
+                archive.writestr("OEBPS/article.xhtml", "<html><body>Article</body></html>")
+                archive.writestr("OEBPS/next.xhtml", "<html><body>Next</body></html>")
+
+            processor = EPUBProcessor(str(source), str(root / "staging"))
+            processor.extract_epub()
+            self.assertTrue(processor.parse_opf("OEBPS/content.opf"))
+
+            self.assertEqual(
+                [chapter["title"] for chapter in processor.chapters],
+                ["Leaders", "First article", "Next article"],
+            )
+            self.assertEqual(
+                processor._build_toc_data(),
+                [
+                    {
+                        "title": "Leaders", "level": 0,
+                        "kind": "chapter", "chapter_index": 0,
+                        "chapter_file": "chapter_0.html",
+                    },
+                    {
+                        "title": "First article", "level": 1,
+                        "kind": "chapter", "chapter_index": 1,
+                        "chapter_file": "chapter_1.html",
+                    },
+                    {
+                        "title": "Next article", "level": 0,
+                        "kind": "chapter", "chapter_index": 2,
+                        "chapter_file": "chapter_2.html",
+                    },
+                ],
+            )
+
+    def test_ncx_order_is_preserved_when_it_differs_from_spine_order(self):
+        """The reader directory follows NCX; chapter_N still follows OPF."""
+        processor = object.__new__(EPUBProcessor)
+        processor.chapters = [
+            {"title": "First in spine", "path": "OEBPS/first.xhtml"},
+            {"title": "Second in spine", "path": "OEBPS/second.xhtml"},
+        ]
+        processor.toc = [
+            {"title": "Second in NCX", "src": "OEBPS/second.xhtml", "level": 0},
+            {"title": "First in NCX", "src": "OEBPS/first.xhtml", "level": 0},
+        ]
+
+        self.assertEqual(
+            processor._build_toc_data(),
+            [
+                {
+                    "title": "Second in NCX", "level": 0,
+                    "kind": "chapter", "chapter_index": 1,
+                    "chapter_file": "chapter_1.html",
+                },
+                {
+                    "title": "First in NCX", "level": 0,
+                    "kind": "chapter", "chapter_index": 0,
+                    "chapter_file": "chapter_0.html",
+                },
+            ],
+        )
+
+    def test_ncx_omitted_spine_page_is_not_added_to_toc(self):
+        """The reader directory is strictly the NCX, not a synthetic spine list."""
+        processor = object.__new__(EPUBProcessor)
+        processor.chapters = [
+            {"title": "Cover page", "path": "OEBPS/cover.xhtml"},
+            {"title": "Chapter", "path": "OEBPS/chapter.xhtml"},
+        ]
+        processor.toc = [
+            {"title": "Chapter", "src": "OEBPS/chapter.xhtml", "level": 0},
+        ]
+
+        self.assertEqual(
+            processor._build_toc_data(),
+            [{
+                "title": "Chapter", "level": 0,
+                "kind": "chapter", "chapter_index": 1,
+                "chapter_file": "chapter_1.html",
+            }],
+        )
 
     def test_processor_rejects_zip_entries_that_escape_extraction_root(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -623,23 +831,6 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotIn('EpubBrowserAuth.init', html)
             self.assertNotIn('syncShelfBtn', html)
 
-    def test_reader_pages_load_pinyin_before_bookshelf_search(self):
-        for html in (self._book_html(), self._chapter_html()):
-            pinyin_script = re.search(
-                r'/assets/immutable/pinyin-pro\.min\.[0-9a-f]{12}\.js',
-                html,
-            )
-            bookshelf_script = re.search(
-                r'/assets/immutable/bookshelf\.[0-9a-f]{12}\.js',
-                html,
-            )
-            self.assertIsNotNone(pinyin_script)
-            self.assertIsNotNone(bookshelf_script)
-            self.assertLess(
-                pinyin_script.start(),
-                bookshelf_script.start(),
-            )
-
     def test_dynamic_browser_urls_use_the_generated_base_path_runtime(self):
         scripts = {
             name: Path("epub_browser", "assets", name).read_text(encoding="utf-8")
@@ -1003,6 +1194,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertIn(".mobile-controls .control-btn span {\n    display: none;", chapter_css)
         self.assertIn("content: attr(aria-label);", chapter_mobile)
+        self.assertNotIn("@media (hover: hover)", chapter_mobile)
         self.assertRegex(
             chapter_mobile,
             r"\.mobile-controls\s*\{[^}]*overflow-x:\s*auto;",
@@ -1022,6 +1214,26 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertIn("mobileTopBtn.classList.add('is-visible')", chapter_script)
         self.assertIn("mobileTopBtn.classList.remove('is-visible')", chapter_script)
+
+        chapter_html = self._chapter_html()
+        self.assertNotIn('id="mobileAIReadingBtn"', chapter_html)
+        self.assertNotIn('data-ai-learning-canvas', chapter_html)
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory, deployment_mode="server")
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            server_chapter_html = processor.create_chapter_template("<p>Text</p>", "", 0, "One")
+        self.assertIn('id="mobileAIReadingBtn"', server_chapter_html)
+        self.assertIn('data-ai-learning-canvas', server_chapter_html)
+        self.assertNotIn('id="mobileThemeBtn"', chapter_html)
+
+    def test_theme_picker_stays_anchored_to_the_top_right_action_on_mobile(self):
+        script = Path("epub_browser/assets/theme.js").read_text(encoding="utf-8")
+
+        self.assertIn("var rect = toggleBtn.getBoundingClientRect();", script)
+        self.assertIn("menu.style.left = 'auto';", script)
+        self.assertNotIn("mobileThemeBtn", script)
+        self.assertNotIn("menu.style.bottom = '80px';", script)
 
     def test_reader_chrome_uses_one_default_font_stack(self):
         for path in ("library.css", "book.css", "chapter.css"):
@@ -1139,12 +1351,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
     def _server_html(self):
         with tempfile.TemporaryDirectory() as directory:
-            library = EPUBLibrary(directory)
+            assets = AssetPublisher(
+                Path('epub_browser/assets'),
+                directory,
+            ).publish()
             publish_library_shell(
                 Path(directory),
                 (),
-                library.asset_manifest,
-                library.urls,
+                assets,
+                SiteURLs(),
                 deployment_mode="server",
             )
             return Path(directory, "index.html").read_text(encoding="utf-8")
@@ -1219,15 +1434,6 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-info', html)
 
-    def test_library_tag_cloud_can_be_collapsed_after_two_rows(self):
-        html = self._library_html()
-        css = Path("epub_browser/assets/library.css").read_text(encoding="utf-8")
-
-        self.assertRegex(html, r'\bid=(?:["\'])?tagCloudToggle(?:["\' >])')
-        self.assertRegex(html, r'\bdata-i18n=(?:["\'])?library\.showMoreTags(?:["\' >])')
-        self.assertIn('.tag-cloud--collapsed:not(.tag-cloud--expanded)', css)
-        self.assertIn('max-height: calc(var(--tag-cloud-row-height) * 2 + var(--tag-cloud-gap))', css)
-
     def test_locale_selector_exists_only_in_library_navigation(self):
         library = self._library_html()
         self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
@@ -1291,8 +1497,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('reader-toolbar top-controls chapter-tools', chapter)
         toolbar = chapter[chapter.index('reader-toolbar top-controls chapter-tools'):]
         toolbar = toolbar[:toolbar.index('</div>')]
-        for control_id in ('togglePagination', 'bookHomeToggle', 'tocToggle', 'settingsControlBtn'):
+        for control_id in ('bookHomeToggle', 'tocToggle', 'settingsControlBtn'):
             self.assertIn(control_id, toolbar)
+        self.assertNotIn('togglePagination', toolbar)
 
         css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
         self.assertIn('.reader-toolbar.top-controls {', css)
@@ -1498,9 +1705,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertRegex(library_html, r'\bid=(?:["\'])?annotationsBtn')
         self.assertRegex(library_html, r'\bdata-annotation-hub')
+        self.assertNotRegex(library_html, r'\bdata-ai-reading-hub')
         self.assertIn('aria-haspopup=dialog', library_html)
         self.assertRegex(library_html, r'/assets/immutable/annotation\.[0-9a-f]{12}\.js')
         self.assertRegex(library_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.js')
+        self.assertNotRegex(library_html, r'ai-reading-hub\.[0-9a-f]{12}\.(?:css|js)')
         self.assertNotIn('/annotations/index.html', library_html)
         self.assertRegex(book_html, r'\bid=(?:["\'])?bookAnnotationsBtn')
         self.assertRegex(book_html, r'\bdata-book-hash=')
@@ -1511,6 +1720,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(chapter_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
         self.assertRegex(chapter_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.js')
         self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+data-chapter-title=')
+
+        server_html = self._server_html()
+        self.assertRegex(server_html, r'\bdata-ai-reading-hub')
+        self.assertRegex(server_html, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.css')
+        self.assertRegex(server_html, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.js')
 
     def test_annotation_modal_assets_are_immutable_and_not_a_separate_page(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1593,7 +1807,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         for key in (
             'reader.thisChapterContents', 'reader.previous', 'reader.next',
-            'settings.appearance', 'settings.readingMode', 'settings.customStyles',
+            'settings.appearance', 'settings.readingMode', 'settings.paginationMode',
+            'settings.customStyles',
         ):
             self.assertIn('data-i18n="' + key + '"', html)
         article = html[html.index('<article'):html.index('</article>')]
@@ -1606,7 +1821,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('data-i18n="reader.theme"', html)
         self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
 
-    def test_ai_reading_controls_expose_a_label_and_accessible_progress_panel(self):
+    def test_ai_reading_controls_use_the_native_canvas_without_extra_book_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor(
                 "book.epub", directory, deployment_mode="server"
@@ -1614,49 +1829,144 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             processor.book_title = "A Book"
             processor.chapters = [{"title": "One"}]
             chapter = processor.create_chapter_template("<p>Text</p>", "", 0, "One")
-        script = Path('epub_browser/assets/ai-reading.js').read_text(encoding='utf-8')
-        stylesheet = Path('epub_browser/assets/ai-reading.css').read_text(encoding='utf-8')
+        script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
+        stylesheet = Path('epub_browser/assets/ai-canvas.css').read_text(encoding='utf-8')
+        chat_script = Path('epub_browser/assets/ai-chat.js').read_text(encoding='utf-8')
+        chat_stylesheet = Path('epub_browser/assets/ai-chat.css').read_text(encoding='utf-8')
 
-        self.assertIn('data-ai-reading-chapter', chapter)
+        self.assertIn('data-ai-learning-canvas', chapter)
         self.assertIn('aria-label="AI reading"', chapter)
+        self.assertIn('aria-pressed="false"', chapter)
         self.assertIn('data-i18n-aria-label="ai.chapterRead"', chapter)
-        self.assertIn("event.key === 'Escape'", script)
-        self.assertIn("event.target === overlay", script)
-        self.assertIn("setProgress(", script)
-        self.assertIn("progress_total", script)
-        self.assertIn("focusReturn.focus()", script)
-        self.assertIn("bindControl(chapter", script)
-        self.assertIn("Never make the trigger", script)
-        self.assertNotIn("/api/ai/status", script)
-        self.assertLess(
-            script.index('target.appendChild(body);'),
-            script.index('startGeneration(context, false);'),
-        )
-        self.assertIn('.ai-reading-overlay {', stylesheet)
-        self.assertIn('grid-template-rows: auto minmax(0, 1fr);', stylesheet)
-        self.assertIn('overflow-y: auto;', stylesheet)
-        self.assertIn('min-height: 0;', stylesheet)
-        self.assertIn('justify-content: flex-end;', stylesheet)
-        self.assertIn('pointer-events: none;', stylesheet)
-        self.assertIn("addInsightCards(body, 'ai.deepThemes'", script)
-        self.assertIn('parseLegacyObject(value, titleKeys.concat(detailKeys))', script)
-        self.assertIn("addEvidenceHighlightControl(body, evidence, result.id)", script)
+        self.assertIn('data-ai-followup-drawer', chapter)
+        self.assertIn('data-i18n-aria-label="ai.askChapter"', chapter)
+        self.assertIn('data-ai-reading-hub', chapter)
+        self.assertRegex(chapter, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.css')
+        self.assertRegex(chapter, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.js')
+        self.assertRegex(chapter, r'/assets/immutable/ai-chat\.[0-9a-f]{12}\.css')
+        self.assertRegex(chapter, r'/assets/immutable/ai-chat\.[0-9a-f]{12}\.js')
+        self.assertIn("content.annotations", script)
         self.assertIn("range.surroundContents(mark)", script)
-        self.assertIn("clearEvidenceMarks();", script)
-        self.assertIn("payload.job.progress_current || 0", script)
+        self.assertIn("job.progress_current || 0", script)
+        self.assertIn("chapter: context.chapterIndex", script)
+        self.assertNotIn("chapter: context.chapterIndex + 1", script)
         self.assertIn("new root.EventSource('/api/ai/events?job_id='", script)
-        self.assertIn("new root.EventSource('/api/ai/events?followup_id='", script)
-        self.assertIn("loadFollowups(resultId, thread);", script)
-        self.assertIn("showEvidenceMarks(evidence, false)", script)
-        self.assertIn("ai-reading-mode-card", script)
-        self.assertIn("ai.evidenceApplied", script)
-        self.assertIn(".ai-reading-chat-log", stylesheet)
-        self.assertIn("renderMarkdown(markdown, followup.answer || '')", script)
-        self.assertIn("data-ai-fullscreen", script)
-        self.assertIn("body.ai-reading-fullscreen .ai-reading-panel", stylesheet)
-        self.assertIn("body.ai-reading-open:not(.pagination-mode) .container", stylesheet)
-        self.assertIn("border-left: 1px solid var(--border, #ddd);", stylesheet)
-        self.assertIn('.ai-evidence-mark {', stylesheet)
+        self.assertIn('.ai-canvas-mark', stylesheet)
+        self.assertIn('ai-chapter-guide', script)
+        self.assertIn('placeParagraphNote', script)
+        self.assertIn('ai-paragraph-note-trigger', script)
+        self.assertIn('ai-paragraph-popover-close', script)
+        self.assertIn('ai-guide-map-modal', script)
+        self.assertIn('ai-guide-map-dialog', script)
+        self.assertIn('ai-guide-map-close', script)
+        self.assertIn("panel.setAttribute('role', 'dialog')", script)
+        self.assertIn("panel.setAttribute('aria-modal', 'true')", script)
+        self.assertIn('ai-guide-map-trigger', script)
+        self.assertIn('ai-chapter-reflection', script)
+        self.assertIn("data-ai-canvas-color', mark.getAttribute", script)
+        self.assertIn('diagram_mermaid', script)
+        self.assertIn("['mindmap'", script)
+        self.assertIn('requestedResultId()', script)
+        self.assertIn('item.book_id !== context.bookId', script)
+        self.assertIn('current_template_version', script)
+        self.assertIn('.ai-paragraph-note-trigger', stylesheet)
+        self.assertIn('.ai-paragraph-popover-close', stylesheet)
+        self.assertIn('.ai-guide-map-modal', stylesheet)
+        self.assertIn('.ai-guide-map-dialog', stylesheet)
+        self.assertIn('.ai-chapter-reflection', stylesheet)
+        self.assertIn('.ai-canvas-status { position: fixed;', stylesheet)
+        self.assertIn("classList.toggle('is-active'", script)
+        self.assertIn("setAttribute('aria-pressed'", script)
+        self.assertIn("document.body.classList.contains('pagination-mode')", script)
+        self.assertIn("ai.unavailableInPagination", script)
+        self.assertIn("appendKicker(", script)
+        self.assertNotIn("trigger.addEventListener('mouseenter', open)", script)
+        self.assertNotIn("mapTrigger.addEventListener('mouseenter', openMap)", script)
+        self.assertIn('[data-ai-learning-canvas].is-active', stylesheet)
+        self.assertIn('linear-gradient(105deg', stylesheet)
+        self.assertNotIn('ai-reading-artifact-surface', script)
+        self.assertIn("'/api/ai/books/'", chat_script)
+        self.assertIn("{ number: Number(turn.chapter_index) }", chat_script)
+        self.assertNotIn("turn.chapter_index) + 1", chat_script)
+        self.assertIn("[data-ai-book-chat]", chat_script)
+        self.assertIn("'book_overview'", chat_script)
+        self.assertIn("new root.EventSource('/api/ai/events?chat_id='", chat_script)
+        self.assertIn("context_mode", chat_script)
+        self.assertIn("chapterContext(button)", chat_script)
+        self.assertIn("function chapterScope(value)", chat_script)
+        self.assertIn("function drawerScope(value)", chat_script)
+        self.assertIn("ai.askScope", chat_script)
+        self.assertIn("ai.chatScope", chat_script)
+        self.assertIn("ai_reading_required", chat_script)
+        self.assertIn('root.EpubBrowserAIRich.render', chat_script)
+        self.assertIn('ai.chatNoReadingTitle', chat_script)
+        self.assertIn("'/api/ai/status'", chat_script)
+        self.assertIn("ai_disabled", chat_script)
+        self.assertIn('.ai-chat-panel', chat_stylesheet)
+        self.assertIn('var(--card-bg', chat_stylesheet)
+        self.assertIn('var(--button-bg', chat_stylesheet)
+        self.assertIn('body.ai-chat-open:not(.pagination-mode) .container', chat_stylesheet)
+
+        Path(processor.web_dir).mkdir(parents=True, exist_ok=True)
+        processor.create_index_page()
+        book_page = Path(processor.web_dir, 'index.html').read_text(encoding='utf-8')
+        self.assertIn('data-ai-reading-hub', book_page)
+        self.assertIn('data-ai-book-chat', book_page)
+        self.assertIn('data-ai-reading-indicators', book_page)
+        self.assertRegex(book_page, r'data-chapter-index(?:="|=)0')
+        self.assertRegex(book_page, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.js')
+        book_script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
+        self.assertIn("/api/books/" + "' + encodeURIComponent(book_hash) + '/metadata", book_script)
+        self.assertIn('renderEffectiveBookTags', book_script)
+        self.assertIn("titleWithSync.insertBefore(syncTag, aiBadge.nextSibling)", book_script)
+        reading_hub_script = Path('epub_browser/assets/ai-reading-hub.js').read_text(encoding='utf-8')
+        self.assertIn("function resultGroups(book)", reading_hub_script)
+        self.assertIn("function resultTimestamp(result)", reading_hub_script)
+        self.assertIn("group.results.sort(function(left, right)", reading_hub_script)
+        self.assertIn("Number(left.result.chapter_index) - Number(right.result.chapter_index)", reading_hub_script)
+        self.assertIn("{ number: index }", reading_hub_script)
+        self.assertNotIn("{ number: index + 1 }", reading_hub_script)
+        self.assertIn("function refreshChapterIndicators(node)", reading_hub_script)
+        self.assertIn("epub-browser:chapter-toc-loaded", reading_hub_script)
+        self.assertIn("method: 'DELETE'", reading_hub_script)
+        self.assertIn("titleGroup.insertBefore(badge, syncTag || null)", reading_hub_script)
+        self.assertIn("state.back.hidden = !Boolean(state.bookId);", reading_hub_script)
+        self.assertIn("?ai_result=' + encodeURIComponent(result.id)", reading_hub_script)
+        self.assertIn("ai.libraryGeneratedAt", reading_hub_script)
+        chapter_stylesheet = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        self.assertIn("#bookHomeTocList .toc-item > a > .chapter-title-with-sync > .chapter-title", chapter_stylesheet)
+        self.assertIn("requestedResultId()", script)
+        self.assertIn("'/api/ai/results/' + encodeURIComponent(requested)", script)
+        self.assertNotIn('ai-learning-hub', book_page)
+        self.assertNotIn('ai-chat.html', book_page)
+        self.assertFalse(Path(processor.web_dir, 'ai-chat.html').exists())
+
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        annotation_script = Path('epub_browser/assets/annotation-hub.js').read_text(encoding='utf-8')
+        self.assertNotIn('nextIdx + 1', chapter_script)
+        self.assertNotIn('prevIdx + 1', chapter_script)
+        self.assertNotIn('{ number: index + 1 }', annotation_script)
+        self.assertIn('epub-browser:chapter-toc-loaded', chapter_script)
+        self.assertIn("item.kind === 'section'", chapter_script)
+        self.assertIn('var currentVisibleChapter = visibleChapterIndex;', chapter_script)
+
+    def test_ssg_reader_surfaces_do_not_ship_server_only_ai_reading(self):
+        forbidden = (
+            'data-ai-reading-hub', 'data-ai-learning-canvas',
+            'data-ai-followup-drawer', 'data-ai-reading-indicators',
+            'ai-canvas', 'ai-chat', 'ai-reading-hub', 'ai-rich-text',
+            'katex', 'mermaid',
+        )
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            for marker in forbidden:
+                self.assertNotIn(marker, html)
+
+        with tempfile.TemporaryDirectory() as directory:
+            library = EPUBLibrary(directory)
+            self.assertFalse(any(
+                logical_path.startswith(('ai-', 'vendor/katex/', 'vendor/mermaid/'))
+                for logical_path in library.asset_manifest.assets
+            ))
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

@@ -68,7 +68,10 @@
         (annotations || []).forEach(function(annotation) {
             var index = Number(annotation.chapter_index);
             if (isNaN(index)) index = 0;
-            if (!groups[index]) groups[index] = { index: index, title: titles[index] || tr('chapterNumber', { number: index + 1 }), annotations: [] };
+            // chapter_index is the canonical, user-visible chapter number across
+            // annotations, AI reading, jobs, and chat. Do not turn it into a
+            // one-based ordinal here.
+            if (!groups[index]) groups[index] = { index: index, title: titles[index] || tr('chapterNumber', { number: index }), annotations: [] };
             groups[index].annotations.push(annotation);
         });
         return Object.keys(groups).map(function(key) { return groups[key]; }).sort(function(a, b) {

@@ -8,7 +8,7 @@ never embedded in exceptions.
 import json
 import socket
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -72,15 +72,23 @@ class OpenAICompatibleClient:
     def endpoint(self) -> str:
         return self._config.base_url + "/chat/completions"
 
-    def complete(self, messages: Sequence[dict], *, temperature: float = 0.2) -> str:
+    def complete(
+        self, messages: Sequence[dict], *, temperature: float = 0.2,
+        max_tokens: Optional[int] = None,
+    ) -> str:
         if not isinstance(messages, Sequence) or not messages:
             raise ValueError("AI messages are required")
+        if max_tokens is not None and (isinstance(max_tokens, bool) or int(max_tokens) < 1):
+            raise ValueError("AI max tokens is out of range")
+        payload_data = {
+            "model": self._config.model,
+            "messages": list(messages),
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            payload_data["max_tokens"] = int(max_tokens)
         payload = json.dumps(
-            {
-                "model": self._config.model,
-                "messages": list(messages),
-                "temperature": temperature,
-            },
+            payload_data,
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")

@@ -24,6 +24,50 @@ EPUB Browser 提供两个职责清晰的模式：
 
 如果产物必须是普通静态文件，请使用 `ssg`；如果需要账户、跨设备数据、书籍访问控制或自动监听源文件，请使用 `server`。
 
+## AI 原生阅读（仅 Server 模式）
+
+**把 EPUB 书库变成贴着原文的学习空间。** AI 阅读不是把一份泛泛的摘要放到书旁边，
+而是在原文之上建立一层可追溯、可验证、可回看的共享学习层：章前先给你阅读路径，
+读到证据时就在证据旁解释，想梳理全貌时再打开思维导图，读完还有值得继续思考的问题。
+
+![章节导读保留在原文中，右侧 Ask AI 可随时继续追问。](docs/releases/assets/v2.2.0-chapter-guide-ask-ai.png)
+
+### 和原文一起读，而不是离开原文去看报告
+
+- **章节导读与思维导图**：先掌握本章要解决的问题、关键主张和阅读线索；Mermaid
+  思维导图按需展开，让原文始终处于阅读中心。
+- **有原文证据的 AI 标注**：AI 只高亮精确引用的句子；点击后在原文下方弹出 Markdown
+  透视，不会把你带离当前上下文。
+- **段落作用便利贴**：段落旁轻量的彩色 `!` 告诉你它在整章论证或叙事中承担什么角色。
+- **章末深入思考**：用少量高质量问题帮助你在离开本章前完成理解整合，而不是打断阅读。
+
+<p align="center">
+  <img src="docs/releases/assets/v2.2.0-inline-claim.png" alt="从高亮主张打开的 AI 解释" width="48%">
+  <img src="docs/releases/assets/v2.2.0-paragraph-note.png" alt="与段落原文紧密对应的段落作用便利贴" width="48%">
+</p>
+
+### Ask AI：不离开书，也能把问题问深
+
+**Ask AI** 是跟随当前章节或整本书的私有对话抽屉。它保存你的问答历史，带着精确的
+章节范围，并能利用本书已生成的共享学习层作为上下文；安全 Markdown、KaTeX 数学公式
+和 Mermaid 图形都会在本地渲染。无论是追问一处细节、质疑作者论证，还是比较不同章节，
+都不需要离开正在阅读的页面。
+
+### 共享学习层，仍由书库治理
+
+章节学习层会在有该书访问权限的读者之间共享，写入 SQLite 缓存，并由可恢复的后台任务
+生成。**AI 阅读**汇总按书籍、章节、语言、生成时间、模板版本和配置版本聚合这些成果。
+管理员可以管理模型权限与结果；成员只能管理自己有权限的结果。所有 AI 能力都服从既有的
+书籍访问控制。
+
+![AI 阅读汇总按书籍和章节归集可访问的共享学习层。](docs/releases/assets/v2.2.0-ai-reading-library.png)
+
+AI 阅读有意限定为 **Server 模式**：管理员配置 OpenAI-compatible Provider 后，仍需
+显式授予成员使用权限。SSG 始终保持完全静态，不会包含 AI 控件、后台任务、账户数据或
+Provider 配置。交互方法与安全边界请见
+[AI 原生阅读设计](docs/ai-native-reading.md) 和
+[本地 AI 富文本渲染器](docs/third-party-ai-renderers.md)。
+
 ## 环境要求与安装
 
 - Python 3.9 或更高版本
@@ -133,6 +177,20 @@ SSG 有意保持本地化且不包含账户体系：
 - 管理员可以管理用户、角色、密码、会话、外部身份和书籍授权。
 - 会话使用 HttpOnly Cookie、CSRF 防护和 30 天滑动有效期。
 
+### 配置与治理 AI 阅读
+
+管理员可在 **管理后台**（用户管理之后、书籍管理之前）配置 OpenAI-compatible Base
+URL、API Key、模型、超时、聊天上下文预算、并发上限和默认每日调用限制。AI 阅读默认对
+成员关闭；管理员需逐一授权，并可设置成员的每日上限（`0` 表示不限）。
+
+章节共享学习层与整书导读按可访问用户和界面语言共享；后续 Ask AI 对话则仅归对应账户。
+结果、任务状态、自定义标签、书籍 AI 分类和私有问答都保存在 SQLite。模型配置变化后，
+旧结果仍然可用，直到管理员显式重新生成。
+
+当用户生成导读或提出问题时，选中的 EPUB 正文与压缩后的会话上下文会发送给已配置的
+外部 Provider。只有在读者被允许将内容发送给该 Provider 时才应启用此能力。API Key
+不会返回浏览器，也不会由 API 暴露；请保护好 Server 状态目录。
+
 无人值守的首次启动可传入管理员名和密码文件：
 
 ```bash
@@ -235,7 +293,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.1.1
+  epub-browser:2.2.0
 ```
 
 修改端口绑定或代理规则之前，请先访问 `http://127.0.0.1:8080/setup` 完成首次设置。
@@ -251,7 +309,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.1.1
+  epub-browser:2.2.0
 ```
 
 首次成功启动后，可移除这次性密钥挂载。只有所有 EPUB 已经包含有效且匹配的 embedded ID 时，书库才可以只读挂载。把同一 ID 嵌入 EPUB 时，既有 sidecar 会保留。

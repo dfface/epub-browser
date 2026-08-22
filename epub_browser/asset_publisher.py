@@ -18,6 +18,32 @@ WEB_MANIFEST_SOURCES = {
     'manifest.zh-CN.json': 'manifest.zh-CN.json',
 }
 
+# These files implement the authenticated Server-mode AI reading experience.
+# Keeping them out of a static export prevents orphaned UI controls (there is no
+# /api/ai endpoint in SSG) and avoids shipping the additional renderers there.
+SERVER_ONLY_ASSET_PATHS = frozenset({
+    # Legacy AI-reading renderer kept for backwards-compatible source trees.
+    'ai-reading.css',
+    'ai-reading.js',
+    'ai-canvas.css',
+    'ai-canvas.js',
+    'ai-chat.css',
+    'ai-chat.js',
+    'ai-reading-hub.css',
+    'ai-reading-hub.js',
+    'ai-rich-text.css',
+    'ai-rich-text.js',
+    'vendor/katex/katex.min.css',
+    'vendor/katex/katex.min.js',
+    'vendor/mermaid/mermaid.min.js',
+})
+
+# KaTeX ships its glyphs below this directory. A path-level exclusion would
+# leave those fonts in static exports even though no SSG surface can use them.
+SERVER_ONLY_ASSET_PREFIXES = frozenset({
+    'vendor/katex/',
+})
+
 
 @dataclass(frozen=True)
 class PublishedAssets:
@@ -38,11 +64,15 @@ class AssetPublisher:
         output_dir,
         urls=None,
         publish_service_worker=True,
+        excluded_paths=(),
+        excluded_prefixes=(),
     ):
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
         self.urls = urls or SiteURLs()
         self.publish_service_worker = publish_service_worker
+        self.excluded_paths = frozenset(excluded_paths)
+        self.excluded_prefixes = tuple(excluded_prefixes)
 
     def publish(self) -> PublishedAssets:
         assets = self._copy_immutable_assets()
@@ -57,11 +87,7 @@ class AssetPublisher:
         source_contents = {
             path.relative_to(self.source_dir).as_posix(): path.read_bytes()
             for path in sorted(path for path in self.source_dir.rglob('*') if path.is_file())
-            if path.relative_to(self.source_dir).as_posix() not in {
-                'sw.js',
-                'manifest.json',
-                'manifest.zh-CN.json',
-            }
+            if not self._is_excluded(path.relative_to(self.source_dir).as_posix())
         }
         preliminary_assets = {
             logical_path: self._immutable_url(logical_path, contents)
@@ -81,6 +107,16 @@ class AssetPublisher:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(contents)
         return assets
+
+    def _is_excluded(self, logical_path: str) -> bool:
+        return (
+            logical_path in {
+                'sw.js',
+                'manifest.json',
+                'manifest.zh-CN.json',
+            } | self.excluded_paths
+            or any(logical_path.startswith(prefix) for prefix in self.excluded_prefixes)
+        )
 
     def _immutable_url(self, logical_path: str, contents: bytes) -> str:
         digest = hashlib.sha256(contents).hexdigest()[:12]
@@ -166,4 +202,4 @@ def rewrite_asset_urls(html: str, published: PublishedAssets) -> str:
         logical_name = match.group(1)
         return published.assets.get(logical_name, match.group(0))
 
-    return re.sub(r'/assets/([A-Za-z0-9_.-]+)(?:\?v=\d+)?', replace, html)
+    return re.sub(r'/assets/([A-Za-z0-9_./-]+)(?:\?v=\d+)?', replace, html)

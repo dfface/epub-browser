@@ -23,12 +23,20 @@ class LibraryBook:
     cover: Optional[str]
 
 
-def _render_library_html(
+def render_library_shell(
     books: Sequence[LibraryBook],
     assets: PublishedAssets,
     urls: SiteURLs,
     deployment_mode: str,
 ) -> str:
+    """Render the shared library application shell for one deployment mode.
+
+    SSG writes this shell together with its static catalogue.  Server mode
+    uses the same shell as a small SPA: the initial document contains no
+    catalogue and ``library.js`` fetches the authenticated catalogue at
+    runtime.  Keeping this public renderer available to the request handler
+    means Server UI/asset updates never depend on a stale ``index.html``.
+    """
     self = SimpleNamespace(
         books={
             book.book_id: {
@@ -61,10 +69,16 @@ def _render_library_html(
     server_account_panel = ""
     server_account_stylesheet = ""
     server_auth_script = ""
+    ai_reading_stylesheet = ""
+    ai_reading_navigation = ""
+    ai_reading_script = ""
     server_client_start = f"""
             if (window.initScriptLibrary) window.initScriptLibrary();
             {server_progress_start}"""
     if deployment_mode == "server":
+        ai_reading_stylesheet = '<link rel="stylesheet" href="/assets/ai-reading-hub.css">'
+        ai_reading_navigation = '''<button type="button" class="app-nav-link" data-ai-reading-hub aria-haspopup="dialog"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="ai.library">AI readings</span></button>'''
+        ai_reading_script = '<script src="/assets/ai-reading-hub.js" defer></script>'
         server_progress_stylesheet = '<link rel="stylesheet" href="/assets/library-progress.css">'
         server_progress_panel = """
     <section id="libraryProgress" class="library-progress" hidden aria-labelledby="libraryProgressTitle">
@@ -168,8 +182,9 @@ def _render_library_html(
                     <label><span data-i18n="admin.ai.apiKey">API key</span><input type="password" name="api_key" autocomplete="new-password" data-i18n-placeholder="admin.ai.apiKeyPlaceholder" placeholder="Leave blank to keep the configured key"></label>
                     <label><span data-i18n="admin.ai.model">Model</span><input type="text" name="model" autocomplete="off" required></label>
                     <label><span data-i18n="admin.ai.timeout">Timeout (seconds)</span><input type="number" name="timeout_seconds" min="5" max="3600" required></label>
-                    <label><span data-i18n="admin.ai.concurrency">Max concurrency</span><input type="number" name="max_concurrency" min="1" max="4" required></label>
-                    <label><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><input type="number" name="daily_limit" min="0" required></label>
+                    <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.modelContextWindow">Model context window (tokens)</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.modelContextWindowHelp" data-i18n-aria-label="admin.ai.modelContextWindowHelpLabel" data-tip="The total input and output tokens the selected model supports in one request. EPUB Browser automatically reserves room for the answer and uses the remainder for source text and conversation history." aria-label="Explain model context window"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="model_context_window" min="2048" max="100000000" required></label>
+                    <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.concurrency">Max concurrency</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.concurrencyHelp" data-i18n-aria-label="admin.ai.concurrencyHelpLabel" data-tip="Maximum number of AI requests this server sends at the same time. A lower value is gentler on the provider; a higher value improves throughput but can hit provider limits." aria-label="Explain max concurrency"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="max_concurrency" min="1" max="4" required></label>
+                    <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.dailyLimitHelp" data-i18n-aria-label="admin.ai.dailyLimitHelpLabel" data-tip="Default number of AI requests each authorized member may start per day. Set 0 for no daily limit. Per-member overrides take precedence." aria-label="Explain default daily limit"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="daily_limit" min="0" required></label>
                     <label class="admin-ai-clear-key"><input type="checkbox" name="clear_api_key"><span data-i18n="admin.ai.clearKey">Clear stored API key</span></label>
                     <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.ai.save">Save AI settings</button>
                 </form>
@@ -248,6 +263,7 @@ def _render_library_html(
 <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
+    {ai_reading_stylesheet}
 {server_account_stylesheet}
 {server_progress_stylesheet}
 <script>
@@ -339,6 +355,7 @@ if (isKindle) {
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+            {ai_reading_navigation}
             {install_control}
         </div>
         <div class="app-nav-actions">
@@ -481,6 +498,7 @@ if (isKindle) {
     <script src="/assets/bookshelf.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/annotation-hub.js" defer></script>
+{ai_reading_script}
 {server_progress_script}
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -597,6 +615,9 @@ if (isKindle) {
     library_html = library_html.replace("{server_account_stylesheet}", server_account_stylesheet)
     library_html = library_html.replace("{server_auth_script}", server_auth_script)
     library_html = library_html.replace("{server_client_start}", server_client_start)
+    library_html = library_html.replace("{ai_reading_stylesheet}", ai_reading_stylesheet)
+    library_html = library_html.replace("{ai_reading_navigation}", ai_reading_navigation)
+    library_html = library_html.replace("{ai_reading_script}", ai_reading_script)
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)
     library_html = rewrite_root_urls(library_html, urls)
     library_html = library_html.replace(
@@ -648,7 +669,7 @@ def publish_library_shell(
         }
         for book in ordered_books
     ]
-    html = _render_library_html(ordered_books, assets, urls, deployment_mode)
+    html = render_library_shell(ordered_books, assets, urls, deployment_mode)
     _atomic_write_text(root / "index.html", html)
     _atomic_write_text(
         root / "book-metadata.json",
