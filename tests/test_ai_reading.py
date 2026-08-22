@@ -109,6 +109,45 @@ class _EnvelopeClient:
         return "Bounded answer"
 
 
+class _LearningLayerEnvelopeClient:
+    calls = []
+
+    def __init__(self, config: ProviderConfig):
+        self.config = config
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append({"messages": messages, "max_tokens": max_tokens})
+        return json.dumps(
+            {
+                "quick": {
+                    "title": "Tiny guide",
+                    "summary": "A safe summary.",
+                    "key_points": ["One point"],
+                },
+                "structure": {
+                    "overview": "A tiny structure.",
+                    "diagram_mermaid": "",
+                    "nodes": [{"label": "Idea", "detail": "The central idea."}],
+                    "links": [],
+                },
+                "deep": {
+                    "themes": [{"title": "Theme", "analysis": "An analysis."}],
+                    "questions": [{"question": "Why?", "why": "For reflection."}],
+                    "applications": [{"context": "Practice", "advice": "Apply it."}],
+                },
+                "evidence": [
+                    {
+                        "chapter_index": 0,
+                        "quote": "Source sentence.",
+                        "reason": "It supports the summary.",
+                    }
+                ],
+                "annotations": [],
+                "paragraph_notes": [],
+            }
+        )
+
+
 class _BlockingClient:
     calls = []
     started = threading.Event()
@@ -209,6 +248,74 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(cached["cached"])
         self.assertEqual(cached["result"]["content"]["quick"]["summary"], "Useful overview")
         self.assertEqual(len(_FakeClient.calls), 1)
+
+    async def test_tiny_chapter_generation_preserves_the_2048_context_minimum(self):
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret",
+            model="reader-model",
+            timeout_seconds=30,
+            model_context_window=2048,
+            max_concurrency=2,
+            daily_limit=100,
+        )
+        self.store.set_ai_user_access(
+            self.member.user_id, enabled=True, daily_limit=100
+        )
+        _LearningLayerEnvelopeClient.calls = []
+        service = AIReadingService(
+            self.store, self.root / "public", _LearningLayerEnvelopeClient
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter",
+                    book_id=self.book.book_id,
+                    chapter_index=0,
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(len(_LearningLayerEnvelopeClient.calls), 1)
+        call = _LearningLayerEnvelopeClient.calls[0]
+        self._assert_dependency_free_call_fits(call)
+        system_prompt = call["messages"][0]["content"].lower()
+        self.assertIn("untrusted", system_prompt)
+        self.assertIn("never", system_prompt)
+        self.assertIn("<UNTRUSTED_EPUB_CONTENT>", call["messages"][-1]["content"])
+
+        result = self.store.get_ai_reading_result(completed["result_id"])
+        content = result["content"]
+        self.assertEqual(
+            set(content),
+            {
+                "quick", "structure", "deep", "evidence", "annotations",
+                "paragraph_notes",
+            },
+        )
+        self.assertEqual(set(content["quick"]), {"title", "summary", "key_points"})
+        self.assertEqual(
+            set(content["structure"]),
+            {"overview", "diagram_mermaid", "nodes", "links"},
+        )
+        self.assertEqual(
+            set(content["deep"]), {"themes", "questions", "applications"}
+        )
+        self.assertEqual(
+            set(content["deep"]["themes"][0]), {"title", "analysis"}
+        )
+        self.assertEqual(
+            set(content["deep"]["questions"][0]), {"question", "why"}
+        )
+        self.assertEqual(
+            set(content["deep"]["applications"][0]), {"context", "advice"}
+        )
 
     async def test_server_content_cache_is_used_without_generated_reader_html(self):
         legacy_path = self.root / "public" / "book" / self.book.book_id / "chapter_0.html"
