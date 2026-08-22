@@ -580,6 +580,193 @@ body.auth-page {
     font-size: .86rem;
 }
 
+.admin-ai-jobs {
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+}
+
+.admin-ai-jobs .account-section-copy,
+.admin-ai-jobs .admin-ai-jobs-controls {
+    margin-top: 0;
+}
+
+.admin-ai-jobs-controls {
+    grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+}
+
+.admin-ai-jobs-controls .bookshelf-action-btn,
+#adminAiJobsPagination .bookshelf-action-btn,
+.account-modal .admin-ai-jobs .admin-ai-job-retry {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.account-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: var(--account-card);
+    -webkit-overflow-scrolling: touch;
+}
+
+.account-admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--account-text);
+    font-size: .78rem;
+}
+
+.account-admin-table th,
+.account-admin-table td {
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--account-border);
+    line-height: 1.45;
+    text-align: start;
+    vertical-align: middle;
+}
+
+.account-admin-table thead th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    background: color-mix(in srgb, var(--account-card) 92%, var(--account-bg));
+    color: var(--account-muted);
+    font-size: .7rem;
+    font-weight: 750;
+    letter-spacing: .035em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.account-admin-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.account-admin-table tbody tr:hover td {
+    background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
+}
+
+.admin-ai-job-id,
+.admin-ai-job-scope,
+.admin-ai-job-time {
+    white-space: nowrap;
+}
+
+.admin-ai-job-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem;
+}
+
+.admin-ai-job-book {
+    min-width: 12rem;
+    max-width: 20rem;
+    overflow-wrap: anywhere;
+}
+
+.admin-ai-job-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    box-sizing: border-box;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-muted) 10%, var(--account-card));
+    color: var(--account-muted);
+    font-size: .7rem;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.admin-ai-job-status.is-queued,
+.admin-ai-job-status.is-running {
+    background: color-mix(in srgb, var(--account-primary) 11%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.admin-ai-job-status.is-complete {
+    background: color-mix(in srgb, var(--account-success) 11%, var(--account-card));
+    color: var(--account-success);
+}
+
+.admin-ai-job-status.is-failed {
+    background: color-mix(in srgb, var(--account-danger) 10%, var(--account-card));
+    color: var(--account-danger);
+}
+
+.admin-ai-job-status.is-interrupted {
+    background: color-mix(in srgb, var(--account-warning) 13%, var(--account-card));
+    color: color-mix(in srgb, var(--account-warning) 78%, var(--account-text));
+}
+
+.admin-ai-job-progress,
+.admin-ai-job-action {
+    text-align: end !important;
+}
+
+.admin-ai-job-progress {
+    display: grid;
+    justify-items: end;
+    gap: 4px;
+    min-width: 8rem;
+}
+
+.admin-ai-job-progress progress {
+    width: 7.5rem;
+    height: 8px;
+    accent-color: var(--account-primary);
+}
+
+.admin-ai-job-progress-text,
+.admin-ai-job-time,
+.admin-ai-job-error {
+    color: var(--account-muted);
+    font-size: .72rem;
+}
+
+.admin-ai-job-error {
+    min-width: 12rem;
+    max-width: 18rem;
+}
+
+.admin-ai-jobs-message {
+    padding: 24px !important;
+    color: var(--account-muted);
+    text-align: center !important;
+}
+
+#adminAiJobsPagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.admin-ai-jobs-page-summary {
+    margin-inline-end: auto;
+    color: var(--account-muted);
+    font-size: .78rem;
+}
+
+#adminAiJobsPagination .admin-ai-jobs-page[aria-current="page"] {
+    border-color: color-mix(in srgb, var(--account-primary) 40%, var(--account-border));
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    color: var(--account-primary);
+    opacity: 1;
+}
+
+.admin-ai-jobs button:focus-visible,
+.admin-ai-jobs select:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--account-primary) 42%, transparent);
+    outline-offset: 3px;
+}
+
 .admin-ai-tag-form {
     display: flex;
     align-items: end;
@@ -1068,6 +1255,20 @@ body.auth-page {
     }
 }
 
+@media (max-width: 720px) {
+    .admin-ai-jobs-controls {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .admin-ai-jobs-controls > button {
+        grid-column: 1 / -1;
+    }
+
+    .account-admin-table {
+        min-width: 56rem;
+    }
+}
+
 @media (max-width: 560px) {
     .auth-shell {
         padding: 16px;
@@ -1133,6 +1334,23 @@ body.auth-page {
         width: 100%;
     }
 
+    .admin-ai-jobs-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-ai-jobs-controls > button {
+        grid-column: auto;
+        width: 100%;
+    }
+
+    #adminAiJobsPagination {
+        justify-content: flex-start;
+    }
+
+    .admin-ai-jobs-page-summary {
+        flex: 1 0 100%;
+    }
+
     .account-list-item {
         align-items: stretch;
     }
@@ -1184,5 +1402,9 @@ body.auth-page {
     .account-modal input,
     .account-modal select {
         transition-duration: .01ms;
+    }
+
+    .account-table-scroll {
+        scroll-behavior: auto;
     }
 }

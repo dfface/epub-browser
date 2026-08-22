@@ -15,6 +15,20 @@
     var identities = [];
     var aiSettings = null;
     var aiTags = [];
+    var aiJobsState = {
+      status: '',
+      page: 1,
+      pageSize: 20,
+      totalPages: 0,
+      total: 0,
+      loading: false
+    };
+    var aiJobsRows = [];
+    var aiJobsPollTimer = null;
+    var aiJobsRequestGeneration = 0;
+    var aiJobsPendingRequests = 0;
+    var aiJobsRetrying = {};
+    var aiJobsRetryRequests = {};
     var aiProfileTranslationKeys = {
       auto: 'admin.ai.profile.auto',
       technical: 'admin.ai.profile.technical',
@@ -282,6 +296,408 @@
       return runtime && runtime.formatDate
         ? runtime.formatDate(value, { dateStyle: 'medium', timeStyle: 'short' })
         : String(value || '');
+    }
+
+    function safeAiJobDate(value) {
+      if (typeof value !== 'string' && typeof value !== 'number') {
+        return t('admin.ai.jobs.unknownValue');
+      }
+      var parsed = new Date(value);
+      if (!isFinite(parsed.getTime())) return t('admin.ai.jobs.unknownValue');
+      try {
+        return formatDate(parsed.toISOString());
+      } catch (error) {
+        return t('admin.ai.jobs.unknownValue');
+      }
+    }
+
+    function safeNonNegativeInteger(value, fallback) {
+      if (value === null || value === '' || typeof value === 'boolean') return fallback;
+      var number = Number(value);
+      return isFinite(number) && number >= 0 && Math.floor(number) === number
+        ? number
+        : fallback;
+    }
+
+    function aiJobStatusKey(status) {
+      var known = {
+        queued: true,
+        running: true,
+        complete: true,
+        failed: true,
+        interrupted: true
+      };
+      return known[status]
+        ? 'admin.ai.jobs.status.' + status
+        : 'admin.ai.jobs.unknownValue';
+    }
+
+    function aiJobStoredErrorKey(code) {
+      var known = {
+        ai_disabled: true,
+        ai_not_authorized: true,
+        ai_quota_exhausted: true,
+        provider_connection_failed: true,
+        provider_rate_limited: true,
+        provider_request_rejected: true,
+        provider_server_error: true,
+        provider_invalid_response: true,
+        ai_result_not_found: true,
+        ai_reading_required: true,
+        invalid_ai_chat: true,
+        ai_generation_failed: true
+      };
+      if (!code) return '';
+      return known[code]
+        ? 'ai.error.' + code
+        : 'admin.ai.jobs.error.unknown';
+    }
+
+    function aiJobActionErrorKey(code) {
+      var known = {
+        invalid_ai_job_query: true,
+        ai_job_not_found: true,
+        ai_job_not_retryable: true,
+        ai_job_retry_conflict: true,
+        ai_disabled: true,
+        ai_not_authorized: true,
+        ai_owner_disabled: true,
+        book_not_found: true,
+        chapter_not_found: true,
+        ai_reading_required: true,
+        ai_template_unavailable: true,
+        source_unavailable: true,
+        no_reading_material: true
+      };
+      return known[code]
+        ? 'admin.ai.jobs.error.' + code
+        : 'admin.ai.jobs.error.unknown';
+    }
+
+    function renderAiJobsMessage(key) {
+      var body = element('adminAiJobsBody');
+      if (!body || !root.document || !root.document.createElement) return;
+      body.textContent = '';
+      var row = root.document.createElement('tr');
+      var cell = createTextElement('td', 'admin-ai-jobs-message', key);
+      cell.colSpan = 10;
+      cell.setAttribute('colspan', '10');
+      row.appendChild(cell);
+      body.appendChild(row);
+    }
+
+    function aiJobCell(row, className) {
+      var cell = root.document.createElement('td');
+      if (className) cell.className = className;
+      row.appendChild(cell);
+      return cell;
+    }
+
+    function aiJobDisplayId(job) {
+      var value = typeof job.id === 'string' && job.id ? job.id.slice(0, 12) : '';
+      var attempt = safeNonNegativeInteger(job.attempt_number, 1) || 1;
+      return (value || t('admin.ai.jobs.unknownValue')) + ' · #' + attempt;
+    }
+
+    function aiJobScopeLabel(job) {
+      var scope = job.scope === 'book' || job.scope === 'chapter'
+        ? job.scope
+        : t('admin.ai.jobs.unknownValue');
+      var details = [scope];
+      var chapter = safeNonNegativeInteger(job.chapter_index, null);
+      if (chapter !== null) details.push('#' + chapter);
+      if (typeof job.language === 'string' && job.language) {
+        details.push(job.language.slice(0, 24));
+      }
+      return details.join(' · ');
+    }
+
+    function renderAiJobProgress(cell, job) {
+      var total = Math.max(1, safeNonNegativeInteger(job.progress_total, 1));
+      var current = Math.min(total, safeNonNegativeInteger(job.progress_current, 0));
+      var label = t('admin.ai.jobs.progress', { current: current, total: total });
+      var progress = root.document.createElement('progress');
+      var text = root.document.createElement('span');
+      progress.max = total;
+      progress.value = current;
+      progress.setAttribute('max', String(total));
+      progress.setAttribute('value', String(current));
+      progress.setAttribute('aria-label', t('admin.ai.jobs.progressLabel', {
+        current: current,
+        total: total
+      }));
+      progress.textContent = label;
+      text.className = 'admin-ai-job-progress-text';
+      text.textContent = label;
+      cell.appendChild(progress);
+      cell.appendChild(text);
+    }
+
+    function renderAdminAiJobs() {
+      var body = element('adminAiJobsBody');
+      if (!body || !root.document || !root.document.createElement) return;
+      body.textContent = '';
+      if (!aiJobsRows.length) {
+        renderAiJobsMessage('admin.ai.jobs.empty');
+        renderAdminAiJobsPagination();
+        return;
+      }
+      aiJobsRows.forEach(function(job) {
+        var row = root.document.createElement('tr');
+        var statusCell = aiJobCell(row, 'admin-ai-job-status-cell');
+        var status = root.document.createElement('span');
+        var normalizedStatus = ['queued', 'running', 'complete', 'failed', 'interrupted']
+          .indexOf(job.status) !== -1 ? job.status : 'unknown';
+        status.className = 'admin-ai-job-status is-' + normalizedStatus;
+        status.textContent = t(aiJobStatusKey(job.status));
+        statusCell.appendChild(status);
+
+        aiJobCell(row, 'admin-ai-job-id').textContent = aiJobDisplayId(job);
+        aiJobCell(row, 'admin-ai-job-book').textContent = (
+          typeof job.book_title === 'string' && job.book_title
+            ? job.book_title
+            : t('admin.ai.jobs.unknownBook')
+        );
+        aiJobCell(row, 'admin-ai-job-user').textContent = (
+          typeof job.owner_username === 'string' && job.owner_username
+            ? job.owner_username
+            : t('admin.ai.jobs.unknownUser')
+        );
+        aiJobCell(row, 'admin-ai-job-scope').textContent = aiJobScopeLabel(job);
+        renderAiJobProgress(aiJobCell(row, 'admin-ai-job-progress'), job);
+
+        var errorCell = aiJobCell(row, 'admin-ai-job-error');
+        var errorKey = aiJobStoredErrorKey(job.error_code);
+        errorCell.textContent = errorKey ? t(errorKey) : '';
+        aiJobCell(row, 'admin-ai-job-time').textContent = safeAiJobDate(job.created_at);
+        aiJobCell(row, 'admin-ai-job-time').textContent = safeAiJobDate(job.updated_at);
+
+        var actionCell = aiJobCell(row, 'admin-ai-job-action');
+        if (job.retryable === true && typeof job.id === 'string' && job.id) {
+          var retrying = Boolean(aiJobsRetrying[job.id]);
+          var retry = createTextElement(
+            'button',
+            'bookshelf-action-btn account-inline-action admin-ai-job-retry',
+            retrying ? 'admin.ai.jobs.retrying' : 'admin.ai.jobs.retry'
+          );
+          retry.type = 'button';
+          retry.disabled = retrying;
+          retry.addEventListener('click', function() { retryAdminAiJob(job.id); });
+          actionCell.appendChild(retry);
+        }
+        body.appendChild(row);
+      });
+      renderAdminAiJobsPagination();
+    }
+
+    function aiJobPageButton(page, currentPage) {
+      var button = createTextElement(
+        'button',
+        'bookshelf-action-btn admin-ai-jobs-page',
+        'admin.ai.jobs.pageButton',
+        { page: page }
+      );
+      button.type = 'button';
+      button.disabled = page === currentPage;
+      if (page === currentPage) button.setAttribute('aria-current', 'page');
+      button.addEventListener('click', function() {
+        if (page === aiJobsState.page) return;
+        aiJobsState.page = page;
+        loadAdminAiJobs();
+      });
+      return button;
+    }
+
+    function renderAdminAiJobsPagination() {
+      var pagination = element('adminAiJobsPagination');
+      if (!pagination || !root.document || !root.document.createElement) return;
+      pagination.textContent = '';
+      var totalPages = Math.max(1, aiJobsState.totalPages);
+      var currentPage = Math.min(totalPages, Math.max(1, aiJobsState.page));
+      var summary = createTextElement(
+        'span', 'admin-ai-jobs-page-summary', 'admin.ai.jobs.pageSummary', {
+          page: currentPage,
+          totalPages: totalPages,
+          total: aiJobsState.total
+        }
+      );
+      var previous = createTextElement(
+        'button', 'bookshelf-action-btn admin-ai-jobs-page', 'admin.ai.jobs.previousPage'
+      );
+      previous.type = 'button';
+      previous.disabled = currentPage <= 1;
+      previous.addEventListener('click', function() {
+        if (aiJobsState.page <= 1) return;
+        aiJobsState.page -= 1;
+        loadAdminAiJobs();
+      });
+      pagination.appendChild(summary);
+      pagination.appendChild(previous);
+
+      var pages = {};
+      [1, currentPage - 2, currentPage - 1, currentPage, currentPage + 1,
+        currentPage + 2, totalPages].forEach(function(page) {
+        if (page >= 1 && page <= totalPages) pages[page] = true;
+      });
+      Object.keys(pages).map(Number).sort(function(left, right) {
+        return left - right;
+      }).forEach(function(page) {
+        pagination.appendChild(aiJobPageButton(page, currentPage));
+      });
+
+      var next = createTextElement(
+        'button', 'bookshelf-action-btn admin-ai-jobs-page', 'admin.ai.jobs.nextPage'
+      );
+      next.type = 'button';
+      next.disabled = currentPage >= totalPages || aiJobsState.totalPages === 0;
+      next.addEventListener('click', function() {
+        if (aiJobsState.page >= aiJobsState.totalPages) return;
+        aiJobsState.page += 1;
+        loadAdminAiJobs();
+      });
+      pagination.appendChild(next);
+    }
+
+    function aiJobsRequestUrl(page, pageSize, status) {
+      var url = '/api/admin/ai/jobs?page=' + page + '&page_size=' + pageSize;
+      if (status) url += '&status=' + encodeURIComponent(status);
+      return url;
+    }
+
+    function finishAiJobsRequest(generation, result) {
+      aiJobsPendingRequests = Math.max(0, aiJobsPendingRequests - 1);
+      aiJobsState.loading = aiJobsPendingRequests > 0;
+      return result;
+    }
+
+    function loadAdminAiJobs(allowClampFollowup) {
+      if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') {
+        return Promise.resolve(null);
+      }
+      var requestedPage = aiJobsState.page;
+      var requestedPageSize = aiJobsState.pageSize;
+      var requestedStatus = aiJobsState.status;
+      var generation = ++aiJobsRequestGeneration;
+      aiJobsPendingRequests += 1;
+      aiJobsState.loading = true;
+      if (!aiJobsRows.length) renderAiJobsMessage('admin.ai.jobs.loading');
+      return authenticatedFetch(aiJobsRequestUrl(
+        requestedPage, requestedPageSize, requestedStatus
+      )).then(function(response) {
+        if (generation !== aiJobsRequestGeneration) return null;
+        if (!response || !response.ok) {
+          renderAiJobsMessage('admin.ai.jobs.loadError');
+          return null;
+        }
+        return readJson(response).then(function(payload) {
+          if (generation !== aiJobsRequestGeneration) return null;
+          var pagination = payload && payload.pagination && typeof payload.pagination === 'object'
+            ? payload.pagination
+            : {};
+          var totalPages = safeNonNegativeInteger(pagination.total_pages, 0);
+          var maxPage = Math.max(1, totalPages);
+          aiJobsState.totalPages = totalPages;
+          aiJobsState.total = safeNonNegativeInteger(pagination.total, 0);
+          if (requestedPage > maxPage) {
+            aiJobsState.page = maxPage;
+            if (allowClampFollowup !== false) return loadAdminAiJobs(false);
+          }
+          aiJobsRows = payload && Array.isArray(payload.jobs) ? payload.jobs : [];
+          renderAdminAiJobs();
+          return payload;
+        });
+      }).catch(function() {
+        if (generation === aiJobsRequestGeneration) {
+          renderAiJobsMessage('admin.ai.jobs.loadError');
+        }
+        return null;
+      }).then(function(result) {
+        return finishAiJobsRequest(generation, result);
+      }, function(error) {
+        finishAiJobsRequest(generation, null);
+        throw error;
+      });
+    }
+
+    function setAiJobsLive(key) {
+      var live = element('adminAiJobsLive');
+      if (live) live.textContent = t(key);
+    }
+
+    function retryAdminAiJob(jobId) {
+      if (typeof jobId !== 'string' || !jobId) return Promise.resolve(null);
+      if (aiJobsRetryRequests[jobId]) return aiJobsRetryRequests[jobId];
+      aiJobsRetrying[jobId] = true;
+      renderAdminAiJobs();
+      var request = authenticatedFetch(
+        '/api/admin/ai/jobs/' + encodeURIComponent(jobId) + '/retry',
+        { method: 'POST' }
+      ).then(function(response) {
+        if (!response || !response.ok) {
+          return readJson(response).then(function(payload) {
+            var code = payload && payload.code;
+            setAiJobsLive(code === 'ai_job_retry_conflict'
+              ? 'admin.ai.jobs.retryConflict'
+              : aiJobActionErrorKey(code));
+            return null;
+          });
+        }
+        return readJson(response).then(function(payload) {
+          setAiJobsLive(payload && payload.status === 'complete'
+            ? 'admin.ai.jobs.retryComplete'
+            : 'admin.ai.jobs.retryQueued');
+          return loadAdminAiJobs().then(function() { return payload; });
+        });
+      }).catch(function() {
+        setAiJobsLive('admin.ai.jobs.error.unknown');
+        return null;
+      });
+      aiJobsRetryRequests[jobId] = request.then(function(result) {
+        delete aiJobsRetrying[jobId];
+        delete aiJobsRetryRequests[jobId];
+        renderAdminAiJobs();
+        return result;
+      }, function(error) {
+        delete aiJobsRetrying[jobId];
+        delete aiJobsRetryRequests[jobId];
+        renderAdminAiJobs();
+        throw error;
+      });
+      return aiJobsRetryRequests[jobId];
+    }
+
+    function adminPanelIsActive() {
+      var panel = element('adminPanel');
+      if (!panel || panel.hidden) return false;
+      return Boolean(panel.classList && typeof panel.classList.contains === 'function'
+        ? panel.classList.contains('active')
+        : panel.active);
+    }
+
+    function startAdminAiJobPolling() {
+      if (aiJobsPollTimer !== null) return;
+      if (!adminPanelIsActive() || (root.document && root.document.hidden === true)) return;
+      if (typeof root.setInterval !== 'function') return;
+      aiJobsPollTimer = root.setInterval(function() {
+        if (!aiJobsState.loading) loadAdminAiJobs();
+      }, 10000);
+      if (aiJobsPollTimer && typeof aiJobsPollTimer.unref === 'function') {
+        aiJobsPollTimer.unref();
+      }
+    }
+
+    function stopAdminAiJobPolling() {
+      if (aiJobsPollTimer === null) return;
+      if (typeof root.clearInterval === 'function') root.clearInterval(aiJobsPollTimer);
+      aiJobsPollTimer = null;
+    }
+
+    function handleAiJobsVisibilityChange() {
+      if (root.document && root.document.hidden === true) {
+        stopAdminAiJobPolling();
+        return;
+      }
+      if (adminPanelIsActive()) startAdminAiJobPolling();
     }
 
     function roleLabel(role) {
@@ -974,6 +1390,8 @@
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
       loadAdminData();
+      loadAdminAiJobs();
+      startAdminAiJobPolling();
     }
 
     function closeAdminPanel() {
@@ -981,6 +1399,7 @@
       if (!panel) return;
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');
+      stopAdminAiJobPolling();
     }
 
     function bindUi() {
@@ -997,6 +1416,9 @@
       var aiTagForm = element('adminAiTagForm');
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
+      var aiJobsStatus = element('adminAiJobsStatus');
+      var aiJobsPageSize = element('adminAiJobsPageSize');
+      var aiJobsRefresh = element('adminAiJobsRefresh');
       var aiHelpButtons = Array.prototype.slice.call(root.document.querySelectorAll('.admin-ai-help'));
       function closeAiHelpTips(except) {
         aiHelpButtons.forEach(function(button) {
@@ -1123,6 +1545,23 @@
       if (clearAiAll) clearAiAll.addEventListener('click', function() {
         clearAiResults({});
       });
+      if (aiJobsStatus) aiJobsStatus.addEventListener('change', function() {
+        aiJobsState.status = String(aiJobsStatus.value || '');
+        aiJobsState.page = 1;
+        loadAdminAiJobs();
+      });
+      if (aiJobsPageSize) aiJobsPageSize.addEventListener('change', function() {
+        var selected = Number(aiJobsPageSize.value);
+        aiJobsState.pageSize = [10, 20, 50, 100].indexOf(selected) !== -1 ? selected : 20;
+        aiJobsState.page = 1;
+        loadAdminAiJobs();
+      });
+      if (aiJobsRefresh) aiJobsRefresh.addEventListener('click', function() {
+        loadAdminAiJobs();
+      });
+      if (root.document && typeof root.document.addEventListener === 'function') {
+        root.document.addEventListener('visibilitychange', handleAiJobsVisibilityChange);
+      }
       if (i18n() && i18n().onLocaleChange) {
         i18n().onLocaleChange(function() {
           renderIdentity();
@@ -1133,6 +1572,7 @@
           renderAiTags();
           renderBooks();
           renderIdentities();
+          renderAdminAiJobs();
           loadSessions();
         });
       }
@@ -1162,6 +1602,8 @@
       createIdentity: createIdentity,
       deleteIdentity: deleteIdentity,
       saveBookGrants: replaceBookGrants,
+      loadAiJobs: loadAdminAiJobs,
+      retryAiJob: retryAdminAiJob,
       init: init,
       setSession: setSession,
       getSession: function() { return sessionState; }
