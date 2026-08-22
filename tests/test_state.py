@@ -2118,14 +2118,16 @@ class StateStoreTests(unittest.TestCase):
             source_job_id="failed-source", job_id="retry-attempt-2",
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="recomputed-cache", request_payload=request,
-            progress_total=4, profile="technical", template_id="current-template",
+            progress_total=4, profile="technical", book_profile_selection="auto",
+            template_id="current-template",
             template_version=2, config_revision=revision,
         )
         second, created_second = self.store.create_or_get_admin_retry_ai_job(
             source_job_id="failed-source", job_id="ignored-retry-id",
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="recomputed-cache", request_payload=request,
-            progress_total=4, profile="technical", template_id="current-template",
+            progress_total=4, profile="technical", book_profile_selection="auto",
+            template_id="current-template",
             template_version=2, config_revision=revision,
         )
 
@@ -2196,7 +2198,8 @@ class StateStoreTests(unittest.TestCase):
             source_job_id="lineage-source", job_id="lineage-attempt-2",
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="lineage-cache-2", request_payload=request,
-            progress_total=2, profile="general", template_id="reading",
+            progress_total=2, profile="general", book_profile_selection="auto",
+            template_id="reading",
             template_version=1, config_revision=revision,
         )
         self.assertTrue(created_two)
@@ -2209,7 +2212,8 @@ class StateStoreTests(unittest.TestCase):
             source_job_id=attempt_two["id"], job_id="lineage-attempt-3",
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="lineage-cache-3", request_payload=request,
-            progress_total=2, profile="general", template_id="reading",
+            progress_total=2, profile="general", book_profile_selection="auto",
+            template_id="reading",
             template_version=1, config_revision=revision,
         )
 
@@ -2324,6 +2328,7 @@ class StateStoreTests(unittest.TestCase):
                     request_payload=request,
                     progress_total=1,
                     profile="general",
+                    book_profile_selection="auto",
                     config_revision=revision,
                     template_id="reading",
                     template_version=5,
@@ -2355,7 +2360,8 @@ class StateStoreTests(unittest.TestCase):
                 retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
                 book_id=book.book_id, cache_key=f"retry-cache-{source_job_id}",
                 request_payload=request, progress_total=2, profile="general",
-                config_revision=0, template_id="reading", template_version=1,
+                book_profile_selection="auto", config_revision=0,
+                template_id="reading", template_version=1,
             )
 
         self.store.create_ai_job(

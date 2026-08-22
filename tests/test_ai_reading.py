@@ -416,6 +416,103 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cached["cache_key"], cache_key)
         self.assertEqual(self._provider_calls(self.member.user_id), 0)
 
+    async def test_admin_retry_refreshes_profile_snapshot_after_transaction_race(self):
+        source = self._create_failed_reading_job()
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0
+        )
+        material, _metadata, _progress_total, _segments = (
+            self.service._material_for_request(self.member, request)
+        )
+        template = template_for(request.scope, request.mode)
+        auto_cache_key = self.service._cache_key(
+            request, material, "auto", template
+        )
+        settings = self.store._get_ai_provider_settings()
+        cached = self.store.store_ai_reading_result(
+            cache_key=auto_cache_key,
+            book_id=self.book.book_id,
+            chapter_index=0,
+            scope="chapter",
+            mode="chapter",
+            profile="auto",
+            config_revision=settings["config_revision"],
+            content={"quick": {"summary": "old auto result"}},
+            created_by_user_id=self.member.user_id,
+            template_id=template["id"],
+            template_version=template["version"],
+            language="en",
+            reading_boundary=0,
+        )
+        create_retry = self.store.create_or_get_admin_retry_ai_job
+        raced = False
+
+        def change_profile_then_create(**kwargs):
+            nonlocal raced
+            if not raced:
+                raced = True
+                self.store.set_book_ai_profile(
+                    self.book.book_id, "technical"
+                )
+            return create_retry(**kwargs)
+
+        with mock.patch.object(
+            self.store,
+            "create_or_get_admin_retry_ai_job",
+            side_effect=change_profile_then_create,
+        ):
+            retried = await self.service.retry_job(self.owner, source["id"])
+
+        private_retry = self.store.get_ai_job_for_retry(retried["job"]["id"])
+        technical_cache_key = auto_cache_key.replace(":auto:", ":technical:", 1)
+        self.assertEqual(retried["status"], "queued")
+        self.assertFalse(retried["cached"])
+        self.assertEqual(retried["job"]["profile"], "technical")
+        self.assertEqual(private_retry["cache_key"], technical_cache_key)
+        self.assertNotEqual(private_retry["result_id"], cached["id"])
+        jobs, total = self.store.list_admin_ai_jobs(
+            status=None, page=1, page_size=20
+        )
+        retry_rows = tuple(
+            job for job in jobs if job["retried_from_job_id"] == source["id"]
+        )
+        self.assertEqual(total, 2)
+        self.assertEqual(len(retry_rows), 1)
+        self.assertEqual(self._provider_calls(self.member.user_id), 0)
+
+    async def test_admin_retry_reports_conflict_after_bounded_profile_churn(self):
+        source = self._create_failed_reading_job()
+        create_retry = self.store.create_or_get_admin_retry_ai_job
+        selections = iter(("technical", "fiction", "general", "auto"))
+        attempts = 0
+
+        def change_profile_then_create(**kwargs):
+            nonlocal attempts
+            attempts += 1
+            self.store.set_book_ai_profile(
+                self.book.book_id, next(selections)
+            )
+            return create_retry(**kwargs)
+
+        with mock.patch.object(
+            self.store,
+            "create_or_get_admin_retry_ai_job",
+            side_effect=change_profile_then_create,
+        ):
+            with self.assertRaises(AIReadingError) as caught:
+                await asyncio.wait_for(
+                    self.service.retry_job(self.owner, source["id"]),
+                    timeout=1,
+                )
+
+        self.assertEqual(caught.exception.code, "ai_job_retry_conflict")
+        self.assertEqual(attempts, 3)
+        _jobs, total = self.store.list_admin_ai_jobs(
+            status=None, page=1, page_size=20
+        )
+        self.assertEqual(total, 1)
+        self.assertEqual(self.service._worker_states, {})
+
     async def test_admin_retry_rechecks_disabled_owner_inside_retry_transaction(self):
         source = self._create_failed_reading_job()
         create_retry = self.store.create_or_get_admin_retry_ai_job

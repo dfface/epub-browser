@@ -13,13 +13,14 @@ from typing import Awaitable, Callable, Optional
 from .ai_client import AIProviderError, OpenAICompatibleClient, ProviderConfig
 from .auth import Principal
 from .prompt_templates import template_for
-from .state import StateStore
+from .state import StateStore, _AIRetrySnapshotChanged
 
 
 _MAX_BRIDGE_INPUT_CHARS = 12000
 _MAX_BOOK_SYNTHESIS_CHARS = 36000
 _MAX_CHAPTER_BRIDGE_EXCERPT_CHARS = 2800
 _TRANSIENT_RETRY_DELAYS = (60, 120, 240)
+_ADMIN_RETRY_SNAPSHOT_ATTEMPTS = 3
 _MODES = frozenset({"spoiler_free", "read_so_far", "full_review"})
 _PROFILES = frozenset({"auto", "technical", "fiction", "general"})
 _COMPACT_LEARNING_LAYER_SYSTEM = (
@@ -618,13 +619,14 @@ class AIReadingService:
 
     def _prepare_reading_request(
         self, principal: Principal, request: ReadingRequest
-    ) -> tuple[str, dict, int, tuple[tuple[int, str], ...], str, dict, str]:
+    ) -> tuple[str, dict, int, tuple[tuple[int, str], ...], str, str, dict, str]:
         material, metadata, progress_total, full_book_segments = (
             self._material_for_request(principal, request)
         )
         if not material:
             raise AIReadingError("no_reading_material")
-        profile = self.store.get_book_ai_profile(request.book_id)
+        profile_selection = self.store.get_book_ai_profile(request.book_id)
+        profile = profile_selection
         template = template_for(request.scope, request.mode)
         cache_key = self._cache_key(request, material, profile, template)
         return (
@@ -633,6 +635,7 @@ class AIReadingService:
             progress_total,
             full_book_segments,
             profile,
+            profile_selection,
             template,
             cache_key,
         )
@@ -650,6 +653,7 @@ class AIReadingService:
             progress_total,
             full_book_segments,
             profile,
+            _profile_selection,
             template,
             cache_key,
         ) = self._prepare_reading_request(principal, request)
@@ -720,78 +724,90 @@ class AIReadingService:
         request = _reading_request_from_job_payload(payload)
         if request.book_id != source.get("book_id"):
             raise AIReadingError("ai_job_not_retryable")
-        try:
-            owner = self.store.get_user(source["owner_user_id"])
-        except (KeyError, TypeError):
-            raise AIReadingError("ai_not_authorized") from None
-        owner_principal = owner.principal
-        settings = self.store._get_ai_provider_settings()
-        if not settings["enabled"]:
-            raise AIReadingError("ai_disabled")
-        if (
-            not owner.enabled
-            or not self.store.can_use_ai(owner_principal)
-            or not self.store.can_read_book(
-                owner.user_id, owner.role, request.book_id
-            )
-        ):
-            raise AIReadingError("ai_not_authorized")
+        for snapshot_attempt in range(_ADMIN_RETRY_SNAPSHOT_ATTEMPTS):
+            try:
+                owner = self.store.get_user(source["owner_user_id"])
+            except (KeyError, TypeError):
+                raise AIReadingError("ai_not_authorized") from None
+            owner_principal = owner.principal
+            settings = self.store._get_ai_provider_settings()
+            if not settings["enabled"]:
+                raise AIReadingError("ai_disabled")
+            if (
+                not owner.enabled
+                or not self.store.can_use_ai(owner_principal)
+                or not self.store.can_read_book(
+                    owner.user_id, owner.role, request.book_id
+                )
+            ):
+                raise AIReadingError("ai_not_authorized")
 
-        (
-            _material,
-            _metadata,
-            progress_total,
-            _segments,
-            profile,
-            template,
-            cache_key,
-        ) = self._prepare_reading_request(owner_principal, request)
-        cached = self.store.get_current_ai_reading_result(cache_key)
-        reusable_cached = cached is not None and (
-            cached.get("cache_key") == cache_key
-            and cached.get("config_revision") == settings["config_revision"]
-            and cached.get("template_id") == template["id"]
-            and cached.get("template_version") == template["version"]
-        )
-        queued_request = {
-            "scope": request.scope,
-            "book_id": request.book_id,
-            "chapter_index": request.chapter_index,
-            "mode": request.mode,
-            "language": request.language,
-            "reading_boundary": self._reading_boundary(owner_principal, request),
-        }
-        job_id = hashlib.sha256(
             (
-                cache_key
-                + owner.user_id
-                + administrator.user_id
-                + str(asyncio.get_running_loop().time())
-            ).encode()
-        ).hexdigest()[:32]
-        try:
-            job, created = self.store.create_or_get_admin_retry_ai_job(
-                source_job_id=source_job_id,
-                job_id=job_id,
-                retried_by_user_id=administrator.user_id,
-                owner_user_id=owner.user_id,
-                book_id=request.book_id,
-                cache_key=cache_key,
-                request_payload=queued_request,
-                progress_total=progress_total,
-                profile=profile,
-                config_revision=int(settings["config_revision"]),
-                template_id=template["id"],
-                template_version=template["version"],
-                cached_result_id=cached["id"] if reusable_cached else None,
+                _material,
+                _metadata,
+                progress_total,
+                _segments,
+                profile,
+                profile_selection,
+                template,
+                cache_key,
+            ) = self._prepare_reading_request(owner_principal, request)
+            cached = self.store.get_current_ai_reading_result(cache_key)
+            reusable_cached = cached is not None and (
+                cached.get("cache_key") == cache_key
+                and cached.get("config_revision") == settings["config_revision"]
+                and cached.get("template_id") == template["id"]
+                and cached.get("template_version") == template["version"]
             )
-        except PermissionError as error:
-            code = str(error)
-            if code not in {"ai_disabled", "ai_not_authorized"}:
-                code = "ai_not_authorized"
-            raise AIReadingError(code) from None
-        except (KeyError, ValueError):
-            raise AIReadingError("ai_job_not_retryable") from None
+            queued_request = {
+                "scope": request.scope,
+                "book_id": request.book_id,
+                "chapter_index": request.chapter_index,
+                "mode": request.mode,
+                "language": request.language,
+                "reading_boundary": self._reading_boundary(
+                    owner_principal, request
+                ),
+            }
+            job_id = hashlib.sha256(
+                (
+                    cache_key
+                    + owner.user_id
+                    + administrator.user_id
+                    + str(asyncio.get_running_loop().time())
+                ).encode()
+            ).hexdigest()[:32]
+            try:
+                job, created = self.store.create_or_get_admin_retry_ai_job(
+                    source_job_id=source_job_id,
+                    job_id=job_id,
+                    retried_by_user_id=administrator.user_id,
+                    owner_user_id=owner.user_id,
+                    book_id=request.book_id,
+                    cache_key=cache_key,
+                    request_payload=queued_request,
+                    progress_total=progress_total,
+                    profile=profile,
+                    book_profile_selection=profile_selection,
+                    config_revision=int(settings["config_revision"]),
+                    template_id=template["id"],
+                    template_version=template["version"],
+                    cached_result_id=(
+                        cached["id"] if reusable_cached else None
+                    ),
+                )
+            except _AIRetrySnapshotChanged:
+                if snapshot_attempt + 1 == _ADMIN_RETRY_SNAPSHOT_ATTEMPTS:
+                    raise AIReadingError("ai_job_retry_conflict") from None
+                continue
+            except PermissionError as error:
+                code = str(error)
+                if code not in {"ai_disabled", "ai_not_authorized"}:
+                    code = "ai_not_authorized"
+                raise AIReadingError(code) from None
+            except (KeyError, ValueError):
+                raise AIReadingError("ai_job_not_retryable") from None
+            break
 
         public_job = _public_ai_job(job)
         assert "request_json" not in public_job

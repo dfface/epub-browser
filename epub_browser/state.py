@@ -79,6 +79,10 @@ class SetupAlreadyCompleteError(RuntimeError):
     pass
 
 
+class _AIRetrySnapshotChanged(RuntimeError):
+    """Signal that retry preparation no longer matches transactional state."""
+
+
 @dataclass(frozen=True)
 class BookRecord:
     book_id: str
@@ -3065,8 +3069,9 @@ class StateStore:
     def create_or_get_admin_retry_ai_job(
         self, *, source_job_id: str, job_id: str, retried_by_user_id: str,
         owner_user_id: str, book_id: str, cache_key: str, request_payload: dict,
-        progress_total: int, profile: str, config_revision: int, template_id: str,
-        template_version: int, cached_result_id: Optional[str] = None,
+        progress_total: int, profile: str, book_profile_selection: str,
+        config_revision: int, template_id: str, template_version: int,
+        cached_result_id: Optional[str] = None,
     ) -> tuple[dict, bool]:
         """Atomically persist one safe, auditable retry attempt or join its flight."""
         if not isinstance(request_payload, dict):
@@ -3083,6 +3088,12 @@ class StateStore:
             or config_revision < 0
         ):
             raise ValueError("AI configuration revision is invalid")
+        if (
+            not isinstance(book_profile_selection, str)
+            or book_profile_selection
+            not in {"auto", "technical", "fiction", "general"}
+        ):
+            raise ValueError("AI book profile selection is invalid")
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             source = connection.execute(
@@ -3127,6 +3138,15 @@ class StateStore:
                 ).fetchone()
                 if book_access is None:
                     raise PermissionError("ai_not_authorized")
+            profile_row = connection.execute(
+                "SELECT profile FROM book_ai_profiles WHERE book_id = ?",
+                (book_id,),
+            ).fetchone()
+            current_profile_selection = (
+                profile_row["profile"] if profile_row is not None else "auto"
+            )
+            if current_profile_selection != book_profile_selection:
+                raise _AIRetrySnapshotChanged
             if config_revision != int(settings["config_revision"]):
                 cached_result_id = None
             if cached_result_id is not None:
