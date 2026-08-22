@@ -35,7 +35,11 @@ class MigrationManagerTests(unittest.TestCase):
         )
         self.assertIsNotNone(result.backup_path)
         self.assertTrue(result.backup_path.is_file())
-        self.assertFalse(source.exists())
+        self.assertTrue(source.exists())
+        self.assertEqual(
+            result.warnings,
+            (f"Legacy root database was retained after migration: {source}",),
+        )
         self.assertTrue(result.state_path.is_file())
         with sqlite3.connect(result.database_path) as connection:
             self.assertEqual(
@@ -54,7 +58,7 @@ class MigrationManagerTests(unittest.TestCase):
         result = self._manager().prepare_data()
 
         self.assertTrue(result.database_path.is_file())
-        self.assertFalse(source.exists())
+        self.assertTrue(source.exists())
 
     def test_migrates_root_database_with_committed_wal_pages(self):
         source = self.server_dir / "epub-browser.db"
@@ -92,6 +96,53 @@ class MigrationManagerTests(unittest.TestCase):
                     "SELECT text FROM annotations WHERE id = 'wal'"
                 ).fetchone()[0],
                 "Committed in WAL",
+            )
+
+    def test_root_database_changed_after_backup_is_retained(self):
+        source = self.server_dir / "epub-browser.db"
+        self._create_legacy_database(source)
+        manager = self._manager()
+        backup_sqlite_digest = manager._backup_sqlite_digest
+
+        def backup_then_write(path):
+            backup = backup_sqlite_digest(path)
+            with sqlite3.connect(source) as connection:
+                connection.execute(
+                    """
+                    INSERT INTO annotations (
+                        id, book_hash, chapter_index, text, color,
+                        created_at, updated_at
+                    ) VALUES ('post-backup', 'book', 0, 'Retained source', '#fff', '2026', '2026')
+                    """
+                )
+            return backup
+
+        with mock.patch.object(
+            manager,
+            "_backup_sqlite_digest",
+            side_effect=backup_then_write,
+        ):
+            result = manager.prepare_data()
+
+        self.assertTrue(source.exists())
+        with sqlite3.connect(source) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT text FROM annotations WHERE id = 'post-backup'"
+                ).fetchone()[0],
+                "Retained source",
+            )
+        with sqlite3.connect(result.database_path) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT text FROM annotations WHERE id = 'a'"
+                ).fetchone()[0],
+                "Saved",
+            )
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT text FROM annotations WHERE id = 'post-backup'"
+                ).fetchone()
             )
 
     def test_migrates_real_xpath_annotation_schema_without_losing_positions(self):
@@ -189,6 +240,18 @@ class MigrationManagerTests(unittest.TestCase):
 
         self.assertEqual(first.database_path, second.database_path)
         self.assertEqual(first.backup_path, second.backup_path)
+        self.assertTrue(source.exists())
+        self.assertEqual(
+            first.warnings,
+            (f"Legacy root database was retained after migration: {source}",),
+        )
+        self.assertEqual(
+            second.warnings,
+            (
+                "Authoritative data database already exists; legacy root database "
+                f"was left untouched: {source}",
+            ),
+        )
         self.assertEqual(
             len(list((self.server_dir / "data" / "backups").iterdir())),
             1,
@@ -268,16 +331,23 @@ class MigrationManagerTests(unittest.TestCase):
         with sqlite3.connect(database) as connection:
             connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION - 1}")
         original = database.read_bytes()
+        manager = self._manager()
+        check_integrity = manager._check_integrity
+
+        def reject_snapshot(path):
+            if path == database:
+                return check_integrity(path)
+            raise MigrationError("snapshot integrity failed")
 
         with (
             mock.patch.object(
-                MigrationManager,
-                "_backup_sqlite_atomic",
-                side_effect=OSError("backup unavailable"),
+                manager,
+                "_check_integrity",
+                side_effect=reject_snapshot,
             ),
-            self.assertRaisesRegex(MigrationError, "backup"),
+            self.assertRaisesRegex(MigrationError, "snapshot integrity"),
         ):
-            self._manager().prepare_data()
+            manager.prepare_data()
 
         self.assertEqual(database.read_bytes(), original)
         backups_dir = self.server_dir / "data" / "backups"

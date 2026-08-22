@@ -120,6 +120,10 @@ class MigrationManager:
                 self._initialize_database(self.database_path)
             else:
                 backup_path = self._migrate_candidate(candidate)
+                warnings.append(
+                    "Legacy root database was retained after migration: "
+                    + str(candidate)
+                )
 
         imported = self._import_legacy_bookshelves()
         legacy_book_ids = self._legacy_book_ids()
@@ -144,21 +148,6 @@ class MigrationManager:
             )
             state.setdefault("layout_phase", "pending")
         self._write_state(state)
-
-        for candidate in root_candidates:
-            if (
-                state.get("source_path") == str(candidate)
-                and backup_path
-                and candidate.exists()
-            ):
-                if (
-                    self._sqlite_snapshot_digest(candidate)
-                    != self._sha256(backup_path)
-                ):
-                    raise MigrationError(
-                        f"Backup verification failed; legacy database was retained: {candidate}"
-                    )
-                candidate.unlink()
 
         return MigrationResult(
             database_path=self.database_path,
@@ -213,26 +202,26 @@ class MigrationManager:
             if temporary.exists():
                 temporary.unlink()
 
-    def _sqlite_snapshot_digest(self, source: Path) -> str:
-        temporary = self.data_dir / (
-            f".{source.name}.{uuid.uuid4().hex}.verify.tmp"
-        )
-        try:
-            self._backup_sqlite_atomic(source, temporary)
-            return self._sha256(temporary)
-        finally:
-            if temporary.exists():
-                temporary.unlink()
-
     def _backup_sqlite_atomic(self, source: Path, destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         temporary = destination.with_name(
             f".{destination.name}.{uuid.uuid4().hex}.tmp"
         )
+        source_connection = None
+        target_connection = None
         try:
-            with sqlite3.connect(source) as source_connection:
-                with sqlite3.connect(temporary) as target_connection:
-                    source_connection.backup(target_connection)
+            try:
+                source_connection = sqlite3.connect(source)
+                target_connection = sqlite3.connect(temporary)
+                source_connection.backup(target_connection)
+                target_connection.commit()
+            finally:
+                try:
+                    if target_connection is not None:
+                        target_connection.close()
+                finally:
+                    if source_connection is not None:
+                        source_connection.close()
             self._check_integrity(temporary)
             os.replace(temporary, destination)
         finally:
