@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const AuthModule = require('../epub_browser/assets/auth.js');
+const { createRuntime, dictionaries } = require('../epub_browser/assets/i18n.js');
 
 function response(status, payload) {
   return {
@@ -853,6 +854,84 @@ test('administrator AI job renderer uses safe DOM, progress, timestamps, and err
   assert.doesNotMatch(scopes[1].textContent, /#0/);
 });
 
+test('administrator AI job scope and language use the active Chinese runtime', async () => {
+  const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload([
+    aiJob({ id: 'chapter-job', scope: 'chapter', language: 'en', chapter_index: 2 }),
+    aiJob({ id: 'book-job', scope: 'book', language: 'zh-CN', chapter_index: null }),
+    aiJob({ id: 'legacy-job', scope: 'constructor', language: 'toString', chapter_index: null }),
+  ]))));
+  harness.root.navigator = { languages: ['zh-CN'], language: 'zh-CN' };
+  harness.root.Intl = Intl;
+  harness.root.EpubBrowserI18n = createRuntime(harness.root, dictionaries);
+  const auth = AuthModule.create(harness.root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.loadAiJobs();
+
+  const scopes = descendants(harness.elements.adminAiJobsBody)
+    .filter(node => node.className === 'admin-ai-job-scope')
+    .map(node => node.textContent);
+  assert.deepEqual(scopes, [
+    '章节 · #2 · 英语',
+    '全书 · 简体中文',
+    '未知 · 未知',
+  ]);
+  assert.doesNotMatch(scopes.join(' '), /\b(?:book|chapter|en|zh-CN|constructor|toString)\b/);
+});
+
+test('administrator AI job status and stored error allowlists reject inherited property names', async () => {
+  const suspicious = ['constructor', 'toString', '__proto__'];
+  const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload(
+    suspicious.map((value, index) => aiJob({
+      id: `legacy-${index}`,
+      status: value,
+      error_code: value,
+    })),
+  ))));
+  const auth = AuthModule.create(harness.root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.loadAiJobs();
+
+  const rendered = descendants(harness.elements.adminAiJobsBody);
+  const statuses = rendered
+    .filter(node => node.className === 'admin-ai-job-status-cell')
+    .map(node => node.textContent);
+  const errors = rendered
+    .filter(node => node.className === 'admin-ai-job-error')
+    .map(node => node.textContent);
+  assert.deepEqual(statuses, suspicious.map(() => '[admin.ai.jobs.unknownValue]'));
+  assert.deepEqual(errors, suspicious.map(() => '[admin.ai.jobs.error.unknown]'));
+  assert.doesNotMatch(statuses.concat(errors).join(' '), /constructor|toString|__proto__/);
+});
+
+test('administrator AI job action error allowlist rejects inherited property names', async () => {
+  const suspicious = ['constructor', 'toString', '__proto__'];
+  let activeCode = '';
+  const harness = jobUiHarness(() => Promise.resolve(response(400, { code: activeCode })));
+  const auth = AuthModule.create(harness.root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  for (let index = 0; index < suspicious.length; index += 1) {
+    activeCode = suspicious[index];
+    await auth.retryAiJob(`job-${index}`);
+    assert.equal(
+      harness.elements.adminAiJobsLive.textContent,
+      '[admin.ai.jobs.error.unknown]',
+    );
+    assert.doesNotMatch(harness.elements.adminAiJobsLive.textContent, new RegExp(activeCode));
+  }
+});
+
 test('administrator AI job polling follows panel and document visibility without duplicates', async () => {
   const firstJobsRequest = deferred();
   let jobsRequests = 0;
@@ -911,4 +990,42 @@ test('administrator AI job polling follows panel and document visibility without
   harness.root.document.hidden = false;
   harness.documentListeners.visibilitychange();
   assert.equal(harness.intervals.size, 0);
+});
+
+test('captured AI job poll callbacks are inert after panel close or visibility hide', async () => {
+  let jobsRequests = 0;
+  const harness = jobUiHarness(url => {
+    const adminResponse = adminDataResponse(url);
+    if (adminResponse) return Promise.resolve(adminResponse);
+    if (url.startsWith('/api/admin/ai/jobs?')) {
+      jobsRequests += 1;
+      return Promise.resolve(response(200, aiJobsPayload([])));
+    }
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(harness.root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+  await auth.init();
+
+  harness.elements.adminMenu.click();
+  await tick();
+  const afterClose = Array.from(harness.intervals.values())[0].callback;
+  harness.elements.adminClose.click();
+  const beforeClosedCallback = jobsRequests;
+  afterClose();
+  await tick();
+  assert.equal(jobsRequests, beforeClosedCallback);
+
+  harness.elements.adminMenu.click();
+  await tick();
+  const afterHide = Array.from(harness.intervals.values())[0].callback;
+  harness.root.document.hidden = true;
+  harness.documentListeners.visibilitychange();
+  const beforeHiddenCallback = jobsRequests;
+  afterHide();
+  await tick();
+  assert.equal(jobsRequests, beforeHiddenCallback);
 });

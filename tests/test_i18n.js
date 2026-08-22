@@ -51,6 +51,31 @@ test('English and Chinese dictionaries have identical non-empty key trees', () =
   });
 });
 
+test('provides exact bilingual administrator AI job scope and language labels', () => {
+  assert.deepEqual({
+    book: dictionaries.en['admin.ai.jobs.scope.book'],
+    chapter: dictionaries.en['admin.ai.jobs.scope.chapter'],
+    en: dictionaries.en['admin.ai.jobs.language.en'],
+    zhCN: dictionaries.en['admin.ai.jobs.language.zh-CN'],
+  }, {
+    book: 'Whole book',
+    chapter: 'Chapter',
+    en: 'English',
+    zhCN: 'Simplified Chinese',
+  });
+  assert.deepEqual({
+    book: dictionaries['zh-CN']['admin.ai.jobs.scope.book'],
+    chapter: dictionaries['zh-CN']['admin.ai.jobs.scope.chapter'],
+    en: dictionaries['zh-CN']['admin.ai.jobs.language.en'],
+    zhCN: dictionaries['zh-CN']['admin.ai.jobs.language.zh-CN'],
+  }, {
+    book: '全书',
+    chapter: '章节',
+    en: '英语',
+    zhCN: '简体中文',
+  });
+});
+
 test('provides the library and shared-chrome copy used by the first bilingual surface', () => {
   [
     'common.language', 'common.version', 'theme.light', 'theme.dark',

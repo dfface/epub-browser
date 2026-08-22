@@ -319,6 +319,10 @@
         : fallback;
     }
 
+    function hasOwn(mapping, key) {
+      return Object.prototype.hasOwnProperty.call(mapping, key);
+    }
+
     function aiJobStatusKey(status) {
       var known = {
         queued: true,
@@ -327,7 +331,7 @@
         failed: true,
         interrupted: true
       };
-      return known[status]
+      return hasOwn(known, status)
         ? 'admin.ai.jobs.status.' + status
         : 'admin.ai.jobs.unknownValue';
     }
@@ -348,7 +352,7 @@
         ai_generation_failed: true
       };
       if (!code) return '';
-      return known[code]
+      return hasOwn(known, code)
         ? 'ai.error.' + code
         : 'admin.ai.jobs.error.unknown';
     }
@@ -369,7 +373,7 @@
         source_unavailable: true,
         no_reading_material: true
       };
-      return known[code]
+      return hasOwn(known, code)
         ? 'admin.ai.jobs.error.' + code
         : 'admin.ai.jobs.error.unknown';
     }
@@ -400,15 +404,23 @@
     }
 
     function aiJobScopeLabel(job) {
-      var scope = job.scope === 'book' || job.scope === 'chapter'
-        ? job.scope
-        : t('admin.ai.jobs.unknownValue');
-      var details = [scope];
+      var scopeKeys = {
+        book: 'admin.ai.jobs.scope.book',
+        chapter: 'admin.ai.jobs.scope.chapter'
+      };
+      var languageKeys = {
+        en: 'admin.ai.jobs.language.en',
+        'zh-CN': 'admin.ai.jobs.language.zh-CN'
+      };
+      var knownScope = hasOwn(scopeKeys, job.scope);
+      var details = [knownScope
+        ? t(scopeKeys[job.scope])
+        : t('admin.ai.jobs.unknownValue')];
       var chapter = safeNonNegativeInteger(job.chapter_index, null);
-      if (chapter !== null) details.push('#' + chapter);
-      if (typeof job.language === 'string' && job.language) {
-        details.push(job.language.slice(0, 24));
-      }
+      if (knownScope && job.scope === 'chapter' && chapter !== null) details.push('#' + chapter);
+      details.push(hasOwn(languageKeys, job.language)
+        ? t(languageKeys[job.language])
+        : t('admin.ai.jobs.unknownValue'));
       return details.join(' · ');
     }
 
@@ -446,6 +458,8 @@
         var row = root.document.createElement('tr');
         var statusCell = aiJobCell(row, 'admin-ai-job-status-cell');
         var status = root.document.createElement('span');
+        var bookTitle = typeof job.book_title === 'string' ? job.book_title : '';
+        var ownerUsername = typeof job.owner_username === 'string' ? job.owner_username : '';
         var normalizedStatus = ['queued', 'running', 'complete', 'failed', 'interrupted']
           .indexOf(job.status) !== -1 ? job.status : 'unknown';
         status.className = 'admin-ai-job-status is-' + normalizedStatus;
@@ -453,16 +467,8 @@
         statusCell.appendChild(status);
 
         aiJobCell(row, 'admin-ai-job-id').textContent = aiJobDisplayId(job);
-        aiJobCell(row, 'admin-ai-job-book').textContent = (
-          typeof job.book_title === 'string' && job.book_title
-            ? job.book_title
-            : t('admin.ai.jobs.unknownBook')
-        );
-        aiJobCell(row, 'admin-ai-job-user').textContent = (
-          typeof job.owner_username === 'string' && job.owner_username
-            ? job.owner_username
-            : t('admin.ai.jobs.unknownUser')
-        );
+        aiJobCell(row, 'admin-ai-job-book').textContent = bookTitle || t('admin.ai.jobs.unknownBook');
+        aiJobCell(row, 'admin-ai-job-user').textContent = ownerUsername || t('admin.ai.jobs.unknownUser');
         aiJobCell(row, 'admin-ai-job-scope').textContent = aiJobScopeLabel(job);
         renderAiJobProgress(aiJobCell(row, 'admin-ai-job-progress'), job);
 
@@ -679,7 +685,13 @@
       if (!adminPanelIsActive() || (root.document && root.document.hidden === true)) return;
       if (typeof root.setInterval !== 'function') return;
       aiJobsPollTimer = root.setInterval(function() {
-        if (!aiJobsState.loading) loadAdminAiJobs();
+        if (
+          !aiJobsState.loading
+          && adminPanelIsActive()
+          && !(root.document && root.document.hidden === true)
+        ) {
+          loadAdminAiJobs();
+        }
       }, 10000);
       if (aiJobsPollTimer && typeof aiJobsPollTimer.unref === 'function') {
         aiJobsPollTimer.unref();

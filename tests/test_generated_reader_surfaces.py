@@ -82,6 +82,25 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ):
             self.assertNotIn(control_id, ssg_html)
 
+    def test_admin_ai_job_table_uses_a_bounded_scroller_for_its_sticky_header(self):
+        stylesheet = Path('epub_browser/assets/account.css').read_text(
+            encoding='utf-8'
+        )
+        scroll_start = stylesheet.index('.account-table-scroll {')
+        scroll_rule = stylesheet[scroll_start:stylesheet.index('}', scroll_start)]
+        header_start = stylesheet.index('.account-admin-table thead th {')
+        header_rule = stylesheet[header_start:stylesheet.index('}', header_start)]
+
+        self.assertIn('overflow: auto;', scroll_rule)
+        self.assertIn('max-height:', scroll_rule)
+        self.assertIn('position: sticky;', header_rule)
+        self.assertIn('top: 0;', header_rule)
+        self.assertRegex(
+            stylesheet,
+            r'@media \(max-width: 720px\)[\s\S]*?'
+            r'\.account-admin-table\s*\{[^}]*min-width:\s*56rem;',
+        )
+
     def test_account_surfaces_use_the_library_form_and_card_system(self):
         stylesheet = Path('epub_browser/assets/account.css').read_text(
             encoding='utf-8'

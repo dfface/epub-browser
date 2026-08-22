@@ -606,10 +606,12 @@ body.auth-page {
 
 .account-table-scroll {
     max-width: 100%;
-    overflow-x: auto;
+    max-height: min(52vh, 34rem);
+    overflow: auto;
     border: 1px solid var(--account-border);
     border-radius: 10px;
     background: var(--account-card);
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
 }
 
