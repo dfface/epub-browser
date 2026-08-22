@@ -23,6 +23,7 @@ from epub_browser.auth import (
     BootstrapCredentials,
     hash_password,
 )
+from epub_browser.ai_reading import AIReadingError, AIReadingService
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from epub_browser.runtime import RuntimeStatus
@@ -1021,6 +1022,178 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(session.status_code, 200)
         client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
         return client
+
+    def _create_failed_ai_job(self, job_id="failed-admin-job"):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / (job_id + ".epub"),
+            "urn:test:" + job_id,
+            "fingerprint-" + job_id,
+            {"title": "Administrative AI Job"},
+        )
+        self.store.create_ai_job(
+            job_id,
+            self.member.user_id,
+            "cache-" + job_id,
+            book_id=book.book_id,
+            request_payload={
+                "scope": "chapter",
+                "book_id": book.book_id,
+                "chapter_index": 0,
+                "mode": "chapter",
+                "language": "en",
+                "reading_boundary": 0,
+                "provider_base_url": "https://provider.example/private",
+                "source_path": "/private/epub/source.epub",
+                "private_note": "PRIVATE_REPLAY_SENTINEL",
+            },
+        )
+        self.assertTrue(self.store.start_ai_job(job_id))
+        self.assertTrue(
+            self.store.finish_ai_job(job_id, error_code="ai_generation_failed")
+        )
+        return book, job_id
+
+    def test_admin_lists_paginated_ai_jobs_without_private_payload(self):
+        book, _job_id = self._create_failed_ai_job()
+        anonymous = TestClient(self.app, follow_redirects=False)
+        self.addCleanup(anonymous.close)
+
+        anonymous_denied = anonymous.get("/api/admin/ai/jobs")
+        denied = self.member_client.get("/api/admin/ai/jobs")
+        listed = self.admin_client.get(
+            "/api/admin/ai/jobs?status=failed&page=1&page_size=10"
+        )
+        empty = self.admin_client.get(
+            "/api/admin/ai/jobs?status=queued&page=1&page_size=10"
+        )
+
+        self.assertEqual(anonymous_denied.status_code, 401)
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(
+            listed.json()["pagination"],
+            {"page": 1, "page_size": 10, "total": 1, "total_pages": 1},
+        )
+        self.assertEqual(listed.json()["jobs"][0]["book_id"], book.book_id)
+        self.assertEqual(listed.json()["jobs"][0]["scope"], "chapter")
+        self.assertNotIn("PRIVATE_REPLAY_SENTINEL", listed.text)
+        self.assertNotIn("request_json", listed.text)
+        self.assertNotIn("provider_base_url", listed.text)
+        self.assertNotIn("/private/epub/source.epub", listed.text)
+        self.assertEqual(empty.status_code, 200)
+        self.assertEqual(empty.json()["jobs"], [])
+        self.assertEqual(empty.json()["pagination"]["total_pages"], 0)
+
+    def test_admin_ai_job_query_validation(self):
+        invalid_queries = (
+            "page=0",
+            "page=%2B1",
+            "page=-1",
+            "page=true",
+            "page=",
+            "page=one",
+            "page=999999999999999999999999999999999999999999",
+            "page_size=0",
+            "page_size=101",
+            "page_size=true",
+            "page_size=",
+            "status=",
+            "status=unknown",
+        )
+
+        for query in invalid_queries:
+            with self.subTest(query=query):
+                response = self.admin_client.get("/api/admin/ai/jobs?" + query)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["code"], "invalid_ai_job_query")
+
+    def test_admin_retries_failed_ai_job_with_csrf(self):
+        _book, source_job_id = self._create_failed_ai_job("failed job")
+        retry_url = "/api/admin/ai/jobs/" + quote(source_job_id, safe="") + "/retry"
+        queued = {
+            "status": "queued",
+            "cached": False,
+            "shared": False,
+            "job": {"id": "new-job", "status": "queued"},
+        }
+        cached = {
+            "status": "complete",
+            "cached": True,
+            "shared": False,
+            "job": {"id": "cached-job", "status": "complete"},
+        }
+        shared = {
+            "status": "queued",
+            "cached": False,
+            "shared": True,
+            "job": {"id": "active-job", "status": "queued"},
+        }
+        completed = {
+            "status": "complete",
+            "cached": False,
+            "shared": False,
+            "job": {"id": "completed-job", "status": "complete"},
+        }
+
+        with mock.patch(
+            "epub_browser.server.AIReadingService.retry_job",
+            new_callable=mock.AsyncMock,
+            return_value=queued,
+        ) as retry_job:
+            response = self.admin_client.post(retry_url)
+            self.assertEqual(response.status_code, 202)
+            self.assertEqual(response.json(), queued)
+            retry_job.assert_awaited_once_with(self.admin, source_job_id)
+
+        for result in (cached, shared, completed):
+            with self.subTest(result=result):
+                with mock.patch(
+                    "epub_browser.server.AIReadingService.retry_job",
+                    new_callable=mock.AsyncMock,
+                    return_value=result,
+                ):
+                    response = self.admin_client.post(retry_url)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json(), result)
+
+        with mock.patch(
+            "epub_browser.server.AIReadingService.retry_job",
+            new_callable=mock.AsyncMock,
+        ) as retry_job:
+            member_denied = self.member_client.post(retry_url)
+            self.assertEqual(member_denied.status_code, 403)
+            retry_job.assert_not_awaited()
+
+            csrf_token = self.admin_client.headers.pop("X-CSRF-Token")
+            try:
+                csrf_denied = self.admin_client.post(retry_url)
+            finally:
+                self.admin_client.headers["X-CSRF-Token"] = csrf_token
+            self.assertEqual(csrf_denied.status_code, 403)
+            self.assertEqual(csrf_denied.json()["code"], "csrf_required")
+            retry_job.assert_not_awaited()
+
+        error_statuses = {
+            "ai_job_not_retryable": 400,
+            "ai_not_authorized": 403,
+            "ai_job_not_found": 404,
+            "book_not_found": 404,
+            "chapter_not_found": 404,
+            "ai_job_retry_conflict": 409,
+            "ai_disabled": 503,
+            "source_unavailable": 503,
+            "ai_template_unavailable": 503,
+        }
+        for code, expected_status in error_statuses.items():
+            with self.subTest(code=code):
+                with mock.patch(
+                    "epub_browser.server.AIReadingService.retry_job",
+                    new_callable=mock.AsyncMock,
+                    side_effect=AIReadingError(code),
+                ):
+                    response = self.admin_client.post(retry_url)
+                self.assertEqual(response.status_code, expected_status)
+                self.assertEqual(response.json()["code"], code)
 
     def test_admin_disables_member_and_revokes_all_member_sessions(self):
         second_member_client = self._login("member", "member-secret")

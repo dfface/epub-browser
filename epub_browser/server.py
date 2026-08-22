@@ -61,6 +61,11 @@ SETUP_NONCE_COOKIE = 'epub_browser_setup_nonce'
 AUTH_NONCE_COOKIE = 'epub_browser_auth_nonce'
 AUTH_NONCE_HEADER = 'X-EPUB-Browser-Auth-Nonce'
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
+ADMIN_AI_JOB_STATUSES = frozenset({
+    'queued', 'running', 'complete', 'failed', 'interrupted',
+})
+ADMIN_AI_JOB_MAX_PAGE = 1_000_000
+ADMIN_AI_JOB_MAX_PAGE_SIZE = 100
 PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/setup',
     '/login',
@@ -1731,6 +1736,91 @@ window.location.assign(payload.redirect||'/');
             )
         })
 
+    def admin_ai_job_query(request):
+        query = request.query_params
+        if any(len(query.getlist(name)) != 1 for name in (
+            'page', 'page_size', 'status'
+        ) if name in query):
+            raise ValueError('Repeated AI job query parameter')
+        if any(name not in {'page', 'page_size', 'status'} for name in query):
+            raise ValueError('Unknown AI job query parameter')
+
+        def positive_integer(name, default, maximum):
+            value = query.get(name)
+            if value is None:
+                return default
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, str)
+                or not value
+                or not value.isascii()
+                or not value.isdecimal()
+            ):
+                raise ValueError('Invalid AI job query integer')
+            parsed = int(value)
+            if parsed < 1 or parsed > maximum:
+                raise ValueError('AI job query integer is out of bounds')
+            return parsed
+
+        status = query.get('status')
+        if status is not None and status not in ADMIN_AI_JOB_STATUSES:
+            raise ValueError('Invalid AI job status')
+        return (
+            status,
+            positive_integer('page', 1, ADMIN_AI_JOB_MAX_PAGE),
+            positive_integer('page_size', 20, ADMIN_AI_JOB_MAX_PAGE_SIZE),
+        )
+
+    async def admin_ai_jobs(request):
+        require_admin(request)
+        try:
+            status, page, page_size = admin_ai_job_query(request)
+            jobs, total = store.list_admin_ai_jobs(
+                status=status, page=page, page_size=page_size
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_ai_job_query', 'Invalid AI job query'), 400
+            )
+        return response({
+            'jobs': list(jobs),
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total': total,
+                'total_pages': (total + page_size - 1) // page_size,
+            },
+        })
+
+    def admin_ai_job_retry_error_response(error):
+        status = {
+            'ai_not_authorized': 403,
+            'ai_job_not_found': 404,
+            'book_not_found': 404,
+            'chapter_not_found': 404,
+            'ai_job_retry_conflict': 409,
+            'ai_disabled': 503,
+            'source_unavailable': 503,
+            'no_reading_material': 503,
+            'ai_template_unavailable': 503,
+        }.get(error.code, 400)
+        return response(
+            error_payload(error.code, 'AI job retry failed'), status
+        )
+
+    async def admin_ai_job_retry(request):
+        principal = require_admin(request)
+        try:
+            result = await ai_reading.retry_job(
+                principal, request.path_params['job_id']
+            )
+        except AIReadingError as error:
+            return admin_ai_job_retry_error_response(error)
+        status = 202 if (
+            result.get('status') == 'queued' and not result.get('shared')
+        ) else 200
+        return response(result, status)
+
     def ai_error_response(error):
         status = {
             'ai_disabled': 503,
@@ -2591,6 +2681,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/ai/tags/{tag_id}', admin_ai_tag, methods=['PUT', 'DELETE']),
         Route('/api/admin/books/{book_id}/ai', admin_book_ai, methods=['GET', 'PUT']),
         Route('/api/admin/ai/results', admin_ai_results, methods=['DELETE']),
+        Route('/api/admin/ai/jobs', admin_ai_jobs, methods=['GET']),
+        Route('/api/admin/ai/jobs/{job_id}/retry', admin_ai_job_retry, methods=['POST']),
         Route(
             '/api/admin/books/{book_id}/grants',
             admin_book_grants,
