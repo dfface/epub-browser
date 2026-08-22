@@ -339,15 +339,18 @@ rows directly:
 6. inside an immediate transaction, reject/join an existing active job for the
    same cache key or create a new job with `attempt_number + 1`,
    `retried_from_job_id`, `retry_root_job_id`, and `retried_by_user_id`;
-7. if a current cached result already satisfies the recomputed key, complete
-   the new linked job without a provider call; otherwise wake the durable
-   worker and return the queued job.
+7. if a current cached result satisfies the recomputed content key and its
+   `config_revision` plus template identity match the current configuration,
+   complete the new linked job without a provider call; otherwise wake the
+   durable worker and return the queued job.
 
 The retry continues to execute as the original owner. It does not bypass book
-authorization, AI authorization, or provider-call quota accounting. A changed
-template, model configuration, book version, or reading boundary therefore
-produces the correct new cache identity instead of replaying an obsolete cache
-key.
+authorization, AI authorization, or provider-call quota accounting. Template,
+book-version, profile, or reading-boundary changes produce the corresponding
+new content cache key. Model configuration revision intentionally remains
+outside that key to preserve existing current-result semantics, but retry will
+not reuse a cached generation from an older configuration revision; it creates
+a new generation under the content key and updates the current-result pointer.
 
 Simultaneous clicks are safe: the partial unique cache index is authoritative,
 and the losing request returns the already-active job rather than creating a
