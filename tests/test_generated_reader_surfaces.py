@@ -53,6 +53,35 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(server_html, r'class=(?:["\'])?account-layout(?:["\' >])')
         self.assertRegex(server_html, r'class=(?:["\'])?account-grid(?:["\' >])')
 
+    def test_server_admin_ai_jobs_surface_is_semantic_and_localized(self):
+        server_html = self._server_html()
+        ssg_html = self._library_html()
+
+        self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminAiJobsTitle')
+        self.assertIn('data-i18n=admin.ai.jobs.statusFilter', server_html)
+        self.assertIn('data-i18n=admin.ai.jobs.pageSize', server_html)
+        self.assertIn('data-i18n=admin.ai.jobs.refresh', server_html)
+        self.assertRegex(server_html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
+        self.assertIn('<thead>', server_html)
+        self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminAiJobsBody')
+        self.assertRegex(server_html, r'<nav\b[^>]*id=(?:["\'])?adminAiJobsPagination')
+        self.assertRegex(
+            server_html,
+            r'<p\b(?=[^>]*id=(?:["\'])?adminAiJobsLive)(?=[^>]*aria-live=(?:["\'])?polite)',
+        )
+        for status in ('all', 'queued', 'running', 'complete', 'failed', 'interrupted'):
+            self.assertIn('data-i18n=admin.ai.jobs.status.' + status, server_html)
+        for page_size in ('10', '20', '50', '100'):
+            self.assertRegex(
+                server_html,
+                r'<option\b[^>]*value=(?:["\'])?' + page_size + r'(?:["\' >])',
+            )
+        for control_id in (
+            'adminAiJobsStatus', 'adminAiJobsPageSize', 'adminAiJobsRefresh',
+            'adminAiJobsBody', 'adminAiJobsPagination', 'adminAiJobsLive',
+        ):
+            self.assertNotIn(control_id, ssg_html)
+
     def test_account_surfaces_use_the_library_form_and_card_system(self):
         stylesheet = Path('epub_browser/assets/account.css').read_text(
             encoding='utf-8'

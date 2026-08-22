@@ -99,6 +99,19 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r'/assets/immutable/notification\.[0-9a-f]{12}\.css')
         self.assertRegex(html, r'(?:hidden id=associationCard|id=associationCard hidden)')
         self.assertIn('id=adminIdentitiesSection', html)
+        self.assertIn('id=adminAiJobsStatus', html)
+        self.assertIn('id=adminAiJobsPageSize', html)
+        self.assertIn('id=adminAiJobsRefresh', html)
+        self.assertIn('id=adminAiJobsBody', html)
+        self.assertIn('id=adminAiJobsPagination', html)
+        self.assertIn('id=adminAiJobsLive', html)
+        self.assertRegex(html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
+        self.assertIn('<thead>', html)
+        self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminAiJobsBody')
+        self.assertRegex(
+            html,
+            r'<p\b(?=[^>]*id=(?:["\'])?adminAiJobsLive)(?=[^>]*aria-live=(?:["\'])?polite)',
+        )
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -110,6 +123,12 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('id=libraryProgress', html)
         self.assertNotIn('library-progress', html)
         self.assertNotIn('id=loginCard', html)
+        self.assertNotIn('adminAiJobsStatus', html)
+        self.assertNotIn('adminAiJobsPageSize', html)
+        self.assertNotIn('adminAiJobsRefresh', html)
+        self.assertNotIn('adminAiJobsBody', html)
+        self.assertNotIn('adminAiJobsPagination', html)
+        self.assertNotIn('adminAiJobsLive', html)
         self.assertNotRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
         self.assertRegex(html, r'/assets/immutable/notification\.[0-9a-f]{12}\.js')
         self.assertIn('id=exportShelfBtn', html)

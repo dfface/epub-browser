@@ -198,6 +198,24 @@ def render_library_shell(
                     <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearRevision" data-i18n="admin.ai.clearRevision">Clear results for this configuration</button>
                     <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearAll" data-i18n="admin.ai.clearAll">Clear all AI results</button>
                 </div>
+                <section class="admin-ai-subsection admin-ai-jobs" aria-labelledby="adminAiJobsTitle">
+                    <h5 id="adminAiJobsTitle" data-i18n="admin.ai.jobs.title">AI jobs</h5>
+                    <p class="account-section-copy" data-i18n="admin.ai.jobs.description">Review shared AI reading jobs and retry eligible failures.</p>
+                    <div class="account-form admin-ai-jobs-controls">
+                        <label for="adminAiJobsStatus"><span data-i18n="admin.ai.jobs.statusFilter">Status</span><select id="adminAiJobsStatus"><option value="" data-i18n="admin.ai.jobs.status.all">All</option><option value="queued" data-i18n="admin.ai.jobs.status.queued">Queued</option><option value="running" data-i18n="admin.ai.jobs.status.running">Running</option><option value="complete" data-i18n="admin.ai.jobs.status.complete">Complete</option><option value="failed" data-i18n="admin.ai.jobs.status.failed">Failed</option><option value="interrupted" data-i18n="admin.ai.jobs.status.interrupted">Interrupted</option></select></label>
+                        <label for="adminAiJobsPageSize"><span data-i18n="admin.ai.jobs.pageSize">Jobs per page</span><select id="adminAiJobsPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
+                        <button type="button" class="bookshelf-action-btn" id="adminAiJobsRefresh" data-i18n="admin.ai.jobs.refresh">Refresh</button>
+                    </div>
+                    <div class="account-table-scroll">
+                        <table class="account-admin-table">
+                            <caption class="sr-only visually-hidden" data-i18n="admin.ai.jobs.tableLabel">AI reading jobs</caption>
+                            <thead><tr><th scope="col" data-i18n="admin.ai.jobs.header.status">Status</th><th scope="col" data-i18n="admin.ai.jobs.header.job">Job</th><th scope="col" data-i18n="admin.ai.jobs.header.book">Book</th><th scope="col" data-i18n="admin.ai.jobs.header.requester">Requester</th><th scope="col" data-i18n="admin.ai.jobs.header.scope">Scope</th><th scope="col" data-i18n="admin.ai.jobs.header.progress">Progress</th><th scope="col" data-i18n="admin.ai.jobs.header.error">Error</th><th scope="col" data-i18n="admin.ai.jobs.header.created">Created</th><th scope="col" data-i18n="admin.ai.jobs.header.updated">Updated</th><th scope="col" data-i18n="admin.ai.jobs.header.action">Action</th></tr></thead>
+                            <tbody id="adminAiJobsBody"><tr><td colspan="10" data-i18n="admin.ai.jobs.loading">Loading AI jobs…</td></tr></tbody>
+                        </table>
+                    </div>
+                    <nav id="adminAiJobsPagination" aria-label="AI job pages" data-i18n-aria-label="admin.ai.jobs.paginationLabel"></nav>
+                    <p id="adminAiJobsLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
+                </section>
             </section>
             <section class="account-admin-section account-card-wide account-tags-section" aria-labelledby="adminTagsTitle">
                 <h4 id="adminTagsTitle" data-i18n="admin.tags">Tag management</h4>
