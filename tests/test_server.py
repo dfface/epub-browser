@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -9,6 +10,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 from unittest import mock
@@ -106,6 +108,36 @@ def _first_sse_chunk(app, path, session_token):
         return headers, chunk
 
     return asyncio.run(collect())
+
+
+@contextmanager
+def _assert_no_error_logs(testcase, logger_name):
+    logger = logging.getLogger(logger_name)
+    original_level = logger.level
+    original_handlers = logger.handlers[:]
+    original_propagate = logger.propagate
+    records = []
+
+    class ErrorCapture(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    handler = ErrorCapture(level=logging.ERROR)
+    logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        logger.handlers[:] = original_handlers
+        logger.setLevel(original_level)
+        logger.propagate = original_propagate
+
+    if records:
+        testcase.fail(
+            "unexpected ERROR-or-higher logs from {}: {}".format(
+                logger_name,
+                "; ".join(record.getMessage() for record in records),
+            ),
+        )
 
 
 class ServerSetupBoundaryTests(unittest.TestCase):
@@ -384,7 +416,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         # Each TestClient owns an event loop. Starting the second lifespan must
         # not replace the first worker's asyncio.Event and leave an unhandled
         # cross-loop task failure behind during shutdown.
-        with self.assertNoLogs("asyncio", level="ERROR"):
+        with _assert_no_error_logs(self, "asyncio"):
             with ThreadPoolExecutor(max_workers=2) as executor:
                 results = tuple(executor.map(submit, ("first", "second")))
 
