@@ -149,7 +149,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/existing-v1-directory:/app/EpubBrowserFiles \
-  epub-browser:2.2.0
+  epub-browser:2.2.1
 ```
 
 Complete `/setup` through the loopback binding before exposing the service. For

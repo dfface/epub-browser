@@ -312,7 +312,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.2.0
+  epub-browser:2.2.1
 ```
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
@@ -328,7 +328,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.2.0
+  epub-browser:2.2.1
 ```
 
 After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.
