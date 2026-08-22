@@ -3033,22 +3033,25 @@ class StateStore:
                 total = connection.execute(
                     "SELECT COUNT(*) FROM ai_reading_jobs"
                 ).fetchone()[0]
-                rows = connection.execute(
+                statement = (
                     self._admin_ai_job_select()
                     + " ORDER BY jobs.created_at DESC, jobs.id DESC "
-                    "LIMIT ? OFFSET ?",
-                    (page_size, offset),
-                ).fetchall()
+                    "LIMIT ? OFFSET ?"
+                )
+                parameters = (page_size, offset)
             else:
                 total = connection.execute(
                     "SELECT COUNT(*) FROM ai_reading_jobs WHERE status = ?", (status,)
                 ).fetchone()[0]
-                rows = connection.execute(
+                statement = (
                     self._admin_ai_job_select()
                     + " WHERE jobs.status = ? "
-                    "ORDER BY jobs.created_at DESC, jobs.id DESC LIMIT ? OFFSET ?",
-                    (status, page_size, offset),
-                ).fetchall()
+                    "ORDER BY jobs.created_at DESC, jobs.id DESC LIMIT ? OFFSET ?"
+                )
+                parameters = (status, page_size, offset)
+            if offset >= total:
+                return (), int(total)
+            rows = connection.execute(statement, parameters).fetchall()
         return tuple(self._admin_ai_job_mapping(row) for row in rows), int(total)
 
     def get_ai_job_for_retry(self, job_id: str) -> Optional[dict]:

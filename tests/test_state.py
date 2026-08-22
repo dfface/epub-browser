@@ -2069,6 +2069,14 @@ class StateStoreTests(unittest.TestCase):
         self.assertNotIn("private_note", jobs[0])
         self.assertTrue(jobs[0]["retryable"])
 
+    def test_admin_ai_job_pagination_handles_a_page_beyond_sqlite_offset_range(self):
+        jobs, total = self.store.list_admin_ai_jobs(
+            status=None, page=10 ** 100, page_size=20
+        )
+
+        self.assertEqual(jobs, ())
+        self.assertEqual(total, 0)
+
     def test_admin_retry_creates_one_linked_active_attempt(self):
         member = self.store.create_user("reader", "hash", role="member")
         book = self.store.resolve_book(
