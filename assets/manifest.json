@@ -1,0 +1,48 @@
+{
+  "name": "EPUB Browser",
+  "short_name": "EPUB Browser",
+  "description": "A personal EPUB reader and static-site generator",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f4f0e6",
+  "theme_color": "#244548",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/immutable/icon-192.c6f7d6e5a9b6.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/immutable/icon-512.2ac1ce7d0c7c.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/immutable/screenshot-wide.561f1fb31ff3.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "EPUB Browser Desktop View"
+    },
+    {
+      "src": "/assets/immutable/screenshot-narrow.b18b2c94a054.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "EPUB Browser Mobile View"
+    }
+  ],
+  "categories": [
+    "books",
+    "education",
+    "productivity"
+  ],
+  "lang": "en",
+  "scope": "/",
+  "prefer_related_applications": false
+}

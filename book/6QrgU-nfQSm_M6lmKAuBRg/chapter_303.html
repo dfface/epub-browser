@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#244548">
+    <meta name="description" content="受压迫的人民总是要起来的 - 毛泽东选集 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>受压迫的人民总是要起来的 - 毛泽东选集</title>
+    <script src="/assets/immutable/i18n.0efdec3fb0df.js"></script>
+    <script>window.EpubBrowserBasePath="/";window.EpubBrowserMode="ssg"</script><script>window.EpubBrowserI18n.init();</script>
+    <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
+    <link id="code-light" rel="stylesheet" href="/assets/immutable/github.min.3a9a5def8b9c.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/immutable/github-dark.min.9f208d022102.css">
+    <link rel="stylesheet" href="/assets/immutable/fa.all.min.0800fc6965d0.css">
+    <link rel="stylesheet" href="/assets/immutable/theme.08019b8f3707.css">
+    <link rel="stylesheet" href="/assets/immutable/notification.6219e1c21c4a.css">
+    <link rel="stylesheet" href="/assets/immutable/dialog.e8978fa5eb89.css">
+    <link rel="stylesheet" href="/assets/immutable/chapter.79ce7d06045e.css">
+    <link rel="stylesheet" href="/assets/immutable/breadcrumb.061bc87d8306.css">
+    <link rel="stylesheet" href="/assets/immutable/loading.56e36e52fd23.css">
+    <link rel="stylesheet" href="/assets/immutable/annotation.752bf04a87e8.css">
+    <link rel="stylesheet" href="/assets/immutable/annotation-hub.1c2b34b3118c.css">
+    
+    <link rel="stylesheet" href="/assets/immutable/fancybox.min.b175fce88bfe.css">
+    <link rel="icon" type="image/png" href="/assets/immutable/favicon.413482070e46.png">
+    <link rel="apple-touch-icon" href="/assets/immutable/icon-192.c6f7d6e5a9b6.png">
+    <link rel="stylesheet" href="/assets/immutable/bookshelf.765c441cdf1c.css">
+
+    <script>
+    // 立即应用主题，避免闪现 —— Kindle 兼容版
+    function isKindleDevice() {
+    // 优先从 window 缓存读取
+    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
+        return window.epubBrowserCache.kindle_mode === "true";
+    }
+    // 检测设备
+    var ua = navigator.userAgent.toLowerCase();
+    var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
+    
+    if (!window.epubBrowserCache) {
+        window.epubBrowserCache = {};
+    }
+    window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
+    return isKindle;
+    }
+
+    // 通用 Cookie 方法（只定义一次）
+    function getCookie(key) {
+    var cookies = document.cookie.split("; ");
+    for (var i = 0; i < cookies.length; i++) {
+        var parts = cookies[i].split("=");
+        var cookieKey = parts[0];
+        var cookieValue = parts.slice(1).join("=");
+        if (cookieKey === key) {
+        return decodeURIComponent(cookieValue);
+        }
+    }
+    return null;
+    }
+
+    var theme = "light";
+    var isKindle = false;
+
+    try {
+    // 优先从 window 缓存读取
+    var storedTheme = null;
+    if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+        storedTheme = window.epubBrowserCache.theme;
+    } else {
+        storedTheme = localStorage.getItem("theme");
+        if (storedTheme) {
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.theme = storedTheme;
+        }
+    }
+
+    if (storedTheme) {
+        theme = storedTheme;
+    } else if (isKindleDevice()) {
+        isKindle = true;
+        theme = getCookie("theme") || "light";
+    }
+    } catch (e) {
+    // 捕获异常，兼容 Kindle
+    if (isKindleDevice()) {
+        isKindle = true;
+        theme = getCookie("theme") || "light";
+    }
+    }
+
+    // 使用 html 元素添加类名
+    var htmlElement = document.documentElement;
+    htmlElement.classList.add(theme + "-mode");
+    if (isKindle) {
+    htmlElement.classList.add("kindle-mode");
+    }
+    </script>
+</head>
+
+<body>
+
+    <a class="skip-link" href="#eb-content" data-i18n="reader.skipToContent">Skip to reading content</a>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="reader.bookChapters">Chapters</h3>
+            <div class="toc-header-actions">
+                <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+                    <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
+                </a>
+                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close book home" data-i18n-aria-label="reader.closeBookHome">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </nav>
+
+    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
+            <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </nav>
+
+    <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
+
+    <header class="chapter-top-bar app-header">
+        <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
+            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/immutable/logo-mark-color.ef9a3679a944.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            <div class="app-nav-links">
+                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+                <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="6QrgU-nfQSm_M6lmKAuBRg" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+                
+            </div>
+            <div class="app-nav-actions">
+                <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
+            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
+            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
+            <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            
+            
+        </div>
+        <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
+            <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
+                <div class="loading-spinner"></div>
+            </div>
+            <article class="eb-content" id="eb-content" lang="zh-CN" data-eb-styles data-chapter-index="303" data-chapter-title="受压迫的人民总是要起来的" data-book-hash="6QrgU-nfQSm_M6lmKAuBRg" data-total-chapters="416">
+            
+  <div class="div">
+    <h3 class="h3"><span class="c3">受压迫的人民总是要起来的</span><a class="zy" href="#id0a" id="id0">*</a></h3>
+
+    <p class="a0"><span class="f2">（一九六三年八月九日）</span></p>
+
+    <p class="a">毛泽东：见到你们很高兴。昨天我见了一批非洲朋友。我们和你们谈得来，觉得平等。我们不把意见强加于你们，你们也不强加于我们。我们互相帮助，互相支持，互相学习斗争中的经验。</p>
+
+    <p class="a">舍马克：几天来，我们同周恩来总理进行了富有内容的会谈，我对会谈的结果感到很满意。我确信，我们两国之间的关系得到了加强。</p>
+
+    <p class="a">毛：谈政治、经济，还有其他方面的问题？</p>
+
+    <p class="a">舍：我们谈了一般的国际形势，特别是两国关系。双方就联合公报和经济技术合作协定达成了协议。</p>
+
+    <p class="a">毛：我们的经济搞得还不行，现在还不能满足你们的要求。我们正在努力，几年或几十年之后，总会有所进步，到那个时候，就有可能更多更好地满足外国朋友的需要。全世界被压迫的民族和被压迫的人民，在争取政治、经济、文化方面的独立和解放的斗争中共同努力，争取从帝国主义和殖民主义的压迫下解放出来。这就是我们的希望。</p>
+
+    <p class="a">你们知道，我国还没有完全解放，因为台湾还没有解放。对西方国家来说，中国这个国家好像不存在一样，但又好像存在。杜勒斯<a class="zy" href="#id1a" id="id1">〔1〕</a>说过，中国好像存在，又好像不存在。为什么中国存在呢？在朝鲜战争中，有中国人同美国人打仗，所以西方国家感到中国的存在。为什么中国又不存在呢？它们认为，中国是个情况不好的国家，不需要几天就要垮下去，就会崩溃、垮台，是没有多少希望的，好像存在等于不存在。西方对非洲也是这样的看法。它们认为，非洲是非非洲人的地方。如果非洲是西方人的，那末非洲不就是不存在了？现在它们好像开始看见有一个非洲存在着。非洲几十个国家已经独立，没有独立的国家的人民也在斗争。西方对亚非国家是很头痛的，对拉丁美洲也很头痛。这三大洲过去都是西方帝国主义国家的后备，现在它们感到这三大洲有些起哄，在闹地震。</p>
+
+    <p class="a">舍：这是真的，它们觉得这些地方出了岔子，违反它们的意志。</p>
+
+    <p class="a">毛：你们就是不服从意、英、法的意志。</p>
+
+    <p class="a">舍：我们独立不久，非常珍视我们的独立，我们自己要负起责任，确立我们自己的人格。过去很长时间内我们是被支配者，现在我们要做历史的主宰。过去西方殖民者不把我们当做人，只把我们当做东西。</p>
+
+    <p class="a">毛：他们只看到东西，因为东西有用。人能够为他们生产财富，所以才有用，除此以外就没有什么用了。现在我们不为西方国家生产财富而为自己生产财富，所以它们就天天骂我们，特别是美国。你们的主要斗争对象不是美国吧？我们的主要斗争对象是美国，英、法、意、西德要排到后面去。美帝国主义在我国周围建立很多军事基地来包围我们，这是你们知道的。你们同日本有外交关系吗？</p>
+
+    <p class="a">舍：有外交关系，但日本在索马里没有使馆。</p>
+
+    <p class="a">毛：我们同日本没有外交关系，因为日本不承认我国，它跟着美国走。</p>
+
+    <p class="a">舍：是日本政府，不是日本人民。</p>
+
+    <p class="a">毛：日本人民很好，我们同日本人民关系很亲密。美国反对中国的也不是美国人民，我们和许多美国人有来往。我们同英、法以及其他欧洲国家的关系也是如此。</p>
+
+    <p class="a">舍：对我们说来，斗争对象主要是英国、法国、意大利，然后才是美国。英国、法国、意大利等这些国家把非洲看做是它们的势力范围，美国要过问非洲就等于过问它们的内政，未经它们的同意，美国很难做什么事情。它们认为非洲既然过去是它们的殖民地，它们就有权保持势力范围。现在非洲国家百分之八十以上独立了，非洲人是非常珍惜自己的人格的，决不让非洲成为人家的势力范围。</p>
+
+    <p class="a">毛：把非洲国家当做势力范围，这种过去的老规矩不行了。现在非洲三十几个国家独立了。一些国家通过战争取得独立，如阿尔及利亚打了八年，它的几万军队与法国的几十万军队打仗，几十万军队失败了，几万军队胜利了。为什么几万军队能战胜几十万军队呢？在几万军队后面有几百万阿尔及利亚人民的支持，法国的几十万军队得不到阿尔及利亚人民的支持。阿尔及利亚一千万人口，其中有一百万法国人，现在他们大部分都跑了。还有阿联<a class="zy" href="#id2a" id="id2">〔2〕</a>为维护苏伊士运河的主权，曾同英、法打过仗，结果英、法被打跑了，现在苏伊士运河控制在阿联手里。</p>
+
+    <p class="a">总而言之，帝国主义的阵地在缩小，大大缩小。如它们在非洲的阵地大大缩小了，在中国大陆它们也管不着了。听说你们不喜欢驻北京的英国代办。</p>
+
+    <p class="a">舍：对个人我们没有怨气，我们反对的是英国政府的政策。英国有七次拿我国的领土做交易。以前我们无能为力，因为我们还没有独立。可是，在我们独立后，英国再把我们的领土给别人时，我们就同它断绝了外交关系。所以现在英国在索马里就无法保持它的影响。</p>
+
+    <p class="a">毛：这样很好。当英国和法国用战争夺取苏伊士运河的时候，埃及也和英、法断了交，最近才恢复。几内亚独立后，也同法国断过交，去年才恢复。</p>
+
+    <p class="a">舍：是。这些都是同过去统治者搞关系的经验教训。</p>
+
+    <p class="a">毛：美国不承认我们，日本同我们没有外交关系，英国、荷兰同我们只是半建交关系，法、意、西德迄今与我们没有外交关系，还有跟它们走的土耳其、希腊、葡萄牙、西班牙、比利时也与我们没有外交关系。</p>
+
+    <p class="a">现在美国还在占领我们的台湾，假如：第一条，美国把台湾交还给我们；第二条，联合国让我们进去，赶走蒋介石；第三条，取消对我国的经济封锁，做起生意来；第四条，两国互相承认，建立外交关系，即使如此，我们仍然反对帝国主义，反对美国帝国主义。因为这不仅是我们自己一国的问题，我们要团结世界大多数人民，这样才能打倒帝国主义。这是它们最恨我们的。我们不仅要在国内打倒帝国主义，而且要在全世界消灭帝国主义。我们的武器不多，没有原子弹，经济也不发达，但是我们赞成全世界人民从帝国主义、殖民主义的统治下解放出来。只有到那个时候，世界人民才会安宁，我们自己也才会最后得到安宁。你们不信吗？帝国主义总有一天会被打倒的。</p>
+
+    <p class="a">舍：我们相信。人民会为自己的解放而努力。如果遭受帝国主义、殖民主义统治的人民不是自己起来，而靠外国参加的话，那就等于内政遭到干涉。</p>
+
+    <p class="a">毛：受压迫的人民自己总是要起来的。</p>
+
+    <p class="a">舍：自由主要靠当地人民自己去争取。</p>
+
+    <p class="a">毛：完全赞成。我们认为，支持就是声援，给予经济上的帮助，必要时并给予武器援助。如对阿尔及利亚，我们就给了武器援助。</p>
+
+    <p class="a">舍：因为阿尔及利亚人民表明他们要独立，呼吁帮助。如果阿尔及利亚人民不表明要独立，那怎么办呢？</p>
+
+    <p class="a">毛：那没有办法，毫无办法，只有等待人民觉醒，起来斗争。中国等了一百多年，大陆才解放，台湾也许要等几十年。全世界统统解放还要等更长时间。对台湾，我们也不准备用武力去解放，原因之一是在台湾有美国军队，我们军队进攻，就要同美国打仗。至于香港，英国没有多少军事力量，我们要占领是可以的。但过去有条约关系，小部分是割让的，大部分是租的，租期是九十九年，还有三十四年才满期。这是特殊情况，我们暂时不准备动它。这一点也许你们不了解。</p>
+
+    <p class="a">舍：如果香港人自己要解放，把英国赶走，能拒绝帮助吗？</p>
+
+    <p class="a">毛：香港人就是我们中国人。香港是通商要道，如果我们现在就控制它，对世界贸易、对我们同世界的贸易关系都不利。我们不动它并不是永远不动它，英国现在安心，将来会不安心的。</p>
+
+    <p class="a">　　</p>
+
+    <p class="a"><span class="f3">　注　　释　</span></p>
+
+    <p class="zs"><a class="hl" href="#id0" id="id0a">　*　</a>这是毛泽东同志同索马里总理阿卜迪拉希德·阿里·舍马克的谈话。</p>
+
+    <p class="zs"><a class="hl" href="#id1" id="id1a">〔1〕</a>杜勒斯，一九五三年至一九五九年任美国国务卿。</p>
+
+    <p class="zs"><a class="hl" href="#id2" id="id2a">〔2〕</a>阿联，阿拉伯联合共和国的简称。一九五八年由埃及、叙利亚合并组成。一九六一年九月叙利亚脱离阿拉伯联合共和国，成立阿拉伯叙利亚共和国。一九七一年阿拉伯联合共和国改名为阿拉伯埃及共和国。</p>
+  </div>
+
+            </article>
+        </div>
+
+        <div class="navigation" data-id="navigation">
+            <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_302.html" aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>
+            <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/index.html" aria-label="Book" data-i18n-aria-label="reader.book" id="navigationHomeBtn">
+                <div class="control-btn">
+                    <i class="fas fa-book"></i>
+                    <span class="control-name" data-i18n="reader.book">Book</span>
+                </div>
+            </a>
+
+            <div id="paginationInfo" style="display: none;">
+                <button class="control-btn pagination-mode-exit" id="exitPaginationMode" type="button" aria-label="Exit page-turning mode" data-i18n-aria-label="settings.exitPaginationMode" title="Exit page-turning mode" data-i18n-title="settings.exitPaginationMode">
+                    <i class="fas fa-scroll"></i>
+                    <span class="control-name" data-i18n="settings.exitPaginationMode">Exit page-turning mode</span>
+                </button>
+                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
+                    <i class="fas fa-chevron-left"></i>
+                    <span class="control-name" data-i18n="reader.previousPage">Previous page</span>
+                </div>
+                <div style="display: flex; flex-direction: row;">
+                    <span class="page-indicator">
+                        <span id="currentPage" style="display:none;"></span>
+                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1" aria-label="Current page" data-i18n-aria-label="reader.currentPage"> / <span id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
+                    </span>
+                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump" data-i18n-title="reader.jump">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span class="control-name" data-i18n="reader.jump">Jump</span>
+                    </div>
+                    <div class="control-btn" id="toggleClickPage" title="Click to turn page" data-i18n-title="reader.clickToTurn">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span class="control-name" data-i18n="reader.clickToTurn">Click to turn page</span>
+                    </div>
+                    <!-- Pure button only for desktop -->
+                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode" data-i18n-title="reader.pureReading">
+                        <i class="fas fa-book-open"></i>
+                        <span class="control-name" data-i18n="reader.pureReading">Pure reading mode</span>
+                    </div>
+                    <!-- Reload button for pagination mode -->
+                    <div class="control-btn" id="reloadPages" title="Reload pages" data-i18n-title="reader.reloadPages">
+                        <i class="fas fa-rotate-right"></i>
+                        <span class="control-name" data-i18n="reader.reloadPages">Reload pages</span>
+                    </div>
+                </div>
+                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
+                    <span>
+                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1" aria-label="Page height" data-i18n-aria-label="reader.pageHeight">
+                    </span>
+                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height" data-i18n-title="reader.setPageHeight">
+                        <i class="fas fa-ruler-vertical"></i>
+                        <span class="control-name" data-i18n="reader.setPageHeight">Set page height</span>
+                    </div>
+                </div>
+                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
+                    <i class="fas fa-chevron-right"></i>
+                    <span class="control-name" data-i18n="reader.nextPage">Next page</span>
+                </div>
+            </div>
+            <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_304.html" aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>
+        </div>
+    </div>
+
+    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay" aria-hidden="true"></div>
+    <div class="settings-modal" id="settingsModal" data-id="settingsModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settingsModalTitle">
+        <div class="settings-header">
+            <h2 class="settings-header-title" id="settingsModalTitle">
+                <i class="fas fa-cog" aria-hidden="true"></i>
+                <span data-i18n="reader.settings">Settings</span>
+            </h2>
+            <button class="settings-close-btn" id="settingsCloseBtn" type="button" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="font">
+                <i class="fas fa-font"></i>
+                <span data-i18n="settings.appearance">Appearance</span>
+            </button>
+            <button class="settings-tab" data-tab="reading">
+                <i class="fas fa-book-reader"></i>
+                <span data-i18n="settings.reading">Reading</span>
+            </button>
+        </div>
+        <div class="settings-content">
+            <div class="settings-tab-panel active" id="font-tab">
+                <div class="settings-group">
+                    <label class="settings-label" data-i18n="settings.fontFamily">Font family</label>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="ebook-default" selected data-i18n="settings.bookDefault">Book default</option>
+                <option value="system-ui, -apple-system, sans-serif" data-i18n="settings.systemDefault">System default</option>
+                <option value="custom" data-i18n="settings.customByInput">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here" data-i18n-placeholder="settings.customFontPlaceholder">
+            <small data-i18n="settings.customFontTip">Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> <span data-i18n="settings.apply">Apply</span>
+            </button>
+        </div>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label" data-i18n="settings.fontSize">Font size</label>
+                    <div class="font-size-control">
+                        <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
+                        <div class="font-size-scale">
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-tab-panel" id="reading-tab">
+                <div class="settings-group">
+                    <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
+                    <div class="page-width-control">
+                        <input type="range" id="pageWidthSlider" min="1" max="4" value="3" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                        <div class="page-width-scale" aria-hidden="true">
+                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
+                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
+                            <span data-i18n="settings.pageWidthWide">Wide</span>
+                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
+                    </label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="paginationModeToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
+                    </label>
+                    <label class="settings-switch desktop-setting-only">
+                        <input type="checkbox" id="desktopChapterSidebarToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar on desktop</span>
+                    </label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="continuousScrollToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                    </label>
+                </div>
+                <div class="settings-group settings-group-custom-css">
+                    <div class="settings-section-heading">
+                        <span class="settings-section-title" data-i18n="settings.customStyles">Custom styles</span>
+                        <span class="settings-section-optional" data-i18n="settings.optional">Optional</span>
+                    </div>
+                    <p class="settings-section-description" data-i18n="settings.customStylesDescription">Use CSS to fine-tune this book’s typography and layout.</p>
+                    <div class="css-editor">
+                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{background: inherit; box-shadow:inherit;} #eb-content{margin: 50px; width: auto} #eb-content p {margin-bottom: 0.8rem; line-height: 1.7;}" data-i18n-placeholder="settings.customCssPlaceholder"></textarea>
+                        <div class="css-controls">
+                            <button class="css-btn primary" id="saveCssBtn">
+                                <i class="fas fa-save"></i> <span data-i18n="settings.save">Save</span>
+                            </button>
+                            <button class="css-btn primary" id="saveAsDefaultBtn">
+                                <i class="fas fa-star"></i> <span data-i18n="settings.saveAsDefault">Save as default</span>
+                            </button>
+                            <button class="css-btn secondary" id="resetCssBtn">
+                                <i class="fas fa-undo"></i> <span data-i18n="settings.reset">Reset</span>
+                            </button>
+                            <button class="css-btn secondary" id="loadDefaultBtn">
+                                <i class="fas fa-download"></i> <span data-i18n="settings.loadDefault">Load default</span>
+                            </button>
+                            <button class="css-btn secondary" id="previewCssBtn">
+                                <i class="fas fa-eye"></i> <span data-i18n="settings.preview">Preview</span>
+                            </button>
+                        </div>
+                        <div class="css-info">
+                            <p><i class="fas fa-info-circle"></i> <span data-i18n="settings.defaultStyleTip">Tip: The default style will be applied to all books unless a custom style is set for specific books.</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="reader.top">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name" data-i18n="reader.top">Top</span>
+        </button>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" title="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" data-i18n-title="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
+            <i class="fas fa-list"></i>
+            <span data-i18n="reader.thisChapterContents">This chapter</span>
+        </button>
+        
+        <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_302.html" aria-label="Previous chapter" title="Previous chapter" data-i18n-aria-label="reader.previous" data-i18n-title="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>
+        <a href="/" aria-label="Home" title="Home" data-i18n-aria-label="reader.home" data-i18n-title="reader.home">
+            <div class="control-btn" aria-label="Home" data-i18n-aria-label="reader.home">
+                <i class="fas fa-home"></i>
+                <span data-i18n="reader.home">Home</span>
+            </div>
+        </a>
+        <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_304.html" aria-label="Next chapter" title="Next chapter" data-i18n-aria-label="reader.next" data-i18n-title="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>
+        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
+            <i class="fas fa-book"></i>
+            <span data-i18n="reader.bookChapters">Chapters</span>
+        </button>
+        <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" title="Settings" data-i18n-aria-label="reader.settings" data-i18n-title="reader.settings" aria-controls="settingsModal" aria-expanded="false">
+            <i class="fas fa-cog"></i>
+            <span data-i18n="reader.settings">Settings</span>
+        </button>
+        <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" title="Top" data-i18n-aria-label="reader.top" data-i18n-title="reader.top">
+            <i class="fas fa-arrow-up"></i>
+            <span data-i18n="reader.top">Top</span>
+        </button>
+    </div>
+
+    <!-- 书架弹窗 -->
+    <div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
+            <div class="bookshelf-header">
+                <div class="bookshelf-header-left">
+                    <button class="bookshelf-action-btn" id="addShelfGroupBtn">
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
+                    </button>
+                    
+                    <button class="bookshelf-action-btn" id="exportShelfBtn">
+                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="importShelfBtn">
+                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+                    </button>
+                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                </div>
+                <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+                <div class="bookshelf-header-right">
+                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="bookshelf-body" id="bookshelfBody">
+            </div>
+            <div class="bookshelf-footer" id="bookshelfFooter">
+                <span id="bookshelfStats"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分组弹窗 -->
+    <div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
+            <div class="bookshelf-header">
+                <div class="bookshelf-header-left">
+                    <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="renameGroupBtn">
+                        <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
+                    </button>
+                    <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
+                        <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
+                    </button>
+                </div>
+                <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
+                <div class="bookshelf-header-right">
+                    <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
+                        <i class="fas fa-home"></i>
+                    </button>
+                    <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="bookshelf-body" id="groupBody">
+            </div>
+            <div class="bookshelf-footer" id="groupFooter">
+                <span id="groupStats"></span>
+            </div>
+        </div>
+    </div>
+    <footer class="eb-footer" data-id="eb-footer" data-version-check data-current-version="2.2.1" data-release-api="https://api.github.com/repos/dfface/epub-browser/releases/latest">
+    <p><span data-i18n="footer.product">EPUB Library</span> &copy; 2026 | <span data-i18n="footer.poweredBy">Powered by</span> <a href="https://github.com/dfface/epub-browser" target="_blank" rel="noopener noreferrer">epub-browser</a><!-- i18n-allow-literal: product name --> <span data-i18n="footer.poweredBySuffix">&middot;</span> <span class="eb-footer-version" aria-label="Version 2.2.1" data-i18n-aria-label="common.version" data-i18n-params='{"version":"2.2.1"}'>v2.2.1</span><span class="eb-footer-update" data-version-update hidden><span aria-hidden="true"> &middot; </span><a target="_blank" rel="noopener noreferrer"></a></span></p>
+</footer>
+
+    
+    <script src="/assets/immutable/notification.7492663447d4.js" defer></script>
+    
+    <script src="/assets/immutable/theme.be1f4df08989.js" defer></script>
+    <script src="/assets/immutable/dialog.80217164cb29.js" defer></script>
+    <script src="/assets/immutable/version-check.47351de03846.js" defer></script>
+    <script src="/assets/immutable/fancybox.min.427255e074f9.js"></script>
+    <script src="/assets/immutable/web-highlighter.min.7360ce01d835.js"></script>
+    <script src="/assets/immutable/chapter-window.8d2c13e8f216.js" defer></script>
+    <script src="/assets/immutable/viewport-anchor.021abaa5aa16.js" defer></script>
+    <script src="/assets/immutable/continuous-buffer.27eaf6de1887.js" defer></script>
+    <script src="/assets/immutable/reading-progress.653eacfc5c3b.js" defer></script>
+    <script src="/assets/immutable/reader-layout.6f67c4c1e04c.js" defer></script>
+    <script src="/assets/immutable/chapter.acbfdb4ad398.js" defer></script>
+    <script src="/assets/immutable/annotation-position.df7b410bbafb.js" defer></script>
+    <script src="/assets/immutable/annotation.6d0efc58939b.js" defer></script>
+    <script src="/assets/immutable/annotation-hub.b3aad98b6207.js" defer></script>
+    <script src="/assets/immutable/sortable.min.6d0a831fc19b.js"></script>
+    <script src="/assets/immutable/highlight.min.c4a399dd6f48.js"></script>
+    <script src="/assets/immutable/bookshelf.9d1bbea30a7a.js" defer></script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.initScriptChapter) window.initScriptChapter();
+    });
+    </script>
+</body>
+</html>

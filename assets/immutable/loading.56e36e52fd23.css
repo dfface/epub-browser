@@ -1,0 +1,49 @@
+.content-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Cover all reader overlays, including Server-mode AI paragraph triggers. */
+    z-index: 10090;
+    background: var(--card-bg);
+    background: color-mix(in srgb, var(--card-bg) 72%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(1.05);
+    backdrop-filter: blur(12px) saturate(1.05);
+}
+
+.content-loading:not(.is-visible) { display: none; }
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid var(--border);
+    border-color: color-mix(in srgb, var(--text-secondary) 24%, transparent);
+    border-top-color: var(--loading-spinner, var(--button-bg));
+    border-radius: 50%;
+    animation: loading-spin 1s linear infinite;
+}
+
+@keyframes loading-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.kindle-mode .loading-spinner {
+    width: auto;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    animation: none;
+    font-size: 18px;
+    color: var(--text);
+    font-family: var(--font-family);
+}
+
+.kindle-mode .loading-spinner::after {
+    content: "Loading...";
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-spinner { animation: none; }
+}
