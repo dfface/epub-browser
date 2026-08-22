@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import sqlite3
+import stat
 import tempfile
 import uuid
 from contextlib import contextmanager
@@ -170,8 +171,13 @@ class MigrationManager:
             self._check_integrity(temporary_database)
             os.replace(temporary_database, self.database_path)
         finally:
-            if temporary_database.exists():
-                temporary_database.unlink()
+            for path in (
+                temporary_database,
+                temporary_database.with_name(f"{temporary_database.name}-wal"),
+                temporary_database.with_name(f"{temporary_database.name}-shm"),
+            ):
+                if path.exists():
+                    path.unlink()
         return backup_path
 
     def _backup_authoritative_database(self, source: Path) -> Path:
@@ -207,9 +213,18 @@ class MigrationManager:
         temporary = destination.with_name(
             f".{destination.name}.{uuid.uuid4().hex}.tmp"
         )
+        source_mode = stat.S_IMODE(source.stat().st_mode)
+        snapshot_mode = source_mode & 0o600
         source_connection = None
         target_connection = None
         try:
+            descriptor = os.open(
+                temporary,
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                0o600,
+            )
+            os.close(descriptor)
+            os.chmod(temporary, 0o600)
             try:
                 source_connection = sqlite3.connect(source)
                 target_connection = sqlite3.connect(temporary)
@@ -223,6 +238,7 @@ class MigrationManager:
                     if source_connection is not None:
                         source_connection.close()
             self._check_integrity(temporary)
+            os.chmod(temporary, snapshot_mode)
             os.replace(temporary, destination)
         finally:
             if temporary.exists():

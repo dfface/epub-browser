@@ -421,7 +421,9 @@ SSG publishes a static Service Worker. Server deliberately disables and retires 
 
 Before upgrading persistent Server installations, back up the source EPUBs and `<server-dir>/data`. Keep the same persistent state volume during container replacement.
 
-Startup migration is automatic and restart-safe. It verifies legacy databases, creates a backup, upgrades a copy, imports eligible legacy bookshelf/progress/annotation data into the pending initial administrator, and only retires legacy files after successful checkpoints. Ordinary requests never scan legacy sync directories. Corrupt databases, invalid password hashes, ambiguous legacy databases, and conflicting IDs fail closed instead of being guessed or overwritten.
+Startup migration is automatic and restart-safe. It verifies legacy databases, creates a backup, upgrades a copy, imports eligible legacy bookshelf/progress/annotation data into the pending initial administrator, and retires only replaceable legacy public artifacts after successful checkpoints. Ordinary requests never scan legacy sync directories. Corrupt databases, invalid password hashes, ambiguous legacy databases, and conflicting IDs fail closed instead of being guessed or overwritten.
+
+A migrated root `epub-browser.db` or `annotations.db` is retained as a sensitive, non-authoritative recovery copy; `data/epub-browser.db` is authoritative and Server requests do not use the retained root file. Keep the recovery copy private. Remove it manually only while Server is stopped, after verifying the authoritative database and recorded backup, and only when v1 rollback is no longer needed. EPUB Browser never deletes it automatically.
 
 If both `epub-browser.db` and `annotations.db` exist at a legacy root, startup stops and leaves them untouched. See [Migrating to v2](docs/migration-v2.md) for backup, rollback, cache rebuilding, and conflict recovery.
 

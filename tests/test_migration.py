@@ -1,5 +1,7 @@
 import io
 import json
+import os
+import stat
 import sqlite3
 import tempfile
 import unittest
@@ -324,6 +326,57 @@ class MigrationManagerTests(unittest.TestCase):
                 connection.execute("PRAGMA integrity_check").fetchone()[0],
                 "ok",
             )
+
+    def test_restrictive_root_database_keeps_snapshots_and_final_copy_private(self):
+        source = self.server_dir / "epub-browser.db"
+        self._create_legacy_database(source)
+        source.chmod(0o600)
+        manager = self._manager()
+        initialize_database = manager._initialize_database
+        staging_modes = []
+
+        def inspect_staging(path):
+            staging_modes.append(stat.S_IMODE(path.stat().st_mode))
+            initialize_database(path)
+
+        previous_umask = os.umask(0)
+        try:
+            with mock.patch.object(
+                manager,
+                "_initialize_database",
+                side_effect=inspect_staging,
+            ):
+                result = manager.prepare_data()
+        finally:
+            os.umask(previous_umask)
+
+        self.assertEqual(staging_modes, [0o600])
+        self.assertEqual(stat.S_IMODE(source.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(result.backup_path.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(result.database_path.stat().st_mode), 0o600)
+        leftovers = tuple(
+            path.name
+            for path in (self.server_dir / "data").rglob("*")
+            if path.name.endswith(".tmp") or ".migrating-" in path.name
+        )
+        self.assertEqual(leftovers, ())
+
+    def test_restrictive_authoritative_database_backup_stays_private(self):
+        database = self.server_dir / "data" / "epub-browser.db"
+        StateStore(database).initialize(bootstrap=self.bootstrap)
+        with sqlite3.connect(database) as connection:
+            connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION - 1}")
+        database.chmod(0o600)
+
+        previous_umask = os.umask(0)
+        try:
+            result = self._manager().prepare_data()
+        finally:
+            os.umask(previous_umask)
+
+        self.assertEqual(stat.S_IMODE(database.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(result.backup_path.stat().st_mode), 0o600)
+        self.assertFalse(any((self.server_dir / "data").glob(".*.migrating-*")))
 
     def test_authoritative_upgrade_backup_failure_leaves_database_unchanged(self):
         database = self.server_dir / "data" / "epub-browser.db"

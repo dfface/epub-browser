@@ -51,11 +51,12 @@ Startup performs these steps:
 2. Reject ambiguous root databases or an unreadable/corrupt SQLite file.
 3. Copy the v1 root `epub-browser.db` or `annotations.db` to a verified backup under `data/backups/`.
 4. Upgrade a temporary root-database copy and atomically activate it as `data/epub-browser.db`. If an authoritative `data/epub-browser.db` already exists at an older supported schema version, integrity-check it and make a verified `data/backups/` copy before upgrading it in place.
-5. Preserve annotations, bookshelf rows, reading progress, and legacy book IDs.
-6. Import the single highest valid `epub-browser-bookshelf-<username>-<version>.json`, regardless of the legacy filename username, into the pending administrator when it is newer than SQLite. JSON source files are not deleted. This scan happens only during startup migration; ordinary `/sync` requests never inspect legacy files.
-7. Wait for web or unattended administrator setup, then reconcile every EPUB into `cache/public/`.
-8. After a complete reconciliation, move old root `index.html`, `book-metadata.json`, `sw.js`, `assets/`, and `book/` into `cache/legacy-public/`.
-9. Remove `cache/legacy-public/` only after the next successful startup.
+5. Retain the original v1 root database in place as a sensitive, non-authoritative recovery copy. Once `data/epub-browser.db` exists, Server requests and later migrations do not use the retained root database.
+6. Preserve annotations, bookshelf rows, reading progress, and legacy book IDs.
+7. Import the single highest valid `epub-browser-bookshelf-<username>-<version>.json`, regardless of the legacy filename username, into the pending administrator when it is newer than SQLite. JSON source files are not deleted. This scan happens only during startup migration; ordinary `/sync` requests never inspect legacy files.
+8. Wait for web or unattended administrator setup, then reconcile every EPUB into `cache/public/`.
+9. After a complete reconciliation, move old root `index.html`, `book-metadata.json`, `sw.js`, `assets/`, and `book/` into `cache/legacy-public/`.
+10. Remove `cache/legacy-public/` only after the next successful startup.
 
 Migration progress is recorded in `data/migration-state.json`, so an interrupted start can be retried safely.
 
@@ -66,8 +67,9 @@ data/backups/epub-browser.db.20260818T120000Z.0123456789ab.bak
 ```
 
 The backup is byte-digest verified and passes SQLite integrity checking before
-the v1 root database is removed or an authoritative older schema is changed.
-A current-schema restart creates no repeated backup.
+an authoritative copy is activated or an authoritative older schema is
+changed. The v1 root database is retained as a sensitive, non-authoritative
+recovery copy. A current-schema restart creates no repeated backup.
 
 ## Book identity and user data
 
@@ -103,6 +105,14 @@ bytes and schema remain intact. If `data/epub-browser.db` already exists, it is
 authoritative; any later-discovered root database is left untouched and
 reported with `--log`.
 
+The retained root database may contain accounts, password hashes, API keys, and
+reading data. Keep its permissions restrictive. An operator may remove it
+manually only after stopping EPUB Browser, confirming that
+`data/epub-browser.db` is the current integrity-checked authority, confirming
+that the verified backup recorded in `data/migration-state.json` is available,
+and deciding that v1 rollback is no longer required. EPUB Browser never deletes
+this recovery copy automatically.
+
 ## Rollback
 
 Stop EPUB Browser before copying database files.
@@ -111,10 +121,11 @@ To return to v1 after a successful v2 migration:
 
 1. Preserve the entire v2 Server directory as an additional backup.
 2. Select the matching verified `.bak` file under `data/backups/`.
-3. For a migrated root database, copy it back to the v1 root as
-   `epub-browser.db` (or `annotations.db` if that was the original name). For an
-   in-place authoritative schema upgrade, copy it back to
-   `data/epub-browser.db`.
+3. For a migrated root database, use the retained, unchanged v1 root database.
+   If an operator already removed or changed it, restore the matching verified
+   backup at the v1 root as `epub-browser.db` (or `annotations.db` if that was
+   the original name). For an in-place authoritative schema upgrade, restore
+   the backup as `data/epub-browser.db`.
 4. Run the compatible earlier package against that restored schema.
 
 Example:

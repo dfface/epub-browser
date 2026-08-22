@@ -2,6 +2,7 @@ import dataclasses
 import hmac
 import json
 import math
+import re
 import sqlite3
 import time
 import unicodedata
@@ -23,6 +24,55 @@ from .identity import new_server_book_id
 
 
 DB_SCHEMA_VERSION = 11
+
+_V11_INDEX_CONTRACTS = (
+    ("idx_books_active_book", "books", False,
+     (("active", False), ("book_id", False)), None),
+    ("idx_annotations_user_created", "annotations", False,
+     (("user_id", False), ("created_at", True), ("id", False)), None),
+    ("idx_annotations_user_book_created", "annotations", False,
+     (("user_id", False), ("book_hash", False), ("created_at", True),
+      ("id", False)), None),
+    ("idx_annotations_user_book_chapter_created", "annotations", False,
+     (("user_id", False), ("book_hash", False), ("chapter_index", False),
+      ("created_at", True), ("id", False)), None),
+    ("idx_sessions_user_created", "sessions", False,
+     (("user_id", False), ("created_at", True), ("session_id", False)), None),
+    ("idx_ai_jobs_created", "ai_reading_jobs", False,
+     (("created_at", True), ("id", True)), None),
+    ("idx_ai_jobs_status_created", "ai_reading_jobs", False,
+     (("status", False), ("created_at", True), ("id", True)), None),
+    ("idx_ai_jobs_queue", "ai_reading_jobs", False,
+     (("created_at", False), ("id", False)),
+     "status='queued' AND request_json IS NOT NULL"),
+    ("idx_ai_jobs_active_cache", "ai_reading_jobs", True,
+     (("cache_key", False),), "status IN ('queued','running')"),
+    ("idx_ai_jobs_result", "ai_reading_jobs", False,
+     (("result_id", False),), "result_id IS NOT NULL"),
+    ("idx_ai_jobs_retry_root", "ai_reading_jobs", False,
+     (("retry_root_job_id", False), ("attempt_number", False)), None),
+    ("idx_ai_followups_queue", "ai_reading_followups", False,
+     (("created_at", False), ("id", False)), "status='queued'"),
+    ("idx_ai_followups_result_owner_created", "ai_reading_followups", False,
+     (("result_id", False), ("owner_user_id", False), ("created_at", False)),
+     None),
+    ("idx_ai_book_chat_queue", "ai_book_chat_turns", False,
+     (("created_at", False),), "status='queued'"),
+    ("idx_ai_book_chat_owner_book_created", "ai_book_chat_turns", False,
+     (("owner_user_id", False), ("book_id", False), ("created_at", False),
+      ("id", False)), None),
+    ("idx_ai_book_chat_result", "ai_book_chat_turns", False,
+     (("result_id", False),), "result_id IS NOT NULL"),
+    ("idx_ai_results_book_created", "ai_reading_results", False,
+     (("book_id", False), ("created_at", True), ("id", True)), None),
+    ("idx_ai_results_chapter_language_created", "ai_reading_results", False,
+     (("book_id", False), ("chapter_index", False), ("language", False),
+      ("created_at", True), ("id", True)), None),
+    ("idx_ai_current_results_result", "ai_reading_current_results", False,
+     (("result_id", False),), None),
+    ("idx_book_ai_tags_tag", "book_ai_tags", False,
+     (("tag_id", False),), None),
+)
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -299,9 +349,10 @@ class StateStore:
             )
             """
         )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_books_active ON books(active)"
-        )
+        if not latest:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_books_active ON books(active)"
+            )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_books_package_identity "
             "ON books(epub_identifier, source_fingerprint, active)"
@@ -438,14 +489,15 @@ class StateStore:
             )
                 """
             )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_owner "
-            "ON ai_reading_jobs(owner_user_id, created_at DESC)"
-        )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_active_cache "
-            "ON ai_reading_jobs(cache_key, status)"
-        )
+        if not latest:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_owner "
+                "ON ai_reading_jobs(owner_user_id, created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_active_cache "
+                "ON ai_reading_jobs(cache_key, status)"
+            )
         if not latest:
             self._add_column_if_missing(
                 connection,
@@ -501,10 +553,11 @@ class StateStore:
             )
             """
         )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_reading_results_book "
-            "ON ai_reading_results(book_id, created_at DESC)"
-        )
+        if not latest:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_reading_results_book "
+                "ON ai_reading_results(book_id, created_at DESC)"
+            )
         self._add_column_if_missing(
             connection, "ai_reading_results", "template_id", "TEXT NOT NULL DEFAULT 'legacy'"
         )
@@ -549,10 +602,11 @@ class StateStore:
             )
             """
         )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_reading_followups_owner "
-            "ON ai_reading_followups(owner_user_id, created_at ASC)"
-        )
+        if not latest:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_reading_followups_owner "
+                "ON ai_reading_followups(owner_user_id, created_at ASC)"
+            )
         self._add_column_if_missing(
             connection, "ai_reading_followups", "language",
             "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN'))",
@@ -589,10 +643,11 @@ class StateStore:
             )
                 """
             )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_turns_owner_book "
-            "ON ai_book_chat_turns(owner_user_id, book_id, created_at ASC, id ASC)"
-        )
+        if not latest:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_turns_owner_book "
+                "ON ai_book_chat_turns(owner_user_id, book_id, created_at ASC, id ASC)"
+            )
         self._add_column_if_missing(
             connection, "ai_book_chat_turns", "book_context",
             "INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1))",
@@ -678,9 +733,10 @@ class StateStore:
             "user_agent",
             "TEXT",
         )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)"
-        )
+        if not latest:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)"
+            )
 
     @staticmethod
     def _create_v11_annotations_table(connection) -> None:
@@ -1060,7 +1116,62 @@ class StateStore:
             )
 
     @staticmethod
+    def _quote_identifier(identifier: str) -> str:
+        return '"' + identifier.replace('"', '""') + '"'
+
+    @staticmethod
+    def _normalize_index_predicate(predicate: Optional[str]) -> Optional[str]:
+        if predicate is None:
+            return None
+        return re.sub(r"\s+", " ", predicate.strip())
+
+    @staticmethod
+    def _index_contract(connection, index_name: str):
+        row = connection.execute(
+            "SELECT tbl_name, sql FROM sqlite_master "
+            "WHERE type = 'index' AND name = ?",
+            (index_name,),
+        ).fetchone()
+        if row is None:
+            return None
+        table, sql = row
+        quoted_table = StateStore._quote_identifier(table)
+        index_row = next(
+            (
+                listed
+                for listed in connection.execute(f"PRAGMA index_list({quoted_table})")
+                if listed[1] == index_name
+            ),
+            None,
+        )
+        if index_row is None:
+            raise sqlite3.IntegrityError(
+                f"schema v11 index metadata missing: {index_name}"
+            )
+        quoted_index = StateStore._quote_identifier(index_name)
+        columns = tuple(
+            (listed[2], bool(listed[3]))
+            for listed in connection.execute(f"PRAGMA index_xinfo({quoted_index})")
+            if listed[5]
+        )
+        predicate_match = re.search(
+            r"\bWHERE\b(.*)$",
+            sql or "",
+            re.IGNORECASE | re.DOTALL,
+        )
+        predicate = StateStore._normalize_index_predicate(
+            predicate_match.group(1) if predicate_match else None
+        )
+        return table, bool(index_row[2]), bool(index_row[4]), columns, predicate
+
+    @staticmethod
     def _create_v11_indexes(connection) -> None:
+        existing_indexes = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            )
+        }
         for index in (
             "idx_books_active",
             "idx_annotations_chapter_user_id",
@@ -1075,50 +1186,42 @@ class StateStore:
             "idx_ai_reading_followups_owner",
             "idx_ai_book_chat_turns_owner_book",
         ):
-            connection.execute(f"DROP INDEX IF EXISTS {index}")
-        statements = (
-            "CREATE INDEX IF NOT EXISTS idx_books_active_book ON books(active, book_id)",
-            "CREATE INDEX IF NOT EXISTS idx_annotations_user_created "
-            "ON annotations(user_id, created_at DESC, id)",
-            "CREATE INDEX IF NOT EXISTS idx_annotations_user_book_created "
-            "ON annotations(user_id, book_hash, created_at DESC, id)",
-            "CREATE INDEX IF NOT EXISTS idx_annotations_user_book_chapter_created "
-            "ON annotations(user_id, book_hash, chapter_index, created_at DESC, id)",
-            "CREATE INDEX IF NOT EXISTS idx_sessions_user_created "
-            "ON sessions(user_id, created_at DESC, session_id)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_created "
-            "ON ai_reading_jobs(created_at DESC, id DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_status_created "
-            "ON ai_reading_jobs(status, created_at DESC, id DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_queue "
-            "ON ai_reading_jobs(created_at, id) "
-            "WHERE status='queued' AND request_json IS NOT NULL",
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_jobs_active_cache "
-            "ON ai_reading_jobs(cache_key) WHERE status IN ('queued','running')",
-            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_result "
-            "ON ai_reading_jobs(result_id) WHERE result_id IS NOT NULL",
-            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_retry_root "
-            "ON ai_reading_jobs(retry_root_job_id, attempt_number)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_followups_queue "
-            "ON ai_reading_followups(created_at, id) WHERE status='queued'",
-            "CREATE INDEX IF NOT EXISTS idx_ai_followups_result_owner_created "
-            "ON ai_reading_followups(result_id, owner_user_id, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_queue "
-            "ON ai_book_chat_turns(created_at) WHERE status='queued'",
-            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_owner_book_created "
-            "ON ai_book_chat_turns(owner_user_id, book_id, created_at, id)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_result "
-            "ON ai_book_chat_turns(result_id) WHERE result_id IS NOT NULL",
-            "CREATE INDEX IF NOT EXISTS idx_ai_results_book_created "
-            "ON ai_reading_results(book_id, created_at DESC, id DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_results_chapter_language_created "
-            "ON ai_reading_results(book_id, chapter_index, language, created_at DESC, id DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_current_results_result "
-            "ON ai_reading_current_results(result_id)",
-            "CREATE INDEX IF NOT EXISTS idx_book_ai_tags_tag ON book_ai_tags(tag_id)",
-        )
-        for statement in statements:
+            if index in existing_indexes:
+                connection.execute(
+                    f"DROP INDEX {StateStore._quote_identifier(index)}"
+                )
+        for name, table, unique, columns, predicate in _V11_INDEX_CONTRACTS:
+            expected = (
+                table,
+                unique,
+                predicate is not None,
+                columns,
+                StateStore._normalize_index_predicate(predicate),
+            )
+            actual = StateStore._index_contract(connection, name)
+            if actual == expected:
+                continue
+            if actual is not None:
+                connection.execute(
+                    f"DROP INDEX {StateStore._quote_identifier(name)}"
+                )
+            column_sql = ", ".join(
+                StateStore._quote_identifier(column) + (" DESC" if descending else "")
+                for column, descending in columns
+            )
+            statement = (
+                "CREATE "
+                + ("UNIQUE " if unique else "")
+                + f"INDEX {StateStore._quote_identifier(name)} "
+                + f"ON {StateStore._quote_identifier(table)}({column_sql})"
+            )
+            if predicate is not None:
+                statement += f" WHERE {predicate}"
             connection.execute(statement)
+            if StateStore._index_contract(connection, name) != expected:
+                raise sqlite3.IntegrityError(
+                    f"schema v11 index contract mismatch: {name}"
+                )
 
     @staticmethod
     def _validate_password_hashes(connection) -> None:
@@ -3014,7 +3117,7 @@ class StateStore:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
-                SELECT * FROM ai_reading_jobs
+                SELECT * FROM ai_reading_jobs INDEXED BY idx_ai_jobs_queue
                 WHERE status = 'queued' AND request_json IS NOT NULL
                 ORDER BY created_at ASC, id ASC LIMIT 1
                 """

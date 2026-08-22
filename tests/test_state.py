@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 import tempfile
 import threading
@@ -19,6 +20,33 @@ def foreign_key_contract(connection, table):
         (row[3], row[2], row[4], row[6])
         for row in connection.execute(f"PRAGMA foreign_key_list({table})")
     }
+
+
+def index_contract(connection, index_name):
+    table, sql = connection.execute(
+        "SELECT tbl_name, sql FROM sqlite_master "
+        "WHERE type = 'index' AND name = ?",
+        (index_name,),
+    ).fetchone()
+    escaped_table = table.replace('"', '""')
+    index_row = next(
+        row
+        for row in connection.execute(f'PRAGMA index_list("{escaped_table}")')
+        if row[1] == index_name
+    )
+    escaped_index = index_name.replace('"', '""')
+    columns = tuple(
+        (row[2], bool(row[3]))
+        for row in connection.execute(f'PRAGMA index_xinfo("{escaped_index}")')
+        if row[5]
+    )
+    predicate_match = re.search(r"\bWHERE\b(.*)$", sql or "", re.IGNORECASE | re.DOTALL)
+    predicate = (
+        re.sub(r"\s+", " ", predicate_match.group(1).strip())
+        if predicate_match
+        else None
+    )
+    return table, bool(index_row[2]), bool(index_row[4]), columns, predicate
 
 
 class StateStoreTests(unittest.TestCase):
@@ -706,6 +734,27 @@ class StateStoreTests(unittest.TestCase):
                 }
                 <= table_columns(connection, "ai_reading_jobs")
             )
+            job_columns = {
+                row[1]: (row[2], bool(row[3]), row[4])
+                for row in connection.execute("PRAGMA table_info(ai_reading_jobs)")
+            }
+            self.assertEqual(
+                {
+                    name: job_columns[name]
+                    for name in (
+                        "attempt_number",
+                        "retried_from_job_id",
+                        "retry_root_job_id",
+                        "retried_by_user_id",
+                    )
+                },
+                {
+                    "attempt_number": ("INTEGER", True, "1"),
+                    "retried_from_job_id": ("TEXT", False, None),
+                    "retry_root_job_id": ("TEXT", False, None),
+                    "retried_by_user_id": ("TEXT", False, None),
+                },
+            )
             session_types = {
                 row[1]: row[2]
                 for row in connection.execute("PRAGMA table_info(sessions)")
@@ -735,11 +784,121 @@ class StateStoreTests(unittest.TestCase):
                 ("book_id", "books", "book_id", "CASCADE"),
                 foreign_key_contract(connection, "ai_book_chat_summaries"),
             )
-            indexes = {
-                row[1]: bool(row[2])
-                for row in connection.execute("PRAGMA index_list(ai_reading_jobs)")
+            expected_indexes = {
+                "idx_books_active_book": (
+                    "books", False, False, (("active", False), ("book_id", False)), None,
+                ),
+                "idx_annotations_user_created": (
+                    "annotations", False, False,
+                    (("user_id", False), ("created_at", True), ("id", False)), None,
+                ),
+                "idx_annotations_user_book_created": (
+                    "annotations", False, False,
+                    (("user_id", False), ("book_hash", False),
+                     ("created_at", True), ("id", False)), None,
+                ),
+                "idx_annotations_user_book_chapter_created": (
+                    "annotations", False, False,
+                    (("user_id", False), ("book_hash", False),
+                     ("chapter_index", False), ("created_at", True),
+                     ("id", False)), None,
+                ),
+                "idx_sessions_user_created": (
+                    "sessions", False, False,
+                    (("user_id", False), ("created_at", True),
+                     ("session_id", False)), None,
+                ),
+                "idx_ai_jobs_created": (
+                    "ai_reading_jobs", False, False,
+                    (("created_at", True), ("id", True)), None,
+                ),
+                "idx_ai_jobs_status_created": (
+                    "ai_reading_jobs", False, False,
+                    (("status", False), ("created_at", True), ("id", True)), None,
+                ),
+                "idx_ai_jobs_queue": (
+                    "ai_reading_jobs", False, True,
+                    (("created_at", False), ("id", False)),
+                    "status='queued' AND request_json IS NOT NULL",
+                ),
+                "idx_ai_jobs_active_cache": (
+                    "ai_reading_jobs", True, True, (("cache_key", False),),
+                    "status IN ('queued','running')",
+                ),
+                "idx_ai_jobs_result": (
+                    "ai_reading_jobs", False, True, (("result_id", False),),
+                    "result_id IS NOT NULL",
+                ),
+                "idx_ai_jobs_retry_root": (
+                    "ai_reading_jobs", False, False,
+                    (("retry_root_job_id", False), ("attempt_number", False)), None,
+                ),
+                "idx_ai_followups_queue": (
+                    "ai_reading_followups", False, True,
+                    (("created_at", False), ("id", False)), "status='queued'",
+                ),
+                "idx_ai_followups_result_owner_created": (
+                    "ai_reading_followups", False, False,
+                    (("result_id", False), ("owner_user_id", False),
+                     ("created_at", False)), None,
+                ),
+                "idx_ai_book_chat_queue": (
+                    "ai_book_chat_turns", False, True, (("created_at", False),),
+                    "status='queued'",
+                ),
+                "idx_ai_book_chat_owner_book_created": (
+                    "ai_book_chat_turns", False, False,
+                    (("owner_user_id", False), ("book_id", False),
+                     ("created_at", False), ("id", False)), None,
+                ),
+                "idx_ai_book_chat_result": (
+                    "ai_book_chat_turns", False, True, (("result_id", False),),
+                    "result_id IS NOT NULL",
+                ),
+                "idx_ai_results_book_created": (
+                    "ai_reading_results", False, False,
+                    (("book_id", False), ("created_at", True), ("id", True)), None,
+                ),
+                "idx_ai_results_chapter_language_created": (
+                    "ai_reading_results", False, False,
+                    (("book_id", False), ("chapter_index", False),
+                     ("language", False), ("created_at", True), ("id", True)), None,
+                ),
+                "idx_ai_current_results_result": (
+                    "ai_reading_current_results", False, False,
+                    (("result_id", False),), None,
+                ),
+                "idx_book_ai_tags_tag": (
+                    "book_ai_tags", False, False, (("tag_id", False),), None,
+                ),
             }
-            self.assertTrue(indexes["idx_ai_jobs_active_cache"])
+            self.assertEqual(
+                {
+                    name: index_contract(connection, name)
+                    for name in expected_indexes
+                },
+                expected_indexes,
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, status) "
+                "VALUES ('default-attempt', ?, 'default-attempt', 'queued')",
+                (connection.execute("SELECT id FROM users LIMIT 1").fetchone()[0],),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT attempt_number FROM ai_reading_jobs "
+                    "WHERE id = 'default-attempt'"
+                ).fetchone()[0],
+                1,
+            )
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO ai_reading_jobs "
+                    "(id, owner_user_id, cache_key, status, attempt_number) "
+                    "VALUES ('bad-attempt', ?, 'bad-attempt', 'queued', 0)",
+                    (connection.execute("SELECT id FROM users LIMIT 1").fetchone()[0],),
+                )
             with self.assertRaises(sqlite3.IntegrityError):
                 connection.execute(
                     "INSERT INTO ai_reading_jobs "
@@ -754,6 +913,136 @@ class StateStoreTests(unittest.TestCase):
                     "VALUES ('failed-without-error', ?, 'failed-without-error', 'failed')",
                     (connection.execute("SELECT id FROM users LIMIT 1").fetchone()[0],),
                 )
+
+    def test_v11_restart_does_not_create_or_drop_superseded_indexes(self):
+        statements = []
+
+        def connect(path):
+            connection = sqlite3.connect(path)
+            connection.set_trace_callback(statements.append)
+            return connection
+
+        with sqlite3.connect(self.database) as connection:
+            before = dict(
+                connection.execute(
+                    "SELECT name, rootpage FROM sqlite_master "
+                    "WHERE type = 'index' AND name LIKE 'idx_%'"
+                )
+            )
+
+        StateStore(self.database, connection_factory=connect).initialize()
+
+        superseded = {
+            "idx_books_active",
+            "idx_annotations_chapter_user_id",
+            "idx_annotations_book_user_id",
+            "idx_annotations_user_id",
+            "idx_bookshelves_user_id",
+            "idx_reading_progress_user_id",
+            "idx_sessions_user_id",
+            "idx_ai_reading_jobs_owner",
+            "idx_ai_reading_jobs_active_cache",
+            "idx_ai_reading_results_book",
+            "idx_ai_reading_followups_owner",
+            "idx_ai_book_chat_turns_owner_book",
+        }
+        index_ddl = tuple(
+            statement
+            for statement in statements
+            if re.match(r"\s*(?:CREATE|DROP)\s+(?:UNIQUE\s+)?INDEX\b", statement, re.I)
+        )
+        for index_name in superseded:
+            self.assertFalse(
+                any(
+                    re.search(
+                        rf"(?<![A-Za-z0-9_]){re.escape(index_name)}"
+                        r"(?![A-Za-z0-9_])",
+                        statement,
+                    )
+                    for statement in index_ddl
+                ),
+                index_ddl,
+            )
+        with sqlite3.connect(self.database) as connection:
+            after = dict(
+                connection.execute(
+                    "SELECT name, rootpage FROM sqlite_master "
+                    "WHERE type = 'index' AND name LIKE 'idx_%'"
+                )
+            )
+        self.assertEqual(after, before)
+
+    def test_v11_restart_repairs_colliding_active_cache_index(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP INDEX idx_ai_jobs_active_cache")
+            connection.execute(
+                "CREATE INDEX idx_ai_jobs_active_cache "
+                "ON ai_reading_jobs(status, cache_key) WHERE status = 'queued'"
+            )
+
+        StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                index_contract(connection, "idx_ai_jobs_active_cache"),
+                (
+                    "ai_reading_jobs",
+                    True,
+                    True,
+                    (("cache_key", False),),
+                    "status IN ('queued','running')",
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, status) "
+                "VALUES ('collision-one', ?, 'collision-key', 'queued')",
+                (self.owner.user_id,),
+            )
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO ai_reading_jobs "
+                    "(id, owner_user_id, cache_key, status) "
+                    "VALUES ('collision-two', ?, 'collision-key', 'running')",
+                    (self.owner.user_id,),
+                )
+
+    def test_v11_restart_fails_closed_if_colliding_index_hides_duplicates(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP INDEX idx_ai_jobs_active_cache")
+            connection.execute(
+                "CREATE INDEX idx_ai_jobs_active_cache "
+                "ON ai_reading_jobs(status, cache_key) WHERE status = 'queued'"
+            )
+            connection.executemany(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, status) VALUES (?, ?, 'duplicate', ?)",
+                (
+                    ("duplicate-one", self.owner.user_id, "queued"),
+                    ("duplicate-two", self.owner.user_id, "running"),
+                ),
+            )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT COUNT(*) FROM ai_reading_jobs WHERE cache_key = 'duplicate'"
+                ).fetchone()[0],
+                2,
+            )
+            self.assertEqual(
+                index_contract(connection, "idx_ai_jobs_active_cache"),
+                (
+                    "ai_reading_jobs",
+                    False,
+                    True,
+                    (("status", False), ("cache_key", False)),
+                    "status = 'queued'",
+                ),
+            )
 
     def test_v10_ai_tables_gain_v11_constraints(self):
         self._downgrade_selected_tables_to_v10(self.database)
@@ -1045,6 +1334,7 @@ class StateStoreTests(unittest.TestCase):
             plans = {
                 "jobs": connection.execute(
                     "EXPLAIN QUERY PLAN SELECT * FROM ai_reading_jobs "
+                    "INDEXED BY idx_ai_jobs_queue "
                     "WHERE status = 'queued' AND request_json IS NOT NULL "
                     "ORDER BY created_at ASC, id ASC LIMIT 1"
                 ).fetchall(),
@@ -1080,7 +1370,7 @@ class StateStoreTests(unittest.TestCase):
             name: tuple(row[3] for row in rows) for name, rows in plans.items()
         }
         queue_indexes = {
-            "jobs": ("idx_ai_jobs_queue", "idx_ai_jobs_status_created"),
+            "jobs": ("idx_ai_jobs_queue",),
             "followups": ("idx_ai_followups_queue",),
             "chat": ("idx_ai_book_chat_queue",),
         }
