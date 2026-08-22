@@ -1,11 +1,15 @@
 import asyncio
 import json
+import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from epub_browser.ai_client import AIProviderError, ProviderConfig
 from epub_browser.ai_reading import (
+    AIReadingError,
     AIReadingService,
     ReadingRequest,
     _ModelTokenBudget,
@@ -13,6 +17,7 @@ from epub_browser.ai_reading import (
     _estimate_tokens,
     _normalize_result,
     _split_text_by_token_budget,
+    _truncate_tokens,
     extract_chapter_text,
 )
 from epub_browser.auth import BootstrapCredentials
@@ -93,6 +98,33 @@ class _ChunkingClient:
         )
 
 
+class _EnvelopeClient:
+    calls = []
+
+    def __init__(self, config: ProviderConfig):
+        self.config = config
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append({"messages": messages, "max_tokens": max_tokens})
+        return "Bounded answer"
+
+
+class _BlockingClient:
+    calls = []
+    started = threading.Event()
+    release = threading.Event()
+
+    def __init__(self, config: ProviderConfig):
+        self.config = config
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append({"messages": messages, "max_tokens": max_tokens})
+        if len(type(self).calls) == 1:
+            type(self).started.set()
+            type(self).release.wait(timeout=5)
+        return "Provider answer"
+
+
 class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -126,13 +158,38 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         await self.service.stop_worker()
         self.temporary.cleanup()
 
-    async def _wait_for_job(self, job_id):
+    async def _wait_for_job(self, job_id, owner_user_id=None):
+        owner_user_id = owner_user_id or self.member.user_id
         for _ in range(100):
-            job = self.store.get_ai_job(job_id, self.member.user_id)
+            job = self.store.get_ai_job(job_id, owner_user_id)
             if job["status"] in {"complete", "failed"}:
                 return job
             await asyncio.sleep(0.01)
         self.fail("AI generation task did not finish")
+
+    def _provider_calls(self, user_id):
+        with self.store._connection() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(SUM(provider_calls), 0) AS calls "
+                "FROM ai_usage WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return int(row["calls"])
+
+    def _assert_dependency_free_call_fits(
+        self, call, context_window=2048, safety_tokens=128
+    ):
+        self.assertIsInstance(call["max_tokens"], int)
+        input_upper_bound = 4 + sum(
+            8
+            + len(message["role"].encode("utf-8"))
+            + len(message["content"].encode("utf-8"))
+            for message in call["messages"]
+        )
+        self.assertLessEqual(
+            input_upper_bound + call["max_tokens"] + safety_tokens,
+            context_window,
+        )
 
     async def test_chapter_generation_is_cached_and_uses_untrusted_content_boundary(self):
         request = ReadingRequest(
@@ -195,6 +252,58 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entries[0]["status"], "complete")
         self.assertEqual(self.store.list_ai_followups(cached["result"]["id"], self.owner.user_id), ())
 
+    async def test_followup_prompt_fits_context_with_large_multilingual_question(self):
+        started = await self.service.submit(
+            self.member,
+            ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0),
+        )
+        await self._wait_for_job(started["job"]["id"])
+        cached = await self.service.submit(
+            self.member,
+            ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0),
+        )
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret",
+            model="reader-model",
+            timeout_seconds=30,
+            model_context_window=2048,
+            max_concurrency=2,
+            daily_limit=100,
+        )
+        self.store.set_ai_user_access(
+            self.member.user_id, enabled=True, daily_limit=100
+        )
+        _EnvelopeClient.calls = []
+        service = AIReadingService(
+            self.store, self.root / "public", _EnvelopeClient
+        )
+
+        try:
+            followup = await service.follow_up(
+                self.member,
+                cached["result"]["id"],
+                "QUESTION_MARKER " + ("😀问题" * 600),
+                "en",
+            )
+            for _ in range(100):
+                entry = self.store.get_ai_followup(
+                    followup["id"], self.member.user_id
+                )
+                if entry and entry["status"] in {"complete", "failed"}:
+                    break
+                await asyncio.sleep(0.01)
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(entry["status"], "complete")
+        self.assertEqual(len(_EnvelopeClient.calls), 1)
+        self.assertIn(
+            "QUESTION_MARKER", _EnvelopeClient.calls[0]["messages"][-1]["content"]
+        )
+        self._assert_dependency_free_call_fits(_EnvelopeClient.calls[0])
+
     async def test_book_chat_can_answer_from_a_chapter_without_a_shared_layer(self):
         turn = await self.service.ask_book(
             self.member, book_id=self.book.book_id, chapter_index=0,
@@ -209,6 +318,56 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(turns[0]["chapter_index"], 0)
         self.assertEqual(turns[0]["status"], "complete")
         self.assertEqual(self.store.list_ai_book_chat_turns(self.book.book_id, self.owner.user_id), ())
+
+    async def test_book_chat_prompt_fits_context_with_large_source_and_question(self):
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret",
+            model="reader-model",
+            timeout_seconds=30,
+            model_context_window=2048,
+            max_concurrency=2,
+            daily_limit=100,
+        )
+        self.store.set_ai_user_access(
+            self.member.user_id, enabled=True, daily_limit=100
+        )
+        chapter = self.root / "public" / "book" / self.book.book_id / "chapter_0.html"
+        chapter.write_text(
+            "<article><p>SOURCE_MARKER " + ("😀正文" * 2000) + "</p></article>",
+            encoding="utf-8",
+        )
+        _EnvelopeClient.calls = []
+        service = AIReadingService(
+            self.store, self.root / "public", _EnvelopeClient
+        )
+
+        try:
+            turn = await service.ask_book(
+                self.member,
+                book_id=self.book.book_id,
+                chapter_index=0,
+                question="QUESTION_MARKER " + ("🤔提问" * 600),
+                language="en",
+                context_mode="chapter_source",
+            )
+            for _ in range(100):
+                entry = self.store.get_ai_book_chat_turn(
+                    turn["id"], self.member.user_id
+                )
+                if entry and entry["status"] in {"complete", "failed"}:
+                    break
+                await asyncio.sleep(0.01)
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(entry["status"], "complete")
+        self.assertEqual(len(_EnvelopeClient.calls), 1)
+        prompt = _EnvelopeClient.calls[0]["messages"][-1]["content"]
+        self.assertIn("SOURCE_MARKER", prompt)
+        self.assertIn("QUESTION_MARKER", prompt)
+        self._assert_dependency_free_call_fits(_EnvelopeClient.calls[0])
 
     async def test_book_chat_sends_this_readers_prior_book_conversation_with_exact_chapter(self):
         first = await self.service.ask_book(
@@ -425,6 +584,107 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(_FlakyClient.calls), 1)
         self.assertEqual(delays, [60])
 
+    async def test_retry_uses_fresh_role_after_administrator_is_demoted(self):
+        self.store.create_user("backup-admin", "hash", role="admin")
+        self.store.set_book_visibility(self.book.book_id, "restricted")
+        _FlakyClient.calls = []
+        delays = []
+
+        async def demote_administrator_during_wait(delay):
+            delays.append(delay)
+            self.store.update_user(self.owner.user_id, role="member")
+
+        service = AIReadingService(
+            self.store,
+            self.root / "public",
+            _FlakyClient,
+            sleeper=demote_administrator_during_wait,
+        )
+
+        try:
+            started = await service.submit(
+                self.owner,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            completed = await self._wait_for_job(
+                started["job"]["id"], self.owner.user_id
+            )
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["error_code"], "ai_not_authorized")
+        self.assertEqual(len(_FlakyClient.calls), 1)
+        self.assertEqual(delays, [60])
+
+    async def test_retry_rechecks_restricted_book_access_after_revocation(self):
+        self.store.set_book_visibility(self.book.book_id, "restricted")
+        self.store.grant_book_access(self.book.book_id, self.member.user_id)
+        _FlakyClient.calls = []
+        delays = []
+
+        async def revoke_book_during_wait(delay):
+            delays.append(delay)
+            self.store.revoke_book_access(self.book.book_id, self.member.user_id)
+
+        service = AIReadingService(
+            self.store,
+            self.root / "public",
+            _FlakyClient,
+            sleeper=revoke_book_during_wait,
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["error_code"], "ai_not_authorized")
+        self.assertEqual(len(_FlakyClient.calls), 1)
+        self.assertEqual(delays, [60])
+
+    async def test_retry_rechecks_member_ai_access_after_revocation(self):
+        _FlakyClient.calls = []
+        delays = []
+
+        async def revoke_ai_during_wait(delay):
+            delays.append(delay)
+            self.store.set_ai_user_access(
+                self.member.user_id, enabled=False, daily_limit=10
+            )
+
+        service = AIReadingService(
+            self.store,
+            self.root / "public",
+            _FlakyClient,
+            sleeper=revoke_ai_during_wait,
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["error_code"], "ai_not_authorized")
+        self.assertEqual(len(_FlakyClient.calls), 1)
+        self.assertEqual(delays, [60])
+
     async def test_retry_rechecks_daily_quota_before_another_provider_attempt(self):
         self.store.set_ai_user_access(
             self.member.user_id, enabled=True, daily_limit=1
@@ -455,6 +715,123 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(_FlakyClient.calls), 1)
         self.assertEqual(delays, [60])
 
+    async def test_client_construction_failure_does_not_charge_quota(self):
+        def failing_client_factory(_config):
+            raise ValueError("invalid client configuration")
+
+        service = AIReadingService(
+            self.store, self.root / "public", failing_client_factory
+        )
+        config = ProviderConfig(
+            "https://provider.example/v1", "secret", "reader-model", 30, 1
+        )
+
+        with self.assertRaises(ValueError):
+            await service._provider_call(
+                self.member,
+                config,
+                [{"role": "user", "content": "Question"}],
+                book_id=self.book.book_id,
+                max_tokens=32,
+            )
+
+        self.assertEqual(self._provider_calls(self.member.user_id), 0)
+
+    async def test_cancellation_while_waiting_for_concurrency_does_not_charge_quota(self):
+        _BlockingClient.calls = []
+        _BlockingClient.started = threading.Event()
+        _BlockingClient.release = threading.Event()
+        service = AIReadingService(
+            self.store, self.root / "public", _BlockingClient
+        )
+        config = ProviderConfig(
+            "https://provider.example/v1", "secret", "reader-model", 30, 1
+        )
+        messages = [{"role": "user", "content": "Question"}]
+        first = asyncio.create_task(
+            service._provider_call(
+                self.member,
+                config,
+                messages,
+                book_id=self.book.book_id,
+                max_tokens=32,
+            )
+        )
+        try:
+            for _ in range(100):
+                if _BlockingClient.started.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            self.assertTrue(_BlockingClient.started.is_set())
+            second = asyncio.create_task(
+                service._provider_call(
+                    self.member,
+                    config,
+                    messages,
+                    book_id=self.book.book_id,
+                    max_tokens=32,
+                )
+            )
+            await asyncio.sleep(0.02)
+            second.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await second
+        finally:
+            _BlockingClient.release.set()
+            await first
+
+        self.assertEqual(len(_BlockingClient.calls), 1)
+        self.assertEqual(self._provider_calls(self.member.user_id), 1)
+
+    async def test_authorization_is_rechecked_after_waiting_for_concurrency(self):
+        _BlockingClient.calls = []
+        _BlockingClient.started = threading.Event()
+        _BlockingClient.release = threading.Event()
+        service = AIReadingService(
+            self.store, self.root / "public", _BlockingClient
+        )
+        config = ProviderConfig(
+            "https://provider.example/v1", "secret", "reader-model", 30, 1
+        )
+        messages = [{"role": "user", "content": "Question"}]
+        first = asyncio.create_task(
+            service._provider_call(
+                self.member,
+                config,
+                messages,
+                book_id=self.book.book_id,
+                max_tokens=32,
+            )
+        )
+        try:
+            for _ in range(100):
+                if _BlockingClient.started.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            self.assertTrue(_BlockingClient.started.is_set())
+            second = asyncio.create_task(
+                service._provider_call(
+                    self.member,
+                    config,
+                    messages,
+                    book_id=self.book.book_id,
+                    max_tokens=32,
+                )
+            )
+            await asyncio.sleep(0.02)
+            self.store.set_ai_user_access(
+                self.member.user_id, enabled=False, daily_limit=10
+            )
+        finally:
+            _BlockingClient.release.set()
+            await first
+
+        with self.assertRaises(AIReadingError) as caught:
+            await second
+        self.assertEqual(caught.exception.code, "ai_not_authorized")
+        self.assertEqual(len(_BlockingClient.calls), 1)
+        self.assertEqual(self._provider_calls(self.member.user_id), 1)
+
     async def test_oversized_chapter_uses_context_bounded_parts_and_complete_synthesis(self):
         self.store.set_ai_settings(
             enabled=True,
@@ -462,7 +839,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             api_key="secret",
             model="reader-model",
             timeout_seconds=30,
-            model_context_window=2048,
+            model_context_window=8192,
             max_concurrency=2,
             daily_limit=100,
         )
@@ -505,7 +882,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             estimated_input = _estimate_messages_tokens(
                 call["messages"], "reader-model"
             )
-            self.assertLessEqual(estimated_input + call["max_tokens"] + 128, 2048)
+            self.assertLessEqual(estimated_input + call["max_tokens"] + 409, 8192)
         self.assertEqual(completed["progress_current"], len(part_calls) + 1)
         self.assertEqual(completed["progress_total"], len(part_calls) + 1)
         result = self.store.get_ai_reading_result(completed["result_id"])
@@ -551,6 +928,39 @@ class ChapterExtractionTests(unittest.TestCase):
 
 
 class ModelContextBudgetTests(unittest.TestCase):
+    def test_dependency_free_estimator_uses_utf8_byte_upper_bound(self):
+        samples = (
+            ("plain ASCII", 11),
+            ("中文内容", 12),
+            ("العربية", 14),
+            ("हिन्दी", 18),
+            ("😀🤔🧠", 12),
+        )
+
+        with mock.patch.dict(sys.modules, {"tiktoken": None}):
+            for sample, expected in samples:
+                with self.subTest(sample=sample):
+                    self.assertEqual(
+                        _estimate_tokens(sample, "unknown-model"),
+                        expected,
+                    )
+
+    def test_optional_tokenizer_cannot_reduce_the_safe_upper_bound(self):
+        undercounting_tiktoken = mock.Mock()
+        undercounting_tiktoken.encoding_for_model.return_value.encode.return_value = [1]
+
+        with mock.patch.dict(sys.modules, {"tiktoken": undercounting_tiktoken}):
+            self.assertEqual(
+                _estimate_tokens("😀 arbitrary provider", "unknown-model"),
+                len("😀 arbitrary provider".encode("utf-8")),
+            )
+
+    def test_truncation_suffix_stays_inside_the_byte_budget(self):
+        truncated = _truncate_tokens("abcdefghijklmnopqrstuvwxyz", 10)
+
+        self.assertTrue(truncated.endswith("…"))
+        self.assertLessEqual(_estimate_tokens(truncated), 10)
+
     def test_context_window_controls_output_and_safety_reserves(self):
         cases = (
             (2048, (512, 128)),
@@ -584,10 +994,25 @@ class ModelContextBudgetTests(unittest.TestCase):
         self.assertIn("MIDDLE", "".join(chunks))
         self.assertTrue(chunks[-1].endswith("FINAL paragraph closes the chapter."))
 
+    def test_dependency_free_chunks_bound_emoji_and_non_latin_source(self):
+        source = "BEGIN " + ("😀 العربية 日本語 " * 40) + "END"
+
+        with mock.patch.dict(sys.modules, {"tiktoken": None}):
+            chunks = _split_text_by_token_budget(source, 96, "unknown-model")
+
+            self.assertGreater(len(chunks), 2)
+            self.assertEqual("".join(chunks), source)
+            self.assertTrue(
+                all(
+                    _estimate_tokens(chunk, "unknown-model") <= 96
+                    for chunk in chunks
+                )
+            )
+
     def test_token_chunks_prefer_paragraph_boundaries_and_hard_split_long_words(self):
         paragraphs = ("甲" * 40) + "\n" + ("乙" * 40)
         paragraph_chunks = _split_text_by_token_budget(
-            paragraphs, 50, "reader-model"
+            paragraphs, 130, "reader-model"
         )
         long_word = "FIRST" + ("界" * 180) + "FINAL"
         hard_chunks = _split_text_by_token_budget(long_word, 50, "reader-model")
