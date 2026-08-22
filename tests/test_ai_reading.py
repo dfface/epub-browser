@@ -8,7 +8,11 @@ from epub_browser.ai_client import AIProviderError, ProviderConfig
 from epub_browser.ai_reading import (
     AIReadingService,
     ReadingRequest,
+    _ModelTokenBudget,
+    _estimate_messages_tokens,
+    _estimate_tokens,
     _normalize_result,
+    _split_text_by_token_budget,
     extract_chapter_text,
 )
 from epub_browser.auth import BootstrapCredentials
@@ -39,11 +43,54 @@ class _FlakyClient(_FakeClient):
 
     def complete(self, messages, *, max_tokens=None):
         type(self).calls.append(messages)
-        if len(type(self).calls) == 1:
+        if len(type(self).calls) <= 3:
             raise AIProviderError("provider_server_error", retryable_without_response=True)
         answer = super().complete(messages, max_tokens=max_tokens)
         type(self).calls.pop()
         return answer
+
+
+class _RejectedClient(_FakeClient):
+    calls = []
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append(messages)
+        raise AIProviderError("provider_request_rejected")
+
+
+class _ChunkingClient:
+    calls = []
+    markers = ("FIRST_MARKER", "MIDDLE_A_MARKER", "MIDDLE_B_MARKER", "FINAL_MARKER")
+
+    def __init__(self, config: ProviderConfig):
+        self.config = config
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append({"messages": messages, "max_tokens": max_tokens})
+        system = messages[0]["content"]
+        user = messages[-1]["content"]
+        if "contiguous source part" in system:
+            covered = [marker for marker in self.markers if marker in user]
+            return json.dumps(
+                {"covered_markers": covered, "detail": "part analysis " * 300}
+            )
+        return json.dumps(
+            {
+                "quick": {"title": "Complete guide", "summary": "All parts covered", "key_points": []},
+                "structure": {"overview": "Whole chapter", "nodes": [], "links": []},
+                "deep": {"themes": [], "questions": [], "applications": []},
+                "evidence": [],
+                "annotations": [
+                    {
+                        "chapter_index": 0,
+                        "kind": "claim",
+                        "quote": "FINAL_MARKER",
+                        "title": "The conclusion",
+                        "body_markdown": "This remains anchored to the full source.",
+                    }
+                ],
+            }
+        )
 
 
 class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -300,16 +347,169 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(completed["status"], "complete")
 
-    async def test_transient_provider_server_error_retries_once_before_failing_the_job(self):
+    async def test_transient_provider_server_errors_back_off_across_the_cooling_window(self):
         _FlakyClient.calls = []
-        service = AIReadingService(self.store, self.root / "public", _FlakyClient)
+        delays = []
+
+        async def record_sleep(delay):
+            delays.append(delay)
+
+        service = AIReadingService(
+            self.store, self.root / "public", _FlakyClient, sleeper=record_sleep
+        )
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
 
-        started = await service.submit(self.member, request)
-        completed = await self._wait_for_job(started["job"]["id"])
+        try:
+            started = await service.submit(self.member, request)
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
 
         self.assertEqual(completed["status"], "complete")
-        self.assertEqual(len(_FlakyClient.calls), 2)
+        self.assertEqual(len(_FlakyClient.calls), 4)
+        self.assertEqual(delays, [60, 120, 240])
+
+    async def test_non_retryable_provider_error_fails_without_waiting_or_retrying(self):
+        _RejectedClient.calls = []
+        delays = []
+
+        async def record_sleep(delay):
+            delays.append(delay)
+
+        service = AIReadingService(
+            self.store, self.root / "public", _RejectedClient, sleeper=record_sleep
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["error_code"], "provider_request_rejected")
+        self.assertEqual(len(_RejectedClient.calls), 1)
+        self.assertEqual(delays, [])
+
+    async def test_retry_rechecks_that_the_user_is_still_enabled(self):
+        _FlakyClient.calls = []
+        delays = []
+
+        async def disable_user_during_wait(delay):
+            delays.append(delay)
+            self.store.set_user_enabled(self.member.user_id, False)
+
+        service = AIReadingService(
+            self.store,
+            self.root / "public",
+            _FlakyClient,
+            sleeper=disable_user_during_wait,
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["error_code"], "ai_not_authorized")
+        self.assertEqual(len(_FlakyClient.calls), 1)
+        self.assertEqual(delays, [60])
+
+    async def test_retry_rechecks_daily_quota_before_another_provider_attempt(self):
+        self.store.set_ai_user_access(
+            self.member.user_id, enabled=True, daily_limit=1
+        )
+        _FlakyClient.calls = []
+        delays = []
+
+        async def record_sleep(delay):
+            delays.append(delay)
+
+        service = AIReadingService(
+            self.store, self.root / "public", _FlakyClient, sleeper=record_sleep
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["error_code"], "ai_quota_exhausted")
+        self.assertEqual(len(_FlakyClient.calls), 1)
+        self.assertEqual(delays, [60])
+
+    async def test_oversized_chapter_uses_context_bounded_parts_and_complete_synthesis(self):
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret",
+            model="reader-model",
+            timeout_seconds=30,
+            model_context_window=2048,
+            max_concurrency=2,
+            daily_limit=100,
+        )
+        self.store.set_ai_user_access(self.member.user_id, enabled=True, daily_limit=100)
+        chapter = self.root / "public" / "book" / self.book.book_id / "chapter_0.html"
+        paragraphs = [
+            marker + " " + ("complete source detail " * 180)
+            for marker in _ChunkingClient.markers
+        ]
+        chapter.write_text(
+            "<article>" + "".join("<p>" + paragraph + "</p>" for paragraph in paragraphs) + "</article>",
+            encoding="utf-8",
+        )
+        _ChunkingClient.calls = []
+        service = AIReadingService(self.store, self.root / "public", _ChunkingClient)
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "complete")
+        part_calls = [
+            call for call in _ChunkingClient.calls
+            if "contiguous source part" in call["messages"][0]["content"]
+        ]
+        self.assertGreater(len(part_calls), 1)
+        self.assertEqual(len(_ChunkingClient.calls), len(part_calls) + 1)
+        for marker in _ChunkingClient.markers:
+            self.assertEqual(
+                sum(marker in call["messages"][-1]["content"] for call in part_calls),
+                1,
+            )
+            self.assertIn(marker, _ChunkingClient.calls[-1]["messages"][-1]["content"])
+        for call in _ChunkingClient.calls:
+            estimated_input = _estimate_messages_tokens(
+                call["messages"], "reader-model"
+            )
+            self.assertLessEqual(estimated_input + call["max_tokens"] + 128, 2048)
+        self.assertEqual(completed["progress_current"], len(part_calls) + 1)
+        self.assertEqual(completed["progress_total"], len(part_calls) + 1)
+        result = self.store.get_ai_reading_result(completed["result_id"])
+        self.assertEqual(result["content"]["annotations"][0]["quote"], "FINAL_MARKER")
 
     def test_full_book_bridges_keep_provider_inputs_and_final_synthesis_bounded(self):
         long_chapter = "start " + ("middle " * 5000) + "finish"
@@ -335,6 +535,73 @@ class ChapterExtractionTests(unittest.TestCase):
             path = Path(temporary) / "chapter.html"
             path.write_text("<header>Chrome</header><nav>Menu</nav><p>Hello</p><script>secret</script><style>x</style><p>World</p>")
             self.assertEqual(extract_chapter_text(path), "Hello\nWorld")
+
+    def test_extract_chapter_text_preserves_content_after_48000_characters(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "chapter.html"
+            path.write_text(
+                "<article><p>" + ("long chapter content " * 2600) + "</p><p>FINAL_MARKER</p></article>",
+                encoding="utf-8",
+            )
+
+            extracted = extract_chapter_text(path)
+
+            self.assertGreater(len(extracted), 48000)
+            self.assertTrue(extracted.endswith("FINAL_MARKER"))
+
+
+class ModelContextBudgetTests(unittest.TestCase):
+    def test_context_window_controls_output_and_safety_reserves(self):
+        cases = (
+            (2048, (512, 128)),
+            (32768, (6553, 1638)),
+            (1050000, (16384, 4096)),
+        )
+
+        for context_window, expected in cases:
+            with self.subTest(context_window=context_window):
+                budget = _ModelTokenBudget.from_context_window(context_window)
+                self.assertEqual(
+                    (budget.output_tokens, budget.safety_tokens), expected
+                )
+                self.assertLess(
+                    budget.output_tokens + budget.safety_tokens,
+                    budget.context_window,
+                )
+
+    def test_token_chunks_fit_the_budget_without_dropping_the_middle_or_end(self):
+        source = (
+            "FIRST paragraph has a short introduction.\n"
+            + ("MIDDLE detail and explanation. " * 80)
+            + "\nFINAL paragraph closes the chapter."
+        )
+
+        chunks = _split_text_by_token_budget(source, 80, "reader-model")
+
+        self.assertGreater(len(chunks), 2)
+        self.assertEqual("".join(chunks), source)
+        self.assertTrue(all(_estimate_tokens(chunk, "reader-model") <= 80 for chunk in chunks))
+        self.assertIn("MIDDLE", "".join(chunks))
+        self.assertTrue(chunks[-1].endswith("FINAL paragraph closes the chapter."))
+
+    def test_token_chunks_prefer_paragraph_boundaries_and_hard_split_long_words(self):
+        paragraphs = ("甲" * 40) + "\n" + ("乙" * 40)
+        paragraph_chunks = _split_text_by_token_budget(
+            paragraphs, 50, "reader-model"
+        )
+        long_word = "FIRST" + ("界" * 180) + "FINAL"
+        hard_chunks = _split_text_by_token_budget(long_word, 50, "reader-model")
+
+        self.assertTrue(paragraph_chunks[0].endswith("\n"))
+        self.assertEqual("".join(paragraph_chunks), paragraphs)
+        self.assertGreater(len(hard_chunks), 2)
+        self.assertEqual("".join(hard_chunks), long_word)
+        self.assertTrue(
+            all(
+                _estimate_tokens(chunk, "reader-model") <= 50
+                for chunk in hard_chunks
+            )
+        )
 
 
 class ResultNormalizationTests(unittest.TestCase):
