@@ -404,10 +404,13 @@ class ReadingRequest:
 def _validate_reading_request_fields(request: ReadingRequest) -> None:
     if (
         not isinstance(request, ReadingRequest)
+        or not isinstance(request.scope, str)
         or request.scope not in {"book", "chapter"}
         or not isinstance(request.book_id, str)
         or not request.book_id
+        or not isinstance(request.language, str)
         or request.language not in {"en", "zh-CN"}
+        or not isinstance(request.mode, str)
         or not isinstance(request.force, bool)
         or isinstance(request.reading_boundary, bool)
         or (
@@ -777,10 +780,16 @@ class AIReadingService:
                 request_payload=queued_request,
                 progress_total=progress_total,
                 profile=profile,
+                config_revision=int(settings["config_revision"]),
                 template_id=template["id"],
                 template_version=template["version"],
                 cached_result_id=cached["id"] if reusable_cached else None,
             )
+        except PermissionError as error:
+            code = str(error)
+            if code not in {"ai_disabled", "ai_not_authorized"}:
+                code = "ai_not_authorized"
+            raise AIReadingError(code) from None
         except (KeyError, ValueError):
             raise AIReadingError("ai_job_not_retryable") from None
 
@@ -791,7 +800,12 @@ class AIReadingService:
             self.wake_worker()
         return {
             "status": public_job["status"],
-            "cached": bool(created and reusable_cached),
+            "cached": bool(
+                created
+                and reusable_cached
+                and public_job["status"] == "complete"
+                and public_job["result_id"] == cached["id"]
+            ),
             "shared": not created,
             "job": public_job,
         }

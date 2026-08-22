@@ -2079,6 +2079,19 @@ class StateStoreTests(unittest.TestCase):
 
     def test_admin_retry_creates_one_linked_active_attempt(self):
         member = self.store.create_user("reader", "hash", role="member")
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        self.store.set_ai_user_access(
+            member.user_id, enabled=True, daily_limit=10
+        )
+        revision = self.store.get_ai_settings()["config_revision"]
         book = self.store.resolve_book(
             Path(self.temporary.name, "retry-book.epub"),
             "urn:test:retry-book", "fingerprint", {"title": "Retry Book"},
@@ -2106,14 +2119,14 @@ class StateStoreTests(unittest.TestCase):
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="recomputed-cache", request_payload=request,
             progress_total=4, profile="technical", template_id="current-template",
-            template_version=2,
+            template_version=2, config_revision=revision,
         )
         second, created_second = self.store.create_or_get_admin_retry_ai_job(
             source_job_id="failed-source", job_id="ignored-retry-id",
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="recomputed-cache", request_payload=request,
             progress_total=4, profile="technical", template_id="current-template",
-            template_version=2,
+            template_version=2, config_revision=revision,
         )
 
         self.assertTrue(created_first)
@@ -2146,6 +2159,19 @@ class StateStoreTests(unittest.TestCase):
 
     def test_admin_retry_attempt_numbers_follow_the_root_lineage(self):
         member = self.store.create_user("reader", "hash", role="member")
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        self.store.set_ai_user_access(
+            member.user_id, enabled=True, daily_limit=10
+        )
+        revision = self.store.get_ai_settings()["config_revision"]
         book = self.store.resolve_book(
             Path(self.temporary.name, "retry-lineage.epub"),
             "urn:test:retry-lineage", "fingerprint", {"title": "Retry Book"},
@@ -2171,7 +2197,7 @@ class StateStoreTests(unittest.TestCase):
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="lineage-cache-2", request_payload=request,
             progress_total=2, profile="general", template_id="reading",
-            template_version=1,
+            template_version=1, config_revision=revision,
         )
         self.assertTrue(created_two)
         self.assertTrue(self.store.start_ai_job(attempt_two["id"]))
@@ -2184,13 +2210,129 @@ class StateStoreTests(unittest.TestCase):
             retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
             book_id=book.book_id, cache_key="lineage-cache-3", request_payload=request,
             progress_total=2, profile="general", template_id="reading",
-            template_version=1,
+            template_version=1, config_revision=revision,
         )
 
         self.assertTrue(created_three)
         self.assertEqual(attempt_three["attempt_number"], 3)
         self.assertEqual(attempt_three["retried_from_job_id"], "lineage-attempt-2")
         self.assertEqual(attempt_three["retry_root_job_id"], "lineage-source")
+
+    def test_admin_retry_cached_completion_revalidates_current_result_identity(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        self.store.set_ai_user_access(
+            member.user_id, enabled=True, daily_limit=10
+        )
+        revision = self.store.get_ai_settings()["config_revision"]
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "retry-cache-identity.epub"),
+            "urn:test:retry-cache-identity", "fingerprint", {"title": "Retry Book"},
+        )
+        request = {
+            "book_id": book.book_id,
+            "scope": "chapter",
+            "mode": "chapter",
+            "language": "en",
+            "chapter_index": 2,
+            "reading_boundary": 2,
+        }
+
+        cases = (
+            ("cache", "different-result-cache", revision, "reading", 5, False),
+            ("revision", "revision-cache", revision - 1, "reading", 5, False),
+            ("template-id", "template-id-cache", revision, "legacy", 5, False),
+            ("template-version", "template-version-cache", revision, "reading", 4, False),
+            ("pointer", "pointer-cache", revision, "reading", 5, True),
+        )
+        for (
+            name,
+            result_cache_key,
+            result_revision,
+            result_template,
+            result_version,
+            move_pointer,
+        ) in cases:
+            with self.subTest(name=name):
+                expected_cache_key = (
+                    "expected-cache" if name == "cache" else result_cache_key
+                )
+                cached = self.store.store_ai_reading_result(
+                    cache_key=result_cache_key,
+                    book_id=book.book_id,
+                    chapter_index=2,
+                    scope="chapter",
+                    mode="chapter",
+                    profile="general",
+                    config_revision=result_revision,
+                    content={"quick": {"summary": name}},
+                    created_by_user_id=member.user_id,
+                    template_id=result_template,
+                    template_version=result_version,
+                    language="en",
+                    reading_boundary=2,
+                )
+                if move_pointer:
+                    self.store.store_ai_reading_result(
+                        cache_key=result_cache_key,
+                        book_id=book.book_id,
+                        chapter_index=2,
+                        scope="chapter",
+                        mode="chapter",
+                        profile="general",
+                        config_revision=revision,
+                        content={"quick": {"summary": "replacement"}},
+                        created_by_user_id=member.user_id,
+                        template_id="reading",
+                        template_version=5,
+                        language="en",
+                        reading_boundary=2,
+                    )
+                source_id = f"{name}-source"
+                self.store.create_ai_job(
+                    source_id,
+                    member.user_id,
+                    f"{name}-source-cache",
+                    book_id=book.book_id,
+                    request_payload=request,
+                    profile="general",
+                    template_id="reading",
+                    template_version=5,
+                )
+                self.assertTrue(self.store.start_ai_job(source_id))
+                self.assertTrue(
+                    self.store.finish_ai_job(
+                        source_id, error_code="provider_failed"
+                    )
+                )
+
+                retried, created = self.store.create_or_get_admin_retry_ai_job(
+                    source_job_id=source_id,
+                    job_id=f"{name}-retry",
+                    retried_by_user_id=self.owner.user_id,
+                    owner_user_id=member.user_id,
+                    book_id=book.book_id,
+                    cache_key=expected_cache_key,
+                    request_payload=request,
+                    progress_total=1,
+                    profile="general",
+                    config_revision=revision,
+                    template_id="reading",
+                    template_version=5,
+                    cached_result_id=cached["id"],
+                )
+
+                self.assertTrue(created)
+                self.assertEqual(retried["status"], "queued")
+                self.assertIsNone(retried["result_id"])
 
     def test_admin_retry_rejects_nonterminal_unknown_and_malformed_sources(self):
         member = self.store.create_user("reader", "hash", role="member")
@@ -2213,7 +2355,7 @@ class StateStoreTests(unittest.TestCase):
                 retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
                 book_id=book.book_id, cache_key=f"retry-cache-{source_job_id}",
                 request_payload=request, progress_total=2, profile="general",
-                template_id="reading", template_version=1,
+                config_revision=0, template_id="reading", template_version=1,
             )
 
         self.store.create_ai_job(

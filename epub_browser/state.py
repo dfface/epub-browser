@@ -3065,7 +3065,7 @@ class StateStore:
     def create_or_get_admin_retry_ai_job(
         self, *, source_job_id: str, job_id: str, retried_by_user_id: str,
         owner_user_id: str, book_id: str, cache_key: str, request_payload: dict,
-        progress_total: int, profile: str, template_id: str,
+        progress_total: int, profile: str, config_revision: int, template_id: str,
         template_version: int, cached_result_id: Optional[str] = None,
     ) -> tuple[dict, bool]:
         """Atomically persist one safe, auditable retry attempt or join its flight."""
@@ -3077,6 +3077,12 @@ class StateStore:
             or progress_total < 1
         ):
             raise ValueError("AI job progress total must be positive")
+        if (
+            isinstance(config_revision, bool)
+            or not isinstance(config_revision, int)
+            or config_revision < 0
+        ):
+            raise ValueError("AI configuration revision is invalid")
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             source = connection.execute(
@@ -3093,16 +3099,59 @@ class StateStore:
                 raise ValueError("AI retry owner does not match source job")
             if source_values["book_id"] != book_id:
                 raise ValueError("AI retry book does not match source job")
-            self._require_user(connection, owner_user_id)
-            self._require_user(connection, retried_by_user_id)
-            self._get_book(connection, book_id)
+            owner = self._get_user(connection, owner_user_id)
+            retrier = self._get_user(connection, retried_by_user_id)
+            book = self._get_book(connection, book_id)
+            settings = connection.execute(
+                "SELECT enabled, config_revision FROM ai_settings WHERE singleton = 1"
+            ).fetchone()
+            if not bool(settings["enabled"]):
+                raise PermissionError("ai_disabled")
+            if not retrier.enabled or retrier.role != "admin":
+                raise PermissionError("ai_not_authorized")
+            if not owner.enabled:
+                raise PermissionError("ai_not_authorized")
+            if owner.role != "admin":
+                ai_access = connection.execute(
+                    "SELECT enabled FROM ai_user_access WHERE user_id = ?",
+                    (owner_user_id,),
+                ).fetchone()
+                if ai_access is None or not bool(ai_access["enabled"]):
+                    raise PermissionError("ai_not_authorized")
+            if not book.active:
+                raise PermissionError("ai_not_authorized")
+            if owner.role != "admin" and book.visibility != "authenticated":
+                book_access = connection.execute(
+                    "SELECT 1 FROM book_access WHERE book_id = ? AND user_id = ?",
+                    (book_id, owner_user_id),
+                ).fetchone()
+                if book_access is None:
+                    raise PermissionError("ai_not_authorized")
+            if config_revision != int(settings["config_revision"]):
+                cached_result_id = None
             if cached_result_id is not None:
                 cached_result = connection.execute(
-                    "SELECT 1 FROM ai_reading_results WHERE id = ? AND book_id = ?",
-                    (cached_result_id, book_id),
+                    """
+                    SELECT 1
+                    FROM ai_reading_current_results AS current_results
+                    JOIN ai_reading_results AS results
+                      ON results.id = current_results.result_id
+                    WHERE current_results.cache_key = ?
+                      AND current_results.result_id = ?
+                      AND results.id = ?
+                      AND results.cache_key = ?
+                      AND results.book_id = ?
+                      AND results.config_revision = ?
+                      AND results.template_id = ?
+                      AND results.template_version = ?
+                    """,
+                    (
+                        cache_key, cached_result_id, cached_result_id, cache_key,
+                        book_id, config_revision, template_id, template_version,
+                    ),
                 ).fetchone()
                 if cached_result is None:
-                    raise KeyError(f"Unknown AI reading result ID: {cached_result_id}")
+                    cached_result_id = None
 
             existing = connection.execute(
                 """
