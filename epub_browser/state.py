@@ -22,7 +22,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 10
+DB_SCHEMA_VERSION = 11
 
 
 class SetupAlreadyCompleteError(RuntimeError):
@@ -77,10 +77,10 @@ class UserIdentityRecord:
 class SessionRecord:
     session_id: str
     user_id: str
-    expires_at: str
-    last_used_at: str
-    revoked_at: Optional[str]
-    created_at: str
+    expires_at: float
+    last_used_at: float
+    revoked_at: Optional[float]
+    created_at: float
     client_address: Optional[str]
     user_agent: Optional[str]
 
@@ -139,7 +139,11 @@ class StateStore:
                     f"this version supports {DB_SCHEMA_VERSION}"
                 )
             connection.execute("BEGIN IMMEDIATE")
-            self._create_compatible_schema(connection)
+            empty_database = not self._has_application_tables(connection)
+            self._create_compatible_schema(
+                connection,
+                latest=empty_database or version >= 11,
+            )
             administrator = self._administrator(connection)
             if administrator is None:
                 administrator = (
@@ -171,9 +175,16 @@ class StateStore:
                 )
             if version < 3:
                 self._migrate_annotation_primary_key(connection)
-            self._create_user_owned_indexes(connection)
             self._validate_password_hashes(connection)
-            connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
+            if empty_database:
+                self._create_v11_indexes(connection)
+                self._require_foreign_key_integrity(connection)
+                connection.execute("PRAGMA user_version = 11")
+            elif version < 11:
+                self._migrate_schema_v11(connection, version)
+            else:
+                self._create_v11_indexes(connection)
+                self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -184,18 +195,28 @@ class StateStore:
         self._configure_database()
         return administrator.principal if administrator is not None else None
 
-    def _create_compatible_schema(self, connection) -> None:
+    @staticmethod
+    def _has_application_tables(connection) -> bool:
+        return connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+            "AND name NOT LIKE 'sqlite_%' LIMIT 1"
+        ).fetchone() is not None
+
+    def _create_compatible_schema(self, connection, *, latest: bool = False) -> None:
         self._migrate_historical_annotations(connection)
-        self._create_account_schema(connection)
+        self._create_account_schema(connection, latest=latest)
         self._add_column_if_missing(
             connection,
             "users",
             "setup_pending",
             "INTEGER NOT NULL DEFAULT 0 CHECK(setup_pending IN (0, 1))",
         )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS annotations (
+        if latest:
+            self._create_v11_annotations_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS annotations (
                 id TEXT NOT NULL,
                 username TEXT NOT NULL DEFAULT '',
                 user_id TEXT NOT NULL CHECK(length(user_id) > 0)
@@ -211,17 +232,20 @@ class StateStore:
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (user_id, id)
             )
-            """
-        )
-        self._add_column_if_missing(
-            connection,
-            "annotations",
-            "username",
-            "TEXT NOT NULL DEFAULT ''",
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS bookshelves (
+                """
+            )
+            self._add_column_if_missing(
+                connection,
+                "annotations",
+                "username",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+        if latest:
+            self._create_v11_bookshelves_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS bookshelves (
                 user_id TEXT NOT NULL PRIMARY KEY CHECK(length(user_id) > 0)
                     REFERENCES users(id) ON DELETE CASCADE,
                 username TEXT NOT NULL DEFAULT '',
@@ -229,8 +253,8 @@ class StateStore:
                 data TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
-            """
-        )
+                """
+            )
         if self._add_column_if_missing(
             connection,
             "bookshelves",
@@ -241,9 +265,12 @@ class StateStore:
                 "UPDATE bookshelves SET updated_at = CURRENT_TIMESTAMP "
                 "WHERE updated_at IS NULL"
             )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS reading_progress (
+        if latest:
+            self._create_v11_reading_progress_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reading_progress (
                 user_id TEXT NOT NULL CHECK(length(user_id) > 0)
                     REFERENCES users(id) ON DELETE CASCADE,
                 username TEXT NOT NULL DEFAULT '',
@@ -252,8 +279,8 @@ class StateStore:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, book_hash)
             )
-            """
-        )
+                """
+            )
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS books (
@@ -388,9 +415,12 @@ class StateStore:
             )
             """
         )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS ai_reading_jobs (
+        if latest:
+            self._create_v11_ai_reading_jobs_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ai_reading_jobs (
                 id TEXT PRIMARY KEY,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
@@ -406,8 +436,8 @@ class StateStore:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
-            """
-        )
+                """
+            )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_owner "
             "ON ai_reading_jobs(owner_user_id, created_at DESC)"
@@ -416,34 +446,35 @@ class StateStore:
             "CREATE INDEX IF NOT EXISTS idx_ai_reading_jobs_active_cache "
             "ON ai_reading_jobs(cache_key, status)"
         )
-        self._add_column_if_missing(
-            connection,
-            "ai_reading_jobs",
-            "book_id",
-            "TEXT REFERENCES books(book_id) ON DELETE CASCADE",
-        )
-        self._add_column_if_missing(
-            connection,
-            "ai_reading_jobs",
-            "result_id",
-            "TEXT",
-        )
-        self._add_column_if_missing(
-            connection,
-            "ai_reading_jobs",
-            "progress_current",
-            "INTEGER NOT NULL DEFAULT 0 CHECK(progress_current >= 0)",
-        )
-        self._add_column_if_missing(
-            connection,
-            "ai_reading_jobs",
-            "progress_total",
-            "INTEGER NOT NULL DEFAULT 1 CHECK(progress_total >= 1)",
-        )
-        self._add_column_if_missing(connection, "ai_reading_jobs", "request_json", "TEXT")
-        self._add_column_if_missing(connection, "ai_reading_jobs", "profile", "TEXT")
-        self._add_column_if_missing(connection, "ai_reading_jobs", "template_id", "TEXT")
-        self._add_column_if_missing(connection, "ai_reading_jobs", "template_version", "INTEGER")
+        if not latest:
+            self._add_column_if_missing(
+                connection,
+                "ai_reading_jobs",
+                "book_id",
+                "TEXT REFERENCES books(book_id) ON DELETE CASCADE",
+            )
+            self._add_column_if_missing(
+                connection,
+                "ai_reading_jobs",
+                "result_id",
+                "TEXT",
+            )
+            self._add_column_if_missing(
+                connection,
+                "ai_reading_jobs",
+                "progress_current",
+                "INTEGER NOT NULL DEFAULT 0 CHECK(progress_current >= 0)",
+            )
+            self._add_column_if_missing(
+                connection,
+                "ai_reading_jobs",
+                "progress_total",
+                "INTEGER NOT NULL DEFAULT 1 CHECK(progress_total >= 1)",
+            )
+            self._add_column_if_missing(connection, "ai_reading_jobs", "request_json", "TEXT")
+            self._add_column_if_missing(connection, "ai_reading_jobs", "profile", "TEXT")
+            self._add_column_if_missing(connection, "ai_reading_jobs", "template_id", "TEXT")
+            self._add_column_if_missing(connection, "ai_reading_jobs", "template_version", "INTEGER")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS ai_reading_results (
@@ -530,9 +561,12 @@ class StateStore:
         # result-bound follow-ups.  A reader may ask from a chapter's source
         # before a shared reading layer exists, while the whole conversation
         # still needs to remain ordered and resumable for that reader.
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS ai_book_chat_turns (
+        if latest:
+            self._create_v11_ai_book_chat_turns_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ai_book_chat_turns (
                 id TEXT PRIMARY KEY,
                 book_id TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
@@ -553,8 +587,8 @@ class StateStore:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
-            """
-        )
+                """
+            )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_turns_owner_book "
             "ON ai_book_chat_turns(owner_user_id, book_id, created_at ASC, id ASC)"
@@ -563,9 +597,12 @@ class StateStore:
             connection, "ai_book_chat_turns", "book_context",
             "INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1))",
         )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS ai_book_chat_summaries (
+        if latest:
+            self._create_v11_ai_book_chat_summaries_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ai_book_chat_summaries (
                 book_id TEXT NOT NULL,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
@@ -574,11 +611,11 @@ class StateStore:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (book_id, owner_user_id, language)
             )
-            """
-        )
+                """
+            )
 
     @staticmethod
-    def _create_account_schema(connection) -> None:
+    def _create_account_schema(connection, *, latest: bool = False) -> None:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -611,9 +648,12 @@ class StateStore:
             "CREATE INDEX IF NOT EXISTS idx_user_identities_user_id "
             "ON user_identities(user_id)"
         )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS sessions (
+        if latest:
+            StateStore._create_v11_sessions_table(connection)
+        else:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
                 token_digest TEXT NOT NULL UNIQUE,
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -624,8 +664,8 @@ class StateStore:
                 client_address TEXT,
                 user_agent TEXT
             )
-            """
-        )
+                """
+            )
         StateStore._add_column_if_missing(
             connection,
             "sessions",
@@ -646,7 +686,7 @@ class StateStore:
     def _create_v11_annotations_table(connection) -> None:
         connection.execute(
             """
-            CREATE TABLE annotations (
+            CREATE TABLE IF NOT EXISTS annotations (
                 id TEXT NOT NULL,
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
@@ -667,7 +707,7 @@ class StateStore:
     def _create_v11_bookshelves_table(connection) -> None:
         connection.execute(
             """
-            CREATE TABLE bookshelves (
+            CREATE TABLE IF NOT EXISTS bookshelves (
                 user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 version INTEGER NOT NULL,
                 data TEXT NOT NULL,
@@ -680,7 +720,7 @@ class StateStore:
     def _create_v11_reading_progress_table(connection) -> None:
         connection.execute(
             """
-            CREATE TABLE reading_progress (
+            CREATE TABLE IF NOT EXISTS reading_progress (
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
@@ -694,7 +734,7 @@ class StateStore:
     def _create_v11_sessions_table(connection) -> None:
         connection.execute(
             """
-            CREATE TABLE sessions (
+            CREATE TABLE IF NOT EXISTS sessions (
                 session_id TEXT PRIMARY KEY,
                 token_digest TEXT NOT NULL UNIQUE,
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -704,6 +744,89 @@ class StateStore:
                 created_at REAL NOT NULL,
                 client_address TEXT,
                 user_agent TEXT
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v11_ai_reading_jobs_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_reading_jobs (
+                id TEXT PRIMARY KEY,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
+                cache_key TEXT NOT NULL,
+                request_json TEXT,
+                profile TEXT,
+                template_id TEXT,
+                template_version INTEGER,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
+                progress_current INTEGER NOT NULL DEFAULT 0,
+                progress_total INTEGER NOT NULL DEFAULT 1,
+                attempt_number INTEGER NOT NULL DEFAULT 1 CHECK(attempt_number >= 1),
+                retried_from_job_id TEXT REFERENCES ai_reading_jobs(id) ON DELETE SET NULL,
+                retry_root_job_id TEXT REFERENCES ai_reading_jobs(id) ON DELETE SET NULL,
+                retried_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK(
+                    progress_current >= 0
+                    AND progress_total >= 1
+                    AND progress_current <= progress_total
+                ),
+                CHECK(
+                    NOT (result_id IS NOT NULL AND error_code IS NOT NULL)
+                    AND (status != 'failed' OR error_code IS NOT NULL)
+                )
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v11_ai_book_chat_turns_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_book_chat_turns (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
+                context_mode TEXT NOT NULL CHECK(context_mode IN (
+                    'shared_layer', 'chapter_source'
+                )),
+                book_context INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1)),
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                answer TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v11_ai_book_chat_summaries_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ai_book_chat_summaries (
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
+                covered_turn_count INTEGER NOT NULL DEFAULT 0
+                    CHECK(covered_turn_count >= 0),
+                summary_text TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (book_id, owner_user_id, language)
             )
             """
         )
@@ -814,6 +937,188 @@ class StateStore:
                     raise sqlite3.IntegrityError(
                         f"schema v11 invalid session {column}: {row[0]}"
                     )
+
+    def _migrate_schema_v11(self, connection, source_version) -> None:
+        if source_version >= 11:
+            return
+        self._reject_v11_source_tables(connection)
+        self._v11_rebuild_owned_state(connection)
+        self._v11_rebuild_sessions(connection)
+        self._v11_rebuild_ai_state(connection)
+        self._create_v11_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 11")
+
+    @staticmethod
+    def _reject_v11_source_tables(connection) -> None:
+        row = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name GLOB '*__v11_source' ORDER BY name LIMIT 1"
+        ).fetchone()
+        if row is not None:
+            raise sqlite3.IntegrityError(
+                f"schema v11 reserved migration table exists: {row[0]}"
+            )
+
+    def _v11_rebuild_ai_state(self, connection) -> None:
+        duplicate = connection.execute(
+            "SELECT cache_key FROM ai_reading_jobs "
+            "WHERE status IN ('queued', 'running') "
+            "GROUP BY cache_key HAVING COUNT(*) > 1 LIMIT 1"
+        ).fetchone()
+        if duplicate is not None:
+            raise sqlite3.IntegrityError(
+                f"schema v11 duplicate active AI cache key: {duplicate[0]}"
+            )
+        orphan_turn = connection.execute(
+            "SELECT ai_book_chat_turns.id FROM ai_book_chat_turns "
+            "LEFT JOIN books ON books.book_id = ai_book_chat_turns.book_id "
+            "WHERE books.book_id IS NULL LIMIT 1"
+        ).fetchone()
+        if orphan_turn is not None:
+            raise sqlite3.IntegrityError(
+                f"schema v11 orphan AI book chat turn: {orphan_turn[0]}"
+            )
+        orphan_summary = connection.execute(
+            "SELECT ai_book_chat_summaries.book_id FROM ai_book_chat_summaries "
+            "LEFT JOIN books ON books.book_id = ai_book_chat_summaries.book_id "
+            "WHERE books.book_id IS NULL LIMIT 1"
+        ).fetchone()
+        if orphan_summary is not None:
+            raise sqlite3.IntegrityError(
+                f"schema v11 orphan AI book chat summary: {orphan_summary[0]}"
+            )
+
+        connection.execute(
+            "ALTER TABLE ai_reading_jobs RENAME TO ai_reading_jobs__v11_source"
+        )
+        connection.execute(
+            "UPDATE ai_reading_jobs__v11_source SET result_id = NULL "
+            "WHERE result_id IS NOT NULL AND NOT EXISTS ("
+            "SELECT 1 FROM ai_reading_results "
+            "WHERE ai_reading_results.id = ai_reading_jobs__v11_source.result_id)"
+        )
+        self._create_v11_ai_reading_jobs_table(connection)
+        connection.execute(
+            "INSERT INTO ai_reading_jobs (id, owner_user_id, book_id, cache_key, "
+            "request_json, profile, template_id, template_version, status, error_code, "
+            "result_id, progress_current, progress_total, attempt_number, "
+            "retried_from_job_id, retry_root_job_id, retried_by_user_id, created_at, "
+            "updated_at) SELECT id, owner_user_id, book_id, cache_key, request_json, "
+            "profile, template_id, template_version, status, error_code, result_id, "
+            "progress_current, progress_total, 1, NULL, NULL, NULL, created_at, updated_at "
+            "FROM ai_reading_jobs__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection, "ai_reading_jobs__v11_source", "ai_reading_jobs"
+        )
+        connection.execute("DROP TABLE ai_reading_jobs__v11_source")
+
+        connection.execute(
+            "ALTER TABLE ai_book_chat_turns RENAME TO ai_book_chat_turns__v11_source"
+        )
+        self._create_v11_ai_book_chat_turns_table(connection)
+        connection.execute(
+            "INSERT INTO ai_book_chat_turns (id, book_id, chapter_index, result_id, "
+            "context_mode, book_context, owner_user_id, question, language, answer, "
+            "status, error_code, created_at, updated_at) SELECT id, book_id, "
+            "chapter_index, result_id, context_mode, book_context, owner_user_id, "
+            "question, language, answer, status, error_code, created_at, updated_at "
+            "FROM ai_book_chat_turns__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection, "ai_book_chat_turns__v11_source", "ai_book_chat_turns"
+        )
+        connection.execute("DROP TABLE ai_book_chat_turns__v11_source")
+
+        connection.execute(
+            "ALTER TABLE ai_book_chat_summaries "
+            "RENAME TO ai_book_chat_summaries__v11_source"
+        )
+        self._create_v11_ai_book_chat_summaries_table(connection)
+        connection.execute(
+            "INSERT INTO ai_book_chat_summaries (book_id, owner_user_id, language, "
+            "covered_turn_count, summary_text, updated_at) SELECT book_id, owner_user_id, "
+            "language, covered_turn_count, summary_text, updated_at "
+            "FROM ai_book_chat_summaries__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection,
+            "ai_book_chat_summaries__v11_source",
+            "ai_book_chat_summaries",
+        )
+        connection.execute("DROP TABLE ai_book_chat_summaries__v11_source")
+
+    @staticmethod
+    def _require_foreign_key_integrity(connection) -> None:
+        violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+        if violations:
+            table, rowid, parent, foreign_key_id = violations[0]
+            raise sqlite3.IntegrityError(
+                "schema v11 foreign key violation: "
+                f"{table} row {rowid} -> {parent} ({foreign_key_id})"
+            )
+
+    @staticmethod
+    def _create_v11_indexes(connection) -> None:
+        for index in (
+            "idx_books_active",
+            "idx_annotations_chapter_user_id",
+            "idx_annotations_book_user_id",
+            "idx_annotations_user_id",
+            "idx_bookshelves_user_id",
+            "idx_reading_progress_user_id",
+            "idx_sessions_user_id",
+            "idx_ai_reading_jobs_owner",
+            "idx_ai_reading_jobs_active_cache",
+            "idx_ai_reading_results_book",
+            "idx_ai_reading_followups_owner",
+            "idx_ai_book_chat_turns_owner_book",
+        ):
+            connection.execute(f"DROP INDEX IF EXISTS {index}")
+        statements = (
+            "CREATE INDEX IF NOT EXISTS idx_books_active_book ON books(active, book_id)",
+            "CREATE INDEX IF NOT EXISTS idx_annotations_user_created "
+            "ON annotations(user_id, created_at DESC, id)",
+            "CREATE INDEX IF NOT EXISTS idx_annotations_user_book_created "
+            "ON annotations(user_id, book_hash, created_at DESC, id)",
+            "CREATE INDEX IF NOT EXISTS idx_annotations_user_book_chapter_created "
+            "ON annotations(user_id, book_hash, chapter_index, created_at DESC, id)",
+            "CREATE INDEX IF NOT EXISTS idx_sessions_user_created "
+            "ON sessions(user_id, created_at DESC, session_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_created "
+            "ON ai_reading_jobs(created_at DESC, id DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_status_created "
+            "ON ai_reading_jobs(status, created_at DESC, id DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_queue "
+            "ON ai_reading_jobs(created_at, id) "
+            "WHERE status='queued' AND request_json IS NOT NULL",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_jobs_active_cache "
+            "ON ai_reading_jobs(cache_key) WHERE status IN ('queued','running')",
+            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_result "
+            "ON ai_reading_jobs(result_id) WHERE result_id IS NOT NULL",
+            "CREATE INDEX IF NOT EXISTS idx_ai_jobs_retry_root "
+            "ON ai_reading_jobs(retry_root_job_id, attempt_number)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_followups_queue "
+            "ON ai_reading_followups(created_at, id) WHERE status='queued'",
+            "CREATE INDEX IF NOT EXISTS idx_ai_followups_result_owner_created "
+            "ON ai_reading_followups(result_id, owner_user_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_queue "
+            "ON ai_book_chat_turns(created_at) WHERE status='queued'",
+            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_owner_book_created "
+            "ON ai_book_chat_turns(owner_user_id, book_id, created_at, id)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_book_chat_result "
+            "ON ai_book_chat_turns(result_id) WHERE result_id IS NOT NULL",
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_book_created "
+            "ON ai_reading_results(book_id, created_at DESC, id DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_results_chapter_language_created "
+            "ON ai_reading_results(book_id, chapter_index, language, created_at DESC, id DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_current_results_result "
+            "ON ai_reading_current_results(result_id)",
+            "CREATE INDEX IF NOT EXISTS idx_book_ai_tags_tag ON book_ai_tags(tag_id)",
+        )
+        for statement in statements:
+            connection.execute(statement)
 
     @staticmethod
     def _validate_password_hashes(connection) -> None:
@@ -1356,9 +1661,9 @@ class StateStore:
                     session_id,
                     token_digest_value,
                     user_id,
-                    str(expiry),
-                    str(created_at),
-                    str(created_at),
+                    expiry,
+                    created_at,
+                    created_at,
                     client_address,
                     user_agent,
                 ),
@@ -1801,9 +2106,9 @@ class StateStore:
                     session_id,
                     token_digest_value,
                     user_id,
-                    str(expiry),
-                    str(created_at),
-                    str(created_at),
+                    expiry,
+                    created_at,
+                    created_at,
                     client_address,
                     user_agent,
                 ),
@@ -1860,7 +2165,7 @@ class StateStore:
                 UPDATE sessions SET revoked_at = ?
                 WHERE token_digest = ? AND revoked_at IS NULL
                 """,
-                (str(created_at), replaced_digest),
+                (created_at, replaced_digest),
             )
             connection.execute(
                 """
@@ -1874,9 +2179,9 @@ class StateStore:
                     session_id,
                     token_digest_value,
                     user_id,
-                    str(expiry),
-                    str(created_at),
-                    str(created_at),
+                    expiry,
+                    created_at,
+                    created_at,
                     client_address,
                     user_agent,
                 ),
@@ -1923,7 +2228,7 @@ class StateStore:
                 WHERE token_digest = ?
                   AND revoked_at IS NULL
                 """,
-                (str(used_at + ttl_seconds), str(used_at), digest),
+                (used_at + ttl_seconds, used_at, digest),
             )
         return Principal(row["user_id"], row["username"], row["role"])
 
@@ -1937,7 +2242,7 @@ class StateStore:
                 UPDATE sessions SET revoked_at = ?
                 WHERE session_id = ? AND revoked_at IS NULL
                 """,
-                (str(timestamp), session_id),
+                (timestamp, session_id),
             )
         return cursor.rowcount == 1
 
@@ -1963,7 +2268,7 @@ class StateStore:
                 UPDATE sessions SET revoked_at = ?
                 WHERE token_digest = ? AND revoked_at IS NULL
                 """,
-                (str(timestamp), digest),
+                (timestamp, digest),
             )
         return cursor.rowcount == 1
 
@@ -1976,7 +2281,7 @@ class StateStore:
                 UPDATE sessions SET revoked_at = ?
                 WHERE user_id = ? AND revoked_at IS NULL
                 """,
-                (str(timestamp), user_id),
+                (timestamp, user_id),
             )
         return cursor.rowcount
 
@@ -2005,7 +2310,7 @@ class StateStore:
             conditions = ["user_id = ?"]
             parameters = [user_id]
             if active_only:
-                conditions.extend(["revoked_at IS NULL", "CAST(expires_at AS REAL) > ?"])
+                conditions.extend(["revoked_at IS NULL", "expires_at > ?"])
                 parameters.append(self._timestamp(now))
             rows = connection.execute(
                 """
@@ -2060,7 +2365,7 @@ class StateStore:
                 UPDATE sessions SET revoked_at = ?
                 WHERE session_id = ? AND user_id = ? AND revoked_at IS NULL
                 """,
-                (str(timestamp), session_id, user_id),
+                (timestamp, session_id, user_id),
             )
         return cursor.rowcount == 1
 
@@ -3536,7 +3841,6 @@ class StateStore:
         conflict = (
             """
                 ON CONFLICT(user_id, id) DO UPDATE SET
-                    username = excluded.username,
                     book_hash = excluded.book_hash,
                     chapter_index = excluded.chapter_index,
                     text = excluded.text,
@@ -3557,8 +3861,8 @@ class StateStore:
                 f"""
                 INSERT INTO annotations (
                     id, book_hash, chapter_index, text, note, start_meta, end_meta,
-                    color, created_at, updated_at, user_id, username
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    color, created_at, updated_at, user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 {conflict}
                 """,
                 (
@@ -3573,7 +3877,6 @@ class StateStore:
                     annotation["created_at"],
                     annotation["updated_at"],
                     user_id,
-                    "",
                 ),
             )
             if replace_existing and cursor.rowcount != 1:
@@ -3625,8 +3928,8 @@ class StateStore:
             connection.execute(
                 """
                 INSERT INTO bookshelves (
-                    user_id, username, version, data, updated_at
-                ) VALUES (?, '', ?, ?, CURRENT_TIMESTAMP)
+                    user_id, version, data, updated_at
+                ) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (user_id, version, serialized),
             )
@@ -3667,8 +3970,8 @@ class StateStore:
             connection.execute(
                 """
                 INSERT INTO reading_progress(
-                    user_id, username, book_hash, chapter_index, updated_at
-                ) VALUES (?, '', ?, ?, CURRENT_TIMESTAMP)
+                    user_id, book_hash, chapter_index, updated_at
+                ) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(user_id, book_hash) DO UPDATE SET
                     chapter_index = excluded.chapter_index,
                     updated_at = CURRENT_TIMESTAMP

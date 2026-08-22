@@ -9,6 +9,17 @@ from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
 
 
+def table_columns(connection, table):
+    return {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+
+
+def foreign_key_contract(connection, table):
+    return {
+        (row[3], row[2], row[4], row[6])
+        for row in connection.execute(f"PRAGMA foreign_key_list({table})")
+    }
+
+
 class StateStoreTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -269,13 +280,7 @@ class StateStoreTests(unittest.TestCase):
             (7, '{"owner":"alpha"}'),
         )
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(
-                connection.execute(
-                    "SELECT username FROM bookshelves WHERE user_id = ?",
-                    (admin.user_id,),
-                ).fetchone()[0],
-                "alpha",
-            )
+            self.assertNotIn("username", table_columns(connection, "bookshelves"))
 
     def test_v1_colliding_progress_keeps_newest_with_deterministic_tie_break(self):
         self._create_v1_database_with_annotation_bookshelf_and_progress("zeta")
@@ -309,16 +314,7 @@ class StateStoreTests(unittest.TestCase):
             9,
         )
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(
-                connection.execute(
-                    """
-                    SELECT username FROM reading_progress
-                    WHERE user_id = ? AND book_hash = 'book'
-                    """,
-                    (admin.user_id,),
-                ).fetchone()[0],
-                "alpha",
-            )
+            self.assertNotIn("username", table_columns(connection, "reading_progress"))
 
     def test_content_update_keeps_book_id(self):
         source = Path(self.temporary.name, "books", "one.epub")
@@ -617,6 +613,340 @@ class StateStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "newer schema"):
             StateStore(future).initialize()
 
+    def test_v11_fresh_database_has_latest_contract(self):
+        database = Path(self.temporary.name, "fresh-v11.db")
+        StateStore(database).initialize(
+            bootstrap=BootstrapCredentials("fresh-owner", "secret")
+        )
+        StateStore(database).initialize()
+
+        with sqlite3.connect(database) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
+            self.assertFalse(
+                {"username"} & table_columns(connection, "annotations")
+            )
+            self.assertFalse(
+                {"username"} & table_columns(connection, "bookshelves")
+            )
+            self.assertFalse(
+                {"username"} & table_columns(connection, "reading_progress")
+            )
+            self.assertTrue(
+                {
+                    "attempt_number",
+                    "retried_from_job_id",
+                    "retry_root_job_id",
+                    "retried_by_user_id",
+                }
+                <= table_columns(connection, "ai_reading_jobs")
+            )
+            session_types = {
+                row[1]: row[2]
+                for row in connection.execute("PRAGMA table_info(sessions)")
+            }
+            self.assertEqual(
+                {
+                    name: session_types[name]
+                    for name in ("expires_at", "last_used_at", "revoked_at", "created_at")
+                },
+                {
+                    "expires_at": "REAL",
+                    "last_used_at": "REAL",
+                    "revoked_at": "REAL",
+                    "created_at": "REAL",
+                },
+            )
+            job_fks = foreign_key_contract(connection, "ai_reading_jobs")
+            self.assertIn(("result_id", "ai_reading_results", "id", "SET NULL"), job_fks)
+            self.assertIn(("retried_from_job_id", "ai_reading_jobs", "id", "SET NULL"), job_fks)
+            self.assertIn(("retry_root_job_id", "ai_reading_jobs", "id", "SET NULL"), job_fks)
+            self.assertIn(("retried_by_user_id", "users", "id", "SET NULL"), job_fks)
+            self.assertIn(
+                ("book_id", "books", "book_id", "CASCADE"),
+                foreign_key_contract(connection, "ai_book_chat_turns"),
+            )
+            self.assertIn(
+                ("book_id", "books", "book_id", "CASCADE"),
+                foreign_key_contract(connection, "ai_book_chat_summaries"),
+            )
+            indexes = {
+                row[1]: bool(row[2])
+                for row in connection.execute("PRAGMA index_list(ai_reading_jobs)")
+            }
+            self.assertTrue(indexes["idx_ai_jobs_active_cache"])
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO ai_reading_jobs "
+                    "(id, owner_user_id, cache_key, status, progress_current, progress_total) "
+                    "VALUES ('bad-progress', ?, 'bad-progress', 'queued', 2, 1)",
+                    (connection.execute("SELECT id FROM users LIMIT 1").fetchone()[0],),
+                )
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO ai_reading_jobs "
+                    "(id, owner_user_id, cache_key, status) "
+                    "VALUES ('failed-without-error', ?, 'failed-without-error', 'failed')",
+                    (connection.execute("SELECT id FROM users LIMIT 1").fetchone()[0],),
+                )
+
+    def test_v10_ai_tables_gain_v11_constraints(self):
+        self._downgrade_selected_tables_to_v10(self.database)
+        self._downgrade_ai_tables_to_v10(self.database)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "INSERT INTO books (book_id, source_path, source_fingerprint, metadata_json) "
+                "VALUES ('book-v10', '/book-v10.epub', 'fingerprint', '{}')"
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_results "
+                "(id, cache_key, book_id, scope, mode, profile, config_revision, "
+                "content_json, created_by_user_id) "
+                "VALUES ('result-v10', 'result-key', 'book-v10', 'book', "
+                "'full_review', 'general', 0, '{}', ?)",
+                (self.owner.user_id,),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, book_id, cache_key, request_json, profile, "
+                "template_id, template_version, status, result_id, progress_current, "
+                "progress_total, created_at, updated_at) VALUES "
+                "('completed-with-result', ?, 'book-v10', 'job-key-1', '{}', 'general', "
+                "'reading-layer', 3, 'complete', 'result-v10', 1, 1, '2026-01', '2026-02'), "
+                "('completed-with-cleared-result', ?, 'book-v10', 'job-key-2', '{}', "
+                "'general', 'reading-layer', 3, 'complete', 'missing-result', 1, 1, "
+                "'2026-03', '2026-04')",
+                (self.owner.user_id, self.owner.user_id),
+            )
+            connection.execute(
+                "INSERT INTO ai_book_chat_turns "
+                "(id, book_id, chapter_index, result_id, context_mode, book_context, "
+                "owner_user_id, question, language, answer, status, created_at, updated_at) "
+                "VALUES ('turn-v10', 'book-v10', 4, 'result-v10', 'shared_layer', 1, ?, "
+                "'Original question?', 'en', 'Original answer.', 'complete', "
+                "'2026-05', '2026-06')",
+                (self.owner.user_id,),
+            )
+            connection.execute(
+                "INSERT INTO ai_book_chat_summaries "
+                "(book_id, owner_user_id, language, covered_turn_count, summary_text, updated_at) "
+                "VALUES ('book-v10', ?, 'en', 1, 'Original summary.', '2026-07')",
+                (self.owner.user_id,),
+            )
+
+        StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            job_fks = foreign_key_contract(connection, "ai_reading_jobs")
+            self.assertIn(("result_id", "ai_reading_results", "id", "SET NULL"), job_fks)
+            self.assertIn(
+                ("book_id", "books", "book_id", "CASCADE"),
+                foreign_key_contract(connection, "ai_book_chat_turns"),
+            )
+            self.assertIn(
+                ("book_id", "books", "book_id", "CASCADE"),
+                foreign_key_contract(connection, "ai_book_chat_summaries"),
+            )
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT result_id FROM ai_reading_jobs "
+                    "WHERE id='completed-with-cleared-result'"
+                ).fetchone()[0]
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT result_id, attempt_number, retried_from_job_id, "
+                    "retry_root_job_id, retried_by_user_id, created_at, updated_at "
+                    "FROM ai_reading_jobs WHERE id='completed-with-result'"
+                ).fetchone(),
+                ("result-v10", 1, None, None, None, "2026-01", "2026-02"),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT question, answer, status, created_at, updated_at "
+                    "FROM ai_book_chat_turns WHERE id='turn-v10'"
+                ).fetchone(),
+                ("Original question?", "Original answer.", "complete", "2026-05", "2026-06"),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT covered_turn_count, summary_text, updated_at "
+                    "FROM ai_book_chat_summaries WHERE book_id='book-v10'"
+                ).fetchone(),
+                (1, "Original summary.", "2026-07"),
+            )
+            self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
+
+    def test_v11_rejects_orphan_chat_book(self):
+        self._downgrade_ai_tables_to_v10(self.database)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "INSERT INTO ai_book_chat_turns "
+                "(id, book_id, chapter_index, context_mode, owner_user_id, question, status) "
+                "VALUES ('orphan-turn', 'missing-book', 0, 'chapter_source', ?, 'Why?', 'queued')",
+                (self.owner.user_id,),
+            )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 10)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT book_id FROM ai_book_chat_turns WHERE id='orphan-turn'"
+                ).fetchone()[0],
+                "missing-book",
+            )
+
+    def test_v11_rejects_duplicate_active_cache_keys(self):
+        self._downgrade_ai_tables_to_v10(self.database)
+        with sqlite3.connect(self.database) as connection:
+            connection.executemany(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, request_json, status) VALUES (?, ?, 'same', '{}', ?)",
+                (
+                    ("queued-one", self.owner.user_id, "queued"),
+                    ("queued-two", self.owner.user_id, "queued"),
+                ),
+            )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 10)
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM ai_reading_jobs").fetchone()[0], 2)
+
+    def test_v11_rejects_leftover_migration_tables(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("CREATE TABLE annotations__v11_source (id TEXT)")
+            connection.execute("PRAGMA user_version = 10")
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 10)
+            self.assertIsNotNone(
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' "
+                    "AND name='annotations__v11_source'"
+                ).fetchone()
+            )
+
+    def test_v11_query_plans_use_final_indexes(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "INSERT INTO books (book_id, source_path, source_fingerprint, metadata_json) "
+                "VALUES ('plan-book', '/plan.epub', 'plan-fingerprint', '{}')"
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_results "
+                "(id, cache_key, book_id, chapter_index, scope, mode, profile, language, "
+                "config_revision, content_json, created_by_user_id) "
+                "VALUES ('plan-result', 'plan-result-key', 'plan-book', 1, 'chapter', "
+                "'chapter', 'general', 'en', 0, '{}', ?)",
+                (self.owner.user_id,),
+            )
+            connection.executemany(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, request_json, status) VALUES (?, ?, ?, '{}', 'complete')",
+                (
+                    (f"complete-job-{number}", self.owner.user_id, f"complete-key-{number}")
+                    for number in range(200)
+                ),
+            )
+            connection.executemany(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, request_json, status) "
+                "VALUES (?, ?, ?, NULL, 'queued')",
+                (
+                    (f"empty-job-{number}", self.owner.user_id, f"empty-key-{number}")
+                    for number in range(200)
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, request_json, status) "
+                "VALUES ('queued-job', ?, 'queued-key', '{}', 'queued')",
+                (self.owner.user_id,),
+            )
+            connection.executemany(
+                "INSERT INTO ai_reading_followups "
+                "(id, result_id, owner_user_id, question, status) "
+                "VALUES (?, 'plan-result', ?, 'Question?', 'complete')",
+                ((f"complete-followup-{number}", self.owner.user_id) for number in range(200)),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_followups "
+                "(id, result_id, owner_user_id, question, status) "
+                "VALUES ('queued-followup', 'plan-result', ?, 'Question?', 'queued')",
+                (self.owner.user_id,),
+            )
+            connection.executemany(
+                "INSERT INTO ai_book_chat_turns "
+                "(id, book_id, chapter_index, context_mode, owner_user_id, question, status) "
+                "VALUES (?, 'plan-book', 1, 'chapter_source', ?, 'Question?', 'complete')",
+                ((f"complete-chat-{number}", self.owner.user_id) for number in range(200)),
+            )
+            connection.execute(
+                "INSERT INTO ai_book_chat_turns "
+                "(id, book_id, chapter_index, context_mode, owner_user_id, question, status) "
+                "VALUES ('queued-chat', 'plan-book', 1, 'chapter_source', ?, 'Question?', 'queued')",
+                (self.owner.user_id,),
+            )
+            connection.execute("ANALYZE")
+            plans = {
+                "jobs": connection.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM ai_reading_jobs "
+                    "INDEXED BY idx_ai_jobs_queue "
+                    "WHERE status='queued' AND request_json IS NOT NULL AND created_at >= '' "
+                    "ORDER BY created_at, id LIMIT 1"
+                ).fetchall(),
+                "followups": connection.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM ai_reading_followups "
+                    "INDEXED BY idx_ai_followups_queue "
+                    "WHERE status='queued' AND created_at >= '' "
+                    "ORDER BY created_at, id LIMIT 1"
+                ).fetchall(),
+                "chat": connection.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM ai_book_chat_turns "
+                    "INDEXED BY idx_ai_book_chat_queue "
+                    "WHERE status='queued' AND created_at >= '' "
+                    "ORDER BY created_at, rowid LIMIT 1"
+                ).fetchall(),
+                "annotations": connection.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM annotations "
+                    "WHERE user_id=? AND book_hash=? AND chapter_index=? "
+                    "ORDER BY created_at DESC, id",
+                    (self.owner.user_id, "book", 1),
+                ).fetchall(),
+                "sessions": connection.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM sessions WHERE user_id=? "
+                    "ORDER BY created_at DESC, session_id",
+                    (self.owner.user_id,),
+                ).fetchall(),
+                "results": connection.execute(
+                    "EXPLAIN QUERY PLAN SELECT * FROM ai_reading_results "
+                    "WHERE book_id=? AND chapter_index=? AND language=? "
+                    "ORDER BY created_at DESC, id DESC",
+                    ("book", 1, "en"),
+                ).fetchall(),
+            }
+        details = {
+            name: " ".join(row[3] for row in rows) for name, rows in plans.items()
+        }
+        self.assertIn("idx_ai_jobs_queue", details["jobs"])
+        self.assertNotIn("SCAN ai_reading_jobs", details["jobs"])
+        self.assertIn("idx_ai_followups_queue", details["followups"])
+        self.assertNotIn("SCAN ai_reading_followups", details["followups"])
+        self.assertIn("idx_ai_book_chat_queue", details["chat"])
+        self.assertNotIn("SCAN ai_book_chat_turns", details["chat"])
+        self.assertIn("idx_annotations_user_book_chapter_created", details["annotations"])
+        self.assertIn("idx_sessions_user_created", details["sessions"])
+        self.assertIn("idx_ai_results_chapter_language_created", details["results"])
+
     def test_initialize_rebuilds_historical_xpath_annotation_schema(self):
         historical = Path(self.temporary.name, "historical.db")
         with sqlite3.connect(historical) as connection:
@@ -667,7 +997,7 @@ class StateStoreTests(unittest.TestCase):
             }
         self.assertIn("start_meta", columns)
         self.assertIn("end_meta", columns)
-        self.assertIn("username", columns)
+        self.assertNotIn("username", columns)
         self.assertNotIn("start_xpath", columns)
 
         store.upsert_annotation(
@@ -1558,16 +1888,16 @@ class StateStoreTests(unittest.TestCase):
             connection.execute(
                 "INSERT INTO annotations_v10 "
                 "SELECT id, book_hash, chapter_index, text, note, start_meta, "
-                "end_meta, color, created_at, updated_at, user_id, username "
+                "end_meta, color, created_at, updated_at, user_id, '' "
                 "FROM annotations"
             )
             connection.execute(
                 "INSERT INTO bookshelves_v10 "
-                "SELECT user_id, username, version, data, updated_at FROM bookshelves"
+                "SELECT user_id, '', version, data, updated_at FROM bookshelves"
             )
             connection.execute(
                 "INSERT INTO reading_progress_v10 "
-                "SELECT user_id, username, book_hash, chapter_index, updated_at "
+                "SELECT user_id, '', book_hash, chapter_index, updated_at "
                 "FROM reading_progress"
             )
             connection.execute(
@@ -1584,6 +1914,69 @@ class StateStoreTests(unittest.TestCase):
                 connection.execute(f"DROP TABLE {table}")
                 connection.execute(f"ALTER TABLE {table}_v10 RENAME TO {table}")
             connection.execute("PRAGMA user_version = 10")
+
+    def _downgrade_ai_tables_to_v10(self, database):
+        with sqlite3.connect(database) as connection:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.executescript(
+                """
+                DROP TABLE ai_reading_jobs;
+                DROP TABLE ai_book_chat_turns;
+                DROP TABLE ai_book_chat_summaries;
+                CREATE TABLE ai_reading_jobs (
+                    id TEXT PRIMARY KEY,
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
+                    cache_key TEXT NOT NULL,
+                    request_json TEXT,
+                    profile TEXT,
+                    template_id TEXT,
+                    template_version INTEGER,
+                    status TEXT NOT NULL CHECK(status IN (
+                        'queued', 'running', 'complete', 'failed', 'interrupted'
+                    )),
+                    error_code TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    result_id TEXT,
+                    progress_current INTEGER NOT NULL DEFAULT 0
+                        CHECK(progress_current >= 0),
+                    progress_total INTEGER NOT NULL DEFAULT 1
+                        CHECK(progress_total >= 1)
+                );
+                CREATE TABLE ai_book_chat_turns (
+                    id TEXT PRIMARY KEY,
+                    book_id TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                    result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
+                    context_mode TEXT NOT NULL CHECK(context_mode IN (
+                        'shared_layer', 'chapter_source'
+                    )),
+                    book_context INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1)),
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    question TEXT NOT NULL,
+                    language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                    answer TEXT,
+                    status TEXT NOT NULL CHECK(status IN (
+                        'queued', 'running', 'complete', 'failed', 'interrupted'
+                    )),
+                    error_code TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE ai_book_chat_summaries (
+                    book_id TEXT NOT NULL,
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
+                    covered_turn_count INTEGER NOT NULL DEFAULT 0
+                        CHECK(covered_turn_count >= 0),
+                    summary_text TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (book_id, owner_user_id, language)
+                );
+                PRAGMA user_version = 10;
+                """
+            )
 
     def _selected_table_snapshot(self):
         tables = ("annotations", "bookshelves", "reading_progress", "sessions")
