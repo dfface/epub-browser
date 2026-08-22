@@ -1999,6 +1999,247 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(second["id"], "job-first")
         self.assertEqual(second["book_id"], book.book_id)
 
+    def test_admin_ai_job_pagination_is_safe_and_stable(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "admin-job-book.epub"),
+            "urn:test:admin-job-book", "fingerprint", {"title": "Admin Job Book"},
+        )
+        replay = {
+            "book_id": book.book_id,
+            "scope": "chapter",
+            "mode": "chapter",
+            "language": "zh-CN",
+            "chapter_index": 4,
+            "reading_boundary": 4,
+            "private_note": "PRIVATE_REPLAY_SENTINEL",
+        }
+        for index in range(25):
+            job_id = f"admin-page-{index:02d}"
+            self.store.create_ai_job(
+                job_id,
+                member.user_id,
+                f"admin-page-cache-{index}",
+                book_id=book.book_id,
+                request_payload=replay,
+                profile="general",
+                template_id="reading",
+                template_version=1,
+            )
+            self.assertTrue(self.store.start_ai_job(job_id))
+            if index % 2 == 0:
+                self.assertTrue(self.store.finish_ai_job(job_id, error_code="provider_failed"))
+            else:
+                self.assertTrue(self.store.finish_ai_job(job_id))
+            with self.store._connection() as connection:
+                connection.execute(
+                    "UPDATE ai_reading_jobs SET created_at = ? WHERE id = ?",
+                    (f"2026-08-23 00:00:{index:02d}", job_id),
+                )
+
+        jobs, total = self.store.list_admin_ai_jobs(
+            status="failed", page=2, page_size=5
+        )
+
+        self.assertEqual(total, 13)
+        self.assertEqual(len(jobs), 5)
+        self.assertEqual(
+            [job["created_at"] for job in jobs],
+            sorted((job["created_at"] for job in jobs), reverse=True),
+        )
+        self.assertTrue(all(job["status"] == "failed" for job in jobs))
+        self.assertTrue(all("request_json" not in job for job in jobs))
+        self.assertTrue(all("metadata_json" not in job for job in jobs))
+        self.assertTrue(all("cache_key" not in job for job in jobs))
+        self.assertEqual(jobs[0]["book_title"], "Admin Job Book")
+        self.assertEqual(jobs[0]["owner_username"], "reader")
+        self.assertEqual(
+            {
+                key: jobs[0][key]
+                for key in ("scope", "mode", "language", "chapter_index", "reading_boundary")
+            },
+            {
+                "scope": "chapter",
+                "mode": "chapter",
+                "language": "zh-CN",
+                "chapter_index": 4,
+                "reading_boundary": 4,
+            },
+        )
+        self.assertNotIn("private_note", jobs[0])
+        self.assertTrue(jobs[0]["retryable"])
+
+    def test_admin_retry_creates_one_linked_active_attempt(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "retry-book.epub"),
+            "urn:test:retry-book", "fingerprint", {"title": "Retry Book"},
+        )
+        request = {
+            "book_id": book.book_id,
+            "scope": "chapter",
+            "mode": "chapter",
+            "language": "en",
+            "chapter_index": 2,
+            "reading_boundary": 2,
+        }
+        self.store.create_ai_job(
+            "failed-source", member.user_id, "failed-cache", book_id=book.book_id,
+            request_payload=request, profile="general", template_id="reading",
+            template_version=1, progress_total=3,
+        )
+        self.assertTrue(self.store.start_ai_job("failed-source"))
+        self.assertTrue(
+            self.store.finish_ai_job("failed-source", error_code="provider_failed")
+        )
+
+        first, created_first = self.store.create_or_get_admin_retry_ai_job(
+            source_job_id="failed-source", job_id="retry-attempt-2",
+            retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
+            book_id=book.book_id, cache_key="recomputed-cache", request_payload=request,
+            progress_total=4, profile="technical", template_id="current-template",
+            template_version=2,
+        )
+        second, created_second = self.store.create_or_get_admin_retry_ai_job(
+            source_job_id="failed-source", job_id="ignored-retry-id",
+            retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
+            book_id=book.book_id, cache_key="recomputed-cache", request_payload=request,
+            progress_total=4, profile="technical", template_id="current-template",
+            template_version=2,
+        )
+
+        self.assertTrue(created_first)
+        self.assertFalse(created_second)
+        self.assertEqual(first["id"], "retry-attempt-2")
+        self.assertEqual(second["id"], "retry-attempt-2")
+        self.assertNotIn("request_json", first)
+        self.assertEqual(
+            {
+                key: first[key]
+                for key in (
+                    "attempt_number", "retried_from_job_id", "retry_root_job_id",
+                    "retried_by_user_id", "owner_user_id",
+                )
+            },
+            {
+                "attempt_number": 2,
+                "retried_from_job_id": "failed-source",
+                "retry_root_job_id": "failed-source",
+                "retried_by_user_id": self.owner.user_id,
+                "owner_user_id": member.user_id,
+            },
+        )
+        self.assertEqual(
+            self.store.get_ai_job_for_retry("failed-source")["status"], "failed"
+        )
+        self.assertIn(
+            "request_json", self.store.get_ai_job_for_retry("failed-source")
+        )
+
+    def test_admin_retry_attempt_numbers_follow_the_root_lineage(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "retry-lineage.epub"),
+            "urn:test:retry-lineage", "fingerprint", {"title": "Retry Book"},
+        )
+        request = {
+            "book_id": book.book_id,
+            "scope": "chapter",
+            "mode": "chapter",
+            "language": "en",
+            "chapter_index": 2,
+            "reading_boundary": 2,
+        }
+        self.store.create_ai_job(
+            "lineage-source", member.user_id, "lineage-source-cache",
+            book_id=book.book_id, request_payload=request, progress_total=2,
+        )
+        self.assertTrue(self.store.start_ai_job("lineage-source"))
+        self.assertTrue(
+            self.store.finish_ai_job("lineage-source", error_code="provider_failed")
+        )
+        attempt_two, created_two = self.store.create_or_get_admin_retry_ai_job(
+            source_job_id="lineage-source", job_id="lineage-attempt-2",
+            retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
+            book_id=book.book_id, cache_key="lineage-cache-2", request_payload=request,
+            progress_total=2, profile="general", template_id="reading",
+            template_version=1,
+        )
+        self.assertTrue(created_two)
+        self.assertTrue(self.store.start_ai_job(attempt_two["id"]))
+        self.assertTrue(
+            self.store.finish_ai_job(attempt_two["id"], error_code="provider_failed")
+        )
+
+        attempt_three, created_three = self.store.create_or_get_admin_retry_ai_job(
+            source_job_id=attempt_two["id"], job_id="lineage-attempt-3",
+            retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
+            book_id=book.book_id, cache_key="lineage-cache-3", request_payload=request,
+            progress_total=2, profile="general", template_id="reading",
+            template_version=1,
+        )
+
+        self.assertTrue(created_three)
+        self.assertEqual(attempt_three["attempt_number"], 3)
+        self.assertEqual(attempt_three["retried_from_job_id"], "lineage-attempt-2")
+        self.assertEqual(attempt_three["retry_root_job_id"], "lineage-source")
+
+    def test_admin_retry_rejects_nonterminal_unknown_and_malformed_sources(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "retry-validation.epub"),
+            "urn:test:retry-validation", "fingerprint", {"title": "Retry Book"},
+        )
+        request = {
+            "book_id": book.book_id,
+            "scope": "chapter",
+            "mode": "chapter",
+            "language": "en",
+            "chapter_index": 2,
+            "reading_boundary": 2,
+        }
+
+        def retry(source_job_id):
+            return self.store.create_or_get_admin_retry_ai_job(
+                source_job_id=source_job_id, job_id=f"retry-{source_job_id}",
+                retried_by_user_id=self.owner.user_id, owner_user_id=member.user_id,
+                book_id=book.book_id, cache_key=f"retry-cache-{source_job_id}",
+                request_payload=request, progress_total=2, profile="general",
+                template_id="reading", template_version=1,
+            )
+
+        self.store.create_ai_job(
+            "queued-source", member.user_id, "queued-cache", book_id=book.book_id,
+            request_payload=request,
+        )
+        self.store.create_ai_job(
+            "running-source", member.user_id, "running-cache", book_id=book.book_id,
+            request_payload=request,
+        )
+        self.assertTrue(self.store.start_ai_job("running-source"))
+        self.store.create_ai_job(
+            "complete-source", member.user_id, "complete-cache", book_id=book.book_id,
+            request_payload=request,
+        )
+        self.assertTrue(self.store.start_ai_job("complete-source"))
+        self.assertTrue(self.store.finish_ai_job("complete-source"))
+        self.store.create_ai_job(
+            "malformed-source", member.user_id, "malformed-cache", book_id=book.book_id,
+        )
+        self.assertTrue(self.store.start_ai_job("malformed-source"))
+        self.assertTrue(
+            self.store.finish_ai_job("malformed-source", error_code="provider_failed")
+        )
+
+        for source_job_id in (
+            "queued-source", "running-source", "complete-source", "malformed-source",
+        ):
+            with self.subTest(source_job_id=source_job_id):
+                with self.assertRaises(ValueError):
+                    retry(source_job_id)
+        with self.assertRaises(KeyError):
+            retry("unknown-source")
+
     def test_running_private_followup_is_requeued_with_its_language(self):
         member = self.store.create_user("reader", "hash", role="member")
         book = self.store.resolve_book(

@@ -2958,6 +2958,217 @@ class StateStore:
             connection.execute("COMMIT")
         return True
 
+    @staticmethod
+    def _json_object(value) -> Optional[dict]:
+        if not isinstance(value, str):
+            return None
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    @classmethod
+    def _admin_ai_job_mapping(cls, row) -> dict:
+        """Return the narrow, public-safe projection for an AI reading job."""
+        values = dict(row)
+        replay = cls._json_object(values.pop("request_json", None))
+        metadata = cls._json_object(values.pop("book_metadata_json", None))
+        values["book_title"] = (
+            metadata.get("title")
+            if metadata is not None and isinstance(metadata.get("title"), str)
+            else None
+        )
+        for field in (
+            "scope", "mode", "language", "chapter_index", "reading_boundary",
+        ):
+            values[field] = replay.get(field) if replay is not None else None
+        values["retryable"] = (
+            values["status"] in {"failed", "interrupted"} and replay is not None
+        )
+        return values
+
+    @staticmethod
+    def _admin_ai_job_select() -> str:
+        return """
+            SELECT jobs.id, jobs.owner_user_id, users.username AS owner_username,
+                   jobs.book_id, books.metadata_json AS book_metadata_json,
+                   jobs.request_json, jobs.profile, jobs.template_id, jobs.template_version,
+                   jobs.status, jobs.error_code, jobs.result_id,
+                   jobs.progress_current, jobs.progress_total,
+                   jobs.attempt_number, jobs.retried_from_job_id,
+                   jobs.retry_root_job_id, jobs.retried_by_user_id,
+                   jobs.created_at, jobs.updated_at
+            FROM ai_reading_jobs AS jobs
+            JOIN users ON users.id = jobs.owner_user_id
+            LEFT JOIN books ON books.book_id = jobs.book_id
+        """
+
+    def _get_admin_ai_job(self, connection, job_id: str) -> Optional[dict]:
+        row = connection.execute(
+            self._admin_ai_job_select() + " WHERE jobs.id = ?", (job_id,)
+        ).fetchone()
+        return self._admin_ai_job_mapping(row) if row is not None else None
+
+    def list_admin_ai_jobs(
+        self, *, status: Optional[str], page: int, page_size: int
+    ) -> tuple[tuple[dict, ...], int]:
+        """Return one privacy-safe administrator page of shared reading jobs."""
+        if status is not None and status not in {
+            "queued", "running", "complete", "failed", "interrupted",
+        }:
+            raise ValueError("AI job status filter is invalid")
+        if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+            raise ValueError("AI job page is invalid")
+        if (
+            isinstance(page_size, bool)
+            or not isinstance(page_size, int)
+            or page_size < 1
+            or page_size > 100
+        ):
+            raise ValueError("AI job page size is invalid")
+        offset = (page - 1) * page_size
+        with self._connection() as connection:
+            if status is None:
+                total = connection.execute(
+                    "SELECT COUNT(*) FROM ai_reading_jobs"
+                ).fetchone()[0]
+                rows = connection.execute(
+                    self._admin_ai_job_select()
+                    + " ORDER BY jobs.created_at DESC, jobs.id DESC "
+                    "LIMIT ? OFFSET ?",
+                    (page_size, offset),
+                ).fetchall()
+            else:
+                total = connection.execute(
+                    "SELECT COUNT(*) FROM ai_reading_jobs WHERE status = ?", (status,)
+                ).fetchone()[0]
+                rows = connection.execute(
+                    self._admin_ai_job_select()
+                    + " WHERE jobs.status = ? "
+                    "ORDER BY jobs.created_at DESC, jobs.id DESC LIMIT ? OFFSET ?",
+                    (status, page_size, offset),
+                ).fetchall()
+        return tuple(self._admin_ai_job_mapping(row) for row in rows), int(total)
+
+    def get_ai_job_for_retry(self, job_id: str) -> Optional[dict]:
+        """Load the private persisted replay row for server-side retry handling only."""
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM ai_reading_jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def create_or_get_admin_retry_ai_job(
+        self, *, source_job_id: str, job_id: str, retried_by_user_id: str,
+        owner_user_id: str, book_id: str, cache_key: str, request_payload: dict,
+        progress_total: int, profile: str, template_id: str,
+        template_version: int, cached_result_id: Optional[str] = None,
+    ) -> tuple[dict, bool]:
+        """Atomically persist one safe, auditable retry attempt or join its flight."""
+        if not isinstance(request_payload, dict):
+            raise ValueError("AI retry request payload is invalid")
+        if (
+            isinstance(progress_total, bool)
+            or not isinstance(progress_total, int)
+            or progress_total < 1
+        ):
+            raise ValueError("AI job progress total must be positive")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            source = connection.execute(
+                "SELECT * FROM ai_reading_jobs WHERE id = ?", (source_job_id,)
+            ).fetchone()
+            if source is None:
+                raise KeyError(f"Unknown AI job ID: {source_job_id}")
+            source_values = dict(source)
+            if source_values["status"] not in {"failed", "interrupted"}:
+                raise ValueError("AI job is not retryable")
+            if self._json_object(source_values["request_json"]) is None:
+                raise ValueError("AI job replay payload is invalid")
+            if source_values["owner_user_id"] != owner_user_id:
+                raise ValueError("AI retry owner does not match source job")
+            if source_values["book_id"] != book_id:
+                raise ValueError("AI retry book does not match source job")
+            self._require_user(connection, owner_user_id)
+            self._require_user(connection, retried_by_user_id)
+            self._get_book(connection, book_id)
+            if cached_result_id is not None:
+                cached_result = connection.execute(
+                    "SELECT 1 FROM ai_reading_results WHERE id = ? AND book_id = ?",
+                    (cached_result_id, book_id),
+                ).fetchone()
+                if cached_result is None:
+                    raise KeyError(f"Unknown AI reading result ID: {cached_result_id}")
+
+            existing = connection.execute(
+                """
+                SELECT id FROM ai_reading_jobs
+                WHERE cache_key = ? AND status IN ('queued', 'running')
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
+                (cache_key,),
+            ).fetchone()
+            if existing is not None:
+                job = self._get_admin_ai_job(connection, existing["id"])
+                connection.execute("COMMIT")
+                return job, False
+
+            retry_root_job_id = source_values["retry_root_job_id"] or source_job_id
+            root_attempt = connection.execute(
+                "SELECT attempt_number FROM ai_reading_jobs WHERE id = ?",
+                (retry_root_job_id,),
+            ).fetchone()
+            if root_attempt is None:
+                raise ValueError("AI retry root is unavailable")
+            highest_retry = connection.execute(
+                "SELECT MAX(attempt_number) FROM ai_reading_jobs "
+                "WHERE retry_root_job_id = ?",
+                (retry_root_job_id,),
+            ).fetchone()[0]
+            attempt_number = (
+                max(int(root_attempt["attempt_number"]), highest_retry or 0) + 1
+            )
+            status = "complete" if cached_result_id is not None else "queued"
+            progress_current = progress_total if cached_result_id is not None else 0
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO ai_reading_jobs (
+                        id, owner_user_id, book_id, cache_key, request_json, profile,
+                        template_id, template_version, status, result_id,
+                        progress_current, progress_total, attempt_number,
+                        retried_from_job_id, retry_root_job_id, retried_by_user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        job_id, owner_user_id, book_id, cache_key,
+                        json.dumps(request_payload, ensure_ascii=False, separators=(",", ":")),
+                        profile, template_id, template_version, status, cached_result_id,
+                        progress_current, progress_total, attempt_number, source_job_id,
+                        retry_root_job_id, retried_by_user_id,
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                if "UNIQUE constraint failed: ai_reading_jobs.cache_key" not in str(exc):
+                    raise
+                existing = connection.execute(
+                    """
+                    SELECT id FROM ai_reading_jobs
+                    WHERE cache_key = ? AND status IN ('queued', 'running')
+                    ORDER BY created_at DESC, id DESC LIMIT 1
+                    """,
+                    (cache_key,),
+                ).fetchone()
+                if existing is None:
+                    raise
+                job = self._get_admin_ai_job(connection, existing["id"])
+                connection.execute("COMMIT")
+                return job, False
+            job = self._get_admin_ai_job(connection, job_id)
+            connection.execute("COMMIT")
+        return job, True
+
     def create_ai_job(
         self,
         job_id: str,
