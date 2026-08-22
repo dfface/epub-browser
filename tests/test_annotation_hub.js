@@ -83,7 +83,7 @@ test('aggregates only annotated books and sorts them by their latest annotation'
   assert.equal(books[0].title, 'Alpha');
 });
 
-test('groups one book in reading order and supplies a chapter fallback title', () => {
+test('groups one book in reading order and combines the zero-based chapter number with its title', () => {
   withI18n(englishI18n, () => {
     const groups = Hub.groupByChapter([
       { id: 'late', chapter_index: 1, created_at: '2026-08-12T00:00:00Z' },
@@ -91,17 +91,19 @@ test('groups one book in reading order and supplies a chapter fallback title', (
       { id: 'start', chapter_index: 0, created_at: '2026-08-10T00:00:00Z' },
     ], [{ index: 0, title: 'Opening' }]);
 
-    assert.deepEqual(groups.map(group => group.title), ['Opening', 'Chapter 2']);
+    assert.deepEqual(groups.map(group => group.title), ['Chapter 0 · Opening', 'Chapter 1']);
     assert.deepEqual(groups[1].annotations.map(annotation => annotation.id), ['early', 'late']);
   });
 });
 
-test('uses the chapter_index field published by toc.json for chapter titles', () => {
-  const groups = Hub.groupByChapter([
-    { id: 'annotation', chapter_index: 3, created_at: '2026-08-11T00:00:00Z' },
-  ], [{ chapter_index: 3, title: 'Part one · Chapter one' }]);
+test('uses the chapter_index field published by toc.json for numbered chapter titles', () => {
+  withI18n(englishI18n, () => {
+    const groups = Hub.groupByChapter([
+      { id: 'annotation', chapter_index: 3, created_at: '2026-08-11T00:00:00Z' },
+    ], [{ chapter_index: 3, title: 'Part one · Chapter one' }]);
 
-  assert.equal(groups[0].title, 'Part one · Chapter one');
+    assert.equal(groups[0].title, 'Chapter 3 · Part one · Chapter one');
+  });
 });
 
 test('uses shared i18n for chapter fallback, counts, and timestamps', () => {
@@ -110,7 +112,7 @@ test('uses shared i18n for chapter fallback, counts, and timestamps', () => {
     formatDate: () => '2026/08/18 09:02:03',
     onLocaleChange: () => () => {},
   }, () => {
-    assert.equal(Hub.groupByChapter([{ chapter_index: 1 }], [])[0].title, '章节 2');
+    assert.equal(Hub.groupByChapter([{ chapter_index: 1 }], [])[0].title, '章节 1');
     assert.equal(Hub.formatTimestamp('2026-08-18T01:02:03Z'), '2026/08/18 09:02:03');
   });
 });

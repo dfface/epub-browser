@@ -71,7 +71,14 @@
             // chapter_index is the canonical, user-visible chapter number across
             // annotations, AI reading, jobs, and chat. Do not turn it into a
             // one-based ordinal here.
-            if (!groups[index]) groups[index] = { index: index, title: titles[index] || tr('chapterNumber', { number: index }), annotations: [] };
+            if (!groups[index]) {
+                var numberLabel = tr('chapterNumber', { number: index });
+                groups[index] = {
+                    index: index,
+                    title: titles[index] ? numberLabel + ' · ' + titles[index] : numberLabel,
+                    annotations: []
+                };
+            }
             groups[index].annotations.push(annotation);
         });
         return Object.keys(groups).map(function(key) { return groups[key]; }).sort(function(a, b) {

@@ -381,8 +381,12 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 )
                 return response.status_code, response.headers.get("location")
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            results = tuple(executor.map(submit, ("first", "second")))
+        # Each TestClient owns an event loop. Starting the second lifespan must
+        # not replace the first worker's asyncio.Event and leave an unhandled
+        # cross-loop task failure behind during shutdown.
+        with self.assertNoLogs("asyncio", level="ERROR"):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                results = tuple(executor.map(submit, ("first", "second")))
 
         self.assertEqual(sorted(results), [(303, "/"), (303, "/login")])
         users = self.store.list_users()
@@ -1053,8 +1057,9 @@ class AdminAccountTests(unittest.TestCase):
         )
         self.store.set_book_visibility(restricted.book_id, "restricted")
         visible_output = Path(self.directory.name) / "book" / visible.book_id
-        visible_output.mkdir(parents=True)
-        (visible_output / "toc.json").write_text(
+        content_output = visible_output / "content"
+        content_output.mkdir(parents=True)
+        (content_output / "toc.json").write_text(
             json.dumps([{"chapter_index": 0, "title": "Opening chapter"}]),
             encoding="utf-8",
         )

@@ -1862,7 +1862,11 @@ window.location.assign(payload.redirect||'/');
                 metadata = {}
             chapter_titles = {}
             try:
-                toc_path = Path(base_directory, 'book', book.book_id, 'toc.json')
+                book_output = Path(base_directory, 'book', book.book_id)
+                toc_path = book_output / 'content' / 'toc.json'
+                if not toc_path.is_file():
+                    # Compatibility with pre-content-cache Server outputs.
+                    toc_path = book_output / 'toc.json'
                 toc_items = json.loads(toc_path.read_text(encoding='utf-8'))
                 if isinstance(toc_items, list):
                     for toc_item in toc_items:

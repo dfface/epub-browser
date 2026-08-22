@@ -325,6 +325,13 @@ class ReadingRequest:
     reading_boundary: Optional[int] = None
 
 
+@dataclass
+class _WorkerState:
+    wake: asyncio.Event
+    task: Optional[asyncio.Task] = None
+    stopping: bool = False
+
+
 class AIReadingService:
     def __init__(
         self,
@@ -337,9 +344,7 @@ class AIReadingService:
         self._client_factory = client_factory
         self._call_controls = {}
         self._tasks: set[asyncio.Task] = set()
-        self._worker_task: Optional[asyncio.Task] = None
-        self._worker_wake: Optional[asyncio.Event] = None
-        self._worker_stopping = False
+        self._worker_states: dict[asyncio.AbstractEventLoop, _WorkerState] = {}
 
     def _call_control(self):
         """Create asyncio primitives inside, rather than before, an event loop."""
@@ -523,38 +528,41 @@ class AIReadingService:
         return {"status": "queued", "cached": False, "shared": False, "job": job}
 
     async def start_worker(self) -> None:
-        """Start a durable SQLite-backed worker once for this process."""
+        """Start one durable SQLite-backed worker for the current event loop."""
         current_loop = asyncio.get_running_loop()
-        if self._worker_task is not None and not self._worker_task.done():
-            if self._worker_task.get_loop() is current_loop:
-                return
-            # Test clients and embedded servers can own different event loops.
-            # The durable queue is the source of truth, so a stale loop may be
-            # cancelled safely and its running lease recovered on next startup.
-            self._worker_task.cancel()
-        self._worker_stopping = False
-        self._worker_wake = asyncio.Event()
-        self._worker_task = asyncio.create_task(self._worker_loop())
+        state = self._worker_states.get(current_loop)
+        if state is not None and state.task is not None and not state.task.done():
+            return
+        state = _WorkerState(wake=asyncio.Event())
+        self._worker_states[current_loop] = state
+        state.task = asyncio.create_task(self._worker_loop(state))
 
     async def stop_worker(self) -> None:
-        self._worker_stopping = True
-        self.wake_worker()
-        task = self._worker_task
-        self._worker_task = None
+        current_loop = asyncio.get_running_loop()
+        state = self._worker_states.pop(current_loop, None)
+        if state is None:
+            return
+        state.stopping = True
+        state.wake.set()
+        task = state.task
         if task is not None:
             task.cancel()
-            if task.get_loop() is asyncio.get_running_loop():
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     def wake_worker(self) -> None:
-        if self._worker_wake is not None:
-            self._worker_wake.set()
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        state = self._worker_states.get(current_loop)
+        if state is not None:
+            state.wake.set()
 
-    async def _worker_loop(self) -> None:
-        while not self._worker_stopping:
+    async def _worker_loop(self, state: _WorkerState) -> None:
+        while not state.stopping:
             chat_turn = self.store.claim_next_ai_book_chat_turn()
             if chat_turn is not None:
                 await self._run_queued_book_chat_turn(chat_turn)
@@ -567,11 +575,9 @@ class AIReadingService:
             if job is not None:
                 await self._run_queued_job(job)
                 continue
-            if self._worker_wake is None:
-                return
-            self._worker_wake.clear()
+            state.wake.clear()
             try:
-                await asyncio.wait_for(self._worker_wake.wait(), timeout=1.0)
+                await asyncio.wait_for(state.wake.wait(), timeout=1.0)
             except asyncio.TimeoutError:
                 pass
 
