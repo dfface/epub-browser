@@ -56,6 +56,44 @@ class MigrationManagerTests(unittest.TestCase):
         self.assertTrue(result.database_path.is_file())
         self.assertFalse(source.exists())
 
+    def test_migrates_root_database_with_committed_wal_pages(self):
+        source = self.server_dir / "epub-browser.db"
+        self._create_legacy_database(source)
+
+        with sqlite3.connect(source) as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA wal_autocheckpoint=0")
+            connection.execute(
+                """
+                INSERT INTO annotations (
+                    id, book_hash, chapter_index, text, color,
+                    created_at, updated_at
+                ) VALUES ('wal', 'book', 0, 'Committed in WAL', '#fff', '2026', '2026')
+                """
+            )
+            connection.commit()
+            self.assertTrue(source.with_name(f"{source.name}-wal").exists())
+            result = self._manager().prepare_data()
+
+        with sqlite3.connect(result.backup_path) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT text FROM annotations WHERE id = 'wal'"
+                ).fetchone()[0],
+                "Committed in WAL",
+            )
+            self.assertEqual(
+                connection.execute("PRAGMA integrity_check").fetchone()[0],
+                "ok",
+            )
+        with sqlite3.connect(result.database_path) as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT text FROM annotations WHERE id = 'wal'"
+                ).fetchone()[0],
+                "Committed in WAL",
+            )
+
     def test_migrates_real_xpath_annotation_schema_without_losing_positions(self):
         source = self.server_dir / "annotations.db"
         self._create_xpath_annotation_database(source)
@@ -200,6 +238,30 @@ class MigrationManagerTests(unittest.TestCase):
                 administrator.user_id,
             )
 
+    def test_authoritative_backup_includes_committed_wal_pages(self):
+        database = self.server_dir / "data" / "epub-browser.db"
+        database.parent.mkdir()
+
+        with sqlite3.connect(database) as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA wal_autocheckpoint=0")
+            connection.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION - 1}")
+            connection.execute("CREATE TABLE wal_marker(value TEXT)")
+            connection.execute("INSERT INTO wal_marker VALUES ('committed-in-wal')")
+            connection.commit()
+            self.assertTrue(database.with_name(f"{database.name}-wal").exists())
+            backup = self._manager()._backup_authoritative_database(database)
+
+        with sqlite3.connect(backup) as connection:
+            self.assertEqual(
+                connection.execute("SELECT value FROM wal_marker").fetchone()[0],
+                "committed-in-wal",
+            )
+            self.assertEqual(
+                connection.execute("PRAGMA integrity_check").fetchone()[0],
+                "ok",
+            )
+
     def test_authoritative_upgrade_backup_failure_leaves_database_unchanged(self):
         database = self.server_dir / "data" / "epub-browser.db"
         StateStore(database).initialize(bootstrap=self.bootstrap)
@@ -210,7 +272,7 @@ class MigrationManagerTests(unittest.TestCase):
         with (
             mock.patch.object(
                 MigrationManager,
-                "_copy_atomic",
+                "_backup_sqlite_atomic",
                 side_effect=OSError("backup unavailable"),
             ),
             self.assertRaisesRegex(MigrationError, "backup"),
@@ -218,6 +280,8 @@ class MigrationManagerTests(unittest.TestCase):
             self._manager().prepare_data()
 
         self.assertEqual(database.read_bytes(), original)
+        backups_dir = self.server_dir / "data" / "backups"
+        self.assertFalse(any(backups_dir.glob(".*.tmp")))
         with sqlite3.connect(database) as connection:
             self.assertEqual(
                 connection.execute("PRAGMA user_version").fetchone()[0],

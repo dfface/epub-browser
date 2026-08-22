@@ -151,7 +151,10 @@ class MigrationManager:
                 and backup_path
                 and candidate.exists()
             ):
-                if self._sha256(candidate) != self._sha256(backup_path):
+                if (
+                    self._sqlite_snapshot_digest(candidate)
+                    != self._sha256(backup_path)
+                ):
                     raise MigrationError(
                         f"Backup verification failed; legacy database was retained: {candidate}"
                     )
@@ -167,19 +170,13 @@ class MigrationManager:
         )
 
     def _migrate_candidate(self, candidate: Path) -> Path:
-        source_digest = self._sha256(candidate)
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        self.backups_dir.mkdir(parents=True, exist_ok=True)
-        backup_path = self.backups_dir / (
-            f"{candidate.name}.{timestamp}.{source_digest[:12]}.bak"
-        )
-        self._copy_atomic(candidate, backup_path)
+        backup_path = self._backup_sqlite_digest(candidate)
 
         temporary_database = self.data_dir / (
             f".epub-browser.db.migrating-{uuid.uuid4().hex}"
         )
         try:
-            shutil.copy2(candidate, temporary_database)
+            self._backup_sqlite_atomic(backup_path, temporary_database)
             self._initialize_database(temporary_database)
             self._check_integrity(temporary_database)
             os.replace(temporary_database, self.database_path)
@@ -190,25 +187,57 @@ class MigrationManager:
 
     def _backup_authoritative_database(self, source: Path) -> Path:
         try:
-            source_digest = self._sha256(source)
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            self.backups_dir.mkdir(parents=True, exist_ok=True)
-            backup_path = self.backups_dir / (
-                f"{source.name}.{timestamp}.{source_digest[:12]}.bak"
-            )
-            self._copy_atomic(source, backup_path)
-            if self._sha256(backup_path) != source_digest:
-                raise MigrationError(
-                    f"Database backup verification failed for {source}"
-                )
-            self._check_integrity(backup_path)
-            return backup_path
+            return self._backup_sqlite_digest(source)
         except MigrationError:
             raise
-        except OSError as error:
+        except (OSError, sqlite3.DatabaseError) as error:
             raise MigrationError(
                 f"Database backup failed for {source}: {error}"
             ) from error
+
+    def _backup_sqlite_digest(self, source: Path) -> Path:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        self.backups_dir.mkdir(parents=True, exist_ok=True)
+        temporary = self.backups_dir / (
+            f".{source.name}.{uuid.uuid4().hex}.tmp"
+        )
+        try:
+            self._backup_sqlite_atomic(source, temporary)
+            source_digest = self._sha256(temporary)
+            backup_path = self.backups_dir / (
+                f"{source.name}.{timestamp}.{source_digest[:12]}.bak"
+            )
+            os.replace(temporary, backup_path)
+            return backup_path
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    def _sqlite_snapshot_digest(self, source: Path) -> str:
+        temporary = self.data_dir / (
+            f".{source.name}.{uuid.uuid4().hex}.verify.tmp"
+        )
+        try:
+            self._backup_sqlite_atomic(source, temporary)
+            return self._sha256(temporary)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    def _backup_sqlite_atomic(self, source: Path, destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(
+            f".{destination.name}.{uuid.uuid4().hex}.tmp"
+        )
+        try:
+            with sqlite3.connect(source) as source_connection:
+                with sqlite3.connect(temporary) as target_connection:
+                    source_connection.backup(target_connection)
+            self._check_integrity(temporary)
+            os.replace(temporary, destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     @staticmethod
     def _schema_version(path: Path) -> int:
