@@ -787,6 +787,98 @@ class StateStoreTests(unittest.TestCase):
             self.store.revoke_user_session(member.user_id, member_session)
         )
 
+    def test_v11_owned_state_and_session_helpers_preserve_rows(self):
+        shelf_payload = json.dumps(
+            {"books": ["book-a", "book-b"], "layout": "ordered"}
+        )
+        self.store.upsert_annotation(
+            {
+                "id": "annotation-id",
+                "book_hash": "book-id",
+                "chapter_index": 9,
+                "text": "Selected text",
+                "note": "A preserved note",
+                "color": "#f3c",
+                "created_at": "2026-08-23T00:00:00Z",
+                "updated_at": "2026-08-23T00:00:00Z",
+                "startMeta": {"parentTagName": "P", "textOffset": 4},
+                "endMeta": {"parentTagName": "P", "textOffset": 17},
+            },
+            user_id=self.owner.user_id,
+        )
+        self.store.create_bookshelf(self.owner.user_id, 7, shelf_payload)
+        self.store.set_reading_progress(self.owner.user_id, "book-id", 9)
+        self.store.create_session("a" * 64, self.owner.user_id, 200, now=100)
+        self._downgrade_selected_tables_to_v10(self.database)
+
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("BEGIN")
+            self.store._v11_rebuild_owned_state(connection)
+            self.store._v11_rebuild_sessions(connection)
+            connection.execute("COMMIT")
+
+            self.assertNotIn(
+                "username",
+                {row[1] for row in connection.execute("PRAGMA table_info(annotations)")},
+            )
+            self.assertNotIn(
+                "username",
+                {row[1] for row in connection.execute("PRAGMA table_info(bookshelves)")},
+            )
+            self.assertNotIn(
+                "username",
+                {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info(reading_progress)")
+                },
+            )
+
+        annotation = self.store.get_annotation(
+            "annotation-id", user_id=self.owner.user_id
+        )
+        self.assertEqual(annotation["color"], "#f3c")
+        self.assertEqual(annotation["startMeta"]["textOffset"], 4)
+        self.assertEqual(self.store.get_bookshelf(self.owner.user_id), (7, shelf_payload))
+        self.assertEqual(
+            self.store.get_reading_progress(self.owner.user_id, "book-id"), 9
+        )
+        self.assertEqual(
+            self.store.list_sessions(self.owner.user_id)[0].expires_at, 200.0
+        )
+
+    def test_v11_rebuild_helpers_roll_back_with_the_caller(self):
+        self.store.upsert_annotation(
+            {
+                "id": "annotation-id",
+                "book_hash": "book-id",
+                "chapter_index": 9,
+                "text": "Selected text",
+                "color": "#f3c",
+                "created_at": "2026-08-23T00:00:00Z",
+                "updated_at": "2026-08-23T00:00:00Z",
+            },
+            user_id=self.owner.user_id,
+        )
+        self.store.create_bookshelf(self.owner.user_id, 7, "{}")
+        self.store.set_reading_progress(self.owner.user_id, "book-id", 9)
+        self.store.create_session("a" * 64, self.owner.user_id, 200, now=100)
+        self._downgrade_selected_tables_to_v10(self.database)
+        before = self._selected_table_snapshot()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("BEGIN")
+            with self.assertRaisesRegex(sqlite3.Error, "stop-v11"):
+                self.store._v11_rebuild_owned_state(connection)
+                raise sqlite3.Error("stop-v11")
+            connection.execute("ROLLBACK")
+        finally:
+            connection.close()
+
+        self.assertEqual(self._selected_table_snapshot(), before)
+
     def test_session_replacement_rolls_back_if_new_token_cannot_be_inserted(self):
         raw_current = "current-session-token"
         current_digest = token_digest(raw_current)
@@ -1222,6 +1314,106 @@ class StateStoreTests(unittest.TestCase):
             return (
                 connection.execute("PRAGMA user_version").fetchone()[0],
                 tuple(connection.iterdump()),
+            )
+
+    def _downgrade_selected_tables_to_v10(self, database):
+        with sqlite3.connect(database) as connection:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            for index in (
+                "idx_annotations_user_created",
+                "idx_annotations_user_book_created",
+                "idx_annotations_user_book_chapter_created",
+                "idx_sessions_user_created",
+            ):
+                connection.execute(f"DROP INDEX IF EXISTS {index}")
+            connection.executescript(
+                """
+                CREATE TABLE annotations_v10 (
+                    id TEXT NOT NULL,
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    note TEXT,
+                    start_meta TEXT,
+                    end_meta TEXT,
+                    color TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    username TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY (user_id, id)
+                );
+                CREATE TABLE bookshelves_v10 (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    username TEXT NOT NULL DEFAULT '',
+                    version INTEGER NOT NULL,
+                    data TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE reading_progress_v10 (
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    username TEXT NOT NULL DEFAULT '',
+                    book_hash TEXT NOT NULL,
+                    chapter_index INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, book_hash)
+                );
+                CREATE TABLE sessions_v10 (
+                    session_id TEXT PRIMARY KEY,
+                    token_digest TEXT NOT NULL UNIQUE,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    expires_at TEXT NOT NULL,
+                    last_used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    revoked_at TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    client_address TEXT,
+                    user_agent TEXT
+                );
+                """
+            )
+            connection.execute(
+                "INSERT INTO annotations_v10 "
+                "SELECT id, book_hash, chapter_index, text, note, start_meta, "
+                "end_meta, color, created_at, updated_at, user_id, username "
+                "FROM annotations"
+            )
+            connection.execute(
+                "INSERT INTO bookshelves_v10 "
+                "SELECT user_id, username, version, data, updated_at FROM bookshelves"
+            )
+            connection.execute(
+                "INSERT INTO reading_progress_v10 "
+                "SELECT user_id, username, book_hash, chapter_index, updated_at "
+                "FROM reading_progress"
+            )
+            connection.execute(
+                "INSERT INTO sessions_v10 "
+                "SELECT session_id, token_digest, user_id, expires_at, last_used_at, "
+                "revoked_at, created_at, client_address, user_agent FROM sessions"
+            )
+            for table in (
+                "annotations",
+                "bookshelves",
+                "reading_progress",
+                "sessions",
+            ):
+                connection.execute(f"DROP TABLE {table}")
+                connection.execute(f"ALTER TABLE {table}_v10 RENAME TO {table}")
+            connection.execute("PRAGMA user_version = 10")
+
+    def _selected_table_snapshot(self):
+        tables = ("annotations", "bookshelves", "reading_progress", "sessions")
+        with sqlite3.connect(self.database) as connection:
+            return tuple(
+                (
+                    table,
+                    connection.execute(
+                        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+                        (table,),
+                    ).fetchone()[0],
+                    tuple(connection.execute(f"SELECT * FROM {table}").fetchall()),
+                )
+                for table in tables
             )
 
 

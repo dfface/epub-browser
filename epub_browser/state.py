@@ -1,6 +1,7 @@
 import dataclasses
 import hmac
 import json
+import math
 import sqlite3
 import time
 import unicodedata
@@ -640,6 +641,182 @@ class StateStore:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)"
         )
+
+    @staticmethod
+    def _create_v11_annotations_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE annotations (
+                id TEXT NOT NULL,
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
+                book_hash TEXT NOT NULL,
+                chapter_index INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                note TEXT,
+                start_meta TEXT,
+                end_meta TEXT,
+                color TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, id)
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v11_bookshelves_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE bookshelves (
+                user_id TEXT NOT NULL PRIMARY KEY CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL,
+                data TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v11_reading_progress_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE reading_progress (
+                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
+                    REFERENCES users(id) ON DELETE CASCADE,
+                book_hash TEXT NOT NULL,
+                chapter_index INTEGER NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, book_hash)
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v11_sessions_table(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE sessions (
+                session_id TEXT PRIMARY KEY,
+                token_digest TEXT NOT NULL UNIQUE,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                expires_at REAL NOT NULL,
+                last_used_at REAL NOT NULL,
+                revoked_at REAL,
+                created_at REAL NOT NULL,
+                client_address TEXT,
+                user_agent TEXT
+            )
+            """
+        )
+
+    @staticmethod
+    def _assert_matching_row_counts(connection, source: str, target: str) -> None:
+        source_count = connection.execute(
+            f'SELECT COUNT(*) FROM "{source}"'
+        ).fetchone()[0]
+        target_count = connection.execute(
+            f'SELECT COUNT(*) FROM "{target}"'
+        ).fetchone()[0]
+        if source_count != target_count:
+            raise sqlite3.IntegrityError(
+                f"schema v11 row-count mismatch: {source}={source_count}, "
+                f"{target}={target_count}"
+            )
+
+    def _v11_rebuild_owned_state(self, connection) -> None:
+        connection.execute("ALTER TABLE annotations RENAME TO annotations__v11_source")
+        self._create_v11_annotations_table(connection)
+        connection.execute(
+            "INSERT INTO annotations (id, book_hash, chapter_index, text, note, "
+            "start_meta, end_meta, color, created_at, updated_at, user_id) "
+            "SELECT id, book_hash, chapter_index, text, note, start_meta, end_meta, "
+            "color, created_at, updated_at, user_id FROM annotations__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection, "annotations__v11_source", "annotations"
+        )
+        connection.execute("DROP TABLE annotations__v11_source")
+
+        connection.execute("ALTER TABLE bookshelves RENAME TO bookshelves__v11_source")
+        self._create_v11_bookshelves_table(connection)
+        connection.execute(
+            "INSERT INTO bookshelves (user_id, version, data, updated_at) "
+            "SELECT user_id, version, data, updated_at "
+            "FROM bookshelves__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection, "bookshelves__v11_source", "bookshelves"
+        )
+        connection.execute("DROP TABLE bookshelves__v11_source")
+
+        connection.execute(
+            "ALTER TABLE reading_progress RENAME TO reading_progress__v11_source"
+        )
+        self._create_v11_reading_progress_table(connection)
+        connection.execute(
+            "INSERT INTO reading_progress (user_id, book_hash, chapter_index, "
+            "updated_at) SELECT user_id, book_hash, chapter_index, updated_at "
+            "FROM reading_progress__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection, "reading_progress__v11_source", "reading_progress"
+        )
+        connection.execute("DROP TABLE reading_progress__v11_source")
+
+    def _v11_rebuild_sessions(self, connection) -> None:
+        connection.execute("ALTER TABLE sessions RENAME TO sessions__v11_source")
+        self._validate_v11_session_epochs(connection)
+        self._create_v11_sessions_table(connection)
+        connection.execute(
+            "INSERT INTO sessions (session_id, token_digest, user_id, expires_at, "
+            "last_used_at, revoked_at, created_at, client_address, user_agent) "
+            "SELECT session_id, token_digest, user_id, CAST(expires_at AS REAL), "
+            "CAST(last_used_at AS REAL), CAST(revoked_at AS REAL), "
+            "CAST(created_at AS REAL), client_address, user_agent "
+            "FROM sessions__v11_source"
+        )
+        self._assert_matching_row_counts(
+            connection, "sessions__v11_source", "sessions"
+        )
+        connection.execute("DROP TABLE sessions__v11_source")
+
+    @staticmethod
+    def _validate_v11_session_epochs(connection) -> None:
+        rows = connection.execute(
+            "SELECT session_id, expires_at, last_used_at, revoked_at, created_at "
+            "FROM sessions__v11_source"
+        ).fetchall()
+        for row in rows:
+            for column, value, nullable in zip(
+                ("expires_at", "last_used_at", "revoked_at", "created_at"),
+                row[1:],
+                (False, False, True, False),
+            ):
+                if value is None and nullable:
+                    continue
+                if value is None:
+                    raise sqlite3.IntegrityError(
+                        f"schema v11 invalid session {column}: {row[0]}"
+                    )
+                try:
+                    epoch = float(value)
+                except (TypeError, ValueError) as error:
+                    raise sqlite3.IntegrityError(
+                        f"schema v11 invalid session {column}: {row[0]}"
+                    ) from error
+                cast_epoch = connection.execute(
+                    "SELECT CAST(? AS REAL)", (value,)
+                ).fetchone()[0]
+                if (
+                    not math.isfinite(epoch)
+                    or not math.isfinite(float(cast_epoch))
+                    or epoch != float(cast_epoch)
+                ):
+                    raise sqlite3.IntegrityError(
+                        f"schema v11 invalid session {column}: {row[0]}"
+                    )
 
     @staticmethod
     def _validate_password_hashes(connection) -> None:
