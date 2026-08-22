@@ -259,6 +259,8 @@ Persistent layout:
 
 Only `data/` is authoritative. `cache/` may be deleted and will be rebuilt. Preserve `data/` across upgrades and container replacement. An operating-system lock controls exclusivity; `.server.lock` may remain after a normal shutdown as diagnostic metadata.
 
+Store persistent `data/epub-browser.db` on a local filesystem. Shared or network filesystems are unsupported for WAL concurrency. Verified backups remain under `data/backups/` and include all committed WAL data.
+
 ### LAN, reverse proxy, and OIDC
 
 Server binds to `127.0.0.1:8000` by default. For a trusted LAN:

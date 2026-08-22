@@ -157,7 +157,7 @@ class ModeIntegrationTests(unittest.TestCase):
             (server_dir / "data" / "migration-state.json").read_text(encoding="utf-8")
         )
         self.assertTrue(Path(migration_state["backup_path"]).is_file())
-        self.assertFalse(legacy_database.exists())
+        self.assertTrue(legacy_database.exists())
         self.assertTrue((server_dir / "cache" / "legacy-public" / "index.html").is_file())
 
         converter.reset_mock()

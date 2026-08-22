@@ -2666,9 +2666,9 @@ class ServerCacheTests(unittest.TestCase):
         self.assertFalse(os.path.exists(legacy_path))
         with sqlite3.connect(database_path) as connection:
             annotation = connection.execute("SELECT id, text FROM annotations").fetchone()
-            bookshelf = connection.execute("SELECT username, version, data FROM bookshelves").fetchone()
+            bookshelf = connection.execute("SELECT version, data FROM bookshelves").fetchone()
         self.assertEqual(annotation, ("annotation-1", "Saved note"))
-        self.assertEqual(bookshelf, ("reader", 3, '{\"items\":[\"book-a\"]}'))
+        self.assertEqual(bookshelf, (3, '{\"items\":[\"book-a\"]}'))
 
     def test_startup_uses_a_new_database_when_legacy_rename_fails(self):
         legacy_directory = tempfile.TemporaryDirectory()

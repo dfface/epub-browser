@@ -240,6 +240,8 @@ epub-browser server book.epub --ephemeral
 
 只有 `data/` 是权威数据；`cache/` 可以删除并重建。升级和替换容器时必须保留 `data/`。进程独占由操作系统锁控制，正常退出后留下的 `.server.lock` 只是诊断元数据。
 
+持久化的 `data/epub-browser.db` 必须位于本地文件系统；共享或网络文件系统不支持 WAL 并发。已验证的备份仍保存在 `data/backups/`，其中包含所有已提交的 WAL 数据。
+
 ### 局域网、反向代理与 OIDC
 
 Server 默认监听 `127.0.0.1:8000`。若要在可信局域网访问：

@@ -46,6 +46,71 @@ class StateStoreTests(unittest.TestCase):
         journal_mode = self.store._configure_database()
         self.assertIn(journal_mode.lower(), {"wal", "delete", "memory"})
 
+    def test_busy_timeout_allows_short_writer_contention(self):
+        first_connection = self.store._connect()
+        writer_started = threading.Event()
+        writer_finished = threading.Event()
+        writer_error = []
+
+        def contend():
+            writer_started.set()
+            try:
+                self.store.set_reading_progress(self.owner.user_id, "book-id", 4)
+            except Exception as exc:
+                writer_error.append(exc)
+            finally:
+                writer_finished.set()
+
+        thread = threading.Thread(target=contend, daemon=True)
+        try:
+            first_connection.execute("BEGIN IMMEDIATE")
+            thread.start()
+            self.assertTrue(writer_started.wait(1.0))
+            self.assertFalse(writer_finished.wait(0.1))
+            first_connection.commit()
+            self.assertTrue(writer_finished.wait(2.0))
+            thread.join(1.0)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(writer_error, [])
+            self.assertEqual(
+                self.store.get_reading_progress(self.owner.user_id, "book-id"), 4
+            )
+        finally:
+            if first_connection.in_transaction:
+                first_connection.rollback()
+            first_connection.close()
+            if thread.is_alive():
+                self.assertTrue(writer_finished.wait(2.0))
+                thread.join(1.0)
+                self.assertFalse(thread.is_alive())
+
+    def test_wal_reader_sees_committed_snapshot_during_write(self):
+        self.store.set_reading_progress(self.owner.user_id, "book-id", 3)
+        writer = self.store._connect()
+        reader = self.store._connect()
+        try:
+            journal_mode = writer.execute("PRAGMA journal_mode").fetchone()[0]
+            self.assertEqual(journal_mode.lower(), "wal")
+            writer.execute("BEGIN IMMEDIATE")
+            writer.execute(
+                "UPDATE reading_progress SET chapter_index = 4 "
+                "WHERE user_id = ? AND book_hash = ?",
+                (self.owner.user_id, "book-id"),
+            )
+
+            chapter_index = reader.execute(
+                "SELECT chapter_index FROM reading_progress "
+                "WHERE user_id = ? AND book_hash = ?",
+                (self.owner.user_id, "book-id"),
+            ).fetchone()[0]
+
+            self.assertEqual(chapter_index, 3)
+        finally:
+            if writer.in_transaction:
+                writer.rollback()
+            writer.close()
+            reader.close()
+
     def test_initialize_creates_versioned_existing_and_books_tables(self):
         with sqlite3.connect(self.database) as connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
