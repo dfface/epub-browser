@@ -124,6 +124,7 @@ def _assert_no_error_logs(testcase, logger_name):
 
     handler = ErrorCapture(level=logging.ERROR)
     logger.addHandler(handler)
+    logger.setLevel(logging.ERROR)
     try:
         yield
     finally:
@@ -138,6 +139,33 @@ def _assert_no_error_logs(testcase, logger_name):
                 "; ".join(record.getMessage() for record in records),
             ),
         )
+
+
+class LoggingAssertionCompatibilityTests(unittest.TestCase):
+    def test_error_logs_are_captured_and_logger_state_is_restored(self):
+        logger = logging.getLogger("asyncio")
+        original_level = logger.level
+        original_handlers = logger.handlers[:]
+        original_propagate = logger.propagate
+        logger.setLevel(logging.CRITICAL)
+        configured_handlers = [logging.NullHandler()]
+        logger.handlers[:] = configured_handlers
+        logger.propagate = False
+
+        try:
+            with self.assertRaisesRegex(
+                AssertionError,
+                "unexpected ERROR-or-higher logs from asyncio: captured error",
+            ):
+                with _assert_no_error_logs(self, "asyncio"):
+                    logger.error("captured error")
+            self.assertEqual(logger.level, logging.CRITICAL)
+            self.assertEqual(logger.handlers, configured_handlers)
+            self.assertFalse(logger.propagate)
+        finally:
+            logger.handlers[:] = original_handlers
+            logger.setLevel(original_level)
+            logger.propagate = original_propagate
 
 
 class ServerSetupBoundaryTests(unittest.TestCase):
