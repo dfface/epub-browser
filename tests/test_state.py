@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -777,6 +778,85 @@ class StateStoreTests(unittest.TestCase):
             self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
             self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
 
+    def test_concurrent_initializer_rereads_user_version_after_lock(self):
+        self._downgrade_selected_tables_to_v10(self.database)
+        self._downgrade_ai_tables_to_v10(self.database)
+        with sqlite3.connect(self.database) as connection:
+            connection.executemany(
+                "INSERT INTO ai_reading_jobs "
+                "(id, owner_user_id, cache_key, request_json, status) "
+                "VALUES (?, ?, ?, '{}', 'complete')",
+                (
+                    ("retry-root", self.owner.user_id, "retry-root-key"),
+                    ("attempt-two", self.owner.user_id, "attempt-two-key"),
+                ),
+            )
+
+        migration_ready = threading.Event()
+        release_migration = threading.Event()
+        second_begin_attempted = threading.Event()
+        errors = []
+
+        class BlockingMigrator(StateStore):
+            def _migrate_schema_v11(inner_self, connection, source_version):
+                super()._migrate_schema_v11(connection, source_version)
+                connection.execute(
+                    "UPDATE ai_reading_jobs SET attempt_number = 2, "
+                    "retried_from_job_id = 'retry-root', "
+                    "retry_root_job_id = 'retry-root', retried_by_user_id = ? "
+                    "WHERE id = 'attempt-two'",
+                    (self.owner.user_id,),
+                )
+                migration_ready.set()
+                if not release_migration.wait(5):
+                    raise RuntimeError("timed out waiting to commit schema v11")
+
+        class BeginObservedConnection(sqlite3.Connection):
+            def execute(inner_self, statement, parameters=()):
+                if statement.strip().upper() == "BEGIN IMMEDIATE":
+                    second_begin_attempted.set()
+                return super().execute(statement, parameters)
+
+        def initialize(store):
+            try:
+                store.initialize()
+            except BaseException as error:
+                errors.append(error)
+
+        first = threading.Thread(target=initialize, args=(BlockingMigrator(self.database),))
+        second = threading.Thread(
+            target=initialize,
+            args=(
+                StateStore(
+                    self.database,
+                    connection_factory=lambda path: sqlite3.connect(
+                        path,
+                        factory=BeginObservedConnection,
+                    ),
+                ),
+            ),
+        )
+        first.start()
+        self.assertTrue(migration_ready.wait(5))
+        second.start()
+        self.assertTrue(second_begin_attempted.wait(5))
+        release_migration.set()
+        first.join(5)
+        second.join(5)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT attempt_number, retried_from_job_id, retry_root_job_id, "
+                    "retried_by_user_id FROM ai_reading_jobs WHERE id = 'attempt-two'"
+                ).fetchone(),
+                (2, "retry-root", "retry-root", self.owner.user_id),
+            )
+
     def test_v11_rejects_orphan_chat_book(self):
         self._downgrade_ai_tables_to_v10(self.database)
         with sqlite3.connect(self.database) as connection:
@@ -900,21 +980,18 @@ class StateStoreTests(unittest.TestCase):
             plans = {
                 "jobs": connection.execute(
                     "EXPLAIN QUERY PLAN SELECT * FROM ai_reading_jobs "
-                    "INDEXED BY idx_ai_jobs_queue "
-                    "WHERE status='queued' AND request_json IS NOT NULL AND created_at >= '' "
-                    "ORDER BY created_at, id LIMIT 1"
+                    "WHERE status = 'queued' AND request_json IS NOT NULL "
+                    "ORDER BY created_at ASC, id ASC LIMIT 1"
                 ).fetchall(),
                 "followups": connection.execute(
                     "EXPLAIN QUERY PLAN SELECT * FROM ai_reading_followups "
-                    "INDEXED BY idx_ai_followups_queue "
-                    "WHERE status='queued' AND created_at >= '' "
-                    "ORDER BY created_at, id LIMIT 1"
+                    "WHERE status = 'queued' "
+                    "ORDER BY created_at ASC, id ASC LIMIT 1"
                 ).fetchall(),
                 "chat": connection.execute(
                     "EXPLAIN QUERY PLAN SELECT * FROM ai_book_chat_turns "
-                    "INDEXED BY idx_ai_book_chat_queue "
-                    "WHERE status='queued' AND created_at >= '' "
-                    "ORDER BY created_at, rowid LIMIT 1"
+                    "WHERE status = 'queued' "
+                    "ORDER BY created_at ASC, rowid ASC LIMIT 1"
                 ).fetchall(),
                 "annotations": connection.execute(
                     "EXPLAIN QUERY PLAN SELECT * FROM annotations "
@@ -934,15 +1011,38 @@ class StateStoreTests(unittest.TestCase):
                     ("book", 1, "en"),
                 ).fetchall(),
             }
-        details = {
-            name: " ".join(row[3] for row in rows) for name, rows in plans.items()
+        plan_details = {
+            name: tuple(row[3] for row in rows) for name, rows in plans.items()
         }
-        self.assertIn("idx_ai_jobs_queue", details["jobs"])
-        self.assertNotIn("SCAN ai_reading_jobs", details["jobs"])
-        self.assertIn("idx_ai_followups_queue", details["followups"])
-        self.assertNotIn("SCAN ai_reading_followups", details["followups"])
-        self.assertIn("idx_ai_book_chat_queue", details["chat"])
-        self.assertNotIn("SCAN ai_book_chat_turns", details["chat"])
+        queue_indexes = {
+            "jobs": ("idx_ai_jobs_queue", "idx_ai_jobs_status_created"),
+            "followups": ("idx_ai_followups_queue",),
+            "chat": ("idx_ai_book_chat_queue",),
+        }
+        queue_tables = {
+            "jobs": "ai_reading_jobs",
+            "followups": "ai_reading_followups",
+            "chat": "ai_book_chat_turns",
+        }
+        for name, expected_indexes in queue_indexes.items():
+            details = plan_details[name]
+            self.assertTrue(
+                any(index in detail for index in expected_indexes for detail in details),
+                details,
+            )
+            self.assertFalse(
+                any(
+                    detail.startswith(f"SCAN {queue_tables[name]}")
+                    and "USING INDEX" not in detail
+                    and "USING COVERING INDEX" not in detail
+                    for detail in details
+                ),
+                details,
+            )
+            self.assertFalse(any("USE TEMP B-TREE" in detail for detail in details), details)
+        details = {
+            name: " ".join(rows) for name, rows in plan_details.items()
+        }
         self.assertIn("idx_annotations_user_book_chapter_created", details["annotations"])
         self.assertIn("idx_sessions_user_created", details["sessions"])
         self.assertIn("idx_ai_results_chapter_language_created", details["results"])

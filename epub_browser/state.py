@@ -132,13 +132,13 @@ class StateStore:
         connection.isolation_level = None
         administrator = None
         try:
+            connection.execute("BEGIN IMMEDIATE")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version > DB_SCHEMA_VERSION:
                 raise RuntimeError(
                     f"Database uses newer schema version {version}; "
                     f"this version supports {DB_SCHEMA_VERSION}"
                 )
-            connection.execute("BEGIN IMMEDIATE")
             empty_database = not self._has_application_tables(connection)
             self._create_compatible_schema(
                 connection,
