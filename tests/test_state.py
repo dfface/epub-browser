@@ -808,8 +808,41 @@ class StateStoreTests(unittest.TestCase):
         )
         self.store.create_bookshelf(self.owner.user_id, 7, shelf_payload)
         self.store.set_reading_progress(self.owner.user_id, "book-id", 9)
-        self.store.create_session("a" * 64, self.owner.user_id, 200, now=100)
+        live_session_id = self.store.create_session(
+            "a" * 64,
+            self.owner.user_id,
+            200,
+            now=100,
+            client_address="192.0.2.10",
+            user_agent="Live Browser",
+        )
+        revoked_session_id = self.store.create_session(
+            "b" * 64,
+            self.owner.user_id,
+            300,
+            now=110,
+            client_address="2001:db8::1",
+            user_agent="Revoked Browser",
+        )
         self._downgrade_selected_tables_to_v10(self.database)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE bookshelves SET updated_at = '2026-08-23T01:02:03Z'"
+            )
+            connection.execute(
+                "UPDATE reading_progress SET updated_at = '2026-08-23T04:05:06Z'"
+            )
+            connection.execute(
+                "UPDATE sessions SET expires_at = '200.5', last_used_at = '125.25', "
+                "created_at = '100.125' WHERE session_id = ?",
+                (live_session_id,),
+            )
+            connection.execute(
+                "UPDATE sessions SET expires_at = '300.5', last_used_at = '150.25', "
+                "revoked_at = '175.75', created_at = '110.125' "
+                "WHERE session_id = ?",
+                (revoked_session_id,),
+            )
 
         with sqlite3.connect(self.database) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
@@ -833,19 +866,133 @@ class StateStoreTests(unittest.TestCase):
                     for row in connection.execute("PRAGMA table_info(reading_progress)")
                 },
             )
+            sessions = {
+                row[0]: row[1:]
+                for row in connection.execute(
+                    "SELECT session_id, token_digest, expires_at, last_used_at, "
+                    "revoked_at, created_at, client_address, user_agent, "
+                    "typeof(expires_at), typeof(last_used_at), typeof(revoked_at), "
+                    "typeof(created_at) FROM sessions"
+                )
+            }
+            self.assertEqual(
+                sessions[live_session_id],
+                (
+                    "a" * 64,
+                    200.5,
+                    125.25,
+                    None,
+                    100.125,
+                    "192.0.2.10",
+                    "Live Browser",
+                    "real",
+                    "real",
+                    "null",
+                    "real",
+                ),
+            )
+            self.assertEqual(
+                sessions[revoked_session_id],
+                (
+                    "b" * 64,
+                    300.5,
+                    150.25,
+                    175.75,
+                    110.125,
+                    "2001:db8::1",
+                    "Revoked Browser",
+                    "real",
+                    "real",
+                    "real",
+                    "real",
+                ),
+            )
 
         annotation = self.store.get_annotation(
             "annotation-id", user_id=self.owner.user_id
         )
         self.assertEqual(annotation["color"], "#f3c")
+        self.assertEqual(annotation["note"], "A preserved note")
         self.assertEqual(annotation["startMeta"]["textOffset"], 4)
+        self.assertEqual(annotation["endMeta"]["textOffset"], 17)
+        self.assertEqual(annotation["created_at"], "2026-08-23T00:00:00Z")
+        self.assertEqual(annotation["updated_at"], "2026-08-23T00:00:00Z")
         self.assertEqual(self.store.get_bookshelf(self.owner.user_id), (7, shelf_payload))
         self.assertEqual(
             self.store.get_reading_progress(self.owner.user_id, "book-id"), 9
         )
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(
+                connection.execute("SELECT updated_at FROM bookshelves").fetchone()[0],
+                "2026-08-23T01:02:03Z",
+            )
+            self.assertEqual(
+                connection.execute("SELECT updated_at FROM reading_progress").fetchone()[0],
+                "2026-08-23T04:05:06Z",
+            )
         self.assertEqual(
-            self.store.list_sessions(self.owner.user_id)[0].expires_at, 200.0
+            {
+                session.session_id: session
+                for session in self.store.list_sessions(self.owner.user_id)
+            }[live_session_id].expires_at,
+            200.5,
         )
+
+    def test_v11_owned_state_factory_preserves_legacy_nullable_color_and_contract(self):
+        self.store.upsert_annotation(
+            {
+                "id": "annotation-id",
+                "book_hash": "book-id",
+                "chapter_index": 9,
+                "text": "Selected text",
+                "color": "#f3c",
+                "created_at": "2026-08-23T00:00:00Z",
+                "updated_at": "2026-08-23T00:00:00Z",
+            },
+            user_id=self.owner.user_id,
+        )
+        self._downgrade_selected_tables_to_v10(self.database)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("UPDATE annotations SET color = NULL")
+            connection.commit()
+            connection.execute("BEGIN")
+            self.store._v11_rebuild_owned_state(connection)
+            connection.execute("COMMIT")
+
+            annotation_columns = {
+                row[1]: row for row in connection.execute("PRAGMA table_info(annotations)")
+            }
+            bookshelf_columns = {
+                row[1]: row for row in connection.execute("PRAGMA table_info(bookshelves)")
+            }
+            self.assertEqual(annotation_columns["color"][3], 0)
+            self.assertEqual(bookshelf_columns["user_id"][3], 0)
+            self.assertNotIn(
+                "CHECK(length(user_id)",
+                connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type = 'table' "
+                    "AND name = 'annotations'"
+                ).fetchone()[0],
+            )
+            self.assertNotIn(
+                "CHECK(length(user_id)",
+                connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type = 'table' "
+                    "AND name = 'bookshelves'"
+                ).fetchone()[0],
+            )
+            self.assertNotIn(
+                "CHECK(length(user_id)",
+                connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type = 'table' "
+                    "AND name = 'reading_progress'"
+                ).fetchone()[0],
+            )
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT color FROM annotations WHERE id = 'annotation-id'"
+                ).fetchone()[0]
+            )
 
     def test_v11_rebuild_helpers_roll_back_with_the_caller(self):
         self.store.upsert_annotation(
@@ -872,12 +1019,49 @@ class StateStoreTests(unittest.TestCase):
             connection.execute("BEGIN")
             with self.assertRaisesRegex(sqlite3.Error, "stop-v11"):
                 self.store._v11_rebuild_owned_state(connection)
+                self.store._v11_rebuild_sessions(connection)
                 raise sqlite3.Error("stop-v11")
             connection.execute("ROLLBACK")
         finally:
             connection.close()
 
         self.assertEqual(self._selected_table_snapshot(), before)
+
+    def test_v11_session_rebuild_rejects_invalid_or_non_finite_epochs(self):
+        session_id = self.store.create_session(
+            "a" * 64, self.owner.user_id, 200, now=100
+        )
+        self._downgrade_selected_tables_to_v10(self.database)
+
+        for column, epoch in (
+            ("expires_at", "not-an-epoch"),
+            ("last_used_at", "NaN"),
+            ("revoked_at", "-Infinity"),
+            ("created_at", "1e999"),
+        ):
+            with self.subTest(column=column, epoch=epoch):
+                with sqlite3.connect(self.database) as connection:
+                    connection.execute(
+                        "UPDATE sessions SET expires_at = '200', last_used_at = '100', "
+                        "revoked_at = NULL, created_at = '100' WHERE session_id = ?",
+                        (session_id,),
+                    )
+                    connection.execute(
+                        f"UPDATE sessions SET {column} = ? WHERE session_id = ?",
+                        (epoch, session_id),
+                    )
+                before = self._selected_table_snapshot()
+
+                connection = sqlite3.connect(self.database)
+                try:
+                    connection.execute("BEGIN")
+                    with self.assertRaisesRegex(sqlite3.IntegrityError, column):
+                        self.store._v11_rebuild_sessions(connection)
+                    connection.execute("ROLLBACK")
+                finally:
+                    connection.close()
+
+                self.assertEqual(self._selected_table_snapshot(), before)
 
     def test_session_replacement_rolls_back_if_new_token_cannot_be_inserted(self):
         raw_current = "current-session-token"

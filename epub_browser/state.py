@@ -648,17 +648,16 @@ class StateStore:
             """
             CREATE TABLE annotations (
                 id TEXT NOT NULL,
-                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
-                    REFERENCES users(id) ON DELETE CASCADE,
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
                 text TEXT NOT NULL,
                 note TEXT,
                 start_meta TEXT,
                 end_meta TEXT,
-                color TEXT NOT NULL,
+                color TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 PRIMARY KEY (user_id, id)
             )
             """
@@ -669,8 +668,7 @@ class StateStore:
         connection.execute(
             """
             CREATE TABLE bookshelves (
-                user_id TEXT NOT NULL PRIMARY KEY CHECK(length(user_id) > 0)
-                    REFERENCES users(id) ON DELETE CASCADE,
+                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 version INTEGER NOT NULL,
                 data TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -683,8 +681,7 @@ class StateStore:
         connection.execute(
             """
             CREATE TABLE reading_progress (
-                user_id TEXT NOT NULL CHECK(length(user_id) > 0)
-                    REFERENCES users(id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 book_hash TEXT NOT NULL,
                 chapter_index INTEGER NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
