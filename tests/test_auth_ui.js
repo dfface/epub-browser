@@ -746,6 +746,67 @@ test('administrator AI job retry encodes IDs, disables one row, and reloads the 
   assert.equal(harness.elements.adminAiJobsLive.textContent, '[admin.ai.jobs.retryComplete]');
 });
 
+test('administrator AI job retry supports opaque identifiers that match inherited property names', async t => {
+  const opaqueIds = [
+    { id: 'constructor', retryUrl: '/api/admin/ai/jobs/constructor/retry' },
+    { id: 'toString', retryUrl: '/api/admin/ai/jobs/toString/retry' },
+    { id: '__proto__', retryUrl: '/api/admin/ai/jobs/__proto__/retry' },
+  ];
+
+  for (const opaqueId of opaqueIds) {
+    const jobId = opaqueId.id;
+    await t.test(jobId, async () => {
+      const postCalls = [];
+      const harness = jobUiHarness((url, options = {}) => {
+        const method = options.method || 'GET';
+        if (method === 'POST') {
+          postCalls.push({
+            url,
+            csrf: options.headers && options.headers['X-CSRF-Token'],
+          });
+          return Promise.resolve(response(200, {
+            status: 'queued',
+            cached: false,
+            shared: false,
+            job: { id: `retry-${jobId}`, status: 'queued' },
+          }));
+        }
+        if (url.startsWith('/api/admin/ai/jobs?')) {
+          return Promise.resolve(response(200, aiJobsPayload([aiJob({ id: jobId })])));
+        }
+        return Promise.resolve(response(404, {}));
+      });
+      const auth = AuthModule.create(harness.root);
+      auth.setSession({
+        user: { id: 'admin', username: 'admin', role: 'admin' },
+        csrf_token: 'admin-csrf',
+      });
+      await auth.loadAiJobs();
+
+      let retryButton = descendants(harness.elements.adminAiJobsBody)
+        .find(node => node.tagName === 'BUTTON');
+      assert.equal(retryButton.disabled, false);
+
+      const firstRetry = auth.retryAiJob(jobId);
+      assert.equal(typeof firstRetry.then, 'function');
+      await firstRetry;
+      retryButton = descendants(harness.elements.adminAiJobsBody)
+        .find(node => node.tagName === 'BUTTON');
+      assert.equal(retryButton.disabled, false);
+
+      const secondRetry = auth.retryAiJob(jobId);
+      assert.notEqual(secondRetry, firstRetry);
+      assert.equal(typeof secondRetry.then, 'function');
+      await secondRetry;
+
+      assert.deepEqual(postCalls, [
+        { url: opaqueId.retryUrl, csrf: 'admin-csrf' },
+        { url: opaqueId.retryUrl, csrf: 'admin-csrf' },
+      ]);
+    });
+  }
+});
+
 test('administrator AI job rendering ignores stale responses', async () => {
   const requests = [deferred(), deferred()];
   let requestIndex = 0;

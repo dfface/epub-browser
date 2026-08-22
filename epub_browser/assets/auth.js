@@ -27,8 +27,8 @@
     var aiJobsPollTimer = null;
     var aiJobsRequestGeneration = 0;
     var aiJobsPendingRequests = 0;
-    var aiJobsRetrying = {};
-    var aiJobsRetryRequests = {};
+    var aiJobsRetrying = Object.create(null);
+    var aiJobsRetryRequests = Object.create(null);
     var aiProfileTranslationKeys = {
       auto: 'admin.ai.profile.auto',
       technical: 'admin.ai.profile.technical',
