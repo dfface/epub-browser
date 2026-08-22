@@ -401,6 +401,65 @@ class ReadingRequest:
     reading_boundary: Optional[int] = None
 
 
+def _validate_reading_request_fields(request: ReadingRequest) -> None:
+    if (
+        not isinstance(request, ReadingRequest)
+        or request.scope not in {"book", "chapter"}
+        or not isinstance(request.book_id, str)
+        or not request.book_id
+        or request.language not in {"en", "zh-CN"}
+        or not isinstance(request.force, bool)
+        or isinstance(request.reading_boundary, bool)
+        or (
+            request.reading_boundary is not None
+            and (
+                not isinstance(request.reading_boundary, int)
+                or request.reading_boundary < 0
+            )
+        )
+    ):
+        raise AIReadingError("invalid_ai_reading_request")
+    if request.scope == "chapter":
+        if (
+            isinstance(request.chapter_index, bool)
+            or not isinstance(request.chapter_index, int)
+            or request.mode != "chapter"
+        ):
+            raise AIReadingError("invalid_ai_reading_request")
+        if request.chapter_index < 0:
+            raise AIReadingError("invalid_chapter_index")
+        return
+    if request.chapter_index is not None or request.mode not in _MODES:
+        raise AIReadingError("invalid_ai_reading_request")
+    if request.mode != "read_so_far" and request.reading_boundary is not None:
+        raise AIReadingError("invalid_ai_reading_request")
+
+
+def _reading_request_from_job_payload(payload: object) -> ReadingRequest:
+    if not isinstance(payload, dict):
+        raise AIReadingError("ai_job_not_retryable")
+    request = ReadingRequest(
+        scope=payload.get("scope"),
+        book_id=payload.get("book_id"),
+        chapter_index=payload.get("chapter_index"),
+        mode=payload.get("mode", "chapter"),
+        language=payload.get("language", "en"),
+        force=True,
+        reading_boundary=payload.get("reading_boundary"),
+    )
+    try:
+        _validate_reading_request_fields(request)
+    except AIReadingError:
+        raise AIReadingError("ai_job_not_retryable") from None
+    return request
+
+
+def _public_ai_job(job: dict) -> dict:
+    public_job = dict(job)
+    public_job.pop("request_json", None)
+    return public_job
+
+
 @dataclass
 class _WorkerState:
     wake: asyncio.Event
@@ -554,18 +613,43 @@ class AIReadingService:
         progress = self.store.get_reading_progress(principal.user_id, request.book_id)
         return progress if isinstance(progress, int) and progress >= 0 else None
 
-    async def submit(self, principal: Principal, request: ReadingRequest) -> dict:
-        settings = self.store._get_ai_provider_settings()
-        if not settings["enabled"]:
-            raise AIReadingError("ai_disabled")
-        if not self.store.can_use_ai(principal):
-            raise AIReadingError("ai_not_authorized")
-        material, metadata, progress_total, full_book_segments = self._material_for_request(principal, request)
+    def _prepare_reading_request(
+        self, principal: Principal, request: ReadingRequest
+    ) -> tuple[str, dict, int, tuple[tuple[int, str], ...], str, dict, str]:
+        material, metadata, progress_total, full_book_segments = (
+            self._material_for_request(principal, request)
+        )
         if not material:
             raise AIReadingError("no_reading_material")
         profile = self.store.get_book_ai_profile(request.book_id)
         template = template_for(request.scope, request.mode)
         cache_key = self._cache_key(request, material, profile, template)
+        return (
+            material,
+            metadata,
+            progress_total,
+            full_book_segments,
+            profile,
+            template,
+            cache_key,
+        )
+
+    async def submit(self, principal: Principal, request: ReadingRequest) -> dict:
+        _validate_reading_request_fields(request)
+        settings = self.store._get_ai_provider_settings()
+        if not settings["enabled"]:
+            raise AIReadingError("ai_disabled")
+        if not self.store.can_use_ai(principal):
+            raise AIReadingError("ai_not_authorized")
+        (
+            material,
+            metadata,
+            progress_total,
+            full_book_segments,
+            profile,
+            template,
+            cache_key,
+        ) = self._prepare_reading_request(principal, request)
         cached = self.store.get_current_ai_reading_result(cache_key)
         if cached is not None and not request.force:
             return {"status": "complete", "cached": True, "result": cached}
@@ -593,7 +677,12 @@ class AIReadingService:
             template_version=template["version"],
         )
         if not created:
-            return {"status": job["status"], "cached": False, "shared": True, "job": job}
+            return {
+                "status": job["status"],
+                "cached": False,
+                "shared": True,
+                "job": _public_ai_job(job),
+            }
         # A previous task can finish after the first cache lookup but before
         # this request acquires the single-flight lock. Prefer its result over
         # another Provider request.
@@ -604,7 +693,108 @@ class AIReadingService:
             return {"status": "complete", "cached": True, "result": cached}
         await self.start_worker()
         self.wake_worker()
-        return {"status": "queued", "cached": False, "shared": False, "job": job}
+        return {
+            "status": "queued",
+            "cached": False,
+            "shared": False,
+            "job": _public_ai_job(job),
+        }
+
+    async def retry_job(
+        self, administrator: Principal, source_job_id: str
+    ) -> dict:
+        if getattr(administrator, "role", None) != "admin":
+            raise AIReadingError("ai_not_authorized")
+        source = self.store.get_ai_job_for_retry(source_job_id)
+        if source is None:
+            raise AIReadingError("ai_job_not_found")
+        if source.get("status") not in {"failed", "interrupted"}:
+            raise AIReadingError("ai_job_not_retryable")
+        try:
+            payload = json.loads(source.get("request_json"))
+        except (TypeError, ValueError):
+            raise AIReadingError("ai_job_not_retryable") from None
+        request = _reading_request_from_job_payload(payload)
+        if request.book_id != source.get("book_id"):
+            raise AIReadingError("ai_job_not_retryable")
+        try:
+            owner = self.store.get_user(source["owner_user_id"])
+        except (KeyError, TypeError):
+            raise AIReadingError("ai_not_authorized") from None
+        owner_principal = owner.principal
+        settings = self.store._get_ai_provider_settings()
+        if not settings["enabled"]:
+            raise AIReadingError("ai_disabled")
+        if (
+            not owner.enabled
+            or not self.store.can_use_ai(owner_principal)
+            or not self.store.can_read_book(
+                owner.user_id, owner.role, request.book_id
+            )
+        ):
+            raise AIReadingError("ai_not_authorized")
+
+        (
+            _material,
+            _metadata,
+            progress_total,
+            _segments,
+            profile,
+            template,
+            cache_key,
+        ) = self._prepare_reading_request(owner_principal, request)
+        cached = self.store.get_current_ai_reading_result(cache_key)
+        reusable_cached = cached is not None and (
+            cached.get("cache_key") == cache_key
+            and cached.get("config_revision") == settings["config_revision"]
+            and cached.get("template_id") == template["id"]
+            and cached.get("template_version") == template["version"]
+        )
+        queued_request = {
+            "scope": request.scope,
+            "book_id": request.book_id,
+            "chapter_index": request.chapter_index,
+            "mode": request.mode,
+            "language": request.language,
+            "reading_boundary": self._reading_boundary(owner_principal, request),
+        }
+        job_id = hashlib.sha256(
+            (
+                cache_key
+                + owner.user_id
+                + administrator.user_id
+                + str(asyncio.get_running_loop().time())
+            ).encode()
+        ).hexdigest()[:32]
+        try:
+            job, created = self.store.create_or_get_admin_retry_ai_job(
+                source_job_id=source_job_id,
+                job_id=job_id,
+                retried_by_user_id=administrator.user_id,
+                owner_user_id=owner.user_id,
+                book_id=request.book_id,
+                cache_key=cache_key,
+                request_payload=queued_request,
+                progress_total=progress_total,
+                profile=profile,
+                template_id=template["id"],
+                template_version=template["version"],
+                cached_result_id=cached["id"] if reusable_cached else None,
+            )
+        except (KeyError, ValueError):
+            raise AIReadingError("ai_job_not_retryable") from None
+
+        public_job = _public_ai_job(job)
+        assert "request_json" not in public_job
+        if created and public_job["status"] == "queued":
+            await self.start_worker()
+            self.wake_worker()
+        return {
+            "status": public_job["status"],
+            "cached": bool(created and reusable_cached),
+            "shared": not created,
+            "job": public_job,
+        }
 
     async def start_worker(self) -> None:
         """Start one durable SQLite-backed worker for the current event loop."""
@@ -663,11 +853,7 @@ class AIReadingService:
     async def _run_queued_job(self, job: dict) -> None:
         try:
             payload = json.loads(job["request_json"])
-            request = ReadingRequest(
-                scope=payload["scope"], book_id=payload["book_id"],
-                chapter_index=payload.get("chapter_index"), mode=payload["mode"],
-                language=payload["language"], reading_boundary=payload.get("reading_boundary"),
-            )
+            request = _reading_request_from_job_payload(payload)
             principal = self.store.get_user(job["owner_user_id"]).principal
             material, metadata, _total, full_book_segments = self._material_for_request(principal, request)
             if not material:

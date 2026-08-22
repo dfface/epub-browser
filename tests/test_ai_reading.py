@@ -215,6 +215,40 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             ).fetchone()
         return int(row["calls"])
 
+    def _create_failed_reading_job(
+        self,
+        job_id="failed-job",
+        *,
+        cache_key="failed-cache-key",
+        request_payload=None,
+        profile="auto",
+    ):
+        template = template_for("chapter", "chapter")
+        replay = request_payload or {
+            "scope": "chapter",
+            "book_id": self.book.book_id,
+            "chapter_index": 0,
+            "mode": "chapter",
+            "language": "en",
+            "reading_boundary": 0,
+        }
+        self.store.create_ai_job(
+            job_id,
+            self.member.user_id,
+            cache_key,
+            book_id=self.book.book_id,
+            progress_total=1,
+            request_payload=replay,
+            profile=profile,
+            template_id=template["id"],
+            template_version=template["version"],
+        )
+        self.assertTrue(self.store.start_ai_job(job_id))
+        self.assertTrue(
+            self.store.finish_ai_job(job_id, error_code="provider_request_rejected")
+        )
+        return self.store.get_ai_job_for_retry(job_id)
+
     def _assert_dependency_free_call_fits(
         self, call, context_window=2048, safety_tokens=128
     ):
@@ -248,6 +282,315 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(cached["cached"])
         self.assertEqual(cached["result"]["content"]["quick"]["summary"], "Useful overview")
         self.assertEqual(len(_FakeClient.calls), 1)
+
+    async def test_admin_retry_recomputes_current_job_state(self):
+        replay = {
+            "scope": "chapter",
+            "book_id": self.book.book_id,
+            "chapter_index": 0,
+            "mode": "chapter",
+            "language": "en",
+            "reading_boundary": 0,
+            "private_marker": "PRIVATE_REPLAY_SENTINEL",
+        }
+        source = self._create_failed_reading_job(request_payload=replay)
+        self.store.set_book_ai_profile(self.book.book_id, "technical")
+        current_template = template_for("chapter", "chapter")
+
+        retried = await self.service.retry_job(self.owner, source["id"])
+
+        self.assertEqual(retried["status"], "queued")
+        self.assertFalse(retried["cached"])
+        self.assertFalse(retried["shared"])
+        self.assertEqual(retried["job"]["owner_user_id"], self.member.user_id)
+        self.assertEqual(retried["job"]["retried_by_user_id"], self.owner.user_id)
+        self.assertEqual(retried["job"]["attempt_number"], 2)
+        self.assertEqual(retried["job"]["profile"], "technical")
+        self.assertEqual(retried["job"]["template_id"], current_template["id"])
+        self.assertEqual(
+            retried["job"]["template_version"], current_template["version"]
+        )
+        private_retry = self.store.get_ai_job_for_retry(retried["job"]["id"])
+        self.assertNotEqual(private_retry["cache_key"], source["cache_key"])
+        self.assertNotIn("request_json", retried["job"])
+        self.assertEqual(set(retried), {"status", "cached", "shared", "job"})
+        self.assertNotIn("PRIVATE_REPLAY_SENTINEL", json.dumps(retried))
+        worker = self.service._worker_states[asyncio.get_running_loop()]
+        self.assertTrue(worker.wake.is_set())
+
+    async def test_admin_retry_uses_current_cache_without_provider_call(self):
+        source = self._create_failed_reading_job()
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0
+        )
+        material, _metadata, progress_total, _segments = (
+            self.service._material_for_request(self.member, request)
+        )
+        profile = self.store.get_book_ai_profile(self.book.book_id)
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(request, material, profile, template)
+        settings = self.store._get_ai_provider_settings()
+        cached = self.store.store_ai_reading_result(
+            cache_key=cache_key,
+            book_id=self.book.book_id,
+            chapter_index=0,
+            scope="chapter",
+            mode="chapter",
+            profile=profile,
+            config_revision=settings["config_revision"],
+            content={"quick": {"summary": "cached"}},
+            created_by_user_id=self.member.user_id,
+            template_id=template["id"],
+            template_version=template["version"],
+            language="en",
+            reading_boundary=0,
+        )
+
+        retried = await self.service.retry_job(self.owner, source["id"])
+
+        self.assertEqual(retried["status"], "complete")
+        self.assertTrue(retried["cached"])
+        self.assertFalse(retried["shared"])
+        self.assertEqual(retried["job"]["result_id"], cached["id"])
+        self.assertEqual(retried["job"]["progress_current"], progress_total)
+        self.assertEqual(retried["job"]["progress_total"], progress_total)
+        self.assertEqual(_FakeClient.calls, [])
+        self.assertEqual(self._provider_calls(self.member.user_id), 0)
+        self.assertEqual(self.service._worker_states, {})
+
+    async def test_admin_retry_rejects_disabled_owner_or_revoked_book(self):
+        source = self._create_failed_reading_job()
+        self.store.set_user_enabled(self.member.user_id, False)
+
+        with self.assertRaises(AIReadingError) as disabled:
+            await self.service.retry_job(self.owner, source["id"])
+        self.assertEqual(disabled.exception.code, "ai_not_authorized")
+
+        self.store.set_user_enabled(self.member.user_id, True)
+        self.store.set_book_visibility(self.book.book_id, "restricted")
+        self.store.grant_book_access(self.book.book_id, self.member.user_id)
+        self.store.revoke_book_access(self.book.book_id, self.member.user_id)
+
+        with self.assertRaises(AIReadingError) as revoked:
+            await self.service.retry_job(self.owner, source["id"])
+        self.assertEqual(revoked.exception.code, "ai_not_authorized")
+
+    async def test_admin_retry_does_not_reuse_a_result_from_an_older_config_revision(self):
+        source = self._create_failed_reading_job()
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0
+        )
+        material, _metadata, _progress_total, _segments = (
+            self.service._material_for_request(self.member, request)
+        )
+        profile = self.store.get_book_ai_profile(self.book.book_id)
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(request, material, profile, template)
+        old_revision = self.store._get_ai_provider_settings()["config_revision"]
+        cached = self.store.store_ai_reading_result(
+            cache_key=cache_key,
+            book_id=self.book.book_id,
+            chapter_index=0,
+            scope="chapter",
+            mode="chapter",
+            profile=profile,
+            config_revision=old_revision,
+            content={"quick": {"summary": "stale config"}},
+            created_by_user_id=self.member.user_id,
+            template_id=template["id"],
+            template_version=template["version"],
+            language="en",
+            reading_boundary=0,
+        )
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key=None,
+            model="new-reader-model",
+            timeout_seconds=30,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+
+        retried = await self.service.retry_job(self.owner, source["id"])
+
+        self.assertEqual(retried["status"], "queued")
+        self.assertFalse(retried["cached"])
+        private_retry = self.store.get_ai_job_for_retry(retried["job"]["id"])
+        self.assertEqual(private_retry["cache_key"], cached["cache_key"])
+        self.assertIsNone(private_retry["result_id"])
+        self.assertEqual(self._provider_calls(self.member.user_id), 0)
+
+    async def test_admin_retry_joins_current_active_job_without_starting_a_worker(self):
+        source = self._create_failed_reading_job()
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0
+        )
+        material, _metadata, progress_total, _segments = (
+            self.service._material_for_request(self.member, request)
+        )
+        profile = self.store.get_book_ai_profile(self.book.book_id)
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(request, material, profile, template)
+        self.store.create_ai_job(
+            "active-current-job",
+            self.member.user_id,
+            cache_key,
+            book_id=self.book.book_id,
+            progress_total=progress_total,
+            request_payload={
+                "scope": "chapter",
+                "book_id": self.book.book_id,
+                "chapter_index": 0,
+                "mode": "chapter",
+                "language": "en",
+                "reading_boundary": 0,
+            },
+            profile=profile,
+            template_id=template["id"],
+            template_version=template["version"],
+        )
+
+        retried = await self.service.retry_job(self.owner, source["id"])
+
+        self.assertEqual(retried["status"], "queued")
+        self.assertTrue(retried["shared"])
+        self.assertFalse(retried["cached"])
+        self.assertEqual(retried["job"]["id"], "active-current-job")
+        self.assertNotIn("request_json", retried["job"])
+        self.assertEqual(self.service._worker_states, {})
+
+    async def test_admin_retry_rejects_non_admin_invalid_replay_and_disabled_ai(self):
+        source = self._create_failed_reading_job()
+
+        with self.assertRaises(AIReadingError) as non_admin:
+            await self.service.retry_job(self.member, source["id"])
+        self.assertEqual(non_admin.exception.code, "ai_not_authorized")
+
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET request_json = ? WHERE id = ?",
+                ('{"scope":"chapter","chapter_index":true}', source["id"]),
+            )
+        with self.assertRaises(AIReadingError) as malformed:
+            await self.service.retry_job(self.owner, source["id"])
+        self.assertEqual(malformed.exception.code, "ai_job_not_retryable")
+
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET request_json = ? WHERE id = ?",
+                (
+                    json.dumps(
+                        {
+                            "scope": "chapter",
+                            "book_id": self.book.book_id,
+                            "chapter_index": 0,
+                            "mode": "chapter",
+                            "language": "en",
+                            "reading_boundary": 0,
+                        }
+                    ),
+                    source["id"],
+                ),
+            )
+        self.store.set_ai_settings(
+            enabled=False,
+            base_url="https://provider.example/v1",
+            api_key=None,
+            model="reader-model",
+            timeout_seconds=30,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        with self.assertRaises(AIReadingError) as disabled:
+            await self.service.retry_job(self.owner, source["id"])
+        self.assertEqual(disabled.exception.code, "ai_disabled")
+
+    async def test_admin_retry_rejects_missing_nonterminal_and_ai_revoked_sources(self):
+        with self.assertRaises(AIReadingError) as missing:
+            await self.service.retry_job(self.owner, "missing-job")
+        self.assertEqual(missing.exception.code, "ai_job_not_found")
+
+        self._create_failed_reading_job("queued-source")
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET status = 'queued', error_code = NULL "
+                "WHERE id = 'queued-source'"
+            )
+        with self.assertRaises(AIReadingError) as nonterminal:
+            await self.service.retry_job(self.owner, "queued-source")
+        self.assertEqual(nonterminal.exception.code, "ai_job_not_retryable")
+
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET status = 'failed', "
+                "error_code = 'provider_request_rejected' WHERE id = 'queued-source'"
+            )
+        self.store.set_ai_user_access(
+            self.member.user_id, enabled=False, daily_limit=10
+        )
+        with self.assertRaises(AIReadingError) as ai_revoked:
+            await self.service.retry_job(self.owner, "queued-source")
+        self.assertEqual(ai_revoked.exception.code, "ai_not_authorized")
+
+    async def test_submit_jobs_hide_replay_while_the_worker_can_still_load_it(self):
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0
+        )
+
+        created = await self.service.submit(self.member, request)
+        joined = await self.service.submit(self.member, request)
+
+        self.assertNotIn("request_json", created["job"])
+        self.assertNotIn("request_json", joined["job"])
+        self.assertTrue(joined["shared"])
+        private_job = self.store.get_ai_job_for_retry(created["job"]["id"])
+        self.assertEqual(
+            json.loads(private_job["request_json"]),
+            {
+                "scope": "chapter",
+                "book_id": self.book.book_id,
+                "chapter_index": 0,
+                "mode": "chapter",
+                "language": "en",
+                "reading_boundary": 0,
+            },
+        )
+        completed = await self._wait_for_job(created["job"]["id"])
+        self.assertEqual(completed["status"], "complete")
+
+    async def test_submit_and_retry_share_strict_reading_request_validation(self):
+        invalid_request = ReadingRequest(
+            scope="chapter",
+            book_id=self.book.book_id,
+            chapter_index=True,
+            mode="chapter",
+        )
+        with self.assertRaises(AIReadingError) as submitted:
+            await self.service.submit(self.member, invalid_request)
+        self.assertEqual(submitted.exception.code, "invalid_ai_reading_request")
+
+        source = self._create_failed_reading_job()
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE ai_reading_jobs SET request_json = ? WHERE id = ?",
+                (
+                    json.dumps(
+                        {
+                            "scope": "chapter",
+                            "book_id": self.book.book_id,
+                            "chapter_index": True,
+                            "mode": "chapter",
+                            "language": "en",
+                            "reading_boundary": 0,
+                        }
+                    ),
+                    source["id"],
+                ),
+            )
+        with self.assertRaises(AIReadingError) as replayed:
+            await self.service.retry_job(self.owner, source["id"])
+        self.assertEqual(replayed.exception.code, "ai_job_not_retryable")
 
     async def test_tiny_chapter_generation_preserves_the_2048_context_minimum(self):
         self.store.set_ai_settings(
