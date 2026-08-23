@@ -252,7 +252,7 @@
       return result;
     });
   }
-  function generate(button, context, contextVersion) { var key = String(context.chapterIndex) + ':' + contextVersion; if (state.pending[key]) return; state.pending[key] = true; button.disabled = true; setStatus(button, contextLabel(context) + ' · ' + t('ai.queued', { current: 0, total: 1 })); api('/api/ai/reading', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'chapter', book_id: context.bookId, chapter_index: context.chapterIndex, mode: 'chapter', language: locale(), force: false }) }).then(function(payload) { if (!isCurrentContext(context, contextVersion)) return; if (payload.status === 'complete') { button.disabled = false; delete state.pending[key]; var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else watch(button, payload.job.id, context, contextVersion); }).catch(function(error) { if (!isCurrentContext(context, contextVersion)) return; button.disabled = false; delete state.pending[key]; setStatus(button, t('ai.error.' + (error.code || 'unknown')), true, true); }); }
+  function generate(button, context, contextVersion) { if (!isCurrentContext(context, contextVersion)) return; var key = String(context.chapterIndex) + ':' + contextVersion; if (state.pending[key]) return; state.pending[key] = true; button.disabled = true; setStatus(button, contextLabel(context) + ' · ' + t('ai.queued', { current: 0, total: 1 })); api('/api/ai/reading', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'chapter', book_id: context.bookId, chapter_index: context.chapterIndex, mode: 'chapter', language: locale(), force: false }) }).then(function(payload) { if (!isCurrentContext(context, contextVersion)) return; if (payload.status === 'complete') { button.disabled = false; delete state.pending[key]; var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else watch(button, payload.job.id, context, contextVersion); }).catch(function(error) { if (!isCurrentContext(context, contextVersion)) return; button.disabled = false; delete state.pending[key]; setStatus(button, t('ai.error.' + (error.code || 'unknown')), true, true); }); }
   function refresh(chapterIndex) {
     if (!state.initialized || !state.button || document.body.classList.contains('pagination-mode') || document.body.classList.contains('continuous-scroll-mode')) return Promise.resolve(null);
     state.contextVersion += 1;
@@ -304,10 +304,10 @@
         var contextVersion = state.contextVersion;
         load(button, context, contextVersion).then(function(result) {
           if (result || !isCurrentContext(context, contextVersion)) return;
-          return confirmGeneration(context).then(function(confirmed) { if (confirmed) generate(button, context, contextVersion); });
+          return confirmGeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, contextVersion)) generate(button, context, contextVersion); });
         }).catch(function() {
           if (!isCurrentContext(context, contextVersion)) return;
-          confirmGeneration(context).then(function(confirmed) { if (confirmed) generate(button, context, contextVersion); });
+          confirmGeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, contextVersion)) generate(button, context, contextVersion); });
         });
       });
     });

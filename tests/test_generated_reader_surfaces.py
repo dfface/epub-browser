@@ -1120,6 +1120,18 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('if (!isCurrentContext(context, contextVersion)) return null;', canvas_script)
         self.assertIn('if (!isCurrentContext(context, contextVersion)) return;', canvas_script)
         self.assertIn("document.querySelector('#eb-content')", canvas_script)
+        self.assertRegex(
+            canvas_script,
+            r'function generate\(button, context, contextVersion\) \{\s*'
+            r'if \(!isCurrentContext\(context, contextVersion\)\) return;',
+        )
+        self.assertEqual(
+            canvas_script.count(
+                'if (confirmed && isCurrentContext(context, contextVersion)) '
+                'generate(button, context, contextVersion);'
+            ),
+            2,
+        )
 
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
