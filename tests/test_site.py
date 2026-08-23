@@ -105,12 +105,27 @@ class SitePublicationTests(unittest.TestCase):
         self.assertIn('id=adminAiJobsBody', html)
         self.assertIn('id=adminAiJobsPagination', html)
         self.assertIn('id=adminAiJobsLive', html)
+        self.assertIn('id=adminBookSearch', html)
+        self.assertIn('id=adminBookVisibilityFilter', html)
+        self.assertIn('id=adminBookTagFilter', html)
+        self.assertIn('id=adminBookPageSize', html)
+        self.assertIn('id=adminBookRefresh', html)
+        self.assertIn('id=adminBookList', html)
+        self.assertIn('id=adminBookPagination', html)
+        self.assertIn('id=adminBookLive', html)
         self.assertRegex(html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
         self.assertIn('<thead>', html)
         self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminAiJobsBody')
         self.assertRegex(
             html,
             r'<p\b(?=[^>]*id=(?:["\'])?adminAiJobsLive)(?=[^>]*aria-live=(?:["\'])?polite)',
+        )
+        self.assertRegex(html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
+        self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
+        self.assertRegex(
+            html,
+            r'<p\b(?=[^>]*id=(?:["\'])?adminBookLive)(?=[^>]*aria-live=(?:["\'])?polite)',
         )
 
     def test_static_library_shell_omits_server_progress_panel_assets(self):
@@ -129,6 +144,14 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('adminAiJobsBody', html)
         self.assertNotIn('adminAiJobsPagination', html)
         self.assertNotIn('adminAiJobsLive', html)
+        self.assertNotIn('adminBookSearch', html)
+        self.assertNotIn('adminBookVisibilityFilter', html)
+        self.assertNotIn('adminBookTagFilter', html)
+        self.assertNotIn('adminBookPageSize', html)
+        self.assertNotIn('adminBookRefresh', html)
+        self.assertNotIn('adminBookList', html)
+        self.assertNotIn('adminBookPagination', html)
+        self.assertNotIn('adminBookLive', html)
         self.assertNotRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
         self.assertRegex(html, r'/assets/immutable/notification\.[0-9a-f]{12}\.js')
         self.assertIn('id=exportShelfBtn', html)

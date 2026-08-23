@@ -241,7 +241,22 @@ def render_library_shell(
             <section class="account-admin-section account-card-wide" aria-labelledby="adminBooksTitle">
                 <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
                 <p class="account-section-copy" data-i18n="admin.booksDescription">Manage visibility, member access, server tags, AI reading classification, and AI results for each book.</p>
-                <ul class="account-list" id="adminBookList"></ul>
+                <div class="account-form admin-books-controls">
+                    <label for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
+                    <label for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
+                    <label for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Server tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All server tags</option></select></label>
+                    <label for="adminBookPageSize"><span data-i18n="admin.books.pageSize">Books per page</span><select id="adminBookPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
+                    <button type="button" class="bookshelf-action-btn" id="adminBookRefresh" data-i18n="admin.books.refresh">Refresh</button>
+                </div>
+                <div class="account-table-scroll">
+                    <table class="account-admin-table">
+                        <caption class="sr-only visually-hidden" data-i18n="admin.books.tableLabel">Books</caption>
+                        <thead><tr><th scope="col" data-i18n="admin.books.header.book">Book</th><th scope="col" data-i18n="admin.books.header.access">Visibility and access</th><th scope="col" data-i18n="admin.books.header.profile">AI profile and tags</th><th scope="col" data-i18n="admin.books.header.results">AI results</th><th scope="col" data-i18n="admin.books.header.updated">Updated</th><th scope="col" data-i18n="admin.books.header.action">Actions</th></tr></thead>
+                        <tbody id="adminBookList"><tr><td colspan="6" data-i18n="admin.books.loading">Loading books…</td></tr></tbody>
+                    </table>
+                </div>
+                <nav id="adminBookPagination" aria-label="Book pages" data-i18n-aria-label="admin.books.paginationLabel"></nav>
+                <p id="adminBookLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
             </section>
             </div>
         </section>

@@ -33,7 +33,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "adminIdentityForm",
             "adminIdentityUser",
             "adminIdentityList",
+            "adminBookSearch",
+            "adminBookVisibilityFilter",
+            "adminBookTagFilter",
+            "adminBookPageSize",
+            "adminBookRefresh",
             "adminBookList",
+            "adminBookPagination",
+            "adminBookLive",
         ):
             self.assertRegex(server_html, rf'\bid=(?:["\'])?{control_id}(?:["\' >])')
             self.assertNotIn(control_id, ssg_html)
@@ -52,6 +59,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertRegex(server_html, r'class=(?:["\'])?account-layout(?:["\' >])')
         self.assertRegex(server_html, r'class=(?:["\'])?account-grid(?:["\' >])')
+
+    def test_server_admin_books_surface_is_semantic_and_localized(self):
+        server_html = self._server_html()
+        ssg_html = self._library_html()
+
+        self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminBooksTitle')
+        for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'pageSize', 'refresh'):
+            self.assertIn('data-i18n=admin.books.' + key, server_html)
+        self.assertIn('data-i18n-placeholder=admin.books.searchPlaceholder', server_html)
+        self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
+        self.assertRegex(server_html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
+        self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(server_html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
+        self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminBookLive)(?=[^>]*aria-live=(?:["\'])?polite)')
+        for key in ('book', 'access', 'profile', 'results', 'updated', 'action'):
+            self.assertIn('data-i18n=admin.books.header.' + key, server_html)
+        for value in ('10', '20', '50', '100'):
+            self.assertRegex(server_html, r'<option\b[^>]*value=(?:["\'])?' + value + r'(?:["\' >])')
+        self.assertRegex(server_html, r'<option\b(?=[^>]*value=(?:["\'])?20)(?=[^>]*selected)')
+        for control_id in (
+            'adminBookSearch', 'adminBookVisibilityFilter', 'adminBookTagFilter',
+            'adminBookPageSize', 'adminBookRefresh', 'adminBookList',
+            'adminBookPagination', 'adminBookLive',
+        ):
+            self.assertNotIn(control_id, ssg_html)
 
     def test_server_admin_ai_jobs_surface_is_semantic_and_localized(self):
         server_html = self._server_html()
