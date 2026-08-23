@@ -739,6 +739,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             english.text.index('id="loginError"'),
             english.text.index('id="loginForm"'),
         )
+        self.assertIn('id="loginError" role="alert" data-i18n="account.error.invalid_credentials" hidden', english.text)
         self.assertIn("setLoginError(true)", english.text)
         self.assertIn(
             'name="next" value="/book/id/chapter_0.html"',
@@ -748,6 +749,8 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         stylesheet = self.client.get('/assets/account.css')
         self.assertEqual(stylesheet.status_code, 200)
         self.assertIn('text/css', stylesheet.headers['content-type'])
+        self.assertIn('.auth-alert[hidden] {', stylesheet.text)
+        self.assertIn('display: none;', stylesheet.text)
 
     def test_cookie_secure_flag_follows_explicit_auth_configuration(self):
         secure_config = AuthConfig.from_values(

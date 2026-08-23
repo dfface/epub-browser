@@ -24,6 +24,11 @@ EPUB Browser 提供两个职责清晰的模式：
 
 如果产物必须是普通静态文件，请使用 `ssg`；如果需要账户、跨设备数据、书籍访问控制或自动监听源文件，请使用 `server`。
 
+## 演示站点
+
+- **SSG 模式**：[epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
+- **Server 模式**：[epub.yuhan.tech](https://epub.yuhan.tech/) —— 演示账户和密码均为 `demo`。
+
 ## AI 原生阅读（仅 Server 模式）
 
 **把 EPUB 书库变成贴着原文的学习空间。** AI 阅读不是把一份泛泛的摘要放到书旁边，
@@ -291,7 +296,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.3
+  epub-browser:2.3.4
 ```
 
 修改端口绑定或代理规则之前，请先访问 `http://127.0.0.1:8080/setup` 完成首次设置。
@@ -317,7 +322,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.3
+  epub-browser:2.3.4
 ```
 
 首次成功启动后，可移除这次性密钥挂载。只有所有 EPUB 已经包含有效且匹配的 embedded ID 时，书库才可以只读挂载。把同一 ID 嵌入 EPUB 时，既有 sidecar 会保留。

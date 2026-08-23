@@ -238,6 +238,10 @@ body.auth-page {
     line-height: 1.5;
 }
 
+.auth-alert[hidden] {
+    display: none;
+}
+
 .auth-alert::before {
     display: inline-grid;
     flex: 0 0 18px;

@@ -24,6 +24,11 @@ EPUB Browser has two explicit modes:
 
 Use `ssg` when the result must be ordinary static files. Use `server` when readers need accounts, cross-device data, access control, or automatic source reconciliation.
 
+## Live demos
+
+- **SSG mode**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
+- **Server mode**: [epub.yuhan.tech](https://epub.yuhan.tech/) — sign in with username `demo` and password `demo`.
+
 ## AI-native reading (Server only)
 
 **Turn an EPUB library into a source-aware learning workspace.** AI reading is
@@ -310,7 +315,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.3
+  epub-browser:2.3.4
 ```
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
@@ -336,7 +341,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.3
+  epub-browser:2.3.4
 ```
 
 After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.

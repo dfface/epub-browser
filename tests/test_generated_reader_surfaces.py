@@ -1419,9 +1419,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         mobile_ai_start = server_chapter_html.index('id="mobileAIReadingBtn"')
         mobile_ai_end = server_chapter_html.index('</button>', mobile_ai_start)
         mobile_ai_button = server_chapter_html[mobile_ai_start:mobile_ai_end]
-        self.assertIn('data-ai-reading-hub', mobile_ai_button)
-        self.assertIn('aria-haspopup="dialog"', mobile_ai_button)
-        self.assertNotIn('data-ai-learning-canvas', mobile_ai_button)
+        self.assertIn('data-ai-learning-canvas', mobile_ai_button)
+        self.assertIn('aria-pressed="false"', mobile_ai_button)
+        self.assertNotIn('data-ai-reading-hub', mobile_ai_button)
         self.assertNotIn('id="mobileThemeBtn"', chapter_html)
 
     def test_theme_picker_stays_anchored_to_the_top_right_action_on_mobile(self):
