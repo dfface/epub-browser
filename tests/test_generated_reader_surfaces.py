@@ -1057,9 +1057,41 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotRegex(script, r"showNotification\(\s*['\"]")
         self.assertNotRegex(script, r"confirm\(\s*['\"]")
         self.assertIn("i18n.t('reader.loadingNextChapter'", script)
+        self.assertIn("i18n.t('reader.chapterLoadFailed'", script)
         self.assertIn("i18n.t('settings.saved'", script)
         self.assertIn("i18n.t('reader.chapterNumber'", script)
         self.assertIn("i18n.t('settings.continuousScrollTip'", script)
+
+    def test_normal_scroll_chapter_navigation_swaps_only_the_reading_body(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn('function navigateScrollingChapter(', script)
+        start = script.index('function navigateScrollingChapter(')
+        end = script.index('\n    function handleKeyDown(', start)
+        navigation = script[start:end]
+
+        self.assertIn("xhr.open('GET', url, true);", navigation)
+        self.assertIn("tempDiv.querySelector('#eb-content')", navigation)
+        self.assertIn("chapterContent.getAttribute('data-chapter-index')", navigation)
+        self.assertIn("chapterContent.getAttribute('data-book-hash')", navigation)
+        self.assertIn('while (content.firstChild) content.removeChild(content.firstChild);', navigation)
+        self.assertIn('content.appendChild(childNodes[i].cloneNode(true));', navigation)
+        self.assertNotIn('content.innerHTML', navigation)
+        self.assertIn("window.history.pushState({chapterIndex: target.index}, '', url);", navigation)
+        self.assertIn("window.addEventListener('popstate'", navigation)
+        self.assertIn("navigateScrollingChapter(window.location.href, { history: false });", navigation)
+        self.assertIn('if (isPaginationMode || isContinuousScroll) return false;', navigation)
+        self.assertIn('wireNormalScrollChapterNavigation();', script)
+
+        keyboard = script[script.index('function handleKeyDown('):script.index('\n    prevPageBtn.addEventListener', script.index('function handleKeyDown('))]
+        self.assertIn('navigateScrollingChapter(prev, { history: true });', keyboard)
+        self.assertIn('navigateScrollingChapter(next, { history: true });', keyboard)
+
+        toc_start = script.index("a.addEventListener('click', function(e) {")
+        toc_end = script.index('\n                    });', toc_start)
+        book_toc = script[toc_start:toc_end]
+        self.assertIn('navigateScrollingChapter(this.href, { history: true });', book_toc)
+        self.assertIn('!isPaginationMode && !isContinuousScroll', book_toc)
 
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
