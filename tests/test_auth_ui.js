@@ -369,6 +369,66 @@ test('book index matches literal and tone-free pinyin text without unsafe HTML r
   assert.equal(elements.adminBookList.innerHTMLWrites, 0);
 });
 
+test('book index keeps literal search working when pinyin is unavailable or throws', async () => {
+  const books = [adminBook({ title: 'Literal fallback', authors: ['Grace Hopper'] })];
+  const load = () => Promise.resolve(response(200, { books }));
+
+  const withoutPinyin = bookUiHarness(url => url === '/api/admin/books/index'
+    ? load() : Promise.resolve(response(404, {})));
+  const missingAuth = AuthModule.create(withoutPinyin.root);
+  missingAuth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await missingAuth.init();
+  await missingAuth.loadBookIndex();
+  withoutPinyin.elements.adminBookSearch.value = 'grace hopper';
+  withoutPinyin.elements.adminBookSearch.listeners.input();
+  assert.deepEqual(rowTitles(withoutPinyin.elements.adminBookList), ['Literal fallback']);
+
+  const throwingPinyin = bookUiHarness(url => url === '/api/admin/books/index'
+    ? load() : Promise.resolve(response(404, {})));
+  throwingPinyin.root.pinyinPro = {
+    pinyin() { throw new Error('pinyin conversion failed'); },
+  };
+  const throwingAuth = AuthModule.create(throwingPinyin.root);
+  throwingAuth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await throwingAuth.init();
+  await throwingAuth.loadBookIndex();
+  throwingPinyin.elements.adminBookSearch.value = 'literal fallback';
+  throwingPinyin.elements.adminBookSearch.listeners.input();
+  assert.deepEqual(rowTitles(throwingPinyin.elements.adminBookList), ['Literal fallback']);
+});
+
+test('a stale initial book index response cannot overwrite a newer refresh', async () => {
+  const initialIndex = deferred();
+  let indexRequests = 0;
+  const { root, elements } = bookUiHarness(url => {
+    if (url === '/api/admin/books/index') {
+      indexRequests += 1;
+      return indexRequests === 1
+        ? initialIndex.promise
+        : Promise.resolve(response(200, { books: [adminBook({ title: 'Fresh index' })] }));
+    }
+    if (url === '/api/admin/users') return Promise.resolve(response(200, { users: [] }));
+    if (url === '/api/admin/ai/settings') return Promise.resolve(response(200, { settings: null }));
+    if (url === '/api/admin/ai/tags') return Promise.resolve(response(200, { tags: [] }));
+    if (url === '/api/admin/ai/jobs?page=1&page_size=20') {
+      return Promise.resolve(response(200, aiJobsPayload([])));
+    }
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  elements.adminMenu.click();
+
+  await auth.loadBookIndex();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Fresh index']);
+
+  initialIndex.resolve(response(200, { books: [adminBook({ title: 'Stale index' })] }));
+  await tick();
+  await tick();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Fresh index']);
+});
+
 test('book refresh requests only the lightweight index and locale changes rerender held state', async () => {
   const calls = [];
   const { root, elements, localeListeners } = bookUiHarness(url => {

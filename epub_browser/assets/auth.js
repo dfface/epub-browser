@@ -1286,7 +1286,11 @@
       })).join(' ');
       var pinyin = '';
       if (root.pinyinPro && typeof root.pinyinPro.pinyin === 'function') {
-        pinyin = root.pinyinPro.pinyin(literal, { toneType: 'none' });
+        try {
+          pinyin = root.pinyinPro.pinyin(literal, { toneType: 'none' });
+        } catch (error) {
+          pinyin = '';
+        }
       }
       return compactSearchText(literal) + ' ' + compactSearchText(pinyin);
     }
@@ -1483,22 +1487,31 @@
       if (live) live.textContent = t(key, params);
     }
 
+    function beginAdminBookIndexLoad() {
+      adminBooksState.requestGeneration += 1;
+      renderAdminBookMessage('admin.books.loading');
+      setAdminBookLive('admin.books.live.loading');
+      return adminBooksState.requestGeneration;
+    }
+
+    function applyAdminBookIndex(generation, payload) {
+      if (generation !== adminBooksState.requestGeneration) return null;
+      setAdminBookIndex(payload && payload.books);
+      setAdminBookLive('admin.books.live.loaded', { count: adminBooksState.books.length });
+      return payload;
+    }
+
     function loadAdminBookIndex() {
       if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') {
         return Promise.resolve(null);
       }
-      adminBooksState.requestGeneration += 1;
-      var generation = adminBooksState.requestGeneration;
-      renderAdminBookMessage('admin.books.loading');
-      setAdminBookLive('admin.books.live.loading');
+      var generation = beginAdminBookIndexLoad();
       return authenticatedFetch('/api/admin/books/index').then(function(response) {
         if (!response || !response.ok) return null;
-        return readJson(response).then(function(payload) {
-          if (generation !== adminBooksState.requestGeneration) return null;
-          setAdminBookIndex(payload && payload.books);
-          setAdminBookLive('admin.books.live.loaded', { count: adminBooksState.books.length });
-          return payload;
-        });
+        return readJson(response);
+      }).then(function(payload) {
+        if (payload) return applyAdminBookIndex(generation, payload);
+        return null;
       }).catch(function() { return null; }).then(function(payload) {
         if (!payload && generation === adminBooksState.requestGeneration) {
           renderAdminBookMessage('admin.books.loadError');
@@ -1597,6 +1610,7 @@
       var proxyEnabled = Boolean(
         sessionState.authentication && sessionState.authentication.proxy_enabled
       );
+      var bookIndexGeneration = beginAdminBookIndexLoad();
       var requests = [
         authenticatedFetch('/api/admin/users'),
         authenticatedFetch('/api/admin/books/index'),
@@ -1619,7 +1633,7 @@
         if (proxyEnabled) payloadRequests.push(readJson(responses[4]));
         return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
-          setAdminBookIndex(payloads[1].books || []);
+          applyAdminBookIndex(bookIndexGeneration, payloads[1]);
           aiSettings = payloads[2].settings || null;
           aiTags = payloads[3].tags || [];
           identities = proxyEnabled ? (payloads[4].identities || []) : [];
