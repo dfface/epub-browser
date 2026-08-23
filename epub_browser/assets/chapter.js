@@ -895,6 +895,15 @@ function initScript() {
         }
     }
 
+    function refreshPartialChapterCanvas(chapterIndex) {
+        if (
+            window.EpubBrowserAICanvas &&
+            typeof window.EpubBrowserAICanvas.refresh === 'function'
+        ) {
+            window.EpubBrowserAICanvas.refresh(chapterIndex);
+        }
+    }
+
     function syncChapterContentAttributes(source) {
         var attributes = [
             'lang', 'data-eb-styles', 'data-chapter-index', 'data-chapter-title',
@@ -994,6 +1003,7 @@ function initScript() {
             chapter_index = String(target.index);
             visibleChapterIndex = target.index;
             syncChapterScopedControls(target.index);
+            refreshPartialChapterCanvas(target.index);
             pendingAnnotationId = requestedAnnotationId();
             if (options.history !== false) {
                 window.history.pushState({chapterIndex: target.index}, '', url);

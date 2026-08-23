@@ -2,7 +2,7 @@
   'use strict';
   if (!root || root.EpubBrowserMode !== 'server') return;
   var document = root.document;
-  var state = { marks: [], paragraphTriggers: [], results: {}, pending: {}, guide: null, reflection: null, popover: null, paragraphPopover: null, mapPopover: null, mapTrigger: null, statusTimer: null, button: null, buttons: [] };
+  var state = { marks: [], paragraphTriggers: [], results: {}, pending: {}, guide: null, reflection: null, popover: null, paragraphPopover: null, mapPopover: null, mapTrigger: null, statusTimer: null, button: null, buttons: [], contextVersion: 0, eventSources: [], initialized: false };
   function t(key, params) { var i = root.EpubBrowserI18n; return i && i.t ? i.t(key, params) : key; }
   function label(key, english, chinese) { var value = t(key); return value === key ? (String(locale()).toLowerCase().indexOf('zh') === 0 ? chinese : english) : value; }
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
@@ -37,6 +37,15 @@
     state.marks = []; state.paragraphTriggers.forEach(function(trigger) { var block = trigger.parentElement; trigger.remove(); if (block) { block.classList.remove('ai-paragraph-note-anchor'); block.removeAttribute('data-ai-paragraph-note-count'); } }); state.paragraphTriggers = []; state.results = {};
     if (state.guide) state.guide.remove(); if (state.reflection) state.reflection.remove(); if (state.popover) state.popover.remove(); if (state.paragraphPopover) state.paragraphPopover.remove(); if (state.mapPopover) state.mapPopover.remove(); state.guide = state.reflection = state.popover = state.paragraphPopover = state.mapPopover = null;
     setCanvasActive(false);
+  }
+  function closeEventSources() {
+    state.eventSources.forEach(function(source) { source.close(); });
+    state.eventSources = [];
+  }
+  function isCurrentContext(context, contextVersion) {
+    var article = document.querySelector('#eb-content');
+    return contextVersion === state.contextVersion && article === context.article &&
+      Number(article && article.getAttribute('data-chapter-index')) === context.chapterIndex;
   }
   function clearChapter(chapterIndex) {
     var key = String(chapterIndex);
@@ -218,20 +227,23 @@
     if (root.EpubDialog && typeof root.EpubDialog.confirm === 'function') return root.EpubDialog.confirm({ title: t('ai.generateScopeTitle'), message: message, confirmText: t('ai.generateScopeAction') });
     return Promise.resolve(root.confirm(message));
   }
-  function watch(button, jobId, context) {
+  function watch(button, jobId, context, contextVersion) {
     if (!root.EventSource) return; var source = new root.EventSource('/api/ai/events?job_id=' + encodeURIComponent(jobId));
+    state.eventSources.push(source);
     source.addEventListener('job', function(event) { var payload; try { payload = JSON.parse(event.data); } catch (_) { return; } var job = payload.job || {};
+      if (!isCurrentContext(context, contextVersion)) { source.close(); return; }
       if (job.status === 'queued' || job.status === 'running') { setStatus(button, contextLabel(context) + ' · ' + t(job.status === 'queued' ? 'ai.queued' : 'ai.generating', { current: job.progress_current || 0, total: job.progress_total || 1 })); return; }
-      source.close(); button.disabled = false; delete state.pending[String(context.chapterIndex)]; if (job.status === 'complete' && payload.result) { var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else setStatus(button, t('ai.error.' + (job.error_code || 'unknown')), true, true);
+      source.close(); button.disabled = false; delete state.pending[String(context.chapterIndex) + ':' + contextVersion]; if (job.status === 'complete' && payload.result) { var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else setStatus(button, t('ai.error.' + (job.error_code || 'unknown')), true, true);
     });
   }
   function requestedResultId() { try { return new root.URLSearchParams(root.location.search).get('ai_result'); } catch (_error) { return null; } }
-  function load(button, context) {
+  function load(button, context, contextVersion) {
     var requested = requestedResultId();
     var source = requested
       ? api('/api/ai/results/' + encodeURIComponent(requested), { method: 'GET' }).then(function(payload) { return { results: [payload.result], current_template_version: payload.result && payload.result.template_version }; })
       : api('/api/ai/books/' + encodeURIComponent(context.bookId) + '/results?chapter_index=' + encodeURIComponent(context.chapterIndex) + '&language=' + encodeURIComponent(locale()), { method: 'GET' });
     return source.then(function(payload) {
+      if (!isCurrentContext(context, contextVersion)) return null;
       var result = (payload.results || []).filter(function(item) {
         if (!item || item.book_id !== context.bookId || Number(item.chapter_index) !== context.chapterIndex) return false;
         return requested || Number(item.template_version || 0) === Number(payload.current_template_version || 0);
@@ -240,7 +252,72 @@
       return result;
     });
   }
-  function generate(button, context) { var key = String(context.chapterIndex); if (state.pending[key]) return; state.pending[key] = true; button.disabled = true; setStatus(button, contextLabel(context) + ' · ' + t('ai.queued', { current: 0, total: 1 })); api('/api/ai/reading', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'chapter', book_id: context.bookId, chapter_index: context.chapterIndex, mode: 'chapter', language: locale(), force: false }) }).then(function(payload) { if (payload.status === 'complete') { button.disabled = false; delete state.pending[key]; var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else watch(button, payload.job.id, context); }).catch(function(error) { button.disabled = false; delete state.pending[key]; setStatus(button, t('ai.error.' + (error.code || 'unknown')), true, true); }); }
-  function init() { var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-ai-learning-canvas]')); if (!buttons.length || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) return; state.buttons = buttons; state.button = buttons[0]; setCanvasActive(false); if (document.body.classList.contains('pagination-mode')) { buttons.forEach(function(button) { button.disabled = true; button.setAttribute('aria-disabled', 'true'); button.setAttribute('title', t('ai.unavailableInPagination')); }); return; } var bookId = state.button.getAttribute('data-book-id'), initial = chapterContext(bookId, Number(state.button.getAttribute('data-chapter-index'))); load(state.button, initial).catch(function() {}); buttons.forEach(function(button) { function currentContext() { return chapterContext(bookId, Number(button.getAttribute('data-chapter-index'))); } updateButtonScope(button, currentContext()); button.addEventListener('mouseenter', function() { updateButtonScope(button, currentContext()); }); button.addEventListener('focus', function() { updateButtonScope(button, currentContext()); }); button.addEventListener('click', function() { var context = currentContext(), key = String(context.chapterIndex); if (document.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + key + '"]')) { clearChapter(context.chapterIndex); setStatus(button, t('ai.canvasHidden'), false, true); return; } if (state.results[key]) { var count = apply(state.results[key], context.article, context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); return; } load(button, context).then(function(result) { if (result) return; return confirmGeneration(context).then(function(confirmed) { if (confirmed) generate(button, context); }); }).catch(function() { confirmGeneration(context).then(function(confirmed) { if (confirmed) generate(button, context); }); }); }); }); var i18n = root.EpubBrowserI18n; if (i18n && i18n.onLocaleChange && !document.documentElement.dataset.aiCanvasI18nBound) { document.documentElement.dataset.aiCanvasI18nBound = 'true'; i18n.onLocaleChange(function() { clear(); var context = chapterContext(bookId, Number(state.button.getAttribute('data-chapter-index'))); buttons.forEach(function(button) { updateButtonScope(button, chapterContext(bookId, Number(button.getAttribute('data-chapter-index')))); }); load(state.button, context).catch(function() {}); }); } }
-  document.addEventListener('DOMContentLoaded', init);
+  function generate(button, context, contextVersion) { var key = String(context.chapterIndex) + ':' + contextVersion; if (state.pending[key]) return; state.pending[key] = true; button.disabled = true; setStatus(button, contextLabel(context) + ' · ' + t('ai.queued', { current: 0, total: 1 })); api('/api/ai/reading', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'chapter', book_id: context.bookId, chapter_index: context.chapterIndex, mode: 'chapter', language: locale(), force: false }) }).then(function(payload) { if (!isCurrentContext(context, contextVersion)) return; if (payload.status === 'complete') { button.disabled = false; delete state.pending[key]; var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else watch(button, payload.job.id, context, contextVersion); }).catch(function(error) { if (!isCurrentContext(context, contextVersion)) return; button.disabled = false; delete state.pending[key]; setStatus(button, t('ai.error.' + (error.code || 'unknown')), true, true); }); }
+  function refresh(chapterIndex) {
+    if (!state.initialized || !state.button || document.body.classList.contains('pagination-mode') || document.body.classList.contains('continuous-scroll-mode')) return Promise.resolve(null);
+    state.contextVersion += 1;
+    closeEventSources();
+    clear();
+    state.pending = {};
+    state.buttons.forEach(function(button) {
+      button.disabled = false;
+      button.removeAttribute('aria-disabled');
+    });
+    var bookId = state.button.getAttribute('data-book-id');
+    var context = chapterContext(bookId, Number(chapterIndex));
+    state.buttons.forEach(function(button) { updateButtonScope(button, chapterContext(bookId, Number(button.getAttribute('data-chapter-index')))); });
+    return load(state.button, context, state.contextVersion).catch(function() { return null; });
+  }
+  function init() {
+    if (state.initialized) return;
+    var buttons = Array.prototype.slice.call(document.querySelectorAll('[data-ai-learning-canvas]'));
+    if (!buttons.length || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) return;
+    state.initialized = true;
+    state.buttons = buttons;
+    state.button = buttons[0];
+    setCanvasActive(false);
+    if (document.body.classList.contains('pagination-mode')) {
+      buttons.forEach(function(button) { button.disabled = true; button.setAttribute('aria-disabled', 'true'); button.setAttribute('title', t('ai.unavailableInPagination')); });
+      return;
+    }
+    var bookId = state.button.getAttribute('data-book-id');
+    var initial = chapterContext(bookId, Number(state.button.getAttribute('data-chapter-index')));
+    state.contextVersion += 1;
+    load(state.button, initial, state.contextVersion).catch(function() {});
+    buttons.forEach(function(button) {
+      function currentContext() { return chapterContext(bookId, Number(button.getAttribute('data-chapter-index'))); }
+      updateButtonScope(button, currentContext());
+      button.addEventListener('mouseenter', function() { updateButtonScope(button, currentContext()); });
+      button.addEventListener('focus', function() { updateButtonScope(button, currentContext()); });
+      button.addEventListener('click', function() {
+        var context = currentContext(), key = String(context.chapterIndex);
+        if (document.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + key + '"]')) {
+          clearChapter(context.chapterIndex);
+          setStatus(button, t('ai.canvasHidden'), false, true);
+          return;
+        }
+        if (state.results[key]) {
+          var count = apply(state.results[key], context.article, context.chapterIndex);
+          setStatus(button, t('ai.canvasApplied', { count: count }), false, true);
+          return;
+        }
+        var contextVersion = state.contextVersion;
+        load(button, context, contextVersion).then(function(result) {
+          if (result || !isCurrentContext(context, contextVersion)) return;
+          return confirmGeneration(context).then(function(confirmed) { if (confirmed) generate(button, context, contextVersion); });
+        }).catch(function() {
+          if (!isCurrentContext(context, contextVersion)) return;
+          confirmGeneration(context).then(function(confirmed) { if (confirmed) generate(button, context, contextVersion); });
+        });
+      });
+    });
+    var i18n = root.EpubBrowserI18n;
+    if (i18n && i18n.onLocaleChange && !document.documentElement.dataset.aiCanvasI18nBound) {
+      document.documentElement.dataset.aiCanvasI18nBound = 'true';
+      i18n.onLocaleChange(function() { refresh(Number(state.button.getAttribute('data-chapter-index'))); });
+    }
+  }
+  root.EpubBrowserAICanvas = { refresh: refresh };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })(window);

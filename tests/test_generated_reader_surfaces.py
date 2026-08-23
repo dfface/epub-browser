@@ -1104,6 +1104,23 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('navigateScrollingChapter(this.href, { history: true });', book_toc)
         self.assertIn('!isPaginationMode && !isContinuousScroll', book_toc)
 
+    def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
+
+        self.assertIn('function refreshPartialChapterCanvas(chapterIndex) {', chapter_script)
+        self.assertIn('window.EpubBrowserAICanvas.refresh(chapterIndex);', chapter_script)
+        self.assertIn('refreshPartialChapterCanvas(target.index);', chapter_script)
+
+        self.assertIn('root.EpubBrowserAICanvas = {', canvas_script)
+        self.assertIn('function refresh(chapterIndex) {', canvas_script)
+        self.assertIn('refresh: refresh', canvas_script)
+        self.assertIn('state.contextVersion += 1;', canvas_script)
+        self.assertIn('closeEventSources();', canvas_script)
+        self.assertIn('if (!isCurrentContext(context, contextVersion)) return null;', canvas_script)
+        self.assertIn('if (!isCurrentContext(context, contextVersion)) return;', canvas_script)
+        self.assertIn("document.querySelector('#eb-content')", canvas_script)
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 
