@@ -22,7 +22,12 @@
       tagId: '',
       page: 1,
       pageSize: 20,
-      requestGeneration: 0
+      requestGeneration: 0,
+      expandedBookId: null,
+      detailCache: Object.create(null),
+      editorGeneration: 0,
+      editorBusy: false,
+      editorError: false
     };
     var aiJobsState = {
       status: '',
@@ -1069,15 +1074,17 @@
       if (!aiTags.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.ai.noTags'));
     }
 
-    function clearAiResults(scope) {
+    function clearAiResults(scope, reload) {
       return authenticatedFetch('/api/admin/ai/results', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scope || {})
       }).then(function(response) {
         if (!response.ok) return showResponseError(response, 'admin');
-        showStatus('admin.ai.cacheCleared', 'success');
-        return loadAdminData();
+        return readJson(response).then(function(payload) {
+          showStatus('admin.ai.cacheCleared', 'success');
+          return reload === false ? payload : loadAdminData();
+        });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
@@ -1466,17 +1473,316 @@
         var actions = createAdminBookCell(row, '');
         var manage = root.document.createElement('button');
         manage.type = 'button';
+        manage.className = 'bookshelf-action-btn account-inline-action admin-book-manage';
         manage.textContent = t('admin.books.manage');
         manage.setAttribute('data-book-id', String(book.id || ''));
         manage.setAttribute('aria-label', t('admin.books.manageLabel', { title: String(book.title || '') }));
-        manage.setAttribute('aria-expanded', 'false');
+        manage.setAttribute('aria-controls', adminBookEditorId(book.id));
+        manage.setAttribute('aria-expanded', String(adminBooksState.expandedBookId === book.id));
+        manage.addEventListener('click', function() { return openAdminBookEditor(book.id); });
         actions.appendChild(manage);
         list.appendChild(row);
+        if (adminBooksState.expandedBookId === book.id) {
+          list.appendChild(renderAdminBookEditor(book));
+        }
       });
       renderAdminBookPagination(matching.length, totalPages);
     }
 
+    function adminBookEditorId(bookId) {
+      return 'adminBookEditor-' + encodeURIComponent(String(bookId || ''));
+    }
+
+    function editorCheckbox(labelText, value, checked) {
+      var label = root.document.createElement('label');
+      var checkbox = root.document.createElement('input');
+      var text = root.document.createElement('span');
+      label.className = 'account-book-grant-option';
+      checkbox.type = 'checkbox';
+      checkbox.value = String(value || '');
+      checkbox.checked = Boolean(checked);
+      text.textContent = String(labelText || '');
+      label.appendChild(checkbox);
+      label.appendChild(text);
+      return { label: label, checkbox: checkbox };
+    }
+
+    function editorSelectedValues(checkboxes) {
+      return checkboxes.filter(function(checkbox) { return checkbox.checked; }).map(function(checkbox) {
+        return checkbox.value;
+      });
+    }
+
+    function renderAdminBookEditor(book) {
+      var row = root.document.createElement('tr');
+      var cell = createAdminBookCell(row, '');
+      row.id = adminBookEditorId(book.id);
+      row.className = 'admin-book-editor-row';
+      cell.colSpan = 6;
+      var panel = root.document.createElement('section');
+      panel.className = 'admin-book-editor';
+      panel.setAttribute('aria-label', t('admin.books.editorLabel', { title: String(book.title || '') }));
+      panel.setAttribute('aria-busy', String(adminBooksState.editorBusy));
+      var heading = root.document.createElement('h5');
+      heading.className = 'admin-book-editor-title';
+      heading.textContent = t('admin.books.editorTitle', { title: String(book.title || '') });
+      panel.appendChild(heading);
+      if (adminBooksState.editorBusy) {
+        panel.appendChild(createTextElement('p', 'account-empty', 'admin.books.loading'));
+        panel.appendChild(adminBookCancelButton(book));
+        cell.appendChild(panel);
+        return row;
+      }
+      if (adminBooksState.editorError || !adminBooksState.detailCache[book.id]) {
+        panel.appendChild(createTextElement('p', 'account-empty', 'admin.books.detailError'));
+        panel.appendChild(adminBookCancelButton(book));
+        cell.appendChild(panel);
+        return row;
+      }
+      var detail = adminBooksState.detailCache[book.id];
+      var grid = root.document.createElement('div');
+      var visibilityField = root.document.createElement('label');
+      var visibilityText = root.document.createElement('span');
+      var visibility = root.document.createElement('select');
+      var grants = root.document.createElement('fieldset');
+      var grantLegend = createTextElement('legend', '', 'admin.books.memberAccess');
+      var grantOptions = root.document.createElement('div');
+      var tags = root.document.createElement('fieldset');
+      var tagLegend = createTextElement('legend', '', 'admin.books.serverTags');
+      var tagOptions = root.document.createElement('div');
+      var profileField = root.document.createElement('label');
+      var profileText = root.document.createElement('span');
+      var profile = root.document.createElement('select');
+      var grantChecks = [];
+      var tagChecks = [];
+      grid.className = 'admin-book-editor-grid';
+      visibilityField.className = 'admin-book-field';
+      visibilityText.textContent = t('admin.books.visibilityLabel');
+      visibilityField.appendChild(visibilityText);
+      ['authenticated', 'restricted'].forEach(function(value) {
+        var option = root.document.createElement('option');
+        option.value = value;
+        option.textContent = t('admin.books.visibility.' + value);
+        option.selected = value === detail.visibility;
+        visibility.appendChild(option);
+      });
+      visibility.value = detail.visibility || 'authenticated';
+      visibilityField.appendChild(visibility);
+      grants.className = 'account-book-grants';
+      grantOptions.className = 'account-book-grant-options';
+      grants.appendChild(grantLegend);
+      users.filter(function(user) { return user.enabled && user.role === 'member'; }).forEach(function(user) {
+        var option = editorCheckbox(user.username, user.id, (detail.grants || []).indexOf(user.id) !== -1);
+        grantChecks.push(option.checkbox);
+        grantOptions.appendChild(option.label);
+      });
+      grants.appendChild(grantOptions);
+      grants.disabled = visibility.value !== 'restricted';
+      visibility.addEventListener('change', function() { grants.disabled = visibility.value !== 'restricted'; });
+      tags.className = 'account-book-grants';
+      tagOptions.className = 'account-book-grant-options';
+      tags.appendChild(tagLegend);
+      aiTags.forEach(function(tag) {
+        var option = editorCheckbox(tag.name, tag.id, (detail.ai_tags || []).some(function(assigned) {
+          return assigned && assigned.id === tag.id;
+        }));
+        tagChecks.push(option.checkbox);
+        tagOptions.appendChild(option.label);
+      });
+      tags.appendChild(tagOptions);
+      profileField.className = 'admin-book-field';
+      profileText.textContent = t('admin.books.aiProfile');
+      profileField.appendChild(profileText);
+      ['auto', 'technical', 'fiction', 'general'].forEach(function(value) {
+        var option = root.document.createElement('option');
+        option.value = value;
+        option.textContent = t('admin.books.profile.' + value);
+        option.selected = value === (detail.ai_profile || 'auto');
+        profile.appendChild(option);
+      });
+      profile.value = detail.ai_profile || 'auto';
+      profileField.appendChild(profile);
+      grid.appendChild(visibilityField);
+      grid.appendChild(grants);
+      grid.appendChild(tags);
+      grid.appendChild(profileField);
+      panel.appendChild(grid);
+      var actions = root.document.createElement('div');
+      actions.className = 'admin-book-editor-actions';
+      var save = root.document.createElement('button');
+      save.type = 'button';
+      save.className = 'bookshelf-action-btn account-inline-action';
+      save.textContent = t('admin.books.save');
+      save.addEventListener('click', function() {
+        saveAdminBookSettings(book.id, {
+          visibility: visibility.value,
+          user_ids: editorSelectedValues(grantChecks),
+          tag_ids: editorSelectedValues(tagChecks),
+          profile: profile.value
+        });
+      });
+      actions.appendChild(save);
+      actions.appendChild(adminBookCancelButton(book));
+      var clear = root.document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'bookshelf-action-btn account-danger-action';
+      clear.textContent = t('admin.books.clearResults');
+      clear.setAttribute('aria-label', t('admin.books.clearResultsLabel', { title: String(book.title || '') }));
+      clear.addEventListener('click', function() { clearAdminBookResults(book.id, book.title); });
+      actions.appendChild(clear);
+      panel.appendChild(actions);
+      cell.appendChild(panel);
+      return row;
+    }
+
+    function adminBookCancelButton(book) {
+      var cancel = root.document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'bookshelf-action-btn account-inline-action';
+      cancel.textContent = t('admin.books.cancel');
+      cancel.setAttribute('aria-label', t('admin.books.cancelLabel', { title: String(book.title || '') }));
+      cancel.addEventListener('click', function() { closeAdminBookEditor(book.id, true); });
+      return cancel;
+    }
+
+    function focusAdminBookManage(bookId) {
+      var list = element('adminBookList');
+      if (!list) return;
+      var children = list.children || [];
+      for (var index = 0; index < children.length; index += 1) {
+        var stack = [children[index]];
+        while (stack.length) {
+          var node = stack.pop();
+          if (node && node.getAttribute && node.getAttribute('data-book-id') === String(bookId)) {
+            if (typeof node.focus === 'function') node.focus();
+            return;
+          }
+          Array.prototype.forEach.call(node && node.children || [], function(child) { stack.push(child); });
+        }
+      }
+    }
+
+    function closeAdminBookEditor(bookId, restoreFocus) {
+      if (adminBooksState.expandedBookId !== bookId) return;
+      adminBooksState.editorGeneration += 1;
+      adminBooksState.expandedBookId = null;
+      adminBooksState.editorBusy = false;
+      adminBooksState.editorError = false;
+      renderAdminBooks();
+      if (restoreFocus) focusAdminBookManage(bookId);
+    }
+
+    function openAdminBookEditor(bookId) {
+      if (!bookId) return Promise.resolve(null);
+      if (adminBooksState.expandedBookId === bookId) {
+        closeAdminBookEditor(bookId, true);
+        return Promise.resolve(null);
+      }
+      var generation = ++adminBooksState.editorGeneration;
+      adminBooksState.expandedBookId = bookId;
+      adminBooksState.editorError = false;
+      adminBooksState.editorBusy = !adminBooksState.detailCache[bookId];
+      renderAdminBooks();
+      if (adminBooksState.detailCache[bookId]) return Promise.resolve(adminBooksState.detailCache[bookId]);
+      return authenticatedFetch('/api/admin/books/' + encodeURIComponent(bookId)).then(function(response) {
+        if (!response || !response.ok) return null;
+        return readJson(response).then(function(payload) {
+          if (generation !== adminBooksState.editorGeneration || adminBooksState.expandedBookId !== bookId) return null;
+          adminBooksState.detailCache[bookId] = payload && payload.book;
+          adminBooksState.editorBusy = false;
+          adminBooksState.editorError = !adminBooksState.detailCache[bookId];
+          renderAdminBooks();
+          return adminBooksState.detailCache[bookId];
+        });
+      }).catch(function() { return null; }).then(function(detail) {
+        if (!detail && generation === adminBooksState.editorGeneration && adminBooksState.expandedBookId === bookId) {
+          adminBooksState.editorBusy = false;
+          adminBooksState.editorError = true;
+          renderAdminBooks();
+        }
+        return detail;
+      });
+    }
+
+    function patchAdminBookSummary(summary) {
+      if (!summary || !summary.id) return;
+      adminBooksState.books = adminBooksState.books.map(function(view) {
+        return view.book.id === summary.id ? adminBookView(summary) : view;
+      });
+    }
+
+    function saveAdminBookSettings(bookId, payload) {
+      var generation = ++adminBooksState.editorGeneration;
+      if (adminBooksState.expandedBookId === bookId) {
+        adminBooksState.editorBusy = true;
+        renderAdminBooks();
+      }
+      return authenticatedFetch('/api/admin/books/' + encodeURIComponent(bookId) + '/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(response) {
+        if (!response || !response.ok) return null;
+        return readJson(response).then(function(result) {
+          if (generation !== adminBooksState.editorGeneration) return null;
+          patchAdminBookSummary(result && result.summary);
+          if (result && result.book) adminBooksState.detailCache[bookId] = result.book;
+          adminBooksState.editorBusy = false;
+          adminBooksState.editorError = false;
+          renderAdminBooks();
+          setAdminBookLive('admin.books.live.saved');
+          return result;
+        });
+      }).catch(function() { return null; }).then(function(result) {
+        if (!result && generation === adminBooksState.editorGeneration && adminBooksState.expandedBookId === bookId) {
+          adminBooksState.editorBusy = false;
+          adminBooksState.editorError = true;
+          renderAdminBooks();
+          setAdminBookLive('admin.books.saveError');
+        }
+        return result;
+      });
+    }
+
+    function clearAdminBookResults(bookId, title) {
+      if (typeof root.confirm === 'function' && !root.confirm(t('admin.books.clearResultsConfirm', {
+        title: String(title || '')
+      }))) return Promise.resolve(null);
+      var generation = ++adminBooksState.editorGeneration;
+      if (adminBooksState.expandedBookId === bookId) {
+        adminBooksState.editorBusy = true;
+        renderAdminBooks();
+      }
+      return clearAiResults({ book_id: bookId }, false).then(function(payload) {
+        if (generation !== adminBooksState.editorGeneration) return null;
+        if (!payload) {
+          adminBooksState.editorBusy = false;
+          renderAdminBooks();
+          setAdminBookLive('admin.books.clearError');
+          return null;
+        }
+        var deleted = Number(payload.deleted || 0);
+        var view = adminBooksState.books.filter(function(candidate) { return candidate.book.id === bookId; })[0];
+        if (view) {
+          var summary = {};
+          Object.keys(view.book).forEach(function(key) { summary[key] = view.book[key]; });
+          summary.ai_result_count = Math.max(0, Number(summary.ai_result_count || 0) - deleted);
+          patchAdminBookSummary(summary);
+        }
+        if (adminBooksState.detailCache[bookId]) adminBooksState.detailCache[bookId].ai_result_count = 0;
+        adminBooksState.editorBusy = false;
+        renderAdminBooks();
+        setAdminBookLive('admin.books.live.cleared', { count: deleted });
+        return payload;
+      });
+    }
+
     function setAdminBookIndex(records) {
+      adminBooksState.editorGeneration += 1;
+      adminBooksState.expandedBookId = null;
+      adminBooksState.detailCache = Object.create(null);
+      adminBooksState.editorBusy = false;
+      adminBooksState.editorError = false;
       adminBooksState.books = (Array.isArray(records) ? records : []).map(adminBookView);
       populateAdminBookTagFilter();
       renderAdminBooks();
@@ -1914,6 +2220,9 @@
       loadAiJobs: loadAdminAiJobs,
       retryAiJob: retryAdminAiJob,
       loadBookIndex: loadAdminBookIndex,
+      openBookEditor: openAdminBookEditor,
+      saveBookSettings: saveAdminBookSettings,
+      clearBookResults: clearAdminBookResults,
       init: init,
       setSession: setSession,
       getSession: function() { return sessionState; }

@@ -61,6 +61,7 @@ function fakeElement(tagName = 'div') {
       if (this.disabled || !this.listeners.click) return undefined;
       return this.listeners.click({ preventDefault() {}, stopPropagation() {} });
     },
+    focus() { this.focused = true; },
   };
   node.classList = {
     add(name) {
@@ -268,6 +269,7 @@ function bookUiHarness(fetchImpl) {
         'admin.books.pageSummary': `Page ${params && params.page} of ${params && params.totalPages} (${params && params.total})`,
         'admin.books.grantCount': `${params && params.count} members`,
         'admin.books.resultCount': `${params && params.count} results`,
+        'admin.books.live.cleared': `Cleared ${params && params.count} results`,
       };
       return values[key] || `[${key}]`;
     },
@@ -282,6 +284,15 @@ function rowTitles(body) {
     const title = descendants(row.children[0] || {}).find(node => node.tagName === 'STRONG');
     return title ? title.textContent : row.children[0] && row.children[0].textContent;
   });
+}
+
+function adminBookButtons(body, bookId) {
+  return descendants(body).filter(node => node.tagName === 'BUTTON'
+    && node.getAttribute('data-book-id') === bookId);
+}
+
+function editorRows(body) {
+  return body.children.filter(row => row.className === 'admin-book-editor-row');
 }
 
 test('book index renders only the current page and resets pagination for controls', async () => {
@@ -427,6 +438,151 @@ test('a stale initial book index response cannot overwrite a newer refresh', asy
   await tick();
   await tick();
   assert.deepEqual(rowTitles(elements.adminBookList), ['Fresh index']);
+});
+
+test('book editor lazy-loads one detail row, reuses cached detail, and ignores a closed request', async () => {
+  const delayedDetail = deferred();
+  const calls = [];
+  const books = [
+    adminBook({ id: 'book/id', title: 'First book' }),
+    adminBook({ id: 'book-2', title: 'Second book' }),
+  ];
+  const detail = id => ({
+    id, title: id === 'book/id' ? 'First book' : 'Second book', grants: [],
+    ai_tags: [], ai_profile: 'auto', visibility: 'authenticated', ai_result_count: 2,
+  });
+  const { root, elements } = bookUiHarness(url => {
+    calls.push(url);
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books }));
+    if (url === '/api/admin/books/book%2Fid') return delayedDetail.promise;
+    if (url === '/api/admin/books/book-2') return Promise.resolve(response(200, { book: detail('book-2') }));
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+
+  const firstOpen = adminBookButtons(elements.adminBookList, 'book/id')[0].click();
+  assert.equal(editorRows(elements.adminBookList).length, 1);
+  assert.equal(adminBookButtons(elements.adminBookList, 'book/id')[0].getAttribute('aria-expanded'), 'true');
+  await tick();
+  assert.equal(calls.filter(url => url === '/api/admin/books/book%2Fid').length, 1);
+  await auth.openBookEditor('book-2');
+  assert.equal(editorRows(elements.adminBookList).length, 1);
+  assert.equal(elements.adminBookList.children.indexOf(editorRows(elements.adminBookList)[0]), 2);
+  delayedDetail.resolve(response(200, { book: detail('book/id') }));
+  await firstOpen;
+  await tick();
+  assert.equal(editorRows(elements.adminBookList).length, 1);
+
+  const cancel = descendants(editorRows(elements.adminBookList)[0]).find(node => node.tagName === 'BUTTON'
+    && node.textContent === '[admin.books.cancel]');
+  cancel.click();
+  assert.equal(adminBookButtons(elements.adminBookList, 'book-2')[0].focused, true);
+  await auth.openBookEditor('book-2');
+  assert.equal(calls.filter(url => url === '/api/admin/books/book-2').length, 1);
+  await auth.openBookEditor('book/id');
+  assert.equal(editorRows(elements.adminBookList).length, 1);
+  assert.equal(calls.filter(url => url === '/api/admin/books/book%2Fid').length, 2);
+});
+
+test('book editor saves one atomic payload and patches only its held summary', async () => {
+  const calls = [];
+  const before = adminBook({ id: 'book/id', title: 'Atomic book', ai_result_count: 4 });
+  const savedSummary = adminBook({
+    id: 'book/id', title: 'Atomic book', visibility: 'restricted', grant_count: 2,
+    ai_profile: 'technical', ai_tags: [{ id: 'tag-1', name: 'Science' }], ai_result_count: 4,
+  });
+  const { root, elements } = bookUiHarness((url, options) => {
+    calls.push({ url, options });
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [before] }));
+    if (url === '/api/admin/books/book%2Fid/settings') return Promise.resolve(response(200, {
+      book: { id: 'book/id', title: 'Atomic book', grants: ['member-1', 'member-2'], ai_tags: [{ id: 'tag-1', name: 'Science' }], ai_profile: 'technical', visibility: 'restricted', ai_result_count: 4 },
+      summary: savedSummary,
+    }));
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  await auth.saveBookSettings('book/id', {
+    visibility: 'restricted', user_ids: ['member-1', 'member-2'], tag_ids: ['tag-1'], profile: 'technical',
+  });
+
+  const save = calls.find(call => call.url === '/api/admin/books/book%2Fid/settings');
+  assert.equal(save.options.method, 'PUT');
+  assert.deepEqual(JSON.parse(save.options.body), {
+    visibility: 'restricted', user_ids: ['member-1', 'member-2'], tag_ids: ['tag-1'], profile: 'technical',
+  });
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Atomic book']);
+  assert.equal(calls.filter(call => call.url !== '/api/admin/books/index'
+    && call.url !== '/api/admin/books/book%2Fid/settings').length, 0);
+});
+
+test('a late book settings save cannot patch an editor that has been closed', async () => {
+  const delayedSave = deferred();
+  const original = adminBook({ id: 'book/id', title: 'Original title', visibility: 'authenticated' });
+  const { root, elements } = bookUiHarness((url, options) => {
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [original] }));
+    if (url === '/api/admin/books/book%2Fid') return Promise.resolve(response(200, {
+      book: Object.assign({}, original, { grants: [], ai_tags: [] }),
+    }));
+    if (url === '/api/admin/books/book%2Fid/settings') return delayedSave.promise;
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  await auth.openBookEditor('book/id');
+
+  const saving = auth.saveBookSettings('book/id', {
+    visibility: 'restricted', user_ids: [], tag_ids: [], profile: 'technical',
+  });
+  await auth.openBookEditor('book/id');
+  delayedSave.resolve(response(200, {
+    book: Object.assign({}, original, { visibility: 'restricted', grants: [], ai_tags: [], ai_profile: 'technical' }),
+    summary: Object.assign({}, original, { visibility: 'restricted', ai_profile: 'technical' }),
+  }));
+  await saving;
+
+  assert.equal(editorRows(elements.adminBookList).length, 0);
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Original title');
+});
+
+test('book result clearing confirms first and patches only the affected count', async () => {
+  const calls = [];
+  const { root, elements } = bookUiHarness((url, options) => {
+    calls.push({ url, options });
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, {
+      books: [adminBook({ id: 'book/id', title: 'Clear me', ai_result_count: 4 })],
+    }));
+    if (url === '/api/admin/ai/results') return Promise.resolve(response(200, { deleted: 4 }));
+    return Promise.resolve(response(404, {}));
+  });
+  let confirmation = false;
+  const translate = root.EpubBrowserI18n.t;
+  root.EpubBrowserI18n.t = (key, params) => key === 'admin.books.clearResultsConfirm'
+    ? `Clear AI results for ${params.title}?` : translate(key, params);
+  root.confirm = message => {
+    assert.equal(message, 'Clear AI results for Clear me?');
+    return confirmation;
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  await auth.clearBookResults('book/id', 'Clear me');
+  assert.equal(calls.filter(call => call.url === '/api/admin/ai/results').length, 0);
+
+  confirmation = true;
+  await auth.clearBookResults('book/id', 'Clear me');
+  const clear = calls.find(call => call.url === '/api/admin/ai/results');
+  assert.deepEqual(JSON.parse(clear.options.body), { book_id: 'book/id' });
+  assert.match(elements.adminBookLive.textContent, /4/);
+  assert.equal(calls.filter(call => call.url === '/api/admin/books/index').length, 1);
 });
 
 test('book refresh requests only the lightweight index and locale changes rerender held state', async () => {
