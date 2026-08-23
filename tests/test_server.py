@@ -1350,6 +1350,7 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(indexed["grant_count"], 1)
         self.assertEqual(indexed["ai_profile"], "technical")
         self.assertEqual(indexed["ai_tags"], [{"id": tag["id"], "name": "Assigned Tag"}])
+        self.assertTrue(indexed["created_at"])
         self.assertNotIn("source_path", index.text)
         self.assertNotIn("metadata_json", index.text)
         self.assertNotIn(str(source), index.text)

@@ -291,7 +291,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.2
+  epub-browser:2.3.3
 ```
 
 修改端口绑定或代理规则之前，请先访问 `http://127.0.0.1:8080/setup` 完成首次设置。
@@ -317,7 +317,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.2
+  epub-browser:2.3.3
 ```
 
 首次成功启动后，可移除这次性密钥挂载。只有所有 EPUB 已经包含有效且匹配的 embedded ID 时，书库才可以只读挂载。把同一 ID 嵌入 EPUB 时，既有 sidecar 会保留。

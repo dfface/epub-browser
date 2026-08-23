@@ -32,6 +32,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "adminBookSearch",
             "adminBookVisibilityFilter",
             "adminBookTagFilter",
+            "adminBookSort",
             "adminBookPageSize",
             "adminBookRefresh",
             "adminBookList",
@@ -65,7 +66,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             server_html,
             r'<section\b[^>]*aria-labelledby=(?:["\'])?adminSectionBooksTab',
         )
-        for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'pageSize', 'refresh'):
+        for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'sortLabel', 'pageSize', 'refresh'):
             self.assertIn('data-i18n=admin.books.' + key, server_html)
         self.assertIn('data-i18n-placeholder=admin.books.searchPlaceholder', server_html)
         self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
@@ -83,7 +84,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertRegex(server_html, r'<option\b[^>]*value=(?:["\'])?' + value + r'(?:["\' >])')
         self.assertRegex(server_html, r'<option\b(?=[^>]*value=(?:["\'])?20)(?=[^>]*selected)')
         for control_id in (
-            'adminBookSearch', 'adminBookVisibilityFilter', 'adminBookTagFilter',
+            'adminBookSearch', 'adminBookVisibilityFilter', 'adminBookTagFilter', 'adminBookSort',
             'adminBookPageSize', 'adminBookRefresh', 'adminBookList',
             'adminBookLegacyList', 'adminBookPagination', 'adminBookLive',
         ):
@@ -1120,7 +1121,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('closeEventSources();', canvas_script)
         self.assertIn('if (!isCurrentContext(context, contextVersion)) return null;', canvas_script)
         self.assertIn('if (!isCurrentContext(context, contextVersion)) return;', canvas_script)
-        self.assertIn("document.querySelector('#eb-content')", canvas_script)
+        context_guard = canvas_script[
+            canvas_script.index('function isCurrentContext('):canvas_script.index(
+                '\n  function clearChapter(', canvas_script.index('function isCurrentContext(')
+            )
+        ]
+        self.assertIn('var article = currentArticleFor(context);', context_guard)
+        self.assertNotIn("document.querySelector('#eb-content')", context_guard)
         self.assertRegex(
             canvas_script,
             r'function generate\(button, context, contextVersion\) \{\s*'
@@ -1409,7 +1416,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             processor.chapters = [{"title": "One"}]
             server_chapter_html = processor.create_chapter_template("<p>Text</p>", "", 0, "One")
         self.assertIn('id="mobileAIReadingBtn"', server_chapter_html)
-        self.assertIn('data-ai-learning-canvas', server_chapter_html)
+        mobile_ai_start = server_chapter_html.index('id="mobileAIReadingBtn"')
+        mobile_ai_end = server_chapter_html.index('</button>', mobile_ai_start)
+        mobile_ai_button = server_chapter_html[mobile_ai_start:mobile_ai_end]
+        self.assertIn('data-ai-reading-hub', mobile_ai_button)
+        self.assertIn('aria-haspopup="dialog"', mobile_ai_button)
+        self.assertNotIn('data-ai-learning-canvas', mobile_ai_button)
         self.assertNotIn('id="mobileThemeBtn"', chapter_html)
 
     def test_theme_picker_stays_anchored_to_the_top_right_action_on_mobile(self):

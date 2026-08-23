@@ -732,7 +732,7 @@ body.auth-page {
 }
 
 .admin-books-controls {
-    grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(10rem, 1fr)) minmax(7.5rem, .65fr) auto auto;
+    grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(10rem, 1fr)) minmax(9rem, .8fr) minmax(7.5rem, .65fr) auto auto;
     align-items: end;
     gap: 12px;
     margin-top: 0;
@@ -823,7 +823,8 @@ body.auth-page {
 }
 
 .admin-books-table-scroll {
-    max-height: min(48vh, 32rem);
+    min-height: min(34vh, 30rem);
+    max-height: min(64vh, 46rem);
 }
 
 .admin-books-table-scroll .account-admin-table {
@@ -1072,14 +1073,29 @@ body.auth-page {
     text-align: end !important;
 }
 
-.admin-ai-job-progress {
+.admin-ai-jobs-table {
+    min-width: 82rem;
+}
+
+.admin-ai-jobs-table th:nth-child(1) { width: 7rem; }
+.admin-ai-jobs-table th:nth-child(2) { width: 10rem; }
+.admin-ai-jobs-table th:nth-child(3) { width: 18%; }
+.admin-ai-jobs-table th:nth-child(4) { width: 8rem; }
+.admin-ai-jobs-table th:nth-child(5) { width: 11rem; }
+.admin-ai-jobs-table th:nth-child(6) { width: 9rem; }
+.admin-ai-jobs-table th:nth-child(7) { width: 13rem; }
+.admin-ai-jobs-table th:nth-child(8),
+.admin-ai-jobs-table th:nth-child(9) { width: 10rem; }
+.admin-ai-jobs-table th:nth-child(10) { width: 5rem; }
+
+.admin-ai-job-progress-content {
     display: grid;
     justify-items: end;
     gap: 4px;
     min-width: 8rem;
 }
 
-.admin-ai-job-progress progress {
+.admin-ai-job-progress-content progress {
     width: 7.5rem;
     height: 8px;
     accent-color: var(--account-primary);

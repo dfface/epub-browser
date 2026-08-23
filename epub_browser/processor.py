@@ -2220,12 +2220,12 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         mobile_ai_reading_button = (
             '<button class="control-btn" id="mobileAIReadingBtn" type="button" '
-            'data-ai-learning-canvas aria-pressed="false" '
-            f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}" '
-            'aria-label="AI reading" title="AI reading" '
-            'data-i18n-aria-label="ai.chapterRead" data-i18n-title="ai.chapterRead">'
+            'data-ai-reading-hub aria-haspopup="dialog" '
+            f'data-book-id="{book_id_attribute}" '
+            'aria-label="AI readings" title="AI readings" '
+            'data-i18n-aria-label="ai.library" data-i18n-title="ai.library">'
             '<i class="fas fa-wand-magic-sparkles"></i>'
-            '<span data-i18n="ai.chapterRead">AI reading</span></button>'
+            '<span data-i18n="ai.library">AI readings</span></button>'
             if self.deployment_mode == "server" else ""
         )
         ai_chapter_scripts = """

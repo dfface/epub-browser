@@ -4,7 +4,7 @@ services:
   epub-browser:
     build:
       context: .
-    image: epub-browser:2.3.2
+    image: epub-browser:2.3.3
     restart: unless-stopped
     # Keep the command explicit so deployment-specific Server flags can be
     # added here without replacing Dockerfile defaults implicitly.

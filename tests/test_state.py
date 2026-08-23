@@ -564,6 +564,7 @@ class StateStoreTests(unittest.TestCase):
                 "ai_profile": "technical",
                 "ai_tags": [{"id": tag["id"], "name": "Computer Science"}],
                 "ai_result_count": 3,
+                "created_at": book.created_at,
                 "updated_at": book.updated_at,
             },
         )

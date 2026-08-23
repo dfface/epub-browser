@@ -231,6 +231,7 @@ function adminBook(overrides = {}) {
     ai_profile: 'auto',
     ai_tags: [],
     ai_result_count: 0,
+    created_at: '2026-08-22T08:00:00Z',
     updated_at: '2026-08-23T08:00:00Z',
   }, overrides);
 }
@@ -246,6 +247,7 @@ function bookUiHarness(fetchImpl) {
     adminBookSearch: fakeElement('input'),
     adminBookVisibilityFilter: fakeElement('select'),
     adminBookTagFilter: fakeElement('select'),
+    adminBookSort: fakeElement('select'),
     adminBookPageSize: fakeElement('select'),
     adminBookRefresh: fakeElement('button'),
     adminBookSelectPage: fakeElement('input'),
@@ -262,6 +264,7 @@ function bookUiHarness(fetchImpl) {
   };
   elements.adminBookTableSurface.hidden = true;
   elements.adminBookBulkActions.hidden = true;
+  elements.adminBookSort.value = 'title_asc';
   elements.adminBookPageSize.value = '20';
   const root = rootWithFetch(fetchImpl);
   root.document = {
@@ -353,12 +356,42 @@ test('book index renders only the current page and resets pagination for control
   assert.deepEqual(calls, ['/api/admin/books/index']);
 });
 
+test('book index sorts by title, added time, and recent updates without reloading', async () => {
+  const books = [
+    adminBook({ id: 'beta', title: 'Beta', created_at: '2026-08-01T08:00:00Z', updated_at: '2026-08-12T08:00:00Z' }),
+    adminBook({ id: 'alpha', title: 'Alpha', created_at: '2026-08-03T08:00:00Z', updated_at: '2026-08-10T08:00:00Z' }),
+    adminBook({ id: 'gamma', title: 'Gamma', created_at: '2026-08-02T08:00:00Z', updated_at: '2026-08-13T08:00:00Z' }),
+  ];
+  const calls = [];
+  const { root, elements } = bookUiHarness(url => {
+    calls.push(url);
+    return Promise.resolve(response(url === '/api/admin/books/index' ? 200 : 404, { books }));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Alpha', 'Beta', 'Gamma']);
+  elements.adminBookSort.value = 'title_desc';
+  elements.adminBookSort.listeners.change();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Gamma', 'Beta', 'Alpha']);
+  elements.adminBookSort.value = 'created_desc';
+  elements.adminBookSort.listeners.change();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Alpha', 'Gamma', 'Beta']);
+  elements.adminBookSort.value = 'updated_desc';
+  elements.adminBookSort.listeners.change();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Gamma', 'Beta', 'Alpha']);
+  assert.deepEqual(calls, ['/api/admin/books/index']);
+});
+
 test('book bulk actions retain a page selection and add member grants without replacing access', async () => {
   const books = [
     adminBook({ id: 'bulk-1', title: 'First bulk book' }),
     adminBook({ id: 'bulk-2', title: 'Second bulk book' }),
   ];
   const requests = [];
+  const confirmations = [];
   const { root, elements } = bookUiHarness((url, options) => {
     if (url === '/api/admin/users') return Promise.resolve(response(200, {
       users: [{ id: 'member-1', username: 'Reader', role: 'member', enabled: true }],
@@ -375,6 +408,12 @@ test('book bulk actions retain a page selection and add member grants without re
     }
     return Promise.resolve(response(404, {}));
   });
+  root.EpubDialog = {
+    confirm(options) {
+      confirmations.push(options);
+      return Promise.resolve(true);
+    },
+  };
   const auth = AuthModule.create(root);
   auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
   await auth.init();
@@ -390,6 +429,12 @@ test('book bulk actions retain a page selection and add member grants without re
   elements.adminBookBulkRestrict.click();
   await tick();
   await tick();
+  assert.deepEqual(confirmations[0], {
+    title: '[admin.books.bulk.restrict]',
+    message: '[admin.books.bulk.restrictConfirm]',
+    confirmText: '[admin.books.bulk.restrict]',
+    destructive: true,
+  });
   assert.deepEqual(requests[0], {
     operation: 'restrict',
     book_ids: ['bulk-1', 'bulk-2'],
@@ -403,6 +448,12 @@ test('book bulk actions retain a page selection and add member grants without re
   elements.adminBookBulkGrant.click();
   await tick();
   await tick();
+  assert.deepEqual(confirmations[1], {
+    title: '[admin.books.bulk.grant]',
+    message: '[admin.books.bulk.grantConfirm]',
+    confirmText: '[admin.books.bulk.grant]',
+    destructive: false,
+  });
   assert.deepEqual(requests[1], {
     operation: 'grant',
     book_ids: ['bulk-1', 'bulk-2'],
@@ -1423,6 +1474,10 @@ test('administrator AI job renderer uses safe DOM, progress, timestamps, and err
   assert.doesNotMatch(harness.elements.adminAiJobsBody.textContent, /private\/provider/);
   const progress = rendered.filter(node => node.tagName === 'PROGRESS');
   assert.equal(progress.length, 2);
+  assert.equal(
+    rendered.filter(node => node.className === 'admin-ai-job-progress-content').length,
+    2,
+  );
   assert.equal(progress[0].max, 10);
   assert.equal(progress[0].value, 3);
   assert.equal(progress[0].attributes['aria-label'], 'Progress 3/10');

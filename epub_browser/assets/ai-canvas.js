@@ -43,7 +43,7 @@
     state.eventSources = [];
   }
   function isCurrentContext(context, contextVersion) {
-    var article = document.querySelector('#eb-content');
+    var article = currentArticleFor(context);
     return contextVersion === state.contextVersion && article === context.article &&
       Number(article && article.getAttribute('data-chapter-index')) === context.chapterIndex;
   }

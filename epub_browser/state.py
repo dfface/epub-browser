@@ -2965,6 +2965,7 @@ class StateStore:
                 for tag in tags
             ],
             "ai_result_count": int(result_count),
+            "created_at": book_row["created_at"],
             "updated_at": book_row["updated_at"],
         }
 
@@ -2973,7 +2974,7 @@ class StateStore:
         with self._connection() as connection:
             books = connection.execute(
                 """
-                SELECT book_id, metadata_json, visibility, updated_at
+                SELECT book_id, metadata_json, visibility, created_at, updated_at
                 FROM books
                 WHERE active = 1
                 ORDER BY book_id
@@ -3043,7 +3044,7 @@ class StateStore:
     def _active_admin_book_row(connection, book_id: str):
         row = connection.execute(
             """
-            SELECT book_id, metadata_json, visibility, updated_at
+            SELECT book_id, metadata_json, visibility, created_at, updated_at
             FROM books
             WHERE book_id = ? AND active = 1
             """,
@@ -3125,6 +3126,7 @@ class StateStore:
             "ai_profile": detail["ai_profile"],
             "ai_tags": [dict(tag) for tag in detail["ai_tags"]],
             "ai_result_count": detail["ai_result_count"],
+            "created_at": detail["created_at"],
             "updated_at": detail["updated_at"],
         }
 

@@ -19,6 +19,7 @@
       query: '',
       visibility: '',
       tagId: '',
+      sort: 'title_asc',
       page: 1,
       pageSize: 20,
       requestGeneration: 0,
@@ -281,6 +282,27 @@
       return root.confirm(t(key, params));
     }
 
+    function confirmAdminBookBulkOperation(operation, params) {
+      var actionKey = operation === 'restrict'
+        ? 'admin.books.bulk.restrict'
+        : 'admin.books.bulk.grant';
+      var messageKey = operation === 'restrict'
+        ? 'admin.books.bulk.restrictConfirm'
+        : 'admin.books.bulk.grantConfirm';
+      var options = {
+        title: t(actionKey),
+        message: t(messageKey, params),
+        confirmText: t(actionKey),
+        destructive: operation === 'restrict'
+      };
+      if (root.EpubDialog && typeof root.EpubDialog.confirm === 'function') {
+        return Promise.resolve(root.EpubDialog.confirm(options));
+      }
+      return Promise.resolve(
+        typeof root.confirm !== 'function' || root.confirm(options.message)
+      );
+    }
+
     function runButtonOperation(button, pendingKey, operation) {
       if (!button) return Promise.resolve().then(operation);
       if (button.disabled) return Promise.resolve(null);
@@ -502,8 +524,10 @@
       var total = Math.max(1, safeNonNegativeInteger(job.progress_total, 1));
       var current = Math.min(total, safeNonNegativeInteger(job.progress_current, 0));
       var label = t('admin.ai.jobs.progress', { current: current, total: total });
+      var wrapper = root.document.createElement('div');
       var progress = root.document.createElement('progress');
       var text = root.document.createElement('span');
+      wrapper.className = 'admin-ai-job-progress-content';
       progress.max = total;
       progress.value = current;
       progress.setAttribute('max', String(total));
@@ -515,8 +539,9 @@
       progress.textContent = label;
       text.className = 'admin-ai-job-progress-text';
       text.textContent = label;
-      cell.appendChild(progress);
-      cell.appendChild(text);
+      wrapper.appendChild(progress);
+      wrapper.appendChild(text);
+      cell.appendChild(wrapper);
     }
 
     function renderAdminAiJobs() {
@@ -1436,6 +1461,13 @@
       var title = String(left.book.title || '').localeCompare(
         String(right.book.title || ''), locale, { sensitivity: 'base' }
       );
+      if (adminBooksState.sort === 'title_desc' && title) return -title;
+      if (adminBooksState.sort === 'created_desc' || adminBooksState.sort === 'updated_desc') {
+        var timestampKey = adminBooksState.sort === 'created_desc' ? 'created_at' : 'updated_at';
+        var leftTime = Date.parse(String(left.book[timestampKey] || '')) || 0;
+        var rightTime = Date.parse(String(right.book[timestampKey] || '')) || 0;
+        if (leftTime !== rightTime) return rightTime - leftTime;
+      }
       if (title) return title;
       return String(left.book.id || '').localeCompare(String(right.book.id || ''), locale, {
         sensitivity: 'base'
@@ -2220,6 +2252,7 @@
       var bookSearch = element('adminBookSearch');
       var bookVisibilityFilter = element('adminBookVisibilityFilter');
       var bookTagFilter = element('adminBookTagFilter');
+      var bookSort = element('adminBookSort');
       var bookPageSize = element('adminBookPageSize');
       var bookClearFilters = element('adminBookClearFilters');
       var bookRefresh = element('adminBookRefresh');
@@ -2383,6 +2416,14 @@
         adminBooksState.page = 1;
         renderAdminBooks();
       });
+      if (bookSort) bookSort.addEventListener('change', function() {
+        var sort = String(bookSort.value || 'title_asc');
+        adminBooksState.sort = ['title_asc', 'title_desc', 'created_desc', 'updated_desc']
+          .indexOf(sort) !== -1 ? sort : 'title_asc';
+        bookSort.value = adminBooksState.sort;
+        adminBooksState.page = 1;
+        renderAdminBooks();
+      });
       if (bookPageSize) bookPageSize.addEventListener('change', function() {
         var selectedBookPageSize = Number(bookPageSize.value);
         adminBooksState.pageSize = [10, 20, 50, 100].indexOf(selectedBookPageSize) !== -1
@@ -2420,9 +2461,12 @@
       });
       if (bookBulkRestrict) bookBulkRestrict.addEventListener('click', function() {
         var count = selectedAdminBookIds().length;
-        if (!count || !confirmAdminAction('admin.books.bulk.restrictConfirm', { count: count })) return;
-        runButtonOperation(bookBulkRestrict, 'admin.books.bulk.restricting', function() {
-          return runAdminBookBulkOperation('restrict');
+        if (!count || adminBooksState.bulkBusy) return;
+        confirmAdminBookBulkOperation('restrict', { count: count }).then(function(confirmed) {
+          if (!confirmed || adminBooksState.bulkBusy) return null;
+          return runButtonOperation(bookBulkRestrict, 'admin.books.bulk.restricting', function() {
+            return runAdminBookBulkOperation('restrict');
+          });
         });
       });
       if (bookBulkGrant) bookBulkGrant.addEventListener('click', function() {
@@ -2432,12 +2476,15 @@
         var memberNames = users.filter(function(user) {
           return userIds.indexOf(user.id) !== -1;
         }).map(function(user) { return user.username; }).join(', ');
-        if (!confirmAdminAction('admin.books.bulk.grantConfirm', {
+        if (adminBooksState.bulkBusy) return;
+        confirmAdminBookBulkOperation('grant', {
           count: bookIds.length,
           members: memberNames
-        })) return;
-        runButtonOperation(bookBulkGrant, 'admin.books.bulk.granting', function() {
-          return runAdminBookBulkOperation('grant', userIds);
+        }).then(function(confirmed) {
+          if (!confirmed || adminBooksState.bulkBusy) return null;
+          return runButtonOperation(bookBulkGrant, 'admin.books.bulk.granting', function() {
+            return runAdminBookBulkOperation('grant', userIds);
+          });
         });
       });
       if (root.document && typeof root.document.addEventListener === 'function') {
