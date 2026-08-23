@@ -170,7 +170,7 @@ mount shown in the main README Docker example.
 The container command uses `epub-browser server --watch`, listens on `0.0.0.0`
 inside the container, and retains authoritative data only through the mounted
 `/app/EpubBrowserFiles` volume. Bind the host port to `127.0.0.1` unless a TLS
-reverse proxy is intended. To record real client IPs, trust only the direct
-proxy network with `--trusted-proxy-cidr`. A public client network is never an
-appropriate trusted-proxy CIDR. Enable `--cookie-secure` when the browser
-connects through HTTPS.
+reverse proxy is intended. To record real client IPs, trust only direct proxy
+networks with repeatable `--trusted-proxy-cidr` options. A public client network
+is never an appropriate trusted-proxy CIDR. Enable `--cookie-secure` when the
+browser connects through HTTPS.

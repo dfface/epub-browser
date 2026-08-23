@@ -19,10 +19,11 @@ services:
       - --host=0.0.0.0
       - --port=80
       - --no-browser
-    # To record real client IPs from X-Forwarded-For, append only this line.
-    # The CIDR must be the direct peer address seen by EPUB Browser (for
-    # example 172.32.11.1/32), never a public client network.
+    # To record real client IPs from X-Forwarded-For, append one line for each
+    # direct peer address or proxy network seen by EPUB Browser. Never trust a
+    # public client network.
     #   - --trusted-proxy-cidr=172.32.11.1/32
+    #   - --trusted-proxy-cidr=10.42.0.0/16
     # When visitors reach the service through HTTPS, also append
     # --cookie-secure so browser sessions are never sent over HTTP.
     ports:

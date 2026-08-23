@@ -283,12 +283,13 @@ epub-browser server /path/to/books \
   --server-dir /path/to/state \
   --watch \
   --host 0.0.0.0 \
-  --trusted-proxy-cidr 172.16.0.0/12 \
+  --trusted-proxy-cidr 172.32.11.1/32 \
+  --trusted-proxy-cidr 10.42.0.0/16 \
   --cookie-secure \
   --no-browser
 ```
 
-Only requests whose direct peer belongs to this CIDR can supply `X-Forwarded-For`; all other peers record only their direct address. Uvicorn forwarded-address processing is disabled, so `Forwarded` and `FORWARDED_ALLOW_IPS` cannot expand this trust boundary. Use `--cookie-secure` only when the browser reaches the service through HTTPS.
+Repeat `--trusted-proxy-cidr` once for each direct proxy address or network. Only requests whose direct peer belongs to one of these CIDRs can supply `X-Forwarded-For`; all other peers record only their direct address. Uvicorn forwarded-address processing is disabled, so `Forwarded` and `FORWARDED_ALLOW_IPS` cannot expand this trust boundary. Use `--cookie-secure` only when the browser reaches the service through HTTPS.
 
 ## Docker
 

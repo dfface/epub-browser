@@ -264,12 +264,13 @@ epub-browser server /path/to/books \
   --server-dir /path/to/state \
   --watch \
   --host 0.0.0.0 \
-  --trusted-proxy-cidr 172.16.0.0/12 \
+  --trusted-proxy-cidr 172.32.11.1/32 \
+  --trusted-proxy-cidr 10.42.0.0/16 \
   --cookie-secure \
   --no-browser
 ```
 
-只有直连对等端属于该 CIDR 的请求才会使用 `X-Forwarded-For`；其他来源只记录直连地址。Uvicorn 的转发地址处理已禁用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能扩大该信任边界。仅当浏览器通过 HTTPS 访问服务时才使用 `--cookie-secure`。
+每个直连代理地址或网段重复传入一次 `--trusted-proxy-cidr`。只有直连对等端属于其中任一 CIDR 的请求才会使用 `X-Forwarded-For`；其他来源只记录直连地址。Uvicorn 的转发地址处理已禁用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能扩大该信任边界。仅当浏览器通过 HTTPS 访问服务时才使用 `--cookie-secure`。
 
 ## Docker
 
