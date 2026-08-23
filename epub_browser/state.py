@@ -1187,6 +1187,15 @@ class StateStore:
         return table, bool(index_row[2]), bool(index_row[4]), columns, predicate
 
     @staticmethod
+    def _index_key_collations(connection, index_name: str):
+        quoted_index = StateStore._quote_identifier(index_name)
+        return tuple(
+            str(listed[4]).upper()
+            for listed in connection.execute(f"PRAGMA index_xinfo({quoted_index})")
+            if listed[5]
+        )
+
+    @staticmethod
     def _create_v11_indexes(connection) -> None:
         existing_indexes = {
             row[0]
@@ -1221,7 +1230,12 @@ class StateStore:
                 StateStore._normalize_index_predicate(predicate),
             )
             actual = StateStore._index_contract(connection, name)
-            if actual == expected:
+            expected_collations = ("BINARY",) * len(columns)
+            if (
+                actual == expected
+                and StateStore._index_key_collations(connection, name)
+                == expected_collations
+            ):
                 continue
             if actual is not None:
                 connection.execute(
@@ -1240,7 +1254,11 @@ class StateStore:
             if predicate is not None:
                 statement += f" WHERE {predicate}"
             connection.execute(statement)
-            if StateStore._index_contract(connection, name) != expected:
+            if (
+                StateStore._index_contract(connection, name) != expected
+                or StateStore._index_key_collations(connection, name)
+                != expected_collations
+            ):
                 raise sqlite3.IntegrityError(
                     f"schema v11 index contract mismatch: {name}"
                 )

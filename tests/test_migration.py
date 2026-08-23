@@ -361,6 +361,35 @@ class MigrationManagerTests(unittest.TestCase):
         )
         self.assertEqual(leftovers, ())
 
+    def test_read_only_legacy_database_stages_owner_writable_copy(self):
+        source = self.server_dir / "epub-browser.db"
+        self._create_legacy_database(source)
+        source_bytes = source.read_bytes()
+        source.chmod(0o400)
+        manager = self._manager()
+        initialize_database = manager._initialize_database
+        staging_modes = []
+
+        def inspect_staging(path):
+            staging_modes.append(stat.S_IMODE(path.stat().st_mode))
+            initialize_database(path)
+
+        try:
+            with mock.patch.object(
+                manager,
+                "_initialize_database",
+                side_effect=inspect_staging,
+            ):
+                result = manager.prepare_data()
+
+            self.assertEqual(staging_modes, [0o600])
+            self.assertEqual(source.read_bytes(), source_bytes)
+            self.assertEqual(stat.S_IMODE(source.stat().st_mode), 0o400)
+            self.assertEqual(stat.S_IMODE(result.backup_path.stat().st_mode), 0o400)
+            self.assertEqual(stat.S_IMODE(result.database_path.stat().st_mode), 0o600)
+        finally:
+            source.chmod(0o600)
+
     def test_restrictive_authoritative_database_backup_stays_private(self):
         database = self.server_dir / "data" / "epub-browser.db"
         StateStore(database).initialize(bootstrap=self.bootstrap)

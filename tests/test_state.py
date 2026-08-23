@@ -1221,6 +1221,27 @@ class StateStoreTests(unittest.TestCase):
                     (self.owner.user_id,),
                 )
 
+    def test_v11_restart_repairs_index_with_wrong_key_collation(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("DROP INDEX idx_ai_jobs_active_cache")
+            connection.execute(
+                "CREATE UNIQUE INDEX idx_ai_jobs_active_cache "
+                "ON ai_reading_jobs(cache_key COLLATE NOCASE) "
+                "WHERE status IN ('queued','running')"
+            )
+
+        StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            collations = tuple(
+                row[4]
+                for row in connection.execute(
+                    "PRAGMA index_xinfo('idx_ai_jobs_active_cache')"
+                )
+                if row[5]
+            )
+        self.assertEqual(collations, ("BINARY",))
+
     def test_v11_restart_fails_closed_if_colliding_index_hides_duplicates(self):
         with sqlite3.connect(self.database) as connection:
             connection.execute("DROP INDEX idx_ai_jobs_active_cache")

@@ -167,6 +167,8 @@ class MigrationManager:
         )
         try:
             self._backup_sqlite_atomic(backup_path, temporary_database)
+            staged_mode = stat.S_IMODE(temporary_database.stat().st_mode)
+            os.chmod(temporary_database, staged_mode | stat.S_IWUSR)
             self._initialize_database(temporary_database)
             self._check_integrity(temporary_database)
             os.replace(temporary_database, self.database_path)
