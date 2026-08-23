@@ -34,7 +34,7 @@ from .version import render_footer
 SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 # Bump whenever the EPUB-derived server cache schema or chapter semantics change.
 # Server reader chrome and assets are deliberately outside this revision.
-SERVER_OUTPUT_REVISION = "server-content-v7"
+SERVER_OUTPUT_REVISION = "server-content-v8"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpe", "jfif", "jpeg",
@@ -966,6 +966,98 @@ class EPUBProcessor:
                 return ncx_path
         
         return None
+
+    def find_nav_file(self, manifest):
+        """Return the EPUB 3 navigation document declared in the manifest."""
+        for item in manifest.values():
+            properties = item.get('properties', '').split()
+            if 'nav' not in properties:
+                continue
+            nav_path = item.get('full_path')
+            if nav_path and self._internal_file(nav_path).is_file():
+                return nav_path
+        return None
+
+    def parse_nav(self, nav_path):
+        """Parse the EPUB 3 navigation document's ``toc`` nav element."""
+        nav_full_path = self._internal_file(nav_path)
+        if not nav_full_path.is_file():
+            self.reporter.detail(f"EPUB navigation document not found: {nav_full_path}")
+            return []
+
+        try:
+            root = ET.parse(nav_full_path).getroot()
+            epub_type = '{http://www.idpf.org/2007/ops}type'
+
+            def local_name(element):
+                return element.tag.rsplit('}', 1)[-1]
+
+            toc_nav = next(
+                (
+                    element for element in root.iter()
+                    if local_name(element) == 'nav'
+                    and 'toc' in element.get(epub_type, element.get('type', '')).split()
+                ),
+                None,
+            )
+            if toc_nav is None:
+                return []
+
+            def direct_child(element, name):
+                return next(
+                    (child for child in element if local_name(child) == name), None
+                )
+
+            def item_label(item):
+                for child in item:
+                    if local_name(child) in {'a', 'span'}:
+                        label = ' '.join(''.join(child.itertext()).split())
+                        if label:
+                            return html.unescape(label), child
+                label = ' '.join((item.text or '').split())
+                return html.unescape(label), None
+
+            toc = []
+            nav_dir = posixpath.dirname(nav_path)
+
+            def process_list(list_element, level=0):
+                for item in list_element:
+                    if local_name(item) != 'li':
+                        continue
+                    title, link = item_label(item)
+                    child_list = direct_child(item, 'ol')
+                    if title:
+                        toc_item = {'title': title, 'level': level}
+                        href = link.get('href') if link is not None else None
+                        if href:
+                            source, anchor = urllib.parse.urldefrag(href)
+                            if source:
+                                full_src = self._resolve_internal_path(source, nav_dir)
+                                toc_item.update({
+                                    'src': full_src,
+                                    'kind': 'chapter',
+                                    'old_file_name': posixpath.basename(source),
+                                })
+                                if anchor:
+                                    toc_item['anchor'] = anchor
+                            elif child_list is not None:
+                                toc_item['kind'] = 'section'
+                        elif child_list is not None:
+                            toc_item['kind'] = 'section'
+                        if toc_item.get('kind') or toc_item.get('src'):
+                            toc.append(toc_item)
+                    if child_list is not None:
+                        process_list(child_list, level + 1)
+
+            list_element = direct_child(toc_nav, 'ol')
+            if list_element is not None:
+                process_list(list_element)
+            return toc
+        except ValueError:
+            raise
+        except Exception as error:
+            self.reporter.detail(f"Failed to parse EPUB navigation document: {error}")
+            return []
     
     def parse_ncx(self, ncx_path):
         """解析NCX文件获取目录结构"""
@@ -1128,14 +1220,19 @@ class EPUBProcessor:
                 manifest[item_id] = {
                     'href': href,
                     'media_type': media_type,
-                    'full_path': full_path
+                    'full_path': full_path,
+                    'properties': item.get('properties', ''),
                 }
             
-            # 查找并解析NCX文件
-            ncx_path = self.find_ncx_file(opf_path, manifest)
-            if ncx_path:
-                self.toc = self.parse_ncx(ncx_path)
-                # print(f"Found {len(self.toc)} table of contents items from NCX file")
+            # EPUB 3 navigation documents are authoritative; NCX remains the
+            # EPUB 2 and backward-compatibility fallback.
+            nav_path = self.find_nav_file(manifest)
+            if nav_path:
+                self.toc = self.parse_nav(nav_path)
+            if not self.toc:
+                ncx_path = self.find_ncx_file(opf_path, manifest)
+                if ncx_path:
+                    self.toc = self.parse_ncx(ncx_path)
             
             # 获取spine（阅读顺序）
             spine = root.find('.//opf:spine', ns)
@@ -1202,7 +1299,9 @@ class EPUBProcessor:
             return matches[0]['title'] if matches else None
 
         # 先尝试精确匹配
-        matching = [item for item in self.toc if item['src'] == chapter_path]
+        matching = [
+            item for item in self.toc if item.get('src') == chapter_path
+        ]
         title = title_from_matches(matching)
         if title:
             return title
@@ -1211,7 +1310,8 @@ class EPUBProcessor:
         chapter_filename = posixpath.basename(chapter_path)
         matching = [
             item for item in self.toc
-            if posixpath.basename(item['src']) == chapter_filename
+            if item.get('src')
+            and posixpath.basename(item['src']) == chapter_filename
         ]
         title = title_from_matches(matching)
         if title:
@@ -1221,7 +1321,8 @@ class EPUBProcessor:
         normalized_chapter_path = posixpath.normpath(chapter_path)
         matching = [
             item for item in self.toc
-            if posixpath.normpath(item['src']) == normalized_chapter_path
+            if item.get('src')
+            and posixpath.normpath(item['src']) == normalized_chapter_path
         ]
         title = title_from_matches(matching)
         if title:
@@ -1524,8 +1625,8 @@ class EPUBProcessor:
         <ul class="chapter-list">
 """
         
-        # OPF spine owns public chapter indexes.  NCX only contributes titles,
-        # anchors and non-navigable grouping nodes to that sequence.
+        # OPF spine owns public chapter indexes.  EPUB navigation only
+        # contributes titles, anchors and non-navigable grouping nodes.
         for toc_item in self._build_toc_data():
             level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
             toc_title = (
@@ -1770,6 +1871,13 @@ document.addEventListener('DOMContentLoaded', function() {{
             
             # 根据toc生成目录
             for order, toc_item in enumerate(self.toc):
+                if toc_item.get('kind') == 'section' and not toc_item.get('src'):
+                    toc_data.append({
+                        'title': toc_item['title'],
+                        'level': toc_item.get('level', 0),
+                        'kind': 'section',
+                    })
+                    continue
                 toc_src = toc_item['src']
                 target_index = self._find_chapter_index(
                     toc_src, chapter_index_map, chapter_filename_map

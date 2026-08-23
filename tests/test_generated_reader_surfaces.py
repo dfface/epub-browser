@@ -337,6 +337,81 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 ],
             )
 
+    def test_epub3_navigation_document_is_preferred_over_ncx(self):
+        """An EPUB 3 nav document supplies the authoritative hierarchical TOC."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "epub3-nav.epub"
+            container = """<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>
+"""
+            package = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>EPUB 3 navigation</dc:title></metadata>
+  <manifest>
+    <item id="nav" href="navigation.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="article" href="text/article.xhtml" media-type="application/xhtml+xml"/>
+    <item id="next" href="text/next.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="article"/><itemref idref="next"/></spine>
+</package>
+"""
+            ncx = """<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <navMap><navPoint id="legacy"><navLabel><text>Legacy title</text></navLabel><content src="text/article.xhtml"/></navPoint></navMap>
+</ncx>
+"""
+            navigation = """<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body>
+    <nav epub:type="landmarks"><ol><li><a href="cover.xhtml">Cover</a></li></ol></nav>
+    <nav epub:type="toc">
+      <ol>
+        <li><span>Part I</span><ol><li><a href="text/article.xhtml#start">Opening</a></li></ol></li>
+        <li><a href="text/next.xhtml">Next article</a></li>
+      </ol>
+    </nav>
+  </body>
+</html>
+"""
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("mimetype", "application/epub+zip")
+                archive.writestr("META-INF/container.xml", container)
+                archive.writestr("OEBPS/content.opf", package)
+                archive.writestr("OEBPS/navigation.xhtml", navigation)
+                archive.writestr("OEBPS/toc.ncx", ncx)
+                archive.writestr("OEBPS/text/article.xhtml", "<html><body>Article</body></html>")
+                archive.writestr("OEBPS/text/next.xhtml", "<html><body>Next</body></html>")
+
+            processor = EPUBProcessor(str(source), str(root / "staging"))
+            processor.extract_epub()
+            self.assertTrue(processor.parse_opf("OEBPS/content.opf"))
+
+            self.assertEqual(
+                [(chapter["title"], chapter["path"]) for chapter in processor.chapters],
+                [
+                    ("Opening", "OEBPS/text/article.xhtml"),
+                    ("Next article", "OEBPS/text/next.xhtml"),
+                ],
+            )
+            self.assertEqual(
+                processor._build_toc_data(),
+                [
+                    {"title": "Part I", "level": 0, "kind": "section"},
+                    {
+                        "title": "Opening", "level": 1, "kind": "chapter",
+                        "chapter_index": 0, "chapter_file": "chapter_0.html", "anchor": "start",
+                    },
+                    {
+                        "title": "Next article", "level": 0, "kind": "chapter",
+                        "chapter_index": 1, "chapter_file": "chapter_1.html",
+                    },
+                ],
+            )
+
     def test_real_section_index_page_keeps_its_own_opf_chapter_index(self):
         """A spine page must not vanish because NCX repeats its first child."""
         with tempfile.TemporaryDirectory() as directory:
