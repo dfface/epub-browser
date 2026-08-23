@@ -1678,6 +1678,115 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(hidden_failure.json()["code"], "invalid_book_settings")
         self.assertNotIn("PRIVATE_RESTRICTED_ENTITY_SENTINEL", hidden_failure.text)
 
+    def test_admin_can_bulk_restrict_and_add_member_grants(self):
+        first = self.store.resolve_book(
+            Path(self.directory.name) / "bulk-first.epub",
+            "urn:test:bulk-first",
+            "bulk-first-fingerprint",
+            {"title": "Bulk first"},
+            preferred_book_id="bulk-first",
+        )
+        second = self.store.resolve_book(
+            Path(self.directory.name) / "bulk-second.epub",
+            "urn:test:bulk-second",
+            "bulk-second-fingerprint",
+            {"title": "Bulk second"},
+            preferred_book_id="bulk-second",
+        )
+        other = self.store.resolve_book(
+            Path(self.directory.name) / "bulk-other.epub",
+            "urn:test:bulk-other",
+            "bulk-other-fingerprint",
+            {"title": "Bulk other"},
+            preferred_book_id="bulk-other",
+        )
+
+        restricted = self.admin_client.post(
+            "/api/admin/books/bulk",
+            json={"operation": "restrict", "book_ids": [first.book_id, second.book_id]},
+        )
+        granted = self.admin_client.post(
+            "/api/admin/books/bulk",
+            json={
+                "operation": "grant",
+                "book_ids": [first.book_id, second.book_id],
+                "user_ids": [self.member.user_id],
+            },
+        )
+
+        self.assertEqual(restricted.status_code, 200)
+        self.assertEqual(restricted.json(), {"operation": "restrict", "updated_count": 2})
+        self.assertEqual(granted.status_code, 200)
+        self.assertEqual(granted.json(), {"operation": "grant", "updated_count": 2})
+        self.assertEqual(self.store.get_book(first.book_id).visibility, "restricted")
+        self.assertEqual(self.store.get_book(second.book_id).visibility, "restricted")
+        self.assertEqual(self.store.book_grants(first.book_id), (self.member.user_id,))
+        self.assertEqual(self.store.book_grants(second.book_id), (self.member.user_id,))
+
+        invalid = self.admin_client.post(
+            "/api/admin/books/bulk",
+            json={"operation": "restrict", "book_ids": [other.book_id, "missing-book"]},
+        )
+        member_denied = self.member_client.post(
+            "/api/admin/books/bulk",
+            json={"operation": "restrict", "book_ids": [other.book_id]},
+        )
+
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["code"], "invalid_bulk_book_update")
+        self.assertEqual(self.store.get_book(other.book_id).visibility, "authenticated")
+        self.assertEqual(member_denied.status_code, 403)
+
+    def test_active_sessions_use_forwarded_client_ip_only_from_trusted_proxy(self):
+        proxy_config = AuthConfig.from_values(
+            ["10.0.0.0/8"],
+            "X-Remote-User",
+            "https://login.example",
+        )
+        app = create_app(
+            Path(self.directory.name),
+            state_store=self.store,
+            auth_service=AuthService(self.store, proxy_config),
+        )
+        trusted = TestClient(
+            app,
+            follow_redirects=False,
+            client=("10.1.2.3", 50000),
+            headers={"X-Forwarded-For": "198.51.100.14, 10.2.3.4"},
+        )
+        untrusted = TestClient(
+            app,
+            follow_redirects=False,
+            client=("203.0.113.9", 50000),
+            headers={"X-Forwarded-For": "198.51.100.99"},
+        )
+        self.addCleanup(trusted.close)
+        self.addCleanup(untrusted.close)
+
+        self.assertEqual(
+            _json_login(self, trusted, "admin", "admin-secret").status_code,
+            200,
+        )
+        self.assertEqual(
+            _json_login(self, untrusted, "admin", "admin-secret").status_code,
+            200,
+        )
+        trusted_token = trusted.cookies.get("epub_browser_session")
+        untrusted_token = untrusted.cookies.get("epub_browser_session")
+        trusted_session_id = self.store.session_id_from_token(
+            trusted_token, user_id=self.admin.user_id
+        )
+        untrusted_session_id = self.store.session_id_from_token(
+            untrusted_token, user_id=self.admin.user_id
+        )
+        sessions = {
+            session.session_id: session
+            for session in self.store.list_sessions(self.admin.user_id)
+        }
+
+        self.assertEqual(sessions[trusted_session_id].client_address, "198.51.100.14")
+        self.assertEqual(sessions[untrusted_session_id].client_address, "203.0.113.9")
+
     def test_admin_book_routes_preserve_encoded_slash_ids_and_specific_suffixes(self):
         book = self.store.resolve_book(
             Path(self.directory.name) / "slash-id.epub",

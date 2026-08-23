@@ -827,16 +827,17 @@ body.auth-page {
 }
 
 .admin-books-table-scroll .account-admin-table {
-    min-width: 68rem;
+    min-width: 72rem;
     font-size: .8rem;
 }
 
-.admin-books-table-scroll .account-admin-table th:nth-child(1) { width: 23%; }
-.admin-books-table-scroll .account-admin-table th:nth-child(2) { width: 20%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(1) { width: 3rem; }
+.admin-books-table-scroll .account-admin-table th:nth-child(2) { width: 23%; }
 .admin-books-table-scroll .account-admin-table th:nth-child(3) { width: 20%; }
-.admin-books-table-scroll .account-admin-table th:nth-child(4) { width: 10%; }
-.admin-books-table-scroll .account-admin-table th:nth-child(5) { width: 13%; }
-.admin-books-table-scroll .account-admin-table th:nth-child(6) { width: 1%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(4) { width: 20%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(5) { width: 10%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(6) { width: 13%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(7) { width: 1%; }
 
 .admin-books-table-scroll .account-admin-table th:last-child,
 .admin-books-table-scroll .account-admin-table td:last-child {
@@ -897,6 +898,77 @@ body.auth-page {
 .admin-book-updated,
 .admin-book-actions {
     white-space: nowrap;
+}
+
+.admin-book-select-column {
+    padding-inline: 10px !important;
+    text-align: center !important;
+}
+
+.admin-book-select-column input,
+.admin-book-row-select {
+    inline-size: 1.15rem;
+    block-size: 1.15rem;
+    accent-color: var(--account-primary);
+}
+
+.admin-book-bulk-actions {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--account-primary) 35%, var(--account-border));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--account-primary) 5%, var(--account-card));
+}
+
+.admin-book-bulk-summary,
+.admin-book-bulk-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.admin-book-bulk-summary h5,
+.admin-book-bulk-summary p {
+    margin: 0;
+}
+
+.admin-book-bulk-summary h5 {
+    font-size: .92rem;
+}
+
+.admin-book-bulk-summary p {
+    color: var(--account-muted);
+    font-size: .82rem;
+}
+
+.admin-book-bulk-summary .bookshelf-action-btn {
+    margin-inline-start: auto;
+}
+
+.admin-book-bulk-members {
+    display: grid;
+    gap: 7px;
+    min-inline-size: min(100%, 15rem);
+    padding: 8px 10px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+}
+
+.admin-book-bulk-members .account-section-copy {
+    margin: 0;
+    font-size: .75rem;
+}
+
+.admin-book-bulk-members .account-book-grant-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+}
+
+.admin-book-bulk-members .account-book-grant-option {
+    min-height: 32px;
 }
 
 .admin-book-results-count {
@@ -1550,7 +1622,7 @@ body.auth-page {
     }
 
     .admin-books-table-scroll .account-admin-table {
-        min-width: 62rem;
+        min-width: 66rem;
     }
 
     .account-admin-table {
@@ -1648,6 +1720,19 @@ body.auth-page {
 
     .account-modal .admin-book-refresh {
         width: 100%;
+    }
+
+    .admin-book-bulk-summary,
+    .admin-book-bulk-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-book-bulk-summary .bookshelf-action-btn,
+    .admin-book-bulk-controls > .bookshelf-action-btn,
+    .admin-book-bulk-members {
+        inline-size: 100%;
+        margin-inline-start: 0;
     }
 
     #adminAiJobsPagination {

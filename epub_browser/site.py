@@ -281,11 +281,19 @@ def render_library_shell(
                         <button type="button" class="bookshelf-action-btn account-inline-action admin-book-clear-filters" id="adminBookClearFilters" data-i18n="admin.books.clearFilters">Clear filters</button>
                         <button type="button" class="bookshelf-action-btn account-inline-action admin-book-refresh" id="adminBookRefresh" data-i18n="admin.books.refresh">Refresh</button>
                     </div>
+                    <section class="admin-book-bulk-actions" id="adminBookBulkActions" aria-labelledby="adminBookBulkTitle" hidden>
+                        <div class="admin-book-bulk-summary"><h5 id="adminBookBulkTitle" data-i18n="admin.books.bulk.title">Bulk actions</h5><p id="adminBookSelectionCount" aria-live="polite" aria-atomic="true"></p><button type="button" class="bookshelf-action-btn account-inline-action" id="adminBookClearSelection" data-i18n="admin.books.bulk.clearSelection">Clear selection</button></div>
+                        <div class="admin-book-bulk-controls">
+                            <button type="button" class="bookshelf-action-btn account-danger-action" id="adminBookBulkRestrict" data-i18n="admin.books.bulk.restrict">Set selected to restricted</button>
+                            <fieldset class="admin-book-bulk-members" id="adminBookBulkGrantFieldset"><legend data-i18n="admin.books.bulk.grantMembers">Grant members access</legend><p class="account-section-copy" data-i18n="admin.books.bulk.grantHelp">Adds access without removing existing grants.</p><div id="adminBookBulkMembers" class="account-book-grant-options"></div></fieldset>
+                            <button type="button" class="bookshelf-action-btn account-primary-action" id="adminBookBulkGrant" data-i18n="admin.books.bulk.grant">Grant access</button>
+                        </div>
+                    </section>
                     <div class="account-table-scroll admin-books-table-scroll">
                         <table class="account-admin-table">
                             <caption class="sr-only visually-hidden" data-i18n="admin.books.tableLabel">Books</caption>
-                            <thead><tr><th scope="col" data-i18n="admin.books.header.book">Book</th><th scope="col" data-i18n="admin.books.header.access">Visibility and access</th><th scope="col" data-i18n="admin.books.header.profile">AI profile and tags</th><th scope="col" data-i18n="admin.books.header.results">AI results</th><th scope="col" data-i18n="admin.books.header.updated">Updated</th><th scope="col" data-i18n="admin.books.header.action">Actions</th></tr></thead>
-                            <tbody id="adminBookList"><tr><td colspan="6" data-i18n="admin.books.loading">Loading books…</td></tr></tbody>
+                            <thead><tr><th scope="col" class="admin-book-select-column"><input type="checkbox" id="adminBookSelectPage" data-i18n-aria-label="admin.books.bulk.selectPage" aria-label="Select visible books"></th><th scope="col" data-i18n="admin.books.header.book">Book</th><th scope="col" data-i18n="admin.books.header.access">Visibility and access</th><th scope="col" data-i18n="admin.books.header.profile">AI profile and tags</th><th scope="col" data-i18n="admin.books.header.results">AI results</th><th scope="col" data-i18n="admin.books.header.updated">Updated</th><th scope="col" data-i18n="admin.books.header.action">Actions</th></tr></thead>
+                            <tbody id="adminBookList"><tr><td colspan="7" data-i18n="admin.books.loading">Loading books…</td></tr></tbody>
                         </table>
                     </div>
                     <nav id="adminBookPagination" aria-label="Book pages" data-i18n-aria-label="admin.books.paginationLabel"></nav>

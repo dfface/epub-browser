@@ -295,10 +295,20 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.0
+  epub-browser:2.3.1
 ```
 
 修改端口绑定或代理规则之前，请先访问 `http://127.0.0.1:8080/setup` 完成首次设置。
+
+### Docker Compose
+
+仓库提供了 [docker-compose.yml](docker-compose.yml)，供偏好 Compose 的用户使用。在仓库目录下创建 `Library/` 并放入 EPUB 后，执行：
+
+```bash
+docker compose up -d --build
+```
+
+示例只发布到 `127.0.0.1:8080`，源 EPUB 放在 `./Library`，Server 状态持久化到 `./EpubBrowserFiles`。请访问 `http://127.0.0.1:8080/setup` 完成一次性初始化。远程访问时，应保留 loopback 绑定，并在前方部署带认证的 TLS 反向代理。
 
 无人值守设置示例：
 
@@ -311,7 +321,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.0
+  epub-browser:2.3.1
 ```
 
 首次成功启动后，可移除这次性密钥挂载。只有所有 EPUB 已经包含有效且匹配的 embedded ID 时，书库才可以只读挂载。把同一 ID 嵌入 EPUB 时，既有 sidecar 会保留。

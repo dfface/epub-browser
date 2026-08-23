@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import html
+import ipaddress
 import json
 import math
 import os
@@ -701,13 +702,39 @@ def create_app(
         }
 
     def client_key(request):
-        return request.client.host if request.client is not None else 'unknown'
+        return trusted_client_address(request) or 'unknown'
+
+    def trusted_client_address(request):
+        """Use forwarded client IPs only when the direct peer is trusted.
+
+        Walk X-Forwarded-For right-to-left so a chain of configured proxies is
+        skipped and the first non-proxy address is retained as the client.
+        Malformed forwarding data is ignored in favor of the direct peer.
+        """
+        direct_address = request.client.host if request.client is not None else None
+        if (
+            not isinstance(direct_address, str)
+            or not auth_service.config.is_trusted_proxy(direct_address)
+        ):
+            return direct_address
+        forwarded = request.headers.get('x-forwarded-for')
+        if not isinstance(forwarded, str) or not forwarded.strip():
+            return direct_address
+        candidates = [part.strip() for part in forwarded.split(',')]
+        if not candidates or any(not candidate for candidate in candidates):
+            return direct_address
+        for candidate in reversed(candidates):
+            try:
+                address = str(ipaddress.ip_address(candidate.strip('[]')))
+            except ValueError:
+                return direct_address
+            if not auth_service.config.is_trusted_proxy(address):
+                return address
+        return direct_address
 
     def session_client_metadata(request):
         return {
-            'client_address': (
-                request.client.host if request.client is not None else None
-            ),
+            'client_address': trusted_client_address(request),
             'user_agent': request.headers.get('user-agent'),
         }
 
@@ -1561,6 +1588,40 @@ window.location.assign(payload.redirect||'/');
                 for book in store.list_admin_book_summaries()
             ]
         })
+
+    async def admin_bulk_books(request):
+        require_admin(request)
+        data = await bounded_unique_json_object(request)
+        if data is None or set(data) not in ({'operation', 'book_ids'}, {'operation', 'book_ids', 'user_ids'}):
+            return response(error_payload('invalid_bulk_book_update', 'Invalid bulk book update'), 400)
+        operation = data.get('operation')
+        book_ids = data.get('book_ids')
+        user_ids = data.get('user_ids')
+        if (
+            operation not in {'restrict', 'grant'}
+            or not isinstance(book_ids, list)
+            or not book_ids
+            or len(book_ids) > 500
+            or any(not isinstance(book_id, str) or not book_id for book_id in book_ids)
+            or len(set(book_ids)) != len(book_ids)
+            or (operation == 'restrict' and user_ids is not None)
+            or (operation == 'grant' and (
+                not isinstance(user_ids, list)
+                or not user_ids
+                or len(user_ids) > 100
+                or any(not isinstance(user_id, str) or not user_id for user_id in user_ids)
+                or len(set(user_ids)) != len(user_ids)
+            ))
+        ):
+            return response(error_payload('invalid_bulk_book_update', 'Invalid bulk book update'), 400)
+        try:
+            if operation == 'restrict':
+                updated_book_ids = store.bulk_set_book_visibility(book_ids, 'restricted')
+            else:
+                updated_book_ids = store.bulk_grant_book_access(book_ids, user_ids)
+        except (KeyError, ValueError):
+            return response(error_payload('invalid_bulk_book_update', 'Invalid bulk book update'), 400)
+        return response({'operation': operation, 'updated_count': len(updated_book_ids)})
 
     async def admin_book(request):
         require_admin(request)
@@ -2885,6 +2946,7 @@ window.location.assign(payload.redirect||'/');
         ),
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/index', admin_book_index, methods=['GET']),
+        Route('/api/admin/books/bulk', admin_bulk_books, methods=['POST']),
         Route(
             '/api/admin/books/{book_path:path}',
             admin_book_request,

@@ -314,10 +314,20 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.0
+  epub-browser:2.3.1
 ```
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
+
+### Docker Compose
+
+The repository includes a [docker-compose.yml](docker-compose.yml) for users who prefer Compose. From a checkout, create `Library/`, put EPUB files there, then run:
+
+```bash
+docker compose up -d --build
+```
+
+It publishes only `127.0.0.1:8080`, keeps source EPUBs in `./Library`, and persists Server state in `./EpubBrowserFiles`. Complete the one-time setup at `http://127.0.0.1:8080/setup`. For remote access, keep this loopback binding and place an authenticated TLS reverse proxy in front of it.
 
 For unattended setup:
 
@@ -330,7 +340,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.0
+  epub-browser:2.3.1
 ```
 
 After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.

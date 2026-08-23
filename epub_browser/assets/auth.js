@@ -29,7 +29,10 @@
       editorBusy: false,
       editorError: false,
       editorSaveError: false,
-      editorDraft: null
+      editorDraft: null,
+      selectedBookIds: Object.create(null),
+      bulkGrantUserIds: Object.create(null),
+      bulkBusy: false
     };
     var aiJobsState = {
       status: '',
@@ -1583,11 +1586,75 @@
       list.textContent = '';
       var row = root.document.createElement('tr');
       var cell = createAdminBookCell(row, t(key));
-      cell.colSpan = 6;
+      cell.colSpan = 7;
       cell.setAttribute('data-i18n', key);
       list.appendChild(row);
       var pagination = element('adminBookPagination');
       if (pagination) pagination.textContent = '';
+    }
+
+    function selectedAdminBookIds() {
+      return Object.keys(adminBooksState.selectedBookIds).filter(function(bookId) {
+        return adminBooksState.selectedBookIds[bookId] === true;
+      });
+    }
+
+    function selectedAdminBookGrantUserIds() {
+      return Object.keys(adminBooksState.bulkGrantUserIds).filter(function(userId) {
+        return adminBooksState.bulkGrantUserIds[userId] === true;
+      });
+    }
+
+    function renderAdminBookBulkActions() {
+      var surface = element('adminBookBulkActions');
+      var count = selectedAdminBookIds().length;
+      var summary = element('adminBookSelectionCount');
+      var clear = element('adminBookClearSelection');
+      var restrict = element('adminBookBulkRestrict');
+      var members = element('adminBookBulkMembers');
+      var grant = element('adminBookBulkGrant');
+      var grantFieldset = element('adminBookBulkGrantFieldset');
+      if (surface) surface.hidden = count === 0;
+      if (summary) summary.textContent = t('admin.books.bulk.selectionCount', { count: count });
+      if (clear) clear.disabled = adminBooksState.bulkBusy;
+      if (restrict) restrict.disabled = !count || adminBooksState.bulkBusy;
+      if (members) {
+        members.textContent = '';
+        var grantableUsers = users.filter(function(user) {
+          return user && user.enabled && user.role === 'member';
+        });
+        grantableUsers.forEach(function(user) {
+          var option = editorCheckbox(
+            user.username,
+            user.id,
+            adminBooksState.bulkGrantUserIds[user.id] === true
+          );
+          option.checkbox.setAttribute('aria-label', String(user.username || ''));
+          option.checkbox.addEventListener('change', function() {
+            adminBooksState.bulkGrantUserIds[user.id] = Boolean(option.checkbox.checked);
+            renderAdminBookBulkActions();
+          });
+          members.appendChild(option.label);
+        });
+        if (!grantableUsers.length) {
+          members.appendChild(createTextElement('p', 'account-empty', 'admin.books.bulk.noMembers'));
+        }
+      }
+      if (grantFieldset) grantFieldset.disabled = adminBooksState.bulkBusy;
+      if (grant) {
+        grant.disabled = !count || !selectedAdminBookGrantUserIds().length || adminBooksState.bulkBusy;
+      }
+    }
+
+    function setAdminBookSelection(bookId, selected) {
+      if (selected) adminBooksState.selectedBookIds[bookId] = true;
+      else delete adminBooksState.selectedBookIds[bookId];
+    }
+
+    function setVisibleAdminBookSelection(visible, selected) {
+      visible.forEach(function(view) {
+        if (view && view.book && view.book.id) setAdminBookSelection(view.book.id, selected);
+      });
     }
 
     function renderAdminBooks() {
@@ -1601,16 +1668,39 @@
       var start = (adminBooksState.page - 1) * adminBooksState.pageSize;
       var visible = matching.slice(start, start + adminBooksState.pageSize);
       list.textContent = '';
+      var selectPage = element('adminBookSelectPage');
+      if (selectPage) {
+        var selectedVisible = visible.filter(function(view) {
+          return view && view.book && adminBooksState.selectedBookIds[view.book.id] === true;
+        }).length;
+        selectPage.checked = Boolean(visible.length && selectedVisible === visible.length);
+        selectPage.indeterminate = selectedVisible > 0 && selectedVisible < visible.length;
+        selectPage.disabled = !visible.length || adminBooksState.bulkBusy;
+      }
       if (!visible.length) {
         var emptyRow = root.document.createElement('tr');
         var emptyCell = createAdminBookCell(emptyRow, t('admin.books.empty'));
-        emptyCell.colSpan = 6;
+        emptyCell.colSpan = 7;
         emptyCell.setAttribute('data-i18n', 'admin.books.empty');
         list.appendChild(emptyRow);
       }
       visible.forEach(function(view) {
         var book = view.book;
         var row = root.document.createElement('tr');
+        var selectCell = createAdminBookCell(row, '', 'admin-book-select-column');
+        var select = root.document.createElement('input');
+        select.type = 'checkbox';
+        select.className = 'admin-book-row-select';
+        select.checked = adminBooksState.selectedBookIds[book.id] === true;
+        select.disabled = adminBooksState.bulkBusy;
+        select.setAttribute('aria-label', t('admin.books.bulk.selectBook', {
+          title: String(book.title || '')
+        }));
+        select.addEventListener('change', function() {
+          setAdminBookSelection(book.id, Boolean(select.checked));
+          renderAdminBooks();
+        });
+        selectCell.appendChild(select);
         var bookCell = createAdminBookCell(row, '', 'admin-book-summary');
         var title = root.document.createElement('strong');
         title.textContent = String(book.title || '');
@@ -1654,6 +1744,7 @@
         }
       });
       renderAdminBookPagination(matching.length, totalPages);
+      renderAdminBookBulkActions();
     }
 
     function adminBookEditorId(bookId) {
@@ -1685,7 +1776,7 @@
       var cell = createAdminBookCell(row, '');
       row.id = adminBookEditorId(book.id);
       row.className = 'admin-book-editor-row';
-      cell.colSpan = 6;
+      cell.colSpan = 7;
       var panel = root.document.createElement('section');
       panel.className = 'admin-book-editor';
       panel.setAttribute('aria-label', t('admin.books.editorLabel', { title: String(book.title || '') }));
@@ -1968,6 +2059,13 @@
       adminBooksState.editorSaveError = false;
       adminBooksState.editorDraft = null;
       adminBooksState.books = (Array.isArray(records) ? records : []).map(adminBookView);
+      var activeBookIds = Object.create(null);
+      adminBooksState.books.forEach(function(view) {
+        if (view.book && view.book.id) activeBookIds[view.book.id] = true;
+      });
+      Object.keys(adminBooksState.selectedBookIds).forEach(function(bookId) {
+        if (!activeBookIds[bookId]) delete adminBooksState.selectedBookIds[bookId];
+      });
       populateAdminBookTagFilter();
       renderAdminBooks();
     }
@@ -2093,6 +2191,52 @@
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
+    function runAdminBookBulkOperation(operation, userIds) {
+      var bookIds = selectedAdminBookIds();
+      if (!bookIds.length || adminBooksState.bulkBusy) return Promise.resolve(null);
+      var payload = { operation: operation, book_ids: bookIds };
+      if (operation === 'grant') payload.user_ids = userIds || [];
+      adminBooksState.bulkBusy = true;
+      renderAdminBooks();
+      return authenticatedFetch('/api/admin/books/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(response) {
+        if (!response || !response.ok) {
+          return readJson(response).then(function(error) {
+            showStatus('admin.books.error.' + (
+              error && error.code === 'invalid_bulk_book_update'
+                ? 'invalid_bulk_book_update' : 'unknown'
+            ), 'error');
+            return null;
+          });
+        }
+        return readJson(response).then(function(result) {
+          return loadAdminBookIndex().then(function() {
+            setAdminBookLive(
+              operation === 'restrict'
+                ? 'admin.books.live.bulkRestricted'
+                : 'admin.books.live.bulkGranted',
+              { count: Number(result && result.updated_count || bookIds.length) }
+            );
+            return result;
+          });
+        });
+      }).catch(function() {
+        showStatus('admin.books.error.network', 'error');
+        return null;
+      }).then(function(result) {
+        adminBooksState.bulkBusy = false;
+        renderAdminBooks();
+        return result;
+      }, function(error) {
+        adminBooksState.bulkBusy = false;
+        renderAdminBooks();
+        throw error;
+      });
+    }
+
     function loadAdminData() {
       if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') {
         return Promise.resolve(null);
@@ -2201,6 +2345,10 @@
       var bookPageSize = element('adminBookPageSize');
       var bookClearFilters = element('adminBookClearFilters');
       var bookRefresh = element('adminBookRefresh');
+      var bookSelectPage = element('adminBookSelectPage');
+      var bookClearSelection = element('adminBookClearSelection');
+      var bookBulkRestrict = element('adminBookBulkRestrict');
+      var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
       [createUserForm, createIdentityForm, aiSettingsForm, aiTagForm].forEach(function(form) {
@@ -2400,6 +2548,42 @@
       });
       if (bookRefresh) bookRefresh.addEventListener('click', function() {
         loadAdminBookIndex();
+      });
+      if (bookSelectPage) bookSelectPage.addEventListener('change', function() {
+        var matching = filteredAdminBooks();
+        var start = (adminBooksState.page - 1) * adminBooksState.pageSize;
+        setVisibleAdminBookSelection(
+          matching.slice(start, start + adminBooksState.pageSize),
+          Boolean(bookSelectPage.checked)
+        );
+        renderAdminBooks();
+      });
+      if (bookClearSelection) bookClearSelection.addEventListener('click', function() {
+        if (adminBooksState.bulkBusy) return;
+        adminBooksState.selectedBookIds = Object.create(null);
+        renderAdminBooks();
+      });
+      if (bookBulkRestrict) bookBulkRestrict.addEventListener('click', function() {
+        var count = selectedAdminBookIds().length;
+        if (!count || !confirmAdminAction('admin.books.bulk.restrictConfirm', { count: count })) return;
+        runButtonOperation(bookBulkRestrict, 'admin.books.bulk.restricting', function() {
+          return runAdminBookBulkOperation('restrict');
+        });
+      });
+      if (bookBulkGrant) bookBulkGrant.addEventListener('click', function() {
+        var bookIds = selectedAdminBookIds();
+        var userIds = selectedAdminBookGrantUserIds();
+        if (!bookIds.length || !userIds.length) return;
+        var memberNames = users.filter(function(user) {
+          return userIds.indexOf(user.id) !== -1;
+        }).map(function(user) { return user.username; }).join(', ');
+        if (!confirmAdminAction('admin.books.bulk.grantConfirm', {
+          count: bookIds.length,
+          members: memberNames
+        })) return;
+        runButtonOperation(bookBulkGrant, 'admin.books.bulk.granting', function() {
+          return runAdminBookBulkOperation('grant', userIds);
+        });
       });
       if (root.document && typeof root.document.addEventListener === 'function') {
         root.document.addEventListener('visibilitychange', handleAiJobsVisibilityChange);

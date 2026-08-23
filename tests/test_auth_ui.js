@@ -248,11 +248,20 @@ function bookUiHarness(fetchImpl) {
     adminBookTagFilter: fakeElement('select'),
     adminBookPageSize: fakeElement('select'),
     adminBookRefresh: fakeElement('button'),
+    adminBookSelectPage: fakeElement('input'),
+    adminBookBulkActions: fakeElement('section'),
+    adminBookSelectionCount: fakeElement('p'),
+    adminBookClearSelection: fakeElement('button'),
+    adminBookBulkRestrict: fakeElement('button'),
+    adminBookBulkGrantFieldset: fakeElement('fieldset'),
+    adminBookBulkMembers: fakeElement('div'),
+    adminBookBulkGrant: fakeElement('button'),
     adminBookList: fakeElement('tbody'),
     adminBookPagination: fakeElement('nav'),
     adminBookLive: fakeElement('p'),
   };
   elements.adminBookTableSurface.hidden = true;
+  elements.adminBookBulkActions.hidden = true;
   elements.adminBookPageSize.value = '20';
   const root = rootWithFetch(fetchImpl);
   root.document = {
@@ -270,6 +279,7 @@ function bookUiHarness(fetchImpl) {
         'admin.books.grantCount': `${params && params.count} members`,
         'admin.books.resultCount': `${params && params.count} results`,
         'admin.books.live.cleared': `Cleared ${params && params.count} results`,
+        'admin.books.bulk.selectionCount': `${params && params.count} selected`,
       };
       return values[key] || `[${key}]`;
     },
@@ -281,7 +291,7 @@ function bookUiHarness(fetchImpl) {
 
 function rowTitles(body) {
   return body.children.map(row => {
-    const title = descendants(row.children[0] || {}).find(node => node.tagName === 'STRONG');
+    const title = descendants(row).find(node => node.tagName === 'STRONG');
     return title ? title.textContent : row.children[0] && row.children[0].textContent;
   });
 }
@@ -341,6 +351,63 @@ test('book index renders only the current page and resets pagination for control
   elements.adminBookPageSize.listeners.change();
   assert.equal(elements.adminBookList.children.length, 7);
   assert.deepEqual(calls, ['/api/admin/books/index']);
+});
+
+test('book bulk actions retain a page selection and add member grants without replacing access', async () => {
+  const books = [
+    adminBook({ id: 'bulk-1', title: 'First bulk book' }),
+    adminBook({ id: 'bulk-2', title: 'Second bulk book' }),
+  ];
+  const requests = [];
+  const { root, elements } = bookUiHarness((url, options) => {
+    if (url === '/api/admin/users') return Promise.resolve(response(200, {
+      users: [{ id: 'member-1', username: 'Reader', role: 'member', enabled: true }],
+    }));
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books }));
+    if (url === '/api/admin/ai/settings') return Promise.resolve(response(200, { settings: null }));
+    if (url === '/api/admin/ai/tags') return Promise.resolve(response(200, { tags: [] }));
+    if (url === '/api/admin/books/bulk') {
+      requests.push(JSON.parse(options.body));
+      return Promise.resolve(response(200, {
+        operation: JSON.parse(options.body).operation,
+        updated_count: 2,
+      }));
+    }
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  elements.adminMenu.click();
+  await tick();
+  await tick();
+
+  elements.adminBookSelectPage.checked = true;
+  elements.adminBookSelectPage.listeners.change();
+  assert.equal(elements.adminBookBulkActions.hidden, false);
+  assert.match(elements.adminBookSelectionCount.textContent, /2/);
+
+  elements.adminBookBulkRestrict.click();
+  await tick();
+  await tick();
+  assert.deepEqual(requests[0], {
+    operation: 'restrict',
+    book_ids: ['bulk-1', 'bulk-2'],
+  });
+
+  const member = descendants(elements.adminBookBulkMembers).find(node =>
+    node.tagName === 'INPUT' && node.value === 'member-1'
+  );
+  member.checked = true;
+  member.listeners.change();
+  elements.adminBookBulkGrant.click();
+  await tick();
+  await tick();
+  assert.deepEqual(requests[1], {
+    operation: 'grant',
+    book_ids: ['bulk-1', 'bulk-2'],
+    user_ids: ['member-1'],
+  });
 });
 
 test('book pagination keeps a compact page window and announces the current page', async () => {
@@ -624,7 +691,7 @@ test('a failed book result clear leaves the summary and editor detail unchanged'
   await auth.openBookEditor('book/id');
   await auth.clearBookResults('book/id', 'Keep results');
 
-  assert.equal(elements.adminBookList.children[0].children[3].textContent, '4 results');
+  assert.equal(elements.adminBookList.children[0].children[4].textContent, '4 results');
   assert.equal(editorRows(elements.adminBookList).length, 1);
   assert.equal(elements.adminBookLive.textContent, '[admin.books.clearError]');
 });

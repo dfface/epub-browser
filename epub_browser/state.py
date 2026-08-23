@@ -2551,6 +2551,71 @@ class StateStore:
                 raise KeyError(f"Unknown book ID: {book_id}")
             return self._get_book(connection, book_id)
 
+    @staticmethod
+    def _normalized_bulk_book_ids(book_ids: Sequence[str]) -> tuple[str, ...]:
+        normalized = tuple(dict.fromkeys(book_ids))
+        if not normalized or len(normalized) != len(book_ids):
+            raise ValueError("Bulk book IDs must be unique and non-empty")
+        return normalized
+
+    def _require_active_bulk_books(self, connection, book_ids: Sequence[str]) -> None:
+        placeholders = ", ".join("?" for _ in book_ids)
+        rows = connection.execute(
+            "SELECT book_id FROM books WHERE active = 1 AND book_id IN (" + placeholders + ")",
+            tuple(book_ids),
+        ).fetchall()
+        if len(rows) != len(book_ids):
+            raise KeyError("One or more active books were not found")
+
+    def bulk_set_book_visibility(
+        self,
+        book_ids: Sequence[str],
+        visibility: str,
+    ) -> tuple[str, ...]:
+        """Atomically update visibility for a bounded set of active books."""
+        self._validate_book_visibility(visibility)
+        normalized_book_ids = self._normalized_bulk_book_ids(book_ids)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_active_bulk_books(connection, normalized_book_ids)
+            placeholders = ", ".join("?" for _ in normalized_book_ids)
+            connection.execute(
+                "UPDATE books SET visibility = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE active = 1 AND book_id IN (" + placeholders + ")",
+                (visibility, *normalized_book_ids),
+            )
+            connection.execute("COMMIT")
+        return normalized_book_ids
+
+    def bulk_grant_book_access(
+        self,
+        book_ids: Sequence[str],
+        user_ids: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Atomically add member grants without replacing existing book access."""
+        normalized_book_ids = self._normalized_bulk_book_ids(book_ids)
+        normalized_user_ids = tuple(dict.fromkeys(user_ids))
+        if not normalized_user_ids or len(normalized_user_ids) != len(user_ids):
+            raise ValueError("Bulk grant user IDs must be unique and non-empty")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_active_bulk_books(connection, normalized_book_ids)
+            for user_id in normalized_user_ids:
+                user = self._get_user(connection, user_id)
+                if not user.enabled or user.role != "member":
+                    raise ValueError("Bulk book access can only be granted to enabled members")
+            connection.executemany(
+                "INSERT INTO book_access (book_id, user_id) VALUES (?, ?) "
+                "ON CONFLICT(book_id, user_id) DO NOTHING",
+                (
+                    (book_id, user_id)
+                    for book_id in normalized_book_ids
+                    for user_id in normalized_user_ids
+                ),
+            )
+            connection.execute("COMMIT")
+        return normalized_book_ids
+
     def grant_book_access(self, book_id: str, user_id: str) -> None:
         with self._connection() as connection:
             self._get_book(connection, book_id)

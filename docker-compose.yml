@@ -1,0 +1,15 @@
+# Start with: docker compose up -d --build
+# Then complete first-run setup at http://127.0.0.1:8080/setup.
+services:
+  epub-browser:
+    build:
+      context: .
+    image: epub-browser:2.3.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      # Embedded book IDs can rewrite an EPUB, so this mount stays writable.
+      - ./Library:/app/Library:rw
+      # Keep accounts, reading data, AI results, and conversion state durable.
+      - ./EpubBrowserFiles:/app/EpubBrowserFiles
