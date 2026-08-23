@@ -585,6 +585,61 @@ test('book result clearing confirms first and patches only the affected count', 
   assert.equal(calls.filter(call => call.url === '/api/admin/books/index').length, 1);
 });
 
+test('a failed book result clear leaves the summary and editor detail unchanged', async () => {
+  const detail = adminBook({ id: 'book/id', title: 'Keep results', ai_result_count: 4 });
+  const { root, elements } = bookUiHarness(url => {
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [detail] }));
+    if (url === '/api/admin/books/book%2Fid') return Promise.resolve(response(200, {
+      book: Object.assign({}, detail, { grants: [], ai_tags: [] }),
+    }));
+    if (url === '/api/admin/ai/results') return Promise.resolve(response(500, { code: 'unknown' }));
+    return Promise.resolve(response(404, {}));
+  });
+  root.confirm = () => true;
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  await auth.openBookEditor('book/id');
+  await auth.clearBookResults('book/id', 'Keep results');
+
+  assert.equal(elements.adminBookList.children[0].children[3].textContent, '4 results');
+  assert.equal(editorRows(elements.adminBookList).length, 1);
+  assert.equal(elements.adminBookLive.textContent, '[admin.books.clearError]');
+});
+
+test('a failed book settings save keeps the editor draft available for retry', async () => {
+  const detail = adminBook({ id: 'book/id', title: 'Retry me', visibility: 'authenticated' });
+  const { root, elements } = bookUiHarness((url, options) => {
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [detail] }));
+    if (url === '/api/admin/books/book%2Fid') return Promise.resolve(response(200, {
+      book: Object.assign({}, detail, { grants: [], ai_tags: [] }),
+    }));
+    if (url === '/api/admin/books/book%2Fid/settings') return Promise.resolve(response(500, { code: 'unknown' }));
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  await auth.openBookEditor('book/id');
+  const editor = editorRows(elements.adminBookList)[0];
+  const visibility = descendants(editor).find(node => node.tagName === 'SELECT');
+  visibility.value = 'restricted';
+  const save = descendants(editor).find(node => node.tagName === 'BUTTON'
+    && node.textContent === '[admin.books.save]');
+  save.click();
+  await tick();
+  await tick();
+
+  const retryEditor = editorRows(elements.adminBookList)[0];
+  const retryVisibility = descendants(retryEditor).find(node => node.tagName === 'SELECT');
+  assert.equal(retryVisibility.value, 'restricted');
+  assert.ok(descendants(retryEditor).some(node => node.textContent === '[admin.books.saveError]'));
+  assert.ok(descendants(retryEditor).some(node => node.tagName === 'BUTTON'
+    && node.textContent === '[admin.books.save]'));
+});
+
 test('book refresh requests only the lightweight index and locale changes rerender held state', async () => {
   const calls = [];
   const { root, elements, localeListeners } = bookUiHarness(url => {

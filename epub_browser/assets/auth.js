@@ -27,7 +27,9 @@
       detailCache: Object.create(null),
       editorGeneration: 0,
       editorBusy: false,
-      editorError: false
+      editorError: false,
+      editorSaveError: false,
+      editorDraft: null
     };
     var aiJobsState = {
       status: '',
@@ -1080,7 +1082,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scope || {})
       }).then(function(response) {
-        if (!response.ok) return showResponseError(response, 'admin');
+        if (!response.ok) {
+          return reload === false ? null : showResponseError(response, 'admin');
+        }
         return readJson(response).then(function(payload) {
           showStatus('admin.ai.cacheCleared', 'success');
           return reload === false ? payload : loadAdminData();
@@ -1540,6 +1544,12 @@
         return row;
       }
       var detail = adminBooksState.detailCache[book.id];
+      var draft = adminBooksState.editorDraft || {
+        visibility: detail.visibility || 'authenticated',
+        user_ids: detail.grants || [],
+        tag_ids: (detail.ai_tags || []).map(function(tag) { return tag && tag.id; }),
+        profile: detail.ai_profile || 'auto'
+      };
       var grid = root.document.createElement('div');
       var visibilityField = root.document.createElement('label');
       var visibilityText = root.document.createElement('span');
@@ -1563,16 +1573,16 @@
         var option = root.document.createElement('option');
         option.value = value;
         option.textContent = t('admin.books.visibility.' + value);
-        option.selected = value === detail.visibility;
+        option.selected = value === draft.visibility;
         visibility.appendChild(option);
       });
-      visibility.value = detail.visibility || 'authenticated';
+      visibility.value = draft.visibility;
       visibilityField.appendChild(visibility);
       grants.className = 'account-book-grants';
       grantOptions.className = 'account-book-grant-options';
       grants.appendChild(grantLegend);
       users.filter(function(user) { return user.enabled && user.role === 'member'; }).forEach(function(user) {
-        var option = editorCheckbox(user.username, user.id, (detail.grants || []).indexOf(user.id) !== -1);
+        var option = editorCheckbox(user.username, user.id, (draft.user_ids || []).indexOf(user.id) !== -1);
         grantChecks.push(option.checkbox);
         grantOptions.appendChild(option.label);
       });
@@ -1583,9 +1593,7 @@
       tagOptions.className = 'account-book-grant-options';
       tags.appendChild(tagLegend);
       aiTags.forEach(function(tag) {
-        var option = editorCheckbox(tag.name, tag.id, (detail.ai_tags || []).some(function(assigned) {
-          return assigned && assigned.id === tag.id;
-        }));
+        var option = editorCheckbox(tag.name, tag.id, (draft.tag_ids || []).indexOf(tag.id) !== -1);
         tagChecks.push(option.checkbox);
         tagOptions.appendChild(option.label);
       });
@@ -1597,16 +1605,19 @@
         var option = root.document.createElement('option');
         option.value = value;
         option.textContent = t('admin.books.profile.' + value);
-        option.selected = value === (detail.ai_profile || 'auto');
+        option.selected = value === draft.profile;
         profile.appendChild(option);
       });
-      profile.value = detail.ai_profile || 'auto';
+      profile.value = draft.profile;
       profileField.appendChild(profile);
       grid.appendChild(visibilityField);
       grid.appendChild(grants);
       grid.appendChild(tags);
       grid.appendChild(profileField);
       panel.appendChild(grid);
+      if (adminBooksState.editorSaveError) {
+        panel.appendChild(createTextElement('p', 'account-empty', 'admin.books.saveError'));
+      }
       var actions = root.document.createElement('div');
       actions.className = 'admin-book-editor-actions';
       var save = root.document.createElement('button');
@@ -1668,6 +1679,8 @@
       adminBooksState.expandedBookId = null;
       adminBooksState.editorBusy = false;
       adminBooksState.editorError = false;
+      adminBooksState.editorSaveError = false;
+      adminBooksState.editorDraft = null;
       renderAdminBooks();
       if (restoreFocus) focusAdminBookManage(bookId);
     }
@@ -1681,6 +1694,8 @@
       var generation = ++adminBooksState.editorGeneration;
       adminBooksState.expandedBookId = bookId;
       adminBooksState.editorError = false;
+      adminBooksState.editorSaveError = false;
+      adminBooksState.editorDraft = null;
       adminBooksState.editorBusy = !adminBooksState.detailCache[bookId];
       renderAdminBooks();
       if (adminBooksState.detailCache[bookId]) return Promise.resolve(adminBooksState.detailCache[bookId]);
@@ -1714,6 +1729,8 @@
     function saveAdminBookSettings(bookId, payload) {
       var generation = ++adminBooksState.editorGeneration;
       if (adminBooksState.expandedBookId === bookId) {
+        adminBooksState.editorDraft = payload;
+        adminBooksState.editorSaveError = false;
         adminBooksState.editorBusy = true;
         renderAdminBooks();
       }
@@ -1729,6 +1746,8 @@
           if (result && result.book) adminBooksState.detailCache[bookId] = result.book;
           adminBooksState.editorBusy = false;
           adminBooksState.editorError = false;
+          adminBooksState.editorSaveError = false;
+          adminBooksState.editorDraft = null;
           renderAdminBooks();
           setAdminBookLive('admin.books.live.saved');
           return result;
@@ -1736,7 +1755,7 @@
       }).catch(function() { return null; }).then(function(result) {
         if (!result && generation === adminBooksState.editorGeneration && adminBooksState.expandedBookId === bookId) {
           adminBooksState.editorBusy = false;
-          adminBooksState.editorError = true;
+          adminBooksState.editorSaveError = true;
           renderAdminBooks();
           setAdminBookLive('admin.books.saveError');
         }
@@ -1783,6 +1802,8 @@
       adminBooksState.detailCache = Object.create(null);
       adminBooksState.editorBusy = false;
       adminBooksState.editorError = false;
+      adminBooksState.editorSaveError = false;
+      adminBooksState.editorDraft = null;
       adminBooksState.books = (Array.isArray(records) ? records : []).map(adminBookView);
       populateAdminBookTagFilter();
       renderAdminBooks();
