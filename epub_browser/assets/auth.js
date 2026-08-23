@@ -51,6 +51,16 @@
       fiction: 'admin.ai.profile.fiction',
       general: 'admin.ai.profile.general'
     };
+    var adminBookVisibilityTranslationKeys = {
+      authenticated: 'admin.books.visibility.authenticated',
+      restricted: 'admin.books.visibility.restricted'
+    };
+    var adminBookProfileTranslationKeys = {
+      auto: 'admin.books.profile.auto',
+      technical: 'admin.books.profile.technical',
+      fiction: 'admin.books.profile.fiction',
+      general: 'admin.books.profile.general'
+    };
 
     function i18n() {
       return root.EpubBrowserI18n;
@@ -1572,7 +1582,7 @@
       ['authenticated', 'restricted'].forEach(function(value) {
         var option = root.document.createElement('option');
         option.value = value;
-        option.textContent = t('admin.books.visibility.' + value);
+        option.textContent = t(adminBookVisibilityTranslationKeys[value]);
         option.selected = value === draft.visibility;
         visibility.appendChild(option);
       });
@@ -1604,7 +1614,7 @@
       ['auto', 'technical', 'fiction', 'general'].forEach(function(value) {
         var option = root.document.createElement('option');
         option.value = value;
-        option.textContent = t('admin.books.profile.' + value);
+        option.textContent = t(adminBookProfileTranslationKeys[value]);
         option.selected = value === draft.profile;
         profile.appendChild(option);
       });
