@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const AuthModule = require('../epub_browser/assets/auth.js');
 const { createRuntime, dictionaries } = require('../epub_browser/assets/i18n.js');
 
@@ -216,6 +218,16 @@ function adminDataResponse(url) {
   if (url === '/api/admin/ai/tags') return response(200, { tags: [] });
   return null;
 }
+
+test('legacy book renderer stays on its list surface until the table renderer takes over', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../epub_browser/assets/auth.js'), 'utf8');
+  const start = source.indexOf('function renderBooks() {');
+  const renderer = source.slice(start, source.indexOf('\n    function renderIdentities()', start));
+
+  assert.match(renderer, /var list = element\('adminBookList'\);/);
+  assert.match(renderer, /root\.document\.createElement\('li'\)/);
+  assert.match(renderer, /list\.appendChild\(item\);/);
+});
 
 test('auth wrapper attaches CSRF and redirects only after a 401 response', async () => {
   let finish;

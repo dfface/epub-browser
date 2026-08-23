@@ -121,7 +121,9 @@ class SitePublicationTests(unittest.TestCase):
             r'<p\b(?=[^>]*id=(?:["\'])?adminAiJobsLive)(?=[^>]*aria-live=(?:["\'])?polite)',
         )
         self.assertRegex(html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
-        self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
+        self.assertRegex(html, r'<ul\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminBookTableBody')
         self.assertRegex(html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
         self.assertRegex(
             html,

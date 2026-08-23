@@ -69,8 +69,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('data-i18n=admin.books.' + key, server_html)
         self.assertIn('data-i18n-placeholder=admin.books.searchPlaceholder', server_html)
         self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
+        self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
         self.assertRegex(server_html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
-        self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(server_html, r'<ul\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminBookTableBody')
         self.assertRegex(server_html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
         self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminBookLive)(?=[^>]*aria-live=(?:["\'])?polite)')
         for key in ('book', 'access', 'profile', 'results', 'updated', 'action'):
@@ -81,7 +83,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         for control_id in (
             'adminBookSearch', 'adminBookVisibilityFilter', 'adminBookTagFilter',
             'adminBookPageSize', 'adminBookRefresh', 'adminBookList',
-            'adminBookPagination', 'adminBookLive',
+            'adminBookTableBody', 'adminBookPagination', 'adminBookLive',
         ):
             self.assertNotIn(control_id, ssg_html)
 
