@@ -891,13 +891,22 @@ class AIReadingService:
             template = template_for(request.scope, request.mode)
             if template["id"] != job.get("template_id") or template["version"] != job.get("template_version"):
                 raise AIReadingError("ai_template_unavailable")
+            profile = job.get("profile") or self.store.get_book_ai_profile(request.book_id)
+            # EPUB-derived material is intentionally read again when the
+            # durable job runs. Its digest, rather than the enqueue-time
+            # snapshot, is therefore the only safe identity for a result.
+            cache_key = self._cache_key(request, material, profile, template)
             settings = self.store._get_ai_provider_settings()
             if not settings["enabled"]:
                 raise AIReadingError("ai_disabled")
+            cached = self.store.get_current_ai_reading_result(cache_key)
+            if cached is not None:
+                self.store.finish_ai_job(job["id"], result_id=cached["id"])
+                return
             await self._run_generation(
                 job["id"], principal, request, metadata, material, full_book_segments,
-                job.get("profile") or self.store.get_book_ai_profile(request.book_id), settings,
-                job["cache_key"], template, self._reading_boundary(principal, request), already_started=True,
+                profile, settings, cache_key, template,
+                self._reading_boundary(principal, request), already_started=True,
             )
         except AIReadingError as error:
             self.store.finish_ai_job(job["id"], error_code=error.code)

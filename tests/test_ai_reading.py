@@ -1223,6 +1223,50 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completed["status"], "complete")
         self.assertIsNotNone(completed["result_id"])
 
+    async def test_durable_job_uses_the_cache_key_for_material_read_by_worker(self):
+        """A queued job must not publish updated source under its old digest."""
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        material, _metadata, progress_total, _segments = self.service._material_for_request(
+            self.member, request
+        )
+        template = template_for(request.scope, request.mode)
+        stale_cache_key = self.service._cache_key(
+            request, material, self.store.get_book_ai_profile(self.book.book_id), template
+        )
+        self.store.create_ai_job(
+            "changed-material-worker-job", self.member.user_id, stale_cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+            request_payload={
+                "scope": "chapter", "book_id": self.book.book_id,
+                "chapter_index": 0, "mode": "chapter", "language": "en",
+                "reading_boundary": 0,
+            },
+            profile="auto", template_id=template["id"], template_version=template["version"],
+        )
+        chapter = self.root / "public" / "book" / self.book.book_id / "chapter_0.html"
+        chapter.write_text(
+            "<article><p>Updated Source sentence.</p></article>", encoding="utf-8"
+        )
+        current_material, _metadata, _total, _segments = self.service._material_for_request(
+            self.member, request
+        )
+        current_cache_key = self.service._cache_key(
+            request, current_material, "auto", template
+        )
+        self.assertNotEqual(current_cache_key, stale_cache_key)
+
+        await self.service.start_worker()
+        self.service.wake_worker()
+        completed = await self._wait_for_job("changed-material-worker-job")
+
+        result = self.store.get_ai_reading_result(completed["result_id"])
+        self.assertEqual(result["cache_key"], current_cache_key)
+        self.assertIsNone(self.store.get_current_ai_reading_result(stale_cache_key))
+        self.assertEqual(
+            self.store.get_current_ai_reading_result(current_cache_key)["id"], result["id"]
+        )
+        self.assertIn("Updated Source sentence.", _FakeClient.calls[-1][1]["content"])
+
     async def test_running_durable_job_is_requeued_after_a_service_restart(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
         material, _metadata, progress_total, _segments = self.service._material_for_request(self.member, request)
