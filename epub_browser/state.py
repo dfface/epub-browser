@@ -3692,6 +3692,32 @@ class StateStore:
             )
         return cursor.rowcount == 1
 
+    def rekey_running_ai_job(self, job_id: str, cache_key: str) -> bool:
+        """Atomically move a leased job onto the cache identity it executes.
+
+        The partial unique index keeps the worker's new identity single-flight
+        with all queued and running jobs. A conflict means another active job
+        already owns that exact execution identity, so the caller must not
+        issue a duplicate provider request.
+        """
+        if not isinstance(cache_key, str) or not cache_key:
+            raise ValueError("AI job cache key must not be empty")
+        try:
+            with self._connection() as connection:
+                cursor = connection.execute(
+                    """
+                    UPDATE ai_reading_jobs SET cache_key = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND status = 'running'
+                    """,
+                    (cache_key, job_id),
+                )
+        except sqlite3.IntegrityError as error:
+            if "ai_reading_jobs.cache_key" in str(error):
+                return False
+            raise
+        return cursor.rowcount == 1
+
     def mark_incomplete_ai_jobs_interrupted(self) -> int:
         with self._connection() as connection:
             cursor = connection.execute(

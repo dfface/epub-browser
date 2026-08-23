@@ -1267,6 +1267,106 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("Updated Source sentence.", _FakeClient.calls[-1][1]["content"])
 
+    async def test_durable_force_job_regenerates_after_cache_and_config_change(self):
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        material, _metadata, progress_total, _segments = self.service._material_for_request(
+            self.member, request
+        )
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(request, material, "auto", template)
+        prior_config_revision = self.store.get_ai_settings()["config_revision"]
+        prior = self.store.store_ai_reading_result(
+            cache_key=cache_key, book_id=self.book.book_id, chapter_index=0,
+            scope="chapter", mode="chapter", profile="auto", config_revision=prior_config_revision,
+            content={"quick": {"summary": "old"}}, created_by_user_id=self.member.user_id,
+            template_id=template["id"], template_version=template["version"], language="en",
+        )
+        self.store.create_ai_job(
+            "forced-config-change-job", self.member.user_id, cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+            request_payload={
+                "scope": "chapter", "book_id": self.book.book_id,
+                "chapter_index": 0, "mode": "chapter", "language": "en",
+                "reading_boundary": 0,
+            },
+            profile="auto", template_id=template["id"], template_version=template["version"],
+        )
+        self.store.set_ai_settings(
+            enabled=True, base_url="https://provider.example/v1", api_key="secret",
+            model="reader-model-v2", timeout_seconds=30, max_concurrency=2,
+            daily_limit=20,
+        )
+        current_config_revision = self.store.get_ai_settings()["config_revision"]
+        self.assertNotEqual(current_config_revision, prior_config_revision)
+        _FakeClient.calls = []
+
+        await self.service.start_worker()
+        self.service.wake_worker()
+        completed = await self._wait_for_job("forced-config-change-job")
+
+        result = self.store.get_ai_reading_result(completed["result_id"])
+        self.assertNotEqual(result["id"], prior["id"])
+        self.assertEqual(result["config_revision"], current_config_revision)
+        self.assertEqual(len(_FakeClient.calls), 1)
+
+    async def test_rekeyed_running_job_joins_later_submission_for_changed_material(self):
+        request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
+        material, _metadata, progress_total, _segments = self.service._material_for_request(
+            self.member, request
+        )
+        template = template_for(request.scope, request.mode)
+        stale_cache_key = self.service._cache_key(request, material, "auto", template)
+        self.store.create_ai_job(
+            "rekeyed-running-job", self.member.user_id, stale_cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+            request_payload={
+                "scope": "chapter", "book_id": self.book.book_id,
+                "chapter_index": 0, "mode": "chapter", "language": "en",
+                "reading_boundary": 0,
+            },
+            profile="auto", template_id=template["id"], template_version=template["version"],
+        )
+        claimed = self.store.claim_next_ai_reading_job()
+        self.assertEqual(claimed["id"], "rekeyed-running-job")
+        chapter = self.root / "public" / "book" / self.book.book_id / "chapter_0.html"
+        chapter.write_text(
+            "<article><p>Updated Source sentence.</p></article>", encoding="utf-8"
+        )
+        current_material, _metadata, _total, _segments = self.service._material_for_request(
+            self.member, request
+        )
+        current_cache_key = self.service._cache_key(request, current_material, "auto", template)
+        self.assertNotEqual(current_cache_key, stale_cache_key)
+        _BlockingClient.calls = []
+        _BlockingClient.started = threading.Event()
+        _BlockingClient.release = threading.Event()
+        service = AIReadingService(self.store, self.root / "public", _BlockingClient)
+        running = asyncio.create_task(service._run_queued_job(claimed))
+        try:
+            for _ in range(100):
+                if _BlockingClient.started.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            self.assertTrue(_BlockingClient.started.is_set())
+
+            joined = await service.submit(self.member, request)
+            self.assertTrue(joined["shared"])
+            self.assertEqual(joined["job"]["id"], "rekeyed-running-job")
+            self.assertEqual(
+                self.store.get_ai_job("rekeyed-running-job")["cache_key"], current_cache_key
+            )
+            self.assertEqual(len(_BlockingClient.calls), 1)
+        finally:
+            _BlockingClient.release.set()
+            await running
+            await service.stop_worker()
+
+        completed = self.store.get_ai_job("rekeyed-running-job")
+        result = self.store.get_ai_reading_result(completed["result_id"])
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(result["cache_key"], current_cache_key)
+        self.assertEqual(len(_BlockingClient.calls), 1)
+
     async def test_running_durable_job_is_requeued_after_a_service_restart(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
         material, _metadata, progress_total, _segments = self.service._material_for_request(self.member, request)

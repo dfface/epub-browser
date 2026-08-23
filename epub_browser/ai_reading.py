@@ -896,13 +896,11 @@ class AIReadingService:
             # durable job runs. Its digest, rather than the enqueue-time
             # snapshot, is therefore the only safe identity for a result.
             cache_key = self._cache_key(request, material, profile, template)
+            if not self.store.rekey_running_ai_job(job["id"], cache_key):
+                raise AIReadingError("ai_generation_failed")
             settings = self.store._get_ai_provider_settings()
             if not settings["enabled"]:
                 raise AIReadingError("ai_disabled")
-            cached = self.store.get_current_ai_reading_result(cache_key)
-            if cached is not None:
-                self.store.finish_ai_job(job["id"], result_id=cached["id"])
-                return
             await self._run_generation(
                 job["id"], principal, request, metadata, material, full_book_segments,
                 profile, settings, cache_key, template,

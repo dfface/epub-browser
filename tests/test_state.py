@@ -2234,6 +2234,37 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(second["id"], "job-first")
         self.assertEqual(second["book_id"], book.book_id)
 
+    def test_running_ai_job_rekeys_its_single_flight_identity(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "rekey-flight.epub"),
+            "urn:test:rekey-flight", "fingerprint", {"title": "Book"},
+        )
+        self.store.create_ai_job(
+            "job-rekey", self.owner.user_id, "material-a", book_id=book.book_id,
+            request_payload={"scope": "chapter"},
+        )
+        claimed = self.store.claim_next_ai_reading_job()
+        self.assertEqual(claimed["id"], "job-rekey")
+
+        self.assertTrue(self.store.rekey_running_ai_job("job-rekey", "material-b"))
+
+        self.assertEqual(
+            self.store.get_ai_job("job-rekey", self.owner.user_id)["cache_key"], "material-b"
+        )
+        shared, created = self.store.create_or_get_active_ai_job(
+            "job-submitted-after-rekey", self.owner.user_id, book.book_id, "material-b"
+        )
+        self.assertFalse(created)
+        self.assertEqual(shared["id"], "job-rekey")
+
+        self.store.create_ai_job(
+            "job-already-material-c", self.owner.user_id, "material-c", book_id=book.book_id,
+        )
+        self.assertFalse(self.store.rekey_running_ai_job("job-rekey", "material-c"))
+        self.assertEqual(
+            self.store.get_ai_job("job-rekey", self.owner.user_id)["cache_key"], "material-b"
+        )
+
     def test_admin_ai_job_pagination_is_safe_and_stable(self):
         member = self.store.create_user("reader", "hash", role="member")
         book = self.store.resolve_book(
