@@ -1453,6 +1453,261 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(payload["job"]["status"], "failed")
         self.assertEqual(payload["job"]["error_code"], "provider_connection_failed")
 
+    def test_admin_book_index_is_lightweight_and_private(self):
+        source = Path(self.directory.name) / "private-library-source.epub"
+        book = self.store.resolve_book(
+            source,
+            "urn:test:admin-index",
+            "admin-index-fingerprint",
+            {
+                "title": "Indexed book",
+                "authors": ["Index Author"],
+                "tags": ["EPUB Tag"],
+                "private_metadata": "PRIVATE_METADATA_SENTINEL",
+            },
+            preferred_book_id="admin-index-book",
+        )
+        tag = self.store.create_ai_tag("Assigned Tag")
+        self.store.set_book_visibility(book.book_id, "restricted")
+        self.store.grant_book_access(book.book_id, self.member.user_id)
+        self.store.replace_book_ai_tags(book.book_id, [tag["id"]])
+        self.store.set_book_ai_profile(book.book_id, "technical")
+
+        index = self.admin_client.get("/api/admin/books/index")
+        member_denied = self.member_client.get("/api/admin/books/index")
+        legacy = self.admin_client.get("/api/admin/books")
+
+        self.assertEqual(index.status_code, 200)
+        indexed = next(
+            item for item in index.json()["books"] if item["id"] == book.book_id
+        )
+        self.assertEqual(indexed["title"], "Indexed book")
+        self.assertEqual(indexed["authors"], ["Index Author"])
+        self.assertEqual(indexed["epub_tags"], ["EPUB Tag"])
+        self.assertEqual(indexed["grant_count"], 1)
+        self.assertEqual(indexed["ai_profile"], "technical")
+        self.assertEqual(indexed["ai_tags"], [{"id": tag["id"], "name": "Assigned Tag"}])
+        self.assertNotIn("source_path", index.text)
+        self.assertNotIn("metadata_json", index.text)
+        self.assertNotIn(str(source), index.text)
+        self.assertNotIn("PRIVATE_METADATA_SENTINEL", index.text)
+        self.assertEqual(member_denied.status_code, 403)
+        self.assertEqual(set(legacy.json()), {"books"})
+        legacy_book = next(
+            item for item in legacy.json()["books"] if item["id"] == book.book_id
+        )
+        self.assertEqual(legacy_book["grants"], [self.member.user_id])
+
+    def test_admin_gets_one_book_detail(self):
+        source = Path(self.directory.name) / "private-detail-source.epub"
+        book = self.store.resolve_book(
+            source,
+            "urn:test:admin-detail",
+            "admin-detail-fingerprint",
+            {
+                "title": "Detailed book",
+                "authors": ["Detail Author"],
+                "tags": ["Original Tag"],
+                "private_metadata": "PRIVATE_DETAIL_SENTINEL",
+            },
+            preferred_book_id="admin-detail-book",
+        )
+        inactive = self.store.resolve_book(
+            Path(self.directory.name) / "inactive-detail.epub",
+            "urn:test:inactive-detail",
+            "inactive-detail-fingerprint",
+            {"title": "Inactive private title"},
+            preferred_book_id="inactive-detail-book",
+        )
+        self.store.mark_missing(inactive.book_id)
+        tag = self.store.create_ai_tag("Detailed Tag")
+        self.store.grant_book_access(book.book_id, self.member.user_id)
+        self.store.replace_book_ai_tags(book.book_id, [tag["id"]])
+        self.store.set_book_ai_profile(book.book_id, "fiction")
+
+        detail = self.admin_client.get("/api/admin/books/" + book.book_id)
+        missing = self.admin_client.get("/api/admin/books/missing-detail-book")
+        inactive_response = self.admin_client.get(
+            "/api/admin/books/" + inactive.book_id
+        )
+        member_denied = self.member_client.get(
+            "/api/admin/books/" + book.book_id
+        )
+
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["book"]["id"], book.book_id)
+        self.assertEqual(detail.json()["book"]["grants"], [self.member.user_id])
+        self.assertEqual(detail.json()["book"]["ai_profile"], "fiction")
+        self.assertEqual(
+            detail.json()["book"]["ai_tags"],
+            [{"id": tag["id"], "name": "Detailed Tag"}],
+        )
+        self.assertEqual(
+            detail.json()["book"]["effective_tags"],
+            ["Detailed Tag", "Original Tag"],
+        )
+        self.assertNotIn("source_path", detail.text)
+        self.assertNotIn("metadata_json", detail.text)
+        self.assertNotIn(str(source), detail.text)
+        self.assertNotIn("PRIVATE_DETAIL_SENTINEL", detail.text)
+        self.assertEqual(missing.status_code, 404)
+        self.assertEqual(inactive_response.status_code, 404)
+        self.assertNotIn("Inactive private title", inactive_response.text)
+        self.assertEqual(member_denied.status_code, 403)
+
+    def test_admin_atomically_updates_complete_book_settings(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "atomic-settings.epub",
+            "urn:test:atomic-settings",
+            "atomic-settings-fingerprint",
+            {"title": "Atomic settings", "authors": [], "tags": ["EPUB"]},
+            preferred_book_id="atomic-settings-book",
+        )
+        inactive = self.store.resolve_book(
+            Path(self.directory.name) / "inactive-settings.epub",
+            "urn:test:inactive-settings",
+            "inactive-settings-fingerprint",
+            {"title": "Inactive settings"},
+            preferred_book_id="inactive-settings-book",
+        )
+        self.store.mark_missing(inactive.book_id)
+        tag = self.store.create_ai_tag("Technical")
+        payload = {
+            "visibility": "restricted",
+            "user_ids": [self.member.user_id],
+            "tag_ids": [tag["id"]],
+            "profile": "technical",
+        }
+
+        saved = self.admin_client.put(
+            "/api/admin/books/" + book.book_id + "/settings",
+            json=payload,
+        )
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["book"]["id"], book.book_id)
+        self.assertEqual(saved.json()["book"]["visibility"], "restricted")
+        self.assertEqual(saved.json()["book"]["grants"], [self.member.user_id])
+        self.assertEqual(saved.json()["book"]["ai_profile"], "technical")
+        self.assertEqual(saved.json()["summary"]["grant_count"], 1)
+        self.assertEqual(saved.json()["summary"]["ai_profile"], "technical")
+        self.assertEqual(
+            saved.json()["summary"]["ai_tags"],
+            [{"id": tag["id"], "name": "Technical"}],
+        )
+
+        invalid_payloads = (
+            {key: value for key, value in payload.items() if key != "profile"},
+            {**payload, "unexpected": True},
+            {**payload, "visibility": True},
+            {**payload, "visibility": "secret"},
+            {**payload, "user_ids": "not-a-list"},
+            {**payload, "user_ids": [True]},
+            {**payload, "tag_ids": {}},
+            {**payload, "tag_ids": [False]},
+            {**payload, "profile": True},
+            {**payload, "profile": "unsupported"},
+            {**payload, "user_ids": ["unknown-private-user"]},
+            {**payload, "tag_ids": ["unknown-private-tag"]},
+        )
+        for invalid_payload in invalid_payloads:
+            with self.subTest(payload=invalid_payload):
+                rejected = self.admin_client.put(
+                    "/api/admin/books/" + book.book_id + "/settings",
+                    json=invalid_payload,
+                )
+                self.assertEqual(rejected.status_code, 400)
+                self.assertEqual(rejected.json()["code"], "invalid_book_settings")
+                self.assertNotIn("unknown-private", rejected.text)
+
+        unknown_book = self.admin_client.put(
+            "/api/admin/books/missing-settings-book/settings",
+            json=payload,
+        )
+        inactive_book = self.admin_client.put(
+            "/api/admin/books/" + inactive.book_id + "/settings",
+            json=payload,
+        )
+        member_denied = self.member_client.put(
+            "/api/admin/books/" + book.book_id + "/settings",
+            json=payload,
+        )
+        csrf_token = self.admin_client.headers.pop("X-CSRF-Token")
+        try:
+            csrf_denied = self.admin_client.put(
+                "/api/admin/books/" + book.book_id + "/settings",
+                json=payload,
+            )
+        finally:
+            self.admin_client.headers["X-CSRF-Token"] = csrf_token
+
+        self.assertEqual(unknown_book.status_code, 404)
+        self.assertEqual(inactive_book.status_code, 404)
+        self.assertEqual(member_denied.status_code, 403)
+        self.assertEqual(csrf_denied.status_code, 403)
+        self.assertEqual(csrf_denied.json()["code"], "csrf_required")
+
+        with mock.patch.object(
+            self.store,
+            "update_admin_book_settings",
+            side_effect=KeyError("PRIVATE_RESTRICTED_ENTITY_SENTINEL"),
+        ):
+            hidden_failure = self.admin_client.put(
+                "/api/admin/books/" + book.book_id + "/settings",
+                json=payload,
+            )
+        self.assertEqual(hidden_failure.status_code, 400)
+        self.assertEqual(hidden_failure.json()["code"], "invalid_book_settings")
+        self.assertNotIn("PRIVATE_RESTRICTED_ENTITY_SENTINEL", hidden_failure.text)
+
+    def test_admin_book_routes_preserve_encoded_slash_ids_and_specific_suffixes(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "slash-id.epub",
+            "urn:test:slash-id",
+            "slash-id-fingerprint",
+            {"title": "Slash ID", "authors": [], "tags": []},
+            preferred_book_id="book/id",
+        )
+        payload = {
+            "visibility": "restricted",
+            "user_ids": [],
+            "tag_ids": [],
+            "profile": "general",
+        }
+
+        detail = self.admin_client.get("/api/admin/books/book%2Fid")
+        settings = self.admin_client.put(
+            "/api/admin/books/book%2Fid/settings",
+            json=payload,
+        )
+        ai = self.admin_client.get("/api/admin/books/book%2Fid/ai")
+        grants = self.admin_client.put(
+            "/api/admin/books/book%2Fid/grants",
+            json={"user_ids": []},
+        )
+        index = self.admin_client.get("/api/admin/books/index")
+        collection = self.admin_client.get("/api/admin/books")
+        empty_detail = self.admin_client.get("/api/admin/books/")
+        empty_settings = self.admin_client.put(
+            "/api/admin/books//settings",
+            json=payload,
+        )
+
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["book"]["id"], book.book_id)
+        self.assertEqual(settings.status_code, 200)
+        self.assertEqual(settings.json()["book"]["id"], "book/id")
+        self.assertEqual(ai.status_code, 200)
+        self.assertEqual(ai.json()["profile"], "general")
+        self.assertEqual(grants.status_code, 200)
+        self.assertEqual(grants.json()["grants"]["book_id"], "book/id")
+        self.assertEqual(index.status_code, 200)
+        self.assertEqual(collection.status_code, 200)
+        self.assertIn("book/id", {item["id"] for item in index.json()["books"]})
+        self.assertIn("book/id", {item["id"] for item in collection.json()["books"]})
+        self.assertEqual(empty_detail.status_code, 404)
+        self.assertEqual(empty_settings.status_code, 404)
+
     def test_admin_saves_book_tags_and_ai_profile_independently(self):
         book = self.store.resolve_book(
             Path(self.directory.name) / "book.epub",

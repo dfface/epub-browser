@@ -612,6 +612,19 @@ def create_app(
             'effective_tags': list(store.effective_book_tags(book.book_id)),
         }
 
+    def admin_book_summary_data(book):
+        payload = dict(book)
+        payload['authors'] = list(book['authors'])
+        payload['epub_tags'] = list(book['epub_tags'])
+        payload['ai_tags'] = [dict(tag) for tag in book['ai_tags']]
+        return payload
+
+    def admin_book_detail_data(book):
+        payload = admin_book_summary_data(book)
+        payload['grants'] = list(book['grants'])
+        payload['effective_tags'] = list(book['effective_tags'])
+        return payload
+
     def admin_identity_data(identity):
         user = store.get_user(identity.user_id)
         return {
@@ -1471,9 +1484,24 @@ window.location.assign(payload.redirect||'/');
             {'books': [admin_book_data(book) for book in store.active_books()]}
         )
 
+    async def admin_book_index(request):
+        require_admin(request)
+        return response({
+            'books': [
+                admin_book_summary_data(book)
+                for book in store.list_admin_book_summaries()
+            ]
+        })
+
     async def admin_book(request):
         require_admin(request)
         book_id = request.path_params['book_id']
+        if request.method == 'GET':
+            try:
+                book = store.get_admin_book_detail(book_id)
+            except KeyError:
+                return response(error_payload('not_found', 'Book not found'), 404)
+            return response({'book': admin_book_detail_data(book)})
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
@@ -1488,6 +1516,72 @@ window.location.assign(payload.redirect||'/');
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
         return response({'book': admin_book_data(book)})
+
+    async def admin_book_settings(request):
+        require_admin(request)
+        book_id = request.path_params['book_id']
+        try:
+            store.get_admin_book_detail(book_id)
+        except KeyError:
+            return response(error_payload('not_found', 'Book not found'), 404)
+
+        data = await json_object(request)
+        required = {'visibility', 'user_ids', 'tag_ids', 'profile'}
+        if data is None or set(data) != required:
+            return response(
+                error_payload(
+                    'invalid_book_settings',
+                    'Invalid book settings',
+                ),
+                400,
+            )
+        visibility = data['visibility']
+        user_ids = data['user_ids']
+        tag_ids = data['tag_ids']
+        profile = data['profile']
+        if (
+            not isinstance(visibility, str)
+            or visibility not in {'authenticated', 'restricted'}
+            or not isinstance(user_ids, list)
+            or any(
+                not isinstance(user_id, str) or not user_id
+                for user_id in user_ids
+            )
+            or not isinstance(tag_ids, list)
+            or any(
+                not isinstance(tag_id, str) or not tag_id
+                for tag_id in tag_ids
+            )
+            or not isinstance(profile, str)
+            or profile not in {'auto', 'technical', 'fiction', 'general'}
+        ):
+            return response(
+                error_payload(
+                    'invalid_book_settings',
+                    'Invalid book settings',
+                ),
+                400,
+            )
+        try:
+            book, summary = store.update_admin_book_settings(
+                book_id,
+                visibility=visibility,
+                user_ids=user_ids,
+                tag_ids=tag_ids,
+                profile=profile,
+            )
+        except (KeyError, ValueError):
+            return response(
+                error_payload(
+                    'invalid_book_settings',
+                    'Invalid book settings',
+                ),
+                400,
+            )
+        return response({
+            'book': admin_book_detail_data(book),
+            'summary': admin_book_summary_data(summary),
+        })
 
     async def admin_book_grant(request):
         require_admin(request)
@@ -2674,25 +2768,39 @@ window.location.assign(payload.redirect||'/');
             methods=['GET', 'POST', 'DELETE'],
         ),
         Route('/api/admin/books', admin_books, methods=['GET']),
-        Route('/api/admin/books/{book_id}', admin_book, methods=['PUT']),
-        Route('/api/admin/ai/settings', admin_ai_settings, methods=['GET', 'PUT']),
-        Route('/api/admin/ai/users/{user_id}', admin_ai_user_access, methods=['GET', 'PUT']),
-        Route('/api/admin/ai/tags', admin_ai_tags, methods=['GET', 'POST']),
-        Route('/api/admin/ai/tags/{tag_id}', admin_ai_tag, methods=['PUT', 'DELETE']),
-        Route('/api/admin/books/{book_id}/ai', admin_book_ai, methods=['GET', 'PUT']),
-        Route('/api/admin/ai/results', admin_ai_results, methods=['DELETE']),
-        Route('/api/admin/ai/jobs', admin_ai_jobs, methods=['GET']),
-        Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
+        Route('/api/admin/books/index', admin_book_index, methods=['GET']),
         Route(
-            '/api/admin/books/{book_id}/grants',
+            '/api/admin/books/{book_id:path}/settings',
+            admin_book_settings,
+            methods=['PUT'],
+        ),
+        Route(
+            '/api/admin/books/{book_id:path}/ai',
+            admin_book_ai,
+            methods=['GET', 'PUT'],
+        ),
+        Route(
+            '/api/admin/books/{book_id:path}/grants/{user_id}',
+            admin_book_grant,
+            methods=['PUT', 'DELETE'],
+        ),
+        Route(
+            '/api/admin/books/{book_id:path}/grants',
             admin_book_grants,
             methods=['PUT'],
         ),
         Route(
-            '/api/admin/books/{book_id}/grants/{user_id}',
-            admin_book_grant,
-            methods=['PUT', 'DELETE'],
+            '/api/admin/books/{book_id:path}',
+            admin_book,
+            methods=['GET', 'PUT'],
         ),
+        Route('/api/admin/ai/settings', admin_ai_settings, methods=['GET', 'PUT']),
+        Route('/api/admin/ai/users/{user_id}', admin_ai_user_access, methods=['GET', 'PUT']),
+        Route('/api/admin/ai/tags', admin_ai_tags, methods=['GET', 'POST']),
+        Route('/api/admin/ai/tags/{tag_id}', admin_ai_tag, methods=['PUT', 'DELETE']),
+        Route('/api/admin/ai/results', admin_ai_results, methods=['DELETE']),
+        Route('/api/admin/ai/jobs', admin_ai_jobs, methods=['GET']),
+        Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
