@@ -618,7 +618,12 @@ def create_app(
                 bytes(body).decode('utf-8'),
                 object_pairs_hook=unique_object,
             )
-        except (UnicodeDecodeError, json.JSONDecodeError, DuplicateKeyError):
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            DuplicateKeyError,
+            RecursionError,
+        ):
             return None
         return data if isinstance(data, dict) else None
 

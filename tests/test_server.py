@@ -1013,8 +1013,12 @@ class AdminAccountTests(unittest.TestCase):
         self.admin_client = self._login("admin", "admin-secret")
         self.member_client = self._login("member", "member-secret")
 
-    def _login(self, username, password):
-        client = TestClient(self.app, follow_redirects=False)
+    def _login(self, username, password, **client_options):
+        client = TestClient(
+            self.app,
+            follow_redirects=False,
+            **client_options,
+        )
         self.addCleanup(client.close)
         login = _json_login(self, client, username, password)
         self.assertEqual(login.status_code, 200)
@@ -1867,6 +1871,52 @@ class AdminAccountTests(unittest.TestCase):
             rejected = self.admin_client.put(
                 "/api/admin/books/" + book.book_id + "/settings",
                 content=duplicate_body,
+                headers={"Content-Type": "application/json"},
+            )
+
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(rejected.json()["code"], "invalid_book_settings")
+        update_settings.assert_not_called()
+        get_detail.assert_not_called()
+        self.assertEqual(self.store.get_admin_book_detail(book.book_id), before)
+
+    def test_admin_book_settings_rejects_deeply_nested_json_without_store_access(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "deeply-nested-settings.epub",
+            "urn:test:deeply-nested-settings",
+            "deeply-nested-settings-fingerprint",
+            {"title": "Deeply nested settings", "authors": [], "tags": []},
+            preferred_book_id="deeply-nested-settings-book",
+        )
+        nested_user_ids = (
+            ("[" * 2000)
+            + json.dumps(self.member.user_id)
+            + ("]" * 2000)
+        )
+        request_body = (
+            '{"visibility":"restricted","user_ids":'
+            + nested_user_ids
+            + ',"tag_ids":[],"profile":"technical"}'
+        )
+        before = self.store.get_admin_book_detail(book.book_id)
+        private_error_client = self._login(
+            "admin",
+            "admin-secret",
+            raise_server_exceptions=False,
+        )
+
+        with mock.patch.object(
+            self.store,
+            "update_admin_book_settings",
+            wraps=self.store.update_admin_book_settings,
+        ) as update_settings, mock.patch.object(
+            self.store,
+            "get_admin_book_detail",
+            wraps=self.store.get_admin_book_detail,
+        ) as get_detail:
+            rejected = private_error_client.put(
+                "/api/admin/books/" + book.book_id + "/settings",
+                content=request_body,
                 headers={"Content-Type": "application/json"},
             )
 
