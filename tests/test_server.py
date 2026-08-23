@@ -609,6 +609,20 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             "a1",
         )
 
+    def test_password_login_reports_the_remaining_throttle_delay(self):
+        for _ in range(4):
+            denied = _json_login(self, self.client, "alice", "wrong")
+            self.assertEqual(denied.status_code, 401)
+            self.assertEqual(denied.json()["code"], "invalid_credentials")
+
+        throttled = _json_login(self, self.client, "alice", "wrong")
+
+        self.assertEqual(throttled.status_code, 429)
+        self.assertEqual(throttled.json()["code"], "login_throttled")
+        self.assertEqual(throttled.json()["retry_after_seconds"], 300)
+        self.assertEqual(throttled.headers["retry-after"], "300")
+        self.assertIn("Too many sign-in attempts", throttled.json()["message"])
+
     def test_anonymous_login_requires_json_same_origin_source_and_strict_nonce(self):
         nonce = _anonymous_auth_nonce(self, self.client)
         valid_payload = {

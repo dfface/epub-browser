@@ -343,6 +343,27 @@ test('book index renders only the current page and resets pagination for control
   assert.deepEqual(calls, ['/api/admin/books/index']);
 });
 
+test('book pagination keeps a compact page window and announces the current page', async () => {
+  const books = Array.from({ length: 180 }, (_, index) => adminBook({
+    id: `book-${index + 1}`,
+    title: `Book ${String(index + 1).padStart(3, '0')}`,
+  }));
+  const { root, elements } = bookUiHarness(url => Promise.resolve(
+    response(url === '/api/admin/books/index' ? 200 : 404, { books })
+  ));
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+
+  const pageButtons = descendants(elements.adminBookPagination).filter(node =>
+    node.classList.contains('admin-book-page') && /^Page /.test(node.textContent)
+  );
+  assert.equal(pageButtons.length, 4);
+  assert.equal(pageButtons.find(node => node.getAttribute('aria-current') === 'page').textContent, 'Page 1');
+  assert.ok(pageButtons.every(node => node.classList.contains('bookshelf-action-btn')));
+});
+
 test('book index matches literal and tone-free pinyin text without unsafe HTML rendering', async () => {
   const books = [
     adminBook({
@@ -953,6 +974,110 @@ test('account settings and administration open as separate surfaces', async () =
     '/api/admin/ai/tags',
     '/api/admin/ai/jobs?page=1&page_size=20',
   ]);
+});
+
+test('administration section navigation keeps one workspace visible and marks its tab current', async () => {
+  const overviewTab = fakeElement('button');
+  const usersTab = fakeElement('button');
+  const aiTab = fakeElement('button');
+  const overview = fakeElement('section');
+  const users = fakeElement('section');
+  const ai = fakeElement('section');
+  overviewTab.setAttribute('data-admin-section', 'overview');
+  usersTab.setAttribute('data-admin-section', 'users');
+  aiTab.setAttribute('data-admin-section', 'ai');
+  overviewTab.setAttribute('role', 'tab');
+  usersTab.setAttribute('role', 'tab');
+  aiTab.setAttribute('role', 'tab');
+  overview.setAttribute('data-admin-panel', 'overview');
+  users.setAttribute('data-admin-panel', 'users');
+  ai.setAttribute('data-admin-panel', 'ai');
+  overview.hidden = false;
+  users.hidden = true;
+  ai.hidden = true;
+  const root = rootWithFetch(() => Promise.resolve(response(200, {
+    user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token',
+  })));
+  root.document = {
+    getElementById() { return null; },
+    querySelectorAll(selector) {
+      if (selector === '[data-admin-section]') return [overviewTab, usersTab, aiTab];
+      if (selector === '[data-admin-panel]') return [overview, users, ai];
+      return [];
+    },
+    addEventListener() {},
+  };
+  const auth = AuthModule.create(root);
+
+  await auth.init();
+  usersTab.click();
+
+  assert.equal(overview.hidden, true);
+  assert.equal(users.hidden, false);
+  assert.equal(ai.hidden, true);
+  assert.equal(usersTab.getAttribute('aria-selected'), 'true');
+  assert.equal(overviewTab.getAttribute('aria-selected'), 'false');
+});
+
+test('clearing all AI results requires an explicit administrator confirmation', async () => {
+  const clearAll = fakeElement('button');
+  const calls = [];
+  let confirmed = false;
+  const root = rootWithFetch((url, options = {}) => {
+    calls.push({ url, method: options.method || 'GET' });
+    if (url === '/api/session') return Promise.resolve(response(200, {
+      user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token',
+    }));
+    return Promise.resolve(response(200, { deleted: 3 }));
+  });
+  root.confirm = () => confirmed;
+  root.document = {
+    getElementById(id) { return id === 'adminAiClearAll' ? clearAll : null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const auth = AuthModule.create(root);
+
+  await auth.init();
+  clearAll.click();
+  await tick();
+  assert.deepEqual(calls, [{ url: '/api/session', method: 'GET' }]);
+
+  confirmed = true;
+  clearAll.click();
+  await tick();
+  assert.ok(calls.some(call => (
+    call.url === '/api/admin/ai/results' && call.method === 'DELETE'
+  )));
+});
+
+test('closing administration keeps unsaved form changes until the administrator confirms', async () => {
+  const adminPanel = fakeElement('section');
+  const adminClose = fakeElement('button');
+  const aiSettingsForm = fakeElement('form');
+  let discard = false;
+  const root = rootWithFetch(() => Promise.resolve(response(200, {
+    user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token',
+  })));
+  root.confirm = () => discard;
+  root.document = {
+    getElementById(id) {
+      return ({ adminPanel, adminClose, adminAiSettingsForm: aiSettingsForm })[id] || null;
+    },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const auth = AuthModule.create(root);
+
+  await auth.init();
+  adminPanel.classList.add('active');
+  if (aiSettingsForm.listeners.input) aiSettingsForm.listeners.input();
+  adminClose.click();
+  assert.equal(adminPanel.classList.contains('active'), true);
+
+  discard = true;
+  adminClose.click();
+  assert.equal(adminPanel.classList.contains('active'), false);
 });
 
 test('proxy association form stays hidden without a pending third-party identity', async () => {

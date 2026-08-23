@@ -224,9 +224,14 @@ class SessionAndProxyTests(unittest.TestCase):
 
         self.assertTrue(service.login_is_throttled("ip", "ALICE"))
         self.assertFalse(service.login_is_throttled("ip", "bob"))
+        self.assertEqual(service.login_retry_after_seconds("ip", "alice"), 300)
 
-        self.clock.advance(service.throttle_window_seconds + 1)
+        self.clock.advance(1)
+        self.assertEqual(service.login_retry_after_seconds("ip", "alice"), 299)
+
+        self.clock.advance(service.throttle_window_seconds)
         self.assertFalse(service.login_is_throttled("ip", "alice"))
+        self.assertEqual(service.login_retry_after_seconds("ip", "alice"), 0)
 
     def test_active_throttle_survives_new_key_churn_at_capacity(self):
         service = AuthService(

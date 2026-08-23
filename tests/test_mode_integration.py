@@ -294,7 +294,7 @@ class ModeIntegrationTests(unittest.TestCase):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
         readme = Path("README.md").read_text(encoding="utf-8")
         migration = Path("docs/migration-v2.md")
-        release = Path("docs/releases/v2.3.0.md")
+        release = Path("docs/releases/v2.3.1.md")
 
         self.assertIn('"server"', dockerfile)
         self.assertIn('"--server-dir=/app/EpubBrowserFiles"', dockerfile)
@@ -307,7 +307,7 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertIn("reverse proxy", readme.lower())
         self.assertTrue(migration.is_file())
         self.assertTrue(release.is_file())
-        self.assertIn('VERSION = "2.3.0"', Path("epub_browser/version.py").read_text())
+        self.assertIn('VERSION = "2.3.1"', Path("epub_browser/version.py").read_text())
 
     def test_docker_server_defaults_to_embedded_book_id_storage(self):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")

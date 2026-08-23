@@ -2871,14 +2871,22 @@ class StateStore:
     def list_ai_tags(self) -> tuple[dict, ...]:
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT id, normalized_name, name FROM ai_tags "
-                "ORDER BY normalized_name, id"
+                """
+                SELECT ai_tags.id, ai_tags.normalized_name, ai_tags.name,
+                       COUNT(books.book_id) AS book_count
+                FROM ai_tags
+                LEFT JOIN book_ai_tags ON book_ai_tags.tag_id = ai_tags.id
+                LEFT JOIN books ON books.book_id = book_ai_tags.book_id AND books.active = 1
+                GROUP BY ai_tags.id, ai_tags.normalized_name, ai_tags.name
+                ORDER BY ai_tags.normalized_name, ai_tags.id
+                """
             ).fetchall()
         return tuple(
             {
                 "id": row["id"],
                 "normalized_name": row["normalized_name"],
                 "name": row["name"],
+                "book_count": int(row["book_count"]),
             }
             for row in rows
         )

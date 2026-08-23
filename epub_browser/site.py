@@ -161,32 +161,63 @@ def render_library_shell(
         <div class="account-modal-body"><div class="account-layout">
         <section class="account-admin account-admin-console" aria-labelledby="adminTitle">
             <p class="account-admin-intro" data-i18n="admin.description">Manage users, external identities, and access to restricted books.</p>
+            <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
+                <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
+                <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
+                <button type="button" class="admin-section-tab" id="adminSectionAiTab" role="tab" aria-selected="false" aria-controls="adminAiSection" data-admin-section="ai" data-i18n="admin.ai.title">AI reading</button>
+                <button type="button" class="admin-section-tab" id="adminSectionTagsTab" role="tab" aria-selected="false" aria-controls="adminTagsSection" data-admin-section="tags" data-i18n="admin.tags">Tag management</button>
+                <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books" data-i18n="admin.books">Book management</button>
+            </nav>
             <div class="account-admin-grid">
-            <section class="account-admin-section account-card-wide account-users-section" aria-labelledby="adminUsersTitle">
+            <section class="account-admin-section account-card-wide admin-overview-section" id="adminOverviewSection" role="tabpanel" aria-labelledby="adminSectionOverviewTab" data-admin-panel="overview">
+                <h4 data-i18n="admin.overview">Overview</h4>
+                <p class="account-section-copy" data-i18n="admin.overviewDescription">Review the state of your library and jump straight to the area that needs attention.</p>
+                <div class="admin-overview-grid">
+                    <button type="button" class="admin-overview-stat" data-admin-section="users"><span data-i18n="admin.overview.users">Users</span><strong id="adminOverviewUsers">—</strong></button>
+                    <button type="button" class="admin-overview-stat" data-admin-section="ai"><span data-i18n="admin.overview.ai">AI reading</span><strong id="adminOverviewAi">—</strong></button>
+                    <button type="button" class="admin-overview-stat" data-admin-section="tags"><span data-i18n="admin.overview.tags">Server tags</span><strong id="adminOverviewTags">—</strong></button>
+                    <button type="button" class="admin-overview-stat" data-admin-section="books"><span data-i18n="admin.overview.books">Books</span><strong id="adminOverviewBooks">—</strong></button>
+                </div>
+                <p id="adminOverviewLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
+            </section>
+            <section class="account-admin-section account-card-wide account-users-section" id="adminUsersSection" role="tabpanel" aria-labelledby="adminSectionUsersTab" data-admin-panel="users" hidden>
                 <h4 id="adminUsersTitle" data-i18n="admin.users">Users</h4>
                 <p class="account-section-copy" data-i18n="admin.usersDescription">Create local accounts and manage their access, role, password, and sessions.</p>
                 <form class="account-form account-create-user-form" id="adminUserForm">
                     <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="off" required></label>
                     <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="new-password" required></label>
                     <label><span data-i18n="admin.role">Role</span><select name="role"><option value="member" data-i18n="account.role.member">Member</option><option value="admin" data-i18n="account.role.admin">Administrator</option></select></label>
-                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.createUser">Create user</button>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminUserSubmit" data-i18n="admin.createUser">Create user</button>
                 </form>
                 <ul class="account-list" id="adminUserList"></ul>
             </section>
-            <section class="account-admin-section account-card-wide account-ai-section" aria-labelledby="adminAiTitle">
+            <section class="account-admin-section account-card-wide account-ai-section" id="adminAiSection" role="tabpanel" aria-labelledby="adminSectionAiTab" data-admin-panel="ai" hidden>
                 <h4 id="adminAiTitle" data-i18n="admin.ai.title">AI reading</h4>
                 <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and cached results. Selected book text is sent to the configured provider.</p>
                 <form class="account-form admin-ai-settings-form" id="adminAiSettingsForm">
-                    <label class="admin-ai-enabled"><span data-i18n="admin.ai.enabled">Enable AI reading</span><input type="checkbox" name="enabled"></label>
-                    <label><span data-i18n="admin.ai.baseUrl">Provider base URL</span><input type="url" name="base_url" autocomplete="off" placeholder="https://api.example/v1" required></label>
-                    <label><span data-i18n="admin.ai.apiKey">API key</span><input type="password" name="api_key" autocomplete="new-password" data-i18n-placeholder="admin.ai.apiKeyPlaceholder" placeholder="Leave blank to keep the configured key"></label>
-                    <label><span data-i18n="admin.ai.model">Model</span><input type="text" name="model" autocomplete="off" required></label>
-                    <label><span data-i18n="admin.ai.timeout">Timeout (seconds)</span><input type="number" name="timeout_seconds" min="5" max="3600" required></label>
-                    <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.modelContextWindow">Model context window (tokens)</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.modelContextWindowHelp" data-i18n-aria-label="admin.ai.modelContextWindowHelpLabel" data-tip="The total input and output tokens the selected model supports in one request. EPUB Browser automatically reserves room for the answer and uses the remainder for source text and conversation history." aria-label="Explain model context window"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="model_context_window" min="2048" max="100000000" required></label>
-                    <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.concurrency">Max concurrency</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.concurrencyHelp" data-i18n-aria-label="admin.ai.concurrencyHelpLabel" data-tip="Maximum number of AI requests this server sends at the same time. A lower value is gentler on the provider; a higher value improves throughput but can hit provider limits." aria-label="Explain max concurrency"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="max_concurrency" min="1" max="4" required></label>
-                    <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.dailyLimitHelp" data-i18n-aria-label="admin.ai.dailyLimitHelpLabel" data-tip="Default number of AI requests each authorized member may start per day. Set 0 for no daily limit. Per-member overrides take precedence." aria-label="Explain default daily limit"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="daily_limit" min="0" required></label>
-                    <label class="admin-ai-clear-key"><input type="checkbox" name="clear_api_key"><span data-i18n="admin.ai.clearKey">Clear stored API key</span></label>
-                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.ai.save">Save AI settings</button>
+                    <fieldset class="admin-ai-settings-group admin-ai-connection-group">
+                        <legend data-i18n="admin.ai.connection">Connection and model</legend>
+                        <label class="admin-ai-enabled"><span data-i18n="admin.ai.enabled">Enable AI reading</span><input type="checkbox" name="enabled"></label>
+                        <p class="admin-ai-connection-status" id="adminAiConnectionStatus" role="status"></p>
+                        <label><span data-i18n="admin.ai.baseUrl">Provider base URL</span><input type="url" name="base_url" autocomplete="off" placeholder="https://api.example/v1" required></label>
+                        <label><span data-i18n="admin.ai.apiKey">API key</span><input type="password" name="api_key" autocomplete="new-password" data-i18n-placeholder="admin.ai.apiKeyPlaceholder" placeholder="Leave blank to keep the configured key"></label>
+                        <label><span data-i18n="admin.ai.model">Model</span><input type="text" name="model" autocomplete="off" required></label>
+                    </fieldset>
+                    <fieldset class="admin-ai-settings-group admin-ai-execution-group">
+                        <legend data-i18n="admin.ai.execution">Execution and limits</legend>
+                        <label><span data-i18n="admin.ai.timeout">Timeout (seconds)</span><input type="number" name="timeout_seconds" min="5" max="3600" required></label>
+                        <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.modelContextWindow">Model context window (tokens)</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.modelContextWindowHelp" data-i18n-aria-label="admin.ai.modelContextWindowHelpLabel" data-tip="The total input and output tokens the selected model supports in one request. EPUB Browser automatically reserves room for the answer and uses the remainder for source text and conversation history." aria-label="Explain model context window"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="model_context_window" min="2048" max="100000000" required></label>
+                        <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.concurrency">Max concurrency</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.concurrencyHelp" data-i18n-aria-label="admin.ai.concurrencyHelpLabel" data-tip="Maximum number of AI requests this server sends at the same time. A lower value is gentler on the provider; a higher value improves throughput but can hit provider limits." aria-label="Explain max concurrency"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="max_concurrency" min="1" max="4" required></label>
+                    </fieldset>
+                    <fieldset class="admin-ai-settings-group admin-ai-member-defaults-group">
+                        <legend data-i18n="admin.ai.memberDefaults">Member defaults</legend>
+                        <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.dailyLimitHelp" data-i18n-aria-label="admin.ai.dailyLimitHelpLabel" data-tip="Default number of AI requests each authorized member may start per day. Set 0 for no daily limit. Per-member overrides take precedence." aria-label="Explain default daily limit"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="daily_limit" min="0" required></label>
+                    </fieldset>
+                    <fieldset class="admin-ai-settings-group admin-ai-credential-group">
+                        <legend data-i18n="admin.ai.credentials">Credentials</legend>
+                        <label class="admin-ai-clear-key"><input type="checkbox" name="clear_api_key"><span data-i18n="admin.ai.clearKey">Clear stored API key</span></label>
+                    </fieldset>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminAiSettingsSubmit" data-i18n="admin.ai.save">Save AI settings</button>
                 </form>
                 <p class="account-section-copy admin-ai-key-notice" data-i18n="admin.ai.keyNotice">The API key is stored in this server's SQLite database and is never returned to the browser.</p>
                 <div class="admin-ai-subsection">
@@ -217,16 +248,16 @@ def render_library_shell(
                     <p id="adminAiJobsLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
                 </section>
             </section>
-            <section class="account-admin-section account-card-wide account-tags-section" aria-labelledby="adminTagsTitle">
+            <section class="account-admin-section account-card-wide account-tags-section" id="adminTagsSection" role="tabpanel" aria-labelledby="adminSectionTagsTab" data-admin-panel="tags" hidden>
                 <h4 id="adminTagsTitle" data-i18n="admin.tags">Tag management</h4>
                 <p class="account-section-copy" data-i18n="admin.tagsDescription">Create server-managed tags and assign them to books. They complement read-only EPUB tags.</p>
                 <form class="account-form admin-ai-tag-form" id="adminAiTagForm">
                     <label><span data-i18n="admin.ai.tagName">Tag name</span><input type="text" name="name" maxlength="80" required></label>
-                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.ai.addTag">Add tag</button>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminAiTagSubmit" data-i18n="admin.ai.addTag">Add tag</button>
                 </form>
                 <ul class="account-list" id="adminAiTagList"></ul>
             </section>
-            <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" hidden>
+            <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" data-admin-panel="users" hidden>
                 <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
                 <p class="account-section-copy" data-i18n="admin.identityHelp">For OIDC, let a trusted reverse proxy complete the protocol and pass a stable subject. Issuer must match --proxy-issuer; subject must match the configured subject header.</p>
                 <form class="account-form" id="adminIdentityForm">
@@ -238,18 +269,19 @@ def render_library_shell(
                 </form>
                 <ul class="account-list" id="adminIdentityList"></ul>
             </section>
-            <section class="account-admin-section account-card-wide" aria-labelledby="adminBooksTitle">
+            <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
                 <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
                 <p class="account-section-copy" data-i18n="admin.booksDescription">Manage visibility, member access, server tags, AI reading classification, and AI results for each book.</p>
-                <div id="adminBookTableSurface" hidden>
-                    <div class="account-form admin-books-controls">
-                        <label for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
-                        <label for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
-                        <label for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Server tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All server tags</option></select></label>
-                        <label for="adminBookPageSize"><span data-i18n="admin.books.pageSize">Books per page</span><select id="adminBookPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
-                        <button type="button" class="bookshelf-action-btn" id="adminBookRefresh" data-i18n="admin.books.refresh">Refresh</button>
+                <div id="adminBookTableSurface" class="admin-books-workspace" hidden>
+                    <div class="account-form admin-books-controls" role="search" aria-labelledby="adminBooksTitle">
+                        <label class="admin-book-search-control" for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
+                        <label class="admin-book-filter-control" for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
+                        <label class="admin-book-filter-control" for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Server tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All server tags</option></select></label>
+                        <label class="admin-book-page-size-control" for="adminBookPageSize"><span data-i18n="admin.books.pageSize">Books per page</span><select id="adminBookPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
+                        <button type="button" class="bookshelf-action-btn account-inline-action admin-book-clear-filters" id="adminBookClearFilters" data-i18n="admin.books.clearFilters">Clear filters</button>
+                        <button type="button" class="bookshelf-action-btn account-inline-action admin-book-refresh" id="adminBookRefresh" data-i18n="admin.books.refresh">Refresh</button>
                     </div>
-                    <div class="account-table-scroll">
+                    <div class="account-table-scroll admin-books-table-scroll">
                         <table class="account-admin-table">
                             <caption class="sr-only visually-hidden" data-i18n="admin.books.tableLabel">Books</caption>
                             <thead><tr><th scope="col" data-i18n="admin.books.header.book">Book</th><th scope="col" data-i18n="admin.books.header.access">Visibility and access</th><th scope="col" data-i18n="admin.books.header.profile">AI profile and tags</th><th scope="col" data-i18n="admin.books.header.results">AI results</th><th scope="col" data-i18n="admin.books.header.updated">Updated</th><th scope="col" data-i18n="admin.books.header.action">Actions</th></tr></thead>

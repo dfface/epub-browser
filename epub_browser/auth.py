@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import ipaddress
+import math
 import secrets
 import threading
 import time
@@ -296,6 +297,35 @@ class AuthService:
                     for (key_client, _), failures in self._login_failures.items()
                 )
             )
+
+    def login_retry_after_seconds(
+        self,
+        client_key: str,
+        username: Optional[str] = None,
+    ) -> int:
+        """Return the active throttle delay without exposing account state."""
+        now = self._now()
+        client = str(client_key)
+        with self._throttle_lock:
+            self._purge_login_failures(now)
+            failures = None
+            if username is not None:
+                key = self._login_key(client, self._normalize_login_username(username))
+                candidate = self._login_failures.get(key)
+                if candidate and len(candidate) >= self.throttle_limit:
+                    failures = candidate
+            if failures is None and len(self._login_failures) >= self.throttle_capacity:
+                candidates = [
+                    candidate
+                    for candidate in self._login_failures.values()
+                    if candidate
+                ]
+                if candidates:
+                    failures = min(candidates, key=lambda candidate: candidate[0])
+            if not failures:
+                return 0
+            remaining = failures[0] + self.throttle_window_seconds - now
+            return max(1, int(math.ceil(remaining)))
 
     def authenticate_password(
         self,

@@ -3,6 +3,7 @@ import base64
 import hashlib
 import html
 import json
+import math
 import os
 import posixpath
 import re
@@ -125,6 +126,7 @@ LOGIN_COPY = {
         'username': 'Username',
         'password': 'Password',
         'invalid_credentials': 'Invalid username or password.',
+        'login_throttled': 'Too many sign-in attempts. Try again in {minutes} minutes.',
         'language': 'Language',
     },
     'zh-CN': {
@@ -134,6 +136,7 @@ LOGIN_COPY = {
         'username': '用户名',
         'password': '密码',
         'invalid_credentials': '用户名或密码不正确。',
+        'login_throttled': '登录尝试次数过多，请在 {minutes} 分钟后重试。',
         'language': '语言',
     },
 }
@@ -1055,7 +1058,12 @@ if(localeField)localeField.value=localeSelect.value;
 }}
 var loginForm=document.getElementById('loginForm');
 var loginError=document.getElementById('loginError');
-function setLoginError(visible){{
+function setLoginError(visible,key,params){{
+if(loginError&&visible&&key){{
+loginError.setAttribute('data-i18n',key);
+loginError.setAttribute('data-i18n-params',JSON.stringify(params||{{}}));
+if(i18n&&i18n.t)loginError.textContent=i18n.t(key,params||{{}});
+}}
 if(loginError)loginError.hidden=!visible;
 if(loginForm)Array.prototype.forEach.call(loginForm.querySelectorAll('input[name="username"],input[name="password"]'),function(field){{
 if(visible)field.setAttribute('aria-invalid','true');else field.removeAttribute('aria-invalid');
@@ -1074,7 +1082,11 @@ headers:{{'Content-Type':'application/json','{AUTH_NONCE_HEADER}':'{nonce}'}},
 body:JSON.stringify({{username:username,password:password,next:next,locale:locale}})
 }}).then(function(response){{
 return response.json().catch(function(){{return {{}};}}).then(function(payload){{
-if(!response.ok){{setLoginError(true);return;}}
+if(!response.ok){{
+var retryAfter=Number(payload.retry_after_seconds||0);
+var errorKey=payload.code==='login_throttled'?'account.error.login_throttled':'account.error.invalid_credentials';
+setLoginError(true,errorKey,{{count:Math.max(1,Math.ceil(retryAfter/60))}});return;
+}}
 window.location.assign(payload.redirect||'/');
 }});
 }}).catch(function(){{setLoginError(true);}});
@@ -1117,6 +1129,21 @@ window.location.assign(payload.redirect||'/');
             client_key,
         )
         if principal is None:
+            retry_after_seconds = auth_service.login_retry_after_seconds(
+                client_key,
+                data.get('username', ''),
+            )
+            if retry_after_seconds:
+                locale = normalize_login_locale(data.get('locale') or requested_locale)
+                minutes = max(1, math.ceil(retry_after_seconds / 60))
+                payload = error_payload(
+                    'login_throttled',
+                    LOGIN_COPY[locale]['login_throttled'].format(minutes=minutes),
+                )
+                payload['retry_after_seconds'] = retry_after_seconds
+                throttled = response(payload, 429, cache_control='no-store')
+                throttled.headers['Retry-After'] = str(retry_after_seconds)
+                return throttled
             return response(
                 error_payload(
                     'invalid_credentials',

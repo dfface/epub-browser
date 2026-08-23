@@ -350,6 +350,51 @@ body.auth-page {
     line-height: 1.6;
 }
 
+.admin-section-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 5px;
+    border: 1px solid var(--account-border);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
+    scrollbar-width: thin;
+}
+
+.admin-section-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--account-muted);
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.admin-section-tab:hover {
+    color: var(--account-primary);
+}
+
+.admin-section-tab.is-active,
+.admin-section-tab[aria-selected="true"] {
+    border-color: color-mix(in srgb, var(--account-primary) 25%, var(--account-border));
+    background: var(--account-card);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--account-text) 10%, transparent);
+    color: var(--account-primary);
+}
+
+.admin-section-tab:focus-visible,
+.admin-overview-stat:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--account-primary) 42%, transparent);
+    outline-offset: 2px;
+}
+
 .account-card {
     padding: clamp(20px, 3vw, 28px);
 }
@@ -534,6 +579,40 @@ body.auth-page {
     background: color-mix(in srgb, var(--account-card) 88%, var(--account-bg));
 }
 
+.admin-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.admin-overview-stat {
+    display: grid;
+    min-width: 0;
+    gap: 7px;
+    padding: 15px;
+    border: 1px solid var(--account-border);
+    border-radius: 9px;
+    background: var(--account-card);
+    color: var(--account-muted);
+    font: inherit;
+    font-size: .76rem;
+    font-weight: 700;
+    text-align: start;
+    cursor: pointer;
+}
+
+.admin-overview-stat:hover {
+    border-color: color-mix(in srgb, var(--account-primary) 42%, var(--account-border));
+    background: color-mix(in srgb, var(--account-primary) 5%, var(--account-card));
+}
+
+.admin-overview-stat strong {
+    overflow-wrap: anywhere;
+    color: var(--account-text);
+    font-size: 1.08rem;
+    line-height: 1.25;
+}
+
 .account-users-section {
     padding: clamp(20px, 3vw, 28px);
 }
@@ -544,8 +623,49 @@ body.auth-page {
 }
 
 .admin-ai-settings-form {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: end;
+}
+
+.admin-ai-settings-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+    padding: 15px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--account-primary) 2%, var(--account-card));
+}
+
+.admin-ai-settings-group legend {
+    padding: 0 6px;
+    color: var(--account-text);
+    font-size: .78rem;
+    font-weight: 750;
+}
+
+.admin-ai-connection-group,
+.admin-ai-execution-group {
+    grid-column: 1 / -1;
+}
+
+.admin-ai-member-defaults-group,
+.admin-ai-credential-group {
+    grid-template-columns: 1fr;
+}
+
+.admin-ai-connection-status {
+    grid-column: 1 / -1;
+    margin: -2px 0 0;
+    color: var(--account-muted);
+    font-size: .78rem;
+    line-height: 1.45;
+}
+
+.admin-ai-connection-status.is-ready {
+    color: var(--account-success);
 }
 
 .admin-ai-settings-form .admin-ai-enabled,
@@ -604,6 +724,54 @@ body.auth-page {
     min-height: 44px;
 }
 
+.admin-books-workspace {
+    display: grid;
+    gap: 14px;
+    margin-top: 20px;
+    min-width: 0;
+}
+
+.admin-books-controls {
+    grid-template-columns: minmax(16rem, 2fr) repeat(2, minmax(10rem, 1fr)) minmax(7.5rem, .65fr) auto auto;
+    align-items: end;
+    gap: 12px;
+    margin-top: 0;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--account-border) 82%, var(--account-primary));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--account-primary) 3%, var(--account-card));
+}
+
+.admin-books-controls input,
+.admin-books-controls select {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+}
+
+.admin-book-search-control {
+    min-width: 0;
+}
+
+.admin-book-page-size-control select {
+    min-width: 7.5rem;
+}
+
+.account-modal .admin-book-refresh {
+    align-self: end;
+    min-width: 6.25rem;
+    min-height: 44px;
+    border-color: color-mix(in srgb, var(--account-primary) 38%, var(--account-border));
+    background: color-mix(in srgb, var(--account-primary) 9%, var(--account-card));
+    color: var(--account-primary);
+}
+
+.account-modal .admin-book-refresh:hover {
+    border-color: color-mix(in srgb, var(--account-primary) 60%, var(--account-border));
+    background: color-mix(in srgb, var(--account-primary) 15%, var(--account-card));
+    color: var(--account-primary);
+}
+
 .account-table-scroll {
     max-width: 100%;
     max-height: min(52vh, 34rem);
@@ -652,6 +820,127 @@ body.auth-page {
 
 .account-admin-table tbody tr:hover td {
     background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
+}
+
+.admin-books-table-scroll {
+    max-height: min(48vh, 32rem);
+}
+
+.admin-books-table-scroll .account-admin-table {
+    min-width: 68rem;
+    font-size: .8rem;
+}
+
+.admin-books-table-scroll .account-admin-table th:nth-child(1) { width: 23%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(2) { width: 20%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(3) { width: 20%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(4) { width: 10%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(5) { width: 13%; }
+.admin-books-table-scroll .account-admin-table th:nth-child(6) { width: 1%; }
+
+.admin-books-table-scroll .account-admin-table th:last-child,
+.admin-books-table-scroll .account-admin-table td:last-child {
+    position: sticky;
+    z-index: 2;
+    right: 0;
+    border-left: 1px solid var(--account-border);
+    background: var(--account-card);
+    box-shadow: -8px 0 12px color-mix(in srgb, var(--account-text) 5%, transparent);
+}
+
+.admin-books-table-scroll .account-admin-table thead th:last-child {
+    z-index: 3;
+    background: color-mix(in srgb, var(--account-card) 92%, var(--account-bg));
+}
+
+.admin-books-table-scroll .account-admin-table tbody tr:hover td:last-child {
+    background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
+}
+
+.admin-book-summary {
+    min-width: 13rem;
+}
+
+.admin-book-summary strong,
+.admin-book-summary span {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.admin-book-summary strong {
+    color: var(--account-text);
+    font-size: .88rem;
+    line-height: 1.35;
+}
+
+.admin-book-authors,
+.admin-book-epub-tags,
+.admin-book-updated {
+    color: var(--account-muted);
+    font-size: .75rem;
+}
+
+.admin-book-authors {
+    margin-top: 3px;
+}
+
+.admin-book-epub-tags {
+    margin-top: 5px;
+}
+
+.admin-book-access,
+.admin-book-profile {
+    overflow-wrap: anywhere;
+}
+
+.admin-book-results-count,
+.admin-book-updated,
+.admin-book-actions {
+    white-space: nowrap;
+}
+
+.admin-book-results-count {
+    color: var(--account-primary);
+    font-weight: 700;
+}
+
+.admin-book-actions {
+    padding-inline: 10px !important;
+    text-align: end !important;
+}
+
+#adminBookPagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-width: 0;
+}
+
+.admin-book-page-summary {
+    margin-inline-end: auto;
+    color: var(--account-muted);
+    font-size: .78rem;
+}
+
+#adminBookPagination .admin-book-page {
+    min-width: 40px;
+    min-height: 40px;
+}
+
+#adminBookPagination .admin-book-page[aria-current="page"] {
+    border-color: color-mix(in srgb, var(--account-primary) 40%, var(--account-border));
+    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
+    color: var(--account-primary);
+    opacity: 1;
+}
+
+.admin-books-workspace button:focus-visible,
+.admin-books-workspace input:focus-visible,
+.admin-books-workspace select:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--account-primary) 42%, transparent);
+    outline-offset: 3px;
 }
 
 .admin-ai-job-id,
@@ -794,6 +1083,14 @@ body.auth-page {
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+.admin-ai-tag-usage {
+    flex: 0 0 auto;
+    color: var(--account-muted);
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .admin-ai-inline-label {
@@ -1219,6 +1516,28 @@ body.auth-page {
     .admin-book-editor-grid {
         grid-template-columns: 1fr;
     }
+
+    .admin-ai-settings-form,
+    .admin-ai-settings-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-ai-member-defaults-group,
+    .admin-ai-credential-group {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-books-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-book-search-control {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (max-width: 720px) {
@@ -1228,6 +1547,10 @@ body.auth-page {
 
     .admin-ai-jobs-controls > button {
         grid-column: 1 / -1;
+    }
+
+    .admin-books-table-scroll .account-admin-table {
+        min-width: 62rem;
     }
 
     .account-admin-table {
@@ -1291,7 +1614,8 @@ body.auth-page {
 
     #adminUserForm,
     #adminIdentityForm,
-    .admin-ai-settings-form {
+    .admin-ai-settings-form,
+    .admin-ai-settings-group {
         grid-template-columns: 1fr;
     }
 
@@ -1309,11 +1633,36 @@ body.auth-page {
         width: 100%;
     }
 
+    .admin-books-controls {
+        grid-template-columns: 1fr;
+        padding: 12px;
+    }
+
+    .admin-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-book-search-control {
+        grid-column: auto;
+    }
+
+    .account-modal .admin-book-refresh {
+        width: 100%;
+    }
+
     #adminAiJobsPagination {
         justify-content: flex-start;
     }
 
     .admin-ai-jobs-page-summary {
+        flex: 1 0 100%;
+    }
+
+    #adminBookPagination {
+        justify-content: flex-start;
+    }
+
+    .admin-book-page-summary {
         flex: 1 0 100%;
     }
 

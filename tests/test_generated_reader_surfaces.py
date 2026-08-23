@@ -65,12 +65,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         server_html = self._server_html()
         ssg_html = self._library_html()
 
-        self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminBooksTitle')
+        self.assertRegex(
+            server_html,
+            r'<section\b[^>]*aria-labelledby=(?:["\'])?adminSectionBooksTab',
+        )
         for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'pageSize', 'refresh'):
             self.assertIn('data-i18n=admin.books.' + key, server_html)
         self.assertIn('data-i18n-placeholder=admin.books.searchPlaceholder', server_html)
         self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
         self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
+        self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*class=(?:["\'])?admin-books-workspace)')
+        self.assertRegex(server_html, r'<div\b(?=[^>]*class=(?:["\'])?account-form admin-books-controls)(?=[^>]*role=(?:["\'])?search)(?=[^>]*aria-labelledby=(?:["\'])?adminBooksTitle)')
         self.assertRegex(server_html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
         self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
         self.assertRegex(server_html, r'<ul\b[^>]*id=(?:["\'])?adminBookLegacyList')

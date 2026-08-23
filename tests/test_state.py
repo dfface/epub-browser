@@ -2183,6 +2183,11 @@ class StateStoreTests(unittest.TestCase):
         self.store.replace_book_ai_tags(book.book_id, [tag["id"], custom["id"]])
         self.store.set_book_ai_profile(book.book_id, "fiction")
 
+        usage_by_tag = {
+            item["name"]: item["book_count"] for item in self.store.list_ai_tags()
+        }
+        self.assertEqual(usage_by_tag, {"Domain driven design": 1, "history": 1})
+
         self.assertEqual(
             self.store.effective_book_tags(book.book_id),
             ("DDD", "Domain driven design", "History"),

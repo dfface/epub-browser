@@ -45,6 +45,8 @@
     var aiJobsPendingRequests = 0;
     var aiJobsRetrying = Object.create(null);
     var aiJobsRetryRequests = Object.create(null);
+    var activeAdminSection = 'overview';
+    var adminHasUnsavedChanges = false;
     var aiProfileTranslationKeys = {
       auto: 'admin.ai.profile.auto',
       technical: 'admin.ai.profile.technical',
@@ -268,6 +270,7 @@
         csrf_required: true,
         forbidden: true,
         invalid_credentials: true,
+        login_throttled: true,
         invalid_password: true,
         proxy_identity_required: true,
         identity_already_linked: true,
@@ -297,6 +300,48 @@
       });
     }
 
+    function confirmAdminAction(key, params) {
+      if (typeof root.confirm !== 'function') return true;
+      return root.confirm(t(key, params));
+    }
+
+    function runButtonOperation(button, pendingKey, operation) {
+      if (!button) return Promise.resolve().then(operation);
+      if (button.disabled) return Promise.resolve(null);
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = t(pendingKey);
+      var result;
+      try {
+        result = operation();
+      } catch (error) {
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+        button.textContent = originalText;
+        throw error;
+      }
+      return Promise.resolve(result).then(function(value) {
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+        button.textContent = originalText;
+        return value;
+      }, function(error) {
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+        button.textContent = originalText;
+        throw error;
+      });
+    }
+
+    function markAdminDirty() {
+      adminHasUnsavedChanges = true;
+    }
+
+    function clearAdminDirty() {
+      adminHasUnsavedChanges = false;
+    }
+
     function createTextElement(tag, className, key, params) {
       var node = root.document.createElement(tag);
       if (className) node.className = className;
@@ -313,7 +358,21 @@
       if (variant === 'danger') className += ' account-danger-action';
       var button = createTextElement('button', className, key);
       button.type = 'button';
-      button.addEventListener('click', action);
+      button.addEventListener('click', function() {
+        var request = action();
+        if (!request || typeof request.then !== 'function') return request;
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        return request.then(function(result) {
+          button.disabled = false;
+          button.setAttribute('aria-busy', 'false');
+          return result;
+        }, function(error) {
+          button.disabled = false;
+          button.setAttribute('aria-busy', 'false');
+          throw error;
+        });
+      });
       return button;
     }
 
@@ -719,6 +778,59 @@
         : panel.active);
     }
 
+    function sectionForAdminControl(control) {
+      if (!control || typeof control.getAttribute !== 'function') return '';
+      var section = control.getAttribute('data-admin-section');
+      return ['overview', 'users', 'ai', 'tags', 'books'].indexOf(section) !== -1
+        ? section : '';
+    }
+
+    function adminPanelIsAvailable(panel) {
+      if (!panel || panel.id !== 'adminIdentitiesSection') return true;
+      return Boolean(
+        sessionState && sessionState.user && sessionState.user.role === 'admin'
+        && sessionState.authentication && sessionState.authentication.proxy_enabled
+      );
+    }
+
+    function setActiveAdminSection(section) {
+      if (['overview', 'users', 'ai', 'tags', 'books'].indexOf(section) === -1) return;
+      activeAdminSection = section;
+      if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
+      Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
+        var selected = sectionForAdminControl(control) === section;
+        if (control.getAttribute && control.getAttribute('role') === 'tab') {
+          control.setAttribute('aria-selected', String(selected));
+          if (control.classList) control.classList.toggle('is-active', selected);
+        }
+      });
+      Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-panel]')).forEach(function(panel) {
+        panel.hidden = panel.getAttribute('data-admin-panel') !== section || !adminPanelIsAvailable(panel);
+      });
+    }
+
+    function renderAdminOverview() {
+      var configured = aiSettings && aiSettings.api_key_configured;
+      var aiStateKey = !aiSettings || !aiSettings.enabled
+        ? 'admin.overview.aiDisabled'
+        : (configured ? 'admin.overview.aiReady' : 'admin.overview.aiNeedsKey');
+      var values = {
+        adminOverviewUsers: users.length,
+        adminOverviewAi: t(aiStateKey),
+        adminOverviewTags: aiTags.length,
+        adminOverviewBooks: adminBooksState.books.length
+      };
+      Object.keys(values).forEach(function(id) {
+        var target = element(id);
+        if (target) target.textContent = String(values[id]);
+      });
+      var live = element('adminOverviewLive');
+      if (live) live.textContent = t('admin.overview.liveLoaded', {
+        users: users.length,
+        books: adminBooksState.books.length
+      });
+    }
+
     function startAdminAiJobPolling() {
       if (aiJobsPollTimer !== null) return;
       if (!adminPanelIsActive() || (root.document && root.document.hidden === true)) return;
@@ -928,10 +1040,15 @@
           'h5', 'account-user-action-title', 'admin.accountAccess'
         ));
         accountActionButtons.appendChild(actionButton(user.enabled ? 'admin.disableUser' : 'admin.enableUser', function() {
-          updateUser(user.username, { enabled: !user.enabled });
+          if (user.enabled && !confirmAdminAction('admin.confirmDisableUser', { username: user.username })) return;
+          return updateUser(user.username, { enabled: !user.enabled });
         }, user.enabled ? 'danger' : undefined));
         accountActionButtons.appendChild(actionButton(user.role === 'admin' ? 'admin.makeMember' : 'admin.makeAdmin', function() {
-          updateUser(user.username, { role: user.role === 'admin' ? 'member' : 'admin' });
+          if (!confirmAdminAction(
+            user.role === 'admin' ? 'admin.confirmMakeMember' : 'admin.confirmMakeAdmin',
+            { username: user.username }
+          )) return;
+          return updateUser(user.username, { role: user.role === 'admin' ? 'member' : 'admin' });
         }));
         accountActions.appendChild(accountActionButtons);
 
@@ -949,7 +1066,7 @@
         passwordControls.className = 'account-user-password-controls';
         passwordControls.appendChild(password);
         passwordControls.appendChild(actionButton('admin.resetPassword', function() {
-          authenticatedFetch('/api/admin/users/' + encodeURIComponent(user.username) + '/password', {
+          return authenticatedFetch('/api/admin/users/' + encodeURIComponent(user.username) + '/password', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password: password.value })
@@ -961,7 +1078,8 @@
         }));
         securityActions.appendChild(passwordControls);
         securityActions.appendChild(actionButton('admin.revokeSessions', function() {
-          updateUser(user.username, { revoke_sessions: true });
+          if (!confirmAdminAction('admin.confirmRevokeSessions', { username: user.username })) return;
+          return updateUser(user.username, { revoke_sessions: true });
         }, 'danger'));
 
         detailsBody.appendChild(accountActions);
@@ -988,6 +1106,17 @@
       fields.clear_api_key.checked = false;
       fields.api_key.placeholder = aiSettings.api_key_configured
         ? t('admin.ai.apiKeyConfigured') : t('admin.ai.apiKeyPlaceholder');
+      var connectionStatus = element('adminAiConnectionStatus');
+      if (connectionStatus) {
+        var statusKey = !aiSettings.enabled
+          ? 'admin.ai.connection.disabled'
+          : (aiSettings.api_key_configured
+            ? 'admin.ai.connection.ready' : 'admin.ai.connection.needsKey');
+        connectionStatus.textContent = t(statusKey);
+        connectionStatus.className = 'admin-ai-connection-status ' + (
+          aiSettings.enabled && aiSettings.api_key_configured ? 'is-ready' : 'is-muted'
+        );
+      }
     }
 
     function saveAiUserAccess(user, enabled, dailyLimit) {
@@ -1039,7 +1168,7 @@
             showStatus('admin.error.invalid_ai_access', 'error');
             return;
           }
-          saveAiUserAccess(user, enabled.checked, parsed);
+          return saveAiUserAccess(user, enabled.checked, parsed);
         }));
         item.appendChild(name);
         item.appendChild(controls);
@@ -1054,6 +1183,7 @@
       list.textContent = '';
       aiTags.forEach(function(tag) {
         var item = root.document.createElement('li');
+        var usage = root.document.createElement('span');
         var input = root.document.createElement('input');
         var actions = root.document.createElement('div');
         item.className = 'account-list-item admin-ai-tag-item';
@@ -1061,9 +1191,13 @@
         input.maxLength = 80;
         input.value = tag.name;
         input.setAttribute('aria-label', t('admin.ai.tagName'));
+        usage.className = 'admin-ai-tag-usage';
+        usage.textContent = t('admin.ai.tagUsage', {
+          count: safeNonNegativeInteger(tag.book_count, 0)
+        });
         actions.className = 'admin-ai-tag-actions';
         actions.appendChild(actionButton('admin.ai.renameTag', function() {
-          authenticatedFetch('/api/admin/ai/tags/' + encodeURIComponent(tag.id), {
+          return authenticatedFetch('/api/admin/ai/tags/' + encodeURIComponent(tag.id), {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: input.value })
           }).then(function(response) {
@@ -1072,13 +1206,18 @@
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }));
         actions.appendChild(actionButton('admin.ai.deleteTag', function() {
-          authenticatedFetch('/api/admin/ai/tags/' + encodeURIComponent(tag.id), {
+          if (!confirmAdminAction('admin.ai.deleteTagConfirm', {
+            name: tag.name,
+            count: safeNonNegativeInteger(tag.book_count, 0)
+          })) return;
+          return authenticatedFetch('/api/admin/ai/tags/' + encodeURIComponent(tag.id), {
             method: 'DELETE'
           }).then(function(response) {
             if (!response.ok) return showResponseError(response, 'admin');
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         }, 'danger'));
+        item.appendChild(usage);
         item.appendChild(input);
         item.appendChild(actions);
         list.appendChild(item);
@@ -1400,6 +1539,7 @@
       if (!pagination) return;
       pagination.textContent = '';
       var summary = root.document.createElement('span');
+      summary.className = 'admin-book-page-summary';
       summary.textContent = t('admin.books.pageSummary', {
         page: adminBooksState.page,
         totalPages: totalPages,
@@ -1409,9 +1549,13 @@
       function pageButton(key, page, disabled) {
         var button = root.document.createElement('button');
         button.type = 'button';
+        button.className = 'bookshelf-action-btn account-inline-action admin-book-page';
         button.disabled = disabled;
         button.textContent = t(key, { page: page });
         button.setAttribute('aria-label', t(key, { page: page }));
+        if (key === 'admin.books.pageButton' && page === adminBooksState.page) {
+          button.setAttribute('aria-current', 'page');
+        }
         button.addEventListener('click', function() {
           adminBooksState.page = page;
           renderAdminBooks();
@@ -1419,9 +1563,16 @@
         pagination.appendChild(button);
       }
       pageButton('admin.books.previousPage', Math.max(1, adminBooksState.page - 1), adminBooksState.page <= 1);
-      for (var page = 1; page <= totalPages; page += 1) {
+      var pages = {};
+      [1, adminBooksState.page - 2, adminBooksState.page - 1, adminBooksState.page,
+        adminBooksState.page + 1, adminBooksState.page + 2, totalPages].forEach(function(page) {
+        if (page >= 1 && page <= totalPages) pages[page] = true;
+      });
+      Object.keys(pages).map(Number).sort(function(left, right) {
+        return left - right;
+      }).forEach(function(page) {
         pageButton('admin.books.pageButton', page, page === adminBooksState.page);
-      }
+      });
       pageButton('admin.books.nextPage', Math.min(totalPages, adminBooksState.page + 1), adminBooksState.page >= totalPages);
     }
 
@@ -1460,31 +1611,33 @@
       visible.forEach(function(view) {
         var book = view.book;
         var row = root.document.createElement('tr');
-        var bookCell = createAdminBookCell(row, '');
+        var bookCell = createAdminBookCell(row, '', 'admin-book-summary');
         var title = root.document.createElement('strong');
         title.textContent = String(book.title || '');
         bookCell.appendChild(title);
         var authors = Array.isArray(book.authors) ? book.authors.filter(Boolean) : [];
         if (authors.length) {
           var authorLine = root.document.createElement('span');
+          authorLine.className = 'admin-book-authors';
           authorLine.textContent = authors.join(', ');
           bookCell.appendChild(authorLine);
         }
         var epubTags = Array.isArray(book.epub_tags) ? book.epub_tags.filter(Boolean) : [];
         if (epubTags.length) {
           var epubTagLine = root.document.createElement('span');
+          epubTagLine.className = 'admin-book-epub-tags';
           epubTagLine.textContent = epubTags.join(', ');
           bookCell.appendChild(epubTagLine);
         }
         createAdminBookCell(row, t('admin.books.visibility.' + (book.visibility || 'authenticated')) + ' · ' + t('admin.books.grantCount', {
           count: Number(book.grant_count || 0)
-        }));
+        }), 'admin-book-access');
         var profile = String(book.ai_profile || 'auto');
         var serverTags = (book.ai_tags || []).map(function(tag) { return tag && tag.name; }).filter(Boolean);
-        createAdminBookCell(row, t('admin.books.profile.' + profile) + (serverTags.length ? ' · ' + serverTags.join(', ') : ''));
-        createAdminBookCell(row, t('admin.books.resultCount', { count: Number(book.ai_result_count || 0) }));
-        createAdminBookCell(row, formatDate(book.updated_at));
-        var actions = createAdminBookCell(row, '');
+        createAdminBookCell(row, t('admin.books.profile.' + profile) + (serverTags.length ? ' · ' + serverTags.join(', ') : ''), 'admin-book-profile');
+        createAdminBookCell(row, t('admin.books.resultCount', { count: Number(book.ai_result_count || 0) }), 'admin-book-results-count');
+        createAdminBookCell(row, formatDate(book.updated_at), 'admin-book-updated');
+        var actions = createAdminBookCell(row, '', 'admin-book-actions');
         var manage = root.document.createElement('button');
         manage.type = 'button';
         manage.className = 'bookshelf-action-btn account-inline-action admin-book-manage';
@@ -1979,6 +2132,7 @@
           renderAiUserAccess();
           renderAiTags();
           renderIdentities();
+          renderAdminOverview();
         });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
@@ -2005,6 +2159,7 @@
       panel.hidden = false;
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
+      setActiveAdminSection(activeAdminSection);
       loadAdminData();
       loadAdminAiJobs();
       startAdminAiJobPolling();
@@ -2013,6 +2168,8 @@
     function closeAdminPanel() {
       var panel = element('adminPanel');
       if (!panel) return;
+      if (adminHasUnsavedChanges && !confirmAdminAction('admin.confirmDiscardChanges')) return;
+      clearAdminDirty();
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');
       stopAdminAiJobPolling();
@@ -2027,9 +2184,12 @@
       var passwordForm = element('accountPasswordForm');
       var associationForm = element('associationForm');
       var createUserForm = element('adminUserForm');
+      var createUserSubmit = element('adminUserSubmit');
       var createIdentityForm = element('adminIdentityForm');
       var aiSettingsForm = element('adminAiSettingsForm');
+      var aiSettingsSubmit = element('adminAiSettingsSubmit');
       var aiTagForm = element('adminAiTagForm');
+      var aiTagSubmit = element('adminAiTagSubmit');
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
       var aiJobsStatus = element('adminAiJobsStatus');
@@ -2039,7 +2199,15 @@
       var bookVisibilityFilter = element('adminBookVisibilityFilter');
       var bookTagFilter = element('adminBookTagFilter');
       var bookPageSize = element('adminBookPageSize');
+      var bookClearFilters = element('adminBookClearFilters');
       var bookRefresh = element('adminBookRefresh');
+      var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
+        ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
+      [createUserForm, createIdentityForm, aiSettingsForm, aiTagForm].forEach(function(form) {
+        if (!form) return;
+        form.addEventListener('input', markAdminDirty);
+        form.addEventListener('change', markAdminDirty);
+      });
       var aiHelpButtons = Array.prototype.slice.call(root.document.querySelectorAll('.admin-ai-help'));
       function closeAiHelpTips(except) {
         aiHelpButtons.forEach(function(button) {
@@ -2065,6 +2233,12 @@
       if (close) close.addEventListener('click', closePanel);
       if (adminMenu) adminMenu.addEventListener('click', openAdminPanel);
       if (adminClose) adminClose.addEventListener('click', closeAdminPanel);
+      adminSectionControls.forEach(function(control) {
+        control.addEventListener('click', function() {
+          var section = sectionForAdminControl(control);
+          if (section) setActiveAdminSection(section);
+        });
+      });
       if (logoutButton) logoutButton.addEventListener('click', function() {
         logout().catch(function() { showStatus('account.error.network', 'error'); });
       });
@@ -2098,21 +2272,24 @@
       });
       if (createUserForm) createUserForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        authenticatedFetch('/api/admin/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: formValue(createUserForm, 'username'),
-            password: formValue(createUserForm, 'password'),
-            role: formValue(createUserForm, 'role')
-          })
-        }).then(function(response) {
-          clearPasswordFields(createUserForm);
-          if (!response.ok) return showResponseError(response, 'admin');
-          createUserForm.reset();
-          showStatus('admin.userCreated', 'success');
-          return loadAdminData();
-        }).catch(function() { showStatus('admin.error.network', 'error'); });
+        runButtonOperation(createUserSubmit, 'admin.creatingUser', function() {
+          return authenticatedFetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: formValue(createUserForm, 'username'),
+              password: formValue(createUserForm, 'password'),
+              role: formValue(createUserForm, 'role')
+            })
+          }).then(function(response) {
+            clearPasswordFields(createUserForm);
+            if (!response.ok) return showResponseError(response, 'admin');
+            createUserForm.reset();
+            clearAdminDirty();
+            showStatus('admin.userCreated', 'success');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        });
       });
       if (createIdentityForm) createIdentityForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -2128,43 +2305,51 @@
       if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {
         event.preventDefault();
         var fields = aiSettingsForm.elements;
-        authenticatedFetch('/api/admin/ai/settings', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            enabled: fields.enabled.checked,
-            base_url: fields.base_url.value,
-            api_key: fields.api_key.value || undefined,
-            model: fields.model.value,
-            timeout_seconds: Number(fields.timeout_seconds.value),
-            model_context_window: Number(fields.model_context_window.value),
-            max_concurrency: Number(fields.max_concurrency.value),
-            daily_limit: Number(fields.daily_limit.value),
-            clear_api_key: fields.clear_api_key.checked
-          })
-        }).then(function(response) {
-          if (!response.ok) return showResponseError(response, 'admin');
-          showStatus('admin.ai.settingsSaved', 'success');
-          return loadAdminData();
-        }).catch(function() { showStatus('admin.error.network', 'error'); });
+        runButtonOperation(aiSettingsSubmit, 'admin.ai.saving', function() {
+          return authenticatedFetch('/api/admin/ai/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              enabled: fields.enabled.checked,
+              base_url: fields.base_url.value,
+              api_key: fields.api_key.value || undefined,
+              model: fields.model.value,
+              timeout_seconds: Number(fields.timeout_seconds.value),
+              model_context_window: Number(fields.model_context_window.value),
+              max_concurrency: Number(fields.max_concurrency.value),
+              daily_limit: Number(fields.daily_limit.value),
+              clear_api_key: fields.clear_api_key.checked
+            })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            clearAdminDirty();
+            showStatus('admin.ai.settingsSaved', 'success');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        });
       });
       if (aiTagForm) aiTagForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        authenticatedFetch('/api/admin/ai/tags', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: formValue(aiTagForm, 'name') })
-        }).then(function(response) {
-          if (!response.ok) return showResponseError(response, 'admin');
-          aiTagForm.reset();
-          showStatus('admin.ai.tagAdded', 'success');
-          return loadAdminData();
-        }).catch(function() { showStatus('admin.error.network', 'error'); });
+        runButtonOperation(aiTagSubmit, 'admin.ai.addingTag', function() {
+          return authenticatedFetch('/api/admin/ai/tags', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: formValue(aiTagForm, 'name') })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            aiTagForm.reset();
+            clearAdminDirty();
+            showStatus('admin.ai.tagAdded', 'success');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        });
       });
       if (clearAiRevision) clearAiRevision.addEventListener('click', function() {
-        if (aiSettings) clearAiResults({ config_revision: aiSettings.config_revision });
+        if (aiSettings && confirmAdminAction('admin.ai.clearRevisionConfirm')) {
+          clearAiResults({ config_revision: aiSettings.config_revision });
+        }
       });
       if (clearAiAll) clearAiAll.addEventListener('click', function() {
-        clearAiResults({});
+        if (confirmAdminAction('admin.ai.clearAllConfirm')) clearAiResults({});
       });
       if (aiJobsStatus) aiJobsStatus.addEventListener('change', function() {
         aiJobsState.status = String(aiJobsStatus.value || '');
@@ -2201,6 +2386,17 @@
           ? selectedBookPageSize : 20;
         adminBooksState.page = 1;
         renderAdminBooks();
+      });
+      if (bookClearFilters) bookClearFilters.addEventListener('click', function() {
+        adminBooksState.query = '';
+        adminBooksState.visibility = '';
+        adminBooksState.tagId = '';
+        adminBooksState.page = 1;
+        if (bookSearch) bookSearch.value = '';
+        if (bookVisibilityFilter) bookVisibilityFilter.value = '';
+        if (bookTagFilter) bookTagFilter.value = '';
+        renderAdminBooks();
+        setAdminBookLive('admin.books.live.filtersCleared');
       });
       if (bookRefresh) bookRefresh.addEventListener('click', function() {
         loadAdminBookIndex();
