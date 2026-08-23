@@ -2513,9 +2513,13 @@ class StateStore:
         with self._connection() as connection:
             return self._get_book(connection, book_id)
 
-    def set_book_visibility(self, book_id: str, visibility: str) -> BookRecord:
+    @staticmethod
+    def _validate_book_visibility(visibility: str) -> None:
         if visibility not in {"authenticated", "restricted"}:
             raise ValueError(f"Unsupported book visibility: {visibility}")
+
+    def set_book_visibility(self, book_id: str, visibility: str) -> BookRecord:
+        self._validate_book_visibility(visibility)
         with self._connection() as connection:
             cursor = connection.execute(
                 """
@@ -2560,27 +2564,35 @@ class StateStore:
         user_ids: Sequence[str],
     ) -> tuple[str, ...]:
         """Atomically replace a book's explicit member grants."""
-        normalized_user_ids = tuple(dict.fromkeys(user_ids))
         with self._connection() as connection:
-            self._get_book(connection, book_id)
-            for user_id in normalized_user_ids:
-                user = self._get_user(connection, user_id)
-                if not user.enabled:
-                    raise ValueError(
-                        "Book access cannot be granted to a disabled user"
-                    )
-                if user.role != "member":
-                    raise ValueError(
-                        "Explicit book access can only be granted to members"
-                    )
-            connection.execute(
-                "DELETE FROM book_access WHERE book_id = ?",
-                (book_id,),
-            )
-            connection.executemany(
-                "INSERT INTO book_access (book_id, user_id) VALUES (?, ?)",
-                ((book_id, user_id) for user_id in normalized_user_ids),
-            )
+            return self._replace_book_grants(connection, book_id, user_ids)
+
+    def _replace_book_grants(
+        self,
+        connection,
+        book_id: str,
+        user_ids: Sequence[str],
+    ) -> tuple[str, ...]:
+        normalized_user_ids = tuple(dict.fromkeys(user_ids))
+        self._get_book(connection, book_id)
+        for user_id in normalized_user_ids:
+            user = self._get_user(connection, user_id)
+            if not user.enabled:
+                raise ValueError(
+                    "Book access cannot be granted to a disabled user"
+                )
+            if user.role != "member":
+                raise ValueError(
+                    "Explicit book access can only be granted to members"
+                )
+        connection.execute(
+            "DELETE FROM book_access WHERE book_id = ?",
+            (book_id,),
+        )
+        connection.executemany(
+            "INSERT INTO book_access (book_id, user_id) VALUES (?, ?)",
+            ((book_id, user_id) for user_id in normalized_user_ids),
+        )
         return tuple(sorted(normalized_user_ids))
 
     def revoke_book_access(self, book_id: str, user_id: str) -> None:
@@ -2882,34 +2894,47 @@ class StateStore:
 
     def book_ai_tags(self, book_id: str) -> tuple[dict, ...]:
         with self._connection() as connection:
-            self._get_book(connection, book_id)
-            rows = connection.execute(
-                """
-                SELECT ai_tags.id, ai_tags.normalized_name, ai_tags.name
-                FROM book_ai_tags JOIN ai_tags ON ai_tags.id = book_ai_tags.tag_id
-                WHERE book_ai_tags.book_id = ?
-                ORDER BY ai_tags.normalized_name, ai_tags.id
-                """,
-                (book_id,),
-            ).fetchall()
+            return self._book_ai_tags(connection, book_id)
+
+    def _book_ai_tags(self, connection, book_id: str) -> tuple[dict, ...]:
+        self._get_book(connection, book_id)
+        rows = connection.execute(
+            """
+            SELECT ai_tags.id, ai_tags.normalized_name, ai_tags.name
+            FROM book_ai_tags JOIN ai_tags ON ai_tags.id = book_ai_tags.tag_id
+            WHERE book_ai_tags.book_id = ?
+            ORDER BY ai_tags.normalized_name, ai_tags.id
+            """,
+            (book_id,),
+        ).fetchall()
         return tuple(
             {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
             for row in rows
         )
 
     def replace_book_ai_tags(self, book_id: str, tag_ids: Sequence[str]) -> tuple[dict, ...]:
-        unique_ids = tuple(dict.fromkeys(tag_ids))
         with self._connection() as connection:
-            self._get_book(connection, book_id)
-            for tag_id in unique_ids:
-                if connection.execute("SELECT 1 FROM ai_tags WHERE id = ?", (tag_id,)).fetchone() is None:
-                    raise KeyError("Unknown AI tag")
-            connection.execute("DELETE FROM book_ai_tags WHERE book_id = ?", (book_id,))
-            connection.executemany(
-                "INSERT INTO book_ai_tags (book_id, tag_id) VALUES (?, ?)",
-                ((book_id, tag_id) for tag_id in unique_ids),
-            )
-        return self.book_ai_tags(book_id)
+            return self._replace_book_ai_tags(connection, book_id, tag_ids)
+
+    def _replace_book_ai_tags(
+        self,
+        connection,
+        book_id: str,
+        tag_ids: Sequence[str],
+    ) -> tuple[dict, ...]:
+        unique_ids = tuple(dict.fromkeys(tag_ids))
+        self._get_book(connection, book_id)
+        for tag_id in unique_ids:
+            if connection.execute(
+                "SELECT 1 FROM ai_tags WHERE id = ?", (tag_id,)
+            ).fetchone() is None:
+                raise KeyError("Unknown AI tag")
+        connection.execute("DELETE FROM book_ai_tags WHERE book_id = ?", (book_id,))
+        connection.executemany(
+            "INSERT INTO book_ai_tags (book_id, tag_id) VALUES (?, ?)",
+            ((book_id, tag_id) for tag_id in unique_ids),
+        )
+        return self._book_ai_tags(connection, book_id)
 
     def effective_book_tags(self, book_id: str) -> tuple[str, ...]:
         with self._connection() as connection:
@@ -2927,20 +2952,29 @@ class StateStore:
         return tuple(sorted(merged.values(), key=str.casefold))
 
     def set_book_ai_profile(self, book_id: str, profile: str) -> None:
+        with self._connection() as connection:
+            self._set_book_ai_profile(connection, book_id, profile)
+
+    def _set_book_ai_profile(
+        self,
+        connection,
+        book_id: str,
+        profile: str,
+    ) -> str:
         if profile not in {"auto", "technical", "fiction", "general"}:
             raise ValueError("Unsupported AI profile")
-        with self._connection() as connection:
-            self._get_book(connection, book_id)
-            connection.execute(
-                """
-                INSERT INTO book_ai_profiles (book_id, profile)
-                VALUES (?, ?)
-                ON CONFLICT(book_id) DO UPDATE SET
-                    profile = excluded.profile,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (book_id, profile),
-            )
+        self._get_book(connection, book_id)
+        connection.execute(
+            """
+            INSERT INTO book_ai_profiles (book_id, profile)
+            VALUES (?, ?)
+            ON CONFLICT(book_id) DO UPDATE SET
+                profile = excluded.profile,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (book_id, profile),
+        )
+        return profile
 
     def get_book_ai_profile(self, book_id: str) -> str:
         with self._connection() as connection:
@@ -2950,6 +2984,254 @@ class StateStore:
                 (book_id,),
             ).fetchone()
         return row["profile"] if row is not None else "auto"
+
+    @staticmethod
+    def _admin_book_metadata(metadata_json: str) -> tuple[str, list[str], list[str]]:
+        try:
+            metadata = json.loads(metadata_json)
+        except (TypeError, ValueError):
+            metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        title = metadata.get("title")
+        if not isinstance(title, str) or not title.strip():
+            title = "EPUB Book"
+        authors = metadata.get("authors")
+        if not isinstance(authors, list):
+            authors = []
+        epub_tags = metadata.get("tags")
+        if not isinstance(epub_tags, list):
+            epub_tags = []
+        return (
+            title,
+            [author for author in authors if isinstance(author, str)],
+            [tag for tag in epub_tags if isinstance(tag, str)],
+        )
+
+    @classmethod
+    def _admin_book_summary_mapping(
+        cls,
+        book_row,
+        *,
+        grant_count: int = 0,
+        profile: str = "auto",
+        tags: Sequence[dict] = (),
+        result_count: int = 0,
+    ) -> dict:
+        title, authors, epub_tags = cls._admin_book_metadata(
+            book_row["metadata_json"]
+        )
+        return {
+            "id": book_row["book_id"],
+            "title": title,
+            "authors": authors,
+            "epub_tags": epub_tags,
+            "visibility": book_row["visibility"],
+            "grant_count": int(grant_count),
+            "ai_profile": profile,
+            "ai_tags": [
+                {"id": tag["id"], "name": tag["name"]}
+                for tag in tags
+            ],
+            "ai_result_count": int(result_count),
+            "updated_at": book_row["updated_at"],
+        }
+
+    def list_admin_book_summaries(self) -> tuple[dict, ...]:
+        """Return privacy-safe active-book summaries using bounded queries."""
+        with self._connection() as connection:
+            books = connection.execute(
+                """
+                SELECT book_id, metadata_json, visibility, updated_at
+                FROM books
+                WHERE active = 1
+                ORDER BY book_id
+                """
+            ).fetchall()
+            grant_counts = {
+                row["book_id"]: row["grant_count"]
+                for row in connection.execute(
+                    """
+                    SELECT book_access.book_id, COUNT(*) AS grant_count
+                    FROM book_access
+                    JOIN books ON books.book_id = book_access.book_id
+                    WHERE books.active = 1
+                    GROUP BY book_access.book_id
+                    """
+                ).fetchall()
+            }
+            profiles = {
+                row["book_id"]: row["profile"]
+                for row in connection.execute(
+                    """
+                    SELECT book_ai_profiles.book_id, book_ai_profiles.profile
+                    FROM book_ai_profiles
+                    JOIN books ON books.book_id = book_ai_profiles.book_id
+                    WHERE books.active = 1
+                    """
+                ).fetchall()
+            }
+            tags_by_book = {}
+            for row in connection.execute(
+                """
+                SELECT book_ai_tags.book_id, ai_tags.id, ai_tags.name
+                FROM book_ai_tags
+                JOIN ai_tags ON ai_tags.id = book_ai_tags.tag_id
+                JOIN books ON books.book_id = book_ai_tags.book_id
+                WHERE books.active = 1
+                ORDER BY book_ai_tags.book_id, ai_tags.normalized_name, ai_tags.id
+                """
+            ).fetchall():
+                tags_by_book.setdefault(row["book_id"], []).append(
+                    {"id": row["id"], "name": row["name"]}
+                )
+            result_counts = {
+                row["book_id"]: row["result_count"]
+                for row in connection.execute(
+                    """
+                    SELECT ai_reading_results.book_id, COUNT(*) AS result_count
+                    FROM ai_reading_results
+                    JOIN books ON books.book_id = ai_reading_results.book_id
+                    WHERE books.active = 1
+                    GROUP BY ai_reading_results.book_id
+                    """
+                ).fetchall()
+            }
+        return tuple(
+            self._admin_book_summary_mapping(
+                book,
+                grant_count=grant_counts.get(book["book_id"], 0),
+                profile=profiles.get(book["book_id"], "auto"),
+                tags=tags_by_book.get(book["book_id"], ()),
+                result_count=result_counts.get(book["book_id"], 0),
+            )
+            for book in books
+        )
+
+    @staticmethod
+    def _active_admin_book_row(connection, book_id: str):
+        row = connection.execute(
+            """
+            SELECT book_id, metadata_json, visibility, updated_at
+            FROM books
+            WHERE book_id = ? AND active = 1
+            """,
+            (book_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown active book ID: {book_id}")
+        return row
+
+    @classmethod
+    def _effective_admin_book_tags(
+        cls,
+        epub_tags: Sequence[str],
+        ai_tags: Sequence[dict],
+    ) -> tuple[str, ...]:
+        merged = {}
+        for name in tuple(epub_tags) + tuple(tag["name"] for tag in ai_tags):
+            try:
+                normalized, display = cls._normalize_ai_tag(name)
+            except ValueError:
+                continue
+            merged.setdefault(normalized, display)
+        return tuple(sorted(merged.values(), key=str.casefold))
+
+    def _admin_book_detail(self, connection, book_row) -> dict:
+        book_id = book_row["book_id"]
+        grants = tuple(
+            row["user_id"]
+            for row in connection.execute(
+                "SELECT user_id FROM book_access WHERE book_id = ? ORDER BY user_id",
+                (book_id,),
+            ).fetchall()
+        )
+        profile_row = connection.execute(
+            "SELECT profile FROM book_ai_profiles WHERE book_id = ?",
+            (book_id,),
+        ).fetchone()
+        tags = tuple(
+            {"id": row["id"], "name": row["name"]}
+            for row in connection.execute(
+                """
+                SELECT ai_tags.id, ai_tags.name
+                FROM book_ai_tags
+                JOIN ai_tags ON ai_tags.id = book_ai_tags.tag_id
+                WHERE book_ai_tags.book_id = ?
+                ORDER BY ai_tags.normalized_name, ai_tags.id
+                """,
+                (book_id,),
+            ).fetchall()
+        )
+        result_count = connection.execute(
+            "SELECT COUNT(*) AS result_count FROM ai_reading_results WHERE book_id = ?",
+            (book_id,),
+        ).fetchone()["result_count"]
+        summary = self._admin_book_summary_mapping(
+            book_row,
+            grant_count=len(grants),
+            profile=(profile_row["profile"] if profile_row is not None else "auto"),
+            tags=tags,
+            result_count=result_count,
+        )
+        detail = dict(summary)
+        detail["grants"] = grants
+        detail["ai_tags"] = tags
+        detail["effective_tags"] = self._effective_admin_book_tags(
+            detail["epub_tags"], tags
+        )
+        return detail
+
+    @staticmethod
+    def _admin_book_summary_from_detail(detail: dict) -> dict:
+        return {
+            "id": detail["id"],
+            "title": detail["title"],
+            "authors": list(detail["authors"]),
+            "epub_tags": list(detail["epub_tags"]),
+            "visibility": detail["visibility"],
+            "grant_count": len(detail["grants"]),
+            "ai_profile": detail["ai_profile"],
+            "ai_tags": [dict(tag) for tag in detail["ai_tags"]],
+            "ai_result_count": detail["ai_result_count"],
+            "updated_at": detail["updated_at"],
+        }
+
+    def get_admin_book_detail(self, book_id: str) -> dict:
+        with self._connection() as connection:
+            book_row = self._active_admin_book_row(connection, book_id)
+            return self._admin_book_detail(connection, book_row)
+
+    def update_admin_book_settings(
+        self,
+        book_id: str,
+        *,
+        visibility: str,
+        user_ids: Sequence[str],
+        tag_ids: Sequence[str],
+        profile: str,
+    ) -> tuple[dict, dict]:
+        """Atomically replace every editable administrator book setting."""
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._active_admin_book_row(connection, book_id)
+            self._validate_book_visibility(visibility)
+            self._replace_book_grants(connection, book_id, user_ids)
+            self._replace_book_ai_tags(connection, book_id, tag_ids)
+            self._set_book_ai_profile(connection, book_id, profile)
+            connection.execute(
+                """
+                UPDATE books
+                SET visibility = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE book_id = ? AND active = 1
+                """,
+                (visibility, book_id),
+            )
+            book_row = self._active_admin_book_row(connection, book_id)
+            detail = self._admin_book_detail(connection, book_row)
+            summary = self._admin_book_summary_from_detail(detail)
+            connection.execute("COMMIT")
+        return detail, summary
 
     def reserve_ai_usage(self, principal: Principal, usage_day: str) -> bool:
         """Atomically reserve one billable Provider attempt for a calendar day."""

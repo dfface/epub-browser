@@ -486,6 +486,220 @@ class StateStoreTests(unittest.TestCase):
             )
         self.assertEqual(self.store.book_grants("batch-book"), grants)
 
+    def test_admin_book_summaries_are_batched_and_private(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "algorithm.epub"),
+            None,
+            "algorithm-fingerprint",
+            {"title": "算法导论", "authors": ["作者甲"], "tags": ["算法"]},
+            preferred_book_id="algorithm-book",
+        )
+        self.store.resolve_book(
+            Path(self.temporary.name, "fiction.epub"),
+            None,
+            "fiction-fingerprint",
+            {"title": "Fiction", "authors": ["Author B"], "tags": ["Novel"]},
+            preferred_book_id="fiction-book",
+        )
+        self.store.resolve_book(
+            Path(self.temporary.name, "fallback.epub"),
+            None,
+            "fallback-fingerprint",
+            {},
+            preferred_book_id="fallback-book",
+        )
+        inactive = self.store.resolve_book(
+            Path(self.temporary.name, "inactive.epub"),
+            None,
+            "inactive-fingerprint",
+            {"title": "Inactive"},
+            preferred_book_id="inactive-book",
+        )
+        self.store.mark_missing(inactive.book_id)
+        first = self.store.create_user("summary-first", "hash", role="member")
+        second = self.store.create_user("summary-second", "hash", role="member")
+        self.store.set_book_visibility(book.book_id, "restricted")
+        self.store.replace_book_grants(book.book_id, [first.user_id, second.user_id])
+        tag = self.store.create_ai_tag("Computer Science")
+        self.store.replace_book_ai_tags(book.book_id, [tag["id"]])
+        self.store.set_book_ai_profile(book.book_id, "technical")
+        for number in range(3):
+            self.store.store_ai_reading_result(
+                cache_key=f"summary-result-{number}",
+                book_id=book.book_id,
+                chapter_index=number,
+                scope="chapter",
+                mode="chapter",
+                profile="technical",
+                config_revision=0,
+                content={"number": number},
+                created_by_user_id=self.owner.user_id,
+            )
+        book = self.store.get_book(book.book_id)
+
+        statements = []
+        original_connect = self.store._connect
+
+        def traced_connect():
+            connection = original_connect()
+            connection.set_trace_callback(statements.append)
+            return connection
+
+        with mock.patch.object(self.store, "_connect", side_effect=traced_connect):
+            summaries = self.store.list_admin_book_summaries()
+        initial_selects = sum(
+            statement.lstrip().upper().startswith("SELECT")
+            for statement in statements
+        )
+
+        self.assertEqual(
+            next(item for item in summaries if item["id"] == book.book_id),
+            {
+                "id": book.book_id,
+                "title": "算法导论",
+                "authors": ["作者甲"],
+                "epub_tags": ["算法"],
+                "visibility": "restricted",
+                "grant_count": 2,
+                "ai_profile": "technical",
+                "ai_tags": [{"id": tag["id"], "name": "Computer Science"}],
+                "ai_result_count": 3,
+                "updated_at": book.updated_at,
+            },
+        )
+        self.assertEqual(tuple(item["id"] for item in summaries), tuple(sorted(
+            ("algorithm-book", "fallback-book", "fiction-book")
+        )))
+        self.assertNotIn(inactive.book_id, {item["id"] for item in summaries})
+        self.assertNotIn("source_path", repr(summaries))
+        self.assertNotIn("metadata_json", repr(summaries))
+
+        for number in range(50):
+            self.store.resolve_book(
+                Path(self.temporary.name, f"bulk-{number}.epub"),
+                None,
+                f"bulk-fingerprint-{number}",
+                {"title": f"Bulk {number}"},
+                preferred_book_id=f"bulk-book-{number:02d}",
+            )
+        statements.clear()
+        with mock.patch.object(self.store, "_connect", side_effect=traced_connect):
+            self.store.list_admin_book_summaries()
+        bulk_selects = sum(
+            statement.lstrip().upper().startswith("SELECT")
+            for statement in statements
+        )
+        self.assertEqual(bulk_selects, initial_selects)
+
+    def test_admin_book_settings_update_is_atomic(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "settings.epub"),
+            None,
+            "settings-fingerprint",
+            {"title": "Settings", "authors": ["Author"], "tags": ["EPUB"]},
+            preferred_book_id="settings-book",
+        )
+        first = self.store.create_user("settings-first", "hash", role="member")
+        second = self.store.create_user("settings-second", "hash", role="member")
+        first_tag = self.store.create_ai_tag("First tag")
+        second_tag = self.store.create_ai_tag("Second tag")
+
+        detail, summary = self.store.update_admin_book_settings(
+            book.book_id,
+            visibility="restricted",
+            user_ids=[second.user_id, first.user_id, second.user_id],
+            tag_ids=[second_tag["id"], first_tag["id"], second_tag["id"]],
+            profile="fiction",
+        )
+
+        self.assertEqual(detail["visibility"], "restricted")
+        self.assertEqual(detail["grants"], tuple(sorted((first.user_id, second.user_id))))
+        self.assertEqual(
+            detail["ai_tags"],
+            (
+                {"id": first_tag["id"], "name": "First tag"},
+                {"id": second_tag["id"], "name": "Second tag"},
+            ),
+        )
+        self.assertEqual(detail["effective_tags"], ("EPUB", "First tag", "Second tag"))
+        self.assertEqual(detail["ai_profile"], "fiction")
+        self.assertEqual(summary["id"], book.book_id)
+        self.assertEqual(summary["grant_count"], 2)
+        self.assertEqual(summary["ai_profile"], "fiction")
+        self.assertEqual(summary["ai_tags"], list(detail["ai_tags"]))
+
+    def test_invalid_admin_book_settings_roll_back(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "rollback.epub"),
+            None,
+            "rollback-fingerprint",
+            {"title": "Rollback", "tags": ["EPUB"]},
+            preferred_book_id="rollback-book",
+        )
+        member = self.store.create_user("rollback-member", "hash", role="member")
+        other = self.store.create_user("rollback-other", "hash", role="member")
+        disabled = self.store.create_user("rollback-disabled", "hash", role="member")
+        self.store.set_user_enabled(disabled.user_id, False)
+        baseline_tag = self.store.create_ai_tag("Baseline")
+        replacement_tag = self.store.create_ai_tag("Replacement")
+        self.store.update_admin_book_settings(
+            book.book_id,
+            visibility="restricted",
+            user_ids=[member.user_id],
+            tag_ids=[baseline_tag["id"]],
+            profile="technical",
+        )
+
+        invalid_payloads = (
+            {
+                "visibility": "authenticated",
+                "user_ids": [other.user_id],
+                "tag_ids": [replacement_tag["id"], "unknown-tag"],
+                "profile": "fiction",
+            },
+            {
+                "visibility": "authenticated",
+                "user_ids": [disabled.user_id],
+                "tag_ids": [replacement_tag["id"]],
+                "profile": "fiction",
+            },
+            {
+                "visibility": "authenticated",
+                "user_ids": [self.owner.user_id],
+                "tag_ids": [replacement_tag["id"]],
+                "profile": "fiction",
+            },
+            {
+                "visibility": "public",
+                "user_ids": [other.user_id],
+                "tag_ids": [replacement_tag["id"]],
+                "profile": "fiction",
+            },
+            {
+                "visibility": "authenticated",
+                "user_ids": [other.user_id],
+                "tag_ids": [replacement_tag["id"]],
+                "profile": "unsupported",
+            },
+        )
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload), self.assertRaises((KeyError, ValueError)):
+                self.store.update_admin_book_settings(book.book_id, **payload)
+            detail = self.store.get_admin_book_detail(book.book_id)
+            self.assertEqual(detail["visibility"], "restricted")
+            self.assertEqual(detail["grants"], (member.user_id,))
+            self.assertEqual(detail["ai_tags"], ({"id": baseline_tag["id"], "name": "Baseline"},))
+            self.assertEqual(detail["ai_profile"], "technical")
+
+        with self.assertRaises(KeyError):
+            self.store.update_admin_book_settings(
+                "unknown-book",
+                visibility="authenticated",
+                user_ids=[],
+                tag_ids=[],
+                profile="auto",
+            )
+
     def test_new_book_can_preserve_a_correlated_legacy_identity(self):
         record = self.store.resolve_book(
             Path(self.temporary.name, "legacy.epub"),
