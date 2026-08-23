@@ -213,20 +213,192 @@ function jobUiHarness(fetchImpl) {
 
 function adminDataResponse(url) {
   if (url === '/api/admin/users') return response(200, { users: [] });
-  if (url === '/api/admin/books') return response(200, { books: [] });
+  if (url === '/api/admin/books/index') return response(200, { books: [] });
   if (url === '/api/admin/ai/settings') return response(200, { settings: null });
   if (url === '/api/admin/ai/tags') return response(200, { tags: [] });
   return null;
 }
 
-test('legacy book renderer stays on its list surface until the table renderer takes over', () => {
+function adminBook(overrides = {}) {
+  return Object.assign({
+    id: 'book-1',
+    title: 'Book 01',
+    authors: [],
+    epub_tags: [],
+    visibility: 'authenticated',
+    grant_count: 0,
+    ai_profile: 'auto',
+    ai_tags: [],
+    ai_result_count: 0,
+    updated_at: '2026-08-23T08:00:00Z',
+  }, overrides);
+}
+
+function bookUiHarness(fetchImpl) {
+  const localeListeners = [];
+  const elements = {
+    adminMenu: fakeElement('button'),
+    adminClose: fakeElement('button'),
+    adminPanel: fakeElement('section'),
+    adminBookTableSurface: fakeElement('div'),
+    adminBookLegacyList: fakeElement('ul'),
+    adminBookSearch: fakeElement('input'),
+    adminBookVisibilityFilter: fakeElement('select'),
+    adminBookTagFilter: fakeElement('select'),
+    adminBookPageSize: fakeElement('select'),
+    adminBookRefresh: fakeElement('button'),
+    adminBookList: fakeElement('tbody'),
+    adminBookPagination: fakeElement('nav'),
+    adminBookLive: fakeElement('p'),
+  };
+  elements.adminBookTableSurface.hidden = true;
+  elements.adminBookPageSize.value = '20';
+  const root = rootWithFetch(fetchImpl);
+  root.document = {
+    hidden: false,
+    createElement: fakeElement,
+    getElementById(id) { return elements[id] || null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  root.EpubBrowserI18n = {
+    t(key, params) {
+      const values = {
+        'admin.books.pageButton': `Page ${params && params.page}`,
+        'admin.books.pageSummary': `Page ${params && params.page} of ${params && params.totalPages} (${params && params.total})`,
+        'admin.books.grantCount': `${params && params.count} members`,
+        'admin.books.resultCount': `${params && params.count} results`,
+      };
+      return values[key] || `[${key}]`;
+    },
+    formatDate(value) { return `date:${value}`; },
+    onLocaleChange(listener) { localeListeners.push(listener); },
+  };
+  return { root, elements, localeListeners };
+}
+
+function rowTitles(body) {
+  return body.children.map(row => {
+    const title = descendants(row.children[0] || {}).find(node => node.tagName === 'STRONG');
+    return title ? title.textContent : row.children[0] && row.children[0].textContent;
+  });
+}
+
+test('book index renders only the current page and resets pagination for controls', async () => {
+  const books = Array.from({ length: 45 }, (_, index) => adminBook({
+    id: `book-${String(index + 1).padStart(2, '0')}`,
+    title: `Book ${String(index + 1).padStart(2, '0')}`,
+    visibility: index % 2 ? 'restricted' : 'authenticated',
+    ai_tags: index % 3 ? [] : [{ id: 'tag-1', name: 'Science' }],
+  })).reverse();
+  const calls = [];
+  const { root, elements } = bookUiHarness(url => {
+    calls.push(url);
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books }));
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+
+  assert.equal(elements.adminBookTableSurface.hidden, false);
+  assert.equal(elements.adminBookLegacyList.hidden, true);
+  assert.equal(elements.adminBookList.children.length, 20);
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Book 01');
+  const next = descendants(elements.adminBookPagination).find(node => node.textContent === '[admin.books.nextPage]');
+  next.click();
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Book 21');
+
+  elements.adminBookSearch.value = 'Book 01';
+  elements.adminBookSearch.listeners.input();
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Book 01');
+  assert.equal(elements.adminBookList.children.length, 1);
+  elements.adminBookSearch.value = '';
+  elements.adminBookSearch.listeners.input();
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Book 01');
+
+  elements.adminBookVisibilityFilter.value = 'restricted';
+  elements.adminBookVisibilityFilter.listeners.change();
+  assert.equal(elements.adminBookList.children.length, 20);
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Book 02');
+  elements.adminBookTagFilter.value = 'tag-1';
+  elements.adminBookTagFilter.listeners.change();
+  assert.equal(rowTitles(elements.adminBookList)[0], 'Book 04');
+
+  elements.adminBookPageSize.value = '50';
+  elements.adminBookPageSize.listeners.change();
+  assert.equal(elements.adminBookList.children.length, 7);
+  assert.deepEqual(calls, ['/api/admin/books/index']);
+});
+
+test('book index matches literal and tone-free pinyin text without unsafe HTML rendering', async () => {
+  const books = [
+    adminBook({
+      id: 'chinese', title: '算法导论', authors: [], epub_tags: [],
+      ai_tags: [{ id: 'tag-cs', name: 'Computer Science' }],
+    }),
+    adminBook({
+      id: 'literal', title: 'Other book', authors: ['Ada Lovelace'],
+      epub_tags: ['Mathematics'], ai_tags: [{ id: 'tag-math', name: 'Theory' }],
+    }),
+  ];
+  const { root, elements } = bookUiHarness(url => Promise.resolve(
+    response(url === '/api/admin/books/index' ? 200 : 404, { books })
+  ));
+  root.pinyinPro = {
+    pinyin(value) { return value === '算法导论 Computer Science' ? 'suan fa dao lun computer science' : value; },
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+
+  elements.adminBookSearch.value = 'suanfadaolun';
+  elements.adminBookSearch.listeners.input();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['算法导论']);
+  elements.adminBookSearch.value = 'ada lovelace';
+  elements.adminBookSearch.listeners.input();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Other book']);
+  elements.adminBookSearch.value = 'mathematics';
+  elements.adminBookSearch.listeners.input();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Other book']);
+  elements.adminBookSearch.value = 'computer science';
+  elements.adminBookSearch.listeners.input();
+  assert.deepEqual(rowTitles(elements.adminBookList), ['算法导论']);
+  assert.equal(elements.adminBookList.innerHTMLWrites, 0);
+});
+
+test('book refresh requests only the lightweight index and locale changes rerender held state', async () => {
+  const calls = [];
+  const { root, elements, localeListeners } = bookUiHarness(url => {
+    calls.push(url);
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, {
+      books: [adminBook({ title: 'Locale book' })],
+    }));
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  elements.adminBookRefresh.click();
+  await tick();
+  await tick();
+  localeListeners.forEach(listener => listener());
+
+  assert.deepEqual(calls, ['/api/admin/books/index', '/api/admin/books/index']);
+  assert.deepEqual(rowTitles(elements.adminBookList), ['Locale book']);
+});
+
+test('book table renderer owns the stable body while the old card renderer is retired', () => {
   const source = fs.readFileSync(path.join(__dirname, '../epub_browser/assets/auth.js'), 'utf8');
-  const start = source.indexOf('function renderBooks() {');
+  const start = source.indexOf('function renderAdminBooks() {');
   const renderer = source.slice(start, source.indexOf('\n    function renderIdentities()', start));
 
-  assert.match(renderer, /var list = element\('adminBookLegacyList'\);/);
-  assert.match(renderer, /root\.document\.createElement\('li'\)/);
-  assert.match(renderer, /list\.appendChild\(item\);/);
+  assert.match(renderer, /var list = element\('adminBookList'\);/);
+  assert.match(renderer, /root\.document\.createElement\('tr'\)/);
+  assert.doesNotMatch(renderer, /adminBookLegacyList/);
 });
 
 test('auth wrapper attaches CSRF and redirects only after a 401 response', async () => {
@@ -471,7 +643,7 @@ test('account settings and administration open as separate surfaces', async () =
     calls.push(url);
     if (url === '/api/account/sessions') return Promise.resolve(response(200, { sessions: [] }));
     if (url === '/api/admin/users') return Promise.resolve(response(200, { users: [] }));
-    if (url === '/api/admin/books') return Promise.resolve(response(200, { books: [] }));
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [] }));
     if (url === '/api/admin/ai/jobs?page=1&page_size=20') {
       return Promise.resolve(response(200, aiJobsPayload([], 1, 0, 0)));
     }
@@ -505,7 +677,7 @@ test('account settings and administration open as separate surfaces', async () =
   assert.deepEqual(calls, [
     '/api/account/sessions',
     '/api/admin/users',
-    '/api/admin/books',
+    '/api/admin/books/index',
     '/api/admin/ai/settings',
     '/api/admin/ai/tags',
     '/api/admin/ai/jobs?page=1&page_size=20',

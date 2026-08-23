@@ -15,6 +15,15 @@
     var identities = [];
     var aiSettings = null;
     var aiTags = [];
+    var adminBooksState = {
+      books: [],
+      query: '',
+      visibility: '',
+      tagId: '',
+      page: 1,
+      pageSize: 20,
+      requestGeneration: 0
+    };
     var aiJobsState = {
       status: '',
       page: 1,
@@ -1072,7 +1081,7 @@
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
-    function renderBooks() {
+    function renderLegacyBooks() {
       var list = element('adminBookLegacyList');
       if (!list) return;
       list.textContent = '';
@@ -1266,6 +1275,238 @@
       if (!books.length) list.appendChild(createTextElement('li', 'account-empty', 'admin.noBooks'));
     }
 
+    function compactSearchText(value) {
+      return String(value || '').toLocaleLowerCase().replace(/\s+/g, '');
+    }
+
+    function adminBookSearchText(book) {
+      var tags = Array.isArray(book.ai_tags) ? book.ai_tags : [];
+      var literal = [book.title].concat(book.authors || [], book.epub_tags || [], tags.map(function(tag) {
+        return tag && tag.name;
+      })).join(' ');
+      var pinyin = '';
+      if (root.pinyinPro && typeof root.pinyinPro.pinyin === 'function') {
+        pinyin = root.pinyinPro.pinyin(literal, { toneType: 'none' });
+      }
+      return compactSearchText(literal) + ' ' + compactSearchText(pinyin);
+    }
+
+    function adminBookView(book) {
+      return {
+        book: book || {},
+        searchText: adminBookSearchText(book || {})
+      };
+    }
+
+    function showAdminBookTable() {
+      var surface = element('adminBookTableSurface');
+      var legacy = element('adminBookLegacyList');
+      if (surface) surface.hidden = false;
+      if (legacy) {
+        legacy.hidden = true;
+        legacy.textContent = '';
+      }
+    }
+
+    function adminBookSort(left, right) {
+      var locale = i18n() && typeof i18n().getLocale === 'function' ? i18n().getLocale() : undefined;
+      var title = String(left.book.title || '').localeCompare(
+        String(right.book.title || ''), locale, { sensitivity: 'base' }
+      );
+      if (title) return title;
+      return String(left.book.id || '').localeCompare(String(right.book.id || ''), locale, {
+        sensitivity: 'base'
+      });
+    }
+
+    function filteredAdminBooks() {
+      var query = compactSearchText(adminBooksState.query);
+      return adminBooksState.books.filter(function(view) {
+        var book = view.book;
+        if (query && view.searchText.indexOf(query) === -1) return false;
+        if (adminBooksState.visibility && book.visibility !== adminBooksState.visibility) return false;
+        if (adminBooksState.tagId && !(book.ai_tags || []).some(function(tag) {
+          return tag && tag.id === adminBooksState.tagId;
+        })) return false;
+        return true;
+      }).sort(adminBookSort);
+    }
+
+    function createAdminBookCell(row, value, className) {
+      var cell = root.document.createElement('td');
+      if (className) cell.className = className;
+      cell.textContent = value;
+      row.appendChild(cell);
+      return cell;
+    }
+
+    function populateAdminBookTagFilter() {
+      var filter = element('adminBookTagFilter');
+      if (!filter) return;
+      var selected = adminBooksState.tagId;
+      var tagsById = Object.create(null);
+      adminBooksState.books.forEach(function(view) {
+        (view.book.ai_tags || []).forEach(function(tag) {
+          if (tag && tag.id && !tagsById[tag.id]) tagsById[tag.id] = tag;
+        });
+      });
+      filter.textContent = '';
+      var all = root.document.createElement('option');
+      all.value = '';
+      all.textContent = t('admin.books.tag.all');
+      all.setAttribute('data-i18n', 'admin.books.tag.all');
+      filter.appendChild(all);
+      Object.keys(tagsById).sort(function(left, right) {
+        return String(tagsById[left].name || '').localeCompare(String(tagsById[right].name || ''));
+      }).forEach(function(id) {
+        var tag = tagsById[id];
+        var option = root.document.createElement('option');
+        option.value = id;
+        option.textContent = String(tag.name || '');
+        option.selected = id === selected;
+        filter.appendChild(option);
+      });
+      if (!tagsById[selected]) adminBooksState.tagId = '';
+      filter.value = adminBooksState.tagId;
+    }
+
+    function renderAdminBookPagination(total, totalPages) {
+      var pagination = element('adminBookPagination');
+      if (!pagination) return;
+      pagination.textContent = '';
+      var summary = root.document.createElement('span');
+      summary.textContent = t('admin.books.pageSummary', {
+        page: adminBooksState.page,
+        totalPages: totalPages,
+        total: total
+      });
+      pagination.appendChild(summary);
+      function pageButton(key, page, disabled) {
+        var button = root.document.createElement('button');
+        button.type = 'button';
+        button.disabled = disabled;
+        button.textContent = t(key, { page: page });
+        button.setAttribute('aria-label', t(key, { page: page }));
+        button.addEventListener('click', function() {
+          adminBooksState.page = page;
+          renderAdminBooks();
+        });
+        pagination.appendChild(button);
+      }
+      pageButton('admin.books.previousPage', Math.max(1, adminBooksState.page - 1), adminBooksState.page <= 1);
+      for (var page = 1; page <= totalPages; page += 1) {
+        pageButton('admin.books.pageButton', page, page === adminBooksState.page);
+      }
+      pageButton('admin.books.nextPage', Math.min(totalPages, adminBooksState.page + 1), adminBooksState.page >= totalPages);
+    }
+
+    function renderAdminBookMessage(key) {
+      var list = element('adminBookList');
+      if (!list) return;
+      showAdminBookTable();
+      list.textContent = '';
+      var row = root.document.createElement('tr');
+      var cell = createAdminBookCell(row, t(key));
+      cell.colSpan = 6;
+      cell.setAttribute('data-i18n', key);
+      list.appendChild(row);
+      var pagination = element('adminBookPagination');
+      if (pagination) pagination.textContent = '';
+    }
+
+    function renderAdminBooks() {
+      var list = element('adminBookList');
+      if (!list) return;
+      showAdminBookTable();
+      populateAdminBookTagFilter();
+      var matching = filteredAdminBooks();
+      var totalPages = Math.max(1, Math.ceil(matching.length / adminBooksState.pageSize));
+      if (adminBooksState.page > totalPages) adminBooksState.page = totalPages;
+      var start = (adminBooksState.page - 1) * adminBooksState.pageSize;
+      var visible = matching.slice(start, start + adminBooksState.pageSize);
+      list.textContent = '';
+      if (!visible.length) {
+        var emptyRow = root.document.createElement('tr');
+        var emptyCell = createAdminBookCell(emptyRow, t('admin.books.empty'));
+        emptyCell.colSpan = 6;
+        emptyCell.setAttribute('data-i18n', 'admin.books.empty');
+        list.appendChild(emptyRow);
+      }
+      visible.forEach(function(view) {
+        var book = view.book;
+        var row = root.document.createElement('tr');
+        var bookCell = createAdminBookCell(row, '');
+        var title = root.document.createElement('strong');
+        title.textContent = String(book.title || '');
+        bookCell.appendChild(title);
+        var authors = Array.isArray(book.authors) ? book.authors.filter(Boolean) : [];
+        if (authors.length) {
+          var authorLine = root.document.createElement('span');
+          authorLine.textContent = authors.join(', ');
+          bookCell.appendChild(authorLine);
+        }
+        var epubTags = Array.isArray(book.epub_tags) ? book.epub_tags.filter(Boolean) : [];
+        if (epubTags.length) {
+          var epubTagLine = root.document.createElement('span');
+          epubTagLine.textContent = epubTags.join(', ');
+          bookCell.appendChild(epubTagLine);
+        }
+        createAdminBookCell(row, t('admin.books.visibility.' + (book.visibility || 'authenticated')) + ' · ' + t('admin.books.grantCount', {
+          count: Number(book.grant_count || 0)
+        }));
+        var profile = String(book.ai_profile || 'auto');
+        var serverTags = (book.ai_tags || []).map(function(tag) { return tag && tag.name; }).filter(Boolean);
+        createAdminBookCell(row, t('admin.books.profile.' + profile) + (serverTags.length ? ' · ' + serverTags.join(', ') : ''));
+        createAdminBookCell(row, t('admin.books.resultCount', { count: Number(book.ai_result_count || 0) }));
+        createAdminBookCell(row, formatDate(book.updated_at));
+        var actions = createAdminBookCell(row, '');
+        var manage = root.document.createElement('button');
+        manage.type = 'button';
+        manage.textContent = t('admin.books.manage');
+        manage.setAttribute('data-book-id', String(book.id || ''));
+        manage.setAttribute('aria-label', t('admin.books.manageLabel', { title: String(book.title || '') }));
+        manage.setAttribute('aria-expanded', 'false');
+        actions.appendChild(manage);
+        list.appendChild(row);
+      });
+      renderAdminBookPagination(matching.length, totalPages);
+    }
+
+    function setAdminBookIndex(records) {
+      adminBooksState.books = (Array.isArray(records) ? records : []).map(adminBookView);
+      populateAdminBookTagFilter();
+      renderAdminBooks();
+    }
+
+    function setAdminBookLive(key, params) {
+      var live = element('adminBookLive');
+      if (live) live.textContent = t(key, params);
+    }
+
+    function loadAdminBookIndex() {
+      if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') {
+        return Promise.resolve(null);
+      }
+      adminBooksState.requestGeneration += 1;
+      var generation = adminBooksState.requestGeneration;
+      renderAdminBookMessage('admin.books.loading');
+      setAdminBookLive('admin.books.live.loading');
+      return authenticatedFetch('/api/admin/books/index').then(function(response) {
+        if (!response || !response.ok) return null;
+        return readJson(response).then(function(payload) {
+          if (generation !== adminBooksState.requestGeneration) return null;
+          setAdminBookIndex(payload && payload.books);
+          setAdminBookLive('admin.books.live.loaded', { count: adminBooksState.books.length });
+          return payload;
+        });
+      }).catch(function() { return null; }).then(function(payload) {
+        if (!payload && generation === adminBooksState.requestGeneration) {
+          renderAdminBookMessage('admin.books.loadError');
+        }
+        return payload;
+      });
+    }
+
     function renderIdentities() {
       var list = element('adminIdentityList');
       var userSelect = element('adminIdentityUser');
@@ -1358,7 +1599,7 @@
       );
       var requests = [
         authenticatedFetch('/api/admin/users'),
-        authenticatedFetch('/api/admin/books'),
+        authenticatedFetch('/api/admin/books/index'),
         authenticatedFetch('/api/admin/ai/settings'),
         authenticatedFetch('/api/admin/ai/tags')
       ];
@@ -1378,7 +1619,7 @@
         if (proxyEnabled) payloadRequests.push(readJson(responses[4]));
         return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
-          books = payloads[1].books || [];
+          setAdminBookIndex(payloads[1].books || []);
           aiSettings = payloads[2].settings || null;
           aiTags = payloads[3].tags || [];
           identities = proxyEnabled ? (payloads[4].identities || []) : [];
@@ -1386,7 +1627,6 @@
           renderAiSettings();
           renderAiUserAccess();
           renderAiTags();
-          renderBooks();
           renderIdentities();
         });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
@@ -1444,6 +1684,11 @@
       var aiJobsStatus = element('adminAiJobsStatus');
       var aiJobsPageSize = element('adminAiJobsPageSize');
       var aiJobsRefresh = element('adminAiJobsRefresh');
+      var bookSearch = element('adminBookSearch');
+      var bookVisibilityFilter = element('adminBookVisibilityFilter');
+      var bookTagFilter = element('adminBookTagFilter');
+      var bookPageSize = element('adminBookPageSize');
+      var bookRefresh = element('adminBookRefresh');
       var aiHelpButtons = Array.prototype.slice.call(root.document.querySelectorAll('.admin-ai-help'));
       function closeAiHelpTips(except) {
         aiHelpButtons.forEach(function(button) {
@@ -1584,6 +1829,31 @@
       if (aiJobsRefresh) aiJobsRefresh.addEventListener('click', function() {
         loadAdminAiJobs();
       });
+      if (bookSearch) bookSearch.addEventListener('input', function() {
+        adminBooksState.query = String(bookSearch.value || '');
+        adminBooksState.page = 1;
+        renderAdminBooks();
+      });
+      if (bookVisibilityFilter) bookVisibilityFilter.addEventListener('change', function() {
+        adminBooksState.visibility = String(bookVisibilityFilter.value || '');
+        adminBooksState.page = 1;
+        renderAdminBooks();
+      });
+      if (bookTagFilter) bookTagFilter.addEventListener('change', function() {
+        adminBooksState.tagId = String(bookTagFilter.value || '');
+        adminBooksState.page = 1;
+        renderAdminBooks();
+      });
+      if (bookPageSize) bookPageSize.addEventListener('change', function() {
+        var selectedBookPageSize = Number(bookPageSize.value);
+        adminBooksState.pageSize = [10, 20, 50, 100].indexOf(selectedBookPageSize) !== -1
+          ? selectedBookPageSize : 20;
+        adminBooksState.page = 1;
+        renderAdminBooks();
+      });
+      if (bookRefresh) bookRefresh.addEventListener('click', function() {
+        loadAdminBookIndex();
+      });
       if (root.document && typeof root.document.addEventListener === 'function') {
         root.document.addEventListener('visibilitychange', handleAiJobsVisibilityChange);
       }
@@ -1595,7 +1865,7 @@
           renderAiSettings();
           renderAiUserAccess();
           renderAiTags();
-          renderBooks();
+          renderAdminBooks();
           renderIdentities();
           renderAdminAiJobs();
           loadSessions();
@@ -1629,6 +1899,7 @@
       saveBookGrants: replaceBookGrants,
       loadAiJobs: loadAdminAiJobs,
       retryAiJob: retryAdminAiJob,
+      loadBookIndex: loadAdminBookIndex,
       init: init,
       setSession: setSession,
       getSession: function() { return sessionState; }
