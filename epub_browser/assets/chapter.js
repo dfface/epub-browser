@@ -886,6 +886,15 @@ function initScript() {
         }
     }
 
+    function syncChapterScopedControls(chapterIndex) {
+        var controls = document.querySelectorAll(
+            '[data-ai-learning-canvas], [data-ai-followup-drawer]'
+        );
+        for (var i = 0; i < controls.length; i++) {
+            controls[i].setAttribute('data-chapter-index', chapterIndex);
+        }
+    }
+
     function syncChapterContentAttributes(source) {
         var attributes = [
             'lang', 'data-eb-styles', 'data-chapter-index', 'data-chapter-title',
@@ -948,7 +957,7 @@ function initScript() {
         options = options || {};
         if (isPaginationMode || isContinuousScroll) return false;
         var target = chapterTargetFromUrl(url);
-        if (!target || target.path === window.location.pathname) return false;
+        if (!target || target.index === parseInt(chapter_index, 10)) return false;
         activeScrollingChapterRequest += 1;
         var requestId = activeScrollingChapterRequest;
         if (scrollingChapterXhr) scrollingChapterXhr.abort();
@@ -984,6 +993,7 @@ function initScript() {
             if (pageTitle) document.title = pageTitle.textContent;
             chapter_index = String(target.index);
             visibleChapterIndex = target.index;
+            syncChapterScopedControls(target.index);
             pendingAnnotationId = requestedAnnotationId();
             if (options.history !== false) {
                 window.history.pushState({chapterIndex: target.index}, '', url);

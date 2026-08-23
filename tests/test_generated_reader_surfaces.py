@@ -1082,7 +1082,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("window.addEventListener('popstate'", navigation)
         self.assertIn("navigateScrollingChapter(window.location.href, { history: false });", navigation)
         self.assertIn('if (isPaginationMode || isContinuousScroll) return false;', navigation)
+        self.assertIn('target.index === parseInt(chapter_index, 10)', navigation)
+        self.assertNotIn('target.path === window.location.pathname', navigation)
+        self.assertIn('syncChapterScopedControls(target.index);', navigation)
         self.assertIn('wireNormalScrollChapterNavigation();', script)
+        self.assertIn('function syncChapterScopedControls(chapterIndex) {', script)
+        self.assertRegex(
+            script,
+            r"document\.querySelectorAll\(\s*"
+            r"'\[data-ai-learning-canvas\], \[data-ai-followup-drawer\]'\s*\)",
+        )
+        self.assertIn("setAttribute('data-chapter-index', chapterIndex);", script)
 
         keyboard = script[script.index('function handleKeyDown('):script.index('\n    prevPageBtn.addEventListener', script.index('function handleKeyDown('))]
         self.assertIn('navigateScrollingChapter(prev, { history: true });', keyboard)
