@@ -10,7 +10,7 @@ from pathlib import Path
 from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
-from epub_browser.processor import EPUBProcessor
+from epub_browser.processor import EPUBProcessor, server_book_public_path_allowed
 from epub_browser.site import publish_library_shell
 from epub_browser.urls import SiteURLs
 
@@ -745,6 +745,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (extracted / "cover.png").write_bytes(b"passive-image")
+            (extracted / "cover.jpe").write_bytes(b"jpe-cover")
+            (extracted / "cover.jfif").write_bytes(b"jfif-cover")
 
             body, _ = processor.process_html_content(
                 '<body><a href="payload.htm">payload</a>'
@@ -766,6 +768,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             safe_css = (resources / "safe.css").read_text(encoding="utf-8")
             unsafe_css = (resources / "unsafe.css").read_text(encoding="utf-8")
             cover_bytes = (resources / "cover.png").read_bytes()
+            jpe_cover_bytes = (resources / "cover.jpe").read_bytes()
+            jfif_cover_bytes = (resources / "cover.jfif").read_bytes()
 
         for payload in (
             "script",
@@ -788,6 +792,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertEqual(safe_css, "p { color: red; }")
         self.assertEqual(unsafe_css, "")
         self.assertEqual(cover_bytes, b"passive-image")
+        self.assertEqual(jpe_cover_bytes, b"jpe-cover")
+        self.assertEqual(jfif_cover_bytes, b"jfif-cover")
+        self.assertTrue(server_book_public_path_allowed("resources/cover.jpe"))
+        self.assertTrue(server_book_public_path_allowed("resources/cover.jfif"))
 
     def test_ssg_processor_preserves_existing_epub_markup_metadata_and_resources(self):
         with tempfile.TemporaryDirectory() as directory:

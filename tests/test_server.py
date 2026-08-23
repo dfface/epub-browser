@@ -27,7 +27,7 @@ from epub_browser.ai_reading import AIReadingError, AIReadingService
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from epub_browser.runtime import RuntimeStatus
-from epub_browser.server import create_app, migrate_legacy_database
+from epub_browser.server import CachedStaticFiles, create_app, migrate_legacy_database
 from epub_browser.state import StateStore
 
 
@@ -167,6 +167,21 @@ class LoggingAssertionCompatibilityTests(unittest.TestCase):
             logger.handlers[:] = original_handlers
             logger.setLevel(original_level)
             logger.propagate = original_propagate
+
+
+class CachedStaticFilesTests(unittest.TestCase):
+    def test_jfif_resources_are_served_as_jpeg(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / "cover.jfif"
+            image.write_bytes(b"\xff\xd8\xff\xe0JFIF")
+            static_files = CachedStaticFiles(directory=directory, html=False)
+            response = static_files.file_response(
+                str(image),
+                image.stat(),
+                {"method": "GET", "headers": []},
+            )
+
+        self.assertEqual(response.headers["content-type"], "image/jpeg")
 
 
 class ServerSetupBoundaryTests(unittest.TestCase):

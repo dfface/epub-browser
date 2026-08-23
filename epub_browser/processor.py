@@ -37,7 +37,7 @@ SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 SERVER_OUTPUT_REVISION = "server-content-v7"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
-    "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpeg",
+    "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpe", "jfif", "jpeg",
     "jpg", "m4a", "m4v", "mp3", "mp4", "mpeg", "mpg", "oga", "ogg",
     "ogv", "opus", "otf", "png", "svg", "ttf", "wav", "webm", "webp",
     "woff", "woff2",

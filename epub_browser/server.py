@@ -434,6 +434,10 @@ class CachedStaticFiles(StaticFiles):
 
     def file_response(self, full_path, stat_result, scope, status_code=200):
         response = super().file_response(full_path, stat_result, scope, status_code)
+        # ``mimetypes`` does not consistently recognise the JPEG JFIF suffix
+        # across platforms, even though EPUB manifests commonly use it.
+        if Path(full_path).suffix.casefold() == '.jfif':
+            response.headers['Content-Type'] = 'image/jpeg'
         response.headers['Cache-Control'] = cache_control_for_path(full_path)
         return response
 
