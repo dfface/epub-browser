@@ -1708,6 +1708,225 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(empty_detail.status_code, 404)
         self.assertEqual(empty_settings.status_code, 404)
 
+    def test_admin_book_raw_paths_disambiguate_encoded_reserved_suffix_ids(self):
+        book_ids = (
+            "tail",
+            "tail/ai",
+            "tail/settings",
+            "tail/grants",
+            "tail//ai",
+            "literal%2Fai",
+        )
+        for index, book_id in enumerate(book_ids):
+            self.store.resolve_book(
+                Path(self.directory.name) / ("reserved-suffix-" + str(index) + ".epub"),
+                "urn:test:reserved-suffix:" + str(index),
+                "reserved-suffix-fingerprint-" + str(index),
+                {"title": "Reserved suffix " + book_id, "authors": [], "tags": []},
+                preferred_book_id=book_id,
+            )
+        tag = self.store.create_ai_tag("Reserved suffix tag")
+        complete_settings = {
+            "visibility": "restricted",
+            "user_ids": [self.member.user_id],
+            "tag_ids": [tag["id"]],
+            "profile": "technical",
+        }
+
+        with mock.patch.object(
+            self.store,
+            "get_admin_book_detail",
+            wraps=self.store.get_admin_book_detail,
+        ) as get_detail, mock.patch.object(
+            self.store,
+            "set_book_visibility",
+            wraps=self.store.set_book_visibility,
+        ) as set_visibility, mock.patch.object(
+            self.store,
+            "update_admin_book_settings",
+            wraps=self.store.update_admin_book_settings,
+        ) as update_settings:
+            encoded_details = {
+                book_id: self.admin_client.get(
+                    "/api/admin/books/" + quote(book_id, safe="")
+                )
+                for book_id in (
+                    "tail/ai",
+                    "tail/settings",
+                    "tail/grants",
+                    "tail//ai",
+                    "literal%2Fai",
+                )
+            }
+            encoded_legacy_settings = self.admin_client.put(
+                "/api/admin/books/" + quote("tail/settings", safe=""),
+                json={"visibility": "restricted"},
+            )
+            encoded_legacy_grants = self.admin_client.put(
+                "/api/admin/books/" + quote("tail/grants", safe=""),
+                json={"visibility": "restricted"},
+            )
+            encoded_atomic = self.admin_client.put(
+                "/api/admin/books/" + quote("tail/ai", safe="") + "/settings",
+                json=complete_settings,
+            )
+
+        for book_id, detail in encoded_details.items():
+            with self.subTest(book_id=book_id):
+                self.assertEqual(detail.status_code, 200)
+                self.assertIn("book", detail.json())
+                self.assertEqual(detail.json()["book"]["id"], book_id)
+        self.assertEqual(encoded_legacy_settings.status_code, 200)
+        self.assertEqual(encoded_legacy_settings.json()["book"]["id"], "tail/settings")
+        self.assertEqual(encoded_legacy_grants.status_code, 200)
+        self.assertEqual(encoded_legacy_grants.json()["book"]["id"], "tail/grants")
+        self.assertEqual(encoded_atomic.status_code, 200)
+        self.assertEqual(encoded_atomic.json()["book"]["id"], "tail/ai")
+        for book_id in encoded_details:
+            self.assertIn(mock.call(book_id), get_detail.call_args_list)
+        set_visibility.assert_has_calls([
+            mock.call("tail/settings", "restricted"),
+            mock.call("tail/grants", "restricted"),
+        ])
+        self.assertIn(mock.call(
+            "tail/ai",
+            visibility="restricted",
+            user_ids=[self.member.user_id],
+            tag_ids=[tag["id"]],
+            profile="technical",
+        ), update_settings.call_args_list)
+
+        literal_ai = self.admin_client.get("/api/admin/books/tail/ai")
+        literal_grants = self.admin_client.put(
+            "/api/admin/books/tail/grants",
+            json={"user_ids": [self.member.user_id]},
+        )
+        literal_settings = self.admin_client.put(
+            "/api/admin/books/tail/settings",
+            json=complete_settings,
+        )
+        member_denied = self.member_client.get(
+            "/api/admin/books/" + quote("tail/ai", safe="")
+        )
+        csrf_token = self.admin_client.headers.pop("X-CSRF-Token")
+        try:
+            csrf_denied = self.admin_client.put(
+                "/api/admin/books/" + quote("tail/settings", safe=""),
+                json={"visibility": "authenticated"},
+            )
+        finally:
+            self.admin_client.headers["X-CSRF-Token"] = csrf_token
+
+        self.assertEqual(literal_ai.status_code, 200)
+        self.assertEqual(literal_ai.json()["profile"], "auto")
+        self.assertEqual(literal_grants.status_code, 200)
+        self.assertEqual(literal_grants.json()["grants"]["book_id"], "tail")
+        self.assertEqual(literal_settings.status_code, 200)
+        self.assertEqual(literal_settings.json()["book"]["id"], "tail")
+        self.assertEqual(member_denied.status_code, 403)
+        self.assertEqual(csrf_denied.status_code, 403)
+        self.assertEqual(csrf_denied.json()["code"], "csrf_required")
+        self.assertEqual(self.admin_client.get("/api/admin/books/index").status_code, 200)
+        self.assertEqual(self.admin_client.get("/api/admin/books").status_code, 200)
+        self.assertEqual(self.admin_client.get("/api/admin/books/").status_code, 404)
+        self.assertEqual(
+            self.admin_client.put(
+                "/api/admin/books//settings",
+                json=complete_settings,
+            ).status_code,
+            404,
+        )
+
+    def test_admin_book_settings_rejects_duplicate_top_level_keys_before_update(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "duplicate-settings-key.epub",
+            "urn:test:duplicate-settings-key",
+            "duplicate-settings-key-fingerprint",
+            {"title": "Duplicate settings key", "authors": [], "tags": []},
+            preferred_book_id="duplicate-settings-key",
+        )
+        tag = self.store.create_ai_tag("Duplicate key tag")
+        payload = {
+            "visibility": "restricted",
+            "user_ids": [self.member.user_id],
+            "tag_ids": [tag["id"]],
+            "profile": "technical",
+        }
+        duplicate_body = json.dumps(payload)[:-1] + ',"profile":"fiction"}'
+        before = self.store.get_admin_book_detail(book.book_id)
+
+        with mock.patch.object(
+            self.store,
+            "update_admin_book_settings",
+            wraps=self.store.update_admin_book_settings,
+        ) as update_settings, mock.patch.object(
+            self.store,
+            "get_admin_book_detail",
+            wraps=self.store.get_admin_book_detail,
+        ) as get_detail:
+            rejected = self.admin_client.put(
+                "/api/admin/books/" + book.book_id + "/settings",
+                content=duplicate_body,
+                headers={"Content-Type": "application/json"},
+            )
+
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(rejected.json()["code"], "invalid_book_settings")
+        update_settings.assert_not_called()
+        get_detail.assert_not_called()
+        self.assertEqual(self.store.get_admin_book_detail(book.book_id), before)
+
+    def test_admin_book_settings_body_is_bounded_and_duplicate_ids_are_normalized(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "bounded-settings.epub",
+            "urn:test:bounded-settings",
+            "bounded-settings-fingerprint",
+            {"title": "Bounded settings", "authors": [], "tags": []},
+            preferred_book_id="bounded-settings-book",
+        )
+        tag = self.store.create_ai_tag("Bounded settings tag")
+        payload = {
+            "visibility": "restricted",
+            "user_ids": [self.member.user_id],
+            "tag_ids": [tag["id"]],
+            "profile": "general",
+        }
+        oversized_body = json.dumps(payload) + (" " * (64 * 1024))
+
+        with mock.patch.object(
+            self.store,
+            "update_admin_book_settings",
+            wraps=self.store.update_admin_book_settings,
+        ) as update_settings, mock.patch.object(
+            self.store,
+            "get_admin_book_detail",
+            wraps=self.store.get_admin_book_detail,
+        ) as get_detail:
+            oversized = self.admin_client.put(
+                "/api/admin/books/" + book.book_id + "/settings",
+                content=oversized_body,
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(oversized.status_code, 400)
+        self.assertEqual(oversized.json()["code"], "invalid_book_settings")
+        update_settings.assert_not_called()
+        get_detail.assert_not_called()
+
+        normalized = self.admin_client.put(
+            "/api/admin/books/" + book.book_id + "/settings",
+            json={
+                **payload,
+                "user_ids": [self.member.user_id, self.member.user_id],
+                "tag_ids": [tag["id"], tag["id"]],
+            },
+        )
+        self.assertEqual(normalized.status_code, 200)
+        self.assertEqual(normalized.json()["book"]["grants"], [self.member.user_id])
+        self.assertEqual(
+            normalized.json()["book"]["ai_tags"],
+            [{"id": tag["id"], "name": "Bounded settings tag"}],
+        )
+
     def test_admin_saves_book_tags_and_ai_profile_independently(self):
         book = self.store.resolve_book(
             Path(self.directory.name) / "book.epub",

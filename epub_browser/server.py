@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from urllib.parse import parse_qs, quote, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, unquote_to_bytes, urlsplit
 
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -584,6 +584,43 @@ def create_app(
         if not isinstance(data, dict):
             return None, 'invalid_json'
         return data, None
+
+    async def bounded_unique_json_object(request, maximum_size=64 * 1024):
+        content_type = request.headers.get('content-type', '').split(';', 1)[0]
+        if content_type.strip().casefold() != 'application/json':
+            return None
+        content_length = request.headers.get('content-length')
+        if content_length:
+            try:
+                if int(content_length) < 0 or int(content_length) > maximum_size:
+                    return None
+            except ValueError:
+                return None
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > maximum_size:
+                return None
+
+        class DuplicateKeyError(ValueError):
+            pass
+
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise DuplicateKeyError
+                result[key] = value
+            return result
+
+        try:
+            data = json.loads(
+                bytes(body).decode('utf-8'),
+                object_pairs_hook=unique_object,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError, DuplicateKeyError):
+            return None
+        return data if isinstance(data, dict) else None
 
     def user_data(user):
         payload = {
@@ -1496,7 +1533,7 @@ window.location.assign(payload.redirect||'/');
     async def admin_book(request):
         require_admin(request)
         book_id = request.path_params['book_id']
-        if request.method == 'GET':
+        if request.method in {'GET', 'HEAD'}:
             try:
                 book = store.get_admin_book_detail(book_id)
             except KeyError:
@@ -1520,12 +1557,7 @@ window.location.assign(payload.redirect||'/');
     async def admin_book_settings(request):
         require_admin(request)
         book_id = request.path_params['book_id']
-        try:
-            store.get_admin_book_detail(book_id)
-        except KeyError:
-            return response(error_payload('not_found', 'Book not found'), 404)
-
-        data = await json_object(request)
+        data = await bounded_unique_json_object(request)
         required = {'visibility', 'user_ids', 'tag_ids', 'profile'}
         if data is None or set(data) != required:
             return response(
@@ -1563,6 +1595,10 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         try:
+            store.get_admin_book_detail(book_id)
+        except KeyError:
+            return response(error_payload('not_found', 'Book not found'), 404)
+        try:
             book, summary = store.update_admin_book_settings(
                 book_id,
                 visibility=visibility,
@@ -1582,6 +1618,54 @@ window.location.assign(payload.redirect||'/');
             'book': admin_book_detail_data(book),
             'summary': admin_book_summary_data(summary),
         })
+
+    def admin_book_raw_tail(request):
+        prefix = b'/api/admin/books/'
+        raw_path = request.scope.get('raw_path')
+        if isinstance(raw_path, bytes):
+            raw_path = raw_path.split(b'?', 1)[0]
+            if raw_path.startswith(prefix):
+                return raw_path[len(prefix):], True
+        book_path = request.path_params.get('book_path', '')
+        return str(book_path).encode('utf-8'), False
+
+    def decode_admin_book_path(value, encoded):
+        if encoded:
+            value = unquote_to_bytes(value)
+        return value.decode('utf-8', errors='replace')
+
+    async def admin_book_request(request):
+        raw_tail, encoded = admin_book_raw_tail(request)
+        method = request.method
+
+        async def dispatch(handler, **path_params):
+            request.scope['path_params'] = path_params
+            return await handler(request)
+
+        if method == 'PUT' and raw_tail.endswith(b'/settings'):
+            book_id = decode_admin_book_path(raw_tail[:-len(b'/settings')], encoded)
+            return await dispatch(admin_book_settings, book_id=book_id)
+        if method in {'GET', 'HEAD', 'PUT'} and raw_tail.endswith(b'/ai'):
+            book_id = decode_admin_book_path(raw_tail[:-len(b'/ai')], encoded)
+            return await dispatch(admin_book_ai, book_id=book_id)
+        grant_marker = b'/grants/'
+        if method in {'PUT', 'DELETE'} and grant_marker in raw_tail:
+            raw_book_id, raw_user_id = raw_tail.rsplit(grant_marker, 1)
+            if raw_user_id and b'/' not in raw_user_id:
+                return await dispatch(
+                    admin_book_grant,
+                    book_id=decode_admin_book_path(raw_book_id, encoded),
+                    user_id=decode_admin_book_path(raw_user_id, encoded),
+                )
+        if method == 'PUT' and raw_tail.endswith(b'/grants'):
+            book_id = decode_admin_book_path(raw_tail[:-len(b'/grants')], encoded)
+            return await dispatch(admin_book_grants, book_id=book_id)
+        if method in {'GET', 'HEAD', 'PUT'}:
+            return await dispatch(
+                admin_book,
+                book_id=decode_admin_book_path(raw_tail, encoded),
+            )
+        raise StarletteHTTPException(status_code=405, detail='Method not allowed')
 
     async def admin_book_grant(request):
         require_admin(request)
@@ -1779,7 +1863,7 @@ window.location.assign(payload.redirect||'/');
             store.get_book(book_id)
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
-        if request.method == 'GET':
+        if request.method in {'GET', 'HEAD'}:
             return response({
                 'profile': store.get_book_ai_profile(book_id),
                 'tags': list(store.book_ai_tags(book_id)),
@@ -2770,29 +2854,9 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/index', admin_book_index, methods=['GET']),
         Route(
-            '/api/admin/books/{book_id:path}/settings',
-            admin_book_settings,
-            methods=['PUT'],
-        ),
-        Route(
-            '/api/admin/books/{book_id:path}/ai',
-            admin_book_ai,
-            methods=['GET', 'PUT'],
-        ),
-        Route(
-            '/api/admin/books/{book_id:path}/grants/{user_id}',
-            admin_book_grant,
-            methods=['PUT', 'DELETE'],
-        ),
-        Route(
-            '/api/admin/books/{book_id:path}/grants',
-            admin_book_grants,
-            methods=['PUT'],
-        ),
-        Route(
-            '/api/admin/books/{book_id:path}',
-            admin_book,
-            methods=['GET', 'PUT'],
+            '/api/admin/books/{book_path:path}',
+            admin_book_request,
+            methods=['GET', 'PUT', 'DELETE'],
         ),
         Route('/api/admin/ai/settings', admin_ai_settings, methods=['GET', 'PUT']),
         Route('/api/admin/ai/users/{user_id}', admin_ai_user_access, methods=['GET', 'PUT']),
