@@ -1073,7 +1073,7 @@
     }
 
     function renderBooks() {
-      var list = element('adminBookList');
+      var list = element('adminBookLegacyList');
       if (!list) return;
       list.textContent = '';
       books.forEach(function(book) {

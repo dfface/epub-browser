@@ -224,7 +224,7 @@ test('legacy book renderer stays on its list surface until the table renderer ta
   const start = source.indexOf('function renderBooks() {');
   const renderer = source.slice(start, source.indexOf('\n    function renderIdentities()', start));
 
-  assert.match(renderer, /var list = element\('adminBookList'\);/);
+  assert.match(renderer, /var list = element\('adminBookLegacyList'\);/);
   assert.match(renderer, /root\.document\.createElement\('li'\)/);
   assert.match(renderer, /list\.appendChild\(item\);/);
 });

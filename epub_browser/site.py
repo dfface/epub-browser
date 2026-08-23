@@ -253,13 +253,13 @@ def render_library_shell(
                         <table class="account-admin-table">
                             <caption class="sr-only visually-hidden" data-i18n="admin.books.tableLabel">Books</caption>
                             <thead><tr><th scope="col" data-i18n="admin.books.header.book">Book</th><th scope="col" data-i18n="admin.books.header.access">Visibility and access</th><th scope="col" data-i18n="admin.books.header.profile">AI profile and tags</th><th scope="col" data-i18n="admin.books.header.results">AI results</th><th scope="col" data-i18n="admin.books.header.updated">Updated</th><th scope="col" data-i18n="admin.books.header.action">Actions</th></tr></thead>
-                            <tbody id="adminBookTableBody"><tr><td colspan="6" data-i18n="admin.books.loading">Loading books…</td></tr></tbody>
+                            <tbody id="adminBookList"><tr><td colspan="6" data-i18n="admin.books.loading">Loading books…</td></tr></tbody>
                         </table>
                     </div>
                     <nav id="adminBookPagination" aria-label="Book pages" data-i18n-aria-label="admin.books.paginationLabel"></nav>
                     <p id="adminBookLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
                 </div>
-                <ul class="account-list" id="adminBookList"></ul>
+                <ul class="account-list" id="adminBookLegacyList"></ul>
             </section>
             </div>
         </section>

@@ -39,6 +39,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "adminBookPageSize",
             "adminBookRefresh",
             "adminBookList",
+            "adminBookLegacyList",
             "adminBookPagination",
             "adminBookLive",
         ):
@@ -71,8 +72,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
         self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
         self.assertRegex(server_html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
-        self.assertRegex(server_html, r'<ul\b[^>]*id=(?:["\'])?adminBookList')
-        self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminBookTableBody')
+        self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(server_html, r'<ul\b[^>]*id=(?:["\'])?adminBookLegacyList')
         self.assertRegex(server_html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
         self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminBookLive)(?=[^>]*aria-live=(?:["\'])?polite)')
         for key in ('book', 'access', 'profile', 'results', 'updated', 'action'):
@@ -83,7 +84,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         for control_id in (
             'adminBookSearch', 'adminBookVisibilityFilter', 'adminBookTagFilter',
             'adminBookPageSize', 'adminBookRefresh', 'adminBookList',
-            'adminBookTableBody', 'adminBookPagination', 'adminBookLive',
+            'adminBookLegacyList', 'adminBookPagination', 'adminBookLive',
         ):
             self.assertNotIn(control_id, ssg_html)
 

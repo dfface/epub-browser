@@ -111,6 +111,7 @@ class SitePublicationTests(unittest.TestCase):
         self.assertIn('id=adminBookPageSize', html)
         self.assertIn('id=adminBookRefresh', html)
         self.assertIn('id=adminBookList', html)
+        self.assertIn('id=adminBookLegacyList', html)
         self.assertIn('id=adminBookPagination', html)
         self.assertIn('id=adminBookLive', html)
         self.assertRegex(html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
@@ -122,8 +123,8 @@ class SitePublicationTests(unittest.TestCase):
         )
         self.assertRegex(html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
         self.assertRegex(html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
-        self.assertRegex(html, r'<ul\b[^>]*id=(?:["\'])?adminBookList')
-        self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminBookTableBody')
+        self.assertRegex(html, r'<tbody\b[^>]*id=(?:["\'])?adminBookList')
+        self.assertRegex(html, r'<ul\b[^>]*id=(?:["\'])?adminBookLegacyList')
         self.assertRegex(html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
         self.assertRegex(
             html,
@@ -152,6 +153,7 @@ class SitePublicationTests(unittest.TestCase):
         self.assertNotIn('adminBookPageSize', html)
         self.assertNotIn('adminBookRefresh', html)
         self.assertNotIn('adminBookList', html)
+        self.assertNotIn('adminBookLegacyList', html)
         self.assertNotIn('adminBookPagination', html)
         self.assertNotIn('adminBookLive', html)
         self.assertNotRegex(html, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
