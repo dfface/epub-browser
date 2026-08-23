@@ -1197,15 +1197,6 @@ body.auth-page {
     background: var(--account-card);
 }
 
-#adminIdentityForm {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: end;
-}
-
-#adminIdentityForm .account-primary-action {
-    align-self: end;
-}
-
 .account-list {
     display: grid;
     gap: 10px;
@@ -1370,8 +1361,7 @@ body.auth-page {
 }
 
 .account-list-summary,
-.account-session-label,
-.admin-identity-summary {
+.account-session-label {
     flex: 1 1 260px;
     min-width: 0;
     overflow-wrap: anywhere;
@@ -1576,7 +1566,6 @@ body.auth-page {
     }
 
     #adminUserForm,
-    #adminIdentityForm,
     .admin-ai-settings-form {
         grid-template-columns: 1fr 1fr;
     }
@@ -1685,7 +1674,6 @@ body.auth-page {
     }
 
     #adminUserForm,
-    #adminIdentityForm,
     .admin-ai-settings-form,
     .admin-ai-settings-group {
         grid-template-columns: 1fr;

@@ -17,7 +17,7 @@ EPUB Browser 提供两个职责清晰的模式：
 | | `ssg` | `server` |
 | --- | --- | --- |
 | 部署方式 | 静态托管、Pages、对象存储、Nginx | 持久化的私有阅读服务 |
-| 账户 | 无 | 本地账户；可选受信任代理身份 |
+| 账户 | 无 | 本地账户 |
 | 进度、标注、书架 | 仅当前浏览器 | SQLite 中的已登录账户数据 |
 | 源文件更新 | 重新运行 `ssg` | 重启服务或使用 `--watch` |
 | 运行时数据库 | 无 | 必需 |
@@ -174,7 +174,7 @@ SSG 有意保持本地化且不包含账户体系：
 - 受限书籍只对管理员和被明确授权的用户可见。
 - 每位用户独立拥有书架、进度、标注和活跃会话。
 - 用户可以修改自己的密码和撤销自己的会话。
-- 管理员可以管理用户、角色、密码、会话、外部身份和书籍授权。
+- 管理员可以管理用户、角色、密码、会话和书籍授权。
 - 会话使用 HttpOnly Cookie、CSRF 防护和 30 天滑动有效期。
 
 ### 配置与治理 AI 阅读
@@ -242,7 +242,7 @@ epub-browser server book.epub --ephemeral
 
 持久化的 `data/epub-browser.db` 必须位于本地文件系统；共享或网络文件系统不支持 WAL 并发。已验证的备份仍保存在 `data/backups/`，其中包含所有已提交的 WAL 数据。
 
-### 局域网、反向代理与 OIDC
+### 局域网与反向代理
 
 Server 默认监听 `127.0.0.1:8000`。若要在可信局域网访问：
 
@@ -257,24 +257,19 @@ epub-browser server /path/to/books \
 
 不要把内置 HTTP Server 直接暴露到公网。请在反向代理处终止 TLS、设置网络访问控制，并启用安全 Cookie。
 
-EPUB Browser 本身不是 OAuth/OIDC 客户端。要接入 OIDC，请在前面部署支持 OIDC 的认证代理，并把稳定的已认证 subject 传给 EPUB Browser：
+要让活跃会话和登录限流在反向代理后记录真实客户端 IP，配置反向代理的**直接套接字网络**（不能写公网客户端地址段）：
 
 ```bash
 epub-browser server /path/to/books \
   --server-dir /path/to/state \
   --watch \
   --host 0.0.0.0 \
+  --trusted-proxy-cidr 172.16.0.0/12 \
   --cookie-secure \
-  --trusted-proxy-cidr 10.42.0.0/16 \
-  --proxy-subject-header X-Remote-User \
-  --proxy-display-name-header X-Remote-Name \
-  --proxy-issuer https://login.example.com \
   --no-browser
 ```
 
-受信任 CIDR 必须表示反向代理的**直接套接字网络**，不能写公网客户端地址段。代理应删除客户端传入的同名身份头，再设置自己的认证结果。来自不受信任对等端的头会被忽略。Uvicorn 的转发地址处理已禁用，因此 `X-Forwarded-For`、`Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能扩大这条信任边界。
-
-`--proxy-subject-header` 应包含不可变的提供方 subject，不能使用可变显示名。`--proxy-issuer` 应在同一身份域中保持稳定。用户可以通过验证本地账户密码来关联未知的受信任身份，管理员也可以创建映射。本地管理员/密码登录始终作为恢复入口保留。
+只有直连对等端属于该 CIDR 的请求才会使用 `X-Forwarded-For`；其他来源只记录直连地址。Uvicorn 的转发地址处理已禁用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能扩大该信任边界。仅当浏览器通过 HTTPS 访问服务时才使用 `--cookie-secure`。
 
 ## Docker
 
@@ -295,7 +290,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.1
+  epub-browser:2.3.2
 ```
 
 修改端口绑定或代理规则之前，请先访问 `http://127.0.0.1:8080/setup` 完成首次设置。
@@ -321,7 +316,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.1
+  epub-browser:2.3.2
 ```
 
 首次成功启动后，可移除这次性密钥挂载。只有所有 EPUB 已经包含有效且匹配的 embedded ID 时，书库才可以只读挂载。把同一 ID 嵌入 EPUB 时，既有 sidecar 会保留。
@@ -332,7 +327,7 @@ docker run -d \
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-示例把容器端口只发布到主机 loopback，从而让容器位于主机边界之后。远程访问时，请使用 TLS 反向代理，并配置其真实容器网络 CIDR、身份头和 `--cookie-secure`。
+示例把容器端口只发布到主机 loopback，从而让容器位于主机边界之后。远程访问时，请使用 TLS 反向代理，并配置其真实容器网络 CIDR 和 `--cookie-secure`。
 
 ## 完整命令参考
 
@@ -362,10 +357,7 @@ docker run -d \
 | `--book-id-storage sidecar\|embedded` | 本次命令中所有源文件的稳定身份载体，默认 `sidecar`。 |
 | `--admin-username NAME` | 无人值守的初始管理员；后备为 `EPUB_BROWSER_ADMIN_USERNAME`。 |
 | `--admin-password-file FILE` | 首选初始密钥文件；后备为 `EPUB_BROWSER_ADMIN_PASSWORD_FILE`，未设置文件时再使用 `EPUB_BROWSER_ADMIN_PASSWORD`。 |
-| `--trusted-proxy-cidr CIDR` | 可重复指定的直接代理网络信任边界；需要同时配置 subject 头和 issuer。 |
-| `--proxy-subject-header NAME` | 包含不可变外部认证 subject 的请求头。 |
-| `--proxy-display-name-header NAME` | 可选的显示名请求头。 |
-| `--proxy-issuer VALUE` | 代理 subject 的稳定 issuer/安全域标识。 |
+| `--trusted-proxy-cidr CIDR` | 可重复指定的直接代理网络信任边界，用于安全解析 `X-Forwarded-For` 中的客户端 IP。 |
 | `--cookie-secure` | 只通过浏览器侧 HTTPS 发送会话 Cookie。 |
 
 ### 旧版 v1 语法
@@ -404,7 +396,7 @@ Server 不提供“本地/云端”存储选择器：已登录阅读数据固定
 
 阅读功能是自包含的：所需 JavaScript、CSS、字体、图标、清单和转换后的 EPUB 资源全部由本地提供，不依赖 CDN。阻断公网出站访问不会影响首次设置、登录、书库浏览、阅读、标注、进度、书架、后台管理或书籍转换。
 
-页脚可能向 GitHub Releases API 发起一次可选请求，用于提示是否存在新版 EPUB Browser。离线、请求失败或被阻断时，只是不显示更新提示。OIDC 则依赖你明确配置并独立运行的认证代理和身份提供方，它不是内置依赖。
+页脚可能向 GitHub Releases API 发起一次可选请求，用于提示是否存在新版 EPUB Browser。离线、请求失败或被阻断时，只是不显示更新提示。
 
 SSG 会发布静态 Service Worker。Server 会禁用并清退整个源范围的 Service Worker，避免一个账户收到另一个账户缓存过的受保护内容。
 

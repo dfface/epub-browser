@@ -136,16 +136,6 @@ class UserRecord:
 
 
 @dataclass(frozen=True)
-class UserIdentityRecord:
-    issuer: str
-    subject: str
-    user_id: str
-    display_name: Optional[str]
-    created_at: str
-    updated_at: str
-
-
-@dataclass(frozen=True)
 class SessionRecord:
     session_id: str
     user_id: str
@@ -707,23 +697,6 @@ class StateStore:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS user_identities (
-                issuer TEXT NOT NULL,
-                subject TEXT NOT NULL,
-                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                display_name TEXT,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (issuer, subject)
-            )
-            """
-        )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_user_identities_user_id "
-            "ON user_identities(user_id)"
         )
         if latest:
             StateStore._create_v11_sessions_table(connection)
@@ -2081,139 +2054,6 @@ class StateStore:
         if isinstance(value, datetime):
             return value.timestamp()
         return float(value)
-
-    @staticmethod
-    def _require_identity_key(issuer: str, subject: str) -> None:
-        if not isinstance(issuer, str) or not issuer.strip():
-            raise ValueError("Identity issuer must not be empty")
-        if not isinstance(subject, str) or not subject.strip():
-            raise ValueError("Identity subject must not be empty")
-
-    @staticmethod
-    def _identity_record(row) -> UserIdentityRecord:
-        return UserIdentityRecord(
-            issuer=row["issuer"],
-            subject=row["subject"],
-            user_id=row["user_id"],
-            display_name=row["display_name"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-        )
-
-    def create_identity(
-        self,
-        issuer: str,
-        subject: str,
-        user_id: str,
-        display_name: Optional[str] = None,
-    ) -> UserIdentityRecord:
-        self._require_identity_key(issuer, subject)
-        with self._connection() as connection:
-            self._require_user(connection, user_id)
-            connection.execute(
-                """
-                INSERT INTO user_identities (issuer, subject, user_id, display_name)
-                VALUES (?, ?, ?, ?)
-                """,
-                (issuer, subject, user_id, display_name),
-            )
-            row = connection.execute(
-                "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
-                (issuer, subject),
-            ).fetchone()
-        return self._identity_record(row)
-
-    def get_identity(
-        self,
-        issuer: str,
-        subject: str,
-    ) -> Optional[UserIdentityRecord]:
-        self._require_identity_key(issuer, subject)
-        with self._connection() as connection:
-            row = connection.execute(
-                "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
-                (issuer, subject),
-            ).fetchone()
-        return self._identity_record(row) if row is not None else None
-
-    def update_identity(
-        self,
-        issuer: str,
-        subject: str,
-        *,
-        display_name: Optional[str],
-    ) -> UserIdentityRecord:
-        self._require_identity_key(issuer, subject)
-        with self._connection() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE user_identities
-                SET display_name = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE issuer = ? AND subject = ?
-                """,
-                (display_name, issuer, subject),
-            )
-            if cursor.rowcount != 1:
-                raise KeyError("Unknown external identity")
-            row = connection.execute(
-                "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
-                (issuer, subject),
-            ).fetchone()
-        return self._identity_record(row)
-
-    def delete_identity(self, issuer: str, subject: str) -> bool:
-        self._require_identity_key(issuer, subject)
-        with self._connection() as connection:
-            cursor = connection.execute(
-                "DELETE FROM user_identities WHERE issuer = ? AND subject = ?",
-                (issuer, subject),
-            )
-        return cursor.rowcount == 1
-
-    def list_identities(self, user_id: str) -> tuple[UserIdentityRecord, ...]:
-        with self._connection() as connection:
-            self._require_user(connection, user_id)
-            rows = connection.execute(
-                """
-                SELECT * FROM user_identities
-                WHERE user_id = ?
-                ORDER BY issuer, subject
-                """,
-                (user_id,),
-            ).fetchall()
-        return tuple(self._identity_record(row) for row in rows)
-
-    def list_all_identities(self) -> tuple[UserIdentityRecord, ...]:
-        with self._connection() as connection:
-            rows = connection.execute(
-                """
-                SELECT * FROM user_identities
-                ORDER BY issuer, subject, user_id
-                """
-            ).fetchall()
-        return tuple(self._identity_record(row) for row in rows)
-
-    def principal_from_identity(
-        self,
-        issuer: str,
-        subject: str,
-    ) -> Optional[Principal]:
-        self._require_identity_key(issuer, subject)
-        with self._connection() as connection:
-            row = connection.execute(
-                """
-                SELECT users.id AS user_id, users.username, users.role
-                FROM user_identities
-                JOIN users ON users.id = user_identities.user_id
-                WHERE user_identities.issuer = ?
-                  AND user_identities.subject = ?
-                  AND users.enabled = 1
-                """,
-                (issuer, subject),
-            ).fetchone()
-        if row is None:
-            return None
-        return Principal(row["user_id"], row["username"], row["role"])
 
     def create_session(
         self,

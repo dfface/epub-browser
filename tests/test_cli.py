@@ -151,7 +151,7 @@ assert config.output_dir.name == 'dist'
                 ["server", "books", "--server-dir", "state", "--base-path", "/reader/"]
             )
 
-    def test_server_parses_auth_proxy_options_without_affecting_ssg(self):
+    def test_server_parses_trusted_proxy_cidr_without_affecting_ssg(self):
         config = parse_cli(
             [
                 "server",
@@ -160,46 +160,31 @@ assert config.output_dir.name == 'dist'
                 "data",
                 "--trusted-proxy-cidr",
                 "10.0.0.0/8",
-                "--proxy-subject-header",
-                "X-Remote-User",
-                "--proxy-issuer",
-                "https://sso.example",
                 "--cookie-secure",
             ]
         )
 
-        self.assertEqual(config.auth.proxy_issuer, "https://sso.example")
         self.assertEqual(config.auth.trusted_proxy_cidrs, ("10.0.0.0/8",))
         self.assertTrue(config.auth.cookie_secure)
 
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             parse_cli(["ssg", "books", "--output-dir", "dist", "--cookie-secure"])
 
-    def test_server_rejects_partial_proxy_configuration(self):
-        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            parse_cli(
-                [
-                    "server",
-                    "books",
-                    "--server-dir",
-                    "state",
-                    "--trusted-proxy-cidr",
-                    "10.0.0.0/8",
-                ]
-            )
+    def test_server_allows_trusted_proxy_cidr_without_identity_headers(self):
+        config = parse_cli(
+            [
+                "server",
+                "books",
+                "--server-dir",
+                "state",
+                "--trusted-proxy-cidr",
+                "172.16.0.0/12",
+            ]
+        )
 
-    def test_server_rejects_invalid_cidr_and_each_incomplete_proxy_configuration(self):
-        partial_options = [
-            ["--trusted-proxy-cidr", "10.0.0.0/8"],
-            ["--proxy-subject-header", "X-Remote-User"],
-            ["--proxy-issuer", "https://sso.example"],
-            ["--proxy-display-name-header", "X-Remote-Name"],
-        ]
-        for options in partial_options:
-            with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()):
-                with self.assertRaises(SystemExit):
-                    parse_cli(["server", "books", "--server-dir", "state", *options])
+        self.assertEqual(config.auth.trusted_proxy_cidrs, ("172.16.0.0/12",))
 
+    def test_server_rejects_invalid_trusted_proxy_cidr_and_removed_identity_flags(self):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             parse_cli(
                 [
@@ -209,10 +194,18 @@ assert config.output_dir.name == 'dist'
                     "state",
                     "--trusted-proxy-cidr",
                     "not-a-cidr",
+                ]
+            )
+
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parse_cli(
+                [
+                    "server",
+                    "books",
+                    "--server-dir",
+                    "state",
                     "--proxy-subject-header",
                     "X-Remote-User",
-                    "--proxy-issuer",
-                    "https://sso.example",
                 ]
             )
 

@@ -195,7 +195,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         )
         self.store = StateStore(Path(self.directory.name) / "state.db")
         self.pending = self.store.initialize()
-        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_config = AuthConfig.from_values([])
         self.app = create_app(
             self.public,
             state_store=self.store,
@@ -460,12 +460,8 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 1,
             )
 
-    def test_trusted_proxy_identity_cannot_claim_pending_setup(self):
-        proxy_config = AuthConfig.from_values(
-            ["10.0.0.0/8"],
-            "X-Remote-User",
-            "https://sso.example",
-        )
+    def test_trusted_proxy_cidr_cannot_claim_pending_setup(self):
+        proxy_config = AuthConfig.from_values(["10.0.0.0/8"])
         app = create_app(
             self.public,
             state_store=self.store,
@@ -518,7 +514,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             {"title": "Book"},
             preferred_book_id="book",
         )
-        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_config = AuthConfig.from_values([])
         self.auth_service = AuthService(self.store, self.auth_config)
         self.app = create_app(
             public,
@@ -756,8 +752,6 @@ class ServerAuthBoundaryTests(unittest.TestCase):
     def test_cookie_secure_flag_follows_explicit_auth_configuration(self):
         secure_config = AuthConfig.from_values(
             [],
-            None,
-            None,
             cookie_secure=True,
         )
         secure_app = create_app(
@@ -855,155 +849,6 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertNotIn("sensitive runtime detail", failed.text)
 
 
-class ProxyAssociationTests(unittest.TestCase):
-    def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        public = Path(self.directory.name)
-        (public / "index.html").write_text("library", encoding="utf-8")
-        self.store = StateStore(public / "epub-browser.db")
-        self.alice = self.store.initialize(
-            bootstrap=BootstrapCredentials("alice", "secret")
-        )
-        config = AuthConfig.from_values(
-            ["10.0.0.0/8"],
-            "X-Remote-User",
-            "https://sso.example",
-            "X-Remote-Name",
-        )
-        self.app = create_app(
-            public,
-            state_store=self.store,
-            auth_service=AuthService(self.store, config),
-        )
-        self.proxy_client = TestClient(
-            self.app,
-            client=("10.1.2.3", 50000),
-            headers={
-                "X-Remote-User": "subject-alice",
-                "X-Remote-Name": "Alice Example",
-            },
-            follow_redirects=False,
-        )
-        self.addCleanup(self.proxy_client.close)
-
-    def test_unknown_trusted_proxy_identity_must_prove_existing_password_before_linking(self):
-        response = self.proxy_client.get("/")
-        self.assertEqual(response.status_code, 303)
-
-        nonce = _anonymous_auth_nonce(self, self.proxy_client)
-        source_headers = {
-            "X-EPUB-Browser-Auth-Nonce": nonce,
-            "Origin": "http://testserver",
-            "Sec-Fetch-Site": "same-origin",
-        }
-
-        rejected = self.proxy_client.post(
-            "/api/identity/link",
-            json={"username": "alice", "password": "wrong"},
-            headers=source_headers,
-        )
-        self.assertEqual(rejected.status_code, 401)
-        self.assertIsNone(
-            self.store.get_identity("https://sso.example", "subject-alice")
-        )
-
-        linked = self.proxy_client.post(
-            "/api/identity/link",
-            json={"username": "alice", "password": "secret"},
-            headers=source_headers,
-        )
-
-        self.assertEqual(linked.status_code, 201)
-        self.assertEqual(
-            self.store.get_identity(
-                "https://sso.example",
-                "subject-alice",
-            ).user_id,
-            self.alice.user_id,
-        )
-        self.assertEqual(
-            self.proxy_client.get("/api/session").json()["user"]["username"],
-            "alice",
-        )
-
-    def test_anonymous_proxy_link_rejects_cross_site_missing_nonce_and_non_json(self):
-        nonce = _anonymous_auth_nonce(self, self.proxy_client)
-        payload = {"username": "alice", "password": "secret"}
-
-        non_json = self.proxy_client.post(
-            "/api/identity/link",
-            data=payload,
-            headers={"X-EPUB-Browser-Auth-Nonce": nonce},
-        )
-        cross_site = self.proxy_client.post(
-            "/api/identity/link",
-            json=payload,
-            headers={
-                "X-EPUB-Browser-Auth-Nonce": nonce,
-                "Origin": "https://attacker.example",
-                "Sec-Fetch-Site": "cross-site",
-            },
-        )
-        missing_nonce = self.proxy_client.post(
-            "/api/identity/link",
-            json=payload,
-            headers={
-                "Origin": "http://testserver",
-                "Sec-Fetch-Site": "same-origin",
-            },
-        )
-
-        self.assertEqual(non_json.status_code, 415)
-        self.assertEqual(cross_site.status_code, 403)
-        self.assertEqual(cross_site.json()["code"], "invalid_auth_request")
-        self.assertEqual(missing_nonce.status_code, 403)
-        self.assertIsNone(
-            self.store.get_identity("https://sso.example", "subject-alice")
-        )
-
-    def test_link_requires_an_unrecognized_assertion_from_a_trusted_peer(self):
-        untrusted = TestClient(
-            self.app,
-            client=("203.0.113.8", 50000),
-            headers={"X-Remote-User": "forged-subject"},
-        )
-        self.addCleanup(untrusted.close)
-
-        nonce = _anonymous_auth_nonce(self, untrusted)
-        response = untrusted.post(
-            "/api/identity/link",
-            json={"username": "alice", "password": "secret"},
-            headers={
-                "X-EPUB-Browser-Auth-Nonce": nonce,
-                "Origin": "http://testserver",
-                "Sec-Fetch-Site": "same-origin",
-            },
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIsNone(
-            self.store.get_identity("https://sso.example", "forged-subject")
-        )
-
-    def test_linked_trusted_proxy_identity_creates_a_local_session(self):
-        self.store.create_identity(
-            "https://sso.example",
-            "subject-alice",
-            self.alice.user_id,
-            "Alice Example",
-        )
-
-        response = self.proxy_client.get("/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("epub_browser_session=", response.headers["set-cookie"])
-        self.assertEqual(
-            self.proxy_client.get("/api/session").json()["user"]["username"],
-            "alice",
-        )
-
-
 class AdminAccountTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -1018,7 +863,7 @@ class AdminAccountTests(unittest.TestCase):
             "member",
             hash_password("member-secret"),
         )
-        config = AuthConfig.from_values([], None, None)
+        config = AuthConfig.from_values([])
         self.app = create_app(
             public,
             state_store=self.store,
@@ -1738,11 +1583,7 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(member_denied.status_code, 403)
 
     def test_active_sessions_use_forwarded_client_ip_only_from_trusted_proxy(self):
-        proxy_config = AuthConfig.from_values(
-            ["10.0.0.0/8"],
-            "X-Remote-User",
-            "https://login.example",
-        )
+        proxy_config = AuthConfig.from_values(["10.0.0.0/8"])
         app = create_app(
             Path(self.directory.name),
             state_store=self.store,
@@ -1760,8 +1601,20 @@ class AdminAccountTests(unittest.TestCase):
             client=("203.0.113.9", 50000),
             headers={"X-Forwarded-For": "198.51.100.99"},
         )
+        identity_header_only = TestClient(
+            app,
+            follow_redirects=False,
+            client=("10.1.2.4", 50000),
+            headers={
+                "X-Forwarded-For": "198.51.100.15",
+                "X-Remote-User": "forged-subject",
+            },
+        )
         self.addCleanup(trusted.close)
         self.addCleanup(untrusted.close)
+        self.addCleanup(identity_header_only.close)
+
+        self.assertEqual(identity_header_only.get("/api/session").status_code, 401)
 
         self.assertEqual(
             _json_login(self, trusted, "admin", "admin-secret").status_code,
@@ -2173,52 +2026,6 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(self.member_client.get("/api/session").status_code, 401)
         self._login("member", "member-secret")
 
-    def test_admin_manages_proxy_identity_mappings_but_members_cannot(self):
-        initial = self.admin_client.get("/api/admin/identities")
-        created = self.admin_client.post(
-            "/api/admin/identities",
-            json={
-                "issuer": "https://sso.example",
-                "subject": "member-subject",
-                "user_id": self.member.user_id,
-                "display_name": "Member Example",
-            },
-        )
-        duplicate = self.admin_client.post(
-            "/api/admin/identities",
-            json={
-                "issuer": "https://sso.example",
-                "subject": "member-subject",
-                "user_id": self.admin.user_id,
-            },
-        )
-        listed = self.admin_client.get("/api/admin/identities")
-        member_denied = self.member_client.get("/api/admin/identities")
-        deleted = self.admin_client.request(
-            "DELETE",
-            "/api/admin/identities",
-            json={
-                "issuer": "https://sso.example",
-                "subject": "member-subject",
-            },
-        )
-
-        self.assertEqual(initial.json(), {"identities": []})
-        self.assertEqual(created.status_code, 201)
-        self.assertEqual(created.json()["identity"]["username"], "member")
-        self.assertEqual(duplicate.status_code, 409)
-        self.assertEqual(duplicate.json()["code"], "identity_already_linked")
-        self.assertEqual(len(listed.json()["identities"]), 1)
-        self.assertEqual(member_denied.status_code, 403)
-        self.assertEqual(deleted.status_code, 200)
-        self.assertEqual(
-            self.store.principal_from_identity(
-                "https://sso.example",
-                "member-subject",
-            ),
-            None,
-        )
-
     def test_user_changes_password_and_all_existing_sessions_are_revoked(self):
         second_admin_client = self._login("admin", "admin-secret")
 
@@ -2262,10 +2069,6 @@ class AdminAccountTests(unittest.TestCase):
         self.assertIn("T", current["created_at"])
         self.assertIn("T", current["last_used_at"])
         self.assertIn("T", current["expires_at"])
-        self.assertEqual(
-            self.admin_client.get("/api/session").json()["authentication"],
-            {"proxy_enabled": False, "pending_proxy_identity": False},
-        )
         member_session = member_sessions.json()["sessions"][0]
 
         denied = self.admin_client.delete(
@@ -2306,7 +2109,7 @@ class SessionOwnershipTests(unittest.TestCase):
             {"title": "Book"},
             preferred_book_id="book",
         )
-        config = AuthConfig.from_values([], None, None)
+        config = AuthConfig.from_values([])
         self.app = create_app(
             public,
             state_store=self.store,
@@ -2452,7 +2255,7 @@ class ServerAccountSecurityMatrixTests(unittest.TestCase):
             },
             preferred_book_id="restricted-id",
         )
-        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_config = AuthConfig.from_values([])
         self.app = create_app(
             public,
             state_store=self.store,
@@ -2620,7 +2423,7 @@ class BookAuthorizationTests(unittest.TestCase):
             preferred_book_id="restricted-id",
         )
         self.store.set_book_visibility("restricted-id", "restricted")
-        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_config = AuthConfig.from_values([])
         self.app = create_app(
             public,
             state_store=self.store,
@@ -3063,7 +2866,7 @@ class ServerCacheTests(unittest.TestCase):
         if store is None:
             store = StateStore(Path(directory) / "epub-browser.db")
             store.initialize(bootstrap=BootstrapCredentials("alice", "secret"))
-        config = AuthConfig.from_values([], None, None)
+        config = AuthConfig.from_values([])
         auth_service = AuthService(store, config)
         app = create_app(
             directory,

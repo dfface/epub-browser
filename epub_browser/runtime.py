@@ -333,9 +333,6 @@ def run_server(
         initial_layout_phase = None
         auth_config = AuthConfig.from_values(
             config.auth.trusted_proxy_cidrs,
-            config.auth.proxy_subject_header,
-            config.auth.proxy_issuer,
-            config.auth.proxy_display_name_header,
             cookie_secure=bool(config.auth.cookie_secure),
         )
 

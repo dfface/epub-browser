@@ -9,7 +9,6 @@ from epub_browser.auth import (
     AuthService,
     BootstrapCredentials,
     Principal,
-    ProxyIdentity,
     hash_password,
     session_cookie_options,
     token_digest,
@@ -26,21 +25,18 @@ class AuthPrimitiveTests(unittest.TestCase):
         self.assertTrue(verify_password(encoded, "correct horse battery staple"))
         self.assertFalse(verify_password(encoded, "wrong"))
 
-    def test_proxy_config_requires_subject_header_issuer_and_trusted_cidr(self):
-        with self.assertRaises(ValueError):
-            AuthConfig.from_values(["10.0.0.0/8"], "X-Remote-User", None)
+    def test_trusted_proxy_cidr_alone_enables_forwarded_address_trust(self):
+        config = AuthConfig.from_values(["172.16.0.0/12"])
+
+        self.assertTrue(config.is_trusted_proxy("172.16.0.1"))
 
     def test_proxy_config_rejects_malformed_cidr(self):
         with self.assertRaises(ValueError):
-            AuthConfig.from_values(
-                ["not-a-cidr"], "X-Remote-User", "https://sso.example"
-            )
+            AuthConfig.from_values(["not-a-cidr"])
 
     def test_proxy_config_parses_cidrs_and_cookie_options(self):
         config = AuthConfig.from_values(
             ["10.0.0.0/8", "2001:db8::/32"],
-            "X-Remote-User",
-            "https://sso.example",
             cookie_secure=True,
         )
 
@@ -71,7 +67,7 @@ class SetupAuthTests(unittest.TestCase):
             clock = MutableClock()
             service = AuthService(
                 store,
-                AuthConfig.from_values([], None, None),
+                AuthConfig.from_values([]),
                 clock=clock,
             )
 
@@ -95,9 +91,6 @@ class SessionAndProxyTests(unittest.TestCase):
         self.clock = MutableClock()
         self.config = AuthConfig.from_values(
             ["10.0.0.0/8"],
-            "X-Remote-User",
-            "https://sso.example",
-            "X-Remote-Name",
         )
         self.service = AuthService(self.store, self.config, clock=self.clock)
 
@@ -171,27 +164,6 @@ class SessionAndProxyTests(unittest.TestCase):
             self.service.verify_csrf_token(alice, bob_token, alice_csrf)
         )
         self.assertFalse(self.service.verify_csrf_token(alice, alice_token, "bad"))
-
-    def test_untrusted_client_cannot_assert_proxy_identity(self):
-        identity = self.service.authenticate_proxy(
-            "203.0.113.8", {"X-Remote-User": "subject"}
-        )
-
-        self.assertIsNone(identity)
-
-    def test_trusted_proxy_identity_uses_issuer_and_subject_not_display_name(self):
-        identity = self.service.authenticate_proxy(
-            "10.1.2.3",
-            {"x-remote-user": "Subject-123", "x-remote-name": "Alice"},
-        )
-
-        self.assertEqual(
-            identity,
-            ProxyIdentity("https://sso.example", "Subject-123", "Alice"),
-        )
-        self.assertIsNone(
-            self.service.authenticate_proxy("10.1.2.3", {"X-Remote-Name": "Alice"})
-        )
 
     def test_failed_password_attempts_are_throttled_without_user_enumeration(self):
         self._principal("alice", "correct")
@@ -333,36 +305,3 @@ class SessionAndProxyTests(unittest.TestCase):
             self.service.authenticate_password("alice", "correct", "ip"), principal
         )
         self.assertFalse(self.service.login_is_throttled("ip", "alice"))
-
-    def test_identity_crud_resolves_only_enabled_users(self):
-        principal = self._principal("alice")
-        identity = self.store.create_identity(
-            "https://sso.example", "subject", principal.user_id, "Alice"
-        )
-
-        self.assertEqual(identity.issuer, "https://sso.example")
-        self.assertEqual(
-            self.store.principal_from_identity("https://sso.example", "subject"),
-            principal,
-        )
-        updated = self.store.update_identity(
-            "https://sso.example", "subject", display_name="Alice Example"
-        )
-        self.assertEqual(updated.display_name, "Alice Example")
-        self.assertEqual(self.store.list_identities(principal.user_id), (updated,))
-
-        with self.assertRaises(sqlite3.IntegrityError):
-            self.store.create_identity(
-                "https://sso.example", "subject", principal.user_id, "Duplicate"
-            )
-
-        self.store.set_user_enabled(principal.user_id, False)
-        self.assertIsNone(
-            self.store.principal_from_identity("https://sso.example", "subject")
-        )
-        self.assertTrue(
-            self.store.delete_identity("https://sso.example", "subject")
-        )
-        self.assertIsNone(
-            self.store.get_identity("https://sso.example", "subject")
-        )

@@ -73,7 +73,7 @@ class RuntimeStatusTests(unittest.TestCase):
             {"title": "Book"},
             preferred_book_id="book",
         )
-        self.auth_config = AuthConfig.from_values([], None, None)
+        self.auth_config = AuthConfig.from_values([])
         self.auth_service = AuthService(self.store, self.auth_config)
 
     def _client(self, status):
@@ -265,13 +265,11 @@ class ServerBootstrapTests(unittest.TestCase):
         self.assertEqual(responses["setup"].status_code, 303)
         self.assertEqual(responses["after"].text, "private library")
 
-    def test_forwarded_allow_ips_cannot_rewrite_the_proxy_trust_peer(self):
+    def test_forwarded_allow_ips_cannot_rewrite_the_trusted_proxy_peer(self):
         observed = {}
         config = self._config(
             ServerAuthOptions(
                 trusted_proxy_cidrs=("10.0.0.0/8",),
-                proxy_subject_header="X-Remote-User",
-                proxy_issuer="https://sso.example",
             )
         )
 
@@ -285,19 +283,7 @@ class ServerBootstrapTests(unittest.TestCase):
                     follow_redirects=False,
                 ) as client:
                     login = _json_login(client, "owner", "secret")
-                    session = client.get("/api/session").json()
-                    response = client.post(
-                        "/api/identity/link",
-                        json={"username": "owner", "password": "secret"},
-                        headers={
-                            "X-Forwarded-For": "10.1.2.3",
-                            "X-Remote-User": "spoofed-subject",
-                            "X-CSRF-Token": session["csrf_token"],
-                        },
-                    )
                     observed["login"] = login.status_code
-                    observed["link"] = response.status_code
-                    observed["code"] = response.json().get("code")
 
         with mock.patch.dict(
             os.environ,
@@ -313,8 +299,6 @@ class ServerBootstrapTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertFalse(observed["proxy_headers"])
         self.assertEqual(observed["login"], 200)
-        self.assertEqual(observed["link"], 400)
-        self.assertEqual(observed["code"], "proxy_identity_required")
 
     def test_empty_password_file_environment_setting_uses_plaintext_fallback(self):
         credentials = resolve_bootstrap_credentials(
@@ -424,16 +408,13 @@ class ServerBootstrapTests(unittest.TestCase):
         self.assertEqual(first, 0)
         self.assertEqual(second, 0)
 
-    def test_runtime_passes_proxy_and_cookie_configuration_to_auth_service(self):
+    def test_runtime_passes_trusted_proxy_and_cookie_configuration_to_auth_service(self):
         self.password_file.write_text("secret-value\n", encoding="utf-8")
         config = self._config(
             ServerAuthOptions(
                 admin_username="admin",
                 admin_password_file=self.password_file,
                 trusted_proxy_cidrs=("10.0.0.0/8",),
-                proxy_subject_header="X-Remote-User",
-                proxy_display_name_header="X-Remote-Name",
-                proxy_issuer="https://sso.example",
                 cookie_secure=True,
             )
         )
@@ -462,11 +443,6 @@ class ServerBootstrapTests(unittest.TestCase):
         self.assertIsInstance(auth_service, AuthService)
         self.assertTrue(auth_service.config.cookie_secure)
         self.assertTrue(auth_service.config.is_trusted_proxy("10.2.3.4"))
-        self.assertEqual(
-            auth_service.config.proxy_subject_header,
-            "X-Remote-User",
-        )
-        self.assertEqual(auth_service.config.proxy_issuer, "https://sso.example")
 
 
 class ServerRuntimeTests(unittest.TestCase):

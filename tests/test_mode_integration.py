@@ -294,7 +294,7 @@ class ModeIntegrationTests(unittest.TestCase):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
         readme = Path("README.md").read_text(encoding="utf-8")
         migration = Path("docs/migration-v2.md")
-        release = Path("docs/releases/v2.3.1.md")
+        release = Path("docs/releases/v2.3.2.md")
         compose = Path("docker-compose.yml")
 
         self.assertIn('"server"', dockerfile)
@@ -317,7 +317,7 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertIn("127.0.0.1:8080:80", compose_text)
         self.assertIn("./Library:/app/Library:rw", compose_text)
         self.assertIn("./EpubBrowserFiles:/app/EpubBrowserFiles", compose_text)
-        self.assertIn('VERSION = "2.3.1"', Path("epub_browser/version.py").read_text())
+        self.assertIn('VERSION = "2.3.2"', Path("epub_browser/version.py").read_text())
 
     def test_docker_server_defaults_to_embedded_book_id_storage(self):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
@@ -340,9 +340,6 @@ class ModeIntegrationTests(unittest.TestCase):
             "--admin-username",
             "--admin-password-file",
             "--trusted-proxy-cidr",
-            "--proxy-subject-header",
-            "--proxy-display-name-header",
-            "--proxy-issuer",
             "--cookie-secure",
         }
 

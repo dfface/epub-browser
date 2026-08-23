@@ -409,7 +409,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
             encoding="utf-8",
         )
         manager.converter_factory = BlockingProcessor
-        auth_config = AuthConfig.from_values([], None, None)
+        auth_config = AuthConfig.from_values([])
         app = create_app(
             manager.public_dir,
             state_store=self.store,
@@ -463,7 +463,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
             "chapter_0.html",
             metadata["cover"],
         )
-        auth_config = AuthConfig.from_values([], None, None)
+        auth_config = AuthConfig.from_values([])
         app = create_app(
             manager.public_dir,
             state_store=self.store,
@@ -721,7 +721,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertFalse((book_dir / "index.html").exists())
         self.assertFalse((book_dir / "chapter_0.html").exists())
 
-        auth_config = AuthConfig.from_values([], None, None)
+        auth_config = AuthConfig.from_values([])
         app = create_app(
             manager.public_dir,
             state_store=self.store,
@@ -764,7 +764,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         # serve its current UI and hashed assets.
         (manager.public_dir / "index.html").unlink()
 
-        auth_config = AuthConfig.from_values([], None, None)
+        auth_config = AuthConfig.from_values([])
         app = create_app(
             manager.public_dir,
             state_store=self.store,
@@ -845,7 +845,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
             / "chapter_0.json"
         )
         self.assertIn("Original", chapter_path.read_text(encoding="utf-8"))
-        auth_config = AuthConfig.from_values([], None, None)
+        auth_config = AuthConfig.from_values([])
         app = create_app(
             manager.public_dir,
             state_store=self.store,

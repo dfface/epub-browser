@@ -17,7 +17,7 @@ EPUB Browser has two explicit modes:
 | | `ssg` | `server` |
 | --- | --- | --- |
 | Deployment | Static hosting, Pages, object storage, Nginx | A persistent private reading service |
-| Accounts | None | Local accounts; optional trusted-proxy identity |
+| Accounts | None | Local accounts |
 | Progress, annotations, bookshelf | This browser only | Authenticated account in SQLite |
 | Source updates | Run `ssg` again | Restart or use `--watch` |
 | Runtime database | None | Required |
@@ -186,7 +186,7 @@ After setup:
 - Restricted books are visible only to administrators and explicitly selected users.
 - Each user owns their bookshelf, progress, annotations, and active sessions.
 - Users can change their password and revoke their sessions.
-- Administrators can manage users, roles, passwords, sessions, external identities, and book grants.
+- Administrators can manage users, roles, passwords, sessions, and book grants.
 - Sessions use an HttpOnly cookie, CSRF protection, and a 30-day sliding lifetime.
 
 ### Configure and govern AI reading
@@ -261,7 +261,7 @@ Only `data/` is authoritative. `cache/` may be deleted and will be rebuilt. Pres
 
 Store persistent `data/epub-browser.db` on a local filesystem. Shared or network filesystems are unsupported for WAL concurrency. Verified backups remain under `data/backups/` and include all committed WAL data.
 
-### LAN, reverse proxy, and OIDC
+### LAN and reverse proxy
 
 Server binds to `127.0.0.1:8000` by default. For a trusted LAN:
 
@@ -276,24 +276,19 @@ epub-browser server /path/to/books \
 
 Do not expose the built-in HTTP server directly to the public internet. Terminate TLS at a reverse proxy, apply network controls, and enable secure cookies.
 
-EPUB Browser is not an OAuth/OIDC client. To use OIDC, place an OIDC-aware authentication proxy in front of it and pass a stable authenticated subject:
+To record real client IPs in active sessions and login-rate limits behind a reverse proxy, configure its **direct socket network** (not public client ranges):
 
 ```bash
 epub-browser server /path/to/books \
   --server-dir /path/to/state \
   --watch \
   --host 0.0.0.0 \
+  --trusted-proxy-cidr 172.16.0.0/12 \
   --cookie-secure \
-  --trusted-proxy-cidr 10.42.0.0/16 \
-  --proxy-subject-header X-Remote-User \
-  --proxy-display-name-header X-Remote-Name \
-  --proxy-issuer https://login.example.com \
   --no-browser
 ```
 
-The trusted CIDR must identify the reverse proxy's **direct socket network**, not the public client range. Configure the proxy to remove client-supplied copies of the identity headers and set its own authenticated values. Headers from untrusted peers are ignored. Uvicorn forwarded-address processing is disabled, so `X-Forwarded-For`, `Forwarded`, and `FORWARDED_ALLOW_IPS` cannot expand this trust boundary.
-
-Use an immutable provider subject, not a display name, in `--proxy-subject-header`. Keep `--proxy-issuer` stable for that identity domain. A user can link an unknown trusted identity by proving a local account password, or an administrator can create the mapping. Local administrator/password login remains the recovery path.
+Only requests whose direct peer belongs to this CIDR can supply `X-Forwarded-For`; all other peers record only their direct address. Uvicorn forwarded-address processing is disabled, so `Forwarded` and `FORWARDED_ALLOW_IPS` cannot expand this trust boundary. Use `--cookie-secure` only when the browser reaches the service through HTTPS.
 
 ## Docker
 
@@ -314,7 +309,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.1
+  epub-browser:2.3.2
 ```
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
@@ -340,7 +335,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.1
+  epub-browser:2.3.2
 ```
 
 After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.
@@ -351,7 +346,7 @@ Mount `/app/SyncData:ro` only while importing legacy bookshelf JSON:
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-The loopback published port in the examples keeps the container behind the host boundary. For remote access, use a TLS reverse proxy and configure its actual container-network CIDR, identity headers, and `--cookie-secure`.
+The loopback published port in the examples keeps the container behind the host boundary. For remote access, use a TLS reverse proxy, configure its actual container-network CIDR, and add `--cookie-secure`.
 
 ## Complete command reference
 
@@ -381,10 +376,7 @@ Exactly one of `--server-dir` and `--ephemeral` is required.
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
 | `--admin-username NAME` | Initial unattended administrator; fallback `EPUB_BROWSER_ADMIN_USERNAME`. |
 | `--admin-password-file FILE` | Preferred initial secret file; fallback `EPUB_BROWSER_ADMIN_PASSWORD_FILE`, then `EPUB_BROWSER_ADMIN_PASSWORD` when no file is set. |
-| `--trusted-proxy-cidr CIDR` | Repeatable direct-proxy network trust boundary. Requires subject header and issuer. |
-| `--proxy-subject-header NAME` | Header containing the immutable authenticated external subject. |
-| `--proxy-display-name-header NAME` | Optional header containing a display name. |
-| `--proxy-issuer VALUE` | Stable issuer/security-domain identifier for proxy subjects. |
+| `--trusted-proxy-cidr CIDR` | Repeatable direct-proxy network trust boundary for safe `X-Forwarded-For` client-IP parsing. |
 | `--cookie-secure` | Send the session cookie only over browser-facing HTTPS. |
 
 ### Legacy v1 syntax
@@ -423,7 +415,7 @@ Server does not offer a local/cloud storage selector: authenticated reading data
 
 The application is self-contained for reading: required JavaScript, CSS, fonts, icons, manifests, and converted EPUB resources are served locally. There are no CDN runtime dependencies. Blocking outbound internet access does not prevent setup, login, browsing, reading, annotations, progress, bookshelf use, administration, or source conversion.
 
-The footer may make an optional request to the GitHub Releases API to discover a newer EPUB Browser version. Failure, blocking, or offline use only suppresses that update hint. OIDC also requires the separately operated authentication proxy and provider you explicitly configure; it is not a built-in dependency.
+The footer may make an optional request to the GitHub Releases API to discover a newer EPUB Browser version. Failure, blocking, or offline use only suppresses that update hint.
 
 SSG publishes a static Service Worker. Server deliberately disables and retires the origin-wide Service Worker so one account cannot receive another account's cached protected content.
 

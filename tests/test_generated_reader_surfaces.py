@@ -21,7 +21,6 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ssg_html = self._library_html()
 
         for control_id in (
-            "associationForm",
             "accountMenu",
             "accountPanel",
             "accountPasswordForm",
@@ -30,9 +29,6 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "adminPanel",
             "adminClose",
             "adminUserForm",
-            "adminIdentityForm",
-            "adminIdentityUser",
-            "adminIdentityList",
             "adminBookSearch",
             "adminBookVisibilityFilter",
             "adminBookTagFilter",

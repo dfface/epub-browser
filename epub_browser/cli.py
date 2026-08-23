@@ -101,9 +101,6 @@ def _new_parser() -> argparse.ArgumentParser:
         ),
     )
     server.add_argument("--trusted-proxy-cidr", action="append", default=[])
-    server.add_argument("--proxy-subject-header")
-    server.add_argument("--proxy-display-name-header")
-    server.add_argument("--proxy-issuer")
     server.add_argument("--cookie-secure", action="store_true", default=None)
     return parser
 
@@ -193,16 +190,10 @@ def _server_auth_options(values: argparse.Namespace) -> ServerAuthOptions:
             Path(values.admin_password_file) if values.admin_password_file else None
         ),
         trusted_proxy_cidrs=tuple(values.trusted_proxy_cidr),
-        proxy_subject_header=values.proxy_subject_header,
-        proxy_display_name_header=values.proxy_display_name_header,
-        proxy_issuer=values.proxy_issuer,
         cookie_secure=values.cookie_secure,
     )
     AuthConfig.from_values(
         auth.trusted_proxy_cidrs,
-        auth.proxy_subject_header,
-        auth.proxy_issuer,
-        auth.proxy_display_name_header,
         cookie_secure=bool(auth.cookie_secure),
     )
     return auth

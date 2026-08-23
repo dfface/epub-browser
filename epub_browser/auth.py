@@ -11,7 +11,7 @@ from collections import OrderedDict, deque
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Optional, Sequence, Tuple
 
 SESSION_COOKIE = "epub_browser_session"
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
@@ -43,20 +43,10 @@ class BootstrapCredentials:
 
 
 @dataclass(frozen=True)
-class ProxyIdentity:
-    issuer: str
-    subject: str
-    display_name: Optional[str] = None
-
-
-@dataclass(frozen=True)
 class ServerAuthOptions:
     admin_username: Optional[str] = None
     admin_password_file: Optional[Path] = None
     trusted_proxy_cidrs: Tuple[str, ...] = ()
-    proxy_subject_header: Optional[str] = None
-    proxy_display_name_header: Optional[str] = None
-    proxy_issuer: Optional[str] = None
     cookie_secure: Optional[bool] = None
 
 
@@ -66,33 +56,13 @@ class AuthConfig:
     session_ttl_seconds: int
     csrf_header_name: str
     trusted_proxy_networks: Tuple[ipaddress._BaseNetwork, ...]
-    proxy_subject_header: Optional[str]
-    proxy_display_name_header: Optional[str]
-    proxy_issuer: Optional[str]
 
     @classmethod
     def from_values(
         cls,
         trusted_proxy_cidrs: Sequence[str],
-        proxy_subject_header: Optional[str],
-        proxy_issuer: Optional[str],
-        proxy_display_name_header: Optional[str] = None,
         cookie_secure: bool = False,
     ) -> "AuthConfig":
-        has_proxy_setting = bool(
-            trusted_proxy_cidrs
-            or proxy_subject_header
-            or proxy_display_name_header
-            or proxy_issuer
-        )
-        has_required_proxy_settings = bool(
-            trusted_proxy_cidrs and proxy_subject_header and proxy_issuer
-        )
-        if has_proxy_setting and not has_required_proxy_settings:
-            raise ValueError(
-                "trusted proxy CIDRs, subject header, and issuer must be configured together"
-            )
-
         try:
             networks = tuple(
                 ipaddress.ip_network(cidr, strict=True)
@@ -106,9 +76,6 @@ class AuthConfig:
             session_ttl_seconds=SESSION_TTL_SECONDS,
             csrf_header_name=CSRF_HEADER_NAME,
             trusted_proxy_networks=networks,
-            proxy_subject_header=proxy_subject_header,
-            proxy_display_name_header=proxy_display_name_header,
-            proxy_issuer=proxy_issuer,
         )
 
     def is_trusted_proxy(self, client_host: str) -> bool:
@@ -117,7 +84,6 @@ class AuthConfig:
         except ValueError:
             return False
         return any(client_address in network for network in self.trusted_proxy_networks)
-
 
 def hash_password(password: str) -> str:
     from argon2 import PasswordHasher
@@ -471,38 +437,3 @@ class AuthService:
         raw_session = request.cookies.get(SESSION_COOKIE)
         supplied_token = request.headers.get(self.config.csrf_header_name)
         return self.verify_csrf_token(principal, raw_session, supplied_token)
-
-    @staticmethod
-    def _header(headers: Mapping, name: Optional[str]) -> Optional[str]:
-        if not name:
-            return None
-        value = headers.get(name)
-        if value is not None:
-            return value
-        wanted = name.casefold()
-        for header_name, header_value in headers.items():
-            if str(header_name).casefold() == wanted:
-                return header_value
-        return None
-
-    def authenticate_proxy(
-        self,
-        client_host: str,
-        headers: Mapping,
-    ) -> Optional[ProxyIdentity]:
-        if not self.config.is_trusted_proxy(client_host):
-            return None
-        subject = self._header(headers, self.config.proxy_subject_header)
-        if not isinstance(subject, str) or not subject.strip():
-            return None
-        display_name = self._header(
-            headers,
-            self.config.proxy_display_name_header,
-        )
-        if not isinstance(display_name, str) or not display_name.strip():
-            display_name = None
-        return ProxyIdentity(
-            self.config.proxy_issuer,
-            subject.strip(),
-            display_name.strip() if display_name is not None else None,
-        )

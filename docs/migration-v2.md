@@ -35,7 +35,7 @@ ID, creates a session, and then allows library reconciliation and publication.
 
 Keep the Server port on loopback or another trusted/private path until setup is
 complete: the first visitor who submits the one-time form claims the
-administrator account. Trusted-proxy identity headers cannot claim it. For an
+administrator account. For an
 unattended migration, add `--admin-username` and preferably a mode-`0600`
 `--admin-password-file`; the environment equivalents are
 `EPUB_BROWSER_ADMIN_USERNAME` and `EPUB_BROWSER_ADMIN_PASSWORD_FILE`.
@@ -160,7 +160,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/existing-v1-directory:/app/EpubBrowserFiles \
-  epub-browser:2.3.1
+  epub-browser:2.3.2
 ```
 
 Complete `/setup` through the loopback binding before exposing the service. For
@@ -170,14 +170,7 @@ mount shown in the main README Docker example.
 The container command uses `epub-browser server --watch`, listens on `0.0.0.0`
 inside the container, and retains authoritative data only through the mounted
 `/app/EpubBrowserFiles` volume. Bind the host port to `127.0.0.1` unless a TLS
-reverse proxy is intended. When a proxy supplies identity headers, enable
-`--cookie-secure`, trust only the direct proxy network with
-`--trusted-proxy-cidr`, configure the subject header and issuer together, and
-make the proxy strip client-supplied copies of those headers. A public client
-network is never an appropriate trusted-proxy CIDR.
-
-Direct OAuth/OIDC protocol handling is not built into EPUB Browser. An
-OIDC-aware reverse proxy performs the provider flow and passes a stable subject
-through the configured trusted header; EPUB Browser maps the proxy's
-issuer/subject pair to a local account. Keep local administrator login available
-as the recovery path.
+reverse proxy is intended. To record real client IPs, trust only the direct
+proxy network with `--trusted-proxy-cidr`. A public client network is never an
+appropriate trusted-proxy CIDR. Enable `--cookie-secure` when the browser
+connects through HTTPS.

@@ -135,16 +135,6 @@ def render_library_shell(
             <h3 id="accountSessionsTitle" data-i18n="account.sessions">Active sessions</h3>
             <ul class="account-list" id="sessionList"></ul>
         </section>
-        <details class="account-card account-card-wide account-details" id="associationCard" hidden>
-            <summary data-i18n="account.associationTitle">Associate a proxy identity</summary>
-            <div class="account-details-body"><p data-i18n="account.associationDescription">If your trusted proxy identity is not recognized, prove which local account it belongs to.</p>
-            <p class="account-section-copy" data-i18n="account.associationOidcHelp">EPUB Browser does not connect to OIDC directly. Open it through the configured OIDC-aware trusted proxy first; this form then links that external identity to an existing local account.</p>
-            <form class="account-form" id="associationForm">
-                <label><span data-i18n="account.username">Username</span><input type="text" name="username" autocomplete="username" required></label>
-                <label><span data-i18n="account.password">Password</span><input type="password" name="password" autocomplete="current-password" required></label>
-                <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="account.associate">Associate identity</button>
-            </form></div>
-        </details>
         </div>
         </div></div>
     </div>
@@ -160,7 +150,7 @@ def render_library_shell(
         </div>
         <div class="account-modal-body"><div class="account-layout">
         <section class="account-admin account-admin-console" aria-labelledby="adminTitle">
-            <p class="account-admin-intro" data-i18n="admin.description">Manage users, external identities, and access to restricted books.</p>
+            <p class="account-admin-intro" data-i18n="admin.description">Manage users and access to restricted books.</p>
             <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
                 <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
                 <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
@@ -256,18 +246,6 @@ def render_library_shell(
                     <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminAiTagSubmit" data-i18n="admin.ai.addTag">Add tag</button>
                 </form>
                 <ul class="account-list" id="adminAiTagList"></ul>
-            </section>
-            <section class="account-admin-section account-card-wide" id="adminIdentitiesSection" aria-labelledby="adminIdentitiesTitle" data-admin-panel="users" hidden>
-                <h4 id="adminIdentitiesTitle" data-i18n="admin.identities">Proxy identities</h4>
-                <p class="account-section-copy" data-i18n="admin.identityHelp">For OIDC, let a trusted reverse proxy complete the protocol and pass a stable subject. Issuer must match --proxy-issuer; subject must match the configured subject header.</p>
-                <form class="account-form" id="adminIdentityForm">
-                    <label><span data-i18n="admin.identityIssuer">Issuer</span><input type="text" name="issuer" autocomplete="off" required></label>
-                    <label><span data-i18n="admin.identitySubject">Subject</span><input type="text" name="subject" autocomplete="off" required></label>
-                    <label><span data-i18n="admin.identityDisplayName">Display name</span><input type="text" name="display_name" autocomplete="off"></label>
-                    <label><span data-i18n="admin.identityUser">Local user</span><select id="adminIdentityUser" name="user_id" required></select></label>
-                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.createIdentity">Create identity</button>
-                </form>
-                <ul class="account-list" id="adminIdentityList"></ul>
             </section>
             <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
                 <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>

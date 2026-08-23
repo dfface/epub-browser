@@ -12,7 +12,6 @@
     var initialized = false;
     var users = [];
     var books = [];
-    var identities = [];
     var aiSettings = null;
     var aiTags = [];
     var adminBooksState = {
@@ -214,28 +213,6 @@
       });
     }
 
-    function pageAuthenticationNonce() {
-      if (!root.document || !root.document.querySelector) return '';
-      var meta = root.document.querySelector('meta[name="epub-browser-auth-nonce"]');
-      return meta && meta.content ? meta.content : '';
-    }
-
-    function associate(credentials) {
-      var options = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials || {})
-      };
-      var csrfToken = sessionState && sessionState.csrf_token;
-      if (!csrfToken) {
-        options.headers['X-EPUB-Browser-Auth-Nonce'] = pageAuthenticationNonce();
-      }
-      return Promise.resolve(root.fetch(
-        '/api/identity/link',
-        requestOptions(options, csrfToken, '/api/identity/link')
-      ));
-    }
-
     function element(id) {
       return root.document && root.document.getElementById
         ? root.document.getElementById(id)
@@ -262,8 +239,6 @@
         last_enabled_admin: true,
         not_found: true,
         invalid_visibility: true,
-        invalid_identity: true,
-        identity_already_linked: true,
         user_disabled: true,
         forbidden: true,
         csrf_required: true,
@@ -275,8 +250,6 @@
         invalid_credentials: true,
         login_throttled: true,
         invalid_password: true,
-        proxy_identity_required: true,
-        identity_already_linked: true,
         not_found: true,
         network: true
       };
@@ -788,13 +761,7 @@
         ? section : '';
     }
 
-    function adminPanelIsAvailable(panel) {
-      if (!panel || panel.id !== 'adminIdentitiesSection') return true;
-      return Boolean(
-        sessionState && sessionState.user && sessionState.user.role === 'admin'
-        && sessionState.authentication && sessionState.authentication.proxy_enabled
-      );
-    }
+    function adminPanelIsAvailable(panel) { return Boolean(panel); }
 
     function setActiveAdminSection(section) {
       if (['overview', 'users', 'ai', 'tags', 'books'].indexOf(section) === -1) return;
@@ -894,17 +861,6 @@
       var adminMenu = element('adminMenu');
       if (adminPanel) adminPanel.hidden = sessionState.user.role !== 'admin';
       if (adminMenu) adminMenu.hidden = sessionState.user.role !== 'admin';
-      var authentication = sessionState.authentication || {};
-      var proxyEnabled = authentication.proxy_enabled === true;
-      var pendingProxyIdentity = authentication.pending_proxy_identity === true;
-      var associationCard = element('associationCard');
-      var adminIdentities = element('adminIdentitiesSection');
-      if (associationCard) {
-        associationCard.hidden = !proxyEnabled || !pendingProxyIdentity;
-      }
-      if (adminIdentities) {
-        adminIdentities.hidden = !proxyEnabled || sessionState.user.role !== 'admin';
-      }
     }
 
     function describeSessionDevice(userAgent) {
@@ -2108,74 +2064,6 @@
       });
     }
 
-    function renderIdentities() {
-      var list = element('adminIdentityList');
-      var userSelect = element('adminIdentityUser');
-      if (userSelect) {
-        var selectedUser = userSelect.value;
-        userSelect.textContent = '';
-        users.forEach(function(user) {
-          var option = root.document.createElement('option');
-          option.value = user.id;
-          option.textContent = user.username;
-          option.selected = user.id === selectedUser;
-          userSelect.appendChild(option);
-        });
-      }
-      if (!list) return;
-      list.textContent = '';
-      identities.forEach(function(identity) {
-        var item = root.document.createElement('li');
-        item.className = 'account-list-item account-identity-item';
-        item.appendChild(createTextElement(
-          'span',
-          'admin-identity-summary',
-          'admin.identitySummary',
-          {
-            issuer: identity.issuer,
-            subject: identity.subject,
-            username: identity.username,
-            displayName: identity.display_name || identity.username
-          }
-        ));
-        item.appendChild(actionButton('admin.deleteIdentity', function() {
-          deleteIdentity(identity.issuer, identity.subject);
-        }, 'danger'));
-        list.appendChild(item);
-      });
-      if (!identities.length) {
-        list.appendChild(createTextElement('li', 'account-empty', 'admin.noIdentities'));
-      }
-    }
-
-    function createIdentity(payload, reload) {
-      return authenticatedFetch('/api/admin/identities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload || {})
-      }).then(function(response) {
-        if (!response.ok) return showResponseError(response, 'admin');
-        showStatus('admin.identityCreated', 'success');
-        return reload === false ? response : loadAdminData();
-      }).catch(function() {
-        showStatus('admin.error.network', 'error');
-      });
-    }
-
-    function deleteIdentity(issuer, subject, reload) {
-      return authenticatedFetch('/api/admin/identities', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issuer: issuer, subject: subject })
-      }).then(function(response) {
-        if (!response.ok) return showResponseError(response, 'admin');
-        showStatus('admin.identityDeleted', 'success');
-        return reload === false ? response : loadAdminData();
-      }).catch(function() {
-        showStatus('admin.error.network', 'error');
-      });
-    }
-
     function replaceBookGrants(bookId, userIds, reload) {
       return authenticatedFetch(
         '/api/admin/books/' + encodeURIComponent(bookId) + '/grants',
@@ -2241,9 +2129,6 @@
       if (!sessionState || !sessionState.user || sessionState.user.role !== 'admin') {
         return Promise.resolve(null);
       }
-      var proxyEnabled = Boolean(
-        sessionState.authentication && sessionState.authentication.proxy_enabled
-      );
       var bookIndexGeneration = beginAdminBookIndexLoad();
       var requests = [
         authenticatedFetch('/api/admin/users'),
@@ -2251,31 +2136,26 @@
         authenticatedFetch('/api/admin/ai/settings'),
         authenticatedFetch('/api/admin/ai/tags')
       ];
-      if (proxyEnabled) requests.push(authenticatedFetch('/api/admin/identities'));
       return Promise.all(requests).then(function(responses) {
         if (!responses[0].ok) return showResponseError(responses[0], 'admin');
         if (!responses[1].ok) return showResponseError(responses[1], 'admin');
         if (!responses[2].ok) return showResponseError(responses[2], 'admin');
         if (!responses[3].ok) return showResponseError(responses[3], 'admin');
-        if (proxyEnabled && !responses[4].ok) return showResponseError(responses[4], 'admin');
         var payloadRequests = [
           readJson(responses[0]),
           readJson(responses[1]),
           readJson(responses[2]),
           readJson(responses[3])
         ];
-        if (proxyEnabled) payloadRequests.push(readJson(responses[4]));
         return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
           applyAdminBookIndex(bookIndexGeneration, payloads[1]);
           aiSettings = payloads[2].settings || null;
           aiTags = payloads[3].tags || [];
-          identities = proxyEnabled ? (payloads[4].identities || []) : [];
           renderUsers();
           renderAiSettings();
           renderAiUserAccess();
           renderAiTags();
-          renderIdentities();
           renderAdminOverview();
         });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
@@ -2326,10 +2206,8 @@
       var adminClose = element('adminClose');
       var logoutButton = element('accountLogout');
       var passwordForm = element('accountPasswordForm');
-      var associationForm = element('associationForm');
       var createUserForm = element('adminUserForm');
       var createUserSubmit = element('adminUserSubmit');
-      var createIdentityForm = element('adminIdentityForm');
       var aiSettingsForm = element('adminAiSettingsForm');
       var aiSettingsSubmit = element('adminAiSettingsSubmit');
       var aiTagForm = element('adminAiTagForm');
@@ -2351,7 +2229,7 @@
       var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
-      [createUserForm, createIdentityForm, aiSettingsForm, aiTagForm].forEach(function(form) {
+      [createUserForm, aiSettingsForm, aiTagForm].forEach(function(form) {
         if (!form) return;
         form.addEventListener('input', markAdminDirty);
         form.addEventListener('change', markAdminDirty);
@@ -2406,18 +2284,6 @@
           redirectToLogin();
         }).catch(function() { showStatus('account.error.network', 'error'); });
       });
-      if (associationForm) associationForm.addEventListener('submit', function(event) {
-        event.preventDefault();
-        associate({
-          username: formValue(associationForm, 'username'),
-          password: formValue(associationForm, 'password')
-        }).then(function(response) {
-          clearPasswordFields(associationForm);
-          if (!response.ok) return showResponseError(response, 'account');
-          showStatus('account.associationSucceeded', 'success');
-          return loadSession(true).then(renderIdentity);
-        }).catch(function() { showStatus('account.error.network', 'error'); });
-      });
       if (createUserForm) createUserForm.addEventListener('submit', function(event) {
         event.preventDefault();
         runButtonOperation(createUserSubmit, 'admin.creatingUser', function() {
@@ -2437,17 +2303,6 @@
             showStatus('admin.userCreated', 'success');
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
-        });
-      });
-      if (createIdentityForm) createIdentityForm.addEventListener('submit', function(event) {
-        event.preventDefault();
-        createIdentity({
-          issuer: formValue(createIdentityForm, 'issuer'),
-          subject: formValue(createIdentityForm, 'subject'),
-          display_name: formValue(createIdentityForm, 'display_name'),
-          user_id: formValue(createIdentityForm, 'user_id')
-        }).then(function() {
-          createIdentityForm.reset();
         });
       });
       if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {
@@ -2597,7 +2452,6 @@
           renderAiUserAccess();
           renderAiTags();
           renderAdminBooks();
-          renderIdentities();
           renderAdminAiJobs();
           loadSessions();
         });
@@ -2624,9 +2478,6 @@
       fetch: authenticatedFetch,
       session: loadSession,
       logout: logout,
-      associate: associate,
-      createIdentity: createIdentity,
-      deleteIdentity: deleteIdentity,
       saveBookGrants: replaceBookGrants,
       loadAiJobs: loadAdminAiJobs,
       retryAiJob: retryAdminAiJob,

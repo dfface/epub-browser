@@ -920,14 +920,10 @@ test('SSG initialization returns before any account request or UI binding', asyn
 test('member account settings keep the administration module hidden', async () => {
   const adminPanel = { hidden: false };
   const adminMenu = { hidden: false, addEventListener() {} };
-  const associationCard = { hidden: false };
-  const adminIdentitiesSection = { hidden: false };
   const root = rootWithFetch(() => Promise.resolve(response(200, {})));
   root.document.getElementById = id => ({
     adminPanel,
     adminMenu,
-    associationCard,
-    adminIdentitiesSection,
   })[id] || null;
   const auth = AuthModule.create(root);
   auth.setSession({
@@ -939,35 +935,6 @@ test('member account settings keep the administration module hidden', async () =
 
   assert.equal(adminPanel.hidden, true);
   assert.equal(adminMenu.hidden, true);
-  assert.equal(associationCard.hidden, true);
-  assert.equal(adminIdentitiesSection.hidden, true);
-});
-
-test('trusted-proxy controls are visible only for a configured administrator session', async () => {
-  const adminPanel = { hidden: true };
-  const adminMenu = { hidden: true, addEventListener() {} };
-  const associationCard = { hidden: true };
-  const adminIdentitiesSection = { hidden: true };
-  const root = rootWithFetch(() => Promise.resolve(response(200, {})));
-  root.document.getElementById = id => ({
-    adminPanel,
-    adminMenu,
-    associationCard,
-    adminIdentitiesSection,
-  })[id] || null;
-  const auth = AuthModule.create(root);
-  auth.setSession({
-    user: { id: 'admin', username: 'owner', role: 'admin' },
-    csrf_token: 'token',
-    authentication: { proxy_enabled: true, pending_proxy_identity: true },
-  });
-
-  await auth.init();
-
-  assert.equal(adminPanel.hidden, false);
-  assert.equal(adminMenu.hidden, false);
-  assert.equal(associationCard.hidden, false);
-  assert.equal(adminIdentitiesSection.hidden, false);
 });
 
 test('account settings and administration open as separate surfaces', async () => {
@@ -1018,7 +985,6 @@ test('account settings and administration open as separate surfaces', async () =
   auth.setSession({
     user: { id: 'admin', username: 'owner', role: 'admin' },
     csrf_token: 'token',
-    authentication: { proxy_enabled: false, pending_proxy_identity: false },
   });
 
   await auth.init();
@@ -1145,104 +1111,6 @@ test('closing administration keeps unsaved form changes until the administrator 
   discard = true;
   adminClose.click();
   assert.equal(adminPanel.classList.contains('active'), false);
-});
-
-test('proxy association form stays hidden without a pending third-party identity', async () => {
-  const associationCard = { hidden: false };
-  const adminIdentitiesSection = { hidden: true };
-  const root = rootWithFetch(() => Promise.resolve(response(200, {})));
-  root.document.getElementById = id => ({
-    associationCard,
-    adminIdentitiesSection,
-  })[id] || null;
-  const auth = AuthModule.create(root);
-  auth.setSession({
-    user: { id: 'admin', username: 'owner', role: 'admin' },
-    csrf_token: 'token',
-    authentication: { proxy_enabled: true, pending_proxy_identity: false },
-  });
-
-  await auth.init();
-
-  assert.equal(associationCard.hidden, true);
-  assert.equal(adminIdentitiesSection.hidden, false);
-});
-
-test('anonymous proxy association sends JSON with the page authentication nonce', async () => {
-  let received;
-  const root = rootWithFetch((url, options) => {
-    received = { url, options };
-    return Promise.resolve(response(201, { identity: {} }));
-  });
-  root.document.querySelector = selector => selector === 'meta[name="epub-browser-auth-nonce"]'
-    ? { content: 'strict-page-nonce' }
-    : null;
-  const auth = AuthModule.create(root);
-
-  await auth.associate({ username: 'reader', password: 'secret' });
-
-  assert.equal(received.url, '/api/identity/link');
-  assert.equal(received.options.headers['Content-Type'], 'application/json');
-  assert.equal(received.options.headers['X-EPUB-Browser-Auth-Nonce'], 'strict-page-nonce');
-  assert.equal(received.options.credentials, 'same-origin');
-});
-
-test('administrator identity helpers create and delete mappings with CSRF', async () => {
-  const calls = [];
-  const root = rootWithFetch((url, options) => {
-    calls.push({ url, options });
-    return Promise.resolve(response(options.method === 'POST' ? 201 : 200, {
-      identity: { issuer: 'issuer', subject: 'subject', user_id: 'member' },
-    }));
-  });
-  const auth = AuthModule.create(root);
-  auth.setSession({
-    user: { id: 'admin', username: 'admin', role: 'admin' },
-    csrf_token: 'admin-csrf',
-  });
-
-  await auth.createIdentity({
-    issuer: 'issuer',
-    subject: 'subject',
-    user_id: 'member',
-    display_name: 'Member',
-  }, false);
-  await auth.deleteIdentity('issuer', 'subject', false);
-
-  assert.deepEqual(calls.map(call => [call.url, call.options.method]), [
-    ['/api/admin/identities', 'POST'],
-    ['/api/admin/identities', 'DELETE'],
-  ]);
-  assert.equal(calls[0].options.headers['X-CSRF-Token'], 'admin-csrf');
-  assert.equal(calls[1].options.headers['X-CSRF-Token'], 'admin-csrf');
-  assert.deepEqual(JSON.parse(calls[1].options.body), {
-    issuer: 'issuer',
-    subject: 'subject',
-  });
-});
-
-test('account success feedback uses the shared notification component', async () => {
-  const shown = [];
-  const root = rootWithFetch(() => Promise.resolve(response(201, {
-    identity: { issuer: 'issuer', subject: 'subject', user_id: 'member' },
-  })));
-  root.EpubBrowserI18n = { t(key) { return key === 'admin.identityCreated' ? 'Created' : key; } };
-  root.EpubBrowserNotification = {
-    show(message, type) { shown.push({ message, type }); },
-  };
-  const auth = AuthModule.create(root);
-  auth.setSession({
-    user: { id: 'admin', username: 'admin', role: 'admin' },
-    csrf_token: 'admin-csrf',
-  });
-
-  await auth.createIdentity({
-    issuer: 'issuer',
-    subject: 'subject',
-    user_id: 'member',
-  }, false);
-
-  assert.deepEqual(shown, [{ message: 'Created', type: 'success' }]);
 });
 
 test('administrator saves the complete multi-user book grant selection in one request', async () => {

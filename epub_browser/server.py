@@ -62,7 +62,6 @@ from .version import render_footer
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
 PRINCIPAL_SCOPE_KEY = 'epub_browser.principal'
-PENDING_IDENTITY_SCOPE_KEY = 'epub_browser.pending_identity'
 SESSION_TOKEN_SCOPE_KEY = 'epub_browser.session_token'
 SETUP_NONCE_COOKIE = 'epub_browser_setup_nonce'
 AUTH_NONCE_COOKIE = 'epub_browser_auth_nonce'
@@ -77,7 +76,6 @@ PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/setup',
     '/login',
     '/logout',
-    '/api/identity/link',
     '/sw.js',
 })
 PUBLIC_LOGIN_ASSETS = frozenset({
@@ -671,16 +669,6 @@ def create_app(
         payload['effective_tags'] = list(book['effective_tags'])
         return payload
 
-    def admin_identity_data(identity):
-        user = store.get_user(identity.user_id)
-        return {
-            'issuer': identity.issuer,
-            'subject': identity.subject,
-            'user_id': identity.user_id,
-            'username': user.username,
-            'display_name': identity.display_name,
-        }
-
     def session_data(record, current_session_id):
         def iso_timestamp(value):
             try:
@@ -1224,14 +1212,6 @@ window.location.assign(payload.redirect||'/');
                     principal,
                     raw_session,
                 ),
-                'authentication': {
-                    'proxy_enabled': bool(
-                        auth_service.config.trusted_proxy_networks
-                    ),
-                    'pending_proxy_identity': request.scope.get(
-                        PENDING_IDENTITY_SCOPE_KEY
-                    ) is not None,
-                },
             },
             cache_control='no-store',
         )
@@ -1247,90 +1227,6 @@ window.location.assign(payload.redirect||'/');
             },
             cache_control='no-store',
         )
-
-    async def link_proxy_identity(request):
-        current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
-        if current_principal is None and not valid_anonymous_auth_request(request):
-            return invalid_auth_request()
-        data, parse_error = await bounded_public_json_object(request)
-        if parse_error is not None:
-            return public_json_error(parse_error)
-        pending_identity = request.scope.get(PENDING_IDENTITY_SCOPE_KEY)
-        if pending_identity is None:
-            return response(
-                error_payload(
-                    'proxy_identity_required',
-                    'An unrecognized trusted proxy identity is required',
-                ),
-                400,
-                cache_control='no-store',
-            )
-        username = data.get('username')
-        password = data.get('password')
-        if not isinstance(username, str) or not isinstance(password, str):
-            return response(
-                error_payload('invalid_credentials', 'Invalid username or password'),
-                401,
-                cache_control='no-store',
-            )
-        principal = auth_service.authenticate_password(
-            username,
-            password,
-            client_key(request),
-        )
-        if principal is None:
-            return response(
-                error_payload('invalid_credentials', 'Invalid username or password'),
-                401,
-                cache_control='no-store',
-            )
-        try:
-            identity = store.create_identity(
-                pending_identity.issuer,
-                pending_identity.subject,
-                principal.user_id,
-                pending_identity.display_name,
-            )
-        except sqlite3.IntegrityError:
-            return response(
-                error_payload(
-                    'identity_already_linked',
-                    'External identity is already linked',
-                ),
-                409,
-                cache_control='no-store',
-            )
-        current_session = request_session_token(request)
-        if current_principal is not None and current_session:
-            raw_session, _ = auth_service.replace_session(
-                principal,
-                current_session,
-                **session_client_metadata(request),
-            )
-        else:
-            raw_session, _ = auth_service.create_session(
-                principal,
-                **session_client_metadata(request),
-            )
-        linked = response(
-            {
-                'user': {
-                    'id': principal.user_id,
-                    'username': principal.username,
-                    'role': principal.role,
-                },
-                'identity': {
-                    'issuer': identity.issuer,
-                    'subject': identity.subject,
-                    'display_name': identity.display_name,
-                },
-            },
-            201,
-            cache_control='no-store',
-        )
-        set_session_cookie(linked, raw_session)
-        delete_auth_nonce_cookie(linked)
-        return linked
 
     async def change_password(request):
         principal = require_principal(request)
@@ -1500,79 +1396,6 @@ window.location.assign(payload.redirect||'/');
             hash_password(password),
         )
         return response({'user': user_data(updated)})
-
-    async def admin_identities(request):
-        require_admin(request)
-        if request.method == 'GET':
-            return response(
-                {
-                    'identities': [
-                        admin_identity_data(identity)
-                        for identity in store.list_all_identities()
-                    ]
-                }
-            )
-        data = await json_object(request)
-        if data is None:
-            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
-        issuer = data.get('issuer')
-        subject = data.get('subject')
-        if isinstance(issuer, str):
-            issuer = issuer.strip()
-        if isinstance(subject, str):
-            subject = subject.strip()
-        if request.method == 'DELETE':
-            if not isinstance(issuer, str) or not isinstance(subject, str):
-                return response(
-                    error_payload('invalid_identity', 'Invalid identity data'),
-                    400,
-                )
-            try:
-                deleted = store.delete_identity(issuer, subject)
-            except ValueError:
-                deleted = False
-            if not deleted:
-                return response(error_payload('not_found', 'Identity not found'), 404)
-            return response({'message': 'Identity deleted'})
-
-        user_id = data.get('user_id')
-        display_name = data.get('display_name')
-        if (
-            not isinstance(issuer, str)
-            or not issuer.strip()
-            or not isinstance(subject, str)
-            or not subject.strip()
-            or not isinstance(user_id, str)
-            or not user_id
-            or (display_name is not None and not isinstance(display_name, str))
-        ):
-            return response(
-                error_payload('invalid_identity', 'Invalid identity data'),
-                400,
-            )
-        try:
-            identity = store.create_identity(
-                issuer,
-                subject,
-                user_id,
-                display_name.strip() if display_name else None,
-            )
-        except KeyError:
-            return response(error_payload('not_found', 'User not found'), 404)
-        except ValueError:
-            return response(
-                error_payload('invalid_identity', 'Invalid identity data'),
-                400,
-            )
-        except sqlite3.IntegrityError:
-            return response(
-                error_payload(
-                    'identity_already_linked',
-                    'External identity is already linked',
-                ),
-                409,
-            )
-        return response({'identity': admin_identity_data(identity)}, 201)
 
     async def admin_books(request):
         require_admin(request)
@@ -2930,7 +2753,6 @@ window.location.assign(payload.redirect||'/');
         Route('/login', login, methods=['GET', 'POST']),
         Route('/logout', logout, methods=['POST']),
         Route('/sw.js', service_worker_tombstone, methods=['GET']),
-        Route('/api/identity/link', link_proxy_identity, methods=['POST']),
         Route('/api/session', session, methods=['GET']),
         Route('/api/csrf', csrf, methods=['GET']),
         Route('/api/account/password', change_password, methods=['PUT']),
@@ -2939,11 +2761,6 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
-        Route(
-            '/api/admin/identities',
-            admin_identities,
-            methods=['GET', 'POST', 'DELETE'],
-        ),
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/index', admin_book_index, methods=['GET']),
         Route('/api/admin/books/bulk', admin_bulk_books, methods=['POST']),
@@ -3012,24 +2829,8 @@ window.location.assign(payload.redirect||'/');
             return await call_next(request)
         raw_session = request.cookies.get(SESSION_COOKIE)
         session_principal = auth_service.principal_from_session(raw_session)
-        host = request.client.host if request.client is not None else ''
-        proxy_identity = auth_service.authenticate_proxy(host, request.headers)
-        proxy_principal = None
-        if proxy_identity is not None:
-            proxy_principal = store.principal_from_identity(
-                proxy_identity.issuer,
-                proxy_identity.subject,
-            )
-        principal = proxy_principal or session_principal
-        pending_identity = (
-            proxy_identity
-            if proxy_identity is not None and proxy_principal is None
-            else None
-        )
-        if proxy_principal is not None and proxy_principal != session_principal:
-            raw_session = None
+        principal = session_principal
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
-        request.scope[PENDING_IDENTITY_SCOPE_KEY] = pending_identity
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
         is_public_auth = route_is_public_auth_endpoint(path)
         if principal is None:
