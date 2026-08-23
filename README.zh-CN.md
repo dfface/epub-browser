@@ -308,7 +308,7 @@ docker run -d \
 docker compose up -d --build
 ```
 
-示例只发布到 `127.0.0.1:8080`，源 EPUB 放在 `./Library`，Server 状态持久化到 `./EpubBrowserFiles`。请访问 `http://127.0.0.1:8080/setup` 完成一次性初始化。远程访问时，应保留 loopback 绑定，并在前方部署带认证的 TLS 反向代理。
+示例只发布到 `127.0.0.1:8080`，源 EPUB 放在 `./Library`，Server 状态持久化到 `./EpubBrowserFiles`。文件中显式写出了完整的 Server `command`，可直接在此追加部署专用参数，而无需覆盖镜像的隐式默认值。请访问 `http://127.0.0.1:8080/setup` 完成一次性初始化。远程访问时，应保留 loopback 绑定，并在前方部署带认证的 TLS 反向代理。
 
 无人值守设置示例：
 

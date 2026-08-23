@@ -327,7 +327,7 @@ The repository includes a [docker-compose.yml](docker-compose.yml) for users who
 docker compose up -d --build
 ```
 
-It publishes only `127.0.0.1:8080`, keeps source EPUBs in `./Library`, and persists Server state in `./EpubBrowserFiles`. Complete the one-time setup at `http://127.0.0.1:8080/setup`. For remote access, keep this loopback binding and place an authenticated TLS reverse proxy in front of it.
+It publishes only `127.0.0.1:8080`, keeps source EPUBs in `./Library`, and persists Server state in `./EpubBrowserFiles`. The complete Server `command` is intentionally visible in the file, so deployment-specific flags can be added without replacing an implicit image default. Complete the one-time setup at `http://127.0.0.1:8080/setup`. For remote access, keep this loopback binding and place an authenticated TLS reverse proxy in front of it.
 
 For unattended setup:
 

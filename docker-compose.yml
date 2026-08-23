@@ -6,6 +6,26 @@ services:
       context: .
     image: epub-browser:2.3.1
     restart: unless-stopped
+    # Keep the command explicit so deployment-specific Server flags can be
+    # added here without replacing Dockerfile defaults implicitly.
+    command:
+      - epub-browser
+      - server
+      - /app/Library
+      - --book-id-storage=embedded
+      - --server-dir=/app/EpubBrowserFiles
+      - --legacy-sync-dir=/app/SyncData
+      - --watch
+      - --host=0.0.0.0
+      - --port=80
+      - --no-browser
+    # For an identity-aware trusted proxy, append the following after setting
+    # the matching authenticated header at the proxy. The CIDR must be the
+    # direct peer address seen by EPUB Browser (for example 172.32.11.1/32).
+    #   - --cookie-secure
+    #   - --trusted-proxy-cidr=172.32.11.1/32
+    #   - --proxy-subject-header=X-Remote-User
+    #   - --proxy-issuer=https://login.example.com
     ports:
       - "127.0.0.1:8080:80"
     volumes:
