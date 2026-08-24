@@ -865,13 +865,13 @@
         isListening: false,
         isBound: false,
         pendingDraft: null,
+        imageNoteButtons: [],
         renderVersion: 0,
         detailLifecycle: createAnnotationDetailLifecycle(),
 
         init: function() {
             var hl = initHighlighter();
-            if (!hl) return;
-            if (!this.isBound) {
+            if (hl && !this.isBound) {
                 this.bindHighlighterEvents(hl);
                 this.isBound = true;
             }
@@ -892,6 +892,10 @@
         },
 
         syncEnabledState: function() {
+            this.imageNoteButtons.forEach(function(button) {
+                button.disabled = !Settings.enabled;
+                button.setAttribute('aria-disabled', Settings.enabled ? 'false' : 'true');
+            });
             if (!highlighter) return;
             if (Settings.enabled) {
                 if (!this.isListening) {
@@ -939,6 +943,12 @@
             return currentChapterIndex;
         },
 
+        getChapterIndexForImage: function(image) {
+            var section = image && image.closest && image.closest('.continuous-chapter');
+            var index = section && parseInt(section.getAttribute('data-chapter-index'), 10);
+            return Number.isInteger(index) ? index : currentChapterIndex;
+        },
+
         getCanonicalSourceMetas: function(source, chapterIndex) {
             var startMeta = Utils.deepClone(source.startMeta);
             var endMeta = Utils.deepClone(source.endMeta);
@@ -970,6 +980,20 @@
         },
 
         buildAnnotationFromSource: function(source, color, note) {
+            if (source && source.imageNote && source.imageMeta) {
+                return {
+                    id: source.id || Utils.generateUUID(),
+                    book_hash: currentBookHash,
+                    chapter_index: typeof source.chapterIndex === 'number' ? source.chapterIndex : currentChapterIndex,
+                    text: source.text || tr('imageNote'),
+                    note: note || '',
+                    startMeta: { image: source.imageMeta },
+                    endMeta: { image: source.imageMeta },
+                    color: color,
+                    created_at: Utils.getISOTime(),
+                    updated_at: Utils.getISOTime()
+                };
+            }
             var chapterIndex = this.getChapterIndexFromSource(source);
             var metas = this.getCanonicalSourceMetas(source, chapterIndex);
             return {
@@ -984,6 +1008,137 @@
                 created_at: Utils.getISOTime(),
                 updated_at: Utils.getISOTime()
             };
+        },
+
+        isImageAnnotation: function(annotation) {
+            return Boolean(annotation && annotation.startMeta && annotation.startMeta.image);
+        },
+
+        imageSource: function(image) {
+            return String(image && (image.getAttribute('src') || image.currentSrc || image.src) || '');
+        },
+
+        imageMetaFor: function(image, chapterIndex) {
+            var section = this.getChapterSection(chapterIndex);
+            var root = section || this.getContentRoot();
+            var source = this.imageSource(image);
+            var images = Array.prototype.slice.call(root.querySelectorAll('img'));
+            var ordinal = 0;
+            for (var index = 0; index < images.length; index++) {
+                if (images[index] === image) break;
+                if (this.imageSource(images[index]) === source) ordinal += 1;
+            }
+            return {
+                src: source,
+                ordinal: ordinal,
+                alt: String(image.getAttribute('alt') || image.getAttribute('title') || '')
+            };
+        },
+
+        imageForMeta: function(meta, chapterIndex) {
+            if (!meta || !meta.src) return null;
+            var section = this.getChapterSection(chapterIndex);
+            var root = section || this.getContentRoot();
+            var matches = Array.prototype.slice.call(root.querySelectorAll('img')).filter(function(image) {
+                return this.imageSource(image) === meta.src;
+            }, this);
+            return matches[Number(meta.ordinal) || 0] || null;
+        },
+
+        imageNoteLabel: function(key) {
+            var i18n = window.EpubBrowserI18n;
+            return i18n && i18n.t ? i18n.t('annotations.' + key) : tr(key);
+        },
+
+        imageNoteContainer: function(image) {
+            var subject = image;
+            if (image.parentElement && image.parentElement.tagName === 'A') subject = image.parentElement;
+            if (subject.parentElement && subject.parentElement.tagName === 'PICTURE') subject = subject.parentElement;
+            if (subject.parentElement && subject.parentElement.classList.contains('image-annotation-anchor')) {
+                return subject.parentElement;
+            }
+            var wrapper = document.createElement('span');
+            wrapper.className = 'image-annotation-anchor';
+            subject.parentNode.insertBefore(wrapper, subject);
+            wrapper.appendChild(subject);
+            return wrapper;
+        },
+
+        clearImageNotes: function() {
+            this.imageNoteButtons.forEach(function(button) { button.remove(); });
+            this.imageNoteButtons = [];
+            this.getContentRoot().querySelectorAll('img.annotation-image-noted').forEach(function(image) {
+                image.classList.remove('annotation-image-noted');
+                image.removeAttribute('data-image-annotation-id');
+            });
+        },
+
+        decorateImageNote: function(image, annotation) {
+            if (!image) return;
+            var self = this;
+            var wrapper = this.imageNoteContainer(image);
+            var button = document.createElement('button');
+            button.className = 'image-annotation-button';
+            button.type = 'button';
+            button.disabled = !Settings.enabled;
+            button.setAttribute('aria-disabled', Settings.enabled ? 'false' : 'true');
+            var i18n = window.EpubBrowserI18n;
+            var labelKey = annotation ? 'annotations.imageNote' : 'annotations.addImageNote';
+            var buttonLabel = i18n && i18n.t ? i18n.t(labelKey) : this.imageNoteLabel(annotation ? 'imageNote' : 'addImageNote');
+            button.setAttribute('aria-label', buttonLabel);
+            button.title = buttonLabel;
+            button.setAttribute('aria-pressed', annotation ? 'true' : 'false');
+            button.appendChild(document.createElement('i')).className = annotation ? 'fas fa-sticky-note' : 'fas fa-plus';
+            if (annotation) {
+                image.classList.add('annotation-image-noted');
+                image.setAttribute('data-image-annotation-id', annotation.id);
+                wrapper.classList.add('has-image-note');
+            } else {
+                wrapper.classList.remove('has-image-note');
+            }
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!Settings.enabled) return;
+                if (annotation) {
+                    self.showDetailDialog(annotation.id);
+                    return;
+                }
+                var chapterIndex = self.getChapterIndexForImage(image);
+                var meta = self.imageMetaFor(image, chapterIndex);
+                var source = {
+                    id: Utils.generateUUID(),
+                    imageNote: true,
+                    imageMeta: meta,
+                    imageElement: image,
+                    chapterIndex: chapterIndex,
+                    text: meta.alt || self.imageNoteLabel('imageNote')
+                };
+                self.setPendingDraft(source);
+                self.showCreateDialogFromSource(source);
+            });
+            wrapper.appendChild(button);
+            this.imageNoteButtons.push(button);
+        },
+
+        renderImageNotes: function() {
+            var self = this;
+            this.clearImageNotes();
+            var images = Array.prototype.slice.call(this.getContentRoot().querySelectorAll('img'));
+            images.forEach(function(image) {
+                var match = null;
+                for (var index = 0; index < self.annotations.length; index++) {
+                    var annotation = self.annotations[index];
+                    if (!self.isImageAnnotation(annotation)) continue;
+                    var meta = annotation.startMeta.image;
+                    var candidate = self.imageForMeta(meta, annotation.chapter_index);
+                    if (candidate === image) {
+                        match = annotation;
+                        break;
+                    }
+                }
+                self.decorateImageNote(image, match);
+            });
         },
 
         getAnnotationIdFromNode: function(node) {
@@ -1148,10 +1303,11 @@
                 colorOptions.appendChild(btn);
             });
 
-            // Position near the highlighted text
+            // Position near the highlighted text or, for an image note, the image itself.
             var nodes = self.getHighlightNodesByAnnotationId(source.id);
-            if (nodes.length > 0) {
-                var rect = nodes[0].getBoundingClientRect();
+            var sourceNode = nodes[0] || source.imageElement;
+            if (sourceNode && sourceNode.getBoundingClientRect) {
+                var rect = sourceNode.getBoundingClientRect();
                 var dialogW = 240;
                 var dialogH = 140;
                 var left = rect.left + (rect.width - dialogW) / 2;
@@ -1335,6 +1491,7 @@
             StorageManager.create(annotation).then(function() {
                 self.annotations.push(annotation);
                 self.applyHighlightStyles(annotation, self.getHighlightNodesByAnnotationId(annotation.id));
+                if (self.isImageAnnotation(annotation)) self.renderImageNotes();
                 self.clearPendingDraftState();
                 self.closeDialog();
             }).catch(function(err) {
@@ -1380,6 +1537,7 @@
                 if (highlighter) {
                     highlighter.remove(id);
                 }
+                self.renderImageNotes();
             }).catch(function(err) {
                 Utils.showNotification(tr('deleteFailed', { error: err.message }), 'error');
             });
@@ -1554,6 +1712,7 @@
         },
 
         renderHighlight: function(annotation) {
+            if (this.isImageAnnotation(annotation)) return true;
             if (!highlighter || !annotation) return false;
             var root = this.getContentRoot();
             var sections = this.getContinuousChapterSections();
@@ -1652,12 +1811,12 @@
 
         renderAll: function(isRetry) {
             var self = this;
-            if (!highlighter) return Promise.resolve();
             var renderVersion = ++this.renderVersion;
             var isContinuous = this.getContinuousChapterSections().length > 0;
             this.isRendering = true;
             this.cancelPendingDraft();
             this.clearHighlights();
+            this.clearImageNotes();
             var loadAnnotations = isContinuous
                 ? StorageManager.getByBook(currentBookHash)
                 : StorageManager.getByChapter(currentBookHash, currentChapterIndex);
@@ -1668,9 +1827,12 @@
                 }).filter(Boolean).sort(function(a, b) {
                     return (b.text || '').length - (a.text || '').length;
                 });
+                self.renderImageNotes();
                 var failedToRestore = false;
                 self.annotations.forEach(function(annotation) {
-                    if (self.renderHighlight(annotation) === false) failedToRestore = true;
+                    if (!self.isImageAnnotation(annotation) && highlighter && self.renderHighlight(annotation) === false) {
+                        failedToRestore = true;
+                    }
                 });
                 if (!failedToRestore) return;
                 if (!isRetry) {
@@ -2308,6 +2470,7 @@
             HighlightInteraction.cancelPendingDraft();
             HighlightInteraction.closeDialog();
             HighlightInteraction.clearHighlights();
+            HighlightInteraction.clearImageNotes();
             if (highlighter && HighlightInteraction.isListening) {
                 highlighter.stop();
                 HighlightInteraction.isListening = false;

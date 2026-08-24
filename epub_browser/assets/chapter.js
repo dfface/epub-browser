@@ -1571,7 +1571,7 @@ function initScript() {
         xhr.send();
     }
 
-    function setBookTocActiveChapter(index, keepVisible) {
+    function setBookTocActiveChapter(index, keepVisible, focusLink) {
         var list = document.getElementById('bookHomeTocList');
         if (!list) return;
         var active = list.querySelector('.toc-item[data-chapter-index="' + index + '"]');
@@ -1591,6 +1591,13 @@ function initScript() {
             var itemBottom = itemTop + active.offsetHeight;
             if (itemTop < list.scrollTop || itemBottom > list.scrollTop + list.clientHeight) {
                 list.scrollTop = Math.max(0, itemTop - list.clientHeight / 2);
+            }
+        }
+        if (focusLink && activeLink && typeof activeLink.focus === 'function') {
+            try {
+                activeLink.focus({ preventScroll: true });
+            } catch (error) {
+                activeLink.focus();
             }
         }
     }
@@ -1713,6 +1720,7 @@ function initScript() {
     var mobileBookHomeBtn = document.getElementById('mobileBookHomeBtn');
     var tocClose = document.getElementById('tocClose');
     var bookHomeClose = document.getElementById('bookHomeClose');
+    var bookHomeLocateCurrent = document.getElementById('bookHomeLocateCurrent');
     var tocList = document.getElementById('tocList');
     var readerDrawerBackdrop = document.getElementById('readerDrawerBackdrop');
     var readerDrawerOpener = null;
@@ -1801,6 +1809,11 @@ function initScript() {
     bookHomeClose.addEventListener('click', function() {
         closeReaderDrawers(true);
     });
+    if (bookHomeLocateCurrent) {
+        bookHomeLocateCurrent.addEventListener('click', function() {
+            setBookTocActiveChapter(visibleChapterIndex, true, true);
+        });
+    }
     readerDrawerBackdrop.addEventListener('click', function() {
         closeReaderDrawers(true);
     });

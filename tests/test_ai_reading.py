@@ -13,11 +13,13 @@ from epub_browser.ai_reading import (
     AIReadingService,
     ReadingRequest,
     _COMPACT_CHAPTER_CORE_SYSTEM,
+    _COMPACT_CHAPTER_GROUNDING_SYSTEM,
     _ModelTokenBudget,
     _estimate_messages_tokens,
     _estimate_tokens,
     _merge_chapter_layers,
     _normalize_core_result,
+    _normalize_grounding_result,
     _normalize_result,
     _public_ai_job,
     _result_object,
@@ -2418,7 +2420,7 @@ class ResultNormalizationTests(unittest.TestCase):
         chapter_template = template_for("chapter", "chapter")
         book_template = template_for("book", "full_review")
 
-        self.assertEqual(chapter_template["version"], 10)
+        self.assertEqual(chapter_template["version"], 11)
         self.assertIn("chapter_summary", chapter_template["system"])
         self.assertIn("key_elements", chapter_template["system"])
         self.assertEqual(book_template["version"], 5)
@@ -2434,6 +2436,29 @@ class ResultNormalizationTests(unittest.TestCase):
         self.assertNotIn("annotations", core["system"])
         self.assertIn("anchor_quote", grounding["system"])
         self.assertIn("annotations", grounding["system"])
+
+    def test_chapter_grounding_prompts_request_source_language_vocabulary_explanations(self):
+        prompts = (chapter_grounding_template()["system"], _COMPACT_CHAPTER_GROUNDING_SYSTEM)
+
+        for prompt in prompts:
+            with self.subTest(prompt="compact" if prompt == prompts[1] else "full"):
+                normalized = prompt.lower()
+                self.assertIn("vocabulary", normalized)
+                self.assertIn("idiom", normalized)
+                self.assertIn("requested language", normalized)
+
+    def test_grounding_normalization_preserves_a_grounded_vocabulary_item(self):
+        normalized = _normalize_grounding_result(json.dumps({
+            "annotations": [{
+                "chapter_index": 0,
+                "kind": "vocabulary",
+                "quote": "by and large",
+                "title": "by and large",
+                "body_markdown": "Generally; here it means overall. Example: By and large, the plan worked.",
+            }],
+        }))
+
+        self.assertEqual(normalized["annotations"][0]["kind"], "vocabulary")
 
     def test_full_and_compact_core_prompts_encode_the_feynman_contract(self):
         prompts = (

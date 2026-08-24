@@ -292,7 +292,12 @@
     var rect = mark.getBoundingClientRect(); popover.style.top = Math.min(root.innerHeight - popover.offsetHeight - 16, rect.bottom + 12) + 'px'; popover.style.left = Math.min(root.innerWidth - popover.offsetWidth - 16, Math.max(16, rect.left)) + 'px'; state.popover = popover; close.focus();
   }
   function markQuote(article, annotation, index, chapterIndex) {
-    var needle = String(annotation.quote || '').trim(); if (needle.length < 8) return null;
+    var needle = String(annotation.quote || '').trim();
+    // Vocabulary is frequently a short Chinese word, four-character idiom,
+    // or a brief term in another language. Other AI notes retain the longer
+    // anchor threshold to avoid attaching broad claims to an accidental match.
+    var minimumLength = annotation.kind === 'vocabulary' ? 1 : 8;
+    if (needle.length < minimumLength) return null;
     var walker = document.createTreeWalker(article, root.NodeFilter ? root.NodeFilter.SHOW_TEXT : 4), node;
     while ((node = walker.nextNode())) {
       if (!node.parentElement || node.parentElement.closest('.ai-canvas-mark,.ai-native-map,.ai-chapter-guide,.ai-chapter-teach,script,style,noscript')) continue;

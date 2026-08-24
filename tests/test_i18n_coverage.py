@@ -413,6 +413,16 @@ class I18nCoverageTests(unittest.TestCase):
         self.assertEqual(required - set(DICTIONARY_KEY.findall(english)), set())
         self.assertEqual(required - set(DICTIONARY_KEY.findall(chinese)), set())
 
+    def test_image_notes_vocabulary_and_toc_location_are_localized(self):
+        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+        for key in (
+            'annotations.addImageNote',
+            'annotations.imageNote',
+            'ai.annotation.vocabulary',
+            'reader.locateCurrentChapter',
+        ):
+            self.assertEqual(source.count("'" + key + "'"), 5, key)
+
     def test_generation_stage_and_task_limit_copy_exists_in_both_locales(self):
         required = {
             'ai.stage.preparingSource',

@@ -2502,6 +2502,9 @@ document.addEventListener('DOMContentLoaded', function() {{
         <div class="toc-header">
             <h3 data-i18n="reader.bookChapters">Chapters</h3>
             <div class="toc-header-actions">
+                <button class="toc-current-chapter" id="bookHomeLocateCurrent" type="button" aria-label="Locate current chapter" data-i18n-aria-label="reader.locateCurrentChapter">
+                    <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                </button>
                 <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
                     <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
                 </a>

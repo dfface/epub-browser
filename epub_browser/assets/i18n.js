@@ -4492,7 +4492,11 @@
       'settings.navigationBehavior.autoHide': 'Hide down, show up',
       'settings.keyboardNavigation': 'Keyboard navigation',
       'settings.arrowKeyNavigation': 'Use Left and Right Arrow keys to navigate',
-      'settings.spaceKeyNavigation': 'Use Space for the next page or chapter'
+      'settings.spaceKeyNavigation': 'Use Space for the next page or chapter',
+      'reader.locateCurrentChapter': 'Locate current chapter',
+      'annotations.addImageNote': 'Add image note',
+      'annotations.imageNote': 'Image note',
+      'ai.annotation.vocabulary': 'Vocabulary'
     },
     'zh-CN': {
       'annotations.shareActions': '分享标注',
@@ -4517,7 +4521,11 @@
       'settings.navigationBehavior.autoHide': '下滚隐藏，上滚显示',
       'settings.keyboardNavigation': '键盘导航',
       'settings.arrowKeyNavigation': '使用左右方向键导航',
-      'settings.spaceKeyNavigation': '使用空格键前往下一页或下一章'
+      'settings.spaceKeyNavigation': '使用空格键前往下一页或下一章',
+      'reader.locateCurrentChapter': '定位当前章节',
+      'annotations.addImageNote': '添加图片笔记',
+      'annotations.imageNote': '图片笔记',
+      'ai.annotation.vocabulary': '词语讲解'
     },
     'zh-TW': {
       'annotations.shareActions': '分享註釋',
@@ -4542,7 +4550,11 @@
       'settings.navigationBehavior.autoHide': '向下捲動時隱藏，向上捲動時顯示',
       'settings.keyboardNavigation': '鍵盤導覽',
       'settings.arrowKeyNavigation': '使用左右方向鍵導覽',
-      'settings.spaceKeyNavigation': '使用空白鍵前往下一頁或下一章'
+      'settings.spaceKeyNavigation': '使用空白鍵前往下一頁或下一章',
+      'reader.locateCurrentChapter': '定位目前章節',
+      'annotations.addImageNote': '新增圖片筆記',
+      'annotations.imageNote': '圖片筆記',
+      'ai.annotation.vocabulary': '詞語解說'
     },
     ko: {
       'annotations.shareActions': '주석 공유',
@@ -4567,7 +4579,11 @@
       'settings.navigationBehavior.autoHide': '아래로 스크롤하면 숨기고 위로 스크롤하면 표시',
       'settings.keyboardNavigation': '키보드 탐색',
       'settings.arrowKeyNavigation': '왼쪽 및 오른쪽 화살표 키로 이동',
-      'settings.spaceKeyNavigation': '스페이스 키로 다음 페이지 또는 장으로 이동'
+      'settings.spaceKeyNavigation': '스페이스 키로 다음 페이지 또는 장으로 이동',
+      'reader.locateCurrentChapter': '현재 장으로 이동',
+      'annotations.addImageNote': '이미지 메모 추가',
+      'annotations.imageNote': '이미지 메모',
+      'ai.annotation.vocabulary': '어휘 풀이'
     },
     ja: {
       'annotations.shareActions': '注釈を共有',
@@ -4592,7 +4608,11 @@
       'settings.navigationBehavior.autoHide': '下へスクロールで隠し、上へスクロールで表示',
       'settings.keyboardNavigation': 'キーボードナビゲーション',
       'settings.arrowKeyNavigation': '左右の矢印キーで移動',
-      'settings.spaceKeyNavigation': 'スペースキーで次のページまたは章へ進む'
+      'settings.spaceKeyNavigation': 'スペースキーで次のページまたは章へ進む',
+      'reader.locateCurrentChapter': '現在の章を表示',
+      'annotations.addImageNote': '画像メモを追加',
+      'annotations.imageNote': '画像メモ',
+      'ai.annotation.vocabulary': '語句の解説'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

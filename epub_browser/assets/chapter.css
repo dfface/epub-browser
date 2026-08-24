@@ -197,6 +197,7 @@ body.reader-drawer-open {
 }
 
 .toc-book-home,
+.toc-current-chapter,
 .toc-close {
     border: 1px solid transparent;
     background: transparent;
@@ -220,6 +221,14 @@ body.reader-drawer-open {
     text-decoration: none;
 }
 
+.toc-current-chapter {
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 10px;
+    font-size: 1rem;
+}
+
 .toc-close {
     display: inline-grid;
     place-items: center;
@@ -229,12 +238,14 @@ body.reader-drawer-open {
 }
 
 .toc-book-home:hover,
+.toc-current-chapter:hover,
 .toc-close:hover {
     color: var(--button-bg);
     background: var(--hover);
 }
 
 .toc-book-home:focus-visible,
+.toc-current-chapter:focus-visible,
 .toc-close:focus-visible {
     outline: 3px solid var(--button-bg);
     outline-offset: 2px;

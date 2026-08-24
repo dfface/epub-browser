@@ -1838,6 +1838,32 @@ assert.deepEqual(
         self.assertIn('.toc-header-actions', css)
         self.assertIn('min-width: 44px;', css)
 
+    def test_book_toc_can_locate_the_current_chapter(self):
+        html = self._chapter_html()
+        script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="bookHomeLocateCurrent"', html)
+        self.assertIn('data-i18n-aria-label="reader.locateCurrentChapter"', html)
+        self.assertLess(html.index('id="bookHomeLocateCurrent"'), html.index('class="toc-book-home"'))
+        self.assertIn('setBookTocActiveChapter(visibleChapterIndex, true, true)', script)
+
+    def test_image_notes_reuse_annotations_without_a_region_selector(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation.css").read_text(encoding="utf-8")
+
+        self.assertIn('startMeta: { image: source.imageMeta }', script)
+        self.assertIn('endMeta: { image: source.imageMeta }', script)
+        self.assertIn('image-annotation-button', script)
+        self.assertIn('image-annotation-anchor', css)
+        self.assertNotIn('selection rectangle', script.lower())
+
+    def test_ai_vocabulary_marks_accept_short_words_and_idioms(self):
+        script = Path("epub_browser/assets/ai-canvas.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/ai-canvas.css").read_text(encoding="utf-8")
+
+        self.assertIn("annotation.kind === 'vocabulary' ? 1 : 8", script)
+        self.assertIn('data-ai-canvas-kind="vocabulary"', css)
+
     def test_chapter_footer_uses_a_divider_instead_of_a_header_surface(self):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
         footer_rules = css[css.index(".eb-footer {"):css.index("}", css.index(".eb-footer {"))]
