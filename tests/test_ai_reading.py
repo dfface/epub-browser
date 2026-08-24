@@ -2140,6 +2140,85 @@ class ModelContextBudgetTests(unittest.TestCase):
 
 
 class ResultNormalizationTests(unittest.TestCase):
+    def test_compact_core_synopsis_is_valid_json_and_keeps_beats_at_2048(self):
+        core = {
+            "quick": {
+                "title": "A very long opening guide",
+                "summary": "opening context " * 80,
+                "key_points": ["context " * 40],
+            },
+            "teach": {
+                "explanation": "plain explanation " * 80,
+                "analogy": "familiar analogy " * 40,
+                "check_question": "Explain it back in your own words.",
+            },
+            "chapter_summary": {
+                "overview": "A long overview " * 40,
+                "beats": [
+                    {
+                        "label": "Opening",
+                        "title": "First claim",
+                        "summary": "Introduces the central claim.",
+                    },
+                    {
+                        "label": "Turn",
+                        "title": "Counterexample",
+                        "summary": "Challenges the first claim.",
+                    },
+                    {
+                        "label": "Closing",
+                        "title": "Revised conclusion",
+                        "summary": "Resolves the chapter's tension.",
+                    },
+                ],
+                "key_elements": [],
+                "closing": "A long closing " * 40,
+            },
+            "structure": {"overview": "structure " * 80, "nodes": [], "links": []},
+            "deep": {"themes": [], "questions": [], "applications": []},
+        }
+
+        synopsis = AIReadingService._compact_core_synopsis(
+            core, _ModelTokenBudget.from_context_window(2048), "reader-model"
+        )
+        try:
+            parsed = json.loads(synopsis)
+        except json.JSONDecodeError as error:
+            self.fail("compact core synopsis is not valid JSON: {}".format(error))
+
+        beats = parsed["chapter_summary"]["beats"]
+        self.assertEqual(len(beats), 3)
+        self.assertEqual(
+            [set(beat) for beat in beats],
+            [{"title", "summary"}, {"title", "summary"}, {"title", "summary"}],
+        )
+        self.assertTrue(all(beat["title"] and beat["summary"] for beat in beats))
+        self.assertLessEqual(len(synopsis.encode("utf-8")), 2048 // 6)
+
+    def test_core_summary_fallback_does_not_include_rejected_grounding_fields(self):
+        core = _normalize_core_result(json.dumps({
+            "quick": {"title": "Guide", "key_points": []},
+            "teach": {"explanation": "Plain", "analogy": "", "check_question": ""},
+            "chapter_summary": {"overview": "", "beats": [], "key_elements": [], "closing": ""},
+            "structure": {"overview": "", "diagram_mermaid": "", "nodes": [], "links": []},
+            "deep": {"themes": [], "questions": [], "applications": []},
+            "evidence": [{
+                "chapter_index": 0,
+                "quote": "CORE-ONLY-ANCHOR",
+                "reason": "Rejected grounding data",
+            }],
+            "annotations": [{
+                "chapter_index": 0,
+                "kind": "claim",
+                "quote": "CORE-ONLY-ANCHOR",
+                "title": "Rejected",
+                "body_markdown": "Rejected grounding data",
+            }],
+        }))
+
+        self.assertEqual(core["quick"]["summary"], "")
+        self.assertNotIn("CORE-ONLY-ANCHOR", json.dumps(core, ensure_ascii=False))
+
     def test_chapter_core_contract_normalizes_feynman_teach_without_anchor_fields(self):
         core = _normalize_core_result(json.dumps({
             "quick": {"title": "Guide", "summary": "Overview", "key_points": []},

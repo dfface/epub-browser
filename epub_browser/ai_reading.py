@@ -486,7 +486,10 @@ def _normalize_core_result(raw: str) -> dict:
 
     # Reuse the established scalar/list normalization for all non-grounded
     # sections. Beat anchors are deliberately handled above and never copied.
-    reusable = dict(value)
+    reusable = {
+        key: value.get(key)
+        for key in ("quick", "teach", "chapter_summary", "structure", "deep")
+    }
     reusable["chapter_summary"] = {
         **chapter_summary,
         "beats": [
@@ -497,6 +500,8 @@ def _normalize_core_result(raw: str) -> dict:
     normalized = _normalize_result(
         json.dumps(reusable, ensure_ascii=False, separators=(",", ":"))
     )
+    quick = value.get("quick") if isinstance(value.get("quick"), dict) else {}
+    normalized["quick"]["summary"] = _safe_text(quick.get("summary"), 4000)
     teach = value.get("teach") if isinstance(value.get("teach"), dict) else {}
     normalized_summary = normalized["chapter_summary"]
     normalized_summary["beats"] = [
@@ -1578,10 +1583,47 @@ class AIReadingService:
     def _compact_core_synopsis(
         core: dict, budget: _ModelTokenBudget, model: str
     ) -> str:
-        """Bound normalized core context so grounding keeps source space at tiny windows."""
-        synopsis = json.dumps(core, ensure_ascii=False, separators=(",", ":"))
+        """Serialize an always-valid, beat-first synopsis for source grounding."""
         synopsis_budget = max(192, min(2048, budget.context_window // 6))
-        return _truncate_tokens(synopsis, synopsis_budget, model)
+        chapter_summary = core.get("chapter_summary")
+        beats = chapter_summary.get("beats") if isinstance(chapter_summary, dict) else []
+        beat_values = [
+            (
+                _safe_text(beat.get("title"), 240),
+                _safe_text(beat.get("summary"), 2400),
+            )
+            for beat in beats[:8]
+            if isinstance(beat, dict)
+        ] if isinstance(beats, list) else []
+
+        def serialize(scalar_budget: int) -> str:
+            return json.dumps(
+                {
+                    "chapter_summary": {
+                        "beats": [
+                            {
+                                "title": _truncate_tokens(title, scalar_budget, model),
+                                "summary": _truncate_tokens(summary, scalar_budget, model),
+                            }
+                            for title, summary in beat_values
+                        ]
+                    }
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+
+        low, high = 0, synopsis_budget
+        fitted = serialize(0)
+        while low <= high:
+            middle = (low + high) // 2
+            candidate = serialize(middle)
+            if _estimate_tokens(candidate, model) <= synopsis_budget:
+                fitted = candidate
+                low = middle + 1
+            else:
+                high = middle - 1
+        return fitted
 
     @classmethod
     def _fit_prompt_components(
