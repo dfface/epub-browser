@@ -115,6 +115,36 @@ Result: focused share/i18n tests 38 passed; all Node test files passed; generate
 
 The tests verify both thrown browser APIs return rejecting promises and, through the actual Copy action handler, emit the localized `shareCopyFailed` error notification without throwing from the click handler.
 
+## Final review follow-up: export object-URL lifecycle
+
+The final review found that the object URL could remain allocated if anchor setup failed after allocation, or if anchor cleanup itself threw.
+
+### RED
+
+Added focused fault-injection tests for anchor creation failure, append failure, cleanup failure, and an unavailable `URL.revokeObjectURL`, then ran:
+
+```text
+node --test tests/test_annotation_hub.js
+```
+
+Result: 18 passed, 4 failed as expected. The created `blob:private` URLs were not revoked after creation/append errors; a removal failure escaped and suppressed revocation; a missing revoker still allocated a URL.
+
+### GREEN
+
+Required both object-URL capabilities before allocation, started the outer cleanup scope immediately after allocation, and independently guarded anchor removal and revocation. Then ran:
+
+```text
+node --test tests/test_annotation_hub.js tests/test_i18n.js
+node --check epub_browser/assets/annotation-hub.js
+node --check epub_browser/assets/i18n.js
+for test_file in tests/test_*.js; do node --test "$test_file" || exit $?; done
+git diff --check
+```
+
+Result: focused annotation/i18n tests 42 passed; all Node test files passed; syntax and diff checks passed.
+
+The fault-injection tests prove each post-allocation creation, append, and removal error revokes the created URL exactly once. They also prove a missing revoker fails before allocation and the export action emits its localized failure notification.
+
 ## Concerns
 
 Clipboard fallback support depends on the browser's legacy `document.execCommand('copy')` availability when the modern Clipboard API is unavailable or rejected; unavailable, rejected, and synchronous-throw failures are now explicitly localized and announced.

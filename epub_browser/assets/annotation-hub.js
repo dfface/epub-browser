@@ -183,22 +183,27 @@
 
     function downloadShareText(text, filename) {
         var BlobConstructor = root.Blob;
-        if (!BlobConstructor || !root.URL || typeof root.URL.createObjectURL !== 'function' || !root.document || !document.body) {
+        var objectUrl = root.URL;
+        if (!BlobConstructor || !objectUrl || typeof objectUrl.createObjectURL !== 'function' ||
+                typeof objectUrl.revokeObjectURL !== 'function' || !root.document || !document.body) {
             throw new Error('Unable to export share summary');
         }
-        var url = root.URL.createObjectURL(new BlobConstructor([text], { type: 'text/plain;charset=utf-8' }));
-        var link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        if (link.style) link.style.display = 'none';
-        document.body.appendChild(link);
+        var url = objectUrl.createObjectURL(new BlobConstructor([text], { type: 'text/plain;charset=utf-8' }));
+        var link;
         try {
+            link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            if (link.style) link.style.display = 'none';
+            document.body.appendChild(link);
             link.click();
         } finally {
-            if (link.parentNode) link.parentNode.removeChild(link);
-            else if (document.body.removeChild) document.body.removeChild(link);
-            else if (link.remove) link.remove();
-            root.URL.revokeObjectURL(url);
+            try {
+                if (link && link.parentNode) link.parentNode.removeChild(link);
+                else if (link && document.body.removeChild) document.body.removeChild(link);
+                else if (link && link.remove) link.remove();
+            } catch (error) {}
+            try { objectUrl.revokeObjectURL(url); } catch (error) {}
         }
     }
 

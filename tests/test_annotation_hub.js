@@ -268,6 +268,74 @@ test('turns a synchronous legacy copy exception into a localized copy failure', 
   assert.deepEqual(notifications, [['Unable to copy the annotation summary.', 'error']]);
 });
 
+test('revokes an allocated Blob URL when anchor creation fails', async () => {
+  const revoked = [];
+  await withHubGlobals({
+    Blob,
+    URL: { createObjectURL: () => 'blob:private', revokeObjectURL: url => revoked.push(url) },
+    document: { body: {}, createElement: () => { throw new Error('DOM denied'); } },
+  }, async () => {
+    assert.throws(() => Hub.downloadShareText('Private text', 'annotations.txt'), /DOM denied/);
+  });
+  assert.deepEqual(revoked, ['blob:private']);
+});
+
+test('revokes an allocated Blob URL when anchor append fails', async () => {
+  const revoked = [];
+  await withHubGlobals({
+    Blob,
+    URL: { createObjectURL: () => 'blob:private', revokeObjectURL: url => revoked.push(url) },
+    document: {
+      body: { appendChild() { throw new Error('append denied'); } },
+      createElement: () => ({ style: {} }),
+    },
+  }, async () => {
+    assert.throws(() => Hub.downloadShareText('Private text', 'annotations.txt'), /append denied/);
+  });
+  assert.deepEqual(revoked, ['blob:private']);
+});
+
+test('revokes an allocated Blob URL despite anchor cleanup failure', async () => {
+  const revoked = [];
+  const body = { appendChild() {}, removeChild() { throw new Error('remove denied'); } };
+  await withHubGlobals({
+    Blob,
+    URL: { createObjectURL: () => 'blob:private', revokeObjectURL: url => revoked.push(url) },
+    document: { body, createElement: () => ({ style: {}, click() {} }) },
+  }, async () => {
+    assert.doesNotThrow(() => Hub.downloadShareText('Private text', 'annotations.txt'));
+  });
+  assert.deepEqual(revoked, ['blob:private']);
+});
+
+test('does not allocate a Blob URL when revocation is unavailable and export announces failure', async () => {
+  const created = [];
+  const notifications = [];
+  const document = fakeDocument();
+  document.body = { appendChild() {}, removeChild() {} };
+  await withHubGlobals({
+    Blob,
+    URL: { createObjectURL: blob => { created.push(blob); return 'blob:private'; } },
+    document,
+    EpubBrowserI18n: { t: (key, params = {}) => ({
+      'annotations.chapterNumber': `Chapter ${params.number}`,
+      'annotations.annotationCount': `${params.count} annotation`,
+      'annotations.shareActions': 'Share annotations',
+      'annotations.copyShare': 'Copy to clipboard',
+      'annotations.exportShare': 'Export text',
+      'annotations.shareFileFallback': 'Annotations',
+      'annotations.shareExportFailed': 'Unable to export the annotation summary.',
+    }[key] || key) },
+    EpubBrowserNotification: { show: (message, type) => notifications.push([message, type]) },
+  }, async () => {
+    assert.throws(() => Hub.downloadShareText('Private text', 'annotations.txt'), /Unable to export share summary/);
+    const actions = Hub.createShareActions({ title: 'Book' }, [{ chapter_index: 0, text: 'Text' }], []);
+    assert.doesNotThrow(() => actions.children[1].listeners.click());
+  });
+  assert.deepEqual(created, []);
+  assert.deepEqual(notifications, [['Unable to export the annotation summary.', 'error']]);
+});
+
 test('downloads UTF-8 text with a safe deterministic filename and revokes its object URL', async () => {
   const created = [];
   const revoked = [];
