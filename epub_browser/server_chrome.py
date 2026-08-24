@@ -94,7 +94,10 @@ SERVER_ACCOUNT_PANEL = '''
     <section class="account-admin-section account-card-wide account-ai-section" id="adminAiSection" role="tabpanel" aria-labelledby="adminSectionAiTab" data-admin-panel="ai" hidden>
         <h4 id="adminAiTitle" data-i18n="admin.ai.title">AI reading</h4>
         <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and cached results. Selected book text is sent to the configured provider.</p>
-        <form class="account-form admin-ai-settings-form" id="adminAiSettingsForm">
+        <div class="admin-ai-panels">
+        <section class="admin-ai-panel admin-ai-configuration-panel" aria-labelledby="adminAiConfigurationTitle">
+            <h5 id="adminAiConfigurationTitle" data-i18n="admin.ai.configuration">AI configuration</h5>
+            <form class="account-form admin-ai-settings-form" id="adminAiSettingsForm">
             <fieldset class="admin-ai-settings-group admin-ai-connection-group">
                 <legend data-i18n="admin.ai.connection">Connection and model</legend>
                 <label class="admin-ai-enabled"><span data-i18n="admin.ai.enabled">Enable AI reading</span><input type="checkbox" name="enabled"></label>
@@ -118,18 +121,19 @@ SERVER_ACCOUNT_PANEL = '''
                 <label class="admin-ai-clear-key"><input type="checkbox" name="clear_api_key"><span data-i18n="admin.ai.clearKey">Clear stored API key</span></label>
             </fieldset>
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminAiSettingsSubmit" data-i18n="admin.ai.save">Save AI settings</button>
-        </form>
-        <p class="account-section-copy admin-ai-key-notice" data-i18n="admin.ai.keyNotice">The API key is stored in this server's SQLite database and is never returned to the browser.</p>
-        <div class="admin-ai-subsection">
-            <h5 data-i18n="admin.ai.memberAccess">Member AI access</h5>
+            </form>
+            <p class="account-section-copy admin-ai-key-notice" data-i18n="admin.ai.keyNotice">The API key is stored in this server's SQLite database and is never returned to the browser.</p>
+            <div class="admin-ai-cache-actions">
+                <h6 data-i18n="admin.ai.cache">AI result cache</h6>
+                <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearRevision" data-i18n="admin.ai.clearRevision">Clear results for this configuration</button>
+                <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearAll" data-i18n="admin.ai.clearAll">Clear all AI results</button>
+            </div>
+        </section>
+        <section class="admin-ai-panel admin-ai-permissions-panel" aria-labelledby="adminAiPermissionsTitle">
+            <h5 id="adminAiPermissionsTitle" data-i18n="admin.ai.permissions">AI permissions</h5>
             <ul class="account-list" id="adminAiUserList"></ul>
-        </div>
-        <div class="admin-ai-subsection admin-ai-cache-actions">
-            <h5 data-i18n="admin.ai.cache">AI result cache</h5>
-            <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearRevision" data-i18n="admin.ai.clearRevision">Clear results for this configuration</button>
-            <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearAll" data-i18n="admin.ai.clearAll">Clear all AI results</button>
-        </div>
-        <section class="admin-ai-subsection admin-ai-jobs" aria-labelledby="adminAiJobsTitle">
+        </section>
+        <section class="admin-ai-panel admin-ai-jobs" aria-labelledby="adminAiJobsTitle">
             <h5 id="adminAiJobsTitle" data-i18n="admin.ai.jobs.title">AI jobs</h5>
             <p class="account-section-copy" data-i18n="admin.ai.jobs.description">Review shared AI reading jobs and retry eligible failures.</p>
             <div class="account-form admin-ai-jobs-controls">
@@ -147,6 +151,7 @@ SERVER_ACCOUNT_PANEL = '''
             <nav id="adminAiJobsPagination" aria-label="AI job pages" data-i18n-aria-label="admin.ai.jobs.paginationLabel"></nav>
             <p id="adminAiJobsLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
         </section>
+        </div>
     </section>
     <section class="account-admin-section account-card-wide account-tags-section" id="adminTagsSection" role="tabpanel" aria-labelledby="adminSectionTagsTab" data-admin-panel="tags" hidden>
         <h4 id="adminTagsTitle" data-i18n="admin.tags">Tag management</h4>

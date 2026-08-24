@@ -20,6 +20,7 @@ from epub_browser.ai_reading import (
     _normalize_core_result,
     _normalize_result,
     _public_ai_job,
+    _result_object,
     _split_text_by_token_budget,
     _truncate_tokens,
     extract_chapter_text,
@@ -2188,6 +2189,23 @@ class ModelContextBudgetTests(unittest.TestCase):
 
 
 class ResultNormalizationTests(unittest.TestCase):
+    def test_recovers_a_provider_response_with_escaped_json_object_syntax(self):
+        escaped = json.dumps({
+            "quick": {
+                "title": "Escaped guide",
+                "summary": "The structured response remains readable.",
+                "key_points": ["Parsed as structured JSON."],
+            },
+        }).replace('"', r'\"')
+
+        self.assertEqual(_result_object(escaped), {
+            "quick": {
+                "title": "Escaped guide",
+                "summary": "The structured response remains readable.",
+                "key_points": ["Parsed as structured JSON."],
+            },
+        })
+
     def test_public_ai_job_includes_only_safe_stage_progress(self):
         """Readers receive a strict job allowlist, never owner or flight internals."""
         public = _public_ai_job({

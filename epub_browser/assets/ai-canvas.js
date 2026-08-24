@@ -336,7 +336,9 @@
     clearChapter(chapterIndex); state.results[String(chapterIndex)] = result;
     var guide = el('section', 'ai-chapter-guide'); guide.setAttribute('data-ai-chapter-guide', ''); guide.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
     var guideHead = el('header'); var guideTitle = el('div', 'ai-chapter-guide-title'); appendKicker(guideTitle, t('ai.guideKicker'), 'fas fa-wand-magic-sparkles'); guideTitle.appendChild(el('h2', '', result.content.quick && result.content.quick.title || t('ai.chapterRead'))); guideHead.appendChild(guideTitle);
-    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-diagram-project')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideHead.appendChild(mapTrigger); }
+    var guideActions = el('div', 'ai-chapter-guide-actions');
+    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-diagram-project')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideActions.appendChild(mapTrigger); }
+    var regenerateLabel = t('ai.regenerate'), regenerate = el('button', 'ai-guide-map-trigger ai-guide-regenerate'); regenerate.type = 'button'; regenerate.setAttribute('data-ai-canvas-regenerate', ''); regenerate.setAttribute('aria-label', regenerateLabel); regenerate.appendChild(el('i', 'fas fa-rotate-right')); regenerate.appendChild(el('span', '', regenerateLabel)); regenerate.addEventListener('click', function(event) { event.preventDefault(); var context = chapterContext(result.book_id, chapterIndex); confirmRegeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, state.contextVersion)) generate(regenerate, context, state.contextVersion, true); }); }); guideActions.appendChild(regenerate); guideHead.appendChild(guideActions);
     guide.appendChild(guideHead);
     guide.appendChild(el('p', 'ai-chapter-guide-summary', result.content.quick && result.content.quick.summary || ''));
     var points = result.content.quick && result.content.quick.key_points || []; if (points.length) { var list = el('ul', 'ai-chapter-guide-points'); points.slice(0, 4).forEach(function(point) { list.appendChild(el('li', '', point)); }); guide.appendChild(list); }
@@ -375,6 +377,11 @@
     if (root.EpubDialog && typeof root.EpubDialog.confirm === 'function') return root.EpubDialog.confirm({ title: t('ai.generateScopeTitle'), message: message, confirmText: t('ai.generateScopeAction') });
     return Promise.resolve(root.confirm(message));
   }
+  function confirmRegeneration(context) {
+    var message = t('ai.regenerateScopeDescription', { scope: contextScope(context) });
+    if (root.EpubDialog && typeof root.EpubDialog.confirm === 'function') return root.EpubDialog.confirm({ title: t('ai.regenerateScopeTitle'), message: message, confirmText: t('ai.regenerateScopeAction') });
+    return Promise.resolve(root.confirm(message));
+  }
   function watch(button, jobId, context, contextVersion) {
     if (!root.EventSource) return; var source = new root.EventSource('/api/ai/events?job_id=' + encodeURIComponent(jobId));
     state.eventSources.push(source);
@@ -400,7 +407,7 @@
       return result;
     });
   }
-  function generate(button, context, contextVersion) { if (!isCurrentContext(context, contextVersion)) return; var key = String(context.chapterIndex) + ':' + contextVersion; if (state.pending[key]) return; state.pending[key] = true; button.disabled = true; setStatus(button, contextLabel(context) + ' · ' + t('ai.queued', { current: 0, total: 1 })); api('/api/ai/reading', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'chapter', book_id: context.bookId, chapter_index: context.chapterIndex, mode: 'chapter', language: locale(), force: false }) }).then(function(payload) { if (!isCurrentContext(context, contextVersion)) return; if (payload.status === 'complete') { button.disabled = false; delete state.pending[key]; var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else watch(button, payload.job.id, context, contextVersion); }).catch(function(error) { if (!isCurrentContext(context, contextVersion)) return; button.disabled = false; delete state.pending[key]; setStatus(button, t('ai.error.' + (error.code || 'unknown')), true, true); }); }
+  function generate(button, context, contextVersion, force) { if (!isCurrentContext(context, contextVersion)) return; var key = String(context.chapterIndex) + ':' + contextVersion; if (state.pending[key]) return; state.pending[key] = true; button.disabled = true; setStatus(button, contextLabel(context) + ' · ' + t('ai.queued', { current: 0, total: 1 })); api('/api/ai/reading', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'chapter', book_id: context.bookId, chapter_index: context.chapterIndex, mode: 'chapter', language: locale(), force: Boolean(force) }) }).then(function(payload) { if (!isCurrentContext(context, contextVersion)) return; if (payload.status === 'complete') { button.disabled = false; delete state.pending[key]; var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else watch(button, payload.job.id, context, contextVersion); }).catch(function(error) { if (!isCurrentContext(context, contextVersion)) return; button.disabled = false; delete state.pending[key]; setStatus(button, t('ai.error.' + (error.code || 'unknown')), true, true); }); }
   function refresh(chapterIndex) {
     if (!state.initialized || !state.button || document.body.classList.contains('pagination-mode') || document.body.classList.contains('continuous-scroll-mode')) return Promise.resolve(null);
     state.contextVersion += 1;
@@ -452,10 +459,10 @@
         var contextVersion = state.contextVersion;
         load(button, context, contextVersion).then(function(result) {
           if (result || !isCurrentContext(context, contextVersion)) return;
-          return confirmGeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, contextVersion)) generate(button, context, contextVersion); });
+          return confirmGeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, contextVersion)) generate(button, context, contextVersion, false); });
         }).catch(function() {
           if (!isCurrentContext(context, contextVersion)) return;
-          confirmGeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, contextVersion)) generate(button, context, contextVersion); });
+          confirmGeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, contextVersion)) generate(button, context, contextVersion, false); });
         });
       });
     });

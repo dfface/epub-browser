@@ -712,15 +712,45 @@ body.auth-page {
     font-size: .8rem;
 }
 
-.admin-ai-subsection {
-    padding-top: 16px;
-    border-top: 1px solid var(--account-border);
+.admin-ai-panels {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
 }
 
-.admin-ai-subsection h5 {
+.admin-ai-panel {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    min-width: 0;
+    padding: clamp(16px, 2.5vw, 22px);
+    border: 1px solid var(--account-border);
+    border-radius: 12px;
+    background: var(--account-card);
+}
+
+.admin-ai-panel > h5 {
     margin: 0;
     color: var(--account-text);
-    font-size: .86rem;
+    font-size: .95rem;
+}
+
+.admin-ai-cache-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--account-danger) 24%, var(--account-border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--account-danger) 4%, var(--account-card));
+}
+
+.admin-ai-cache-actions h6 {
+    flex: 1 0 100%;
+    margin: 0;
+    color: var(--account-text);
+    font-size: .82rem;
 }
 
 .admin-ai-jobs {
@@ -845,6 +875,7 @@ body.auth-page {
     background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
 }
 
+.admin-ai-jobs-table-scroll,
 .admin-books-table-scroll {
     min-height: 0;
     max-height: none;
@@ -1160,6 +1191,7 @@ body.auth-page {
 }
 
 @media (max-width: 1200px) {
+    .admin-ai-jobs-table-scroll,
     .admin-books-table-scroll {
         overflow-x: auto;
         overflow-y: visible;

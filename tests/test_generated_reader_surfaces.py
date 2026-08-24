@@ -94,6 +94,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         server_html = self._server_html()
         ssg_html = self._library_html()
 
+        for panel_class, panel_id, key in (
+            ('admin-ai-configuration-panel', 'adminAiConfigurationTitle', 'admin.ai.configuration'),
+            ('admin-ai-permissions-panel', 'adminAiPermissionsTitle', 'admin.ai.permissions'),
+            ('admin-ai-jobs', 'adminAiJobsTitle', 'admin.ai.jobs.title'),
+        ):
+            self.assertIn(panel_class, server_html)
+            self.assertRegex(
+                server_html,
+                rf'<(?:section|h5)\b[^>]*(?:id=(?:["\'])?{panel_id}|aria-labelledby=(?:["\'])?{panel_id})',
+            )
+            self.assertIn('data-i18n=' + key, server_html)
         self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminAiJobsTitle')
         self.assertIn('data-i18n=admin.ai.jobs.statusFilter', server_html)
         self.assertIn('data-i18n=admin.ai.jobs.pageSize', server_html)
@@ -136,6 +147,23 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             stylesheet,
             r'@media \(max-width: 720px\)[\s\S]*?'
             r'\.account-admin-table\s*\{[^}]*min-width:\s*56rem;',
+        )
+
+    def test_admin_ai_and_book_tables_use_page_flow_for_the_current_page(self):
+        stylesheet = Path('epub_browser/assets/account.css').read_text(
+            encoding='utf-8'
+        )
+        rule_start = stylesheet.index('.admin-ai-jobs-table-scroll,')
+        table_rule = stylesheet[rule_start:stylesheet.index('}', rule_start)]
+
+        self.assertIn('.admin-books-table-scroll {', table_rule)
+        self.assertIn('min-height: 0;', table_rule)
+        self.assertIn('max-height: none;', table_rule)
+        self.assertIn('overflow: visible;', table_rule)
+        self.assertRegex(
+            stylesheet,
+            r'@media \(max-width: 1200px\)[\s\S]*?'
+            r'\.admin-ai-jobs-table-scroll,\s*\.admin-books-table-scroll\s*\{[^}]*overflow-x:\s*auto;',
         )
 
     def test_shared_server_chrome_clips_accessibility_text_without_removing_it(self):
@@ -1277,18 +1305,24 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ]
         self.assertIn('var article = currentArticleFor(context);', context_guard)
         self.assertNotIn("document.querySelector('#eb-content')", context_guard)
+        self.assertIn('data-ai-canvas-regenerate', canvas_script)
+        self.assertIn('ai-chapter-guide-actions', canvas_script)
+        self.assertIn('function confirmRegeneration(context)', canvas_script)
+        self.assertIn("t('ai.regenerateScopeDescription'", canvas_script)
+        self.assertIn('confirmRegeneration(context).then(function(confirmed)', canvas_script)
         self.assertRegex(
             canvas_script,
-            r'function generate\(button, context, contextVersion\) \{\s*'
+            r'function generate\(button, context, contextVersion, force\) \{\s*'
             r'if \(!isCurrentContext\(context, contextVersion\)\) return;',
         )
         self.assertEqual(
             canvas_script.count(
                 'if (confirmed && isCurrentContext(context, contextVersion)) '
-                'generate(button, context, contextVersion);'
+                'generate(button, context, contextVersion, false);'
             ),
             2,
         )
+        self.assertIn('generate(regenerate, context, state.contextVersion, true);', canvas_script)
 
     def test_chapter_ai_surfaces_render_feynman_teach_only_for_a_chapter_explanation(self):
         """A chapter explanation is a Server-only learning surface, never empty chrome."""

@@ -289,13 +289,25 @@ def _result_object(raw: str) -> dict:
     fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", candidate, re.DOTALL)
     if fenced:
         candidate = fenced.group(1)
-    try:
-        value = json.loads(candidate)
-    except json.JSONDecodeError:
-        value = {}
-    if not isinstance(value, dict):
-        return {}
-    return value
+    parse_candidates = [candidate]
+    if r'\"' in candidate:
+        # Some compatible providers escape the JSON object's structural quotes
+        # instead of returning a JSON object. Recover that response before
+        # falling back to the raw text, which would otherwise look truncated.
+        parse_candidates.append(candidate.replace(r'\"', '"'))
+    for parse_candidate in parse_candidates:
+        try:
+            value = json.loads(parse_candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                continue
+        if isinstance(value, dict):
+            return value
+    return {}
 
 
 def _normalize_result(raw: str) -> dict:

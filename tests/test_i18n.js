@@ -121,6 +121,19 @@ test('localizes every navigation behavior choice and its helper copy', () => {
   });
 });
 
+test('localizes AI administration panels and chapter regeneration in all five locales', () => {
+  const keys = [
+    'admin.ai.configuration',
+    'admin.ai.permissions',
+    'ai.regenerateScopeTitle',
+    'ai.regenerateScopeDescription',
+    'ai.regenerateScopeAction',
+  ];
+  ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
+    keys.forEach(key => assert.ok(dictionaries[locale][key], `${locale}:${key}`));
+  });
+});
+
 test('uses Taiwan product language for navigation AI errors and destructive actions', () => {
   const traditional = dictionaries['zh-TW'];
   assert.deepEqual({
