@@ -1212,6 +1212,48 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(joined["job"]["id"], "already-running")
         self.assertEqual(_FakeClient.calls, [])
 
+    async def test_force_chapter_submission_creates_and_charges_a_distinct_active_job(self):
+        _BlockingClient.calls = []
+        _BlockingClient.started = threading.Event()
+        _BlockingClient.release = threading.Event()
+        normal_service = AIReadingService(
+            self.store, self.root / "public", _BlockingClient
+        )
+        try:
+            normal = await normal_service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            for _ in range(100):
+                if _BlockingClient.started.is_set():
+                    break
+                await asyncio.sleep(0.01)
+            self.assertTrue(_BlockingClient.started.is_set())
+
+            forced = await self.service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0,
+                    force=True,
+                ),
+            )
+
+            self.assertFalse(forced["shared"])
+            self.assertNotEqual(forced["job"]["id"], normal["job"]["id"])
+            _BlockingClient.release.set()
+            self.assertEqual(
+                (await self._wait_for_job(normal["job"]["id"]))["status"], "complete"
+            )
+            self.assertEqual(
+                (await self._wait_for_job(forced["job"]["id"]))["status"], "complete"
+            )
+            self.assertEqual(self._reading_tasks(self.member.user_id), 2)
+        finally:
+            _BlockingClient.release.set()
+            await normal_service.stop_worker()
+
     async def test_background_worker_claims_a_durable_sqlite_job(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
         material, _metadata, progress_total, _segments = self.service._material_for_request(self.member, request)

@@ -599,6 +599,15 @@ class AIReadingService:
             )
         )
 
+    @staticmethod
+    def _force_job_cache_key(cache_key: str, job_id: str) -> str:
+        """Give a forced regeneration a private durable-flight identity."""
+        return f"{cache_key}:force:{job_id}"
+
+    @staticmethod
+    def _is_force_job_cache_key(cache_key: str, job_id: str) -> bool:
+        return cache_key.endswith(f":force:{job_id}")
+
     def _material_for_request(
         self, principal: Principal, request: ReadingRequest
     ) -> tuple[str, dict, int, tuple[tuple[int, str], ...]]:
@@ -716,11 +725,16 @@ class AIReadingService:
             "force": request.force,
             "reading_boundary": self._reading_boundary(principal, request),
         }
+        job_cache_key = (
+            self._force_job_cache_key(cache_key, job_id)
+            if request.force
+            else cache_key
+        )
         job, created = self.store.create_or_get_active_ai_job(
             job_id,
             principal.user_id,
             request.book_id,
-            cache_key,
+            job_cache_key,
             progress_total=progress_total,
             request_payload=queued_request,
             profile=profile,
@@ -941,7 +955,12 @@ class AIReadingService:
             # durable job runs. Its digest, rather than the enqueue-time
             # snapshot, is therefore the only safe identity for a result.
             cache_key = self._cache_key(request, material, profile, template)
-            if not self.store.rekey_running_ai_job(job["id"], cache_key):
+            job_cache_key = (
+                self._force_job_cache_key(cache_key, job["id"])
+                if self._is_force_job_cache_key(job["cache_key"], job["id"])
+                else cache_key
+            )
+            if not self.store.rekey_running_ai_job(job["id"], job_cache_key):
                 raise AIReadingError("ai_generation_failed")
             cached = self.store.get_current_ai_reading_result(cache_key)
             if cached is not None and not request.force:
