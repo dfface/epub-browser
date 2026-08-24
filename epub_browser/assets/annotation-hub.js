@@ -141,32 +141,38 @@
 
     function copyWithSelection(text) {
         if (!root.document || !document.body || !document.execCommand) return false;
-        var textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.setAttribute('readonly', '');
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
+        var textarea;
         try {
+            textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
             textarea.select();
             return document.execCommand('copy');
+        } catch (error) {
+            return false;
         } finally {
-            if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
-            else if (document.body.removeChild) document.body.removeChild(textarea);
-            else if (textarea.remove) textarea.remove();
+            try {
+                if (textarea && textarea.parentNode) textarea.parentNode.removeChild(textarea);
+                else if (textarea && document.body.removeChild) document.body.removeChild(textarea);
+                else if (textarea && textarea.remove) textarea.remove();
+            } catch (error) {}
         }
     }
 
     function copyShareText(text) {
         var clipboard = root.navigator && root.navigator.clipboard;
-        if (clipboard && typeof clipboard.writeText === 'function') {
-            return Promise.resolve(clipboard.writeText(text)).catch(function() {
-                if (copyWithSelection(text)) return undefined;
-                throw new Error('Unable to copy share summary');
+        function fallback() {
+            return Promise.resolve().then(function() {
+                if (!copyWithSelection(text)) throw new Error('Unable to copy share summary');
             });
         }
-        if (copyWithSelection(text)) return Promise.resolve();
-        return Promise.reject(new Error('Unable to copy share summary'));
+        if (clipboard && typeof clipboard.writeText === 'function') {
+            return Promise.resolve().then(function() { return clipboard.writeText(text); }).catch(fallback);
+        }
+        return fallback();
     }
 
     function shareFilename(title, fallback) {

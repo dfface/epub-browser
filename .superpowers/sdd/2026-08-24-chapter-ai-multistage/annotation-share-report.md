@@ -85,9 +85,39 @@ Result: passed.
 - Confirmed all five runtime dictionaries have identical shape and interpolation-token parity.
 - No Server content-cache schema or revision changed because this is UI/runtime data only.
 
+## Review follow-up: synchronous copy failures
+
+The post-implementation review found that synchronous throws from `navigator.clipboard.writeText` and the legacy `document.execCommand('copy')` fallback could escape before the Copy action attached its localized error handler.
+
+### RED
+
+Added two focused behavioral tests in `tests/test_annotation_hub.js`, then ran:
+
+```text
+node --test tests/test_annotation_hub.js
+```
+
+Result: 16 passed, 2 failed as expected. The new tests showed synchronous `clipboard denied` and `legacy denied` errors escaping `Hub.copyShareText` rather than producing rejecting promises and the existing localized notification.
+
+### GREEN
+
+Made both branches promise-based, contained every fallback exception as a failed copy result, and reran:
+
+```text
+node --test tests/test_annotation_hub.js tests/test_i18n.js
+node --check epub_browser/assets/annotation-hub.js
+for test_file in tests/test_*.js; do node --test "$test_file" || exit $?; done
+python3 -m unittest tests.test_generated_reader_surfaces tests.test_i18n_coverage -v
+git diff --check
+```
+
+Result: focused share/i18n tests 38 passed; all Node test files passed; generated-surface/i18n guards 110 passed; syntax and diff checks passed.
+
+The tests verify both thrown browser APIs return rejecting promises and, through the actual Copy action handler, emit the localized `shareCopyFailed` error notification without throwing from the click handler.
+
 ## Concerns
 
-None. Clipboard fallback support depends on the browser's legacy `document.execCommand('copy')` availability when the modern Clipboard API is unavailable or rejected; failure is explicitly localized and announced.
+Clipboard fallback support depends on the browser's legacy `document.execCommand('copy')` availability when the modern Clipboard API is unavailable or rejected; unavailable, rejected, and synchronous-throw failures are now explicitly localized and announced.
 
 ## Commit
 

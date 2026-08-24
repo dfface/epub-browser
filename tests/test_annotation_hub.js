@@ -207,6 +207,67 @@ test('reports clipboard fallback failure to the caller', async () => {
   });
 });
 
+test('turns a synchronous Clipboard API exception into a localized copy failure', async () => {
+  const notifications = [];
+  let copy;
+  await withHubGlobals({
+    document: fakeDocument(),
+    navigator: { clipboard: { writeText() { throw new Error('clipboard denied'); } } },
+    EpubBrowserI18n: { t: (key, params = {}) => ({
+      'annotations.chapterNumber': `Chapter ${params.number}`,
+      'annotations.annotationCount': `${params.count} annotation`,
+      'annotations.shareActions': 'Share annotations',
+      'annotations.copyShare': 'Copy to clipboard',
+      'annotations.exportShare': 'Export text',
+      'annotations.shareCopyFailed': 'Unable to copy the annotation summary.',
+    }[key] || key) },
+    EpubBrowserNotification: { show: (message, type) => notifications.push([message, type]) },
+  }, async () => {
+    assert.doesNotThrow(() => { copy = Hub.copyShareText('Plain text'); });
+    await assert.rejects(copy, /Unable to copy share summary/);
+
+    const actions = Hub.createShareActions({ title: 'Book' }, [{ chapter_index: 0, text: 'Text' }], []);
+    assert.doesNotThrow(() => actions.children[0].listeners.click());
+    await new Promise(resolve => setImmediate(resolve));
+  });
+  assert.deepEqual(notifications, [['Unable to copy the annotation summary.', 'error']]);
+});
+
+test('turns a synchronous legacy copy exception into a localized copy failure', async () => {
+  const notifications = [];
+  let copy;
+  const document = fakeDocument();
+  document.body = { appendChild() {}, removeChild() {} };
+  const createElement = document.createElement;
+  document.createElement = tagName => {
+    const node = createElement(tagName);
+    node.select = () => {};
+    return node;
+  };
+  document.execCommand = () => { throw new Error('legacy denied'); };
+  await withHubGlobals({
+    document,
+    navigator: {},
+    EpubBrowserI18n: { t: (key, params = {}) => ({
+      'annotations.chapterNumber': `Chapter ${params.number}`,
+      'annotations.annotationCount': `${params.count} annotation`,
+      'annotations.shareActions': 'Share annotations',
+      'annotations.copyShare': 'Copy to clipboard',
+      'annotations.exportShare': 'Export text',
+      'annotations.shareCopyFailed': 'Unable to copy the annotation summary.',
+    }[key] || key) },
+    EpubBrowserNotification: { show: (message, type) => notifications.push([message, type]) },
+  }, async () => {
+    assert.doesNotThrow(() => { copy = Hub.copyShareText('Plain text'); });
+    await assert.rejects(copy, /Unable to copy share summary/);
+
+    const actions = Hub.createShareActions({ title: 'Book' }, [{ chapter_index: 0, text: 'Text' }], []);
+    assert.doesNotThrow(() => actions.children[0].listeners.click());
+    await new Promise(resolve => setImmediate(resolve));
+  });
+  assert.deepEqual(notifications, [['Unable to copy the annotation summary.', 'error']]);
+});
+
 test('downloads UTF-8 text with a safe deterministic filename and revokes its object URL', async () => {
   const created = [];
   const revoked = [];
