@@ -1255,7 +1255,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('guide.nextSibling', teach_renderer)
         self.assertIn(".ai-chapter-teach,script,style,noscript", canvas)
 
-    def test_empty_feynman_explanations_create_no_canvas_or_drawer_surface(self):
+    def test_feynman_renderers_preserve_empty_and_populated_paragraph_semantics(self):
         fixture = r'''
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -1268,16 +1268,17 @@ function element(tagName) {
     appendChild(child) { child.parentNode = this; this.children.push(child); this.childNodes.push(child); return child; },
     insertBefore(child, reference) { const index = reference ? this.children.indexOf(reference) : -1; child.parentNode = this; if (index < 0) return this.appendChild(child); this.children.splice(index, 0, child); this.childNodes.splice(index, 0, child); return child; },
     setAttribute(name, value) { this.attributes[name] = String(value); },
-    getAttribute(name) { return this.attributes[name] || null; },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; },
     addEventListener() {},
     querySelector(selector) { return findAll(this, selector)[0] || null; },
     querySelectorAll(selector) { return findAll(this, selector); },
   };
-  Object.defineProperty(node, 'textContent', { get() { return ''; }, set() { node.children = []; node.childNodes = []; } });
+  Object.defineProperty(node, 'textContent', { get() { return node._textContent || ''; }, set(value) { node._textContent = String(value || ''); node.children = []; node.childNodes = []; } });
   return node;
 }
 
 function matches(node, selector) {
+  if (!node || typeof node.getAttribute !== 'function') return false;
   if (selector.charAt(0) === '.') return node.className.split(/\s+/).includes(selector.slice(1));
   if (selector === '[data-ai-chapter-teach]') return node.getAttribute('data-ai-chapter-teach') !== null;
   const guide = selector.match(/^\[data-ai-chapter-guide\]\[data-ai-canvas-chapter="(.*)"\]$/);
@@ -1286,7 +1287,7 @@ function matches(node, selector) {
 
 function findAll(node, selector) {
   const found = [];
-  node.children.forEach(child => {
+  (node.children || []).forEach(child => {
     if (matches(child, selector)) found.push(child);
     found.push(...findAll(child, selector));
   });
@@ -1312,6 +1313,58 @@ assert.equal(canvasArticle.querySelector('[data-ai-chapter-teach]'), null);
 const drawerBody = element('div');
 window.__testAddResult(drawerBody, result);
 assert.equal(drawerBody.querySelector('.ai-reading-teach'), null);
+
+const populated = { id: 'populated-teach', content: {
+  teach: {
+    explanation: 'First plain paragraph.\n\nSecond plain paragraph.\n\nThird plain paragraph.\n\nFourth plain paragraph.\n\nFifth must be capped.',
+    analogy: 'Everyday analogy.',
+    check_question: 'Can you teach it back?'
+  },
+  quick: { title: 'Guide', summary: 'Summary', key_points: [] },
+  chapter_summary: {}, structure: { overview: '', nodes: [] }, deep: {}, evidence: []
+} };
+const populatedArticle = element('article');
+window.__testAppendTeach(populatedArticle, populated, 2);
+const canvasTeach = populatedArticle.querySelector('[data-ai-chapter-teach]');
+assert.ok(canvasTeach);
+assert.deepEqual(
+  canvasTeach.children.map(child => child.tagName),
+  ['HEADER', 'P', 'P', 'P', 'P', 'DIV', 'DIV']
+);
+assert.deepEqual(
+  canvasTeach.querySelectorAll('.ai-chapter-teach-explanation').map(child => child.textContent),
+  ['First plain paragraph.', 'Second plain paragraph.', 'Third plain paragraph.', 'Fourth plain paragraph.']
+);
+assert.equal(canvasTeach.children[5].children[1].textContent, 'Everyday analogy.');
+assert.equal(canvasTeach.children[6].children[1].textContent, 'Can you teach it back?');
+
+const stale = element('aside');
+drawerBody.appendChild(stale);
+window.__testAddResult(drawerBody, populated);
+assert.equal(drawerBody.children.includes(stale), false);
+const drawerTeach = drawerBody.querySelector('.ai-reading-teach');
+assert.deepEqual(
+  drawerTeach.children.map(child => child.tagName),
+  ['H4', 'P', 'P', 'P', 'P', 'H5', 'P', 'H5', 'P']
+);
+assert.deepEqual(
+  drawerTeach.querySelectorAll('.ai-reading-teach-explanation').map(child => child.textContent),
+  ['First plain paragraph.', 'Second plain paragraph.', 'Third plain paragraph.', 'Fourth plain paragraph.']
+);
+assert.equal(drawerTeach.children[6].textContent, 'Everyday analogy.');
+assert.equal(drawerTeach.children[8].textContent, 'Can you teach it back?');
+
+const explanationOnly = { id: 'explanation-only', content: {
+  teach: { explanation: 'Only paragraph.', analogy: '', check_question: '' },
+  quick: { title: '', summary: '', key_points: [] },
+  chapter_summary: {}, structure: { overview: '', nodes: [] }, deep: {}, evidence: []
+} };
+window.__testAddResult(drawerBody, explanationOnly);
+assert.equal(drawerBody.children.includes(drawerTeach), false);
+assert.deepEqual(
+  drawerBody.querySelector('.ai-reading-teach').children.map(child => child.tagName),
+  ['H4', 'P']
+);
 '''
         result = subprocess.run(
             ['node', '-e', fixture],

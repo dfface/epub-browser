@@ -12,6 +12,7 @@ from epub_browser.ai_reading import (
     AIReadingError,
     AIReadingService,
     ReadingRequest,
+    _COMPACT_CHAPTER_CORE_SYSTEM,
     _ModelTokenBudget,
     _estimate_messages_tokens,
     _estimate_tokens,
@@ -1845,6 +1846,16 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completed["status"], "complete")
         self.assertEqual(self._reading_tasks(self.member.user_id), 1)
 
+    async def test_admin_retry_of_a_pre_reservation_failure_does_not_charge_member(self):
+        source = self._create_failed_reading_job("pre-reservation-failure")
+        self.assertEqual(self._reading_tasks(self.member.user_id), 0)
+
+        retried = await self.service.retry_job(self.owner, source["id"])
+        completed = await self._wait_for_job(retried["job"]["id"])
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(self._reading_tasks(self.member.user_id), 0)
+
     async def test_cancellation_while_waiting_for_concurrency_does_not_charge_quota(self):
         _BlockingClient.calls = []
         _BlockingClient.started = threading.Event()
@@ -2142,15 +2153,45 @@ class ModelContextBudgetTests(unittest.TestCase):
 
 class ResultNormalizationTests(unittest.TestCase):
     def test_public_ai_job_includes_only_safe_stage_progress(self):
-        """Readers receive the durable stage, never the private replay payload."""
+        """Readers receive a strict job allowlist, never owner or flight internals."""
         public = _public_ai_job({
             "id": "job",
+            "owner_user_id": "private-member-id",
+            "book_id": "book",
+            "cache_key": "private-cache-key",
             "request_json": "secret",
+            "status": "running",
+            "error_code": "provider_rate_limited",
+            "result_id": None,
+            "progress_current": 1,
+            "progress_total": 3,
+            "quota_reserved": 1,
             "generation_stage": "generating_core",
+            "attempt_number": 2,
+            "retried_from_job_id": "private-source",
+            "retry_root_job_id": "private-root",
+            "retried_by_user_id": "private-admin",
+            "created_at": "2026-08-24 12:00:00",
+            "updated_at": "2026-08-24 12:01:00",
         })
 
-        self.assertEqual(public["generation_stage"], "generating_core")
-        self.assertNotIn("request_json", public)
+        self.assertEqual(public, {
+            "id": "job",
+            "book_id": "book",
+            "result_id": None,
+            "status": "running",
+            "error_code": "provider_rate_limited",
+            "progress_current": 1,
+            "progress_total": 3,
+            "generation_stage": "generating_core",
+            "created_at": "2026-08-24 12:00:00",
+            "updated_at": "2026-08-24 12:01:00",
+        })
+
+    def test_public_ai_job_drops_non_allowlisted_error_codes(self):
+        public = _public_ai_job({"id": "job", "error_code": "private:/secret"})
+
+        self.assertIsNone(public["error_code"])
 
     def test_compact_core_synopsis_is_valid_json_and_keeps_beats_at_2048(self):
         core = {
@@ -2323,7 +2364,7 @@ class ResultNormalizationTests(unittest.TestCase):
         chapter_template = template_for("chapter", "chapter")
         book_template = template_for("book", "full_review")
 
-        self.assertEqual(chapter_template["version"], 9)
+        self.assertEqual(chapter_template["version"], 10)
         self.assertIn("chapter_summary", chapter_template["system"])
         self.assertIn("key_elements", chapter_template["system"])
         self.assertEqual(book_template["version"], 5)
@@ -2339,6 +2380,21 @@ class ResultNormalizationTests(unittest.TestCase):
         self.assertNotIn("annotations", core["system"])
         self.assertIn("anchor_quote", grounding["system"])
         self.assertIn("annotations", grounding["system"])
+
+    def test_full_and_compact_core_prompts_encode_the_feynman_contract(self):
+        prompts = (
+            chapter_core_template()["system"],
+            _COMPACT_CHAPTER_CORE_SYSTEM,
+        )
+
+        for prompt in prompts:
+            with self.subTest(prompt="compact" if prompt == prompts[1] else "full"):
+                normalized = prompt.lower().replace("–", "-")
+                self.assertIn("two to four short paragraphs", normalized)
+                self.assertIn("define unavoidable jargon immediately", normalized)
+                self.assertIn("only claims supported by the supplied source", normalized)
+                self.assertIn("analogy is optional", normalized)
+                self.assertIn("teach-back question", normalized)
 
     def test_chapter_prompt_uses_distinct_profile_guidance(self):
         template = template_for("chapter", "chapter")

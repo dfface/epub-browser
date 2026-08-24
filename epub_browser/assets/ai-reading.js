@@ -322,6 +322,12 @@
     if (focusReturn && typeof focusReturn.focus === 'function') focusReturn.focus();
   }
 
+  function explanationParagraphs(value) {
+    return String(value || '').trim().split(/\n\s*\n+/).map(function(paragraph) {
+      return paragraph.trim();
+    }).filter(Boolean).slice(0, 4);
+  }
+
   function addResult(result) {
     if (evidenceMarks.length && evidenceResultId !== result.id) clearEvidenceMarks();
     var body = panel.querySelector('.ai-reading-body');
@@ -332,13 +338,14 @@
     var structure = content.structure || {};
     var deep = content.deep || {};
     var teach = content.teach || {};
+    var teachParagraphs = explanationParagraphs(teach.explanation);
     body.appendChild(el('h3', 'ai-reading-result-title', quick.title || t('ai.result')));
     body.appendChild(el('p', 'ai-reading-summary', quick.summary || ''));
     addList(body, 'ai.quickPoints', quick.key_points || []);
-    if (teach.explanation) {
+    if (teachParagraphs.length) {
       var teachSection = el('section', 'ai-reading-teach');
       teachSection.appendChild(el('h4', '', t('ai.teachTitle')));
-      teachSection.appendChild(el('p', 'ai-reading-teach-explanation', teach.explanation));
+      teachParagraphs.forEach(function(paragraph) { teachSection.appendChild(el('p', 'ai-reading-teach-explanation', paragraph)); });
       if (teach.analogy) { teachSection.appendChild(el('h5', '', t('ai.teachAnalogy'))); teachSection.appendChild(el('p', '', teach.analogy)); }
       if (teach.check_question) { teachSection.appendChild(el('h5', '', t('ai.teachCheck'))); teachSection.appendChild(el('p', '', teach.check_question)); }
       body.appendChild(teachSection);

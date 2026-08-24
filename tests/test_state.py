@@ -2254,6 +2254,82 @@ class StateStoreTests(unittest.TestCase):
             )
             self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
 
+    def test_admin_retry_of_migrated_v11_failed_root_is_quota_exempt(self):
+        member = self.store.create_user(
+            "migrated-reader", hash_password("migrated-secret"), role="member"
+        )
+        self.store.set_ai_settings(
+            enabled=True,
+            base_url="https://provider.example/v1",
+            api_key="secret-key",
+            model="reader-model",
+            timeout_seconds=60,
+            max_concurrency=2,
+            daily_limit=20,
+        )
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=10)
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "migrated-retry.epub"),
+            "urn:test:migrated-retry", "migrated-retry", {"title": "Migrated"},
+        )
+        request = {
+            "book_id": book.book_id,
+            "scope": "chapter",
+            "mode": "chapter",
+            "language": "en",
+            "chapter_index": 0,
+            "reading_boundary": 0,
+        }
+        self.store.create_ai_job(
+            "migrated-failed-root", member.user_id, "migrated-old-cache",
+            book_id=book.book_id, request_payload=request,
+        )
+        self.assertTrue(self.store.start_ai_job("migrated-failed-root"))
+        self.assertTrue(self.store.finish_ai_job(
+            "migrated-failed-root", error_code="provider_failed"
+        ))
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("ALTER TABLE ai_usage DROP COLUMN reading_tasks")
+            connection.execute("ALTER TABLE ai_reading_jobs DROP COLUMN quota_reserved")
+            connection.execute("ALTER TABLE ai_reading_jobs DROP COLUMN generation_stage")
+            connection.execute("PRAGMA user_version = 11")
+
+        migrated = StateStore(self.database)
+        migrated.initialize()
+        revision = migrated.get_ai_settings()["config_revision"]
+        retried, created = migrated.create_or_get_admin_retry_ai_job(
+            source_job_id="migrated-failed-root",
+            job_id="migrated-admin-retry",
+            retried_by_user_id=self.owner.user_id,
+            owner_user_id=member.user_id,
+            book_id=book.book_id,
+            cache_key="migrated-current-cache",
+            request_payload=request,
+            progress_total=2,
+            profile="auto",
+            book_profile_selection="auto",
+            config_revision=revision,
+            template_id="reading",
+            template_version=1,
+        )
+
+        self.assertTrue(created)
+        self.assertEqual(retried["retry_root_job_id"], "migrated-failed-root")
+        self.assertTrue(migrated.reserve_ai_reading_task(
+            "migrated-failed-root", member, "2026-08-24"
+        ))
+        with migrated._connection() as connection:
+            usage = connection.execute(
+                "SELECT COALESCE(SUM(reading_tasks), 0) FROM ai_usage WHERE user_id = ?",
+                (member.user_id,),
+            ).fetchone()[0]
+            quota_reserved = connection.execute(
+                "SELECT quota_reserved FROM ai_reading_jobs WHERE id = ?",
+                ("migrated-failed-root",),
+            ).fetchone()[0]
+        self.assertEqual(usage, 0)
+        self.assertEqual(quota_reserved, 1)
+
     def test_reading_task_reservation_is_idempotent_for_one_job(self):
         member = self.store.create_user("reader", "hash", role="member")
         self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)

@@ -1294,19 +1294,93 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(deleted_own.json(), {"deleted": member_result["id"]})
         self.assertEqual(deleted_other.json(), {"deleted": admin_result["id"]})
 
-    def test_authorized_member_can_poll_a_shared_ai_generation_job(self):
+    def test_second_member_poll_and_sse_receive_only_safe_shared_job_fields(self):
         book = self.store.resolve_book(
             Path(self.directory.name) / "shared-job.epub",
             "urn:test:shared-job", "shared-job-fingerprint", {"title": "Book"},
         )
+        second_member = self.store.create_user(
+            "second-member", hash_password("second-secret")
+        )
+        second_client = self._login("second-member", "second-secret")
         self.store.create_ai_job(
-            "shared-generation", self.admin.user_id, "chapter:shared", book_id=book.book_id,
+            "shared-generation", self.member.user_id, "private:chapter:shared",
+            book_id=book.book_id,
+            request_payload={"private": "replay"},
+            profile="technical", template_id="private-template",
+            template_version=99,
+        )
+        self.assertTrue(self.store.start_ai_job("shared-generation"))
+        self.assertTrue(self.store.update_ai_job_progress(
+            "shared-generation", 1, 3, generation_stage="generating_core"
+        ))
+
+        response = second_client.get("/api/ai/jobs/shared-generation")
+        headers, chunk = _first_sse_chunk(
+            self.app,
+            "/api/ai/events?job_id=shared-generation",
+            second_client.cookies.get("epub_browser_session"),
         )
 
-        response = self.member_client.get("/api/ai/jobs/shared-generation")
-
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["job"]["book_id"], book.book_id)
+        polled = response.json()["job"]
+        streamed = json.loads(chunk.split("data: ", 1)[1])["job"]
+        safe_fields = {
+            "id", "book_id", "result_id", "status", "error_code",
+            "progress_current", "progress_total", "generation_stage",
+            "created_at", "updated_at",
+        }
+        self.assertEqual(set(polled), safe_fields)
+        self.assertEqual(set(streamed), safe_fields)
+        self.assertEqual(polled["book_id"], book.book_id)
+        self.assertEqual(polled["generation_stage"], "generating_core")
+        self.assertEqual(streamed["generation_stage"], "generating_core")
+        self.assertEqual(headers["status"], 200)
+        for private_value in (
+            self.member.user_id, "private:chapter:shared", "private-template", "replay",
+        ):
+            self.assertNotIn(private_value, response.text)
+            self.assertNotIn(private_value, chunk)
+
+        result = self.store.store_ai_reading_result(
+            cache_key="private:result:cache",
+            book_id=book.book_id,
+            chapter_index=0,
+            scope="chapter",
+            mode="chapter",
+            profile="technical",
+            config_revision=17,
+            content={"quick": {"title": "Shared learning"}},
+            created_by_user_id=self.member.user_id,
+            template_id="private-result-template",
+            template_version=99,
+            language="en",
+            reading_boundary=0,
+        )
+        self.assertTrue(self.store.finish_ai_job(
+            "shared-generation", result_id=result["id"]
+        ))
+        completed_response = second_client.get("/api/ai/jobs/shared-generation")
+        _completed_headers, completed_chunk = _first_sse_chunk(
+            self.app,
+            "/api/ai/events?job_id=shared-generation",
+            second_client.cookies.get("epub_browser_session"),
+        )
+        completed_poll = completed_response.json()["result"]
+        completed_stream = json.loads(
+            completed_chunk.split("data: ", 1)[1]
+        )["result"]
+        safe_result_fields = {"id", "book_id", "chapter_index", "content"}
+        self.assertEqual(set(completed_poll), safe_result_fields)
+        self.assertEqual(set(completed_stream), safe_result_fields)
+        self.assertEqual(completed_poll["content"]["quick"]["title"], "Shared learning")
+        for private_value in (
+            self.member.user_id,
+            "private:result:cache",
+            "private-result-template",
+        ):
+            self.assertNotIn(private_value, completed_response.text)
+            self.assertNotIn(private_value, completed_chunk)
 
     def test_ai_job_events_emit_durable_terminal_state_with_sse_headers(self):
         book = self.store.resolve_book(

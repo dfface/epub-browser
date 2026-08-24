@@ -313,12 +313,19 @@
     var list = el('ol', 'ai-chapter-reflection-list'); questions.slice(0, 3).forEach(function(item) { var entry = el('li', 'ai-reflection-question'); entry.appendChild(el('strong', '', item.question || '')); if (item.why) entry.appendChild(el('p', '', item.why)); list.appendChild(entry); }); reflection.appendChild(list);
     article.appendChild(reflection); state.reflection = reflection;
   }
+  function explanationParagraphs(value) {
+    return String(value || '').trim().split(/\n\s*\n+/).map(function(paragraph) {
+      return paragraph.trim();
+    }).filter(Boolean).slice(0, 4);
+  }
   function appendTeach(article, result, chapterIndex) {
     var teach = result.content && result.content.teach || {};
     if (!teach.explanation) return;
+    var paragraphs = explanationParagraphs(teach.explanation);
+    if (!paragraphs.length) return;
     var section = el('section', 'ai-chapter-teach'); section.setAttribute('data-ai-chapter-teach', ''); section.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
     var head = el('header'); appendKicker(head, t('ai.teachKicker'), 'fas fa-graduation-cap'); head.appendChild(el('h2', '', t('ai.teachTitle'))); section.appendChild(head);
-    section.appendChild(el('p', 'ai-chapter-teach-explanation', teach.explanation));
+    paragraphs.forEach(function(paragraph) { section.appendChild(el('p', 'ai-chapter-teach-explanation', paragraph)); });
     if (teach.analogy) { var analogy = el('div', 'ai-chapter-teach-detail'); analogy.appendChild(el('h3', '', t('ai.teachAnalogy'))); analogy.appendChild(el('p', '', teach.analogy)); section.appendChild(analogy); }
     if (teach.check_question) { var check = el('div', 'ai-chapter-teach-detail'); check.appendChild(el('h3', '', t('ai.teachCheck'))); check.appendChild(el('p', '', teach.check_question)); section.appendChild(check); }
     var guide = article.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + chapterIndex + '"]');

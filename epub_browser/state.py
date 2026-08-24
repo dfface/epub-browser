@@ -3583,6 +3583,14 @@ class StateStore:
                 job = self._get_admin_ai_job(connection, existing["id"])
                 connection.execute("COMMIT")
                 return job, False
+            # An administrator-triggered retry is exempt from the member's
+            # reading-task allowance. Persist that exemption on the lineage
+            # root that workers reserve, in the same transaction as the new
+            # attempt, so restarts and migrated unreserved roots cannot bill it.
+            connection.execute(
+                "UPDATE ai_reading_jobs SET quota_reserved = 1 WHERE id = ?",
+                (retry_root_job_id,),
+            )
             job = self._get_admin_ai_job(connection, job_id)
             connection.execute("COMMIT")
         return job, True
