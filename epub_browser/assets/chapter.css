@@ -991,21 +991,23 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
 .navigation-behavior-options {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 6px;
 }
 
 .navigation-behavior-option {
     display: flex;
     align-items: center;
     gap: 8px;
+    box-sizing: border-box;
     min-height: 44px;
-    padding: 8px 10px;
+    padding: 0 10px;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--card-bg);
     color: var(--text-secondary);
     cursor: pointer;
+    line-height: 1.35;
 }
 
 .navigation-behavior-option:has(input:checked) {
@@ -1028,9 +1030,19 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     accent-color: var(--button-bg);
 }
 
+.navigation-behavior-option span {
+    min-width: 0;
+}
+
+@media (min-width: 601px) {
+    .navigation-behavior-option span {
+        white-space: nowrap;
+    }
+}
+
 @media (max-width: 600px) {
-    .navigation-behavior-options {
-        grid-template-columns: 1fr;
+    .navigation-behavior-option {
+        padding-block: 7px;
     }
 }
 

@@ -138,6 +138,67 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'\.account-admin-table\s*\{[^}]*min-width:\s*56rem;',
         )
 
+    def test_shared_server_chrome_clips_accessibility_text_without_removing_it(self):
+        server_html = self._server_html()
+        stylesheet = Path('epub_browser/assets/account.css').read_text(
+            encoding='utf-8'
+        )
+
+        rule_start = stylesheet.find('.app-nav-locale .sr-only,')
+        self.assertNotEqual(rule_start, -1)
+        hidden_rule = stylesheet[rule_start:stylesheet.index('}', rule_start)]
+        for declaration in (
+            'position: absolute !important;',
+            'width: 1px !important;',
+            'height: 1px !important;',
+            'overflow: hidden !important;',
+            'clip-path: inset(50%) !important;',
+            'white-space: nowrap !important;',
+        ):
+            self.assertIn(declaration, hidden_rule)
+        self.assertNotIn('display: none', hidden_rule)
+        self.assertNotIn('visibility: hidden', hidden_rule)
+        self.assertRegex(
+            server_html,
+            r'<span\b(?=[^>]*id=(?:["\'])?localeCurrentLabel)'
+            r'(?=[^>]*class=(?:["\'])?sr-only)',
+        )
+        self.assertRegex(
+            server_html,
+            r'<select\b(?=[^>]*id=(?:["\'])?localeSelect)'
+            r'(?=[^>]*class=(?:["\'])?sr-only)',
+        )
+
+    def test_admin_book_table_uses_page_flow_with_nonvisual_accessibility_copy(self):
+        server_html = self._server_html()
+        stylesheet = Path('epub_browser/assets/account.css').read_text(
+            encoding='utf-8'
+        )
+
+        rule_start = stylesheet.index('.admin-books-table-scroll {')
+        table_scroll_rule = stylesheet[rule_start:stylesheet.index('}', rule_start)]
+        self.assertIn('min-height: 0;', table_scroll_rule)
+        self.assertIn('max-height: none;', table_scroll_rule)
+        self.assertIn('overflow: visible;', table_scroll_rule)
+        self.assertRegex(
+            stylesheet,
+            r'@media \(max-width: 1200px\)[\s\S]*?'
+            r'\.admin-books-table-scroll\s*\{[^}]*overflow-x:\s*auto;',
+        )
+        self.assertRegex(
+            server_html,
+            r'<h4\b(?=[^>]*id=(?:["\'])?adminBooksTitle)',
+        )
+        self.assertRegex(
+            server_html,
+            r'<caption\b[^>]*class=(?:["\'])?sr-only visually-hidden',
+        )
+        self.assertRegex(
+            server_html,
+            r'<p\b(?=[^>]*id=(?:["\'])?adminBookLive)'
+            r'(?=[^>]*class=(?:["\'])?sr-only visually-hidden)',
+        )
+
     def test_account_surfaces_use_the_library_form_and_card_system(self):
         stylesheet = Path('epub_browser/assets/account.css').read_text(
             encoding='utf-8'
@@ -2253,6 +2314,28 @@ assert.deepEqual(
                 rf'<input\b(?=[^>]*type="radio")(?=[^>]*name="navigationBehavior")(?=[^>]*value="{value}")',
             )
         self.assertRegex(reading, r'value="normal"[^>]*checked')
+
+        stylesheet = Path('epub_browser/assets/chapter.css').read_text(
+            encoding='utf-8'
+        )
+        options_start = stylesheet.index('.navigation-behavior-options {')
+        options_rule = stylesheet[
+            options_start:stylesheet.index('}', options_start)
+        ]
+        option_start = stylesheet.index('.navigation-behavior-option {')
+        option_rule = stylesheet[
+            option_start:stylesheet.index('}', option_start)
+        ]
+        self.assertIn('grid-template-columns: 1fr;', options_rule)
+        self.assertNotIn('repeat(3', options_rule)
+        self.assertIn('min-height: 44px;', option_rule)
+        self.assertIn('padding: 0 10px;', option_rule)
+        self.assertIn('box-sizing: border-box;', option_rule)
+        self.assertRegex(
+            stylesheet,
+            r'@media \(min-width: 601px\)[\s\S]*?'
+            r'\.navigation-behavior-option span\s*\{[^}]*white-space:\s*nowrap;',
+        )
 
     def test_book_and_chapter_load_shared_navigation_behavior_without_server_apis(self):
         for html in (self._book_html(), self._chapter_html()):

@@ -18,6 +18,25 @@
     color-scheme: light;
 }
 
+.app-nav-locale .sr-only,
+.account-modal .sr-only,
+.account-modal .visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    min-width: 1px !important;
+    max-width: 1px !important;
+    height: 1px !important;
+    min-height: 1px !important;
+    max-height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
 body.auth-page {
     min-height: 100vh;
     min-height: 100dvh;
@@ -827,8 +846,11 @@ body.auth-page {
 }
 
 .admin-books-table-scroll {
-    min-height: min(34vh, 30rem);
-    max-height: min(64vh, 46rem);
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+    -webkit-overflow-scrolling: auto;
 }
 
 .admin-books-table-scroll .account-admin-table {
@@ -1135,6 +1157,15 @@ body.auth-page {
     margin-inline-end: auto;
     color: var(--account-muted);
     font-size: .78rem;
+}
+
+@media (max-width: 1200px) {
+    .admin-books-table-scroll {
+        overflow-x: auto;
+        overflow-y: visible;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
 #adminAiJobsPagination .admin-ai-jobs-page[aria-current="page"] {
