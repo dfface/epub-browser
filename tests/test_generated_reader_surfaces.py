@@ -1246,11 +1246,6 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             canvas.index('function appendTeach(article, result, chapterIndex)'):
             canvas.index('\n  function apply(', canvas.index('function appendTeach(article, result, chapterIndex)'))
         ]
-        # This fixture represents cached/legacy results with no explanation.
-        # The early return must run before any section is created, so stale or
-        # partial AI results cannot leave an empty landmark in the chapter.
-        missing_explanation = {'content': {'teach': {}}}
-        self.assertFalse(missing_explanation['content']['teach'].get('explanation'))
         self.assertLess(
             teach_renderer.index('if (!teach.explanation) return;'),
             teach_renderer.index("el('section', 'ai-chapter-teach')"),
@@ -1259,6 +1254,73 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('innerHTML', teach_renderer)
         self.assertIn('guide.nextSibling', teach_renderer)
         self.assertIn(".ai-chapter-teach,script,style,noscript", canvas)
+
+    def test_empty_feynman_explanations_create_no_canvas_or_drawer_surface(self):
+        fixture = r'''
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+
+function element(tagName) {
+  const node = {
+    tagName: tagName.toUpperCase(), attributes: {}, children: [], childNodes: [],
+    className: '', style: {}, parentNode: null,
+    appendChild(child) { child.parentNode = this; this.children.push(child); this.childNodes.push(child); return child; },
+    insertBefore(child, reference) { const index = reference ? this.children.indexOf(reference) : -1; child.parentNode = this; if (index < 0) return this.appendChild(child); this.children.splice(index, 0, child); this.childNodes.splice(index, 0, child); return child; },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    getAttribute(name) { return this.attributes[name] || null; },
+    addEventListener() {},
+    querySelector(selector) { return findAll(this, selector)[0] || null; },
+    querySelectorAll(selector) { return findAll(this, selector); },
+  };
+  Object.defineProperty(node, 'textContent', { get() { return ''; }, set() { node.children = []; node.childNodes = []; } });
+  return node;
+}
+
+function matches(node, selector) {
+  if (selector.charAt(0) === '.') return node.className.split(/\s+/).includes(selector.slice(1));
+  if (selector === '[data-ai-chapter-teach]') return node.getAttribute('data-ai-chapter-teach') !== null;
+  const guide = selector.match(/^\[data-ai-chapter-guide\]\[data-ai-canvas-chapter="(.*)"\]$/);
+  return guide && node.getAttribute('data-ai-chapter-guide') !== null && node.getAttribute('data-ai-canvas-chapter') === guide[1];
+}
+
+function findAll(node, selector) {
+  const found = [];
+  node.children.forEach(child => {
+    if (matches(child, selector)) found.push(child);
+    found.push(...findAll(child, selector));
+  });
+  return found;
+}
+
+const document = { body: element('body'), readyState: 'loading', documentElement: { dataset: {} }, createElement: element, createTextNode: text => ({ textContent: text }), addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; } };
+const window = { EpubBrowserMode: 'server', document, EpubBrowserAuth: { fetch() { return Promise.resolve({ ok: true, json() { return Promise.resolve({ followups: [] }); } }); } } };
+const context = { window, document, console, Promise, setTimeout, clearTimeout };
+let canvas = fs.readFileSync('epub_browser/assets/ai-canvas.js', 'utf8');
+canvas = canvas.replace('  function apply(result, article, chapterIndex) {', '  root.__testAppendTeach = appendTeach;\n  function apply(result, article, chapterIndex) {');
+vm.runInNewContext(canvas, context);
+let drawer = fs.readFileSync('epub_browser/assets/ai-reading.js', 'utf8');
+drawer = drawer.replace('  function addEvidenceHighlightControl(parent, evidence, resultId) {', "  root.__testAddResult = function(body, result) { panel = { querySelector: function(selector) { return selector === '.ai-reading-body' ? body : null; } }; requestContext = { scope: 'book' }; addResult(result); };\n\n  function addEvidenceHighlightControl(parent, evidence, resultId) {");
+vm.runInNewContext(drawer, context);
+
+assert.equal(typeof window.__testAppendTeach, 'function');
+assert.equal(typeof window.__testAddResult, 'function');
+const result = { id: 'empty-teach', content: { teach: { explanation: '', analogy: 'Unused analogy', check_question: 'Unused check' }, quick: { title: '', summary: '', key_points: [] }, chapter_summary: {}, structure: { overview: '', nodes: [] }, deep: {}, evidence: [] } };
+const canvasArticle = element('article');
+window.__testAppendTeach(canvasArticle, result, 0);
+assert.equal(canvasArticle.querySelector('[data-ai-chapter-teach]'), null);
+const drawerBody = element('div');
+window.__testAddResult(drawerBody, result);
+assert.equal(drawerBody.querySelector('.ai-reading-teach'), null);
+'''
+        result = subprocess.run(
+            ['node', '-e', fixture],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
