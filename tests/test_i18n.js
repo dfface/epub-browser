@@ -73,6 +73,23 @@ test('all five dictionaries have identical non-empty shapes and interpolation to
   });
 });
 
+test('translates the local annotation sharing actions in all five supported locales', () => {
+  ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
+    [
+      'annotations.shareActions',
+      'annotations.copyShare',
+      'annotations.exportShare',
+      'annotations.shareAuthors',
+      'annotations.shareNote',
+      'annotations.shareCopied',
+      'annotations.shareCopyFailed',
+      'annotations.shareExported',
+      'annotations.shareExportFailed',
+      'annotations.shareFileFallback',
+    ].forEach(key => assert.notEqual(dictionaries[locale][key], undefined, `${locale}:${key}`));
+  });
+});
+
 test('provides native locale names and translated AI language labels', () => {
   const nativeNames = {
     en: 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ko: '한국어', ja: '日本語'

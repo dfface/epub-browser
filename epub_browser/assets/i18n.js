@@ -4468,6 +4468,71 @@
     localeKeys.forEach(function(key, index) { dictionary[key] = localeValues[code][index]; });
     dictionaries[code] = dictionary;
   });
+  var localeAdditions = {
+    en: {
+      'annotations.shareActions': 'Share annotations',
+      'annotations.copyShare': 'Copy to clipboard',
+      'annotations.exportShare': 'Export text',
+      'annotations.shareAuthors': 'Authors',
+      'annotations.shareNote': 'Note',
+      'annotations.shareCopied': 'Annotation summary copied locally.',
+      'annotations.shareCopyFailed': 'Unable to copy the annotation summary.',
+      'annotations.shareExported': 'Annotation summary exported locally.',
+      'annotations.shareExportFailed': 'Unable to export the annotation summary.',
+      'annotations.shareFileFallback': 'Annotations'
+    },
+    'zh-CN': {
+      'annotations.shareActions': '分享标注',
+      'annotations.copyShare': '复制到剪贴板',
+      'annotations.exportShare': '导出文本',
+      'annotations.shareAuthors': '作者',
+      'annotations.shareNote': '笔记',
+      'annotations.shareCopied': '标注摘要已仅在本地复制。',
+      'annotations.shareCopyFailed': '无法复制标注摘要。',
+      'annotations.shareExported': '标注摘要已仅在本地导出。',
+      'annotations.shareExportFailed': '无法导出标注摘要。',
+      'annotations.shareFileFallback': '标注'
+    },
+    'zh-TW': {
+      'annotations.shareActions': '分享註釋',
+      'annotations.copyShare': '複製到剪貼簿',
+      'annotations.exportShare': '匯出文字',
+      'annotations.shareAuthors': '作者',
+      'annotations.shareNote': '筆記',
+      'annotations.shareCopied': '註釋摘要已僅在本機複製。',
+      'annotations.shareCopyFailed': '無法複製註釋摘要。',
+      'annotations.shareExported': '註釋摘要已僅在本機匯出。',
+      'annotations.shareExportFailed': '無法匯出註釋摘要。',
+      'annotations.shareFileFallback': '註釋'
+    },
+    ko: {
+      'annotations.shareActions': '주석 공유',
+      'annotations.copyShare': '클립보드에 복사',
+      'annotations.exportShare': '텍스트 내보내기',
+      'annotations.shareAuthors': '저자',
+      'annotations.shareNote': '메모',
+      'annotations.shareCopied': '주석 요약을 로컬에 복사했습니다.',
+      'annotations.shareCopyFailed': '주석 요약을 복사할 수 없습니다.',
+      'annotations.shareExported': '주석 요약을 로컬로 내보냈습니다.',
+      'annotations.shareExportFailed': '주석 요약을 내보낼 수 없습니다.',
+      'annotations.shareFileFallback': '주석'
+    },
+    ja: {
+      'annotations.shareActions': '注釈を共有',
+      'annotations.copyShare': 'クリップボードにコピー',
+      'annotations.exportShare': 'テキストをエクスポート',
+      'annotations.shareAuthors': '著者',
+      'annotations.shareNote': 'メモ',
+      'annotations.shareCopied': '注釈の概要をローカルにコピーしました。',
+      'annotations.shareCopyFailed': '注釈の概要をコピーできません。',
+      'annotations.shareExported': '注釈の概要をローカルにエクスポートしました。',
+      'annotations.shareExportFailed': '注釈の概要をエクスポートできません。',
+      'annotations.shareFileFallback': '注釈'
+    }
+  };
+  Object.keys(localeAdditions).forEach(function(code) {
+    Object.keys(localeAdditions[code]).forEach(function(key) { dictionaries[code][key] = localeAdditions[code][key]; });
+  });
 
   function normalizeLocale(value) {
     value = String(value || '').replace('_', '-').toLowerCase();

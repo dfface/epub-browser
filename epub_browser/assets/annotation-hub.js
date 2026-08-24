@@ -122,6 +122,113 @@
     }
     function labelCount(count) { return tr('annotationCount', { count: count }); }
 
+    function buildShareSummary(book, annotations, toc) {
+        book = book || {};
+        annotations = annotations || [];
+        var authors = Array.isArray(book.authors) ? book.authors.filter(function(author) { return author; }) : [];
+        var lines = [book.title || tr('bookFallback')];
+        if (authors.length) lines.push(tr('shareAuthors') + ': ' + authors.join(tr('authorSeparator')));
+        lines.push(labelCount(annotations.length));
+        groupByChapter(annotations, toc).forEach(function(group) {
+            lines.push('', group.title);
+            group.annotations.forEach(function(annotation) {
+                lines.push('“' + (annotation.text || '') + '”');
+                if (annotation.note && annotation.note.trim()) lines.push(tr('shareNote') + ': ' + annotation.note);
+            });
+        });
+        return lines.join('\n');
+    }
+
+    function copyWithSelection(text) {
+        if (!root.document || !document.body || !document.execCommand) return false;
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        try {
+            textarea.select();
+            return document.execCommand('copy');
+        } finally {
+            if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
+            else if (document.body.removeChild) document.body.removeChild(textarea);
+            else if (textarea.remove) textarea.remove();
+        }
+    }
+
+    function copyShareText(text) {
+        var clipboard = root.navigator && root.navigator.clipboard;
+        if (clipboard && typeof clipboard.writeText === 'function') {
+            return Promise.resolve(clipboard.writeText(text)).catch(function() {
+                if (copyWithSelection(text)) return undefined;
+                throw new Error('Unable to copy share summary');
+            });
+        }
+        if (copyWithSelection(text)) return Promise.resolve();
+        return Promise.reject(new Error('Unable to copy share summary'));
+    }
+
+    function shareFilename(title, fallback) {
+        var stem = String(title || '').normalize ? String(title || '').normalize('NFKC') : String(title || '');
+        stem = stem.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').replace(/^\.+|\.+$/g, '').trim();
+        return (stem || fallback || 'annotations').slice(0, 100) + '-annotations.txt';
+    }
+
+    function downloadShareText(text, filename) {
+        var BlobConstructor = root.Blob;
+        if (!BlobConstructor || !root.URL || typeof root.URL.createObjectURL !== 'function' || !root.document || !document.body) {
+            throw new Error('Unable to export share summary');
+        }
+        var url = root.URL.createObjectURL(new BlobConstructor([text], { type: 'text/plain;charset=utf-8' }));
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        if (link.style) link.style.display = 'none';
+        document.body.appendChild(link);
+        try {
+            link.click();
+        } finally {
+            if (link.parentNode) link.parentNode.removeChild(link);
+            else if (document.body.removeChild) document.body.removeChild(link);
+            else if (link.remove) link.remove();
+            root.URL.revokeObjectURL(url);
+        }
+    }
+
+    function createShareActions(book, annotations, toc) {
+        if (!book || !annotations || !annotations.length) return null;
+        var summary = buildShareSummary(book, annotations, toc);
+        var actions = element('div', 'annotation-share-actions');
+        actions.setAttribute('role', 'group');
+        actions.setAttribute('aria-label', tr('shareActions'));
+        [
+            ['copy', 'copyShare', 'fa-copy', function() {
+                copyShareText(summary).then(function() { notify('shareCopied', 'success'); }).catch(function() { notify('shareCopyFailed', 'error'); });
+            }],
+            ['export', 'exportShare', 'fa-file-export', function() {
+                try {
+                    downloadShareText(summary, shareFilename(book.title, tr('shareFileFallback')));
+                    notify('shareExported', 'success');
+                } catch (error) { notify('shareExportFailed', 'error'); }
+            }]
+        ].forEach(function(definition) {
+            var label = tr(definition[1]);
+            var button = element('button', 'annotation-share-action');
+            button.type = 'button';
+            button.setAttribute('aria-label', label);
+            button.setAttribute('title', label);
+            button.setAttribute('data-annotation-share-action', definition[0]);
+            var icon = element('i', 'fas ' + definition[2]);
+            icon.setAttribute('aria-hidden', 'true');
+            button.appendChild(icon);
+            button.appendChild(element('span', '', label));
+            button.addEventListener('click', definition[3]);
+            actions.appendChild(button);
+        });
+        return actions;
+    }
+
     function notify(key, type, params) {
         if (root.EpubBrowserNotification && typeof root.EpubBrowserNotification.show === 'function') {
             root.EpubBrowserNotification.show(tr(key, params), type);
@@ -268,14 +375,16 @@
     }
 
     function renderBookAnnotations(bookHash, annotations, metadata, toc) {
-        var container = modalState.container, book = bookMap(metadata)[bookHash];
+        var container = modalState.container, book = bookMap(metadata)[bookHash] || { title: bookHash, authors: [] };
         clear(container);
         container.removeAttribute('aria-busy');
         var heading = element('header', 'annotation-hub-heading');
-        var title = element('h1', 'annotation-hub-title', book ? book.title : bookHash);
+        var title = element('h1', 'annotation-hub-title', book.title);
         title.id = 'annotationHubTitle';
         heading.appendChild(title);
         heading.appendChild(element('p', '', labelCount(annotations.length)));
+        var actions = createShareActions(book, annotations, toc);
+        if (actions) heading.appendChild(actions);
         container.appendChild(heading);
         if (!annotations.length) { renderState(tr('noBookAnnotationsTitle'), tr('noBookAnnotationsDescription')); return; }
         groupByChapter(annotations, toc).forEach(function(group) {
@@ -405,5 +514,5 @@
         else bind();
     }
 
-    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
+    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, buildShareSummary: buildShareSummary, copyShareText: copyShareText, downloadShareText: downloadShareText, shareFilename: shareFilename, createShareActions: createShareActions, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
 });

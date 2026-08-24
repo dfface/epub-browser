@@ -30,15 +30,15 @@ function withI18n(runtime, callback) {
 async function withHubGlobals(overrides, callback) {
   const previous = {};
   for (const [name, value] of Object.entries(overrides)) {
-    previous[name] = global[name];
-    global[name] = value;
+    previous[name] = Object.getOwnPropertyDescriptor(global, name);
+    Object.defineProperty(global, name, { value, configurable: true, writable: true });
   }
   try {
     return await callback();
   } finally {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) delete global[name];
-      else global[name] = value;
+    for (const [name, descriptor] of Object.entries(previous)) {
+      if (descriptor === undefined) delete global[name];
+      else Object.defineProperty(global, name, descriptor);
     }
   }
 }
@@ -104,6 +104,128 @@ test('uses the chapter_index field published by toc.json for numbered chapter ti
 
     assert.equal(groups[0].title, 'Chapter 3 · Part one · Chapter one');
   });
+});
+
+test('builds a deterministic local-only share summary in the displayed chapter order', () => {
+  withI18n({
+    t: (key, params = {}) => ({
+      'annotations.chapterNumber': `Chapter ${params.number}`,
+      'annotations.annotationCount': `${params.count} annotations`,
+      'annotations.authorSeparator': ' & ',
+      'annotations.shareAuthors': 'Authors',
+      'annotations.shareNote': 'Note',
+    }[key] || key),
+  }, () => {
+    assert.equal(Hub.buildShareSummary({ title: 'The Book', authors: ['Ada', 'Ben'] }, [
+      { id: 'later', chapter_index: 2, created_at: '2026-08-12T00:00:00Z', text: 'Second highlight' },
+      { id: 'first', chapter_index: 0, created_at: '2026-08-10T00:00:00Z', text: 'First highlight', note: 'Keep this note exactly.' },
+    ], [{ chapter_index: 0, title: 'Opening' }, { chapter_index: 2, title: 'Ending' }]), [
+      'The Book',
+      'Authors: Ada & Ben',
+      '2 annotations',
+      '',
+      'Chapter 0 · Opening',
+      '“First highlight”',
+      'Note: Keep this note exactly.',
+      '',
+      'Chapter 2 · Ending',
+      '“Second highlight”',
+    ].join('\n'));
+  });
+});
+
+test('omits absent authors and empty notes from a share summary', () => {
+  withI18n({
+    t: (key, params = {}) => ({
+      'annotations.chapterNumber': `Chapter ${params.number}`,
+      'annotations.annotationCount': `${params.count} annotation`,
+      'annotations.authorSeparator': ' & ',
+      'annotations.shareAuthors': 'Authors',
+      'annotations.shareNote': 'Note',
+    }[key] || key),
+  }, () => {
+    assert.equal(Hub.buildShareSummary({ title: 'Untitled' }, [
+      { chapter_index: 1, text: 'Exact source text', note: '   ' },
+    ], []), 'Untitled\n1 annotation\n\nChapter 1\n“Exact source text”');
+  });
+});
+
+test('only creates labelled share actions for a non-empty per-book view', async () => {
+  await withHubGlobals({
+    document: fakeDocument(),
+    EpubBrowserI18n: { t: key => ({
+      'annotations.shareActions': 'Share annotations',
+      'annotations.copyShare': 'Copy to clipboard',
+      'annotations.exportShare': 'Export text',
+    }[key] || key) },
+  }, async () => {
+    assert.equal(Hub.createShareActions(null, [{ text: 'A' }], []), null);
+    assert.equal(Hub.createShareActions({ title: 'Book' }, [], []), null);
+
+    const actions = Hub.createShareActions({ title: 'Book' }, [{ chapter_index: 0, text: 'A' }], []);
+    assert.equal(actions.className, 'annotation-share-actions');
+    assert.equal(actions.attributes.role, 'group');
+    assert.equal(actions.attributes['aria-label'], 'Share annotations');
+    assert.deepEqual(actions.children.map(button => [button.className, button.attributes['aria-label'], button.attributes['data-annotation-share-action']]), [
+      ['annotation-share-action', 'Copy to clipboard', 'copy'],
+      ['annotation-share-action', 'Export text', 'export'],
+    ]);
+  });
+});
+
+test('copies a plain-text share summary through Clipboard API and falls back when unavailable', async () => {
+  const copied = [];
+  await withHubGlobals({
+    navigator: { clipboard: { writeText: async text => copied.push(text) } },
+  }, async () => {
+    await Hub.copyShareText('Plain text');
+  });
+  assert.deepEqual(copied, ['Plain text']);
+
+  const body = { children: [], appendChild(node) { this.children.push(node); }, removeChild(node) { this.children.splice(this.children.indexOf(node), 1); } };
+  let selected = false;
+  await withHubGlobals({
+    navigator: {},
+    document: {
+      body,
+      createElement: () => ({ style: {}, setAttribute() {}, select() { selected = true; }, remove() {} }),
+      execCommand: command => command === 'copy',
+    },
+  }, async () => {
+    await Hub.copyShareText('Fallback text');
+  });
+  assert.equal(selected, true);
+  assert.deepEqual(body.children, []);
+});
+
+test('reports clipboard fallback failure to the caller', async () => {
+  await withHubGlobals({
+    navigator: {},
+    document: { body: { appendChild() {}, removeChild() {} }, createElement: () => ({ style: {}, setAttribute() {}, select() {} }), execCommand: () => false },
+  }, async () => {
+    await assert.rejects(Hub.copyShareText('No clipboard'), /copy/i);
+  });
+});
+
+test('downloads UTF-8 text with a safe deterministic filename and revokes its object URL', async () => {
+  const created = [];
+  const revoked = [];
+  const body = { children: [], appendChild(node) { this.children.push(node); }, removeChild(node) { this.children.splice(this.children.indexOf(node), 1); } };
+  let clicked = false;
+  await withHubGlobals({
+    Blob,
+    URL: { createObjectURL(blob) { created.push(blob); return 'blob:share'; }, revokeObjectURL(url) { revoked.push(url); } },
+    document: { body, createElement: () => ({ click() { clicked = true; }, remove() {} }) },
+  }, async () => {
+    assert.equal(Hub.shareFilename('  A / B: C?  ', 'Annotations'), 'A B C-annotations.txt');
+    assert.equal(Hub.shareFilename('...', 'Annotations'), 'Annotations-annotations.txt');
+    Hub.downloadShareText('Hello', 'A B C-annotations.txt');
+  });
+  assert.equal(await created[0].text(), 'Hello');
+  assert.equal(created[0].type, 'text/plain;charset=utf-8');
+  assert.equal(clicked, true);
+  assert.deepEqual(body.children, []);
+  assert.deepEqual(revoked, ['blob:share']);
 });
 
 test('uses shared i18n for chapter fallback, counts, and timestamps', () => {
