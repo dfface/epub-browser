@@ -106,7 +106,7 @@
             isCurrent: function(token) {
                 return token === revision;
             },
-            runSave: function(token, operation, onSuccess, onFailure) {
+            run: function(token, operation, onSuccess, onFailure) {
                 var self = this;
                 return Promise.resolve().then(operation).then(function(result) {
                     if (self.isCurrent(token) && onSuccess) onSuccess(result);
@@ -115,6 +115,11 @@
                     if (self.isCurrent(token) && onFailure) onFailure(error);
                     throw error;
                 });
+            },
+            runSave: function(token, operation, onSuccess, onFailure) {
+                return this.run(token, function() {
+                    return operation({ notifyFailure: false });
+                }, onSuccess, onFailure);
             }
         };
     }
@@ -1200,8 +1205,10 @@
             var self = this;
             this.closeDialog();
             var dialogToken = this.detailLifecycle.begin();
-            StorageManager.getById(id).then(function(annotation) {
-                if (!self.detailLifecycle.isCurrent(dialogToken)) return;
+            this.detailLifecycle.run(
+                dialogToken,
+                function() { return StorageManager.getById(id); },
+                function(annotation) {
                 annotation = self.normalizeAnnotation(annotation);
                 if (!annotation) {
                     Utils.showNotification(tr('notFound'), 'warning');
@@ -1300,25 +1307,26 @@
                     saveButton.setAttribute('aria-disabled', 'true');
                     self.detailLifecycle.runSave(
                         dialogToken,
-                        function() {
+                        function(updateOptions) {
                             return self.updateAnnotation(annotation.id, {
                                 color: color,
                                 note: noteInput.value.trim()
-                            });
+                            }, updateOptions);
                         },
                         function() {
                             if (self.activeDialog === dialog) self.closeDialog();
                         },
-                        function() {
+                        function(err) {
                             if (self.activeDialog !== dialog) return;
+                            Utils.showNotification(tr('updateFailed', { error: err.message }), 'error');
                             saveButton.disabled = false;
                             saveButton.setAttribute('aria-disabled', 'false');
                         }
                     ).catch(function() {});
                 });
-            }).catch(function(err) {
+            }, function(err) {
                 Utils.showNotification(tr('loadFailed', { error: err.message }), 'error');
-            });
+            }).catch(function() {});
         },
 
         createAnnotationFromSource: function(source, color, note) {
@@ -1335,7 +1343,7 @@
             });
         },
 
-        updateAnnotation: function(id, data) {
+        updateAnnotation: function(id, data, options) {
             var self = this;
             var updateData = {
                 color: data.color,
@@ -1356,7 +1364,9 @@
                     self.applyHighlightStyles(updatedAnnotation, self.getHighlightNodesByAnnotationId(id));
                 }
             }).catch(function(err) {
-                Utils.showNotification(tr('updateFailed', { error: err.message }), 'error');
+                if (!options || options.notifyFailure !== false) {
+                    Utils.showNotification(tr('updateFailed', { error: err.message }), 'error');
+                }
                 throw err;
             });
         },

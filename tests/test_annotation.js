@@ -291,3 +291,54 @@ test('closing an annotation detail invalidates its late save completion', async 
   assert.equal(lifecycle.isCurrent(newToken), true);
   assert.equal(oldDialogClosed, false);
 });
+
+test('invalidated annotation detail load rejection is silent after a newer dialog begins', async () => {
+  const window = loadAnnotationWindow({ status: 200, body: '{}' });
+  const lifecycle = window.AnnotationDetailLifecycle.create();
+  const oldToken = lifecycle.begin();
+  let rejectLoad;
+  const pendingLoad = new Promise((resolve, reject) => { rejectLoad = reject; });
+  let failureFeedback = 0;
+  const load = lifecycle.run(
+    oldToken,
+    () => pendingLoad,
+    () => {},
+    () => { failureFeedback += 1; },
+  );
+
+  lifecycle.invalidate();
+  const newToken = lifecycle.begin();
+  rejectLoad(new Error('late load failure'));
+  await assert.rejects(load, /late load failure/);
+
+  assert.equal(lifecycle.isCurrent(newToken), true);
+  assert.equal(failureFeedback, 0);
+});
+
+test('invalidated annotation detail save rejection stays silent and requests silent persistence', async () => {
+  const window = loadAnnotationWindow({ status: 200, body: '{}' });
+  const lifecycle = window.AnnotationDetailLifecycle.create();
+  const oldToken = lifecycle.begin();
+  let rejectSave;
+  const pendingSave = new Promise((resolve, reject) => { rejectSave = reject; });
+  let persistenceOptions;
+  let failureFeedback = 0;
+  const save = lifecycle.runSave(
+    oldToken,
+    options => {
+      persistenceOptions = options;
+      return pendingSave;
+    },
+    () => {},
+    () => { failureFeedback += 1; },
+  );
+
+  lifecycle.invalidate();
+  const newToken = lifecycle.begin();
+  rejectSave(new Error('late save failure'));
+  await assert.rejects(save, /late save failure/);
+
+  assert.equal(lifecycle.isCurrent(newToken), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(persistenceOptions)), { notifyFailure: false });
+  assert.equal(failureFeedback, 0);
+});
