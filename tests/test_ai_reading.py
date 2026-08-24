@@ -15,13 +15,20 @@ from epub_browser.ai_reading import (
     _ModelTokenBudget,
     _estimate_messages_tokens,
     _estimate_tokens,
+    _merge_chapter_layers,
+    _normalize_core_result,
     _normalize_result,
     _split_text_by_token_budget,
     _truncate_tokens,
     extract_chapter_text,
 )
 from epub_browser.auth import BootstrapCredentials
-from epub_browser.prompt_templates import profile_system_prompt, template_for
+from epub_browser.prompt_templates import (
+    chapter_core_template,
+    chapter_grounding_template,
+    profile_system_prompt,
+    template_for,
+)
 from epub_browser.state import StateStore
 
 
@@ -124,6 +131,11 @@ class _LearningLayerEnvelopeClient:
                     "summary": "A safe summary.",
                     "key_points": ["One point"],
                 },
+                "teach": {
+                    "explanation": "A plain explanation.",
+                    "analogy": "A familiar analogy.",
+                    "check_question": "Can you explain it back?",
+                },
                 "structure": {
                     "overview": "A tiny structure.",
                     "diagram_mermaid": "",
@@ -146,6 +158,25 @@ class _LearningLayerEnvelopeClient:
                 "paragraph_notes": [],
             }
         )
+
+
+class _FailingGroundingClient:
+    calls = []
+
+    def __init__(self, config: ProviderConfig):
+        self.config = config
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append({"messages": messages, "max_tokens": max_tokens})
+        if len(type(self).calls) == 1:
+            return json.dumps({
+                "quick": {"title": "Guide", "summary": "Core complete", "key_points": []},
+                "teach": {"explanation": "Plain", "analogy": "", "check_question": ""},
+                "chapter_summary": {"overview": "", "beats": [], "key_elements": [], "closing": ""},
+                "structure": {"overview": "", "diagram_mermaid": "", "nodes": [], "links": []},
+                "deep": {"themes": [], "questions": [], "applications": []},
+            })
+        raise AIProviderError("provider_request_rejected")
 
 
 class _BlockingClient:
@@ -282,15 +313,16 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         completed = await self._wait_for_job(started["job"]["id"])
         self.assertEqual(completed["status"], "complete")
         self.assertIsNotNone(completed["result_id"])
-        self.assertEqual(len(_FakeClient.calls), 1)
-        self.assertIn("<UNTRUSTED_EPUB_CONTENT>", _FakeClient.calls[0][1]["content"])
-        self.assertIn("Source sentence.", _FakeClient.calls[0][1]["content"])
-        self.assertNotIn("ignore()", _FakeClient.calls[0][1]["content"])
+        self.assertEqual(len(_FakeClient.calls), 2)
+        for call in _FakeClient.calls:
+            self.assertIn("<UNTRUSTED_EPUB_CONTENT>", call[1]["content"])
+            self.assertIn("Source sentence.", call[1]["content"])
+            self.assertNotIn("ignore()", call[1]["content"])
 
         cached = await self.service.submit(self.member, request)
         self.assertTrue(cached["cached"])
         self.assertEqual(cached["result"]["content"]["quick"]["summary"], "Useful overview")
-        self.assertEqual(len(_FakeClient.calls), 1)
+        self.assertEqual(len(_FakeClient.calls), 2)
 
     async def test_admin_retry_recomputes_current_job_state(self):
         replay = {
@@ -928,22 +960,32 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             await service.stop_worker()
 
         self.assertEqual(completed["status"], "complete")
-        self.assertEqual(len(_LearningLayerEnvelopeClient.calls), 1)
-        call = _LearningLayerEnvelopeClient.calls[0]
-        self._assert_dependency_free_call_fits(call)
-        system_prompt = call["messages"][0]["content"].lower()
-        self.assertIn("untrusted", system_prompt)
-        self.assertIn("never", system_prompt)
-        self.assertIn("<UNTRUSTED_EPUB_CONTENT>", call["messages"][-1]["content"])
+        self.assertEqual(len(_LearningLayerEnvelopeClient.calls), 2)
+        for call in _LearningLayerEnvelopeClient.calls:
+            self._assert_dependency_free_call_fits(call)
+            system_prompt = call["messages"][0]["content"].lower()
+            self.assertIn("untrusted", system_prompt)
+            self.assertIn("never", system_prompt)
+            self.assertIn("<UNTRUSTED_EPUB_CONTENT>", call["messages"][-1]["content"])
+        self.assertNotIn(
+            "annotations", _LearningLayerEnvelopeClient.calls[0]["messages"][0]["content"]
+        )
+        self.assertIn(
+            "Normalized core synopsis",
+            _LearningLayerEnvelopeClient.calls[1]["messages"][-1]["content"],
+        )
 
         result = self.store.get_ai_reading_result(completed["result_id"])
         content = result["content"]
         self.assertEqual(
             set(content),
             {
-                "quick", "structure", "deep", "evidence", "annotations",
+                "quick", "teach", "structure", "deep", "evidence", "annotations",
                 "paragraph_notes", "chapter_summary",
             },
+        )
+        self.assertEqual(
+            set(content["teach"]), {"explanation", "analogy", "check_question"}
         )
         self.assertEqual(
             set(content["chapter_summary"]),
@@ -991,7 +1033,38 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         completed = await self._wait_for_job(started["job"]["id"])
 
         self.assertEqual(completed["status"], "complete")
-        self.assertIn("Cached source sentence.", _FakeClient.calls[0][1]["content"])
+        self.assertEqual(len(_FakeClient.calls), 2)
+        self.assertTrue(all(
+            "Cached source sentence." in call[-1]["content"]
+            for call in _FakeClient.calls
+        ))
+
+    async def test_failed_grounding_does_not_persist_a_partial_core_result(self):
+        _FailingGroundingClient.calls = []
+        service = AIReadingService(
+            self.store, self.root / "public", _FailingGroundingClient
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "failed")
+        self.assertEqual(completed["generation_stage"], "grounding_source")
+        self.assertEqual(len(_FailingGroundingClient.calls), 2)
+        with self.store._connection() as connection:
+            stored = connection.execute(
+                "SELECT COUNT(*) FROM ai_reading_results WHERE cache_key = ?",
+                (completed["cache_key"],),
+            ).fetchone()[0]
+        self.assertEqual(stored, 0)
 
     async def test_followups_are_private_and_charged_to_the_owner(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
@@ -1401,7 +1474,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         result = self.store.get_ai_reading_result(completed["result_id"])
         self.assertNotEqual(result["id"], prior["id"])
         self.assertEqual(result["config_revision"], current_config_revision)
-        self.assertEqual(len(_FakeClient.calls), 1)
+        self.assertEqual(len(_FakeClient.calls), 2)
 
     async def test_rekeyed_running_job_joins_later_submission_for_changed_material(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
@@ -1459,7 +1532,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         result = self.store.get_ai_reading_result(completed["result_id"])
         self.assertEqual(completed["status"], "complete")
         self.assertEqual(result["cache_key"], current_cache_key)
-        self.assertEqual(len(_BlockingClient.calls), 1)
+        self.assertEqual(len(_BlockingClient.calls), 2)
 
     async def test_running_durable_job_is_requeued_after_a_service_restart(self):
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
@@ -1506,7 +1579,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             await service.stop_worker()
 
         self.assertEqual(completed["status"], "complete")
-        self.assertEqual(len(_FlakyClient.calls), 4)
+        self.assertEqual(len(_FlakyClient.calls), 5)
         self.assertEqual(delays, [60, 120, 240])
 
     async def test_non_retryable_provider_error_fails_without_waiting_or_retrying(self):
@@ -1692,9 +1765,9 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             await service.stop_worker()
 
         self.assertEqual(completed["status"], "complete")
-        self.assertEqual(len(_FlakyClient.calls), 4)
+        self.assertEqual(len(_FlakyClient.calls), 5)
         self.assertEqual(delays, [60, 120, 240])
-        self.assertEqual(self._provider_calls(self.member.user_id), 4)
+        self.assertEqual(self._provider_calls(self.member.user_id), 5)
         self.assertEqual(self._reading_tasks(self.member.user_id), 1)
 
     async def test_client_construction_failure_does_not_charge_quota(self):
@@ -1905,20 +1978,23 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             if "contiguous source part" in call["messages"][0]["content"]
         ]
         self.assertGreater(len(part_calls), 1)
-        self.assertEqual(len(_ChunkingClient.calls), len(part_calls) + 1)
+        self.assertEqual(len(_ChunkingClient.calls), len(part_calls) + 2)
         for marker in _ChunkingClient.markers:
             self.assertEqual(
                 sum(marker in call["messages"][-1]["content"] for call in part_calls),
                 1,
             )
-            self.assertIn(marker, _ChunkingClient.calls[-1]["messages"][-1]["content"])
+            self.assertTrue(all(
+                marker in call["messages"][-1]["content"]
+                for call in _ChunkingClient.calls[-2:]
+            ))
         for call in _ChunkingClient.calls:
             estimated_input = _estimate_messages_tokens(
                 call["messages"], "reader-model"
             )
             self.assertLessEqual(estimated_input + call["max_tokens"] + 409, 8192)
-        self.assertEqual(completed["progress_current"], len(part_calls) + 1)
-        self.assertEqual(completed["progress_total"], len(part_calls) + 1)
+        self.assertEqual(completed["progress_current"], len(part_calls) + 2)
+        self.assertEqual(completed["progress_total"], len(part_calls) + 2)
         result = self.store.get_ai_reading_result(completed["result_id"])
         self.assertEqual(result["content"]["annotations"][0]["quote"], "FINAL_MARKER")
 
@@ -2064,15 +2140,114 @@ class ModelContextBudgetTests(unittest.TestCase):
 
 
 class ResultNormalizationTests(unittest.TestCase):
+    def test_chapter_core_contract_normalizes_feynman_teach_without_anchor_fields(self):
+        core = _normalize_core_result(json.dumps({
+            "quick": {"title": "Guide", "summary": "Overview", "key_points": []},
+            "teach": {
+                "explanation": "Plain explanation",
+                "analogy": "Daily analogy",
+                "check_question": "Explain it back.",
+            },
+            "chapter_summary": {
+                "overview": "A guided account.",
+                "beats": [{
+                    "label": "Opening",
+                    "title": "The claim",
+                    "anchor_quote": "Core must not own this source anchor.",
+                    "summary": "Introduces the claim.",
+                }],
+                "key_elements": [],
+                "closing": "",
+            },
+            "structure": {"overview": "", "diagram_mermaid": "", "nodes": [], "links": []},
+            "deep": {"themes": [], "questions": [], "applications": []},
+            "evidence": [{"chapter_index": 0, "quote": "Unsafe", "reason": "Unsafe"}],
+            "annotations": [{"chapter_index": 0, "quote": "Unsafe"}],
+        }))
+
+        self.assertEqual(core["teach"]["explanation"], "Plain explanation")
+        self.assertEqual(
+            set(core), {"quick", "teach", "chapter_summary", "structure", "deep"}
+        )
+        self.assertNotIn("anchor_quote", core["chapter_summary"]["beats"][0])
+
+    def test_merge_keeps_only_grounded_annotations(self):
+        core_layer = {
+            "quick": {"title": "Guide", "summary": "Overview", "key_points": []},
+            "teach": {"explanation": "Plain", "analogy": "", "check_question": ""},
+            "chapter_summary": {"overview": "", "beats": [], "key_elements": [], "closing": ""},
+            "structure": {"overview": "", "diagram_mermaid": "", "nodes": [], "links": []},
+            "deep": {"themes": [], "questions": [], "applications": []},
+            "annotations": [{
+                "chapter_index": 0, "kind": "claim", "quote": "Core invention.",
+                "title": "Unsafe", "body_markdown": "Must be ignored.",
+            }],
+        }
+        grounding_layer = {
+            "evidence": [],
+            "annotations": [{
+                "chapter_index": 0, "kind": "claim", "quote": "Exact source quote.",
+                "title": "Grounded", "body_markdown": "Tied to the source.",
+            }],
+            "paragraph_notes": [],
+        }
+
+        merged = _merge_chapter_layers(core_layer, grounding_layer)
+        validated = AIReadingService._validate_learning_layer(
+            merged,
+            ReadingRequest(scope="chapter", book_id="book", chapter_index=0),
+            "Exact source quote.",
+        )
+
+        self.assertEqual(validated["annotations"], [grounding_layer["annotations"][0]])
+
+    def test_grounded_evidence_requires_an_exact_source_quote(self):
+        content = {
+            "quick": {},
+            "teach": {},
+            "chapter_summary": {},
+            "structure": {},
+            "deep": {},
+            "evidence": [
+                {"chapter_index": 10, "quote": "Exact source quote.", "reason": "Support"},
+                {"chapter_index": 10, "quote": "Invented quote.", "reason": "Unsafe"},
+            ],
+            "annotations": [],
+            "paragraph_notes": [],
+        }
+
+        validated = AIReadingService._validate_learning_layer(
+            content,
+            ReadingRequest(scope="chapter", book_id="book", chapter_index=21),
+            "Exact source quote.",
+        )
+
+        self.assertEqual(validated["evidence"], [{
+            "chapter_index": 21,
+            "quote": "Exact source quote.",
+            "reason": "Support",
+        }])
+
     def test_chapter_summary_contract_does_not_change_book_generation(self):
         chapter_template = template_for("chapter", "chapter")
         book_template = template_for("book", "full_review")
 
-        self.assertEqual(chapter_template["version"], 7)
+        self.assertEqual(chapter_template["version"], 9)
         self.assertIn("chapter_summary", chapter_template["system"])
         self.assertIn("key_elements", chapter_template["system"])
         self.assertEqual(book_template["version"], 5)
         self.assertNotIn("chapter_summary", book_template["system"])
+
+    def test_chapter_templates_separate_learning_from_source_grounding(self):
+        core = chapter_core_template()
+        grounding = chapter_grounding_template()
+
+        self.assertEqual((core["id"], core["version"]), (grounding["id"], grounding["version"]))
+        self.assertIn("teach", core["system"])
+        self.assertNotIn("anchor_quote", core["system"])
+        self.assertNotIn("annotations", core["system"])
+        self.assertIn("anchor_quote", grounding["system"])
+        self.assertIn("annotations", grounding["system"])
 
     def test_chapter_prompt_uses_distinct_profile_guidance(self):
         template = template_for("chapter", "chapter")

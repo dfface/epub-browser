@@ -21,7 +21,7 @@ def reading_layer_template() -> dict:
 
 
 @lru_cache(maxsize=1)
-def chapter_reading_layer_template() -> dict:
+def _chapter_reading_layer_template() -> dict:
     source = (
         resources.files("epub_browser")
         .joinpath("prompt_templates/chapter-reading-layer.json")
@@ -32,6 +32,8 @@ def chapter_reading_layer_template() -> dict:
         raise RuntimeError("Invalid chapter reading layer prompt template")
     if not isinstance(template.get("version"), int) or not isinstance(template.get("system"), str):
         raise RuntimeError("Invalid chapter reading layer prompt template")
+    if not isinstance(template.get("grounding_system"), str) or not template["grounding_system"].strip():
+        raise RuntimeError("Invalid chapter grounding prompt template")
     if not isinstance(template.get("research_principles"), str) or not template["research_principles"].strip():
         raise RuntimeError("Invalid chapter reading research principles")
     profiles = template.get("profiles")
@@ -41,6 +43,23 @@ def chapter_reading_layer_template() -> dict:
     ):
         raise RuntimeError("Invalid chapter reading layer profile prompts")
     return template
+
+
+def chapter_core_template() -> dict:
+    """Return the chapter learning-core contract used by the first final call."""
+    return dict(_chapter_reading_layer_template())
+
+
+def chapter_grounding_template() -> dict:
+    """Return the matching source-grounding contract used by the second final call."""
+    template = dict(_chapter_reading_layer_template())
+    template["system"] = template["grounding_system"]
+    return template
+
+
+def chapter_reading_layer_template() -> dict:
+    """Retain the public chapter template accessor for cache identity callers."""
+    return chapter_core_template()
 
 
 def template_for(scope: str, mode: str) -> dict:
