@@ -23,7 +23,7 @@ from .auth import (
 from .identity import new_server_book_id
 
 
-DB_SCHEMA_VERSION = 11
+DB_SCHEMA_VERSION = 12
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -241,9 +241,12 @@ class StateStore:
             if empty_database:
                 self._create_v11_indexes(connection)
                 self._require_foreign_key_integrity(connection)
-                connection.execute("PRAGMA user_version = 11")
+                connection.execute("PRAGMA user_version = 12")
             elif version < 11:
                 self._migrate_schema_v11(connection, version)
+                self._migrate_schema_v12(connection, 11)
+            elif version < 12:
+                self._migrate_schema_v12(connection, version)
             else:
                 self._create_v11_indexes(connection)
                 self._require_foreign_key_integrity(connection)
@@ -474,6 +477,8 @@ class StateStore:
                 usage_day TEXT NOT NULL,
                 provider_calls INTEGER NOT NULL DEFAULT 0
                     CHECK(provider_calls >= 0),
+                reading_tasks INTEGER NOT NULL DEFAULT 0
+                    CHECK(reading_tasks >= 0),
                 PRIMARY KEY (user_id, usage_day)
             )
             """
@@ -819,6 +824,9 @@ class StateStore:
                 result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
                 progress_current INTEGER NOT NULL DEFAULT 0,
                 progress_total INTEGER NOT NULL DEFAULT 1,
+                quota_reserved INTEGER NOT NULL DEFAULT 0
+                    CHECK(quota_reserved IN (0, 1)),
+                generation_stage TEXT,
                 attempt_number INTEGER NOT NULL DEFAULT 1 CHECK(attempt_number >= 1),
                 retried_from_job_id TEXT REFERENCES ai_reading_jobs(id) ON DELETE SET NULL,
                 retry_root_job_id TEXT REFERENCES ai_reading_jobs(id) ON DELETE SET NULL,
@@ -999,6 +1007,31 @@ class StateStore:
         self._create_v11_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 11")
+
+    def _migrate_schema_v12(self, connection, source_version) -> None:
+        if source_version >= 12:
+            return
+        self._add_column_if_missing(
+            connection,
+            "ai_usage",
+            "reading_tasks",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(reading_tasks >= 0)",
+        )
+        self._add_column_if_missing(
+            connection,
+            "ai_reading_jobs",
+            "quota_reserved",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(quota_reserved IN (0, 1))",
+        )
+        self._add_column_if_missing(
+            connection,
+            "ai_reading_jobs",
+            "generation_stage",
+            "TEXT",
+        )
+        self._create_v11_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 12")
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -3195,6 +3228,61 @@ class StateStore:
             connection.execute("COMMIT")
         return True
 
+    def reserve_ai_reading_task(
+        self, job_id: str, principal: Principal, usage_day: str
+    ) -> bool:
+        """Atomically reserve one daily reading-task allowance for a job."""
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            job = connection.execute(
+                "SELECT owner_user_id, quota_reserved FROM ai_reading_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+            if job is None:
+                raise KeyError(job_id)
+            if job["quota_reserved"]:
+                connection.execute("COMMIT")
+                return True
+            if job["owner_user_id"] != principal.user_id or not self.can_use_ai(principal):
+                connection.execute("COMMIT")
+                return False
+            limit = self.ai_daily_limit(principal)
+            used = connection.execute(
+                "SELECT reading_tasks FROM ai_usage WHERE user_id = ? AND usage_day = ?",
+                (principal.user_id, usage_day),
+            ).fetchone()
+            if limit and used is not None and used["reading_tasks"] >= limit:
+                connection.execute("COMMIT")
+                return False
+            connection.execute(
+                """
+                INSERT INTO ai_usage (user_id, usage_day, reading_tasks)
+                VALUES (?, ?, 1)
+                ON CONFLICT(user_id, usage_day) DO UPDATE SET
+                    reading_tasks = ai_usage.reading_tasks + 1
+                """,
+                (principal.user_id, usage_day),
+            )
+            connection.execute(
+                "UPDATE ai_reading_jobs SET quota_reserved = 1 WHERE id = ?",
+                (job_id,),
+            )
+            connection.execute("COMMIT")
+        return True
+
+    def record_ai_provider_call(self, principal: Principal, usage_day: str) -> None:
+        """Record an attempted AI provider call without consuming task allowance."""
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO ai_usage (user_id, usage_day, provider_calls)
+                VALUES (?, ?, 1)
+                ON CONFLICT(user_id, usage_day) DO UPDATE SET
+                    provider_calls = ai_usage.provider_calls + 1
+                """,
+                (principal.user_id, usage_day),
+            )
+
     @staticmethod
     def _json_object(value) -> Optional[dict]:
         if not isinstance(value, str):
@@ -3257,6 +3345,7 @@ class StateStore:
                    jobs.request_json, jobs.profile, jobs.template_id, jobs.template_version,
                    jobs.status, jobs.error_code, jobs.result_id,
                    jobs.progress_current, jobs.progress_total,
+                   jobs.quota_reserved, jobs.generation_stage,
                    jobs.attempt_number, jobs.retried_from_job_id,
                    jobs.retry_root_job_id, jobs.retried_by_user_id,
                    jobs.created_at, jobs.updated_at
@@ -3560,7 +3649,8 @@ class StateStore:
                 """
                 SELECT id, owner_user_id, book_id, cache_key, request_json, profile,
                        template_id, template_version, status, error_code, result_id,
-                       progress_current, progress_total, created_at, updated_at
+                       progress_current, progress_total, quota_reserved, generation_stage,
+                       created_at, updated_at
                 FROM ai_reading_jobs
                 WHERE cache_key = ? AND status IN ('queued', 'running')
                 ORDER BY created_at DESC, id DESC LIMIT 1
@@ -3587,7 +3677,8 @@ class StateStore:
                 """
                 SELECT id, owner_user_id, book_id, cache_key, request_json, profile,
                        template_id, template_version, status, error_code, result_id,
-                       progress_current, progress_total, created_at, updated_at
+                       progress_current, progress_total, quota_reserved, generation_stage,
+                       created_at, updated_at
                 FROM ai_reading_jobs WHERE id = ?
                 """,
                 (job_id,),
@@ -3769,20 +3860,29 @@ class StateStore:
         return dict(claimed)
 
     def update_ai_job_progress(
-        self, job_id: str, progress_current: int, progress_total: int
+        self,
+        job_id: str,
+        progress_current: int,
+        progress_total: int,
+        generation_stage: Optional[str] = None,
     ) -> bool:
         if int(progress_current) < 0 or int(progress_total) < 1:
             raise ValueError("AI job progress is invalid")
         if int(progress_current) > int(progress_total):
             raise ValueError("AI job progress exceeds its total")
+        if generation_stage not in {
+            None, "preparing_source", "generating_core", "grounding_source",
+        }:
+            raise ValueError("AI job generation stage is invalid")
         with self._connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE ai_reading_jobs SET progress_current = ?, progress_total = ?,
+                    generation_stage = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND status = 'running'
                 """,
-                (int(progress_current), int(progress_total), job_id),
+                (int(progress_current), int(progress_total), generation_stage, job_id),
             )
         return cursor.rowcount == 1
 
@@ -3813,7 +3913,8 @@ class StateStore:
         with self._connection() as connection:
             statement = """
                 SELECT id, owner_user_id, book_id, cache_key, status, error_code,
-                       result_id, progress_current, progress_total, created_at, updated_at
+                       result_id, progress_current, progress_total, quota_reserved,
+                       generation_stage, created_at, updated_at
                 FROM ai_reading_jobs
                 WHERE id = ?
                 """

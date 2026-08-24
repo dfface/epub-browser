@@ -922,15 +922,15 @@ class StateStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "newer schema"):
             StateStore(future).initialize()
 
-    def test_v11_fresh_database_has_latest_contract(self):
-        database = Path(self.temporary.name, "fresh-v11.db")
+    def test_v12_fresh_database_has_latest_contract(self):
+        database = Path(self.temporary.name, "fresh-v12.db")
         StateStore(database).initialize(
             bootstrap=BootstrapCredentials("fresh-owner", "secret")
         )
         StateStore(database).initialize()
 
         with sqlite3.connect(database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
             self.assertFalse(
                 {"username"} & table_columns(connection, "annotations")
             )
@@ -946,9 +946,12 @@ class StateStoreTests(unittest.TestCase):
                     "retried_from_job_id",
                     "retry_root_job_id",
                     "retried_by_user_id",
+                    "quota_reserved",
+                    "generation_stage",
                 }
                 <= table_columns(connection, "ai_reading_jobs")
             )
+            self.assertIn("reading_tasks", table_columns(connection, "ai_usage"))
             job_columns = {
                 row[1]: (row[2], bool(row[3]), row[4])
                 for row in connection.execute("PRAGMA table_info(ai_reading_jobs)")
@@ -1366,7 +1369,7 @@ class StateStoreTests(unittest.TestCase):
                 (1, "Original summary.", "2026-07"),
             )
             self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
 
     def test_concurrent_initializer_rereads_user_version_after_lock(self):
         self._downgrade_selected_tables_to_v10(self.database)
@@ -1438,7 +1441,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 11)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
             self.assertEqual(
                 connection.execute(
                     "SELECT attempt_number, retried_from_job_id, retry_root_job_id, "
@@ -2221,6 +2224,82 @@ class StateStoreTests(unittest.TestCase):
             self.store.get_ai_job("job-running", member.user_id)["status"],
             "interrupted",
         )
+
+    def test_v12_migration_adds_task_usage_and_job_stage_without_converting_provider_calls(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "INSERT INTO ai_usage (user_id, usage_day, provider_calls) VALUES (?, '2026-08-24', 7)",
+                (self.owner.user_id,),
+            )
+            connection.execute("PRAGMA user_version = 11")
+        store = StateStore(self.database)
+        store.initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            row = connection.execute(
+                "SELECT provider_calls, reading_tasks FROM ai_usage WHERE user_id = ?",
+                (self.owner.user_id,),
+            ).fetchone()
+            self.assertEqual(row, (7, 0))
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
+
+    def test_reading_task_reservation_is_idempotent_for_one_job(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)
+        self.store.create_ai_job("task-job", member.user_id, "cache")
+
+        self.assertTrue(
+            self.store.reserve_ai_reading_task("task-job", member, "2026-08-24")
+        )
+        self.assertTrue(
+            self.store.reserve_ai_reading_task("task-job", member, "2026-08-24")
+        )
+        with self.store._connection() as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT reading_tasks FROM ai_usage WHERE user_id = ?",
+                    (member.user_id,),
+                ).fetchone()[0],
+                1,
+            )
+
+    def test_recording_a_provider_call_preserves_reserved_task_count(self):
+        member = self.store.create_user("provider-reader", "hash", role="member")
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)
+        self.store.create_ai_job("provider-task", member.user_id, "provider-cache")
+        self.assertTrue(
+            self.store.reserve_ai_reading_task("provider-task", member, "2026-08-24")
+        )
+
+        self.store.record_ai_provider_call(member, "2026-08-24")
+
+        with self.store._connection() as connection:
+            self.assertEqual(
+                tuple(connection.execute(
+                    "SELECT provider_calls, reading_tasks FROM ai_usage "
+                    "WHERE user_id = ? AND usage_day = ?",
+                    (member.user_id, "2026-08-24"),
+                ).fetchone()),
+                (1, 1),
+            )
+
+    def test_ai_job_progress_persists_a_valid_generation_stage(self):
+        self.store.create_ai_job("staged-job", self.owner.user_id, "staged-cache")
+        self.assertTrue(self.store.start_ai_job("staged-job"))
+
+        self.assertTrue(
+            self.store.update_ai_job_progress(
+                "staged-job", 1, 3, generation_stage="generating_core"
+            )
+        )
+        self.assertEqual(
+            self.store.get_ai_job("staged-job", self.owner.user_id)["generation_stage"],
+            "generating_core",
+        )
+        with self.assertRaisesRegex(ValueError, "generation stage"):
+            self.store.update_ai_job_progress(
+                "staged-job", 1, 3, generation_stage="unsupported"
+            )
 
     def test_ai_generation_jobs_single_flight_by_cache_key(self):
         book = self.store.resolve_book(
