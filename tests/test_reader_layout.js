@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 
 const {
   applyPageWidth,
+  allowsReaderNavigationEvent,
   createNavigationBehaviorController,
   initNavigationBehavior,
   normalizeNavigationBehavior,
   normalizePageWidth,
+  readingPreferenceEnabled,
   syncChapterTocAvailability,
 } = require('../epub_browser/assets/reader-layout.js');
 
@@ -118,6 +120,80 @@ test('continuous reading disables and closes both chapter-local TOC controls', (
     assert.equal(document.elements[id].disabled, false);
     assert.equal(document.elements[id].getAttribute('aria-disabled'), 'false');
   }
+});
+
+test('keyboard navigation preferences default on and only explicit false disables them', () => {
+  assert.equal(readingPreferenceEnabled(null), true);
+  assert.equal(readingPreferenceEnabled(undefined), true);
+  assert.equal(readingPreferenceEnabled('true'), true);
+  assert.equal(readingPreferenceEnabled('false'), false);
+});
+
+test('arrow and Space preferences gate their own keys without gating ArrowDown', () => {
+  const event = key => ({ key, target: { tagName: 'DIV' } });
+
+  assert.equal(allowsReaderNavigationEvent(event('ArrowLeft'), false, true), false);
+  assert.equal(allowsReaderNavigationEvent(event('ArrowRight'), false, true), false);
+  assert.equal(allowsReaderNavigationEvent(event(' '), true, false), false);
+  assert.equal(allowsReaderNavigationEvent(event('Space'), true, false), false);
+  assert.equal(allowsReaderNavigationEvent(event('ArrowRight'), true, false), true);
+  assert.equal(allowsReaderNavigationEvent(event(' '), false, true), true);
+  assert.equal(allowsReaderNavigationEvent(event('ArrowDown'), false, false), true);
+});
+
+test('reader keyboard navigation ignores editing targets, prevented events, and modifiers', () => {
+  const editableTargets = [
+    { tagName: 'INPUT' },
+    { tagName: 'TEXTAREA', className: 'annotation-note-input' },
+    { tagName: 'SELECT' },
+    { tagName: 'DIV', isContentEditable: true },
+    {
+      tagName: 'SPAN',
+      getAttribute(name) { return name === 'contenteditable' ? 'plaintext-only' : null; },
+    },
+  ];
+  editableTargets.forEach(target => {
+    const event = { key: 'ArrowRight', target, composedPath: () => [target] };
+    assert.equal(allowsReaderNavigationEvent(event, true, true), false, target.tagName);
+  });
+
+  const editableAncestor = { tagName: 'DIV', isContentEditable: true };
+  const nestedTarget = { tagName: 'SPAN' };
+  assert.equal(allowsReaderNavigationEvent({
+    key: ' ',
+    target: nestedTarget,
+    composedPath: () => [nestedTarget, editableAncestor],
+  }, true, true), false);
+
+  for (const property of ['defaultPrevented', 'altKey', 'ctrlKey', 'metaKey', 'shiftKey']) {
+    assert.equal(allowsReaderNavigationEvent({
+      key: 'ArrowLeft',
+      target: { tagName: 'DIV' },
+      [property]: true,
+    }, true, true), false, property);
+  }
+});
+
+test('reader keyboard navigation leaves interactive controls and dialogs alone', () => {
+  for (const tagName of ['BUTTON', 'A', 'SUMMARY', 'DIALOG']) {
+    const target = { tagName };
+    assert.equal(allowsReaderNavigationEvent({
+      key: ' ',
+      target,
+      composedPath: () => [target],
+    }, true, true), false, tagName);
+  }
+
+  const target = { tagName: 'SPAN' };
+  const dialog = {
+    tagName: 'DIV',
+    getAttribute(name) { return name === 'role' ? 'dialog' : null; },
+  };
+  assert.equal(allowsReaderNavigationEvent({
+    key: 'ArrowRight',
+    target,
+    composedPath: () => [target, dialog],
+  }, true, true), false);
 });
 
 test('navigation behavior defaults to normal and persists an explicit choice', () => {

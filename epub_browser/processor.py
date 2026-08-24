@@ -2746,6 +2746,19 @@ document.addEventListener('DOMContentLoaded', function() {{
                         </span>
                     </label>
                 </div>
+                <fieldset class="settings-group keyboard-navigation-settings">
+                    <legend class="settings-section-title" data-i18n="settings.keyboardNavigation">Keyboard navigation</legend>
+                    <div class="keyboard-navigation-options">
+                        <label class="keyboard-navigation-option">
+                            <input type="checkbox" id="arrowKeyNavigationToggle" checked>
+                            <span data-i18n="settings.arrowKeyNavigation">Use Left and Right Arrow keys to navigate</span>
+                        </label>
+                        <label class="keyboard-navigation-option">
+                            <input type="checkbox" id="spaceKeyNavigationToggle" checked>
+                            <span data-i18n="settings.spaceKeyNavigation">Use Space for the next page or chapter</span>
+                        </label>
+                    </div>
+                </fieldset>
                 <fieldset class="settings-group navigation-behavior-settings" aria-describedby="navigationBehaviorHelp">
                     <legend class="settings-section-title" data-i18n="settings.navigationBehavior">Navigation bar behavior</legend>
                     <p class="settings-section-description" id="navigationBehaviorHelp" data-i18n="settings.navigationBehaviorHelp">Choose when the top navigation stays visible while you read.</p>

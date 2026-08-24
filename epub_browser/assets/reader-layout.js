@@ -34,6 +34,61 @@
         return preset;
     }
 
+    function readingPreferenceEnabled(value) {
+        return value !== 'false';
+    }
+
+    function isEditableNavigationNode(node) {
+        if (!node || typeof node !== 'object') return false;
+        var tagName = String(node.tagName || '').toUpperCase();
+        if (
+            tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' ||
+            tagName === 'BUTTON' || tagName === 'A' || tagName === 'SUMMARY' ||
+            tagName === 'DIALOG' || tagName === 'OPTION'
+        ) return true;
+        if (node.isContentEditable === true) return true;
+        if (typeof node.getAttribute === 'function') {
+            var contentEditable = node.getAttribute('contenteditable');
+            if (contentEditable !== null && String(contentEditable).toLowerCase() !== 'false') return true;
+            var role = String(node.getAttribute('role') || '').toLowerCase();
+            if (
+                role === 'button' || role === 'link' || role === 'textbox' ||
+                role === 'combobox' || role === 'listbox' || role === 'menu' ||
+                role === 'dialog' || role === 'alertdialog'
+            ) return true;
+        }
+        return false;
+    }
+
+    function navigationEventPath(event) {
+        if (event && typeof event.composedPath === 'function') {
+            try {
+                var composed = event.composedPath();
+                if (composed && composed.length) return composed;
+            } catch (error) {}
+        }
+        var path = [];
+        var node = event && event.target;
+        while (node) {
+            path.push(node);
+            node = node.parentElement || node.parentNode || node.host || null;
+        }
+        return path;
+    }
+
+    function allowsReaderNavigationEvent(event, arrowEnabled, spaceEnabled) {
+        if (!event || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+            return false;
+        }
+        var path = navigationEventPath(event);
+        for (var i = 0; i < path.length; i++) {
+            if (isEditableNavigationNode(path[i])) return false;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') return Boolean(arrowEnabled);
+        if (event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar') return Boolean(spaceEnabled);
+        return true;
+    }
+
     function normalizeNavigationBehavior(value) {
         value = String(value || '');
         return NAVIGATION_BEHAVIORS.indexOf(value) !== -1
@@ -246,11 +301,13 @@
 
     return {
         PAGE_WIDTHS: PAGE_WIDTHS,
+        allowsReaderNavigationEvent: allowsReaderNavigationEvent,
         applyPageWidth: applyPageWidth,
         createNavigationBehaviorController: createNavigationBehaviorController,
         initNavigationBehavior: initNavigationBehavior,
         normalizeNavigationBehavior: normalizeNavigationBehavior,
         normalizePageWidth: normalizePageWidth,
+        readingPreferenceEnabled: readingPreferenceEnabled,
         syncChapterTocAvailability: syncChapterTocAvailability
     };
 });

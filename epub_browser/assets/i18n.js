@@ -4484,7 +4484,10 @@
       'settings.navigationBehaviorHelp': 'Choose when the top navigation stays visible while you read.',
       'settings.navigationBehavior.normal': 'Normal scroll',
       'settings.navigationBehavior.sticky': 'Always sticky',
-      'settings.navigationBehavior.autoHide': 'Hide down, show up'
+      'settings.navigationBehavior.autoHide': 'Hide down, show up',
+      'settings.keyboardNavigation': 'Keyboard navigation',
+      'settings.arrowKeyNavigation': 'Use Left and Right Arrow keys to navigate',
+      'settings.spaceKeyNavigation': 'Use Space for the next page or chapter'
     },
     'zh-CN': {
       'annotations.shareActions': '分享标注',
@@ -4501,7 +4504,10 @@
       'settings.navigationBehaviorHelp': '选择阅读时顶部导航栏何时保持可见。',
       'settings.navigationBehavior.normal': '正常滚动',
       'settings.navigationBehavior.sticky': '始终固定',
-      'settings.navigationBehavior.autoHide': '下滚隐藏，上滚显示'
+      'settings.navigationBehavior.autoHide': '下滚隐藏，上滚显示',
+      'settings.keyboardNavigation': '键盘导航',
+      'settings.arrowKeyNavigation': '使用左右方向键导航',
+      'settings.spaceKeyNavigation': '使用空格键前往下一页或下一章'
     },
     'zh-TW': {
       'annotations.shareActions': '分享註釋',
@@ -4518,7 +4524,10 @@
       'settings.navigationBehaviorHelp': '選擇閱讀時頂部導覽列何時保持顯示。',
       'settings.navigationBehavior.normal': '正常捲動',
       'settings.navigationBehavior.sticky': '永遠固定',
-      'settings.navigationBehavior.autoHide': '向下捲動時隱藏，向上捲動時顯示'
+      'settings.navigationBehavior.autoHide': '向下捲動時隱藏，向上捲動時顯示',
+      'settings.keyboardNavigation': '鍵盤導覽',
+      'settings.arrowKeyNavigation': '使用左右方向鍵導覽',
+      'settings.spaceKeyNavigation': '使用空白鍵前往下一頁或下一章'
     },
     ko: {
       'annotations.shareActions': '주석 공유',
@@ -4535,7 +4544,10 @@
       'settings.navigationBehaviorHelp': '읽는 동안 상단 탐색 모음을 언제 표시할지 선택하세요.',
       'settings.navigationBehavior.normal': '일반 스크롤',
       'settings.navigationBehavior.sticky': '항상 고정',
-      'settings.navigationBehavior.autoHide': '아래로 스크롤하면 숨기고 위로 스크롤하면 표시'
+      'settings.navigationBehavior.autoHide': '아래로 스크롤하면 숨기고 위로 스크롤하면 표시',
+      'settings.keyboardNavigation': '키보드 탐색',
+      'settings.arrowKeyNavigation': '왼쪽 및 오른쪽 화살표 키로 이동',
+      'settings.spaceKeyNavigation': '스페이스 키로 다음 페이지 또는 장으로 이동'
     },
     ja: {
       'annotations.shareActions': '注釈を共有',
@@ -4552,7 +4564,10 @@
       'settings.navigationBehaviorHelp': '読書中に上部ナビゲーションを表示するタイミングを選びます。',
       'settings.navigationBehavior.normal': '通常スクロール',
       'settings.navigationBehavior.sticky': '常に固定',
-      'settings.navigationBehavior.autoHide': '下へスクロールで隠し、上へスクロールで表示'
+      'settings.navigationBehavior.autoHide': '下へスクロールで隠し、上へスクロールで表示',
+      'settings.keyboardNavigation': 'キーボードナビゲーション',
+      'settings.arrowKeyNavigation': '左右の矢印キーで移動',
+      'settings.spaceKeyNavigation': 'スペースキーで次のページまたは章へ進む'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

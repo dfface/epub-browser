@@ -232,3 +232,62 @@ test('converts migrated XPath positions into current annotation metadata', () =>
   );
   assert.deepEqual(expressions, ['./p[1]/text()[1]']);
 });
+
+test('annotation detail lifecycle closes only after a successful save', async () => {
+  const window = loadAnnotationWindow({ status: 200, body: '{}' });
+  const lifecycle = window.AnnotationDetailLifecycle.create();
+  const token = lifecycle.begin();
+  let closed = false;
+  let reenabled = false;
+
+  await lifecycle.runSave(
+    token,
+    () => Promise.resolve(),
+    () => { closed = true; },
+    () => { reenabled = true; },
+  );
+
+  assert.equal(closed, true);
+  assert.equal(reenabled, false);
+});
+
+test('annotation detail lifecycle leaves a failed save open and re-enables it', async () => {
+  const window = loadAnnotationWindow({ status: 200, body: '{}' });
+  const lifecycle = window.AnnotationDetailLifecycle.create();
+  const token = lifecycle.begin();
+  let closed = false;
+  let reenabled = false;
+
+  await assert.rejects(lifecycle.runSave(
+    token,
+    () => Promise.reject(new Error('save failed')),
+    () => { closed = true; },
+    () => { reenabled = true; },
+  ), /save failed/);
+
+  assert.equal(closed, false);
+  assert.equal(reenabled, true);
+});
+
+test('closing an annotation detail invalidates its late save completion', async () => {
+  const window = loadAnnotationWindow({ status: 200, body: '{}' });
+  const lifecycle = window.AnnotationDetailLifecycle.create();
+  const oldToken = lifecycle.begin();
+  let resolveSave;
+  const pendingSave = new Promise(resolve => { resolveSave = resolve; });
+  let oldDialogClosed = false;
+  const save = lifecycle.runSave(
+    oldToken,
+    () => pendingSave,
+    () => { oldDialogClosed = true; },
+    () => {},
+  );
+
+  lifecycle.invalidate();
+  const newToken = lifecycle.begin();
+  resolveSave();
+  await save;
+
+  assert.equal(lifecycle.isCurrent(newToken), true);
+  assert.equal(oldDialogClosed, false);
+});

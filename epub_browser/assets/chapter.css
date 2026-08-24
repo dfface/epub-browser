@@ -989,6 +989,55 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     border-top: 1px solid var(--border);
 }
 
+.keyboard-navigation-settings {
+    min-width: 0;
+    margin: 0;
+    padding: 16px 0 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+}
+
+.keyboard-navigation-options {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+
+.keyboard-navigation-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.keyboard-navigation-option:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.keyboard-navigation-option:focus-within {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 34%, transparent);
+    outline-offset: 2px;
+}
+
+.keyboard-navigation-option input {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--button-bg);
+}
+
+.keyboard-navigation-option span {
+    min-width: 0;
+    line-height: 1.35;
+}
+
 .navigation-behavior-options {
     display: grid;
     grid-template-columns: 1fr;

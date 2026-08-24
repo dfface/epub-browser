@@ -93,6 +93,32 @@
         return i18n && i18n.t ? i18n.t('annotations.' + key, params) : key;
     }
 
+    function createAnnotationDetailLifecycle() {
+        var revision = 0;
+        return {
+            begin: function() {
+                revision += 1;
+                return revision;
+            },
+            invalidate: function() {
+                revision += 1;
+            },
+            isCurrent: function(token) {
+                return token === revision;
+            },
+            runSave: function(token, operation, onSuccess, onFailure) {
+                var self = this;
+                return Promise.resolve().then(operation).then(function(result) {
+                    if (self.isCurrent(token) && onSuccess) onSuccess(result);
+                    return result;
+                }).catch(function(error) {
+                    if (self.isCurrent(token) && onFailure) onFailure(error);
+                    throw error;
+                });
+            }
+        };
+    }
+
     var BACKEND_ERROR_CODES = {
         not_found: true,
         username_required: true,
@@ -835,6 +861,7 @@
         isBound: false,
         pendingDraft: null,
         renderVersion: 0,
+        detailLifecycle: createAnnotationDetailLifecycle(),
 
         init: function() {
             var hl = initHighlighter();
@@ -1003,6 +1030,7 @@
         },
 
         closeDialog: function() {
+            this.detailLifecycle.invalidate();
             if (this.activeDialog) {
                 this.activeDialog.remove();
                 this.activeDialog = null;
@@ -1171,7 +1199,9 @@
         showDetailDialog: function(id) {
             var self = this;
             this.closeDialog();
+            var dialogToken = this.detailLifecycle.begin();
             StorageManager.getById(id).then(function(annotation) {
+                if (!self.detailLifecycle.isCurrent(dialogToken)) return;
                 annotation = self.normalizeAnnotation(annotation);
                 if (!annotation) {
                     Utils.showNotification(tr('notFound'), 'warning');
@@ -1262,14 +1292,29 @@
                         self.closeDialog();
                     }
                 });
-                dialog.querySelector('.annotation-btn-confirm').addEventListener('click', function() {
+                var saveButton = dialog.querySelector('.annotation-btn-confirm');
+                saveButton.addEventListener('click', function() {
                     var selectedColor = colorOptions.querySelector('.color-option.selected');
                     var color = selectedColor ? selectedColor.getAttribute('data-color') : annotation.color;
-                    self.updateAnnotation(annotation.id, {
-                        color: color,
-                        note: noteInput.value.trim()
-                    });
-                    self.closeDialog();
+                    saveButton.disabled = true;
+                    saveButton.setAttribute('aria-disabled', 'true');
+                    self.detailLifecycle.runSave(
+                        dialogToken,
+                        function() {
+                            return self.updateAnnotation(annotation.id, {
+                                color: color,
+                                note: noteInput.value.trim()
+                            });
+                        },
+                        function() {
+                            if (self.activeDialog === dialog) self.closeDialog();
+                        },
+                        function() {
+                            if (self.activeDialog !== dialog) return;
+                            saveButton.disabled = false;
+                            saveButton.setAttribute('aria-disabled', 'false');
+                        }
+                    ).catch(function() {});
                 });
             }).catch(function(err) {
                 Utils.showNotification(tr('loadFailed', { error: err.message }), 'error');
@@ -1297,7 +1342,7 @@
                 note: data.note,
                 updated_at: Utils.getISOTime()
             };
-            StorageManager.update(id, updateData).then(function() {
+            return StorageManager.update(id, updateData).then(function() {
                 var updatedAnnotation = null;
                 self.annotations = self.annotations.map(function(annotation) {
                     if (annotation.id !== id) return annotation;
@@ -1312,6 +1357,7 @@
                 }
             }).catch(function(err) {
                 Utils.showNotification(tr('updateFailed', { error: err.message }), 'error');
+                throw err;
             });
         },
 
@@ -2268,6 +2314,11 @@
         setBookInfo: function(bookHash, chapterIndex) {
             return HighlightInteraction.setContext(bookHash, chapterIndex);
         },
+
+        closeTransient: function() {
+            if (HighlightInteraction.pendingDraft) HighlightInteraction.cancelPendingDraft();
+            else HighlightInteraction.closeDialog();
+        },
         
         // Get annotation count
         getAnnotationCount: function() {
@@ -2322,6 +2373,9 @@
     global.AnnotationStorage = AnnotationStorage;
     if (global.__EPUB_BROWSER_TESTING__) {
         global.AnnotationBackendStorage = BackendStorage;
+        global.AnnotationDetailLifecycle = {
+            create: createAnnotationDetailLifecycle
+        };
         global.AnnotationLegacyPosition = {
             resolve: function(meta, chapterRoot) {
                 return HighlightInteraction.resolveLegacyPointMeta(meta, chapterRoot);

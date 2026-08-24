@@ -112,6 +112,9 @@ test('localizes every navigation behavior choice and its helper copy', () => {
     'settings.navigationBehavior.normal',
     'settings.navigationBehavior.sticky',
     'settings.navigationBehavior.autoHide',
+    'settings.keyboardNavigation',
+    'settings.arrowKeyNavigation',
+    'settings.spaceKeyNavigation',
   ];
   ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
     keys.forEach(key => assert.ok(dictionaries[locale][key], `${locale}:${key}`));

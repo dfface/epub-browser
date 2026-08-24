@@ -359,6 +359,12 @@ function initScript() {
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
         : getReadingPreference('showReadingProgressBar') !== 'false';
     var showDesktopChapterSidebar = getReadingPreference('desktopChapterSidebar') === 'true';
+    var arrowKeyNavigationEnabled = window.EpubReaderLayout
+        ? window.EpubReaderLayout.readingPreferenceEnabled(getReadingPreference('arrowKeyNavigation'))
+        : getReadingPreference('arrowKeyNavigation') !== 'false';
+    var spaceKeyNavigationEnabled = window.EpubReaderLayout
+        ? window.EpubReaderLayout.readingPreferenceEnabled(getReadingPreference('spaceKeyNavigation'))
+        : getReadingPreference('spaceKeyNavigation') !== 'false';
     applyReadingProgressBarVisibility(showReadingProgressBar);
 
     function applyDesktopChapterSidebar() {
@@ -992,6 +998,9 @@ function initScript() {
                 showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
                 return;
             }
+            if (window.AnnotationModule && typeof window.AnnotationModule.closeTransient === 'function') {
+                window.AnnotationModule.closeTransient();
+            }
             while (content.firstChild) content.removeChild(content.firstChild);
             var childNodes = chapterContent.childNodes;
             for (var i = 0; i < childNodes.length; i++) {
@@ -1042,6 +1051,14 @@ function initScript() {
     
     function handleKeyDown(e) {
         if (isKindleMode()) return;
+        if (
+            !window.EpubReaderLayout ||
+            !window.EpubReaderLayout.allowsReaderNavigationEvent(
+                e,
+                arrowKeyNavigationEnabled,
+                spaceKeyNavigationEnabled
+            )
+        ) return;
         if (isPaginationMode) {
             switch(e.key) {
                 case 'ArrowLeft':
@@ -1066,10 +1083,6 @@ function initScript() {
                     break;
             }
         } else {
-            var cssInput = document.getElementById('customCssInput');
-            var fontInput = document.getElementById('customFontFamily');
-            if (document.activeElement === cssInput || document.activeElement === fontInput) return;
-            
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -2476,6 +2489,22 @@ function initScript() {
     var continuousScrollTip = document.getElementById('continuousScrollTip');
     var showReadingProgressBarToggle = document.getElementById('showReadingProgressBarToggle');
     var desktopChapterSidebarToggle = document.getElementById('desktopChapterSidebarToggle');
+    var arrowKeyNavigationToggle = document.getElementById('arrowKeyNavigationToggle');
+    var spaceKeyNavigationToggle = document.getElementById('spaceKeyNavigationToggle');
+    if (arrowKeyNavigationToggle) {
+        arrowKeyNavigationToggle.checked = arrowKeyNavigationEnabled;
+        arrowKeyNavigationToggle.addEventListener('change', function() {
+            arrowKeyNavigationEnabled = this.checked;
+            setReadingPreference('arrowKeyNavigation', arrowKeyNavigationEnabled ? 'true' : 'false');
+        });
+    }
+    if (spaceKeyNavigationToggle) {
+        spaceKeyNavigationToggle.checked = spaceKeyNavigationEnabled;
+        spaceKeyNavigationToggle.addEventListener('change', function() {
+            spaceKeyNavigationEnabled = this.checked;
+            setReadingPreference('spaceKeyNavigation', spaceKeyNavigationEnabled ? 'true' : 'false');
+        });
+    }
     if (showReadingProgressBarToggle) {
         showReadingProgressBarToggle.checked = showReadingProgressBar;
         showReadingProgressBarToggle.addEventListener('change', function() {

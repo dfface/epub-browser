@@ -1223,6 +1223,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("chapterContent.getAttribute('data-book-hash')", navigation)
         self.assertIn('while (content.firstChild) content.removeChild(content.firstChild);', navigation)
         self.assertIn('content.appendChild(childNodes[i].cloneNode(true));', navigation)
+        cleanup = navigation.index('window.AnnotationModule.closeTransient();')
+        replacement = navigation.index(
+            'while (content.firstChild) content.removeChild(content.firstChild);'
+        )
+        self.assertLess(cleanup, replacement)
         self.assertNotIn('content.innerHTML', navigation)
         self.assertIn("window.history.pushState({chapterIndex: target.index}, '', url);", navigation)
         self.assertIn("window.addEventListener('popstate'", navigation)
@@ -2336,6 +2341,34 @@ assert.deepEqual(
             r'@media \(min-width: 601px\)[\s\S]*?'
             r'\.navigation-behavior-option span\s*\{[^}]*white-space:\s*nowrap;',
         )
+
+    def test_chapter_reading_tab_has_default_on_keyboard_navigation_preferences(self):
+        html = self._chapter_html()
+        reading = html[
+            html.index('id="reading-tab"'):
+            html.index('</div>\n        </div>\n    </div>', html.index('id="reading-tab"'))
+        ]
+
+        self.assertRegex(reading, r'<fieldset\b[^>]*class="[^"]*keyboard-navigation')
+        self.assertIn('data-i18n="settings.keyboardNavigation"', reading)
+        for control_id, key in (
+            ('arrowKeyNavigationToggle', 'settings.arrowKeyNavigation'),
+            ('spaceKeyNavigationToggle', 'settings.spaceKeyNavigation'),
+        ):
+            self.assertRegex(
+                reading,
+                rf'<input\b(?=[^>]*type="checkbox")'
+                rf'(?=[^>]*id="{control_id}")(?=[^>]*checked)',
+            )
+            self.assertIn(f'data-i18n="{key}"', reading)
+
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn("getReadingPreference('arrowKeyNavigation')", chapter_script)
+        self.assertIn("getReadingPreference('spaceKeyNavigation')", chapter_script)
+        self.assertIn("setReadingPreference('arrowKeyNavigation'", chapter_script)
+        self.assertIn("setReadingPreference('spaceKeyNavigation'", chapter_script)
 
     def test_book_and_chapter_load_shared_navigation_behavior_without_server_apis(self):
         for html in (self._book_html(), self._chapter_html()):
