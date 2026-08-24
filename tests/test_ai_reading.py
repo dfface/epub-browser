@@ -21,7 +21,7 @@ from epub_browser.ai_reading import (
     extract_chapter_text,
 )
 from epub_browser.auth import BootstrapCredentials
-from epub_browser.prompt_templates import template_for
+from epub_browser.prompt_templates import profile_system_prompt, template_for
 from epub_browser.state import StateStore
 
 
@@ -932,8 +932,12 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             set(content),
             {
                 "quick", "structure", "deep", "evidence", "annotations",
-                "paragraph_notes",
+                "paragraph_notes", "chapter_summary",
             },
+        )
+        self.assertEqual(
+            set(content["chapter_summary"]),
+            {"overview", "beats", "key_elements", "closing"},
         )
         self.assertEqual(set(content["quick"]), {"title", "summary", "key_points"})
         self.assertEqual(
@@ -1917,6 +1921,83 @@ class ModelContextBudgetTests(unittest.TestCase):
 
 
 class ResultNormalizationTests(unittest.TestCase):
+    def test_chapter_summary_contract_does_not_change_book_generation(self):
+        chapter_template = template_for("chapter", "chapter")
+        book_template = template_for("book", "full_review")
+
+        self.assertEqual(chapter_template["version"], 7)
+        self.assertIn("chapter_summary", chapter_template["system"])
+        self.assertIn("key_elements", chapter_template["system"])
+        self.assertEqual(book_template["version"], 5)
+        self.assertNotIn("chapter_summary", book_template["system"])
+
+    def test_chapter_prompt_uses_distinct_profile_guidance(self):
+        template = template_for("chapter", "chapter")
+
+        technical = profile_system_prompt(template, "technical")
+        fiction = profile_system_prompt(template, "fiction")
+        general = profile_system_prompt(template, "general")
+
+        self.assertIn("argument, method", technical)
+        self.assertIn("narrative movement", fiction)
+        self.assertIn("concepts, facts", general)
+        self.assertNotEqual(technical, fiction)
+
+    def test_chapter_prompt_frames_analysis_as_evidence_based_reading_comprehension(self):
+        template = template_for("chapter", "chapter")
+
+        prompt = profile_system_prompt(template, "general")
+
+        self.assertIn("reading-comprehension researcher", prompt)
+        self.assertIn("textual evidence", prompt)
+        self.assertIn("fact, inference, and open question", prompt)
+
+    def test_chapter_summary_keeps_story_beats_and_key_elements_with_exact_source_anchors(self):
+        result = _normalize_result(json.dumps({
+            "quick": {"summary": "Quick guide"},
+            "chapter_summary": {
+                "overview": "A complete account of this chapter.",
+                "beats": [
+                    {
+                        "label": "Opening",
+                        "title": "The opening claim",
+                        "anchor_quote": "The source starts here.",
+                        "summary": "It establishes the chapter's subject.",
+                    },
+                    {
+                        "label": "Discarded",
+                        "title": "Discarded section",
+                        "anchor_quote": "This is absent from the source.",
+                        "summary": "It must not be published as navigable detail.",
+                    },
+                ],
+                "key_elements": [
+                    {"name": "Memory", "note": "The pressure point of the chapter."},
+                    {"name": "The diary", "note": "Turns private doubt into action."},
+                ],
+                "closing": "The chapter leaves the question open.",
+            },
+        }))
+        request = ReadingRequest(scope="chapter", book_id="book", chapter_index=0)
+        validated = AIReadingService._validate_learning_layer(
+            result, request, "The source starts here.\nIt continues here."
+        )
+
+        self.assertEqual(validated["chapter_summary"], {
+            "overview": "A complete account of this chapter.",
+            "beats": [{
+                "label": "Opening",
+                "title": "The opening claim",
+                "anchor_quote": "The source starts here.",
+                "summary": "It establishes the chapter's subject.",
+            }],
+            "key_elements": [
+                {"name": "Memory", "note": "The pressure point of the chapter."},
+                {"name": "The diary", "note": "Turns private doubt into action."},
+            ],
+            "closing": "The chapter leaves the question open.",
+        })
+
     def test_deep_report_items_remain_structured_instead_of_becoming_json_text(self):
         result = _normalize_result(json.dumps({
             "quick": {"summary": "Summary"},

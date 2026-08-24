@@ -314,11 +314,38 @@
     body.textContent = '';
     var content = result.content || {};
     var quick = content.quick || {};
+    var chapterSummary = content.chapter_summary || {};
     var structure = content.structure || {};
     var deep = content.deep || {};
     body.appendChild(el('h3', 'ai-reading-result-title', quick.title || t('ai.result')));
     body.appendChild(el('p', 'ai-reading-summary', quick.summary || ''));
     addList(body, 'ai.quickPoints', quick.key_points || []);
+    if (chapterSummary.overview || (chapterSummary.beats || []).length || (chapterSummary.key_elements || []).length || chapterSummary.closing) {
+      body.appendChild(el('h4', '', t('ai.chapterSummary')));
+      if (chapterSummary.overview) {
+        body.appendChild(el('h5', '', t('ai.chapterSummarySummary')));
+        body.appendChild(el('p', 'ai-reading-summary', chapterSummary.overview));
+      }
+      if ((chapterSummary.beats || []).length) {
+        body.appendChild(el('h5', '', t('ai.chapterSummaryDetails')));
+        chapterSummary.beats.forEach(function(section) {
+          var item = el('article', 'ai-reading-map-node');
+          item.appendChild(el('strong', '', section.title || ''));
+          item.appendChild(el('span', '', section.summary || ''));
+          body.appendChild(item);
+        });
+      }
+      if ((chapterSummary.key_elements || []).length) {
+        body.appendChild(el('h5', '', t('ai.chapterSummaryKeyElements')));
+        chapterSummary.key_elements.forEach(function(item) {
+          var element = el('article', 'ai-reading-map-node'); element.appendChild(el('strong', '', item.name || '')); element.appendChild(el('span', '', item.note || '')); body.appendChild(element);
+        });
+      }
+      if (chapterSummary.closing) {
+        body.appendChild(el('h5', '', t('ai.chapterSummaryClosing')));
+        body.appendChild(el('p', 'ai-reading-summary', chapterSummary.closing));
+      }
+    }
     body.appendChild(el('h4', '', t('ai.structure')));
     body.appendChild(el('p', '', structure.overview || ''));
     var map = el('div', 'ai-reading-map');

@@ -88,6 +88,7 @@ function updateFontFamily(fontFamily, fontFamilyInput) {
         }
         window.epubBrowserCache.font_family = fontFamily;
     }
+    document.dispatchEvent(new CustomEvent('epub:reader-typography-change'));
 }
 
 function setCookie(key, value) {
@@ -2031,6 +2032,7 @@ function initScript() {
         }
         content.classList.remove('font-size-1', 'font-size-2', 'font-size-3', 'font-size-4', 'font-size-5', 'font-size-6', 'font-size-7');
         content.classList.add('font-size-' + size);
+        document.dispatchEvent(new CustomEvent('epub:reader-typography-change'));
     }
 
     function updatePageWidth(preset, reflowPagination) {

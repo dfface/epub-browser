@@ -76,8 +76,65 @@
   function createMap(result) {
     var source = diagramFromStructure(result.content && result.content.structure); if (!source || !root.EpubBrowserAIRich) return;
     var map = el('figure', 'ai-native-map'); map.setAttribute('data-ai-native-map', '');
-    var canvas = el('div', 'ai-canvas-rich-block'); root.EpubBrowserAIRich.render(canvas, 'mermaid', source); map.appendChild(canvas);
+    var canvas = el('div', 'ai-map-viewport'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', t('ai.mapKicker')); root.EpubBrowserAIRich.render(canvas, 'mermaid', source); map.appendChild(canvas);
     return map;
+  }
+  function applyMapTheme(viewport) {
+    var svg = viewport && viewport.querySelector('svg'); if (!svg) return;
+    svg.classList.add('ai-map-themed');
+    var rootNode = svg.querySelector('.mindmap-node.section-root');
+    if (rootNode) rootNode.setAttribute('data-ai-map-root', '');
+  }
+  function enableMapViewport(viewport) {
+    var scale = 1, x = 0, y = 0, dragging = null;
+    function target() { return viewport.querySelector('svg'); }
+    function applyTransform() {
+      var svg = target(); if (!svg) return;
+      var transform = 'translate(' + x + 'px, ' + y + 'px) scale(' + scale + ')';
+      svg.style.transformOrigin = '0 0'; svg.style.transform = transform;
+    }
+    function center() { return { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 }; }
+    function setScale(next, point) {
+      var bounded = Math.max(0.5, Math.min(3, next)); point = point || center();
+      var ratio = bounded / scale; x = point.x - (point.x - x) * ratio; y = point.y - (point.y - y) * ratio;
+      scale = bounded; applyTransform();
+    }
+    function fit() {
+      var svg = target(); if (!svg || !viewport.clientWidth || !viewport.clientHeight) return;
+      svg.style.transform = ''; var box = svg.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      scale = Math.max(0.5, Math.min(1.5, Math.min(
+        (viewport.clientWidth - 32) / box.width,
+        (viewport.clientHeight - 32) / box.height
+      )));
+      x = Math.max(16, (viewport.clientWidth - box.width * scale) / 2);
+      y = Math.max(16, (viewport.clientHeight - box.height * scale) / 2);
+      applyTransform();
+    }
+    viewport.addEventListener('wheel', function(event) {
+      event.preventDefault(); var rect = viewport.getBoundingClientRect();
+      setScale(scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15), { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    }, { passive: false });
+    viewport.addEventListener('pointerdown', function(event) {
+      if (event.button !== 0) return; dragging = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      if (viewport.setPointerCapture) viewport.setPointerCapture(event.pointerId);
+    });
+    viewport.addEventListener('pointermove', function(event) {
+      if (!dragging || dragging.id !== event.pointerId) return;
+      x += event.clientX - dragging.x; y += event.clientY - dragging.y; dragging.x = event.clientX; dragging.y = event.clientY; applyTransform();
+    });
+    function stopDragging(event) { if (dragging && dragging.id === event.pointerId) dragging = null; }
+    viewport.addEventListener('pointerup', stopDragging); viewport.addEventListener('pointercancel', stopDragging);
+    viewport.addEventListener('keydown', function(event) {
+      if (event.key === '+' || event.key === '=') { event.preventDefault(); setScale(scale * 1.15); }
+      else if (event.key === '-') { event.preventDefault(); setScale(scale / 1.15); }
+      else if (event.key === '0') { event.preventDefault(); fit(); }
+    });
+    if (root.MutationObserver) {
+      var observer = new root.MutationObserver(function() { if (target()) { applyMapTheme(viewport); fit(); observer.disconnect(); } });
+      observer.observe(viewport, { childList: true, subtree: true });
+    }
+    return { zoomIn: function() { setScale(scale * 1.15); }, zoomOut: function() { setScale(scale / 1.15); }, fit: fit };
   }
   function createNote(annotation, index) {
     var note = el('article', 'ai-native-sticky'); note.id = annotation.id || 'ai-native-note-' + index; note.tabIndex = -1; note.setAttribute('data-ai-note-color', String(index % 4));
@@ -142,17 +199,81 @@
     block.appendChild(trigger); state.paragraphTriggers.push(trigger);
   }
   function removeMapPopover() { if (state.mapPopover) state.mapPopover.remove(); document.body.classList.remove('ai-map-open'); if (state.mapTrigger) state.mapTrigger.setAttribute('aria-expanded', 'false'); state.mapPopover = null; state.mapTrigger = null; }
+  function syncReaderTypography(target) {
+    var source = document.querySelector('#eb-content');
+    if (!source || !target || !root.getComputedStyle) return;
+    var style = root.getComputedStyle(source);
+    target.style.setProperty('--ai-reader-font-family', style.fontFamily || 'inherit');
+    target.style.setProperty('--ai-reader-font-size', style.fontSize || '1rem');
+    target.style.setProperty('--ai-reader-line-height', style.lineHeight || '1.65');
+  }
+  document.addEventListener('epub:reader-typography-change', function() {
+    if (state.mapPopover) syncReaderTypography(state.mapPopover.querySelector('.ai-guide-map-dialog'));
+  });
+  function chapterSummary(result) {
+    var summary = result.content && result.content.chapter_summary || {};
+    var beats = Array.isArray(summary.beats) ? summary.beats : [];
+    var elements = Array.isArray(summary.key_elements) ? summary.key_elements : [];
+    if (!summary.overview && !beats.length && !elements.length && !summary.closing) return null;
+    var section = el('section', 'ai-chapter-summary'); section.setAttribute('aria-label', t('ai.chapterOverview'));
+    if (summary.overview) { section.appendChild(el('h3', '', t('ai.chapterSummarySummary'))); section.appendChild(el('p', 'ai-chapter-summary-copy', summary.overview)); }
+    if (beats.length) {
+      section.appendChild(el('h3', '', t('ai.chapterSummaryDetails')));
+      var details = el('ol', 'ai-chapter-summary-beats');
+      beats.forEach(function(item, index) {
+        var itemNode = el('li', 'ai-chapter-summary-beat');
+        var marker = el('span', 'ai-chapter-summary-beat-index', String(index + 1).padStart(2, '0')); marker.setAttribute('aria-hidden', 'true'); itemNode.appendChild(marker);
+        var copy = el('div', 'ai-chapter-summary-beat-copy'); if (item.label) copy.appendChild(el('span', 'ai-chapter-summary-beat-label', item.label)); copy.appendChild(el('h5', '', item.title || ''));
+        itemNode.appendChild(copy);
+        itemNode.appendChild(el('p', '', item.summary || '')); details.appendChild(itemNode);
+      });
+      section.appendChild(details);
+    }
+    if (elements.length) {
+      section.appendChild(el('h3', '', t('ai.chapterSummaryKeyElements')));
+      var keyElements = el('dl', 'ai-chapter-summary-key-elements');
+      elements.forEach(function(item) { var row = el('div', 'ai-chapter-summary-key-element'); row.appendChild(el('dt', '', item.name || '')); row.appendChild(el('dd', '', item.note || '')); keyElements.appendChild(row); });
+      section.appendChild(keyElements);
+    }
+    if (summary.closing) { section.appendChild(el('h3', '', t('ai.chapterSummaryClosing'))); section.appendChild(el('p', 'ai-chapter-summary-copy', summary.closing)); }
+    return section;
+  }
+  function overviewAvailable(result) {
+    var summary = result.content && result.content.chapter_summary || {};
+    return Boolean(diagramFromStructure(result.content && result.content.structure) || summary.overview || (summary.beats || []).length || (summary.key_elements || []).length || summary.closing);
+  }
   function showMapPopover(trigger, result) {
     if (state.mapPopover) return;
-    var map = createMap(result); if (!map) return;
     var modal = el('div', 'ai-guide-map-modal');
-    var panel = el('aside', 'ai-guide-map-dialog'); panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', label('ai.viewMap', 'View mind map', '查看思维导图'));
-    var header = el('header', 'ai-guide-map-header'), heading = el('div', 'ai-guide-map-heading'); appendKicker(heading, t('ai.mapKicker'), 'fas fa-diagram-project'); var title = el('h2', '', result.content.quick && result.content.quick.title || t('ai.chapterRead')); title.id = 'ai-guide-map-title'; heading.appendChild(title); panel.setAttribute('aria-labelledby', title.id); header.appendChild(heading);
+    modal.classList.add('is-fullscreen');
+    var panel = el('aside', 'ai-guide-map-dialog'); panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', t('ai.chapterOverview'));
+    var header = el('header', 'ai-guide-map-header'); var title = el('h2', 'ai-guide-map-title', t('ai.chapterOverview')); title.id = 'ai-guide-map-title'; panel.setAttribute('aria-labelledby', title.id); header.appendChild(title);
     var actions = el('div', 'ai-map-popover-actions');
-    var fullscreen = el('button', 'ai-map-action'); fullscreen.type = 'button'; fullscreen.setAttribute('aria-label', t('ai.fullscreen')); fullscreen.appendChild(el('i', 'fas fa-expand'));
-    fullscreen.addEventListener('click', function() { var active = modal.classList.toggle('is-fullscreen'); fullscreen.setAttribute('aria-label', t(active ? 'ai.exitFullscreen' : 'ai.fullscreen')); fullscreen.querySelector('i').className = active ? 'fas fa-compress' : 'fas fa-expand'; });
     var close = el('button', 'ai-map-action ai-guide-map-close'); close.type = 'button'; close.setAttribute('aria-label', t('ai.close')); close.appendChild(el('i', 'fas fa-times')); close.addEventListener('click', function() { removeMapPopover(); trigger.focus(); });
-    actions.appendChild(fullscreen); actions.appendChild(close); header.appendChild(actions); panel.appendChild(header); panel.appendChild(map); modal.appendChild(panel); modal.addEventListener('click', function(event) { if (event.target === modal) { removeMapPopover(); trigger.focus(); } }); document.body.appendChild(modal); document.body.classList.add('ai-map-open'); state.mapPopover = modal; state.mapTrigger = trigger; close.focus();
+    actions.appendChild(close); header.appendChild(actions); panel.appendChild(header);
+    var body = el('main', 'ai-chapter-overview-body'), layout = el('div', 'ai-chapter-overview-layout'), map = createMap(result);
+    var summary = chapterSummary(result); if (summary) layout.appendChild(summary);
+    if (map) {
+      layout.classList.add('has-map');
+      var mapSection = el('section', 'ai-chapter-overview-map'); mapSection.appendChild(el('h3', '', t('ai.mapKicker'))); mapSection.appendChild(map);
+      var controls = enableMapViewport(map.querySelector('.ai-map-viewport')), controlBar = el('div', 'ai-map-controls');
+      [['ai.mapZoomOut', 'fas fa-minus', controls.zoomOut], ['ai.mapFit', 'fas fa-expand-arrows-alt', controls.fit], ['ai.mapZoomIn', 'fas fa-plus', controls.zoomIn]].forEach(function(item) {
+        var control = el('button', 'ai-map-control'); control.type = 'button'; control.setAttribute('aria-label', t(item[0])); control.setAttribute('title', t(item[0])); control.appendChild(el('i', item[1])); control.addEventListener('click', item[2]); controlBar.appendChild(control);
+      });
+      mapSection.appendChild(controlBar); layout.appendChild(mapSection);
+    }
+    body.appendChild(layout);
+    panel.appendChild(body); modal.appendChild(panel);
+    modal.addEventListener('click', function(event) { if (event.target === modal) { removeMapPopover(); trigger.focus(); } });
+    modal.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') { event.preventDefault(); removeMapPopover(); trigger.focus(); return; }
+      if (event.key !== 'Tab') return;
+      var focusable = panel.querySelectorAll('button:not([disabled]), [tabindex="0"]'); if (!focusable.length) return;
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+    document.body.appendChild(modal); syncReaderTypography(panel); document.body.classList.add('ai-map-open'); state.mapPopover = modal; state.mapTrigger = trigger; close.focus();
   }
   function showPopover(mark, annotation) {
     if (state.popover) state.popover.remove();
@@ -189,7 +310,7 @@
     clearChapter(chapterIndex); state.results[String(chapterIndex)] = result;
     var guide = el('section', 'ai-chapter-guide'); guide.setAttribute('data-ai-chapter-guide', ''); guide.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
     var guideHead = el('header'); var guideTitle = el('div', 'ai-chapter-guide-title'); appendKicker(guideTitle, t('ai.guideKicker'), 'fas fa-wand-magic-sparkles'); guideTitle.appendChild(el('h2', '', result.content.quick && result.content.quick.title || t('ai.chapterRead'))); guideHead.appendChild(guideTitle);
-    if (diagramFromStructure(result.content && result.content.structure)) { var mapLabel = label('ai.viewMap', 'View mind map', '查看思维导图'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-diagram-project')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); mapTrigger.addEventListener('keydown', function(event) { if (event.key === 'Escape') { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } }); guideHead.appendChild(mapTrigger); }
+    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-diagram-project')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideHead.appendChild(mapTrigger); }
     guide.appendChild(guideHead);
     guide.appendChild(el('p', 'ai-chapter-guide-summary', result.content.quick && result.content.quick.summary || ''));
     var points = result.content.quick && result.content.quick.key_points || []; if (points.length) { var list = el('ul', 'ai-chapter-guide-points'); points.slice(0, 4).forEach(function(point) { list.appendChild(el('li', '', point)); }); guide.appendChild(list); }
