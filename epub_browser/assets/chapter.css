@@ -981,6 +981,59 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     line-height: 1.45;
 }
 
+.navigation-behavior-settings {
+    min-width: 0;
+    margin: 0;
+    padding: 16px 0 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+}
+
+.navigation-behavior-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.navigation-behavior-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.navigation-behavior-option:has(input:checked) {
+    border-color: var(--button-bg);
+    background: color-mix(in srgb, var(--button-bg) 10%, var(--card-bg));
+    color: var(--text);
+    font-weight: 600;
+}
+
+.navigation-behavior-option:focus-within {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 34%, transparent);
+    outline-offset: 2px;
+}
+
+.navigation-behavior-option input {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--button-bg);
+}
+
+@media (max-width: 600px) {
+    .navigation-behavior-options {
+        grid-template-columns: 1fr;
+    }
+}
+
 .settings-label {
     font-size: 0.9rem;
     font-weight: 500;

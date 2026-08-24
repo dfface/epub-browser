@@ -13,6 +13,44 @@
     -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
+html {
+    scroll-padding-top: var(--reader-navigation-offset, 0px);
+}
+
+[id] {
+    scroll-margin-top: var(--reader-navigation-offset, 0px);
+}
+
+[data-navigation-behavior="sticky"] .app-header,
+[data-navigation-behavior="auto-hide"] .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+}
+
+[data-navigation-behavior="auto-hide"] .app-header {
+    transition: transform 220ms ease, opacity 220ms ease;
+    will-change: transform, opacity;
+}
+
+[data-navigation-behavior="auto-hide"] .app-header.is-navigation-hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+[data-navigation-behavior="auto-hide"] .app-header:focus-within {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-navigation-behavior="auto-hide"] .app-header {
+        transition: none;
+    }
+}
+
 .app-nav {
     display: flex;
     align-items: center;

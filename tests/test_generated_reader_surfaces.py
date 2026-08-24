@@ -683,7 +683,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             " onmouseover=",
             "javascript:",
             "attacker.example",
-            "<form",
+            'action="/logout"',
             "<iframe",
             "<svg",
         ):
@@ -1865,7 +1865,7 @@ assert.deepEqual(
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-info', html)
 
-    def test_locale_selector_exists_only_in_library_navigation(self):
+    def test_locale_selector_uses_the_shared_library_navigation_asset(self):
         library = self._library_html()
         self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
         breadcrumb = library[library.index('<nav'):library.index('</nav>')]
@@ -1879,12 +1879,14 @@ assert.deepEqual(
         self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')
         self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
         self.assertNotRegex(self._chapter_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
-        self.assertRegex(library, r'localeSelect\.value=i18n\.getLocale\(\)')
-        self.assertRegex(library, r'localeSelect\.addEventListener\(["\'`]change')
-        self.assertRegex(library, r'i18n\.setLocale\(localeSelect\.value\)')
-        self.assertRegex(library, r'localeMenu\.className=["\'`]theme-menu locale-menu["\'`]')
-        self.assertRegex(library, r'item\.setAttribute\(["\'`]role["\'`],["\'`]menuitemradio["\'`]\)')
-        self.assertRegex(library, r'item\.setAttribute\(["\'`]aria-checked["\'`]')
+        self.assertRegex(library, r'/assets/immutable/locale-nav\.[0-9a-f]{12}\.js')
+        locale_script = Path('epub_browser/assets/locale-nav.js').read_text(encoding='utf-8')
+        self.assertIn("localeSelect.value = i18n.getLocale()", locale_script)
+        self.assertIn("localeSelect.addEventListener('change'", locale_script)
+        self.assertIn('i18n.setLocale(localeSelect.value)', locale_script)
+        self.assertIn("localeMenu.className = 'theme-menu locale-menu'", locale_script)
+        self.assertIn("item.setAttribute('role', 'menuitemradio')", locale_script)
+        self.assertIn("item.setAttribute('aria-checked'", locale_script)
 
     def test_locale_action_is_a_compact_icon_control(self):
         library = self._library_html()
@@ -2004,14 +2006,16 @@ assert.deepEqual(
     def test_reader_settings_offer_four_responsive_page_widths(self):
         chapter = self._chapter_html()
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
-        reading_tab = chapter[chapter.index('id="reading-tab"'):]
+        appearance_tab = chapter[
+            chapter.index('id="font-tab"'):chapter.index('id="reading-tab"')
+        ]
 
         self.assertRegex(
-            reading_tab,
+            appearance_tab,
             r'id="pageWidthSlider"[^>]+min="1"[^>]+max="4"[^>]+value="3"',
         )
-        self.assertNotIn('id="pageWidthValue"', reading_tab)
-        self.assertNotIn('<output', reading_tab)
+        self.assertNotIn('id="pageWidthValue"', appearance_tab)
+        self.assertNotIn('<output', appearance_tab)
         for key in (
             'settings.pageWidth',
             'settings.pageWidthNarrow',
@@ -2019,7 +2023,7 @@ assert.deepEqual(
             'settings.pageWidthWide',
             'settings.pageWidthExtraWide',
         ):
-            self.assertIn(f'data-i18n="{key}"', reading_tab)
+            self.assertIn(f'data-i18n="{key}"', appearance_tab)
         self.assertIn('max-width: var(--reader-page-width, 1000px);', chapter_css)
         self.assertIn('updatePageWidth(pageWidthPreset, false);', Path(
             'epub_browser/assets/chapter.js'
@@ -2225,16 +2229,54 @@ assert.deepEqual(
         self.assertIn('@media (hover: none), (pointer: coarse)', css)
         self.assertIn('@media (max-width: 600px)', css)
 
-    def test_chapter_puts_custom_css_in_the_reading_settings_tab(self):
+    def test_chapter_groups_width_and_custom_css_under_appearance_only(self):
         html = self._chapter_html()
 
+        appearance_tab_start = html.index('id="font-tab"')
         reading_tab_start = html.index('id="reading-tab"')
+        width_start = html.index('id="pageWidthSlider"')
         editor_start = html.index('id="customCssInput"')
-        self.assertGreater(editor_start, reading_tab_start)
+        self.assertGreater(width_start, appearance_tab_start)
+        self.assertLess(width_start, reading_tab_start)
+        self.assertGreater(editor_start, appearance_tab_start)
+        self.assertLess(editor_start, reading_tab_start)
+        self.assertEqual(html.count('id="pageWidthSlider"'), 1)
+        self.assertEqual(html.count('id="customCssInput"'), 1)
         self.assertIn('Custom styles', html)
         self.assertIn('Optional', html)
         self.assertNotIn('Reading appearance (advanced)', html)
         self.assertNotIn('id="cssPanelToggle"', html)
+
+    def test_chapter_reading_tab_has_accessible_navigation_behavior_radios(self):
+        html = self._chapter_html()
+        reading = html[html.index('id="reading-tab"'):html.index('</div>\n        </div>\n    </div>', html.index('id="reading-tab"'))]
+
+        self.assertRegex(reading, r'<fieldset\b[^>]*class="[^"]*navigation-behavior')
+        self.assertIn('data-i18n="settings.navigationBehavior"', reading)
+        self.assertIn('data-i18n="settings.navigationBehaviorHelp"', reading)
+        for value in ('normal', 'sticky', 'auto-hide'):
+            self.assertRegex(
+                reading,
+                rf'<input\b(?=[^>]*type="radio")(?=[^>]*name="navigationBehavior")(?=[^>]*value="{value}")',
+            )
+        self.assertRegex(reading, r'value="normal"[^>]*checked')
+
+    def test_book_and_chapter_load_shared_navigation_behavior_without_server_apis(self):
+        for html in (self._book_html(), self._chapter_html()):
+            self.assertRegex(html, r'/assets/immutable/reader-layout\.[0-9a-f]{12}\.js')
+            self.assertNotIn('/api/', html)
+            for server_only in (
+                'localeToggle', 'localeSelect', 'accountMenu', 'accountPanel',
+                'adminMenu', 'adminPanel', 'auth.js', 'account.css', 'locale-nav.js',
+            ):
+                self.assertNotIn(server_only, html)
+
+        css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        self.assertIn('[data-navigation-behavior="auto-hide"] .app-header', css)
+        self.assertIn('transform 220ms', css)
+        self.assertIn('opacity 220ms', css)
+        self.assertIn('@media (prefers-reduced-motion: reduce)', css)
+        self.assertIn('scroll-padding-top: var(--reader-navigation-offset, 0px);', css)
 
     def test_reader_template_marks_static_ui_and_preserves_chapter_content(self):
         html = self._chapter_html()

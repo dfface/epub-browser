@@ -25,6 +25,14 @@ from .asset_publisher import (
 )
 from .models import BookMetadata, ConvertedBook
 from .reporting import Reporter
+from .server_chrome import (
+    SERVER_ACCOUNT_CONTROL,
+    SERVER_ACCOUNT_PANEL,
+    SERVER_ACCOUNT_STYLESHEET,
+    SERVER_AUTH_SCRIPT,
+    SERVER_LOCALE_CONTROL,
+    SERVER_LOCALE_SCRIPT,
+)
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 
@@ -1457,6 +1465,11 @@ class EPUBProcessor:
 <script src="/assets/ai-chat.js" defer></script>'''
             if self.deployment_mode == "server" else ""
         )
+        server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
+        server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
+        server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
+        server_account_panel = SERVER_ACCOUNT_PANEL if self.deployment_mode == "server" else ""
+        server_locale_script = SERVER_LOCALE_SCRIPT if self.deployment_mode == "server" else ""
         index_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1482,6 +1495,7 @@ class EPUBProcessor:
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
+    {server_account_stylesheet}
     {ai_reading_stylesheet}
     {ai_book_chat_styles}
 """
@@ -1570,7 +1584,9 @@ class EPUBProcessor:
             {ai_reading_navigation}
         </div>
         <div class="app-nav-actions">
+            {server_locale_control}
             <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="book.theme">Theme</span></button>
+            {server_account_control}
         </div>
     </nav>
 </header>
@@ -1728,6 +1744,7 @@ class EPUBProcessor:
         </div>
     </div>
 </div>
+{server_account_panel}
 {render_footer(datetime.now().year)}"""
 
         cache_boundary_script = (
@@ -1736,7 +1753,7 @@ class EPUBProcessor:
             else ""
         )
         auth_script = (
-            '<script src="/assets/auth.js" defer></script>'
+            SERVER_AUTH_SCRIPT
             if self.deployment_mode == "server"
             else ""
         )
@@ -1758,10 +1775,12 @@ if (window.EpubBrowserCacheBoundary) {
 {cache_boundary_script}
 <script src="/assets/notification.js" defer></script>
 {auth_script}
+{server_locale_script}
 <script src="/assets/theme.js" defer></script>
 <script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
+<script src="/assets/reader-layout.js" defer></script>
     <script src="/assets/book.js?v=13" defer></script>
 <script src="/assets/bookshelf.js" defer></script>
 <script src="/assets/annotation.js" defer></script>
@@ -2343,6 +2362,11 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/ai-rich-text.js" defer></script>
     <script src="/assets/ai-canvas.js" defer></script>
     <script src="/assets/ai-chat.js" defer></script>""" if self.deployment_mode == "server" else ""
+        server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
+        server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
+        server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
+        server_account_panel = SERVER_ACCOUNT_PANEL if self.deployment_mode == "server" else ""
+        server_locale_script = SERVER_LOCALE_SCRIPT if self.deployment_mode == "server" else ""
         prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
@@ -2384,6 +2408,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
+    {server_account_stylesheet}
     {ai_chapter_styles}
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
@@ -2513,7 +2538,9 @@ document.addEventListener('DOMContentLoaded', function() {{
                 {ai_reading_navigation}
             </div>
             <div class="app-nav-actions">
+                {server_locale_control}
                 <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
+                {server_account_control}
             </div>
         </nav>
     </header>
@@ -2649,8 +2676,6 @@ document.addEventListener('DOMContentLoaded', function() {{
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="settings-tab-panel" id="reading-tab">
                 <div class="settings-group">
                     <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
                     <div class="page-width-control">
@@ -2662,32 +2687,6 @@ document.addEventListener('DOMContentLoaded', function() {{
                             <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
                         </div>
                     </div>
-                </div>
-                <div class="settings-group">
-                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
-                    <label class="settings-switch">
-                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
-                    </label>
-                    <label class="settings-switch">
-                        <input type="checkbox" id="paginationModeToggle">
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
-                    </label>
-                    <label class="settings-switch desktop-setting-only">
-                        <input type="checkbox" id="desktopChapterSidebarToggle">
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar on desktop</span>
-                    </label>
-                    <label class="settings-switch">
-                        <input type="checkbox" id="continuousScrollToggle">
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
-                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip">
-                            <i class="fas fa-info-circle"></i>
-                        </span>
-                    </label>
                 </div>
                 <div class="settings-group settings-group-custom-css">
                     <div class="settings-section-heading">
@@ -2719,6 +2718,43 @@ document.addEventListener('DOMContentLoaded', function() {{
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="settings-tab-panel" id="reading-tab">
+                <div class="settings-group">
+                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
+                    </label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="paginationModeToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
+                    </label>
+                    <label class="settings-switch desktop-setting-only">
+                        <input type="checkbox" id="desktopChapterSidebarToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar on desktop</span>
+                    </label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="continuousScrollToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip">
+                            <i class="fas fa-info-circle"></i>
+                        </span>
+                    </label>
+                </div>
+                <fieldset class="settings-group navigation-behavior-settings" aria-describedby="navigationBehaviorHelp">
+                    <legend class="settings-section-title" data-i18n="settings.navigationBehavior">Navigation bar behavior</legend>
+                    <p class="settings-section-description" id="navigationBehaviorHelp" data-i18n="settings.navigationBehaviorHelp">Choose when the top navigation stays visible while you read.</p>
+                    <div class="navigation-behavior-options">
+                        <label class="navigation-behavior-option"><input type="radio" name="navigationBehavior" value="normal" checked><span data-i18n="settings.navigationBehavior.normal">Normal scroll</span></label>
+                        <label class="navigation-behavior-option"><input type="radio" name="navigationBehavior" value="sticky"><span data-i18n="settings.navigationBehavior.sticky">Always sticky</span></label>
+                        <label class="navigation-behavior-option"><input type="radio" name="navigationBehavior" value="auto-hide"><span data-i18n="settings.navigationBehavior.autoHide">Hide down, show up</span></label>
+                    </div>
+                </fieldset>
             </div>
         </div>
     </div>
@@ -2828,6 +2864,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             </div>
         </div>
     </div>
+    {server_account_panel}
     {render_footer(datetime.now().year)}
 """
         cache_boundary_script = (
@@ -2836,7 +2873,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             else ""
         )
         auth_script = (
-            '<script src="/assets/auth.js" defer></script>'
+            SERVER_AUTH_SCRIPT
             if self.deployment_mode == "server"
             else ""
         )
@@ -2858,6 +2895,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     {cache_boundary_script}
     <script src="/assets/notification.js" defer></script>
     {auth_script}
+    {server_locale_script}
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>

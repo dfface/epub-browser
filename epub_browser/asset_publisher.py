@@ -21,10 +21,12 @@ WEB_MANIFEST_SOURCES = {
     'manifest.ja.json': 'manifest.ja.json',
 }
 
-# These files implement the authenticated Server-mode AI reading experience.
-# Keeping them out of a static export prevents orphaned UI controls (there is no
-# /api/ai endpoint in SSG) and avoids shipping the additional renderers there.
+# These files implement authenticated Server-mode experiences. Keeping them out
+# of a static export prevents orphaned account/AI controls and API clients from
+# crossing the SSG boundary.
 SERVER_ONLY_ASSET_PATHS = frozenset({
+    'account.css',
+    'auth.js',
     # Legacy AI-reading renderer kept for backwards-compatible source trees.
     'ai-reading.css',
     'ai-reading.js',

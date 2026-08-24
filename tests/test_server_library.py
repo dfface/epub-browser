@@ -713,6 +713,27 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )
         manager.shutdown()
 
+    def test_dynamic_reader_pages_reuse_server_locale_and_account_chrome(self):
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        renderer = ServerPageRenderer(manager.public_dir, record.book_id)
+
+        for markup in (renderer.render_index(), renderer.render_chapter(0)):
+            for control_id in (
+                'localeToggle', 'localeSelect', 'localeCurrentLabel',
+                'accountMenu', 'accountPanel', 'accountPasswordForm',
+                'adminMenu', 'adminPanel', 'adminClose',
+            ):
+                self.assertRegex(markup, rf'\bid=(?:["\'])?{control_id}(?:["\' >])')
+            for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+                self.assertRegex(markup, rf'\bvalue=(?:["\'])?{re.escape(locale)}(?:["\' >])')
+            self.assertRegex(markup, r'<button\b(?=[^>]*id=(?:["\'])?adminMenu)(?=[^>]*hidden)')
+            self.assertRegex(markup, r'/assets/immutable/account\.[0-9a-f]{12}\.css')
+            self.assertRegex(markup, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+            self.assertRegex(markup, r'/assets/immutable/locale-nav\.[0-9a-f]{12}\.js')
+
+        manager.shutdown()
+
     def test_server_reader_pages_are_rendered_from_content_cache(self):
         manager = self._manager()
         record = manager.reconcile().active_books[0]

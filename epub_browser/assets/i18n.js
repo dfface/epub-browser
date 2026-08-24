@@ -4479,7 +4479,12 @@
       'annotations.shareCopyFailed': 'Unable to copy the annotation summary.',
       'annotations.shareExported': 'Annotation summary exported locally.',
       'annotations.shareExportFailed': 'Unable to export the annotation summary.',
-      'annotations.shareFileFallback': 'Annotations'
+      'annotations.shareFileFallback': 'Annotations',
+      'settings.navigationBehavior': 'Navigation bar behavior',
+      'settings.navigationBehaviorHelp': 'Choose when the top navigation stays visible while you read.',
+      'settings.navigationBehavior.normal': 'Normal scroll',
+      'settings.navigationBehavior.sticky': 'Always sticky',
+      'settings.navigationBehavior.autoHide': 'Hide down, show up'
     },
     'zh-CN': {
       'annotations.shareActions': '分享标注',
@@ -4491,7 +4496,12 @@
       'annotations.shareCopyFailed': '无法复制标注摘要。',
       'annotations.shareExported': '标注摘要已仅在本地导出。',
       'annotations.shareExportFailed': '无法导出标注摘要。',
-      'annotations.shareFileFallback': '标注'
+      'annotations.shareFileFallback': '标注',
+      'settings.navigationBehavior': '导航栏行为',
+      'settings.navigationBehaviorHelp': '选择阅读时顶部导航栏何时保持可见。',
+      'settings.navigationBehavior.normal': '正常滚动',
+      'settings.navigationBehavior.sticky': '始终固定',
+      'settings.navigationBehavior.autoHide': '下滚隐藏，上滚显示'
     },
     'zh-TW': {
       'annotations.shareActions': '分享註釋',
@@ -4503,7 +4513,12 @@
       'annotations.shareCopyFailed': '無法複製註釋摘要。',
       'annotations.shareExported': '註釋摘要已僅在本機匯出。',
       'annotations.shareExportFailed': '無法匯出註釋摘要。',
-      'annotations.shareFileFallback': '註釋'
+      'annotations.shareFileFallback': '註釋',
+      'settings.navigationBehavior': '導覽列行為',
+      'settings.navigationBehaviorHelp': '選擇閱讀時頂部導覽列何時保持顯示。',
+      'settings.navigationBehavior.normal': '正常捲動',
+      'settings.navigationBehavior.sticky': '永遠固定',
+      'settings.navigationBehavior.autoHide': '向下捲動時隱藏，向上捲動時顯示'
     },
     ko: {
       'annotations.shareActions': '주석 공유',
@@ -4515,7 +4530,12 @@
       'annotations.shareCopyFailed': '주석 요약을 복사할 수 없습니다.',
       'annotations.shareExported': '주석 요약을 로컬로 내보냈습니다.',
       'annotations.shareExportFailed': '주석 요약을 내보낼 수 없습니다.',
-      'annotations.shareFileFallback': '주석'
+      'annotations.shareFileFallback': '주석',
+      'settings.navigationBehavior': '탐색 모음 동작',
+      'settings.navigationBehaviorHelp': '읽는 동안 상단 탐색 모음을 언제 표시할지 선택하세요.',
+      'settings.navigationBehavior.normal': '일반 스크롤',
+      'settings.navigationBehavior.sticky': '항상 고정',
+      'settings.navigationBehavior.autoHide': '아래로 스크롤하면 숨기고 위로 스크롤하면 표시'
     },
     ja: {
       'annotations.shareActions': '注釈を共有',
@@ -4527,7 +4547,12 @@
       'annotations.shareCopyFailed': '注釈の概要をコピーできません。',
       'annotations.shareExported': '注釈の概要をローカルにエクスポートしました。',
       'annotations.shareExportFailed': '注釈の概要をエクスポートできません。',
-      'annotations.shareFileFallback': '注釈'
+      'annotations.shareFileFallback': '注釈',
+      'settings.navigationBehavior': 'ナビゲーションバーの動作',
+      'settings.navigationBehaviorHelp': '読書中に上部ナビゲーションを表示するタイミングを選びます。',
+      'settings.navigationBehavior.normal': '通常スクロール',
+      'settings.navigationBehavior.sticky': '常に固定',
+      'settings.navigationBehavior.autoHide': '下へスクロールで隠し、上へスクロールで表示'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

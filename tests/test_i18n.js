@@ -105,6 +105,19 @@ test('provides native locale names and translated AI language labels', () => {
   assert.equal(dictionaries.ja['library.title'], 'ライブラリ');
 });
 
+test('localizes every navigation behavior choice and its helper copy', () => {
+  const keys = [
+    'settings.navigationBehavior',
+    'settings.navigationBehaviorHelp',
+    'settings.navigationBehavior.normal',
+    'settings.navigationBehavior.sticky',
+    'settings.navigationBehavior.autoHide',
+  ];
+  ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
+    keys.forEach(key => assert.ok(dictionaries[locale][key], `${locale}:${key}`));
+  });
+});
+
 test('uses Taiwan product language for navigation AI errors and destructive actions', () => {
   const traditional = dictionaries['zh-TW'];
   assert.deepEqual({

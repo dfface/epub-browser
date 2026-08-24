@@ -6,6 +6,7 @@ from pathlib import Path
 FIRST_PARTY = [
     Path('epub_browser/library.py'),
     Path('epub_browser/processor.py'),
+    Path('epub_browser/server_chrome.py'),
     Path('epub_browser/version.py'),
     *[
         Path('epub_browser/assets', name)
