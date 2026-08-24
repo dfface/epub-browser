@@ -2330,7 +2330,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(usage, 0)
         self.assertEqual(quota_reserved, 1)
 
-    def test_v13_migration_preserves_ai_state_and_expands_language_constraints(self):
+    def _seed_real_v12_ai_language_fixture(self):
         member = self.store.create_user(
             'locale-reader', hash_password('locale-secret'), role='member'
         )
@@ -2338,43 +2338,310 @@ class StateStoreTests(unittest.TestCase):
             Path(self.temporary.name, 'locale-book.epub'),
             'urn:test:locale-book', 'locale-fingerprint', {'title': 'Locale book'},
         )
-        result = self.store.store_ai_reading_result(
-            cache_key='locale-result-en', book_id=book.book_id, chapter_index=0,
-            scope='chapter', mode='chapter', profile='auto', config_revision=0,
-            content={'quick': {'title': 'Existing'}}, created_by_user_id=member.user_id,
-            language='en', reading_boundary=0,
+        self._downgrade_ai_language_tables_to_v12(self.database)
+        result_content = json.dumps(
+            {'quick': {'title': 'Existing v12 result'}, 'evidence': ['quote']},
+            ensure_ascii=False, separators=(',', ':'),
         )
-        followup = self.store.create_ai_followup(
-            result_id=result['id'], owner_user_id=member.user_id,
-            question='Existing follow-up?', language='en',
-        )
-        turn = self.store.create_ai_book_chat_turn(
-            book_id=book.book_id, chapter_index=0, owner_user_id=member.user_id,
-            question='既存の会話?', language='zh-CN', context_mode='chapter_source',
-        )
-        self.store.upsert_ai_book_chat_summary(
-            book_id=book.book_id, owner_user_id=member.user_id, language='zh-CN',
-            covered_turn_count=1, summary_text='既存摘要',
-        )
-        self.store.create_ai_job(
-            'locale-job', member.user_id, 'locale-job-cache', book_id=book.book_id,
-            request_payload={
-                'scope': 'chapter', 'book_id': book.book_id,
-                'chapter_index': 0, 'mode': 'chapter', 'language': 'zh-CN',
+        request_json = json.dumps(
+            {
+                'scope': 'chapter', 'book_id': book.book_id, 'chapter_index': 4,
+                'mode': 'chapter', 'language': 'zh-CN', 'force': True,
+                'reading_boundary': 4,
             },
+            ensure_ascii=False, separators=(',', ':'),
         )
         with sqlite3.connect(self.database) as connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute(
+                "INSERT INTO ai_reading_results VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-result', 'v12-result-cache', book.book_id, 4, 'chapter',
+                    'chapter', 'technical', 'zh-CN', 4, 7, 'chapter-analysis', 6,
+                    result_content, member.user_id, '2026-08-24 01:02:03',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_jobs VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-job-root', member.user_id, book.book_id, 'v12-job-root-cache',
+                    request_json, 'technical', 'chapter-analysis', 6, 'failed',
+                    'provider_server_error', None, 2, 3, 1, 'grounding_source', 1,
+                    None, None, None, '2026-08-24 01:03:00',
+                    '2026-08-24 01:04:00',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_jobs VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-job-retry', member.user_id, book.book_id,
+                    'v12-job-retry-cache', request_json, 'technical',
+                    'chapter-analysis', 6, 'complete', None, 'v12-result', 3, 3, 0,
+                    'grounding_source', 2, 'v12-job-root', 'v12-job-root',
+                    self.owner.user_id, '2026-08-24 01:05:00',
+                    '2026-08-24 01:06:00',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_current_results VALUES (?, ?, ?)",
+                ('v12-result-cache', 'v12-result', '2026-08-24 01:07:00'),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_followups VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-followup-answer', 'v12-result', member.user_id,
+                    'Existing follow-up?', 'en', 'Existing answer.', 'complete', None,
+                    '2026-08-24 01:08:00', '2026-08-24 01:09:00',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_reading_followups VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-followup-error', 'v12-result', member.user_id,
+                    'Failed follow-up?', 'zh-CN', None, 'failed',
+                    'provider_invalid_response', '2026-08-24 01:10:00',
+                    '2026-08-24 01:11:00',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_book_chat_turns VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-chat-answer', book.book_id, 4, 'v12-result',
+                    'shared_layer', 0, member.user_id, 'Existing chat?', 'zh-CN',
+                    'Existing chat answer.', 'complete', None,
+                    '2026-08-24 01:12:00', '2026-08-24 01:13:00',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_book_chat_turns VALUES "
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    'v12-chat-error', book.book_id, 0, None, 'chapter_source', 1,
+                    member.user_id, 'Failed chat?', 'en', None, 'failed',
+                    'provider_rate_limited', '2026-08-24 01:14:00',
+                    '2026-08-24 01:15:00',
+                ),
+            )
+            connection.execute(
+                "INSERT INTO ai_book_chat_summaries VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    book.book_id, member.user_id, 'zh-CN', 2,
+                    'Existing private summary.', '2026-08-24 01:16:00',
+                ),
+            )
             connection.execute(
                 "INSERT INTO ai_usage (user_id, usage_day, provider_calls, reading_tasks) "
                 "VALUES (?, '2026-08-24', 7, 3)", (member.user_id,),
             )
-            connection.execute('PRAGMA user_version = 12')
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO ai_reading_results "
+                    "SELECT 'v12-reject-new-locale', 'v12-reject-cache', book_id, "
+                    "chapter_index, scope, mode, profile, 'zh-TW', reading_boundary, "
+                    "config_revision, template_id, template_version, content_json, "
+                    "created_by_user_id, created_at FROM ai_reading_results "
+                    "WHERE id='v12-result'"
+                )
+            self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
+        return member, book, result_content, request_json
+
+    @staticmethod
+    def _v13_migration_sensitive_snapshot(connection):
+        tables = (
+            'ai_reading_results', 'ai_reading_jobs',
+            'ai_reading_current_results', 'ai_reading_followups',
+            'ai_book_chat_turns', 'ai_book_chat_summaries',
+        )
+        rows = {
+            table: tuple(connection.execute(
+                f'SELECT * FROM "{table}" ORDER BY rowid'
+            ).fetchall())
+            for table in tables
+        }
+        schema = {
+            table: connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()[0]
+            for table in tables
+        }
+        indexes = {
+            row[0]: index_contract(connection, row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL "
+                "AND tbl_name IN ({}) ORDER BY name".format(
+                    ','.join('?' for _ in tables)
+                ),
+                tables,
+            )
+        }
+        foreign_keys = {
+            table: foreign_key_contract(connection, table) for table in tables
+        }
+        usage = tuple(connection.execute(
+            "SELECT * FROM ai_usage ORDER BY user_id, usage_day"
+        ).fetchall())
+        return {
+            'version': connection.execute('PRAGMA user_version').fetchone()[0],
+            'rows': rows, 'schema': schema, 'indexes': indexes,
+            'foreign_keys': foreign_keys, 'usage': usage,
+        }
+
+    def test_v13_migration_from_real_v12_preserves_every_ai_relation_and_field(self):
+        member, book, result_content, request_json = (
+            self._seed_real_v12_ai_language_fixture()
+        )
+        with sqlite3.connect(self.database) as connection:
+            before = self._v13_migration_sensitive_snapshot(connection)
+        self.assertEqual(before['version'], 12)
+        self.assertIn("CHECK(language IN ('en', 'zh-CN'))", before['schema']['ai_reading_results'])
+        self.assertNotIn('zh-TW', before['schema']['ai_reading_results'])
+        self.assertEqual(set(before['indexes']), {
+            'idx_ai_jobs_created', 'idx_ai_jobs_status_created',
+            'idx_ai_jobs_queue', 'idx_ai_jobs_active_cache',
+            'idx_ai_jobs_result', 'idx_ai_jobs_retry_root',
+            'idx_ai_followups_queue', 'idx_ai_followups_result_owner_created',
+            'idx_ai_book_chat_queue', 'idx_ai_book_chat_owner_book_created',
+            'idx_ai_book_chat_result', 'idx_ai_results_book_created',
+            'idx_ai_results_chapter_language_created',
+            'idx_ai_current_results_result',
+        })
+        self.assertEqual(before['foreign_keys'], {
+            'ai_reading_results': {
+                ('book_id', 'books', 'book_id', 'CASCADE'),
+                ('created_by_user_id', 'users', 'id', 'CASCADE'),
+            },
+            'ai_reading_jobs': {
+                ('owner_user_id', 'users', 'id', 'CASCADE'),
+                ('book_id', 'books', 'book_id', 'CASCADE'),
+                ('result_id', 'ai_reading_results', 'id', 'SET NULL'),
+                ('retried_from_job_id', 'ai_reading_jobs', 'id', 'SET NULL'),
+                ('retry_root_job_id', 'ai_reading_jobs', 'id', 'SET NULL'),
+                ('retried_by_user_id', 'users', 'id', 'SET NULL'),
+            },
+            'ai_reading_current_results': {
+                ('result_id', 'ai_reading_results', 'id', 'CASCADE'),
+            },
+            'ai_reading_followups': {
+                ('result_id', 'ai_reading_results', 'id', 'CASCADE'),
+                ('owner_user_id', 'users', 'id', 'CASCADE'),
+            },
+            'ai_book_chat_turns': {
+                ('book_id', 'books', 'book_id', 'CASCADE'),
+                ('result_id', 'ai_reading_results', 'id', 'SET NULL'),
+                ('owner_user_id', 'users', 'id', 'CASCADE'),
+            },
+            'ai_book_chat_summaries': {
+                ('book_id', 'books', 'book_id', 'CASCADE'),
+                ('owner_user_id', 'users', 'id', 'CASCADE'),
+            },
+        })
 
         migrated = StateStore(self.database)
         migrated.initialize()
 
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(connection.execute('PRAGMA user_version').fetchone()[0], 13)
+            after = self._v13_migration_sensitive_snapshot(connection)
+            self.assertEqual(after['version'], 13)
+            self.assertEqual(after['rows'], before['rows'])
+            self.assertEqual(after['indexes'], before['indexes'])
+            self.assertEqual(after['foreign_keys'], before['foreign_keys'])
+            self.assertEqual(after['usage'], before['usage'])
+            for table in (
+                'ai_reading_results', 'ai_reading_followups',
+                'ai_book_chat_turns', 'ai_book_chat_summaries',
+            ):
+                self.assertIn("'zh-TW'", after['schema'][table])
+                self.assertIn("'ko'", after['schema'][table])
+                self.assertIn("'ja'", after['schema'][table])
+            self.assertEqual(
+                connection.execute("SELECT * FROM ai_reading_results").fetchone(),
+                (
+                    'v12-result', 'v12-result-cache', book.book_id, 4, 'chapter',
+                    'chapter', 'technical', 'zh-CN', 4, 7, 'chapter-analysis', 6,
+                    result_content, member.user_id, '2026-08-24 01:02:03',
+                ),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT id, request_json, status, error_code, result_id, "
+                    "progress_current, progress_total, quota_reserved, generation_stage, "
+                    "attempt_number, retried_from_job_id, retry_root_job_id, "
+                    "retried_by_user_id, created_at, updated_at "
+                    "FROM ai_reading_jobs ORDER BY id"
+                ).fetchall(),
+                [
+                    (
+                        'v12-job-retry', request_json, 'complete', None,
+                        'v12-result', 3, 3, 0, 'grounding_source', 2,
+                        'v12-job-root', 'v12-job-root', self.owner.user_id,
+                        '2026-08-24 01:05:00', '2026-08-24 01:06:00',
+                    ),
+                    (
+                        'v12-job-root', request_json, 'failed',
+                        'provider_server_error', None, 2, 3, 1,
+                        'grounding_source', 1, None, None, None,
+                        '2026-08-24 01:03:00', '2026-08-24 01:04:00',
+                    ),
+                ],
+            )
+            self.assertEqual(
+                connection.execute("SELECT * FROM ai_reading_current_results").fetchone(),
+                ('v12-result-cache', 'v12-result', '2026-08-24 01:07:00'),
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT id, result_id, owner_user_id, question, language, answer, "
+                    "status, error_code, created_at, updated_at "
+                    "FROM ai_reading_followups ORDER BY id"
+                ).fetchall(),
+                [
+                    (
+                        'v12-followup-answer', 'v12-result', member.user_id,
+                        'Existing follow-up?', 'en', 'Existing answer.', 'complete',
+                        None, '2026-08-24 01:08:00', '2026-08-24 01:09:00',
+                    ),
+                    (
+                        'v12-followup-error', 'v12-result', member.user_id,
+                        'Failed follow-up?', 'zh-CN', None, 'failed',
+                        'provider_invalid_response', '2026-08-24 01:10:00',
+                        '2026-08-24 01:11:00',
+                    ),
+                ],
+            )
+            self.assertEqual(
+                connection.execute(
+                    "SELECT id, book_id, chapter_index, result_id, context_mode, "
+                    "book_context, owner_user_id, question, language, answer, status, "
+                    "error_code, created_at, updated_at FROM ai_book_chat_turns ORDER BY id"
+                ).fetchall(),
+                [
+                    (
+                        'v12-chat-answer', book.book_id, 4, 'v12-result',
+                        'shared_layer', 0, member.user_id, 'Existing chat?', 'zh-CN',
+                        'Existing chat answer.', 'complete', None,
+                        '2026-08-24 01:12:00', '2026-08-24 01:13:00',
+                    ),
+                    (
+                        'v12-chat-error', book.book_id, 0, None, 'chapter_source', 1,
+                        member.user_id, 'Failed chat?', 'en', None, 'failed',
+                        'provider_rate_limited', '2026-08-24 01:14:00',
+                        '2026-08-24 01:15:00',
+                    ),
+                ],
+            )
+            self.assertEqual(
+                connection.execute("SELECT * FROM ai_book_chat_summaries").fetchone(),
+                (
+                    book.book_id, member.user_id, 'zh-CN', 2,
+                    'Existing private summary.', '2026-08-24 01:16:00',
+                ),
+            )
             self.assertEqual(
                 connection.execute(
                     "SELECT provider_calls, reading_tasks FROM ai_usage WHERE user_id=?",
@@ -2382,24 +2649,7 @@ class StateStoreTests(unittest.TestCase):
                 ).fetchone(),
                 (7, 3),
             )
-            request_json = connection.execute(
-                "SELECT request_json FROM ai_reading_jobs WHERE id='locale-job'"
-            ).fetchone()[0]
-            self.assertEqual(json.loads(request_json)['language'], 'zh-CN')
             self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
-        self.assertEqual(migrated.get_ai_reading_result(result['id'])['language'], 'en')
-        self.assertEqual(
-            migrated.get_ai_followup(followup['id'], member.user_id)['language'], 'en'
-        )
-        self.assertEqual(
-            migrated.get_ai_book_chat_turn(turn['id'], member.user_id)['language'], 'zh-CN'
-        )
-        self.assertEqual(
-            migrated.get_ai_book_chat_summary(
-                book.book_id, member.user_id, 'zh-CN'
-            )['summary_text'],
-            '既存摘要',
-        )
 
         for index, locale in enumerate(('zh-TW', 'ko', 'ja'), 1):
             created = migrated.store_ai_reading_result(
@@ -2428,6 +2678,30 @@ class StateStoreTests(unittest.TestCase):
                 )['language'],
                 locale,
             )
+
+    def test_v13_migration_failure_rolls_back_real_v12_schema_data_and_indexes(self):
+        self._seed_real_v12_ai_language_fixture()
+        with sqlite3.connect(self.database) as connection:
+            before = self._v13_migration_sensitive_snapshot(connection)
+
+        with mock.patch.object(
+            StateStore, '_require_foreign_key_integrity',
+            side_effect=RuntimeError('injected v13 post-drop failure'),
+        ):
+            with self.assertRaisesRegex(RuntimeError, 'injected v13 post-drop failure'):
+                StateStore(self.database).initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            after = self._v13_migration_sensitive_snapshot(connection)
+            leftovers = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name LIKE '%__v13_target' ORDER BY name"
+            ).fetchall()
+            self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
+        self.assertEqual(after, before)
+        self.assertEqual(after['version'], 12)
+        self.assertEqual(leftovers, [])
+
     def test_reading_task_reservation_is_idempotent_for_one_job(self):
         member = self.store.create_user("reader", "hash", role="member")
         self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)
@@ -3444,6 +3718,139 @@ class StateStoreTests(unittest.TestCase):
                 connection.execute(f"DROP TABLE {table}")
                 connection.execute(f"ALTER TABLE {table}_v10 RENAME TO {table}")
             connection.execute("PRAGMA user_version = 10")
+
+    def _downgrade_ai_language_tables_to_v12(self, database):
+        """Install the exact v12 AI-language table contract for migration tests."""
+        with sqlite3.connect(database) as connection:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.executescript(
+                """
+                DROP TABLE ai_reading_current_results;
+                DROP TABLE ai_reading_followups;
+                DROP TABLE ai_book_chat_turns;
+                DROP TABLE ai_reading_jobs;
+                DROP TABLE ai_book_chat_summaries;
+                DROP TABLE ai_reading_results;
+
+                CREATE TABLE ai_reading_results (
+                    id TEXT PRIMARY KEY,
+                    cache_key TEXT NOT NULL,
+                    book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                    chapter_index INTEGER,
+                    scope TEXT NOT NULL CHECK(scope IN ('book', 'chapter')),
+                    mode TEXT NOT NULL CHECK(mode IN (
+                        'spoiler_free', 'read_so_far', 'full_review', 'chapter'
+                    )),
+                    profile TEXT NOT NULL CHECK(profile IN (
+                        'auto', 'technical', 'fiction', 'general'
+                    )),
+                    language TEXT NOT NULL DEFAULT 'en'
+                        CHECK(language IN ('en', 'zh-CN')),
+                    reading_boundary INTEGER,
+                    config_revision INTEGER NOT NULL CHECK(config_revision >= 0),
+                    template_id TEXT NOT NULL DEFAULT 'legacy',
+                    template_version INTEGER NOT NULL DEFAULT 0
+                        CHECK(template_version >= 0),
+                    content_json TEXT NOT NULL,
+                    created_by_user_id TEXT NOT NULL
+                        REFERENCES users(id) ON DELETE CASCADE,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE ai_reading_jobs (
+                    id TEXT PRIMARY KEY,
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
+                    cache_key TEXT NOT NULL,
+                    request_json TEXT,
+                    profile TEXT,
+                    template_id TEXT,
+                    template_version INTEGER,
+                    status TEXT NOT NULL CHECK(status IN (
+                        'queued', 'running', 'complete', 'failed', 'interrupted'
+                    )),
+                    error_code TEXT,
+                    result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
+                    progress_current INTEGER NOT NULL DEFAULT 0,
+                    progress_total INTEGER NOT NULL DEFAULT 1,
+                    quota_reserved INTEGER NOT NULL DEFAULT 0
+                        CHECK(quota_reserved IN (0, 1)),
+                    generation_stage TEXT,
+                    attempt_number INTEGER NOT NULL DEFAULT 1
+                        CHECK(attempt_number >= 1),
+                    retried_from_job_id TEXT
+                        REFERENCES ai_reading_jobs(id) ON DELETE SET NULL,
+                    retry_root_job_id TEXT
+                        REFERENCES ai_reading_jobs(id) ON DELETE SET NULL,
+                    retried_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CHECK(
+                        progress_current >= 0
+                        AND progress_total >= 1
+                        AND progress_current <= progress_total
+                    ),
+                    CHECK(
+                        NOT (result_id IS NOT NULL AND error_code IS NOT NULL)
+                        AND (status != 'failed' OR error_code IS NOT NULL)
+                    )
+                );
+                CREATE TABLE ai_reading_current_results (
+                    cache_key TEXT PRIMARY KEY,
+                    result_id TEXT NOT NULL REFERENCES ai_reading_results(id)
+                        ON DELETE CASCADE,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE ai_reading_followups (
+                    id TEXT PRIMARY KEY,
+                    result_id TEXT NOT NULL REFERENCES ai_reading_results(id)
+                        ON DELETE CASCADE,
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    question TEXT NOT NULL,
+                    language TEXT NOT NULL DEFAULT 'en'
+                        CHECK(language IN ('en', 'zh-CN')),
+                    answer TEXT,
+                    status TEXT NOT NULL CHECK(status IN (
+                        'queued', 'running', 'complete', 'failed', 'interrupted'
+                    )),
+                    error_code TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE ai_book_chat_turns (
+                    id TEXT PRIMARY KEY,
+                    book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                    chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                    result_id TEXT REFERENCES ai_reading_results(id) ON DELETE SET NULL,
+                    context_mode TEXT NOT NULL CHECK(context_mode IN (
+                        'shared_layer', 'chapter_source'
+                    )),
+                    book_context INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1)),
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    question TEXT NOT NULL,
+                    language TEXT NOT NULL DEFAULT 'en'
+                        CHECK(language IN ('en', 'zh-CN')),
+                    answer TEXT,
+                    status TEXT NOT NULL CHECK(status IN (
+                        'queued', 'running', 'complete', 'failed', 'interrupted'
+                    )),
+                    error_code TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE ai_book_chat_summaries (
+                    book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                    owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
+                    covered_turn_count INTEGER NOT NULL DEFAULT 0
+                        CHECK(covered_turn_count >= 0),
+                    summary_text TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (book_id, owner_user_id, language)
+                );
+                """
+            )
+            StateStore._create_v11_indexes(connection)
+            connection.execute("PRAGMA user_version = 12")
 
     def _downgrade_ai_tables_to_v10(self, database):
         with sqlite3.connect(database) as connection:

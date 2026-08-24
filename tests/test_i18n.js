@@ -88,6 +88,35 @@ test('provides native locale names and translated AI language labels', () => {
   assert.equal(dictionaries.ja['library.title'], 'ライブラリ');
 });
 
+test('uses Taiwan product language for navigation AI errors and destructive actions', () => {
+  const traditional = dictionaries['zh-TW'];
+  assert.deepEqual({
+    aiJobsPages: traditional['admin.ai.jobs.paginationLabel'],
+    aiJobsRefresh: traditional['admin.ai.jobs.refresh'],
+    bookChat: traditional['ai.bookChat'],
+    backToBook: traditional['ai.backToBook'],
+    answer: traditional['ai.answer'],
+    config: traditional['ai.libraryConfigVersion'],
+    clearProgressError: traditional['book.clearReadingProgressFailed'],
+    removeFromShelf: traditional['book.removeFromShelf'],
+    libraryLoadError: traditional['library.loadError'],
+    countingData: traditional['annotations.countingData'],
+    exportData: traditional['annotations.exportData'],
+  }, {
+    aiJobsPages: 'AI 作業頁面',
+    aiJobsRefresh: '重新整理',
+    bookChat: '書籍對話',
+    backToBook: '返回書籍',
+    answer: '後續回答',
+    config: '設定',
+    clearProgressError: '無法清除閱讀進度。請再試一次。',
+    removeFromShelf: '從書架移除',
+    libraryLoadError: '無法載入書庫。請重新整理後再試。',
+    countingData: '正在計算資料…',
+    exportData: '匯出資料',
+  });
+});
+
 test('provides exact bilingual administrator AI job scope and language labels', () => {
   assert.deepEqual({
     book: dictionaries.en['admin.ai.jobs.scope.book'],
