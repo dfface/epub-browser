@@ -10,6 +10,8 @@ import threading
 import time
 import unittest
 import zipfile
+from collections import Counter
+from html.parser import HTMLParser
 from pathlib import Path
 from unittest import mock
 
@@ -34,6 +36,19 @@ from epub_browser.server_library import ServerLibraryManager
 from epub_browser.server_pages import ServerPageRenderer
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
+
+
+class _ElementIdCollector(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.ids = []
+
+    def handle_starttag(self, _tag, attrs):
+        for name, value in attrs:
+            if name == "id" and value is not None:
+                self.ids.append(value)
+
+    handle_startendtag = handle_starttag
 
 
 def _json_login(client, username, password):
@@ -719,6 +734,14 @@ class ServerLibraryManagerTests(unittest.TestCase):
         renderer = ServerPageRenderer(manager.public_dir, record.book_id)
 
         for markup in (renderer.render_index(), renderer.render_chapter(0)):
+            id_collector = _ElementIdCollector()
+            id_collector.feed(markup)
+            duplicates = sorted(
+                element_id
+                for element_id, count in Counter(id_collector.ids).items()
+                if count > 1
+            )
+            self.assertEqual(duplicates, [], f"duplicate generated element IDs: {duplicates}")
             for control_id in (
                 'localeToggle', 'localeSelect', 'localeCurrentLabel',
                 'accountMenu', 'accountPanel', 'accountPasswordForm',

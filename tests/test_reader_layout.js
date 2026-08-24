@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   applyPageWidth,
   createNavigationBehaviorController,
+  initNavigationBehavior,
   normalizeNavigationBehavior,
   normalizePageWidth,
   syncChapterTocAvailability,
@@ -18,8 +19,8 @@ class FakeClassList {
     this.values.add(value);
   }
 
-  remove(value) {
-    this.values.delete(value);
+  remove(...values) {
+    values.forEach(value => this.values.delete(value));
   }
 
   contains(value) {
@@ -32,6 +33,7 @@ class FakeElement {
     this.attributes = new Map();
     this.classList = new FakeClassList();
     this.disabled = false;
+    this.listeners = new Map();
     this.style = {
       values: new Map(),
       setProperty: (name, value) => this.style.values.set(name, value),
@@ -44,6 +46,10 @@ class FakeElement {
 
   getAttribute(name) {
     return this.attributes.get(name);
+  }
+
+  addEventListener(type, listener) {
+    this.listeners.set(type, listener);
   }
 
   contains(element) {
@@ -132,14 +138,21 @@ test('navigation behavior defaults to normal and persists an explicit choice', (
   assert.equal(normalizeNavigationBehavior('unknown'), 'normal');
   assert.equal(controller.getMode(), 'normal');
   assert.equal(root.getAttribute('data-navigation-behavior'), 'normal');
+  assert.deepEqual([...header.classList.values], ['is-navigation-normal']);
 
   controller.setMode('sticky');
   assert.equal(values.get('navigation_bar_behavior'), 'sticky');
   assert.equal(root.getAttribute('data-navigation-behavior'), 'sticky');
-  assert.equal(header.classList.contains('is-navigation-sticky'), true);
+  assert.deepEqual([...header.classList.values], ['is-navigation-sticky']);
+
+  controller.setMode('auto-hide');
+  assert.deepEqual([...header.classList.values], ['is-navigation-auto-hide']);
+
+  controller.setMode('normal');
+  assert.deepEqual([...header.classList.values], ['is-navigation-normal']);
 });
 
-test('auto-hide navigation hides down, shows up, and stays visible while focused', () => {
+test('auto-hide seeds direction tracking from a restored scroll position', () => {
   const header = new FakeElement();
   const root = new FakeElement();
   const documentObject = { activeElement: null };
@@ -147,17 +160,161 @@ test('auto-hide navigation hides down, shows up, and stays visible while focused
     header,
     rootElement: root,
     documentObject,
+    initialScrollY: 500,
     storage: { getItem: () => 'auto-hide', setItem() {} },
   });
 
-  controller.handleScroll(120);
+  controller.handleScroll(497);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+
+  controller.handleScroll(494);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+});
+
+test('navigation bootstrap seeds restored window scroll before the first event', () => {
+  const header = new FakeElement();
+  const rootElement = new FakeElement();
+  rootElement.scrollTop = 500;
+  const documentObject = {
+    activeElement: null,
+    documentElement: rootElement,
+    getElementById() { return null; },
+    querySelector(selector) { return selector === '.app-header' ? header : null; },
+    querySelectorAll() { return []; },
+  };
+  const rootListeners = new Map();
+  const root = {
+    document: documentObject,
+    localStorage: { getItem: () => 'auto-hide', setItem() {} },
+    pageYOffset: 500,
+    addEventListener(type, listener) { rootListeners.set(type, listener); },
+    requestAnimationFrame(callback) { callback(); },
+  };
+
+  initNavigationBehavior(root);
+  root.pageYOffset = 497;
+  rootListeners.get('scroll')();
+
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+});
+
+test('auto-hide accumulates slow motion in both directions', () => {
+  const header = new FakeElement();
+  const controller = createNavigationBehaviorController({
+    header,
+    rootElement: new FakeElement(),
+    documentObject: { activeElement: null },
+    initialScrollY: 100,
+    storage: { getItem: () => 'auto-hide', setItem() {} },
+  });
+
+  controller.handleScroll(103);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+  controller.handleScroll(106);
   assert.equal(header.classList.contains('is-navigation-hidden'), true);
 
-  controller.handleScroll(90);
+  controller.handleScroll(103);
+  assert.equal(header.classList.contains('is-navigation-hidden'), true);
+  controller.handleScroll(100);
   assert.equal(header.classList.contains('is-navigation-hidden'), false);
+});
 
+test('auto-hide resets accumulated motion when scroll direction reverses', () => {
+  const header = new FakeElement();
+  const controller = createNavigationBehaviorController({
+    header,
+    rootElement: new FakeElement(),
+    documentObject: { activeElement: null },
+    initialScrollY: 100,
+    storage: { getItem: () => 'auto-hide', setItem() {} },
+  });
+
+  controller.handleScroll(103);
+  controller.handleScroll(101);
+  controller.handleScroll(104);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+  controller.handleScroll(107);
+  assert.equal(header.classList.contains('is-navigation-hidden'), true);
+});
+
+test('auto-hide always reveals within the header top zone', () => {
+  const header = new FakeElement();
+  const controller = createNavigationBehaviorController({
+    header,
+    rootElement: new FakeElement(),
+    documentObject: { activeElement: null },
+    initialScrollY: 70,
+    storage: { getItem: () => 'auto-hide', setItem() {} },
+  });
+
+  controller.handleScroll(76);
+  assert.equal(header.classList.contains('is-navigation-hidden'), true);
+  controller.handleScroll(72);
+  assert.equal(header.classList.contains('is-navigation-hidden'), true);
+  controller.handleScroll(68);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+});
+
+test('focus and an expanded locale popup reset motion and keep navigation visible', () => {
+  const header = new FakeElement();
+  const localeToggle = new FakeElement();
+  const documentObject = {
+    activeElement: null,
+    getElementById(id) {
+      return id === 'localeToggle' ? localeToggle : null;
+    },
+  };
+  const controller = createNavigationBehaviorController({
+    header,
+    rootElement: new FakeElement(),
+    documentObject,
+    initialScrollY: 100,
+    storage: { getItem: () => 'auto-hide', setItem() {} },
+  });
+
+  controller.handleScroll(103);
   header.focusedChild = {};
   documentObject.activeElement = header.focusedChild;
-  controller.handleScroll(180);
+  controller.handleScroll(106);
   assert.equal(header.classList.contains('is-navigation-hidden'), false);
+
+  documentObject.activeElement = null;
+  controller.handleScroll(109);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+
+  localeToggle.setAttribute('aria-expanded', 'true');
+  controller.handleScroll(112);
+  controller.handleScroll(115);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+
+  localeToggle.setAttribute('aria-expanded', 'false');
+  controller.handleScroll(118);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+  controller.handleScroll(121);
+  assert.equal(header.classList.contains('is-navigation-hidden'), true);
+});
+
+test('mode changes reset motion at the current non-zero scroll position', () => {
+  let scrollY = 200;
+  const header = new FakeElement();
+  const controller = createNavigationBehaviorController({
+    header,
+    rootElement: new FakeElement(),
+    documentObject: { activeElement: null },
+    initialScrollY: scrollY,
+    getScrollY: () => scrollY,
+    storage: { getItem: () => 'auto-hide', setItem() {} },
+  });
+
+  scrollY = 203;
+  controller.handleScroll(scrollY);
+  controller.setMode('sticky');
+  controller.setMode('auto-hide');
+
+  scrollY = 206;
+  controller.handleScroll(scrollY);
+  assert.equal(header.classList.contains('is-navigation-hidden'), false);
+  scrollY = 209;
+  controller.handleScroll(scrollY);
+  assert.equal(header.classList.contains('is-navigation-hidden'), true);
 });

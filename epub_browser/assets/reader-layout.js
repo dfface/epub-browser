@@ -10,6 +10,7 @@
     var DEFAULT_NAVIGATION_BEHAVIOR = 'normal';
     var NAVIGATION_BEHAVIOR_KEY = 'navigation_bar_behavior';
     var NAVIGATION_BEHAVIORS = ['normal', 'sticky', 'auto-hide'];
+    var NAVIGATION_MOTION_THRESHOLD = 4;
     var PAGE_WIDTHS = {
         '1': 680,
         '2': 820,
@@ -46,7 +47,9 @@
         var rootElement = options.rootElement;
         var documentObject = options.documentObject || {};
         var storage = options.storage;
-        var previousScrollY = 0;
+        var getScrollY = typeof options.getScrollY === 'function' ? options.getScrollY : null;
+        var previousScrollY = Math.max(0, Number(options.initialScrollY) || 0);
+        var accumulatedMotion = 0;
         var mode = DEFAULT_NAVIGATION_BEHAVIOR;
 
         try {
@@ -60,15 +63,36 @@
             return Math.max(0, Math.ceil(header.getBoundingClientRect().height || 0));
         }
 
-        function focusedWithinHeader() {
-            return Boolean(
+        function navigationOwnsFocus() {
+            var focusedWithinHeader = Boolean(
                 header && typeof header.contains === 'function' &&
                 documentObject.activeElement && header.contains(documentObject.activeElement)
             );
+            var localeToggle = typeof documentObject.getElementById === 'function'
+                ? documentObject.getElementById('localeToggle')
+                : null;
+            return focusedWithinHeader || Boolean(
+                localeToggle && localeToggle.getAttribute('aria-expanded') === 'true'
+            );
+        }
+
+        function revealNavigation() {
+            if (header) header.classList.remove('is-navigation-hidden');
+        }
+
+        function currentScrollY() {
+            if (!getScrollY) return previousScrollY;
+            return Math.max(0, Number(getScrollY()) || 0);
+        }
+
+        function resetMotion(scrollY) {
+            accumulatedMotion = 0;
+            previousScrollY = Math.max(0, Number(scrollY) || 0);
         }
 
         function showNavigation() {
-            if (header) header.classList.remove('is-navigation-hidden');
+            revealNavigation();
+            resetMotion(currentScrollY());
         }
 
         function updateOffset() {
@@ -81,7 +105,11 @@
             mode = normalizeNavigationBehavior(nextMode);
             if (rootElement) rootElement.setAttribute('data-navigation-behavior', mode);
             if (header) {
-                header.classList.remove('is-navigation-sticky', 'is-navigation-auto-hide');
+                header.classList.remove(
+                    'is-navigation-normal',
+                    'is-navigation-sticky',
+                    'is-navigation-auto-hide'
+                );
                 header.classList.add(mode === 'auto-hide' ? 'is-navigation-auto-hide' : (
                     mode === 'sticky' ? 'is-navigation-sticky' : 'is-navigation-normal'
                 ));
@@ -102,14 +130,30 @@
         function handleScroll(nextScrollY) {
             nextScrollY = Math.max(0, Number(nextScrollY) || 0);
             var delta = nextScrollY - previousScrollY;
-            if (mode !== 'auto-hide' || focusedWithinHeader()) {
-                showNavigation();
-            } else if (delta > 4 && nextScrollY > headerHeight()) {
-                if (header) header.classList.add('is-navigation-hidden');
-            } else if (delta < -4) {
-                showNavigation();
-            }
             previousScrollY = nextScrollY;
+            if (mode !== 'auto-hide' || navigationOwnsFocus() || nextScrollY <= headerHeight()) {
+                revealNavigation();
+                accumulatedMotion = 0;
+                return;
+            }
+            if (!delta) return;
+            var directionChanged = (
+                (accumulatedMotion > 0 && delta < 0) ||
+                (accumulatedMotion < 0 && delta > 0)
+            );
+            if (directionChanged) {
+                accumulatedMotion = delta;
+            } else {
+                accumulatedMotion += delta;
+            }
+            var hidden = Boolean(header && header.classList.contains('is-navigation-hidden'));
+            if (accumulatedMotion > NAVIGATION_MOTION_THRESHOLD && !hidden) {
+                if (header) header.classList.add('is-navigation-hidden');
+                accumulatedMotion = 0;
+            } else if (accumulatedMotion < -NAVIGATION_MOTION_THRESHOLD && hidden) {
+                revealNavigation();
+                accumulatedMotion = 0;
+            }
         }
 
         applyMode(mode);
@@ -130,11 +174,16 @@
         header.setAttribute('data-navigation-behavior-bound', 'true');
         var storage = null;
         try { storage = root.localStorage; } catch (error) {}
+        function readScrollY() {
+            return root.pageYOffset || documentObject.documentElement.scrollTop || 0;
+        }
         var controller = createNavigationBehaviorController({
             header: header,
             rootElement: documentObject.documentElement,
             documentObject: documentObject,
-            storage: storage
+            storage: storage,
+            initialScrollY: readScrollY(),
+            getScrollY: readScrollY
         });
         var radios = documentObject.querySelectorAll('input[name="navigationBehavior"]');
 
@@ -160,7 +209,7 @@
             framePending = true;
             root.requestAnimationFrame(function() {
                 framePending = false;
-                controller.handleScroll(root.pageYOffset || documentObject.documentElement.scrollTop || 0);
+                controller.handleScroll(readScrollY());
             });
         }, { passive: true });
         header.addEventListener('focusin', controller.show);

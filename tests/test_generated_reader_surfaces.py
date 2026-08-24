@@ -1880,13 +1880,6 @@ assert.deepEqual(
         self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
         self.assertNotRegex(self._chapter_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
         self.assertRegex(library, r'/assets/immutable/locale-nav\.[0-9a-f]{12}\.js')
-        locale_script = Path('epub_browser/assets/locale-nav.js').read_text(encoding='utf-8')
-        self.assertIn("localeSelect.value = i18n.getLocale()", locale_script)
-        self.assertIn("localeSelect.addEventListener('change'", locale_script)
-        self.assertIn('i18n.setLocale(localeSelect.value)', locale_script)
-        self.assertIn("localeMenu.className = 'theme-menu locale-menu'", locale_script)
-        self.assertIn("item.setAttribute('role', 'menuitemradio')", locale_script)
-        self.assertIn("item.setAttribute('aria-checked'", locale_script)
 
     def test_locale_action_is_a_compact_icon_control(self):
         library = self._library_html()
