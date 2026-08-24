@@ -491,7 +491,7 @@ def reading_request_from_job_payload(payload: object) -> ReadingRequest:
         chapter_index=payload.get("chapter_index"),
         mode=payload.get("mode", "chapter"),
         language=payload.get("language", "en"),
-        force=True,
+        force=payload.get("force", True),
         reading_boundary=payload.get("reading_boundary"),
     )
     try:
@@ -713,6 +713,7 @@ class AIReadingService:
             "chapter_index": request.chapter_index,
             "mode": request.mode,
             "language": request.language,
+            "force": request.force,
             "reading_boundary": self._reading_boundary(principal, request),
         }
         job, created = self.store.create_or_get_active_ai_job(
@@ -808,6 +809,7 @@ class AIReadingService:
                 "chapter_index": request.chapter_index,
                 "mode": request.mode,
                 "language": request.language,
+                "force": True,
                 "reading_boundary": self._reading_boundary(
                     owner_principal, request
                 ),
@@ -941,9 +943,16 @@ class AIReadingService:
             cache_key = self._cache_key(request, material, profile, template)
             if not self.store.rekey_running_ai_job(job["id"], cache_key):
                 raise AIReadingError("ai_generation_failed")
+            cached = self.store.get_current_ai_reading_result(cache_key)
+            if cached is not None and not request.force:
+                self.store.finish_ai_job(job["id"], result_id=cached["id"])
+                return
             settings = self.store._get_ai_provider_settings()
             if not settings["enabled"]:
                 raise AIReadingError("ai_disabled")
+            self._reserve_generation_task(
+                job.get("retry_root_job_id") or job["id"], principal, request
+            )
             await self._run_generation(
                 job["id"], principal, request, metadata, material, full_book_segments,
                 profile, settings, cache_key, template,
@@ -999,6 +1008,7 @@ class AIReadingService:
         *,
         book_id: str,
         max_tokens: Optional[int] = None,
+        task_scoped: bool = False,
     ) -> str:
         loop, control = self._call_control()
         condition, active_calls = control
@@ -1015,9 +1025,10 @@ class AIReadingService:
                 live_principal = self._live_provider_principal(
                     principal.user_id, book_id
                 )
-                if not self.store.reserve_ai_usage(
-                    live_principal, date.today().isoformat()
-                ):
+                usage_day = date.today().isoformat()
+                if task_scoped:
+                    self.store.record_ai_provider_call(live_principal, usage_day)
+                elif not self.store.reserve_ai_usage(live_principal, usage_day):
                     raise AIReadingError("ai_quota_exhausted")
                 try:
                     return await asyncio.to_thread(
@@ -1036,6 +1047,19 @@ class AIReadingService:
             async with condition:
                 self._call_controls[loop] = (condition, active_calls - 1)
                 condition.notify_all()
+
+    def _reserve_generation_task(
+        self, job_id: str, principal: Principal, request: ReadingRequest
+    ) -> None:
+        if request.scope != "chapter":
+            return
+        live_principal = self._live_provider_principal(
+            principal.user_id, request.book_id
+        )
+        if not self.store.reserve_ai_reading_task(
+            job_id, live_principal, date.today().isoformat()
+        ):
+            raise AIReadingError("ai_quota_exhausted")
 
     def _live_provider_principal(self, user_id: str, book_id: str) -> Principal:
         try:
@@ -1318,6 +1342,7 @@ class AIReadingService:
                 messages,
                 book_id=request.book_id,
                 max_tokens=part_output_tokens,
+                task_scoped=True,
             )
             analyses.append(
                 _truncate_tokens(analysis, part_output_tokens, config.model)
@@ -1591,6 +1616,7 @@ class AIReadingService:
                 final_call_messages,
                 book_id=request.book_id,
                 max_tokens=budget.output_tokens,
+                task_scoped=request.scope == "chapter",
             )
             result = self.store.store_ai_reading_result(
                 cache_key=cache_key,

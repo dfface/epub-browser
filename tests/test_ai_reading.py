@@ -215,6 +215,15 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             ).fetchone()
         return int(row["calls"])
 
+    def _reading_tasks(self, user_id):
+        with self.store._connection() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(SUM(reading_tasks), 0) AS tasks "
+                "FROM ai_usage WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return int(row["tasks"])
+
     def _create_failed_reading_job(
         self,
         job_id="failed-job",
@@ -803,6 +812,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
                 "chapter_index": 0,
                 "mode": "chapter",
                 "language": "en",
+                "force": False,
                 "reading_boundary": 0,
             },
         )
@@ -1227,6 +1237,44 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completed["status"], "complete")
         self.assertIsNotNone(completed["result_id"])
 
+    async def test_claimed_chapter_job_uses_a_winning_cache_without_reserving_a_task(self):
+        request = ReadingRequest(
+            scope="chapter", book_id=self.book.book_id, chapter_index=0
+        )
+        material, _metadata, progress_total, _segments = self.service._material_for_request(
+            self.member, request
+        )
+        template = template_for(request.scope, request.mode)
+        cache_key = self.service._cache_key(request, material, "auto", template)
+        self.store.create_ai_job(
+            "claimed-cached-job", self.member.user_id, cache_key,
+            book_id=self.book.book_id, progress_total=progress_total,
+            request_payload={
+                "scope": "chapter", "book_id": self.book.book_id,
+                "chapter_index": 0, "mode": "chapter", "language": "en",
+                "force": False, "reading_boundary": 0,
+            },
+            profile="auto", template_id=template["id"], template_version=template["version"],
+        )
+        claimed = self.store.claim_next_ai_reading_job()
+        settings = self.store._get_ai_provider_settings()
+        cached = self.store.store_ai_reading_result(
+            cache_key=cache_key, book_id=self.book.book_id, chapter_index=0,
+            scope="chapter", mode="chapter", profile="auto",
+            config_revision=settings["config_revision"],
+            content={"quick": {"summary": "winning cache"}},
+            created_by_user_id=self.member.user_id, template_id=template["id"],
+            template_version=template["version"], language="en", reading_boundary=0,
+        )
+
+        await self.service._run_queued_job(claimed)
+
+        completed = self.store.get_ai_job("claimed-cached-job", self.member.user_id)
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(completed["result_id"], cached["id"])
+        self.assertEqual(_FakeClient.calls, [])
+        self.assertEqual(self._reading_tasks(self.member.user_id), 0)
+
     async def test_durable_job_uses_the_cache_key_for_material_read_by_worker(self):
         """A queued job must not publish updated source under its old digest."""
         request = ReadingRequest(scope="chapter", book_id=self.book.book_id, chapter_index=0)
@@ -1576,7 +1624,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(_FlakyClient.calls), 1)
         self.assertEqual(delays, [60])
 
-    async def test_retry_rechecks_daily_quota_before_another_provider_attempt(self):
+    async def test_chapter_task_retries_provider_attempts_without_a_second_allowance(self):
         self.store.set_ai_user_access(
             self.member.user_id, enabled=True, daily_limit=1
         )
@@ -1601,10 +1649,11 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await service.stop_worker()
 
-        self.assertEqual(completed["status"], "failed")
-        self.assertEqual(completed["error_code"], "ai_quota_exhausted")
-        self.assertEqual(len(_FlakyClient.calls), 1)
-        self.assertEqual(delays, [60])
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(len(_FlakyClient.calls), 4)
+        self.assertEqual(delays, [60, 120, 240])
+        self.assertEqual(self._provider_calls(self.member.user_id), 4)
+        self.assertEqual(self._reading_tasks(self.member.user_id), 1)
 
     async def test_client_construction_failure_does_not_charge_quota(self):
         def failing_client_factory(_config):
@@ -1627,6 +1676,58 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(self._provider_calls(self.member.user_id), 0)
+
+    async def test_one_chapter_job_can_make_two_provider_calls_with_one_task_allowance(self):
+        self.store.create_ai_job(
+            "two-call-chapter-job", self.member.user_id, "two-call-cache",
+            book_id=self.book.book_id,
+        )
+        self.assertTrue(self.store.start_ai_job("two-call-chapter-job"))
+        config = ProviderConfig(
+            "https://provider.example/v1", "secret", "reader-model", 30, 1
+        )
+        messages = [{"role": "user", "content": "Chapter source"}]
+
+        self.service._reserve_generation_task(
+            "two-call-chapter-job",
+            self.member,
+            ReadingRequest(
+                scope="chapter", book_id=self.book.book_id, chapter_index=0
+            ),
+        )
+        await self.service._provider_call(
+            self.member, config, messages, book_id=self.book.book_id,
+            max_tokens=32, task_scoped=True,
+        )
+        await self.service._provider_call(
+            self.member, config, messages, book_id=self.book.book_id,
+            max_tokens=32, task_scoped=True,
+        )
+
+        self.assertEqual(self._provider_calls(self.member.user_id), 2)
+        self.assertEqual(self._reading_tasks(self.member.user_id), 1)
+
+    async def test_retrying_a_failed_chapter_job_does_not_reserve_a_second_task(self):
+        failing_service = AIReadingService(
+            self.store, self.root / "public", _RejectedClient
+        )
+        try:
+            started = await failing_service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0
+                ),
+            )
+            failed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await failing_service.stop_worker()
+        self.assertEqual(failed["status"], "failed")
+
+        retried = await self.service.retry_job(self.owner, failed["id"])
+        completed = await self._wait_for_job(retried["job"]["id"])
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(self._reading_tasks(self.member.user_id), 1)
 
     async def test_cancellation_while_waiting_for_concurrency_does_not_charge_quota(self):
         _BlockingClient.calls = []
