@@ -302,3 +302,14 @@ body.ai-map-open { overflow: hidden; }
   --ai-canvas-note-wash: var(--card-bg, #1e1e1e);
   background: linear-gradient(135deg, color-mix(in srgb, var(--ai-canvas-note-accent) 12%, var(--card-bg, #1e1e1e)), var(--card-bg, #1e1e1e));
 }
+
+/* A Feynman explanation is part of the chapter's opening orientation, not a
+   control surface. Keep its reading measure and contrast in the active theme. */
+.ai-chapter-teach { display: grid; gap: 12px; margin: -16px 0 32px; padding: 18px 20px 20px; border: 1px solid color-mix(in srgb, var(--secondary, #4cc9f0) 28%, var(--border, #ddd)); border-left: 3px solid var(--secondary, #4cc9f0); border-radius: 10px; background: color-mix(in srgb, var(--secondary, #4cc9f0) 5%, var(--card-bg, #fff)); color: var(--text, #333); font-family: system-ui, sans-serif; font-size: 16px !important; line-height: 1.65; }
+.ai-chapter-teach header { display: grid; gap: 4px; }
+.ai-chapter-teach h2, .ai-chapter-teach h3 { margin: 0; color: var(--text, #333); }
+.ai-chapter-teach h2 { font-size: 22px !important; line-height: 1.28; }
+.ai-chapter-teach h3 { color: var(--text-secondary, #666); font-size: 12px !important; font-weight: 750; letter-spacing: .08em; line-height: 1.25; text-transform: uppercase; }
+.ai-chapter-teach-explanation, .ai-chapter-teach-detail p { margin: 0; font-size: 16px !important; line-height: 1.7; white-space: pre-line; }
+.ai-chapter-teach-detail { display: grid; gap: 5px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--secondary, #4cc9f0) 8%, var(--card-bg, #fff)); }
+@media (max-width: 720px) { .ai-chapter-teach { margin-right: 0; margin-left: 0; padding: 16px; } }

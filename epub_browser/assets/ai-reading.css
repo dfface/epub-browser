@@ -144,6 +144,11 @@ body.ai-reading-open {
 .ai-reading-insight { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--button-bg, #4361ee) 16%, var(--border, #ddd)); border-radius: 10px; background: color-mix(in srgb, var(--button-bg, #4361ee) 5%, var(--card-bg, #fff)); }
 .ai-reading-insight strong { line-height: 1.45; }
 .ai-reading-insight p { color: var(--text-secondary, #666); font-size: .92rem; }
+.ai-reading-teach { display: grid; gap: 9px; padding: 14px; border: 1px solid color-mix(in srgb, var(--secondary, #4cc9f0) 30%, var(--border, #ddd)); border-left: 3px solid var(--secondary, #4cc9f0); border-radius: 10px; background: color-mix(in srgb, var(--secondary, #4cc9f0) 6%, var(--card-bg, #fff)); color: var(--text, #333); }
+.ai-reading-teach h4, .ai-reading-teach h5 { color: var(--text, #333); }
+.ai-reading-teach h4 { font-size: 1rem; line-height: 1.35; }
+.ai-reading-teach h5 { margin-top: 4px; color: var(--text-secondary, #666); font-size: .75rem; font-weight: 750; letter-spacing: .08em; line-height: 1.25; text-transform: uppercase; }
+.ai-reading-teach-explanation, .ai-reading-teach p { font-size: 16px; line-height: 1.7; white-space: pre-line; }
 .ai-reading-evidence { display: grid; gap: 7px; margin: 0; padding: 12px 14px; border-left: 3px solid var(--secondary, #4cc9f0); background: color-mix(in srgb, var(--secondary, #4cc9f0) 8%, var(--card-bg, #fff)); }
 .ai-reading-evidence p { font-style: italic; }
 .ai-reading-evidence footer { color: var(--text-secondary, #666); font-size: .84rem; }

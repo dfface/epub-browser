@@ -1224,6 +1224,42 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             2,
         )
 
+    def test_chapter_ai_surfaces_render_feynman_teach_only_for_a_chapter_explanation(self):
+        """A chapter explanation is a Server-only learning surface, never empty chrome."""
+        canvas = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
+        drawer = Path('epub_browser/assets/ai-reading.js').read_text(encoding='utf-8')
+        canvas_css = Path('epub_browser/assets/ai-canvas.css').read_text(encoding='utf-8')
+        drawer_css = Path('epub_browser/assets/ai-reading.css').read_text(encoding='utf-8')
+
+        self.assertIn('function appendTeach(article, result, chapterIndex)', canvas)
+        self.assertIn('data-ai-chapter-teach', canvas)
+        self.assertIn('teach.explanation', canvas)
+        self.assertIn("t('ai.teachCheck')", canvas)
+        self.assertIn('content.teach', drawer)
+        self.assertIn('ai-reading-teach', drawer)
+        self.assertIn("t('ai.teachCheck')", drawer)
+        self.assertIn('.ai-chapter-teach', canvas_css)
+        self.assertIn('font-size: 16px', canvas_css)
+        self.assertIn('.ai-reading-teach', drawer_css)
+
+        teach_renderer = canvas[
+            canvas.index('function appendTeach(article, result, chapterIndex)'):
+            canvas.index('\n  function apply(', canvas.index('function appendTeach(article, result, chapterIndex)'))
+        ]
+        # This fixture represents cached/legacy results with no explanation.
+        # The early return must run before any section is created, so stale or
+        # partial AI results cannot leave an empty landmark in the chapter.
+        missing_explanation = {'content': {'teach': {}}}
+        self.assertFalse(missing_explanation['content']['teach'].get('explanation'))
+        self.assertLess(
+            teach_renderer.index('if (!teach.explanation) return;'),
+            teach_renderer.index("el('section', 'ai-chapter-teach')"),
+        )
+        self.assertIn("setAttribute('data-ai-canvas-chapter', String(chapterIndex))", teach_renderer)
+        self.assertNotIn('innerHTML', teach_renderer)
+        self.assertIn('guide.nextSibling', teach_renderer)
+        self.assertIn(".ai-chapter-teach,script,style,noscript", canvas)
+
     def test_annotation_menu_includes_a_text_only_copy_action(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 

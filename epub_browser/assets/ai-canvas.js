@@ -35,7 +35,7 @@
   function clear() {
     state.marks.forEach(function(mark) { if (!mark.parentNode) return; var parent = mark.parentNode; while (mark.firstChild) parent.insertBefore(mark.firstChild, mark); parent.removeChild(mark); parent.normalize(); });
     state.marks = []; state.paragraphTriggers.forEach(function(trigger) { var block = trigger.parentElement; trigger.remove(); if (block) { block.classList.remove('ai-paragraph-note-anchor'); block.removeAttribute('data-ai-paragraph-note-count'); } }); state.paragraphTriggers = []; state.results = {};
-    if (state.guide) state.guide.remove(); if (state.reflection) state.reflection.remove(); if (state.popover) state.popover.remove(); if (state.paragraphPopover) state.paragraphPopover.remove(); if (state.mapPopover) state.mapPopover.remove(); state.guide = state.reflection = state.popover = state.paragraphPopover = state.mapPopover = null;
+    if (state.guide) state.guide.remove(); if (state.reflection) state.reflection.remove(); Array.prototype.forEach.call(document.querySelectorAll('[data-ai-chapter-teach]'), function(node) { node.remove(); }); if (state.popover) state.popover.remove(); if (state.paragraphPopover) state.paragraphPopover.remove(); if (state.mapPopover) state.mapPopover.remove(); state.guide = state.reflection = state.popover = state.paragraphPopover = state.mapPopover = null;
     setCanvasActive(false);
   }
   function closeEventSources() {
@@ -174,7 +174,7 @@
     var blocks = article.querySelectorAll('p,li,blockquote,dd,dt,figcaption');
     for (var index = 0; index < blocks.length; index++) {
       var block = blocks[index];
-      if (block.closest('.ai-chapter-guide,script,style,noscript')) continue;
+      if (block.closest('.ai-chapter-guide,.ai-chapter-teach,script,style,noscript')) continue;
       var text = normalizeAnchor(block.textContent);
       if (text.indexOf(needle) >= 0) return block;
       // EPUBs often split a source paragraph across inline elements or
@@ -287,7 +287,7 @@
     var needle = String(annotation.quote || '').trim(); if (needle.length < 8) return null;
     var walker = document.createTreeWalker(article, root.NodeFilter ? root.NodeFilter.SHOW_TEXT : 4), node;
     while ((node = walker.nextNode())) {
-      if (!node.parentElement || node.parentElement.closest('.ai-canvas-mark,.ai-native-map,script,style,noscript')) continue;
+      if (!node.parentElement || node.parentElement.closest('.ai-canvas-mark,.ai-native-map,.ai-chapter-guide,.ai-chapter-teach,script,style,noscript')) continue;
       var start = node.nodeValue.indexOf(needle); if (start < 0) continue;
       var range = document.createRange(); range.setStart(node, start); range.setEnd(node, start + needle.length);
       var mark = el('mark', 'ai-canvas-mark'); mark.setAttribute('data-ai-canvas-kind', annotation.kind || 'concept'); mark.setAttribute('data-ai-canvas-color', String(index % 5)); mark.setAttribute('data-ai-canvas-chapter', String(chapterIndex)); mark.tabIndex = 0; mark.setAttribute('role', 'button'); mark.setAttribute('aria-controls', 'ai-native-note-' + index); mark.setAttribute('aria-label', annotation.title || t('ai.result'));
@@ -305,6 +305,17 @@
     var list = el('ol', 'ai-chapter-reflection-list'); questions.slice(0, 3).forEach(function(item) { var entry = el('li', 'ai-reflection-question'); entry.appendChild(el('strong', '', item.question || '')); if (item.why) entry.appendChild(el('p', '', item.why)); list.appendChild(entry); }); reflection.appendChild(list);
     article.appendChild(reflection); state.reflection = reflection;
   }
+  function appendTeach(article, result, chapterIndex) {
+    var teach = result.content && result.content.teach || {};
+    if (!teach.explanation) return;
+    var section = el('section', 'ai-chapter-teach'); section.setAttribute('data-ai-chapter-teach', ''); section.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
+    var head = el('header'); appendKicker(head, t('ai.teachKicker'), 'fas fa-graduation-cap'); head.appendChild(el('h2', '', t('ai.teachTitle'))); section.appendChild(head);
+    section.appendChild(el('p', 'ai-chapter-teach-explanation', teach.explanation));
+    if (teach.analogy) { var analogy = el('div', 'ai-chapter-teach-detail'); analogy.appendChild(el('h3', '', t('ai.teachAnalogy'))); analogy.appendChild(el('p', '', teach.analogy)); section.appendChild(analogy); }
+    if (teach.check_question) { var check = el('div', 'ai-chapter-teach-detail'); check.appendChild(el('h3', '', t('ai.teachCheck'))); check.appendChild(el('p', '', teach.check_question)); section.appendChild(check); }
+    var guide = article.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + chapterIndex + '"]');
+    article.insertBefore(section, guide ? guide.nextSibling : article.firstChild);
+  }
   function apply(result, article, chapterIndex) {
     article = article || document.querySelector('#eb-content'); chapterIndex = Number(chapterIndex == null ? result.chapter_index : chapterIndex); if (!article || !Number.isInteger(chapterIndex)) return 0;
     clearChapter(chapterIndex); state.results[String(chapterIndex)] = result;
@@ -315,6 +326,7 @@
     guide.appendChild(el('p', 'ai-chapter-guide-summary', result.content.quick && result.content.quick.summary || ''));
     var points = result.content.quick && result.content.quick.key_points || []; if (points.length) { var list = el('ul', 'ai-chapter-guide-points'); points.slice(0, 4).forEach(function(point) { list.appendChild(el('li', '', point)); }); guide.appendChild(list); }
     article.insertBefore(guide, article.firstChild); state.guide = guide;
+    appendTeach(article, result, chapterIndex);
     var annotations = result.content && result.content.annotations || [];
     if (!annotations.length) annotations = (result.content && result.content.evidence || []).map(function(item) { return { kind: 'evidence', quote: item.quote, title: t('ai.evidence'), body_markdown: item.reason }; });
     var placed = 0; annotations.forEach(function(item, index) { var mark = markQuote(article, item, index, chapterIndex); if (mark) { state.marks.push(mark); placed += 1; } });

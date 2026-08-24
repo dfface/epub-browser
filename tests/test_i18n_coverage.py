@@ -398,6 +398,20 @@ class I18nCoverageTests(unittest.TestCase):
 
         self.assertEqual(required - keys, set())
 
+    def test_feynman_learning_copy_exists_in_both_locales(self):
+        required = {
+            'ai.teachKicker',
+            'ai.teachTitle',
+            'ai.teachAnalogy',
+            'ai.teachCheck',
+        }
+        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+        english = source[source.index('en: {'):source.index("'zh-CN': {")]
+        chinese = source[source.index("'zh-CN': {"):]
+
+        self.assertEqual(required - set(DICTIONARY_KEY.findall(english)), set())
+        self.assertEqual(required - set(DICTIONARY_KEY.findall(chinese)), set())
+
     def test_first_party_ui_sinks_do_not_embed_english_copy(self):
         failures = []
         for path in FIRST_PARTY:
