@@ -3240,12 +3240,12 @@ class StateStore:
             ).fetchone()
             if job is None:
                 raise KeyError(job_id)
-            if job["quota_reserved"]:
-                connection.execute("COMMIT")
-                return True
             if job["owner_user_id"] != principal.user_id or not self.can_use_ai(principal):
                 connection.execute("COMMIT")
                 return False
+            if job["quota_reserved"]:
+                connection.execute("COMMIT")
+                return True
             limit = self.ai_daily_limit(principal)
             used = connection.execute(
                 "SELECT reading_tasks FROM ai_usage WHERE user_id = ? AND usage_day = ?",

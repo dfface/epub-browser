@@ -2227,6 +2227,13 @@ class StateStoreTests(unittest.TestCase):
 
     def test_v12_migration_adds_task_usage_and_job_stage_without_converting_provider_calls(self):
         with sqlite3.connect(self.database) as connection:
+            connection.execute("ALTER TABLE ai_usage DROP COLUMN reading_tasks")
+            connection.execute(
+                "ALTER TABLE ai_reading_jobs DROP COLUMN quota_reserved"
+            )
+            connection.execute(
+                "ALTER TABLE ai_reading_jobs DROP COLUMN generation_stage"
+            )
             connection.execute(
                 "INSERT INTO ai_usage (user_id, usage_day, provider_calls) VALUES (?, '2026-08-24', 7)",
                 (self.owner.user_id,),
@@ -2241,6 +2248,10 @@ class StateStoreTests(unittest.TestCase):
                 (self.owner.user_id,),
             ).fetchone()
             self.assertEqual(row, (7, 0))
+            self.assertTrue(
+                {"quota_reserved", "generation_stage"}
+                <= table_columns(connection, "ai_reading_jobs")
+            )
             self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
 
     def test_reading_task_reservation_is_idempotent_for_one_job(self):
@@ -2262,6 +2273,33 @@ class StateStoreTests(unittest.TestCase):
                 ).fetchone()[0],
                 1,
             )
+
+    def test_reserved_reading_task_rejects_a_different_job_owner(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        other_member = self.store.create_user("other-reader", "hash", role="member")
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)
+        self.store.set_ai_user_access(other_member.user_id, enabled=True, daily_limit=2)
+        self.store.create_ai_job("owned-task", member.user_id, "owned-cache")
+        self.assertTrue(
+            self.store.reserve_ai_reading_task("owned-task", member, "2026-08-24")
+        )
+
+        self.assertFalse(
+            self.store.reserve_ai_reading_task("owned-task", other_member, "2026-08-24")
+        )
+
+    def test_reserved_reading_task_rejects_an_owner_without_ai_access(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)
+        self.store.create_ai_job("revoked-task", member.user_id, "revoked-cache")
+        self.assertTrue(
+            self.store.reserve_ai_reading_task("revoked-task", member, "2026-08-24")
+        )
+        self.store.set_ai_user_access(member.user_id, enabled=False, daily_limit=2)
+
+        self.assertFalse(
+            self.store.reserve_ai_reading_task("revoked-task", member, "2026-08-24")
+        )
 
     def test_recording_a_provider_call_preserves_reserved_task_count(self):
         member = self.store.create_user("provider-reader", "hash", role="member")
