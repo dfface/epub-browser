@@ -4,11 +4,11 @@
   var document = root.document;
   var state = { marks: [], paragraphTriggers: [], results: {}, pending: {}, guide: null, reflection: null, popover: null, paragraphPopover: null, mapPopover: null, mapTrigger: null, statusTimer: null, button: null, buttons: [], contextVersion: 0, eventSources: [], initialized: false };
   function t(key, params) { var i = root.EpubBrowserI18n; return i && i.t ? i.t(key, params) : key; }
-  function label(key, english, chinese) { var value = t(key); return value === key ? (String(locale()).toLowerCase().indexOf('zh') === 0 ? chinese : english) : value; }
+  function label(key, english, _chinese) { var value = t(key); return value === key ? english : value; }
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function locale() {
     var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang;
-    return String(value || '').toLowerCase().indexOf('zh') === 0 ? 'zh-CN' : 'en';
+    return ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].indexOf(value) >= 0 ? value : 'en';
   }
   function generationStatus(job, context) {
     var stageKey = job.generation_stage && {

@@ -922,15 +922,15 @@ class StateStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "newer schema"):
             StateStore(future).initialize()
 
-    def test_v12_fresh_database_has_latest_contract(self):
-        database = Path(self.temporary.name, "fresh-v12.db")
+    def test_v13_fresh_database_has_latest_contract(self):
+        database = Path(self.temporary.name, "fresh-v13.db")
         StateStore(database).initialize(
             bootstrap=BootstrapCredentials("fresh-owner", "secret")
         )
         StateStore(database).initialize()
 
         with sqlite3.connect(database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
             self.assertFalse(
                 {"username"} & table_columns(connection, "annotations")
             )
@@ -1369,7 +1369,7 @@ class StateStoreTests(unittest.TestCase):
                 (1, "Original summary.", "2026-07"),
             )
             self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
 
     def test_concurrent_initializer_rereads_user_version_after_lock(self):
         self._downgrade_selected_tables_to_v10(self.database)
@@ -1441,7 +1441,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
             self.assertEqual(
                 connection.execute(
                     "SELECT attempt_number, retried_from_job_id, retry_root_job_id, "
@@ -2252,7 +2252,7 @@ class StateStoreTests(unittest.TestCase):
                 {"quota_reserved", "generation_stage"}
                 <= table_columns(connection, "ai_reading_jobs")
             )
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 12)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
 
     def test_admin_retry_of_migrated_v11_failed_root_is_quota_exempt(self):
         member = self.store.create_user(
@@ -2330,6 +2330,104 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(usage, 0)
         self.assertEqual(quota_reserved, 1)
 
+    def test_v13_migration_preserves_ai_state_and_expands_language_constraints(self):
+        member = self.store.create_user(
+            'locale-reader', hash_password('locale-secret'), role='member'
+        )
+        book = self.store.resolve_book(
+            Path(self.temporary.name, 'locale-book.epub'),
+            'urn:test:locale-book', 'locale-fingerprint', {'title': 'Locale book'},
+        )
+        result = self.store.store_ai_reading_result(
+            cache_key='locale-result-en', book_id=book.book_id, chapter_index=0,
+            scope='chapter', mode='chapter', profile='auto', config_revision=0,
+            content={'quick': {'title': 'Existing'}}, created_by_user_id=member.user_id,
+            language='en', reading_boundary=0,
+        )
+        followup = self.store.create_ai_followup(
+            result_id=result['id'], owner_user_id=member.user_id,
+            question='Existing follow-up?', language='en',
+        )
+        turn = self.store.create_ai_book_chat_turn(
+            book_id=book.book_id, chapter_index=0, owner_user_id=member.user_id,
+            question='既存の会話?', language='zh-CN', context_mode='chapter_source',
+        )
+        self.store.upsert_ai_book_chat_summary(
+            book_id=book.book_id, owner_user_id=member.user_id, language='zh-CN',
+            covered_turn_count=1, summary_text='既存摘要',
+        )
+        self.store.create_ai_job(
+            'locale-job', member.user_id, 'locale-job-cache', book_id=book.book_id,
+            request_payload={
+                'scope': 'chapter', 'book_id': book.book_id,
+                'chapter_index': 0, 'mode': 'chapter', 'language': 'zh-CN',
+            },
+        )
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "INSERT INTO ai_usage (user_id, usage_day, provider_calls, reading_tasks) "
+                "VALUES (?, '2026-08-24', 7, 3)", (member.user_id,),
+            )
+            connection.execute('PRAGMA user_version = 12')
+
+        migrated = StateStore(self.database)
+        migrated.initialize()
+
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute('PRAGMA user_version').fetchone()[0], 13)
+            self.assertEqual(
+                connection.execute(
+                    "SELECT provider_calls, reading_tasks FROM ai_usage WHERE user_id=?",
+                    (member.user_id,),
+                ).fetchone(),
+                (7, 3),
+            )
+            request_json = connection.execute(
+                "SELECT request_json FROM ai_reading_jobs WHERE id='locale-job'"
+            ).fetchone()[0]
+            self.assertEqual(json.loads(request_json)['language'], 'zh-CN')
+            self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
+        self.assertEqual(migrated.get_ai_reading_result(result['id'])['language'], 'en')
+        self.assertEqual(
+            migrated.get_ai_followup(followup['id'], member.user_id)['language'], 'en'
+        )
+        self.assertEqual(
+            migrated.get_ai_book_chat_turn(turn['id'], member.user_id)['language'], 'zh-CN'
+        )
+        self.assertEqual(
+            migrated.get_ai_book_chat_summary(
+                book.book_id, member.user_id, 'zh-CN'
+            )['summary_text'],
+            '既存摘要',
+        )
+
+        for index, locale in enumerate(('zh-TW', 'ko', 'ja'), 1):
+            created = migrated.store_ai_reading_result(
+                cache_key='locale-result-' + locale, book_id=book.book_id,
+                chapter_index=index, scope='chapter', mode='chapter', profile='auto',
+                config_revision=0, content={'quick': {'title': locale}},
+                created_by_user_id=member.user_id, language=locale,
+                reading_boundary=index,
+            )
+            self.assertEqual(created['language'], locale)
+            self.assertEqual(migrated.create_ai_followup(
+                result_id=created['id'], owner_user_id=member.user_id,
+                question='question', language=locale,
+            )['language'], locale)
+            self.assertEqual(migrated.create_ai_book_chat_turn(
+                book_id=book.book_id, chapter_index=index,
+                owner_user_id=member.user_id, question='question', language=locale,
+            )['language'], locale)
+            migrated.upsert_ai_book_chat_summary(
+                book_id=book.book_id, owner_user_id=member.user_id,
+                language=locale, covered_turn_count=index, summary_text=locale,
+            )
+            self.assertEqual(
+                migrated.get_ai_book_chat_summary(
+                    book.book_id, member.user_id, locale
+                )['language'],
+                locale,
+            )
     def test_reading_task_reservation_is_idempotent_for_one_job(self):
         member = self.store.create_user("reader", "hash", role="member")
         self.store.set_ai_user_access(member.user_id, enabled=True, daily_limit=2)

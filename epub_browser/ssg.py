@@ -295,6 +295,9 @@ class SSGPublisher:
             "assets/manifest.json",
             "assets/manifest.en.json",
             "assets/manifest.zh-CN.json",
+            "assets/manifest.zh-TW.json",
+            "assets/manifest.ko.json",
+            "assets/manifest.ja.json",
             "sw.js",
         )
         for relative in required_root_files:

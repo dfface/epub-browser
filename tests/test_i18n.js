@@ -18,8 +18,14 @@ function fakeRoot(language) {
   };
 }
 
-test('detects Simplified Chinese regions and falls back unsupported locales to English', () => {
+test('normalizes all supported browser locale families and falls back unsupported locales to English', () => {
   assert.equal(createRuntime(fakeRoot('zh-SG'), dictionaries).init(), 'zh-CN');
+  assert.equal(createRuntime(fakeRoot('zh-TW'), dictionaries).init(), 'zh-TW');
+  assert.equal(createRuntime(fakeRoot('zh_HK'), dictionaries).init(), 'zh-TW');
+  assert.equal(createRuntime(fakeRoot('zh-MO'), dictionaries).init(), 'zh-TW');
+  assert.equal(createRuntime(fakeRoot('ko-KR'), dictionaries).init(), 'ko');
+  assert.equal(createRuntime(fakeRoot('ja-JP'), dictionaries).init(), 'ja');
+  assert.equal(createRuntime(fakeRoot('en-GB'), dictionaries).init(), 'en');
   assert.equal(createRuntime(fakeRoot('fr-FR'), dictionaries).init(), 'en');
 });
 
@@ -43,12 +49,43 @@ test('persists an explicit locale and interpolates text parameters', () => {
   assert.equal(i18n.t('common.version', { version: '1.11.1' }), '版本 1.11.1');
 });
 
-test('English and Chinese dictionaries have identical non-empty key trees', () => {
-  assert.deepEqual(Object.keys(dictionaries.en).sort(), Object.keys(dictionaries['zh-CN']).sort());
-  Object.keys(dictionaries.en).forEach(key => {
-    assert.notEqual(dictionaries.en[key], '');
-    assert.notEqual(dictionaries['zh-CN'][key], '');
+test('all five dictionaries have identical non-empty shapes and interpolation tokens', () => {
+  const locales = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'];
+  const placeholders = value => [...String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]).sort();
+  const shape = value => value && typeof value === 'object' ? Object.keys(value).sort() : typeof value;
+  locales.slice(1).forEach(locale => {
+    assert.deepEqual(Object.keys(dictionaries[locale]).sort(), Object.keys(dictionaries.en).sort());
   });
+  Object.keys(dictionaries.en).forEach(key => {
+    locales.forEach(locale => {
+      const value = dictionaries[locale][key];
+      assert.deepEqual(shape(value), shape(dictionaries.en[key]), `${locale}:${key} shape`);
+      if (value && typeof value === 'object') {
+        Object.keys(dictionaries.en[key]).forEach(category => {
+          assert.notEqual(value[category], '', `${locale}:${key}.${category}`);
+          assert.deepEqual(placeholders(value[category]), placeholders(dictionaries.en[key][category]), `${locale}:${key}.${category} placeholders`);
+        });
+      } else {
+        assert.notEqual(value, '', `${locale}:${key}`);
+        assert.deepEqual(placeholders(value), placeholders(dictionaries.en[key]), `${locale}:${key} placeholders`);
+      }
+    });
+  });
+});
+
+test('provides native locale names and translated AI language labels', () => {
+  const nativeNames = {
+    en: 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ko: '한국어', ja: '日本語'
+  };
+  Object.keys(dictionaries).forEach(locale => {
+    Object.entries(nativeNames).forEach(([code, name]) => {
+      assert.equal(dictionaries[locale][`locale.name.${code}`], name);
+      assert.ok(dictionaries[locale][`admin.ai.jobs.language.${code}`]);
+    });
+  });
+  assert.equal(dictionaries['zh-TW']['ai.title'], 'AI 閱讀');
+  assert.equal(dictionaries.ko['account.signIn'], '로그인');
+  assert.equal(dictionaries.ja['library.title'], 'ライブラリ');
 });
 
 test('provides exact bilingual administrator AI job scope and language labels', () => {
@@ -150,6 +187,23 @@ test('uses cache and cookie storage fallbacks in order when local storage is una
   assert.equal(createRuntime(fromCookie, dictionaries).init(), 'zh-CN');
   createRuntime(fromCookie, dictionaries).setLocale('en');
   assert.equal(fromCookie.document.cookie, 'epub_browser_locale=en; path=/');
+});
+
+test('normalizes aliases from persisted storage before selecting a dictionary and manifest', () => {
+  const root = fakeRoot('en');
+  root.__values.epub_browser_locale = 'zh-HK';
+  root.document = {
+    documentElement: { lang: '' },
+    head: { appendChild(node) { this.node = node; } },
+    createElement() { return {}; },
+    querySelector() { return this.head.node || null; },
+    querySelectorAll() { return []; },
+  };
+  const i18n = createRuntime(root, dictionaries);
+
+  assert.equal(i18n.init(), 'zh-TW');
+  assert.equal(root.document.documentElement.lang, 'zh-TW');
+  assert.equal(root.document.head.node.href, '/assets/manifest.zh-TW.json');
 });
 
 test('ignores cookie access exceptions while determining the browser locale', () => {

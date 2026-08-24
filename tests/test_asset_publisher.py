@@ -96,6 +96,9 @@ class AssetPublisherTests(unittest.TestCase):
                 "/assets/manifest.json",
                 "/assets/manifest.en.json",
                 "/assets/manifest.zh-CN.json",
+                "/assets/manifest.zh-TW.json",
+                "/assets/manifest.ko.json",
+                "/assets/manifest.ja.json",
             ):
                 self.assertIn(json.dumps(manifest_path), worker)
 
@@ -107,9 +110,18 @@ class AssetPublisherTests(unittest.TestCase):
 
             english = json.loads(Path(output, "assets", "manifest.en.json").read_text(encoding="utf-8"))
             chinese = json.loads(Path(output, "assets", "manifest.zh-CN.json").read_text(encoding="utf-8"))
+            traditional = json.loads(Path(output, "assets", "manifest.zh-TW.json").read_text(encoding="utf-8"))
+            korean = json.loads(Path(output, "assets", "manifest.ko.json").read_text(encoding="utf-8"))
+            japanese = json.loads(Path(output, "assets", "manifest.ja.json").read_text(encoding="utf-8"))
             self.assertEqual(english["lang"], "en")
             self.assertEqual(chinese["lang"], "zh-CN")
             self.assertEqual(chinese["description"], "私人 EPUB 阅读器与静态站点生成器")
+            self.assertEqual(traditional["lang"], "zh-TW")
+            self.assertEqual(traditional["description"], "私人 EPUB 閱讀器與靜態網站產生器")
+            self.assertEqual(korean["lang"], "ko")
+            self.assertEqual(korean["description"], "개인용 EPUB 리더 및 정적 사이트 생성기")
+            self.assertEqual(japanese["lang"], "ja")
+            self.assertEqual(japanese["description"], "個人用 EPUB リーダー兼静的サイトジェネレーター")
             self.assertRegex(english["icons"][0]["src"], r"^/assets/immutable/icon-192\.[0-9a-f]{12}\.png$")
 
     def test_real_worker_only_uses_cache_first_for_content_addressed_assets(self):
@@ -185,6 +197,19 @@ class AssetPublisherTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        for locale, description in (
+            ("zh-TW", "私人 EPUB 閱讀器與靜態網站產生器"),
+            ("ko", "개인용 EPUB 리더 및 정적 사이트 생성기"),
+            ("ja", "個人用 EPUB リーダー兼静的サイトジェネレーター"),
+        ):
+            (root / f"manifest.{locale}.json").write_text(
+                json.dumps({
+                    "lang": locale,
+                    "description": description,
+                    "icons": [{"src": "/assets/icon-192.png"}],
+                }, ensure_ascii=False),
+                encoding="utf-8",
+            )
         (root / "sw.js").write_text(
             "const CACHE_NAME = 'epub-browser-__EPUB_BROWSER_RELEASE_ID__';\n"
             "const PRECACHE_URLS = __EPUB_BROWSER_PRECACHE_URLS__;\n",

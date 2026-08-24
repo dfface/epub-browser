@@ -21,9 +21,10 @@ from .auth import (
     validate_password_hash,
 )
 from .identity import new_server_book_id
+from .locales import SUPPORTED_LOCALE_SET
 
 
-DB_SCHEMA_VERSION = 12
+DB_SCHEMA_VERSION = 13
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -241,12 +242,16 @@ class StateStore:
             if empty_database:
                 self._create_v11_indexes(connection)
                 self._require_foreign_key_integrity(connection)
-                connection.execute("PRAGMA user_version = 12")
+                connection.execute("PRAGMA user_version = 13")
             elif version < 11:
                 self._migrate_schema_v11(connection, version)
                 self._migrate_schema_v12(connection, 11)
+                self._migrate_schema_v13(connection, 12)
             elif version < 12:
                 self._migrate_schema_v12(connection, version)
+                self._migrate_schema_v13(connection, 12)
+            elif version < 13:
+                self._migrate_schema_v13(connection, version)
             else:
                 self._create_v11_indexes(connection)
                 self._require_foreign_key_integrity(connection)
@@ -558,7 +563,7 @@ class StateStore:
                 profile TEXT NOT NULL CHECK(profile IN (
                     'auto', 'technical', 'fiction', 'general'
                 )),
-                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')),
                 reading_boundary INTEGER,
                 config_revision INTEGER NOT NULL CHECK(config_revision >= 0),
                 template_id TEXT NOT NULL DEFAULT 'legacy',
@@ -584,7 +589,7 @@ class StateStore:
         )
         self._add_column_if_missing(
             connection, "ai_reading_results", "language",
-            "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN'))",
+            "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'))",
         )
         self._add_column_if_missing(
             connection, "ai_reading_results", "reading_boundary", "INTEGER",
@@ -608,7 +613,7 @@ class StateStore:
                 owner_user_id TEXT NOT NULL REFERENCES users(id)
                     ON DELETE CASCADE,
                 question TEXT NOT NULL,
-                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')),
                 answer TEXT,
                 status TEXT NOT NULL CHECK(status IN (
                     'queued', 'running', 'complete', 'failed', 'interrupted'
@@ -626,7 +631,7 @@ class StateStore:
             )
         self._add_column_if_missing(
             connection, "ai_reading_followups", "language",
-            "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN'))",
+            "TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'))",
         )
         # A book conversation deliberately lives separately from the legacy
         # result-bound follow-ups.  A reader may ask from a chapter's source
@@ -649,7 +654,7 @@ class StateStore:
                 owner_user_id TEXT NOT NULL REFERENCES users(id)
                     ON DELETE CASCADE,
                 question TEXT NOT NULL,
-                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')),
                 answer TEXT,
                 status TEXT NOT NULL CHECK(status IN (
                     'queued', 'running', 'complete', 'failed', 'interrupted'
@@ -677,7 +682,7 @@ class StateStore:
                 CREATE TABLE IF NOT EXISTS ai_book_chat_summaries (
                 book_id TEXT NOT NULL,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
+                language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')),
                 covered_turn_count INTEGER NOT NULL DEFAULT 0 CHECK(covered_turn_count >= 0),
                 summary_text TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -861,7 +866,7 @@ class StateStore:
                 book_context INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1)),
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 question TEXT NOT NULL,
-                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN')),
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')),
                 answer TEXT,
                 status TEXT NOT NULL CHECK(status IN (
                     'queued', 'running', 'complete', 'failed', 'interrupted'
@@ -880,7 +885,7 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS ai_book_chat_summaries (
                 book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN')),
+                language TEXT NOT NULL CHECK(language IN ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')),
                 covered_turn_count INTEGER NOT NULL DEFAULT 0
                     CHECK(covered_turn_count >= 0),
                 summary_text TEXT NOT NULL DEFAULT '',
@@ -1032,6 +1037,220 @@ class StateStore:
         self._create_v11_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 12")
+
+    @staticmethod
+    def _create_v13_ai_language_targets(connection) -> None:
+        languages = "'en', 'zh-CN', 'zh-TW', 'ko', 'ja'"
+        connection.execute(
+            f"""
+            CREATE TABLE ai_reading_results__v13_target (
+                id TEXT PRIMARY KEY,
+                cache_key TEXT NOT NULL,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                chapter_index INTEGER,
+                scope TEXT NOT NULL CHECK(scope IN ('book', 'chapter')),
+                mode TEXT NOT NULL CHECK(mode IN (
+                    'spoiler_free', 'read_so_far', 'full_review', 'chapter'
+                )),
+                profile TEXT NOT NULL CHECK(profile IN (
+                    'auto', 'technical', 'fiction', 'general'
+                )),
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ({languages})),
+                reading_boundary INTEGER,
+                config_revision INTEGER NOT NULL CHECK(config_revision >= 0),
+                template_id TEXT NOT NULL DEFAULT 'legacy',
+                template_version INTEGER NOT NULL DEFAULT 0 CHECK(template_version >= 0),
+                content_json TEXT NOT NULL,
+                created_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE ai_reading_jobs__v13_target (
+                id TEXT PRIMARY KEY,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
+                cache_key TEXT NOT NULL,
+                request_json TEXT,
+                profile TEXT,
+                template_id TEXT,
+                template_version INTEGER,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                result_id TEXT REFERENCES ai_reading_results__v13_target(id) ON DELETE SET NULL,
+                progress_current INTEGER NOT NULL DEFAULT 0,
+                progress_total INTEGER NOT NULL DEFAULT 1,
+                quota_reserved INTEGER NOT NULL DEFAULT 0 CHECK(quota_reserved IN (0, 1)),
+                generation_stage TEXT,
+                attempt_number INTEGER NOT NULL DEFAULT 1 CHECK(attempt_number >= 1),
+                retried_from_job_id TEXT REFERENCES ai_reading_jobs__v13_target(id) ON DELETE SET NULL,
+                retry_root_job_id TEXT REFERENCES ai_reading_jobs__v13_target(id) ON DELETE SET NULL,
+                retried_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK(
+                    progress_current >= 0
+                    AND progress_total >= 1
+                    AND progress_current <= progress_total
+                ),
+                CHECK(
+                    NOT (result_id IS NOT NULL AND error_code IS NOT NULL)
+                    AND (status != 'failed' OR error_code IS NOT NULL)
+                )
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE ai_reading_current_results__v13_target (
+                cache_key TEXT PRIMARY KEY,
+                result_id TEXT NOT NULL REFERENCES ai_reading_results__v13_target(id)
+                    ON DELETE CASCADE,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TABLE ai_reading_followups__v13_target (
+                id TEXT PRIMARY KEY,
+                result_id TEXT NOT NULL REFERENCES ai_reading_results__v13_target(id)
+                    ON DELETE CASCADE,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ({languages})),
+                answer TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TABLE ai_book_chat_turns__v13_target (
+                id TEXT PRIMARY KEY,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                result_id TEXT REFERENCES ai_reading_results__v13_target(id) ON DELETE SET NULL,
+                context_mode TEXT NOT NULL CHECK(context_mode IN (
+                    'shared_layer', 'chapter_source'
+                )),
+                book_context INTEGER NOT NULL DEFAULT 0 CHECK(book_context IN (0, 1)),
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ({languages})),
+                answer TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            CREATE TABLE ai_book_chat_summaries__v13_target (
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                language TEXT NOT NULL CHECK(language IN ({languages})),
+                covered_turn_count INTEGER NOT NULL DEFAULT 0
+                    CHECK(covered_turn_count >= 0),
+                summary_text TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (book_id, owner_user_id, language)
+            )
+            """
+        )
+
+    @staticmethod
+    def _v13_copy_table(connection, source: str, target: str) -> None:
+        source_columns = tuple(
+            row[1] for row in connection.execute(
+                f'PRAGMA table_info("{source}")'
+            )
+        )
+        target_columns = tuple(
+            row[1] for row in connection.execute(
+                f'PRAGMA table_info("{target}")'
+            )
+        )
+        if (
+            len(source_columns) != len(target_columns)
+            or set(source_columns) != set(target_columns)
+        ):
+            raise sqlite3.IntegrityError(
+                f"schema v13 column mismatch: {source} -> {target}"
+            )
+        quoted_columns = ", ".join(f'"{column}"' for column in source_columns)
+        connection.execute(
+            f'INSERT INTO "{target}" ({quoted_columns}) '
+            f'SELECT {quoted_columns} FROM "{source}"'
+        )
+        StateStore._assert_matching_row_counts(connection, source, target)
+
+    def _migrate_schema_v13(self, connection, source_version) -> None:
+        if source_version >= 13:
+            return
+        targets = (
+            "ai_reading_results__v13_target",
+            "ai_reading_jobs__v13_target",
+            "ai_reading_current_results__v13_target",
+            "ai_reading_followups__v13_target",
+            "ai_book_chat_turns__v13_target",
+            "ai_book_chat_summaries__v13_target",
+        )
+        placeholder = ",".join("?" for _ in targets)
+        leftover = connection.execute(
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name IN ({placeholder}) "
+            "ORDER BY name LIMIT 1",
+            targets,
+        ).fetchone()
+        if leftover is not None:
+            raise sqlite3.IntegrityError(
+                f"schema v13 reserved migration table exists: {leftover[0]}"
+            )
+        self._create_v13_ai_language_targets(connection)
+        pairs = (
+            ("ai_reading_results", "ai_reading_results__v13_target"),
+            ("ai_reading_jobs", "ai_reading_jobs__v13_target"),
+            ("ai_reading_current_results", "ai_reading_current_results__v13_target"),
+            ("ai_reading_followups", "ai_reading_followups__v13_target"),
+            ("ai_book_chat_turns", "ai_book_chat_turns__v13_target"),
+            ("ai_book_chat_summaries", "ai_book_chat_summaries__v13_target"),
+        )
+        for source, target in pairs:
+            self._v13_copy_table(connection, source, target)
+        for table in (
+            "ai_reading_current_results",
+            "ai_reading_followups",
+            "ai_book_chat_turns",
+            "ai_reading_jobs",
+            "ai_book_chat_summaries",
+            "ai_reading_results",
+        ):
+            connection.execute(f'DROP TABLE "{table}"')
+        for target, final in (
+            ("ai_reading_results__v13_target", "ai_reading_results"),
+            ("ai_reading_jobs__v13_target", "ai_reading_jobs"),
+            ("ai_reading_current_results__v13_target", "ai_reading_current_results"),
+            ("ai_reading_followups__v13_target", "ai_reading_followups"),
+            ("ai_book_chat_turns__v13_target", "ai_book_chat_turns"),
+            ("ai_book_chat_summaries__v13_target", "ai_book_chat_summaries"),
+        ):
+            connection.execute(f'ALTER TABLE "{target}" RENAME TO "{final}"')
+        self._create_v11_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 13")
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -3962,7 +4181,7 @@ class StateStore:
             raise ValueError("AI reading template id is invalid")
         if isinstance(template_version, bool) or not isinstance(template_version, int) or template_version < 0:
             raise ValueError("AI reading template version is invalid")
-        if language not in {"en", "zh-CN"}:
+        if language not in SUPPORTED_LOCALE_SET:
             raise ValueError("AI reading language is invalid")
         if isinstance(reading_boundary, bool) or (
             reading_boundary is not None and (
@@ -4117,7 +4336,7 @@ class StateStore:
     ) -> dict:
         if not isinstance(question, str) or not question.strip() or len(question) > 2000:
             raise ValueError("AI follow-up must contain 1 to 2000 characters")
-        if language not in {"en", "zh-CN"}:
+        if language not in SUPPORTED_LOCALE_SET:
             raise ValueError("AI follow-up language is invalid")
         followup_id = uuid.uuid4().hex
         with self._connection() as connection:
@@ -4219,7 +4438,7 @@ class StateStore:
             raise ValueError('AI chat must contain 1 to 2000 characters')
         if not isinstance(chapter_index, int) or chapter_index < 0:
             raise ValueError('AI chat chapter is invalid')
-        if language not in {'en', 'zh-CN'}:
+        if language not in SUPPORTED_LOCALE_SET:
             raise ValueError('AI chat language is invalid')
         if context_mode not in {'shared_layer', 'chapter_source'}:
             raise ValueError('AI chat context is invalid')
@@ -4281,7 +4500,7 @@ class StateStore:
     def get_ai_book_chat_summary(
         self, book_id: str, owner_user_id: str, language: str,
     ) -> Optional[dict]:
-        if language not in {'en', 'zh-CN'}:
+        if language not in SUPPORTED_LOCALE_SET:
             raise ValueError('AI chat language is invalid')
         with self._connection() as connection:
             row = connection.execute(
@@ -4299,7 +4518,7 @@ class StateStore:
         self, *, book_id: str, owner_user_id: str, language: str,
         covered_turn_count: int, summary_text: str,
     ) -> None:
-        if language not in {'en', 'zh-CN'} or covered_turn_count < 0:
+        if language not in SUPPORTED_LOCALE_SET or covered_turn_count < 0:
             raise ValueError('AI chat summary is invalid')
         if not isinstance(summary_text, str) or len(summary_text) > 24000:
             raise ValueError('AI chat summary is invalid')

@@ -5,8 +5,8 @@
   var overlay, panel, thread, composer, input, send, previousFocus;
   var context = null, eventSources = {};
   function t(key, params) { var i = root.EpubBrowserI18n; return i && i.t ? i.t(key, params) : key; }
-  function localised(key, en, zh, params) { var value = t(key, params); return value === key ? ((locale() === 'zh-CN' ? zh : en)) : value; }
-  function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return String(value || '').toLowerCase().indexOf('zh') === 0 ? 'zh-CN' : 'en'; }
+  function localised(key, en, _zh, params) { var value = t(key, params); return value === key ? en : value; }
+  function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].indexOf(value) >= 0 ? value : 'en'; }
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function fetchApi(url, options) { return root.EpubBrowserAuth.fetch(url, options).then(function(response) { return response.json().catch(function() { return {}; }).then(function(payload) { if (!response.ok) { var error = new Error(payload.code || 'ai_generation_failed'); error.code = payload.code || 'ai_generation_failed'; throw error; } return payload; }); }); }
   function chapterContext(button) {

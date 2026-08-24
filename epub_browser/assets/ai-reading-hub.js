@@ -5,7 +5,8 @@
   var state = { modal: null, container: null, close: null, back: null, opener: null, scrollY: 0, books: [], bookId: '', contextualBookId: '', language: '', version: 0, chapterIndicators: {} };
   function t(key, params) { var i = root.EpubBrowserI18n; return i && i.t ? i.t(key, params) : key; }
   function path(value) { return root.EpubBrowserURL ? root.EpubBrowserURL.publicPath(value) : value; }
-  function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return String(value || '').toLowerCase().indexOf('zh') === 0 ? 'zh-CN' : 'en'; }
+  var supportedLanguages = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'];
+  function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return supportedLanguages.indexOf(value) >= 0 ? value : 'en'; }
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
   function request(url, options) {
@@ -42,7 +43,7 @@
     if (result.scope === 'chapter' && Number.isInteger(Number(result.chapter_index))) return path('/book/' + encodeURIComponent(book.book_id) + '/chapter_' + Number(result.chapter_index) + '.html?ai_result=' + encodeURIComponent(result.id));
     return path('/book/' + encodeURIComponent(book.book_id) + '/');
   }
-  function resultLanguage(result) { return result && result.language === 'zh-CN' ? 'zh-CN' : 'en'; }
+  function resultLanguage(result) { return result && supportedLanguages.indexOf(result.language) >= 0 ? result.language : 'en'; }
   function visibleResults(book) { return (book.results || []).filter(function(result) { return !state.language || resultLanguage(result) === state.language; }); }
   function resultTimestamp(result) {
     if (!result || !result.created_at) return 0;
@@ -55,12 +56,12 @@
     if (!result || !result.created_at) return '';
     var parsed = new Date(resultTimestamp(result));
     if (isNaN(parsed.getTime())) return String(result.created_at);
-    try { return new Intl.DateTimeFormat(locale() === 'zh-CN' ? 'zh-CN' : 'en', { dateStyle: 'medium', timeStyle: 'short' }).format(parsed); } catch (_error) { return String(result.created_at); }
+    try { return new Intl.DateTimeFormat(locale(), { dateStyle: 'medium', timeStyle: 'short' }).format(parsed); } catch (_error) { return String(result.created_at); }
   }
   function resultDetails(result) {
     var fields = [
       t('ai.libraryGeneratedAt') + ': ' + resultDate(result),
-      t('ai.libraryLanguage') + ': ' + (resultLanguage(result) === 'zh-CN' ? t('common.chinese') : t('common.english')),
+      t('ai.libraryLanguage') + ': ' + t('locale.name.' + resultLanguage(result)),
       t('ai.libraryTemplateVersion') + ': v' + Number(result.template_version || 0),
       t('ai.libraryConfigVersion') + ': ' + Number(result.config_revision || 0),
     ];
@@ -142,7 +143,8 @@
     clear(state.container); state.container.removeAttribute('aria-busy');
     var heading = el('header', 'ai-reading-hub-heading'); var title = el('h1', 'ai-reading-hub-title', book.title); title.id = 'aiReadingHubTitle'; heading.appendChild(title);
     var languageRow = el('label', 'ai-reading-language-filter'); languageRow.appendChild(el('span', '', t('ai.libraryLanguage')));
-    var languageSelect = el('select'); languageSelect.setAttribute('aria-label', t('ai.libraryLanguage')); [['', t('ai.libraryAllLanguages')], ['en', t('common.english')], ['zh-CN', t('common.chinese')]].forEach(function(option) { var node = el('option', '', option[1]); node.value = option[0]; node.selected = option[0] === state.language; languageSelect.appendChild(node); }); languageSelect.addEventListener('change', function() { state.language = languageSelect.value; render(); }); languageRow.appendChild(languageSelect); heading.appendChild(languageRow);
+    var languageOptions = [['', t('ai.libraryAllLanguages')]].concat(supportedLanguages.map(function(language) { return [language, t('locale.name.' + language)]; }));
+    var languageSelect = el('select'); languageSelect.setAttribute('aria-label', t('ai.libraryLanguage')); languageOptions.forEach(function(option) { var node = el('option', '', option[1]); node.value = option[0]; node.selected = option[0] === state.language; languageSelect.appendChild(node); }); languageSelect.addEventListener('change', function() { state.language = languageSelect.value; render(); }); languageRow.appendChild(languageSelect); heading.appendChild(languageRow);
     var groups = resultGroups(book), results = visibleResults(book); heading.appendChild(el('p', '', t('ai.libraryResultCount', { count: results.length }))); state.container.appendChild(heading);
     var list = el('div', 'ai-reading-result-list');
     groups.forEach(function(group) {

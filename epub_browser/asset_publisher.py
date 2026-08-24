@@ -16,6 +16,9 @@ WEB_MANIFEST_SOURCES = {
     'manifest.json': 'manifest.json',
     'manifest.en.json': 'manifest.json',
     'manifest.zh-CN.json': 'manifest.zh-CN.json',
+    'manifest.zh-TW.json': 'manifest.zh-TW.json',
+    'manifest.ko.json': 'manifest.ko.json',
+    'manifest.ja.json': 'manifest.ja.json',
 }
 
 # These files implement the authenticated Server-mode AI reading experience.
@@ -114,6 +117,9 @@ class AssetPublisher:
                 'sw.js',
                 'manifest.json',
                 'manifest.zh-CN.json',
+                'manifest.zh-TW.json',
+                'manifest.ko.json',
+                'manifest.ja.json',
             } | self.excluded_paths
             or any(logical_path.startswith(prefix) for prefix in self.excluded_prefixes)
         )

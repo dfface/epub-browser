@@ -1570,6 +1570,33 @@ test('administrator AI job scope and language use the active Chinese runtime', a
   assert.doesNotMatch(scopes.join(' '), /\b(?:book|chapter|en|zh-CN|constructor|toString)\b/);
 });
 
+test('administrator AI jobs preserve and label the three additional languages', async () => {
+  const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload([
+    aiJob({ id: 'traditional-job', scope: 'chapter', language: 'zh-TW', chapter_index: 1 }),
+    aiJob({ id: 'korean-job', scope: 'book', language: 'ko', chapter_index: null }),
+    aiJob({ id: 'japanese-job', scope: 'book', language: 'ja', chapter_index: null }),
+  ]))));
+  harness.root.navigator = { languages: ['ja-JP'], language: 'ja-JP' };
+  harness.root.Intl = Intl;
+  harness.root.EpubBrowserI18n = createRuntime(harness.root, dictionaries);
+  const auth = AuthModule.create(harness.root);
+  auth.setSession({
+    user: { id: 'admin', username: 'admin', role: 'admin' },
+    csrf_token: 'admin-csrf',
+  });
+
+  await auth.loadAiJobs();
+
+  const scopes = descendants(harness.elements.adminAiJobsBody)
+    .filter(node => node.className === 'admin-ai-job-scope')
+    .map(node => node.textContent);
+  assert.deepEqual(scopes, [
+    '章 · #1 · 繁体字中国語',
+    '本全体 · 韓国語',
+    '本全体 · 日本語',
+  ]);
+});
+
 test('administrator AI job status and stored error allowlists reject inherited property names', async () => {
   const suspicious = ['constructor', 'toString', '__proto__'];
   const harness = jobUiHarness(() => Promise.resolve(response(200, aiJobsPayload(

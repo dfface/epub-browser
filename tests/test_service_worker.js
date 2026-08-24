@@ -88,6 +88,9 @@ for (const manifestPath of [
   '/assets/manifest.json',
   '/assets/manifest.en.json',
   '/assets/manifest.zh-CN.json',
+  '/assets/manifest.zh-TW.json',
+  '/assets/manifest.ko.json',
+  '/assets/manifest.ja.json',
 ]) {
   test(`${manifestPath} revalidates from the network despite a precached fallback`, async () => {
     const result = await fetchWithWorker(loadWorker(), manifestPath);

@@ -506,7 +506,10 @@
       };
       var languageKeys = {
         en: 'admin.ai.jobs.language.en',
-        'zh-CN': 'admin.ai.jobs.language.zh-CN'
+        'zh-CN': 'admin.ai.jobs.language.zh-CN',
+        'zh-TW': 'admin.ai.jobs.language.zh-TW',
+        ko: 'admin.ai.jobs.language.ko',
+        ja: 'admin.ai.jobs.language.ja'
       };
       var knownScope = hasOwn(scopeKeys, job.scope);
       var details = [knownScope

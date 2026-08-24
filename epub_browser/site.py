@@ -415,8 +415,8 @@ if (isKindle) {
         </div>
         <div class="app-nav-actions">
             <div class="library-language app-nav-locale">
-                <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" id="localeCurrentLabel">中文</span></button>
-                <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="zh-CN" data-i18n="common.chinese">中文</option><option value="en" data-i18n="common.english">English</option></select>
+                <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" id="localeCurrentLabel">English</span></button>
+                <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="en" data-i18n="locale.name.en">English</option><option value="zh-CN" data-i18n="locale.name.zh-CN">简体中文</option><option value="zh-TW" data-i18n="locale.name.zh-TW">繁體中文</option><option value="ko" data-i18n="locale.name.ko">한국어</option><option value="ja" data-i18n="locale.name.ja">日本語</option></select>
             </div>
             <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
             {server_account_control}
@@ -572,7 +572,7 @@ if (isKindle) {
             document.body.appendChild(localeMenu);
 
             function localeName(locale) {
-                return i18n.t(locale === 'zh-CN' ? 'common.chinese' : 'common.english');
+                return i18n.t('locale.name.' + locale);
             }
 
             function positionLocaleMenu() {
@@ -589,7 +589,7 @@ if (isKindle) {
             function renderLocaleMenu() {
                 var current = i18n.getLocale();
                 localeMenu.innerHTML = '';
-                ['zh-CN', 'en'].forEach(function(locale) {
+                ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(function(locale) {
                     var item = document.createElement('button');
                     item.type = 'button';
                     item.className = 'theme-menu-item locale-menu-item';

@@ -23,6 +23,8 @@ from epub_browser.ai_reading import (
     _split_text_by_token_budget,
     _truncate_tokens,
     extract_chapter_text,
+    prompt_language_name,
+    validate_reading_request,
 )
 from epub_browser.auth import BootstrapCredentials
 from epub_browser.prompt_templates import (
@@ -325,6 +327,34 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(cached["cached"])
         self.assertEqual(cached["result"]["content"]["quick"]["summary"], "Useful overview")
         self.assertEqual(len(_FakeClient.calls), 2)
+
+    def test_all_supported_locales_keep_distinct_prompt_language_instructions(self):
+        expected = {
+            'en': 'English',
+            'zh-CN': 'Chinese (Simplified)',
+            'zh-TW': 'Chinese (Traditional)',
+            'ko': 'Korean',
+            'ja': 'Japanese',
+        }
+        template = template_for('chapter', 'chapter')
+        for locale, language_name in expected.items():
+            with self.subTest(locale=locale):
+                request = ReadingRequest(
+                    scope='chapter', book_id=self.book.book_id,
+                    chapter_index=0, language=locale,
+                )
+                validate_reading_request(request)
+                self.assertEqual(prompt_language_name(locale), language_name)
+                messages = self.service._prompt(
+                    request, {'title': 'Book'}, 'auto', 'Source sentence.', template,
+                )
+                self.assertIn('Language: ' + language_name, messages[-1]['content'])
+
+        with self.assertRaises(AIReadingError):
+            validate_reading_request(ReadingRequest(
+                scope='chapter', book_id=self.book.book_id,
+                chapter_index=0, language='fr',
+            ))
 
     async def test_admin_retry_recomputes_current_job_state(self):
         replay = {
@@ -1117,7 +1147,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
                 self.member,
                 cached["result"]["id"],
                 "QUESTION_MARKER " + ("😀问题" * 600),
-                "en",
+                "ja",
             )
             for _ in range(100):
                 entry = self.store.get_ai_followup(
@@ -1131,6 +1161,9 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(entry["status"], "complete")
         self.assertEqual(len(_EnvelopeClient.calls), 1)
+        self.assertIn(
+            "Answer in Japanese.", _EnvelopeClient.calls[0]["messages"][0]["content"]
+        )
         self.assertIn(
             "QUESTION_MARKER", _EnvelopeClient.calls[0]["messages"][-1]["content"]
         )
@@ -1181,7 +1214,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
                 book_id=self.book.book_id,
                 chapter_index=0,
                 question="QUESTION_MARKER " + ("🤔提问" * 600),
-                language="en",
+                language="ko",
                 context_mode="chapter_source",
             )
             for _ in range(100):
@@ -1196,6 +1229,9 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(entry["status"], "complete")
         self.assertEqual(len(_EnvelopeClient.calls), 1)
+        self.assertIn(
+            "Answer in Korean.", _EnvelopeClient.calls[0]["messages"][0]["content"]
+        )
         prompt = _EnvelopeClient.calls[0]["messages"][-1]["content"]
         self.assertIn("SOURCE_MARKER", prompt)
         self.assertIn("QUESTION_MARKER", prompt)

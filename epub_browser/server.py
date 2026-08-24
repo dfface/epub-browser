@@ -50,6 +50,7 @@ from .asset_publisher import PublishedAssets
 from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
+from .locales import SUPPORTED_LOCALE_SET, normalize_locale
 from .processor import (
     SERVER_OUTPUT_REVISION,
     SERVER_OUTPUT_REVISION_FILE,
@@ -118,6 +119,45 @@ SETUP_COPY = {
         'password_mismatch': '密码与确认密码不一致。',
         'username_unavailable': '用户名不可用。',
     },
+    'zh-TW': {
+        'page_title': '設定 · EPUB Browser',
+        'title': '建立超級使用者帳戶',
+        'description': '首次存取 Web 介面時，系統會提示你建立一個超級使用者帳戶。',
+        'username': '使用者名稱',
+        'password': '密碼',
+        'password_confirmation': '確認密碼',
+        'submit': '建立超級使用者',
+        'language': '語言',
+        'invalid': '請輸入使用者名稱和密碼。',
+        'password_mismatch': '密碼與確認密碼不一致。',
+        'username_unavailable': '此使用者名稱無法使用。',
+    },
+    'ko': {
+        'page_title': '설정 · EPUB Browser',
+        'title': '슈퍼유저 계정 만들기',
+        'description': '웹 인터페이스에 처음 접속하면 슈퍼유저 계정을 만들라는 안내가 표시됩니다.',
+        'username': '사용자 이름',
+        'password': '비밀번호',
+        'password_confirmation': '비밀번호 확인',
+        'submit': '슈퍼유저 만들기',
+        'language': '언어',
+        'invalid': '사용자 이름과 비밀번호를 입력하세요.',
+        'password_mismatch': '비밀번호가 서로 일치하지 않습니다.',
+        'username_unavailable': '사용할 수 없는 사용자 이름입니다.',
+    },
+    'ja': {
+        'page_title': 'セットアップ · EPUB Browser',
+        'title': 'スーパーユーザーアカウントを作成',
+        'description': 'Web インターフェースへ初めてアクセスすると、スーパーユーザーアカウントの作成を求められます。',
+        'username': 'ユーザー名',
+        'password': 'パスワード',
+        'password_confirmation': 'パスワードの確認',
+        'submit': 'スーパーユーザーを作成',
+        'language': '言語',
+        'invalid': 'ユーザー名とパスワードを入力してください。',
+        'password_mismatch': 'パスワードが一致しません。',
+        'username_unavailable': 'このユーザー名は使用できません。',
+    },
 }
 LOGIN_COPY = {
     'en': {
@@ -140,7 +180,57 @@ LOGIN_COPY = {
         'login_throttled': '登录尝试次数过多，请在 {minutes} 分钟后重试。',
         'language': '语言',
     },
+    'zh-TW': {
+        'page_title': '登入 · EPUB Browser',
+        'sign_in': '登入',
+        'description': '登入以繼續前往你的個人書庫。',
+        'username': '使用者名稱',
+        'password': '密碼',
+        'invalid_credentials': '使用者名稱或密碼不正確。',
+        'login_throttled': '登入嘗試次數過多，請在 {minutes} 分鐘後再試。',
+        'language': '語言',
+    },
+    'ko': {
+        'page_title': '로그인 · EPUB Browser',
+        'sign_in': '로그인',
+        'description': '개인 라이브러리를 계속 이용하려면 로그인하세요.',
+        'username': '사용자 이름',
+        'password': '비밀번호',
+        'invalid_credentials': '사용자 이름 또는 비밀번호가 올바르지 않습니다.',
+        'login_throttled': '로그인 시도가 너무 많습니다. {minutes}분 후 다시 시도하세요.',
+        'language': '언어',
+    },
+    'ja': {
+        'page_title': 'ログイン · EPUB Browser',
+        'sign_in': 'ログイン',
+        'description': '個人ライブラリを引き続き利用するにはログインしてください。',
+        'username': 'ユーザー名',
+        'password': 'パスワード',
+        'invalid_credentials': 'ユーザー名またはパスワードが正しくありません。',
+        'login_throttled': 'ログイン試行回数が多すぎます。{minutes} 分後にもう一度お試しください。',
+        'language': '言語',
+    },
 }
+
+LOCALE_NATIVE_NAMES = {
+    'en': 'English',
+    'zh-CN': '简体中文',
+    'zh-TW': '繁體中文',
+    'ko': '한국어',
+    'ja': '日本語',
+}
+
+
+def locale_options(locale):
+    return '\n'.join(
+        '<option value="{}"{} data-i18n="locale.name.{}">{}</option>'.format(
+            code,
+            ' selected' if code == locale else '',
+            code,
+            name,
+        )
+        for code, name in LOCALE_NATIVE_NAMES.items()
+    )
 
 SERVICE_WORKER_TOMBSTONE = r"""'use strict';
 self.addEventListener('install', function(event) {
@@ -204,12 +294,10 @@ def route_is_public_auth_endpoint(path):
 
 
 def normalize_login_locale(value, accept_language=''):
-    candidate = str(value or '').replace('_', '-').lower()
+    candidate = value
     if not candidate:
-        candidate = str(accept_language or '').split(',', 1)[0].split(';', 1)[0].strip().lower()
-    if candidate == 'zh' or candidate.startswith(('zh-cn', 'zh-sg')):
-        return 'zh-CN'
-    return 'en'
+        candidate = str(accept_language or '').split(',', 1)[0].split(';', 1)[0].strip()
+    return normalize_locale(candidate, 'en')
 
 
 def require_principal(request) -> Principal:
@@ -858,8 +946,7 @@ def create_app(
             if error_key is not None
             else ''
         )
-        en_selected = ' selected' if locale == 'en' else ''
-        zh_selected = ' selected' if locale == 'zh-CN' else ''
+        language_options = locale_options(locale)
         footer_markup = render_footer(datetime.now().year)
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -876,8 +963,7 @@ def create_app(
 <header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
 <label class="auth-language setup-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
 <select id="setupLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
-<option value="en"{en_selected} data-i18n="common.english">English</option>
-<option value="zh-CN"{zh_selected} data-i18n="common.chinese">中文</option>
+{language_options}
 </select></label></header>
 <div class="auth-intro"><h1 data-i18n="account.setupTitle">{copy['title']}</h1>
 <p class="auth-description" data-i18n="account.setupDescription">{copy['description']}</p></div>
@@ -1034,8 +1120,7 @@ if(localeField)localeField.value=localeSelect.value;
             + copy['invalid_credentials']
             + '</p>'
         )
-        en_selected = ' selected' if locale == 'en' else ''
-        zh_selected = ' selected' if locale == 'zh-CN' else ''
+        language_options = locale_options(locale)
         footer_markup = render_footer(datetime.now().year)
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1053,8 +1138,7 @@ if(localeField)localeField.value=localeSelect.value;
 <header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
 <label class="auth-language login-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
 <select id="loginLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
-<option value="en"{en_selected} data-i18n="common.english">English</option>
-<option value="zh-CN"{zh_selected} data-i18n="common.chinese">中文</option>
+{language_options}
 </select></label></header>
 <div class="auth-intro"><h1 data-i18n="account.signIn">{copy['sign_in']}</h1>
 <p class="auth-description" data-i18n="account.loginDescription">{copy['description']}</p></div>
@@ -2018,7 +2102,7 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('forbidden', 'Forbidden'), 403)
         chapter_index_raw = request.query_params.get('chapter_index')
         language = request.query_params.get('language')
-        if language not in {None, 'en', 'zh-CN'}:
+        if language is not None and language not in SUPPORTED_LOCALE_SET:
             return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
         chapter_index = None
         if chapter_index_raw is not None:
@@ -2222,7 +2306,7 @@ window.location.assign(payload.redirect||'/');
         result_id = data.get('result_id')
         question = data.get('question')
         language = data.get('language', 'en')
-        if not isinstance(result_id, str) or not isinstance(question, str) or language not in {'en', 'zh-CN'}:
+        if not isinstance(result_id, str) or not isinstance(question, str) or language not in SUPPORTED_LOCALE_SET:
             return response(error_payload('invalid_ai_followup', 'Invalid AI follow-up'), 400)
         result = store.get_ai_reading_result(result_id)
         if result is None:
@@ -2253,7 +2337,7 @@ window.location.assign(payload.redirect||'/');
         if (
             (not book_context and (isinstance(chapter_index, bool) or not isinstance(chapter_index, int)))
             or (book_context and chapter_index not in {None, ''})
-            or not isinstance(question, str) or language not in {'en', 'zh-CN'}
+            or not isinstance(question, str) or language not in SUPPORTED_LOCALE_SET
             or context_mode not in {'shared_layer', 'chapter_source', 'book_overview'}
         ):
             return response(error_payload('invalid_ai_chat', 'Invalid AI chat'), 400)

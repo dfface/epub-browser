@@ -171,6 +171,9 @@ class SSGPublicationTests(unittest.TestCase):
                 "manifest.json",
                 "manifest.en.json",
                 "manifest.zh-CN.json",
+                "manifest.zh-TW.json",
+                "manifest.ko.json",
+                "manifest.ja.json",
             ):
                 manifest = json.loads(
                     (output / "assets" / manifest_name).read_text(encoding="utf-8")

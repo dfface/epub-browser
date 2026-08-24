@@ -307,6 +307,27 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(response.json(), {"status": "setup_required"})
 
+    def test_setup_supports_all_locale_aliases_and_native_language_choices(self):
+        cases = (
+            ('zh-HK', 'zh-TW', '建立超級使用者帳戶'),
+            ('zh-MO', 'zh-TW', '建立超級使用者帳戶'),
+            ('ko-KR', 'ko', '슈퍼유저 계정 만들기'),
+            ('ja-JP', 'ja', 'スーパーユーザーアカウントを作成'),
+        )
+        for requested, normalized, title in cases:
+            with self.subTest(requested=requested):
+                page = self.client.get('/setup?lang=' + requested)
+                self.assertEqual(page.status_code, 200)
+                self.assertIn(f'<html lang="{normalized}">', page.text)
+                self.assertIn(title, page.text)
+                self.assertIn(f'<option value="{normalized}" selected', page.text)
+                for code, native_name in (
+                    ('en', 'English'), ('zh-CN', '简体中文'),
+                    ('zh-TW', '繁體中文'), ('ko', '한국어'), ('ja', '日本語'),
+                ):
+                    self.assertIn(f'<option value="{code}"', page.text)
+                    self.assertIn(native_name, page.text)
+
     def test_setup_head_matches_get_status_and_has_no_body(self):
         response = self.client.head("/setup")
 
@@ -766,6 +787,20 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('text/css', stylesheet.headers['content-type'])
         self.assertIn('.auth-alert[hidden] {', stylesheet.text)
         self.assertIn('display: none;', stylesheet.text)
+
+    def test_public_login_supports_traditional_chinese_korean_and_japanese(self):
+        cases = (
+            ('zh-TW', '登入'),
+            ('ko', '로그인'),
+            ('ja', 'ログイン'),
+        )
+        for locale, heading in cases:
+            with self.subTest(locale=locale):
+                page = self.client.get('/login?lang=' + locale)
+                self.assertEqual(page.status_code, 200)
+                self.assertIn(f'<html lang="{locale}">', page.text)
+                self.assertIn(f'<h1 data-i18n="account.signIn">{heading}</h1>', page.text)
+                self.assertIn(f'<option value="{locale}" selected', page.text)
 
     def test_cookie_secure_flag_follows_explicit_auth_configuration(self):
         secure_config = AuthConfig.from_values(
@@ -2645,6 +2680,93 @@ class BookAuthorizationTests(unittest.TestCase):
         self.assertEqual(request.book_id, "open-id")
         self.assertEqual(request.reading_boundary, 0)
 
+    def test_ai_reading_and_result_routes_accept_every_supported_locale(self):
+        result = {"status": "queued", "cached": False, "job": {"id": "job"}}
+        with mock.patch(
+            "epub_browser.server.AIReadingService.submit",
+            new_callable=mock.AsyncMock,
+            return_value=result,
+        ) as submit:
+            for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+                with self.subTest(route='reading', locale=locale):
+                    response = self.member_client.post(
+                        '/api/ai/reading',
+                        json={
+                            'scope': 'chapter', 'book_id': 'open-id',
+                            'chapter_index': 0, 'mode': 'chapter',
+                            'language': locale, 'force': False,
+                        },
+                    )
+                    self.assertEqual(response.status_code, 202)
+                    self.assertEqual(submit.await_args.args[1].language, locale)
+                with self.subTest(route='results', locale=locale):
+                    response = self.member_client.get(
+                        '/api/ai/books/open-id/results?language=' + locale
+                    )
+                    self.assertEqual(response.status_code, 200)
+
+        rejected = self.member_client.post(
+            '/api/ai/reading',
+            json={
+                'scope': 'chapter', 'book_id': 'open-id', 'chapter_index': 0,
+                'mode': 'chapter', 'language': 'fr', 'force': False,
+            },
+        )
+        self.assertEqual(rejected.status_code, 400)
+
+    def test_ai_followup_and_chat_routes_preserve_every_supported_locale(self):
+        result = self.store.store_ai_reading_result(
+            cache_key='server-locale-result', book_id='open-id', chapter_index=0,
+            scope='chapter', mode='chapter', profile='auto', language='en',
+            reading_boundary=0, config_revision=0, template_id='chapter',
+            template_version=1, content={'quick': {'title': 'Locale result'}},
+            created_by_user_id=self.member.user_id,
+        )
+        with mock.patch(
+            'epub_browser.server.AIReadingService.follow_up',
+            new_callable=mock.AsyncMock,
+            return_value={'id': 'followup'},
+        ) as follow_up, mock.patch(
+            'epub_browser.server.AIReadingService.ask_book',
+            new_callable=mock.AsyncMock,
+            return_value={'id': 'chat'},
+        ) as ask_book:
+            for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+                with self.subTest(route='followup', locale=locale):
+                    response = self.member_client.post(
+                        '/api/ai/followups',
+                        json={
+                            'result_id': result['id'], 'question': 'Question?',
+                            'language': locale,
+                        },
+                    )
+                    self.assertEqual(response.status_code, 202)
+                    self.assertEqual(follow_up.await_args.args[3], locale)
+                with self.subTest(route='chat', locale=locale):
+                    response = self.member_client.post(
+                        '/api/ai/books/open-id/chat',
+                        json={
+                            'chapter_index': 0, 'question': 'Question?',
+                            'language': locale, 'context_mode': 'chapter_source',
+                        },
+                    )
+                    self.assertEqual(response.status_code, 202)
+                    self.assertEqual(ask_book.await_args.kwargs['language'], locale)
+
+        for path, payload in (
+            ('/api/ai/followups', {
+                'result_id': result['id'], 'question': 'Question?', 'language': 'fr',
+            }),
+            ('/api/ai/books/open-id/chat', {
+                'chapter_index': 0, 'question': 'Question?', 'language': 'fr',
+                'context_mode': 'chapter_source',
+            }),
+        ):
+            with self.subTest(rejected=path):
+                self.assertEqual(
+                    self.member_client.post(path, json=payload).status_code, 400
+                )
+
     def test_administrator_can_list_restrict_grant_and_revoke_books(self):
         listing = self.admin_client.get("/api/admin/books")
 
@@ -2905,6 +3027,12 @@ class ServerCacheTests(unittest.TestCase):
             manifest.write("{}")
         with open(os.path.join(self.directory.name, "assets", "manifest.zh-CN.json"), "w", encoding="utf-8") as manifest:
             manifest.write("{}")
+        for locale in ('zh-TW', 'ko', 'ja'):
+            with open(
+                os.path.join(self.directory.name, 'assets', f'manifest.{locale}.json'),
+                'w', encoding='utf-8',
+            ) as manifest:
+                manifest.write('{}')
         with open(os.path.join(self.directory.name, "sw.js"), "w", encoding="utf-8") as worker:
             worker.write("self.addEventListener('fetch', () => {})")
         os.makedirs(os.path.join(self.directory.name, "book", "demo", "resources"))
@@ -3059,6 +3187,9 @@ class ServerCacheTests(unittest.TestCase):
             "/assets/manifest.json",
             "/assets/manifest.en.json",
             "/assets/manifest.zh-CN.json",
+            "/assets/manifest.zh-TW.json",
+            "/assets/manifest.ko.json",
+            "/assets/manifest.ja.json",
         ):
             with self.subTest(path=path):
                 response = self.client.get(path)
