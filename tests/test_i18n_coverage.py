@@ -412,6 +412,25 @@ class I18nCoverageTests(unittest.TestCase):
         self.assertEqual(required - set(DICTIONARY_KEY.findall(english)), set())
         self.assertEqual(required - set(DICTIONARY_KEY.findall(chinese)), set())
 
+    def test_generation_stage_and_task_limit_copy_exists_in_both_locales(self):
+        required = {
+            'ai.stage.preparingSource',
+            'ai.stage.generatingCore',
+            'ai.stage.groundingSource',
+            'admin.ai.dailyLimit',
+            'admin.ai.dailyLimitHelp',
+        }
+        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+        english = source[source.index('en: {'):source.index("'zh-CN': {")]
+        chinese = source[source.index("'zh-CN': {"):]
+
+        self.assertEqual(required - set(DICTIONARY_KEY.findall(english)), set())
+        self.assertEqual(required - set(DICTIONARY_KEY.findall(chinese)), set())
+        self.assertIn(
+            'AI reading tasks each authorized member may start per day', english,
+        )
+        self.assertIn('several backend model calls', english)
+
     def test_first_party_ui_sinks_do_not_embed_english_copy(self):
         failures = []
         for path in FIRST_PARTY:

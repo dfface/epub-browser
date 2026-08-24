@@ -42,6 +42,7 @@ from .ai_reading import (
     AIReadingError,
     AIReadingService,
     ReadingRequest,
+    _public_ai_job,
     validate_reading_request,
 )
 from .asset_publisher import PublishedAssets
@@ -2004,7 +2005,7 @@ window.location.assign(payload.redirect||'/');
             principal.user_id, principal.role, result['book_id']
         ):
             return response(error_payload('forbidden', 'Forbidden'), 403)
-        return response({'job': job, 'result': result})
+        return response({'job': _public_ai_job(job), 'result': result})
 
     async def ai_book_results(request):
         principal = require_principal(request)
@@ -2143,7 +2144,7 @@ window.location.assign(payload.redirect||'/');
                 if current is None:
                     return None
                 result = store.get_ai_reading_result(current['result_id']) if current.get('result_id') else None
-                return {'job': current, 'result': result}
+                return {'job': _public_ai_job(current), 'result': result}
 
             event_name = 'job'
             terminal = lambda payload: payload is None or payload['job']['status'] not in {'queued', 'running'}

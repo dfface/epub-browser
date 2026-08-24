@@ -116,6 +116,10 @@ class SitePublicationTests(unittest.TestCase):
         self.assertIn('data-i18n=admin.ai.connection', html)
         self.assertIn('data-i18n=admin.ai.execution', html)
         self.assertIn('data-i18n=admin.ai.memberDefaults', html)
+        self.assertIn('data-i18n=admin.ai.dailyLimit', html)
+        self.assertIn(
+            'AI reading tasks each authorized member may start per day', html,
+        )
         self.assertIn('id=adminUserSubmit', html)
         self.assertIn('id=adminAiSettingsSubmit', html)
         self.assertIn('id=adminAiTagSubmit', html)

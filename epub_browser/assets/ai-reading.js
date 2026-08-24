@@ -237,17 +237,31 @@
     return { root: progress, status: status, meter: meter };
   }
 
-  function setProgress(progress, status, current, total) {
+  function generationStatus(job, context) {
+    var stageKey = job.generation_stage && {
+      preparing_source: 'ai.stage.preparingSource',
+      generating_core: 'ai.stage.generatingCore',
+      grounding_source: 'ai.stage.groundingSource'
+    }[job.generation_stage];
+    if (stageKey) return t(stageKey);
+    return t(job.status === 'queued' ? 'ai.queued' : 'ai.generating', {
+      current: job.progress_current || 0,
+      total: job.progress_total || 1
+    });
+  }
+
+  function setProgress(progress, job, context) {
     if (!progress) return;
-    var safeTotal = Math.max(1, Number(total) || 1);
-    var safeCurrent = Math.min(safeTotal, Math.max(0, Number(current) || 0));
-    var key = status === 'queued' ? 'ai.queued' : 'ai.generating';
+    var safeTotal = Math.max(1, Number(job.progress_total) || 1);
+    var safeCurrent = Math.min(safeTotal, Math.max(0, Number(job.progress_current) || 0));
+    var key = job.status === 'queued' ? 'ai.queued' : 'ai.generating';
     var message = t(key, { current: safeCurrent, total: safeTotal });
+    var stage = generationStatus(job, context);
     progress.root.hidden = false;
-    progress.status.textContent = message;
+    progress.status.textContent = stage;
     progress.meter.max = safeTotal;
     progress.meter.value = safeCurrent;
-    progress.meter.setAttribute('aria-valuetext', message);
+    progress.meter.setAttribute('aria-valuetext', stage + ' · ' + message);
   }
 
   function openPanel(context, trigger) {
@@ -715,12 +729,7 @@
         if (run !== activeRun || overlay.hidden) return;
         var job = payload.job || {};
         if (job.status === 'queued' || job.status === 'running') {
-          setProgress(
-            context.progress,
-            job.status,
-            job.progress_current || 0,
-            job.progress_total || 1
-          );
+          setProgress(context.progress, job, context);
           return root.setTimeout(poll, 700);
         }
         if (job.status !== 'complete') throw Object.assign(new Error(job.error_code), { code: job.error_code });
@@ -749,12 +758,7 @@
       try { payload = JSON.parse(event.data); } catch (error) { return; }
       var job = payload.job || {};
       if (job.status === 'queued' || job.status === 'running') {
-        setProgress(
-          context.progress,
-          job.status,
-          job.progress_current || 0,
-          job.progress_total || 1
-        );
+        setProgress(context.progress, job, context);
         return;
       }
       source.close();
@@ -795,7 +799,11 @@
     }
     if (context.generateButton) context.generateButton.disabled = true;
     (context.modeButtons || []).forEach(function(button) { button.disabled = true; });
-    setProgress(context.progress, 'queued', 0, 1);
+    setProgress(
+      context.progress,
+      { status: 'queued', progress_current: 0, progress_total: 1 },
+      context
+    );
     fetchApi('/api/ai/reading', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -806,12 +814,7 @@
       if (run !== activeRun || !overlay || overlay.hidden) return;
       if (payload.status === 'complete') return addResult(payload.result);
       if (payload.job) {
-        setProgress(
-          context.progress,
-          payload.job.status,
-          payload.job.progress_current || 0,
-          payload.job.progress_total || 1
-        );
+        setProgress(context.progress, payload.job, context);
       }
       streamJob(payload.job.id, context, run);
     }).catch(function(error) {

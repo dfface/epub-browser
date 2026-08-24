@@ -674,6 +674,7 @@ def reading_request_from_job_payload(payload: object) -> ReadingRequest:
 
 
 def _public_ai_job(job: dict) -> dict:
+    """Return reader-safe durable job state without its retry payload."""
     public_job = dict(job)
     public_job.pop("request_json", None)
     return public_job

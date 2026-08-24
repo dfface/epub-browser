@@ -10,6 +10,14 @@
     var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang;
     return String(value || '').toLowerCase().indexOf('zh') === 0 ? 'zh-CN' : 'en';
   }
+  function generationStatus(job, context) {
+    var stageKey = job.generation_stage && {
+      preparing_source: 'ai.stage.preparingSource',
+      generating_core: 'ai.stage.generatingCore',
+      grounding_source: 'ai.stage.groundingSource'
+    }[job.generation_stage];
+    return stageKey ? t(stageKey) : contextLabel(context);
+  }
   function api(url, options) { return root.EpubBrowserAuth.fetch(url, options).then(function(response) { return response.json().catch(function() { return {}; }).then(function(payload) { if (!response.ok) { var error = new Error(payload.code || 'ai_generation_failed'); error.code = payload.code || 'ai_generation_failed'; throw error; } return payload; }); }); }
   function setStatus(button, text, error, transient) {
     var status = document.querySelector('[data-ai-canvas-status]');
@@ -365,7 +373,7 @@
     state.eventSources.push(source);
     source.addEventListener('job', function(event) { var payload; try { payload = JSON.parse(event.data); } catch (_) { return; } var job = payload.job || {};
       if (!isCurrentContext(context, contextVersion)) { source.close(); return; }
-      if (job.status === 'queued' || job.status === 'running') { setStatus(button, contextLabel(context) + ' · ' + t(job.status === 'queued' ? 'ai.queued' : 'ai.generating', { current: job.progress_current || 0, total: job.progress_total || 1 })); return; }
+      if (job.status === 'queued' || job.status === 'running') { setStatus(button, generationStatus(job, context) + ' · ' + t(job.status === 'queued' ? 'ai.queued' : 'ai.generating', { current: job.progress_current || 0, total: job.progress_total || 1 })); return; }
       source.close(); button.disabled = false; delete state.pending[String(context.chapterIndex) + ':' + contextVersion]; if (job.status === 'complete' && payload.result) { var count = apply(payload.result, currentArticleFor(context), context.chapterIndex); setStatus(button, t('ai.canvasApplied', { count: count }), false, true); } else setStatus(button, t('ai.error.' + (job.error_code || 'unknown')), true, true);
     });
   }

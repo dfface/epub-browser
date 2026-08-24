@@ -201,7 +201,7 @@ def render_library_shell(
                     </fieldset>
                     <fieldset class="admin-ai-settings-group admin-ai-member-defaults-group">
                         <legend data-i18n="admin.ai.memberDefaults">Member defaults</legend>
-                        <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.dailyLimit">Default daily limit</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.dailyLimitHelp" data-i18n-aria-label="admin.ai.dailyLimitHelpLabel" data-tip="Default number of AI requests each authorized member may start per day. Set 0 for no daily limit. Per-member overrides take precedence." aria-label="Explain default daily limit"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="daily_limit" min="0" required></label>
+                        <label><span class="admin-ai-field-label"><span data-i18n="admin.ai.dailyLimit">Default daily AI reading task limit</span><button type="button" class="admin-ai-help" data-i18n-data-tip="admin.ai.dailyLimitHelp" data-i18n-aria-label="admin.ai.dailyLimitHelpLabel" data-tip="The default number of AI reading tasks each authorized member may start per day. One chapter reading task may use several backend model calls. Set 0 for no daily limit. Per-member overrides take precedence." aria-label="Explain default daily AI reading task limit"><i class="fas fa-info" aria-hidden="true"></i></button></span><input type="number" name="daily_limit" min="0" required></label>
                     </fieldset>
                     <fieldset class="admin-ai-settings-group admin-ai-credential-group">
                         <legend data-i18n="admin.ai.credentials">Credentials</legend>

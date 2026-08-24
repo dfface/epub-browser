@@ -18,6 +18,7 @@ from epub_browser.ai_reading import (
     _merge_chapter_layers,
     _normalize_core_result,
     _normalize_result,
+    _public_ai_job,
     _split_text_by_token_budget,
     _truncate_tokens,
     extract_chapter_text,
@@ -2140,6 +2141,17 @@ class ModelContextBudgetTests(unittest.TestCase):
 
 
 class ResultNormalizationTests(unittest.TestCase):
+    def test_public_ai_job_includes_only_safe_stage_progress(self):
+        """Readers receive the durable stage, never the private replay payload."""
+        public = _public_ai_job({
+            "id": "job",
+            "request_json": "secret",
+            "generation_stage": "generating_core",
+        })
+
+        self.assertEqual(public["generation_stage"], "generating_core")
+        self.assertNotIn("request_json", public)
+
     def test_compact_core_synopsis_is_valid_json_and_keeps_beats_at_2048(self):
         core = {
             "quick": {
