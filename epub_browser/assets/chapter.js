@@ -281,6 +281,12 @@ function scopeEBStyles(scopeSelector) {
   }
 }
 
+function initializeChapterBookshelf() {
+    if (!window.initBookShelf) return false;
+    window.initBookShelf();
+    return true;
+}
+
 function initScript() {
     var i18n = window.EpubBrowserI18n;
     function showLoading() {
@@ -2240,9 +2246,7 @@ function initScript() {
     });
 
     function bookshelfSupport() {
-        if (window.initBookshelf) {
-            window.initBookshelf();
-        } else {
+        if (!initializeChapterBookshelf()) {
             setTimeout(bookshelfSupport, 100);
         }
     }

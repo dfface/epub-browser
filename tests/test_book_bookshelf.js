@@ -72,6 +72,94 @@ test('logged-in Server reader changes its shelf without a legacy username marker
   ]);
 });
 
+test('Server reader defers its shelf button until the Server store has loaded', async () => {
+  const listeners = {};
+  const saved = [];
+  const localWrites = [];
+  const button = {
+    dataset: {},
+    classList: { add() {}, remove() {} },
+    setAttribute() {},
+    removeAttribute() {},
+    querySelector() { return null; },
+    addEventListener(type, listener) {
+      if (!listeners[type]) listeners[type] = [];
+      listeners[type].push(listener);
+    },
+    click() {
+      (listeners.click || []).slice().forEach((listener) => listener({ preventDefault() {} }));
+    },
+  };
+  const passiveButton = {
+    classList: { add() {}, remove() {} },
+    addEventListener() {},
+  };
+  const remoteShelf = { items: ['book-id'], groups: {}, order: ['book-id'] };
+  const window = {
+    EpubBrowserMode: 'server',
+    epubBrowserCache: { kindle_mode: 'false' },
+    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserNotification: { show() {} },
+    EpubBrowserBookFeatures: {
+      load() {
+        window.EpubBookshelfStore = {
+          isServerMode() { return true; },
+          data() { return remoteShelf; },
+          load() { return Promise.resolve({ data: remoteShelf, version: 1 }); },
+          save(data) {
+            saved.push(data);
+            return Promise.resolve({ data, version: 2 });
+          },
+        };
+        return Promise.resolve();
+      },
+    },
+    addEventListener() {},
+    location: { pathname: '/book/book-id/index.html' },
+  };
+  const document = {
+    cookie: '',
+    body: { addEventListener() {}, style: {} },
+    head: { appendChild() {} },
+    documentElement: { classList: { add() {}, remove() {} } },
+    createElement() { return { style: {} }; },
+    getElementById(id) {
+      if (id === 'toggleShelfBtn') return button;
+      if (id === 'toggleShelfBtnText') return { textContent: '' };
+      if (id === 'scrollToTopBtn') return passiveButton;
+      return null;
+    },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+  };
+  const context = {
+    window,
+    document,
+    navigator: { userAgent: '' },
+    localStorage: {
+      getItem(key) {
+        if (key === 'bookshelf') return JSON.stringify(remoteShelf);
+        return null;
+      },
+      setItem(key) { localWrites.push(key); },
+      length: 0,
+      key() { return null; },
+      removeItem() {},
+    },
+    setTimeout,
+    clearTimeout,
+    Promise,
+  };
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
+
+  context.initScript();
+  button.click();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), [{ items: [], groups: {}, order: [] }]);
+  assert.deepEqual(localWrites, []);
+});
+
 test('Server progress labels never invent a shared account identity', () => {
   const client = loadBookClient();
   client.context.window.EpubReadingProgress = { getUsername() { return ''; } };

@@ -277,7 +277,6 @@ function initScript() {
             });
         }
 
-        initBookShelfButton(book_hash);
     }
 
     var storageKeySortableContainer = 'book-container-sortable-order';
@@ -323,6 +322,9 @@ function initScript() {
     if (!isKindleMode()) {
         deferBookFeature('bookshelfBtn', 'bookshelf', function() {
             if (window.initBookShelf) window.initBookShelf();
+        }, 'bookshelf.loading');
+        deferBookFeature('toggleShelfBtn', 'bookshelf', function() {
+            initBookShelfButton(book_hash);
         }, 'bookshelf.loading');
         deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading');
         enableBookSortableOnInteraction();
