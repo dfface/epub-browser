@@ -149,6 +149,32 @@ html {
     opacity: .76;
 }
 
+/* Keep AI-reading completion markers visible without loading the hub modal CSS. */
+.ai-reading-chapter-badge {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: var(--button-bg);
+    background: color-mix(in srgb, var(--button-bg) 10%, transparent);
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.chapter-title-with-sync .ai-reading-chapter-badge { margin-left: 0; }
+.chapter-link.active .ai-reading-chapter-badge,
+.chapter-link:target .ai-reading-chapter-badge { color: inherit; background: color-mix(in srgb, white 18%, transparent); }
+
+@media (max-width: 600px) {
+    .ai-reading-chapter-badge { padding: 3px 6px; font-size: .68rem; }
+    .ai-reading-chapter-badge i { display: none; }
+}
+
 .app-nav-link i,
 .app-nav-action i {
     color: currentColor;

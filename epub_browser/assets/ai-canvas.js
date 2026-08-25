@@ -88,8 +88,14 @@
   function createMap(result) {
     var source = diagramFromStructure(result.content && result.content.structure); if (!source || !root.EpubBrowserAIRich) return;
     var map = el('figure', 'ai-native-map'); map.setAttribute('data-ai-native-map', '');
-    var canvas = el('div', 'ai-map-viewport'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', t('ai.mapKicker')); root.EpubBrowserAIRich.render(canvas, 'mermaid', source); map.appendChild(canvas);
+    var canvas = el('div', 'ai-map-viewport'); canvas.tabIndex = 0; canvas.setAttribute('aria-label', t('ai.mapKicker'));
+    map.aiMapRenderPromise = Promise.resolve(root.EpubBrowserAIRich.render(canvas, 'mermaid', source));
+    map.appendChild(canvas);
     return map;
+  }
+  function waitForLayout() {
+    if (!root.requestAnimationFrame) return Promise.resolve();
+    return new Promise(function(resolve) { root.requestAnimationFrame(function() { root.requestAnimationFrame(resolve); }); });
   }
   function applyMapTheme(viewport) {
     var svg = viewport && viewport.querySelector('svg'); if (!svg) return;
@@ -255,7 +261,7 @@
     return Boolean(diagramFromStructure(result.content && result.content.structure) || summary.overview || (summary.beats || []).length || (summary.key_elements || []).length || summary.closing);
   }
   function showMapPopover(trigger, result) {
-    if (state.mapPopover) return;
+    if (state.mapPopover) return Promise.resolve(false);
     var modal = el('div', 'ai-guide-map-modal');
     modal.classList.add('is-fullscreen');
     var panel = el('aside', 'ai-guide-map-dialog'); panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', t('ai.chapterOverview'));
@@ -265,10 +271,11 @@
     actions.appendChild(close); header.appendChild(actions); panel.appendChild(header);
     var body = el('main', 'ai-chapter-overview-body'), layout = el('div', 'ai-chapter-overview-layout'), map = createMap(result);
     var summary = chapterSummary(result); if (summary) layout.appendChild(summary);
+    var controls = null, viewport = null;
     if (map) {
       layout.classList.add('has-map');
       var mapSection = el('section', 'ai-chapter-overview-map'); mapSection.appendChild(el('h3', '', t('ai.mapKicker'))); mapSection.appendChild(map);
-      var controls = enableMapViewport(map.querySelector('.ai-map-viewport')), controlBar = el('div', 'ai-map-controls');
+      viewport = map.querySelector('.ai-map-viewport'); controls = enableMapViewport(viewport); var controlBar = el('div', 'ai-map-controls');
       [['ai.mapZoomOut', 'fas fa-minus', controls.zoomOut], ['ai.mapFit', 'fas fa-expand-arrows-alt', controls.fit], ['ai.mapZoomIn', 'fas fa-plus', controls.zoomIn]].forEach(function(item) {
         var control = el('button', 'ai-map-control'); control.type = 'button'; control.setAttribute('aria-label', t(item[0])); control.setAttribute('title', t(item[0])); control.appendChild(el('i', item[1])); control.addEventListener('click', item[2]); controlBar.appendChild(control);
       });
@@ -285,7 +292,28 @@
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     });
-    document.body.appendChild(modal); syncReaderTypography(panel); document.body.classList.add('ai-map-open'); state.mapPopover = modal; state.mapTrigger = trigger; close.focus();
+    return Promise.resolve(map && map.aiMapRenderPromise).then(function() {
+      if (state.mapPopover) return false;
+      document.body.appendChild(modal); syncReaderTypography(panel); document.body.classList.add('ai-map-open'); state.mapPopover = modal; state.mapTrigger = trigger; close.focus();
+      return waitForLayout().then(function() {
+        if (state.mapPopover !== modal) return false;
+        if (viewport) applyMapTheme(viewport);
+        if (controls) controls.fit();
+        return true;
+      });
+    });
+  }
+  function setMapTriggerLoading(trigger, loading) {
+    var label = trigger.querySelector('span'), icon = trigger.querySelector('i');
+    if (loading) {
+      if (label) { trigger.dataset.aiMapLabel = label.textContent; label.textContent = t('ai.libraryLoading'); }
+      if (icon) { trigger.dataset.aiMapIcon = icon.className; icon.className = 'fas fa-spinner fa-spin'; }
+      trigger.classList.add('is-loading'); trigger.disabled = true; trigger.setAttribute('aria-busy', 'true'); return;
+    }
+    if (label) label.textContent = trigger.dataset.aiMapLabel || t('ai.chapterOverview');
+    if (icon && trigger.dataset.aiMapIcon) icon.className = trigger.dataset.aiMapIcon;
+    trigger.classList.remove('is-loading'); trigger.disabled = false; trigger.removeAttribute('aria-busy');
+    delete trigger.dataset.aiMapLabel; delete trigger.dataset.aiMapIcon;
   }
   function showPopover(mark, annotation) {
     if (state.popover) state.popover.remove();
@@ -345,7 +373,7 @@
     var guide = el('section', 'ai-chapter-guide'); guide.setAttribute('data-ai-chapter-guide', ''); guide.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
     var guideHead = el('header'); var guideTitle = el('div', 'ai-chapter-guide-title'); appendKicker(guideTitle, t('ai.guideKicker'), 'fas fa-wand-magic-sparkles'); guideTitle.appendChild(el('h2', '', result.content.quick && result.content.quick.title || t('ai.chapterRead'))); guideHead.appendChild(guideTitle);
     var guideActions = el('div', 'ai-chapter-guide-actions');
-    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-wand-magic-sparkles')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideActions.appendChild(mapTrigger); }
+    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-wand-magic-sparkles')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { setMapTriggerLoading(mapTrigger, true); showMapPopover(mapTrigger, result).then(function(opened) { if (opened) mapTrigger.setAttribute('aria-expanded', 'true'); setMapTriggerLoading(mapTrigger, false); }, function() { setMapTriggerLoading(mapTrigger, false); }); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideActions.appendChild(mapTrigger); }
     var regenerateLabel = t('ai.regenerate'), regenerate = el('button', 'ai-guide-map-trigger ai-guide-regenerate'); regenerate.type = 'button'; regenerate.setAttribute('data-ai-canvas-regenerate', ''); regenerate.setAttribute('aria-label', regenerateLabel); regenerate.appendChild(el('i', 'fas fa-rotate-right')); regenerate.appendChild(el('span', '', regenerateLabel)); regenerate.addEventListener('click', function(event) { event.preventDefault(); var context = chapterContext(result.book_id, chapterIndex); confirmRegeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, state.contextVersion)) generate(regenerate, context, state.contextVersion, true); }); }); guideActions.appendChild(regenerate); guideHead.appendChild(guideActions);
     guide.appendChild(guideHead);
     guide.appendChild(el('p', 'ai-chapter-guide-summary', result.content.quick && result.content.quick.summary || ''));

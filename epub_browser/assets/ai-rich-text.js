@@ -77,31 +77,43 @@
     if (language === 'math') {
       if (!root.katex || !root.katex.render) {
         fallback(parent, text, language);
-        if (!parent.dataset.aiRichLoading) { parent.dataset.aiRichLoading = 'true'; ensureRenderer(language).then(function() { delete parent.dataset.aiRichLoading; render(parent, language, text); }).catch(function() { delete parent.dataset.aiRichLoading; }); }
-        return;
+        if (!parent.dataset.aiRichLoading) {
+          parent.dataset.aiRichLoading = 'true';
+          parent.aiRichRenderPromise = ensureRenderer(language).then(function() {
+            delete parent.dataset.aiRichLoading;
+            return render(parent, language, text);
+          }).catch(function() { delete parent.dataset.aiRichLoading; });
+        }
+        return parent.aiRichRenderPromise || Promise.resolve();
       }
       try { root.katex.render(text, parent, { displayMode: true, throwOnError: true, trust: false, strict: 'error' }); }
       catch (_) { fallback(parent, text, language); }
-      return;
+      return Promise.resolve();
     }
     if (language === 'mermaid') {
-      if (!safeMermaid(text)) return fallback(parent, text, language);
+      if (!safeMermaid(text)) { fallback(parent, text, language); return Promise.resolve(); }
       if (!root.mermaid || !root.mermaid.render) {
         fallback(parent, text, language);
-        if (!parent.dataset.aiRichLoading) { parent.dataset.aiRichLoading = 'true'; ensureRenderer(language).then(function() { delete parent.dataset.aiRichLoading; render(parent, language, text); }).catch(function() { delete parent.dataset.aiRichLoading; }); }
-        return;
+        if (!parent.dataset.aiRichLoading) {
+          parent.dataset.aiRichLoading = 'true';
+          parent.aiRichRenderPromise = ensureRenderer(language).then(function() {
+            delete parent.dataset.aiRichLoading;
+            return render(parent, language, text);
+          }).catch(function() { delete parent.dataset.aiRichLoading; });
+        }
+        return parent.aiRichRenderPromise || Promise.resolve();
       }
       var id = 'epub-browser-mermaid-' + (++sequence);
       root.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true });
-      root.mermaid.render(id, text).then(function(result) {
+      return root.mermaid.render(id, text).then(function(result) {
         parent.textContent = '';
         // Mermaid generated this SVG in strict mode from a constrained code
         // block.  Model HTML is never assigned to innerHTML anywhere else.
         parent.innerHTML = result.svg;
       }).catch(function() { fallback(parent, text, language); });
-      return;
     }
     fallback(parent, text, language);
+    return Promise.resolve();
   }
   function renderMarkdown(parent, source, className) {
     parent.textContent = '';

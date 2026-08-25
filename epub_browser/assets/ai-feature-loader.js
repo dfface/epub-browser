@@ -32,7 +32,9 @@
         ? 'aiReadingHubCss'
         : name === 'aiCanvas'
           ? 'aiCanvasCss'
-          : '';
+          : name === 'aiChat'
+            ? 'aiChatCss'
+            : '';
       if (!stylesheet) return load(name);
       return root.EpubBrowserAIRich.loadStyle(stylesheet)
         .then(waitForStylePaint)
@@ -54,12 +56,12 @@
     button.click();
   }
   function setFeatureLoading(button, loading) {
-    if (!button.hasAttribute('data-ai-reading-hub') && !button.hasAttribute('data-ai-learning-canvas')) return;
     var label = button.querySelector('[data-i18n]');
     var icon = button.querySelector('i');
     var i18n = root.EpubBrowserI18n;
+    var messageKey = featureFor(button) === 'aiChat' ? 'ai.chatLoading' : 'ai.libraryLoading';
     if (loading) {
-      if (label) { button.dataset.aiFeatureLabel = label.textContent; label.textContent = i18n && i18n.t ? i18n.t('ai.libraryLoading') : button.dataset.aiFeatureLabel; }
+      if (label) { button.dataset.aiFeatureLabel = label.textContent; label.textContent = i18n && i18n.t ? i18n.t(messageKey) : button.dataset.aiFeatureLabel; }
       if (icon) { button.dataset.aiFeatureIcon = icon.className; icon.className = 'fas fa-spinner fa-spin'; }
       button.classList.add('is-loading');
       button.setAttribute('aria-busy', 'true');
@@ -95,6 +97,12 @@
     if (!button) return;
     enable('aiCanvas').then(function() { replay(button); }).catch(function() {});
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadRequestedResult);
-  else loadRequestedResult();
+  function loadReadingIndicators() {
+    // Chapter badges need result metadata on the book/chapter page, but do not
+    // need the hub stylesheet or modal.  Load only this small behavior chunk.
+    if (document.querySelector('[data-ai-reading-indicators]')) load('aiReadingHub').catch(function() {});
+  }
+  function initializeDeferredFeatures() { loadRequestedResult(); loadReadingIndicators(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeDeferredFeatures);
+  else initializeDeferredFeatures();
 })(window);

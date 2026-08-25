@@ -1509,7 +1509,7 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
-    <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
+    <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -2467,7 +2467,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
-    <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
+    <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">

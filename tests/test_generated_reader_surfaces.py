@@ -1366,12 +1366,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         """Opening a reader must not start AI work or duplicate the same result query."""
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
         hub_script = Path('epub_browser/assets/ai-reading-hub.js').read_text(encoding='utf-8')
+        feature_loader = Path('epub_browser/assets/ai-feature-loader.js').read_text(encoding='utf-8')
+        breadcrumb_stylesheet = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
 
         init = canvas_script[canvas_script.index('function init() {'):canvas_script.index('\n  root.EpubBrowserAICanvas', canvas_script.index('function init() {'))]
         self.assertIn('if (requestedResultId()) load(state.button, initial, state.contextVersion)', init)
         self.assertIn('chapterIndicatorRequests: {}', hub_script)
         self.assertIn('function loadChapterIndicators(bookId)', hub_script)
         self.assertIn('return state.chapterIndicatorRequests[bookId];', hub_script)
+        self.assertIn("name === 'aiChat'", feature_loader)
+        self.assertIn("'aiChatCss'", feature_loader)
+        self.assertIn("function loadReadingIndicators()", feature_loader)
+        self.assertIn("load('aiReadingHub').catch", feature_loader)
+        self.assertIn('.ai-reading-chapter-badge', breadcrumb_stylesheet)
+
+    def test_chapter_overview_waits_for_mermaid_rendering_and_layout(self):
+        canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
+        rich_text = Path('epub_browser/assets/ai-rich-text.js').read_text(encoding='utf-8')
+
+        self.assertIn('map.aiMapRenderPromise = Promise.resolve(root.EpubBrowserAIRich.render', canvas_script)
+        self.assertIn('function waitForLayout()', canvas_script)
+        self.assertIn('return Promise.resolve(map && map.aiMapRenderPromise).then', canvas_script)
+        self.assertIn('setMapTriggerLoading(mapTrigger, true)', canvas_script)
+        self.assertIn('if (controls) controls.fit();', canvas_script)
+        self.assertIn('return root.mermaid.render(id, text).then', rich_text)
+        self.assertIn('return parent.aiRichRenderPromise || Promise.resolve();', rich_text)
 
     def test_chapter_ai_surfaces_render_feynman_teach_only_for_a_chapter_explanation(self):
         """A chapter explanation is a Server-only learning surface, never empty chrome."""
