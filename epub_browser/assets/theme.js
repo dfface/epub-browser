@@ -240,7 +240,7 @@ function initTheme() {
                 themeMenu.style.display = 'none';
                 themeToggle.setAttribute('aria-expanded', 'false');
             }
-        });
+        }, true);
 
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && themeMenu && themeMenu.style.display !== 'none') {
