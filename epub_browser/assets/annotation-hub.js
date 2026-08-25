@@ -93,6 +93,21 @@
         return publicPath('/book/' + encodeURIComponent(annotation.book_hash) + '/chapter_' + Number(annotation.chapter_index) + '.html?annotation=' + encodeURIComponent(annotation.id));
     }
 
+    function imageAnnotationMeta(annotation) {
+        var startMeta = annotation && (annotation.startMeta || annotation.start_meta);
+        return startMeta && startMeta.image && startMeta.image.src ? startMeta.image : null;
+    }
+
+    function annotationThumbnailHref(annotation) {
+        var meta = imageAnnotationMeta(annotation);
+        if (!meta) return '';
+        var source = String(meta.src || '');
+        if (!source) return '';
+        if (/^(?:data:image\/|https?:\/\/|\/)/i.test(source)) return source;
+        var chapterHref = annotationHref(annotation).split('?')[0];
+        return chapterHref.slice(0, chapterHref.lastIndexOf('/') + 1) + source;
+    }
+
     function requestJson(url) {
         return new Promise(function(resolve, reject) {
             var request = new XMLHttpRequest();
@@ -414,6 +429,17 @@
         card.href = annotationHref(annotation); card.addEventListener('click', close);
         var stripe = element('span', 'annotation-card-color');
         stripe.style.backgroundColor = annotation.color || '#FFEB3B'; card.appendChild(stripe);
+        var thumbnailUrl = annotationThumbnailHref(annotation);
+        if (thumbnailUrl) {
+            var thumbnail = document.createElement('img');
+            thumbnail.className = 'annotation-card-thumbnail';
+            thumbnail.src = thumbnailUrl;
+            thumbnail.alt = annotation.text || tr('imageNote');
+            thumbnail.loading = 'lazy';
+            thumbnail.decoding = 'async';
+            thumbnail.addEventListener('error', function() { thumbnail.remove(); });
+            card.appendChild(thumbnail);
+        }
         var content = element('div', 'annotation-card-content');
         content.appendChild(element('blockquote', '', annotation.text || ''));
         if (annotation.note && annotation.note.trim()) content.appendChild(element('p', 'annotation-card-note', annotation.note));
@@ -525,5 +551,5 @@
         else bind();
     }
 
-    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, formatTimestamp: formatTimestamp, buildShareSummary: buildShareSummary, copyShareText: copyShareText, downloadShareText: downloadShareText, shareFilename: shareFilename, createShareActions: createShareActions, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
+    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, annotationThumbnailHref: annotationThumbnailHref, formatTimestamp: formatTimestamp, buildShareSummary: buildShareSummary, copyShareText: copyShareText, downloadShareText: downloadShareText, shareFilename: shareFilename, createShareActions: createShareActions, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
 });

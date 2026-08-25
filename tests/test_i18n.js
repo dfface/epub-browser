@@ -125,6 +125,7 @@ test('localizes AI administration panels and chapter regeneration in all five lo
   const keys = [
     'admin.ai.configuration',
     'admin.ai.permissions',
+    'admin.ai.jobs.header.timeline',
     'ai.regenerateScopeTitle',
     'ai.regenerateScopeDescription',
     'ai.regenerateScopeAction',

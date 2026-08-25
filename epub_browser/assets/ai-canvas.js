@@ -313,7 +313,7 @@
   function appendReflection(article, result, chapterIndex) {
     var questions = result.content && result.content.deep && result.content.deep.questions || []; if (!questions.length) return;
     var reflection = el('section', 'ai-chapter-reflection'); reflection.setAttribute('data-ai-chapter-reflection', ''); reflection.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
-    var head = el('header'); appendKicker(head, label('ai.reflectionKicker', 'AFTER THE CHAPTER', '本章末尾'), 'fas fa-lightbulb'); head.appendChild(el('h2', '', label('ai.reflectionTitle', 'Think further', '深入思考'))); reflection.appendChild(head);
+    var head = el('header'); appendKicker(head, label('ai.reflectionKicker', 'AFTER THE CHAPTER', '本章末尾'), 'fas fa-wand-magic-sparkles'); head.appendChild(el('h2', '', label('ai.reflectionTitle', 'Think further', '深入思考'))); reflection.appendChild(head);
     reflection.appendChild(el('p', 'ai-chapter-reflection-intro', label('ai.reflectionDescription', 'Pause here before moving on.', '读完后，不妨停下来想一想。')));
     var list = el('ol', 'ai-chapter-reflection-list'); questions.slice(0, 3).forEach(function(item) { var entry = el('li', 'ai-reflection-question'); entry.appendChild(el('strong', '', item.question || '')); if (item.why) entry.appendChild(el('p', '', item.why)); list.appendChild(entry); }); reflection.appendChild(list);
     article.appendChild(reflection); state.reflection = reflection;
@@ -329,12 +329,11 @@
     var paragraphs = explanationParagraphs(teach.explanation);
     if (!paragraphs.length) return;
     var section = el('section', 'ai-chapter-teach'); section.setAttribute('data-ai-chapter-teach', ''); section.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
-    var head = el('header'); appendKicker(head, t('ai.teachKicker'), 'fas fa-graduation-cap'); head.appendChild(el('h2', '', t('ai.teachTitle'))); section.appendChild(head);
+    var head = el('header'); appendKicker(head, t('ai.teachKicker'), 'fas fa-wand-magic-sparkles'); head.appendChild(el('h2', '', t('ai.teachTitle'))); section.appendChild(head);
     paragraphs.forEach(function(paragraph) { section.appendChild(el('p', 'ai-chapter-teach-explanation', paragraph)); });
     if (teach.analogy) { var analogy = el('div', 'ai-chapter-teach-detail'); analogy.appendChild(el('h3', '', t('ai.teachAnalogy'))); analogy.appendChild(el('p', '', teach.analogy)); section.appendChild(analogy); }
     if (teach.check_question) { var check = el('div', 'ai-chapter-teach-detail'); check.appendChild(el('h3', '', t('ai.teachCheck'))); check.appendChild(el('p', '', teach.check_question)); section.appendChild(check); }
-    var guide = article.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + chapterIndex + '"]');
-    article.insertBefore(section, guide ? guide.nextSibling : article.firstChild);
+    article.appendChild(section);
   }
   function apply(result, article, chapterIndex) {
     article = article || document.querySelector('#eb-content'); chapterIndex = Number(chapterIndex == null ? result.chapter_index : chapterIndex); if (!article || !Number.isInteger(chapterIndex)) return 0;
@@ -342,18 +341,18 @@
     var guide = el('section', 'ai-chapter-guide'); guide.setAttribute('data-ai-chapter-guide', ''); guide.setAttribute('data-ai-canvas-chapter', String(chapterIndex));
     var guideHead = el('header'); var guideTitle = el('div', 'ai-chapter-guide-title'); appendKicker(guideTitle, t('ai.guideKicker'), 'fas fa-wand-magic-sparkles'); guideTitle.appendChild(el('h2', '', result.content.quick && result.content.quick.title || t('ai.chapterRead'))); guideHead.appendChild(guideTitle);
     var guideActions = el('div', 'ai-chapter-guide-actions');
-    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-diagram-project')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideActions.appendChild(mapTrigger); }
+    if (overviewAvailable(result)) { var mapLabel = t('ai.chapterOverview'), mapTrigger = el('button', 'ai-guide-map-trigger'); mapTrigger.type = 'button'; mapTrigger.setAttribute('aria-label', mapLabel); mapTrigger.setAttribute('aria-expanded', 'false'); mapTrigger.appendChild(el('i', 'fas fa-wand-magic-sparkles')); mapTrigger.appendChild(el('span', '', mapLabel)); function openMap() { showMapPopover(mapTrigger, result); mapTrigger.setAttribute('aria-expanded', 'true'); } mapTrigger.addEventListener('click', function(event) { event.preventDefault(); if (state.mapPopover) { removeMapPopover(); mapTrigger.setAttribute('aria-expanded', 'false'); } else openMap(); }); guideActions.appendChild(mapTrigger); }
     var regenerateLabel = t('ai.regenerate'), regenerate = el('button', 'ai-guide-map-trigger ai-guide-regenerate'); regenerate.type = 'button'; regenerate.setAttribute('data-ai-canvas-regenerate', ''); regenerate.setAttribute('aria-label', regenerateLabel); regenerate.appendChild(el('i', 'fas fa-rotate-right')); regenerate.appendChild(el('span', '', regenerateLabel)); regenerate.addEventListener('click', function(event) { event.preventDefault(); var context = chapterContext(result.book_id, chapterIndex); confirmRegeneration(context).then(function(confirmed) { if (confirmed && isCurrentContext(context, state.contextVersion)) generate(regenerate, context, state.contextVersion, true); }); }); guideActions.appendChild(regenerate); guideHead.appendChild(guideActions);
     guide.appendChild(guideHead);
     guide.appendChild(el('p', 'ai-chapter-guide-summary', result.content.quick && result.content.quick.summary || ''));
     var points = result.content.quick && result.content.quick.key_points || []; if (points.length) { var list = el('ul', 'ai-chapter-guide-points'); points.slice(0, 4).forEach(function(point) { list.appendChild(el('li', '', point)); }); guide.appendChild(list); }
     article.insertBefore(guide, article.firstChild); state.guide = guide;
-    appendTeach(article, result, chapterIndex);
     var annotations = result.content && result.content.annotations || [];
     if (!annotations.length) annotations = (result.content && result.content.evidence || []).map(function(item) { return { kind: 'evidence', quote: item.quote, title: t('ai.evidence'), body_markdown: item.reason }; });
     var placed = 0; annotations.forEach(function(item, index) { var mark = markQuote(article, item, index, chapterIndex); if (mark) { state.marks.push(mark); placed += 1; } });
     var paragraphNotes = result.content && result.content.paragraph_notes || [];
     paragraphNotes.forEach(function(item, index) { placeParagraphNote(article, { id: 'ai-native-note-' + chapterIndex + '-' + index, title: item.title, body_markdown: item.summary_markdown, anchor_quote: item.anchor_quote, kind: 'paragraph' }, index, chapterIndex); });
+    appendTeach(article, result, chapterIndex);
     appendReflection(article, result, chapterIndex);
     setCanvasActive(true);
     return placed;

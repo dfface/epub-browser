@@ -2420,7 +2420,7 @@ class ResultNormalizationTests(unittest.TestCase):
         chapter_template = template_for("chapter", "chapter")
         book_template = template_for("book", "full_review")
 
-        self.assertEqual(chapter_template["version"], 11)
+        self.assertEqual(chapter_template["version"], 12)
         self.assertIn("chapter_summary", chapter_template["system"])
         self.assertIn("key_elements", chapter_template["system"])
         self.assertEqual(book_template["version"], 5)
@@ -2445,6 +2445,7 @@ class ResultNormalizationTests(unittest.TestCase):
                 normalized = prompt.lower()
                 self.assertIn("vocabulary", normalized)
                 self.assertIn("idiom", normalized)
+                self.assertIn("single character", normalized)
                 self.assertIn("requested language", normalized)
 
     def test_grounding_normalization_preserves_a_grounded_vocabulary_item(self):
@@ -2474,6 +2475,7 @@ class ResultNormalizationTests(unittest.TestCase):
                 self.assertIn("only claims supported by the supplied source", normalized)
                 self.assertIn("analogy is optional", normalized)
                 self.assertIn("teach-back question", normalized)
+                self.assertIn("do not restate quick", normalized)
 
     def test_chapter_prompt_uses_distinct_profile_guidance(self):
         template = template_for("chapter", "chapter")

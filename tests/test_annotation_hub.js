@@ -369,7 +369,19 @@ test('uses shared i18n for chapter fallback, counts, and timestamps', () => {
 });
 
 test('builds a chapter deep link with an encoded annotation id', () => {
-  assert.equal(Hub.annotationHref({ book_hash: 'book', chapter_index: 3, id: 'note / 1' }), '/book/book/chapter_3.html?annotation=note%20%2F%201');
+    assert.equal(Hub.annotationHref({ book_hash: 'book', chapter_index: 3, id: 'note / 1' }), '/book/book/chapter_3.html?annotation=note%20%2F%201');
+});
+
+test('resolves an image note thumbnail relative to its chapter page', () => {
+  const annotation = {
+    book_hash: 'book', chapter_index: 3, id: 'image-note',
+    startMeta: { image: { src: 'images/page-3.jpg' } },
+  };
+  assert.equal(
+    Hub.annotationThumbnailHref(annotation),
+    '/book/book/images/page-3.jpg',
+  );
+  assert.equal(Hub.annotationThumbnailHref({}), '');
 });
 
 test('renders an icon-only delete action outside the annotation card content', async () => {
@@ -397,6 +409,24 @@ test('renders an icon-only delete action outside the annotation card content', a
     assert.equal(deleteButton.attributes['aria-label'], 'Delete annotation');
     assert.equal(deleteButton.attributes.title, 'Delete annotation');
     assert.deepEqual(deleteButton.children.map(child => child.className), ['fas fa-trash-alt']);
+  });
+});
+
+test('renders a compact thumbnail for an image note', async () => {
+  await withHubGlobals({
+    document: fakeDocument(),
+    EpubBrowserI18n: { t: key => key },
+  }, async () => {
+    const row = Hub.annotationCard({
+      id: 'image-note', book_hash: 'book', chapter_index: 1,
+      text: 'Image note', startMeta: { image: { src: 'images/page.jpg' } },
+    });
+    const card = row.children[0];
+    const thumbnail = card.children.find(child => child.className === 'annotation-card-thumbnail');
+    assert.ok(thumbnail);
+    assert.equal(thumbnail.src, '/book/book/images/page.jpg');
+    assert.equal(thumbnail.alt, 'Image note');
+    assert.equal(thumbnail.loading, 'lazy');
   });
 });
 

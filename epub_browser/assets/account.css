@@ -376,8 +376,9 @@ body.auth-page {
 .admin-section-nav {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
+    overflow: visible;
     padding: 5px;
     border: 1px solid var(--account-border);
     border-radius: 11px;
@@ -1073,21 +1074,36 @@ body.auth-page {
     outline-offset: 3px;
 }
 
-.admin-ai-job-id,
-.admin-ai-job-scope,
+.admin-ai-job-task,
+.admin-ai-job-book,
 .admin-ai-job-time {
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
-.admin-ai-job-id {
+.admin-ai-job-task strong,
+.admin-ai-job-book strong {
+    display: block;
+    color: var(--account-text);
+    font-weight: 750;
+}
+
+.admin-ai-job-task strong {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: .72rem;
 }
 
 .admin-ai-job-book {
-    min-width: 12rem;
-    max-width: 20rem;
-    overflow-wrap: anywhere;
+    max-width: none;
+}
+
+.admin-ai-job-meta,
+.admin-ai-job-scope {
+    display: block;
+    margin-top: 3px;
+    color: var(--account-muted);
+    font-size: .72rem;
+    line-height: 1.4;
 }
 
 .admin-ai-job-status {
@@ -1131,29 +1147,27 @@ body.auth-page {
 }
 
 .admin-ai-jobs-table {
-    min-width: 82rem;
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
 }
 
-.admin-ai-jobs-table th:nth-child(1) { width: 7rem; }
-.admin-ai-jobs-table th:nth-child(2) { width: 10rem; }
-.admin-ai-jobs-table th:nth-child(3) { width: 18%; }
-.admin-ai-jobs-table th:nth-child(4) { width: 8rem; }
-.admin-ai-jobs-table th:nth-child(5) { width: 11rem; }
-.admin-ai-jobs-table th:nth-child(6) { width: 9rem; }
-.admin-ai-jobs-table th:nth-child(7) { width: 13rem; }
-.admin-ai-jobs-table th:nth-child(8),
-.admin-ai-jobs-table th:nth-child(9) { width: 10rem; }
-.admin-ai-jobs-table th:nth-child(10) { width: 5rem; }
+.admin-ai-jobs-table th:nth-child(1) { width: 10%; }
+.admin-ai-jobs-table th:nth-child(2) { width: 24%; }
+.admin-ai-jobs-table th:nth-child(3) { width: 23%; }
+.admin-ai-jobs-table th:nth-child(4) { width: 15%; }
+.admin-ai-jobs-table th:nth-child(5) { width: 20%; }
+.admin-ai-jobs-table th:nth-child(6) { width: 8%; }
 
 .admin-ai-job-progress-content {
     display: grid;
-    justify-items: end;
+    justify-items: start;
     gap: 4px;
-    min-width: 8rem;
+    min-width: 0;
 }
 
 .admin-ai-job-progress-content progress {
-    width: 7.5rem;
+    width: min(100%, 7.5rem);
     height: 8px;
     accent-color: var(--account-primary);
 }
@@ -1166,8 +1180,7 @@ body.auth-page {
 }
 
 .admin-ai-job-error {
-    min-width: 12rem;
-    max-width: 18rem;
+    color: var(--account-danger);
 }
 
 .admin-ai-jobs-message {
@@ -1191,13 +1204,76 @@ body.auth-page {
 }
 
 @media (max-width: 1200px) {
-    .admin-ai-jobs-table-scroll,
     .admin-books-table-scroll {
         overflow-x: auto;
         overflow-y: visible;
         overscroll-behavior-x: contain;
         -webkit-overflow-scrolling: touch;
     }
+}
+
+@media (max-width: 820px) {
+    .admin-ai-jobs-table,
+    .admin-ai-jobs-table tbody,
+    .admin-ai-jobs-table tr,
+    .admin-ai-jobs-table tbody tr td {
+        display: block;
+        width: 100%;
+    }
+
+    .admin-ai-jobs-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .admin-ai-jobs-table tbody {
+        display: grid;
+        gap: 12px;
+    }
+
+    .admin-ai-jobs-table tbody tr {
+        overflow: hidden;
+        border: 1px solid var(--account-border);
+        border-radius: 10px;
+        background: var(--account-card);
+    }
+
+    .admin-ai-jobs-table td {
+        display: grid;
+        grid-template-columns: minmax(6.5rem, .38fr) minmax(0, 1fr);
+        gap: 10px;
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--account-border);
+        text-align: start !important;
+    }
+
+    .admin-ai-jobs-table td::before {
+        color: var(--account-muted);
+        content: attr(data-label);
+        font-size: .7rem;
+        font-weight: 750;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
+
+    .admin-ai-jobs-table td:last-child { border-bottom: 0; }
+
+    .admin-ai-jobs-table .admin-ai-job-progress-content { justify-items: start; }
+
+    .admin-ai-jobs-table .admin-ai-job-action { justify-items: start; }
+
+    .admin-ai-jobs-table .admin-ai-jobs-message {
+        display: block;
+        padding: 24px !important;
+        text-align: center !important;
+    }
+
+    .admin-ai-jobs-table .admin-ai-jobs-message::before { content: none; }
 }
 
 #adminAiJobsPagination .admin-ai-jobs-page[aria-current="page"] {

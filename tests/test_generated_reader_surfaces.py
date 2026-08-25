@@ -102,10 +102,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn(panel_class, server_html)
             self.assertRegex(
                 server_html,
-                rf'<(?:section|h5)\b[^>]*(?:id=(?:["\'])?{panel_id}|aria-labelledby=(?:["\'])?{panel_id})',
+                rf'<(?:section|h4)\b[^>]*(?:id=(?:["\'])?{panel_id}|aria-labelledby=(?:["\'])?{panel_id})',
             )
             self.assertIn('data-i18n=' + key, server_html)
-        self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminAiJobsTitle')
+        self.assertRegex(
+            server_html,
+            r'<section\b[^>]*(?:id=(?:["\'])?adminAiConfigurationSection|'
+            r'aria-labelledby=(?:["\'])?adminSectionAiConfigurationTab)',
+        )
+        self.assertRegex(
+            server_html,
+            r'<section\b[^>]*(?:id=(?:["\'])?adminAiPermissionsSection|'
+            r'aria-labelledby=(?:["\'])?adminSectionAiPermissionsTab)',
+        )
+        self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminSectionAiJobsTab')
         self.assertIn('data-i18n=admin.ai.jobs.statusFilter', server_html)
         self.assertIn('data-i18n=admin.ai.jobs.pageSize', server_html)
         self.assertIn('data-i18n=admin.ai.jobs.refresh', server_html)
@@ -130,24 +140,21 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ):
             self.assertNotIn(control_id, ssg_html)
 
-    def test_admin_ai_job_table_uses_a_bounded_scroller_for_its_sticky_header(self):
+    def test_admin_ai_job_table_uses_page_flow_without_a_nested_scroller(self):
         stylesheet = Path('epub_browser/assets/account.css').read_text(
             encoding='utf-8'
         )
-        scroll_start = stylesheet.index('.account-table-scroll {')
+        scroll_start = stylesheet.index('.admin-ai-jobs-table-scroll,')
         scroll_rule = stylesheet[scroll_start:stylesheet.index('}', scroll_start)]
-        header_start = stylesheet.index('.account-admin-table thead th {')
-        header_rule = stylesheet[header_start:stylesheet.index('}', header_start)]
+        table_start = stylesheet.index('.admin-ai-jobs-table {')
+        table_rule = stylesheet[table_start:stylesheet.index('}', table_start)]
 
-        self.assertIn('overflow: auto;', scroll_rule)
-        self.assertIn('max-height:', scroll_rule)
-        self.assertIn('position: sticky;', header_rule)
-        self.assertIn('top: 0;', header_rule)
-        self.assertRegex(
-            stylesheet,
-            r'@media \(max-width: 720px\)[\s\S]*?'
-            r'\.account-admin-table\s*\{[^}]*min-width:\s*56rem;',
-        )
+        self.assertIn('max-height: none;', scroll_rule)
+        self.assertIn('overflow: visible;', scroll_rule)
+        self.assertIn('min-width: 0;', table_rule)
+        self.assertIn('table-layout: fixed;', table_rule)
+        self.assertIn('@media (max-width: 820px)', stylesheet)
+        self.assertIn('content: attr(data-label);', stylesheet)
 
     def test_admin_ai_and_book_tables_use_page_flow_for_the_current_page(self):
         stylesheet = Path('epub_browser/assets/account.css').read_text(
@@ -163,7 +170,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(
             stylesheet,
             r'@media \(max-width: 1200px\)[\s\S]*?'
-            r'\.admin-ai-jobs-table-scroll,\s*\.admin-books-table-scroll\s*\{[^}]*overflow-x:\s*auto;',
+            r'\.admin-books-table-scroll\s*\{[^}]*overflow-x:\s*auto;',
         )
 
     def test_shared_server_chrome_clips_accessibility_text_without_removing_it(self):
@@ -1245,6 +1252,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         end = script.index('\n    function handleKeyDown(', start)
         navigation = script[start:end]
 
+        self.assertIn("link.search = '';", script)
         self.assertIn("xhr.open('GET', url, true);", navigation)
         self.assertIn("tempDiv.querySelector('#eb-content')", navigation)
         self.assertIn("chapterContent.getAttribute('data-chapter-index')", navigation)
@@ -1257,7 +1265,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertLess(cleanup, replacement)
         self.assertNotIn('content.innerHTML', navigation)
-        self.assertIn("window.history.pushState({chapterIndex: target.index}, '', url);", navigation)
+        self.assertIn("window.history.pushState({chapterIndex: target.index}, '', target.url);", navigation)
+        self.assertIn("window.history.replaceState({chapterIndex: target.index}, '', target.url);", navigation)
+        history_update = navigation.index("window.history.pushState({chapterIndex: target.index}, '', target.url);")
+        canvas_refresh = navigation.index('refreshPartialChapterCanvas(target.index);')
+        self.assertLess(history_update, canvas_refresh)
         self.assertIn("window.addEventListener('popstate'", navigation)
         self.assertIn("navigateScrollingChapter(window.location.href, { history: false });", navigation)
         self.assertIn('if (isPaginationMode || isContinuousScroll) return false;', navigation)
@@ -1335,6 +1347,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('data-ai-chapter-teach', canvas)
         self.assertIn('teach.explanation', canvas)
         self.assertIn("t('ai.teachCheck')", canvas)
+        self.assertNotIn('fas fa-graduation-cap', canvas)
+        self.assertNotIn('fas fa-lightbulb', canvas)
+        self.assertNotIn('fas fa-diagram-project', canvas)
+        self.assertIn('fas fa-rotate-right', canvas)
         self.assertIn('content.teach', drawer)
         self.assertIn('ai-reading-teach', drawer)
         self.assertIn("t('ai.teachCheck')", drawer)
@@ -1352,8 +1368,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertIn("setAttribute('data-ai-canvas-chapter', String(chapterIndex))", teach_renderer)
         self.assertNotIn('innerHTML', teach_renderer)
-        self.assertIn('guide.nextSibling', teach_renderer)
+        self.assertIn('article.appendChild(section);', teach_renderer)
+        self.assertNotIn('guide.nextSibling', teach_renderer)
         self.assertIn(".ai-chapter-teach,script,style,noscript", canvas)
+        apply_renderer = canvas[canvas.index('  function apply(result, article, chapterIndex) {'):canvas.index('\n  function chapterContext(', canvas.index('  function apply(result, article, chapterIndex) {'))]
+        self.assertLess(apply_renderer.index('paragraphNotes.forEach'), apply_renderer.index('appendTeach(article, result, chapterIndex);'))
+        self.assertLess(apply_renderer.index('appendTeach(article, result, chapterIndex);'), apply_renderer.index('appendReflection(article, result, chapterIndex);'))
 
     def test_feynman_renderers_preserve_empty_and_populated_paragraph_semantics(self):
         fixture = r'''
@@ -1854,7 +1874,10 @@ assert.deepEqual(
         self.assertIn('startMeta: { image: source.imageMeta }', script)
         self.assertIn('endMeta: { image: source.imageMeta }', script)
         self.assertIn('image-annotation-button', script)
+        self.assertIn('imageForAnnotationId: function(id)', script)
+        self.assertIn('HighlightInteraction.imageForAnnotationId(id)', script)
         self.assertIn('image-annotation-anchor', css)
+        self.assertIn('.annotation-image-noted.annotation-focus-active', css)
         self.assertNotIn('selection rectangle', script.lower())
 
     def test_ai_vocabulary_marks_accept_short_words_and_idioms(self):
@@ -1870,6 +1893,16 @@ assert.deepEqual(
 
         self.assertIn("border-top: 1px solid var(--footer-border);", footer_rules)
         self.assertNotIn("background: var(--header-bg);", footer_rules)
+
+    def test_reader_font_override_preserves_font_awesome_glyphs(self):
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+        icon_override_start = css.index(
+            "[data-eb-styles]:not(.ebook-font-default) :is(.fas, .far, .fab, .fa-solid"
+        )
+        icon_override = css[icon_override_start:css.index("}", icon_override_start) + 1]
+
+        self.assertIn("Font Awesome 7 Free", icon_override)
+        self.assertIn("font-weight: var(--fa-style, 900) !important;", icon_override)
 
     def test_chapter_content_has_desktop_breathing_room_below_the_app_header(self):
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
@@ -2391,15 +2424,14 @@ assert.deepEqual(
         option_rule = stylesheet[
             option_start:stylesheet.index('}', option_start)
         ]
-        self.assertIn('grid-template-columns: 1fr;', options_rule)
-        self.assertNotIn('repeat(3', options_rule)
-        self.assertIn('min-height: 44px;', option_rule)
-        self.assertIn('padding: 0 10px;', option_rule)
+        self.assertIn('grid-template-columns: repeat(3, minmax(0, 1fr));', options_rule)
+        self.assertIn('min-height: 72px;', option_rule)
+        self.assertIn('padding: 10px 12px;', option_rule)
         self.assertIn('box-sizing: border-box;', option_rule)
         self.assertRegex(
             stylesheet,
-            r'@media \(min-width: 601px\)[\s\S]*?'
-            r'\.navigation-behavior-option span\s*\{[^}]*white-space:\s*nowrap;',
+            r'@media \(max-width: 520px\)[\s\S]*?'
+            r'\.navigation-behavior-options\s*\{[^}]*grid-template-columns:\s*1fr;',
         )
 
     def test_chapter_reading_tab_has_default_on_keyboard_navigation_preferences(self):
@@ -2421,6 +2453,8 @@ assert.deepEqual(
                 rf'(?=[^>]*id="{control_id}")(?=[^>]*checked)',
             )
             self.assertIn(f'data-i18n="{key}"', reading)
+        self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
+        self.assertEqual(reading.count('class="switch-slider"'), 6)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'

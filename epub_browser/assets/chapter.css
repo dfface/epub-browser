@@ -22,6 +22,12 @@ body {
     font-family: var(--font-family, system-ui, -apple-system, sans-serif) !important;
 }
 
+/* Reader font choices apply to EPUB text, never to Font Awesome glyphs. */
+[data-eb-styles]:not(.ebook-font-default) :is(.fas, .far, .fab, .fa-solid, .fa-regular, .fa-brands, .fa-classic, .fa) {
+    font-family: var(--fa-family-classic, "Font Awesome 7 Free") !important;
+    font-weight: var(--fa-style, 900) !important;
+}
+
 .container {
     max-width: var(--reader-page-width, 1000px);
     width: 80%;
@@ -1009,26 +1015,13 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 .keyboard-navigation-options {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .keyboard-navigation-option {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    box-sizing: border-box;
-    min-height: 44px;
-    padding: 0 10px;
-    border-radius: 8px;
-    color: var(--text-secondary);
-    cursor: pointer;
-}
-
-.keyboard-navigation-option:hover {
-    background: var(--hover-bg);
-    color: var(--text);
+    margin: 0;
 }
 
 .keyboard-navigation-option:focus-within {
@@ -1036,23 +1029,10 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     outline-offset: 2px;
 }
 
-.keyboard-navigation-option input {
-    flex: 0 0 auto;
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    accent-color: var(--button-bg);
-}
-
-.keyboard-navigation-option span {
-    min-width: 0;
-    line-height: 1.35;
-}
-
 .navigation-behavior-options {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 6px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
 }
 
 .navigation-behavior-option {
@@ -1060,8 +1040,8 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     align-items: center;
     gap: 8px;
     box-sizing: border-box;
-    min-height: 44px;
-    padding: 0 10px;
+    min-height: 72px;
+    padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--card-bg);
@@ -1094,14 +1074,13 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     min-width: 0;
 }
 
-@media (min-width: 601px) {
-    .navigation-behavior-option span {
-        white-space: nowrap;
+@media (max-width: 520px) {
+    .navigation-behavior-options {
+        grid-template-columns: 1fr;
     }
-}
 
-@media (max-width: 600px) {
     .navigation-behavior-option {
+        min-height: 44px;
         padding-block: 7px;
     }
 }

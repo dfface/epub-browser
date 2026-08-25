@@ -18,6 +18,12 @@
     animation: annotation-focus-pulse 0.9s ease-in-out 2;
 }
 
+.annotation-image-noted.annotation-focus-active {
+    outline: 3px solid var(--annotation-border-color, var(--button-bg));
+    outline-offset: 5px;
+    animation: annotation-focus-pulse 0.9s ease-in-out 2;
+}
+
 @keyframes annotation-focus-pulse {
     50% { filter: brightness(1.15); }
 }

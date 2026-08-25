@@ -64,7 +64,9 @@ SERVER_ACCOUNT_PANEL = '''
     <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
         <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
         <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
-        <button type="button" class="admin-section-tab" id="adminSectionAiTab" role="tab" aria-selected="false" aria-controls="adminAiSection" data-admin-section="ai" data-i18n="admin.ai.title">AI reading</button>
+        <button type="button" class="admin-section-tab" id="adminSectionAiConfigurationTab" role="tab" aria-selected="false" aria-controls="adminAiConfigurationSection" data-admin-section="ai-configuration" data-i18n="admin.ai.configuration">AI configuration</button>
+        <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions" data-i18n="admin.ai.permissions">AI permissions</button>
+        <button type="button" class="admin-section-tab" id="adminSectionAiJobsTab" role="tab" aria-selected="false" aria-controls="adminAiJobsSection" data-admin-section="ai-jobs" data-i18n="admin.ai.jobs.title">AI jobs</button>
         <button type="button" class="admin-section-tab" id="adminSectionTagsTab" role="tab" aria-selected="false" aria-controls="adminTagsSection" data-admin-section="tags" data-i18n="admin.tags">Tag management</button>
         <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books" data-i18n="admin.books">Book management</button>
     </nav>
@@ -74,7 +76,7 @@ SERVER_ACCOUNT_PANEL = '''
         <p class="account-section-copy" data-i18n="admin.overviewDescription">Review the state of your library and jump straight to the area that needs attention.</p>
         <div class="admin-overview-grid">
             <button type="button" class="admin-overview-stat" data-admin-section="users"><span data-i18n="admin.overview.users">Users</span><strong id="adminOverviewUsers">—</strong></button>
-            <button type="button" class="admin-overview-stat" data-admin-section="ai"><span data-i18n="admin.overview.ai">AI reading</span><strong id="adminOverviewAi">—</strong></button>
+            <button type="button" class="admin-overview-stat" data-admin-section="ai-configuration"><span data-i18n="admin.overview.ai">AI reading</span><strong id="adminOverviewAi">—</strong></button>
             <button type="button" class="admin-overview-stat" data-admin-section="tags"><span data-i18n="admin.overview.tags">Server tags</span><strong id="adminOverviewTags">—</strong></button>
             <button type="button" class="admin-overview-stat" data-admin-section="books"><span data-i18n="admin.overview.books">Books</span><strong id="adminOverviewBooks">—</strong></button>
         </div>
@@ -91,12 +93,9 @@ SERVER_ACCOUNT_PANEL = '''
         </form>
         <ul class="account-list" id="adminUserList"></ul>
     </section>
-    <section class="account-admin-section account-card-wide account-ai-section" id="adminAiSection" role="tabpanel" aria-labelledby="adminSectionAiTab" data-admin-panel="ai" hidden>
-        <h4 id="adminAiTitle" data-i18n="admin.ai.title">AI reading</h4>
-        <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and cached results. Selected book text is sent to the configured provider.</p>
-        <div class="admin-ai-panels">
-        <section class="admin-ai-panel admin-ai-configuration-panel" aria-labelledby="adminAiConfigurationTitle">
-            <h5 id="adminAiConfigurationTitle" data-i18n="admin.ai.configuration">AI configuration</h5>
+    <section class="account-admin-section account-card-wide account-ai-section admin-ai-configuration-panel" id="adminAiConfigurationSection" role="tabpanel" aria-labelledby="adminSectionAiConfigurationTab" data-admin-panel="ai-configuration" hidden>
+            <h4 id="adminAiConfigurationTitle" data-i18n="admin.ai.configuration">AI configuration</h4>
+            <p class="account-section-copy" data-i18n="admin.ai.description">Configure one OpenAI-compatible model, member access, and cached results. Selected book text is sent to the configured provider.</p>
             <form class="account-form admin-ai-settings-form" id="adminAiSettingsForm">
             <fieldset class="admin-ai-settings-group admin-ai-connection-group">
                 <legend data-i18n="admin.ai.connection">Connection and model</legend>
@@ -128,13 +127,13 @@ SERVER_ACCOUNT_PANEL = '''
                 <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearRevision" data-i18n="admin.ai.clearRevision">Clear results for this configuration</button>
                 <button type="button" class="bookshelf-action-btn account-danger-action" id="adminAiClearAll" data-i18n="admin.ai.clearAll">Clear all AI results</button>
             </div>
-        </section>
-        <section class="admin-ai-panel admin-ai-permissions-panel" aria-labelledby="adminAiPermissionsTitle">
-            <h5 id="adminAiPermissionsTitle" data-i18n="admin.ai.permissions">AI permissions</h5>
+    </section>
+    <section class="account-admin-section account-card-wide account-ai-section admin-ai-permissions-panel" id="adminAiPermissionsSection" role="tabpanel" aria-labelledby="adminSectionAiPermissionsTab" data-admin-panel="ai-permissions" hidden>
+            <h4 id="adminAiPermissionsTitle" data-i18n="admin.ai.permissions">AI permissions</h4>
             <ul class="account-list" id="adminAiUserList"></ul>
-        </section>
-        <section class="admin-ai-panel admin-ai-jobs" aria-labelledby="adminAiJobsTitle">
-            <h5 id="adminAiJobsTitle" data-i18n="admin.ai.jobs.title">AI jobs</h5>
+    </section>
+    <section class="account-admin-section account-card-wide account-ai-section admin-ai-jobs" id="adminAiJobsSection" role="tabpanel" aria-labelledby="adminSectionAiJobsTab" data-admin-panel="ai-jobs" hidden>
+            <h4 id="adminAiJobsTitle" data-i18n="admin.ai.jobs.title">AI jobs</h4>
             <p class="account-section-copy" data-i18n="admin.ai.jobs.description">Review shared AI reading jobs and retry eligible failures.</p>
             <div class="account-form admin-ai-jobs-controls">
                 <label for="adminAiJobsStatus"><span data-i18n="admin.ai.jobs.statusFilter">Status</span><select id="adminAiJobsStatus"><option value="" data-i18n="admin.ai.jobs.status.all">All</option><option value="queued" data-i18n="admin.ai.jobs.status.queued">Queued</option><option value="running" data-i18n="admin.ai.jobs.status.running">Running</option><option value="complete" data-i18n="admin.ai.jobs.status.complete">Complete</option><option value="failed" data-i18n="admin.ai.jobs.status.failed">Failed</option><option value="interrupted" data-i18n="admin.ai.jobs.status.interrupted">Interrupted</option></select></label>
@@ -144,14 +143,12 @@ SERVER_ACCOUNT_PANEL = '''
             <div class="account-table-scroll admin-ai-jobs-table-scroll">
                 <table class="account-admin-table admin-ai-jobs-table">
                     <caption class="sr-only visually-hidden" data-i18n="admin.ai.jobs.tableLabel">AI reading jobs</caption>
-                    <thead><tr><th scope="col" data-i18n="admin.ai.jobs.header.status">Status</th><th scope="col" data-i18n="admin.ai.jobs.header.job">Job</th><th scope="col" data-i18n="admin.ai.jobs.header.book">Book</th><th scope="col" data-i18n="admin.ai.jobs.header.requester">Requester</th><th scope="col" data-i18n="admin.ai.jobs.header.scope">Scope</th><th scope="col" data-i18n="admin.ai.jobs.header.progress">Progress</th><th scope="col" data-i18n="admin.ai.jobs.header.error">Error</th><th scope="col" data-i18n="admin.ai.jobs.header.created">Created</th><th scope="col" data-i18n="admin.ai.jobs.header.updated">Updated</th><th scope="col" data-i18n="admin.ai.jobs.header.action">Action</th></tr></thead>
-                    <tbody id="adminAiJobsBody"><tr><td colspan="10" data-i18n="admin.ai.jobs.loading">Loading AI jobs…</td></tr></tbody>
+                    <thead><tr><th scope="col" data-i18n="admin.ai.jobs.header.status">Status</th><th scope="col" data-i18n="admin.ai.jobs.header.job">Job</th><th scope="col" data-i18n="admin.ai.jobs.header.book">Book</th><th scope="col" data-i18n="admin.ai.jobs.header.progress">Progress</th><th scope="col" data-i18n="admin.ai.jobs.header.timeline">Timeline</th><th scope="col" data-i18n="admin.ai.jobs.header.action">Action</th></tr></thead>
+                    <tbody id="adminAiJobsBody"><tr><td colspan="6" data-i18n="admin.ai.jobs.loading">Loading AI jobs…</td></tr></tbody>
                 </table>
             </div>
             <nav id="adminAiJobsPagination" aria-label="AI job pages" data-i18n-aria-label="admin.ai.jobs.paginationLabel"></nav>
             <p id="adminAiJobsLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
-        </section>
-        </div>
     </section>
     <section class="account-admin-section account-card-wide account-tags-section" id="adminTagsSection" role="tabpanel" aria-labelledby="adminSectionTagsTab" data-admin-panel="tags" hidden>
         <h4 id="adminTagsTitle" data-i18n="admin.tags">Tag management</h4>

@@ -480,17 +480,26 @@
       body.textContent = '';
       var row = root.document.createElement('tr');
       var cell = createTextElement('td', 'admin-ai-jobs-message', key);
-      cell.colSpan = 10;
-      cell.setAttribute('colspan', '10');
+      cell.colSpan = 6;
+      cell.setAttribute('colspan', '6');
       row.appendChild(cell);
       body.appendChild(row);
     }
 
-    function aiJobCell(row, className) {
+    function aiJobCell(row, className, labelKey) {
       var cell = root.document.createElement('td');
       if (className) cell.className = className;
+      if (labelKey) cell.setAttribute('data-label', t(labelKey));
       row.appendChild(cell);
       return cell;
+    }
+
+    function appendAiJobMeta(container, className, label, value) {
+      if (!value) return;
+      var detail = root.document.createElement('span');
+      detail.className = className;
+      detail.textContent = label ? label + ': ' + value : value;
+      container.appendChild(detail);
     }
 
     function aiJobDisplayId(job) {
@@ -558,7 +567,7 @@
       }
       aiJobsRows.forEach(function(job) {
         var row = root.document.createElement('tr');
-        var statusCell = aiJobCell(row, 'admin-ai-job-status-cell');
+        var statusCell = aiJobCell(row, 'admin-ai-job-status-cell', 'admin.ai.jobs.header.status');
         var status = root.document.createElement('span');
         var bookTitle = typeof job.book_title === 'string' ? job.book_title : '';
         var ownerUsername = typeof job.owner_username === 'string' ? job.owner_username : '';
@@ -568,19 +577,38 @@
         status.textContent = t(aiJobStatusKey(job.status));
         statusCell.appendChild(status);
 
-        aiJobCell(row, 'admin-ai-job-id').textContent = aiJobDisplayId(job);
-        aiJobCell(row, 'admin-ai-job-book').textContent = bookTitle || t('admin.ai.jobs.unknownBook');
-        aiJobCell(row, 'admin-ai-job-user').textContent = ownerUsername || t('admin.ai.jobs.unknownUser');
-        aiJobCell(row, 'admin-ai-job-scope').textContent = aiJobScopeLabel(job);
-        renderAiJobProgress(aiJobCell(row, 'admin-ai-job-progress'), job);
-
-        var errorCell = aiJobCell(row, 'admin-ai-job-error');
+        var taskCell = aiJobCell(row, 'admin-ai-job-task', 'admin.ai.jobs.header.job');
+        var taskId = root.document.createElement('strong');
+        taskId.textContent = aiJobDisplayId(job);
+        taskCell.appendChild(taskId);
+        appendAiJobMeta(
+          taskCell, 'admin-ai-job-meta', t('admin.ai.jobs.header.requester'),
+          ownerUsername || t('admin.ai.jobs.unknownUser')
+        );
         var errorKey = aiJobStoredErrorKey(job.error_code);
-        errorCell.textContent = errorKey ? t(errorKey) : '';
-        aiJobCell(row, 'admin-ai-job-time').textContent = safeAiJobDate(job.created_at);
-        aiJobCell(row, 'admin-ai-job-time').textContent = safeAiJobDate(job.updated_at);
+        appendAiJobMeta(
+          taskCell, 'admin-ai-job-error', t('admin.ai.jobs.header.error'),
+          errorKey ? t(errorKey) : ''
+        );
 
-        var actionCell = aiJobCell(row, 'admin-ai-job-action');
+        var bookCell = aiJobCell(row, 'admin-ai-job-book', 'admin.ai.jobs.header.book');
+        var bookName = root.document.createElement('strong');
+        bookName.textContent = bookTitle || t('admin.ai.jobs.unknownBook');
+        bookCell.appendChild(bookName);
+        appendAiJobMeta(
+          bookCell, 'admin-ai-job-scope', '', aiJobScopeLabel(job)
+        );
+        renderAiJobProgress(aiJobCell(row, 'admin-ai-job-progress', 'admin.ai.jobs.header.progress'), job);
+
+        var timeCell = aiJobCell(row, 'admin-ai-job-time', 'admin.ai.jobs.header.timeline');
+        appendAiJobMeta(
+          timeCell, 'admin-ai-job-meta', t('admin.ai.jobs.header.created'), safeAiJobDate(job.created_at)
+        );
+        appendAiJobMeta(
+          timeCell, 'admin-ai-job-meta', t('admin.ai.jobs.header.updated'), safeAiJobDate(job.updated_at)
+        );
+
+        var actionCell = aiJobCell(row, 'admin-ai-job-action', 'admin.ai.jobs.header.action');
         if (job.retryable === true && typeof job.id === 'string' && job.id) {
           var retrying = Boolean(aiJobsRetrying[job.id]);
           var retry = createTextElement(
@@ -785,14 +813,14 @@
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'ai', 'tags', 'books'].indexOf(section) !== -1
+      return ['overview', 'users', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) !== -1
         ? section : '';
     }
 
     function adminPanelIsAvailable(panel) { return Boolean(panel); }
 
     function setActiveAdminSection(section) {
-      if (['overview', 'users', 'ai', 'tags', 'books'].indexOf(section) === -1) return;
+      if (['overview', 'users', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {

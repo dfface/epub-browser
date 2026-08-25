@@ -353,6 +353,7 @@ class I18nCoverageTests(unittest.TestCase):
             'admin.ai.jobs.header.requester',
             'admin.ai.jobs.header.scope',
             'admin.ai.jobs.header.progress',
+            'admin.ai.jobs.header.timeline',
             'admin.ai.jobs.header.error',
             'admin.ai.jobs.header.created',
             'admin.ai.jobs.header.updated',

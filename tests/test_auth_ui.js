@@ -1063,30 +1063,30 @@ test('account settings and administration open as separate surfaces', async () =
 test('administration section navigation keeps one workspace visible and marks its tab current', async () => {
   const overviewTab = fakeElement('button');
   const usersTab = fakeElement('button');
-  const aiTab = fakeElement('button');
+  const aiConfigurationTab = fakeElement('button');
   const overview = fakeElement('section');
   const users = fakeElement('section');
-  const ai = fakeElement('section');
+  const aiConfiguration = fakeElement('section');
   overviewTab.setAttribute('data-admin-section', 'overview');
   usersTab.setAttribute('data-admin-section', 'users');
-  aiTab.setAttribute('data-admin-section', 'ai');
+  aiConfigurationTab.setAttribute('data-admin-section', 'ai-configuration');
   overviewTab.setAttribute('role', 'tab');
   usersTab.setAttribute('role', 'tab');
-  aiTab.setAttribute('role', 'tab');
+  aiConfigurationTab.setAttribute('role', 'tab');
   overview.setAttribute('data-admin-panel', 'overview');
   users.setAttribute('data-admin-panel', 'users');
-  ai.setAttribute('data-admin-panel', 'ai');
+  aiConfiguration.setAttribute('data-admin-panel', 'ai-configuration');
   overview.hidden = false;
   users.hidden = true;
-  ai.hidden = true;
+  aiConfiguration.hidden = true;
   const root = rootWithFetch(() => Promise.resolve(response(200, {
     user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token',
   })));
   root.document = {
     getElementById() { return null; },
     querySelectorAll(selector) {
-      if (selector === '[data-admin-section]') return [overviewTab, usersTab, aiTab];
-      if (selector === '[data-admin-panel]') return [overview, users, ai];
+      if (selector === '[data-admin-section]') return [overviewTab, usersTab, aiConfigurationTab];
+      if (selector === '[data-admin-panel]') return [overview, users, aiConfiguration];
       return [];
     },
     addEventListener() {},
@@ -1098,7 +1098,7 @@ test('administration section navigation keeps one workspace visible and marks it
 
   assert.equal(overview.hidden, true);
   assert.equal(users.hidden, false);
-  assert.equal(ai.hidden, true);
+  assert.equal(aiConfiguration.hidden, true);
   assert.equal(usersTab.getAttribute('aria-selected'), 'true');
   assert.equal(overviewTab.getAttribute('aria-selected'), 'false');
 });
@@ -1504,11 +1504,13 @@ test('administrator AI job timestamps treat SQLite shapes as UTC in Asia Shangha
     await auth.loadAiJobs();
 
     const times = descendants(harness.elements.adminAiJobsBody)
-      .filter(node => node.className === 'admin-ai-job-time')
+      .filter(node => node.className === 'admin-ai-job-meta')
+      .filter(node => node.textContent.startsWith('[admin.ai.jobs.header.created]')
+        || node.textContent.startsWith('[admin.ai.jobs.header.updated]'))
       .map(node => node.textContent);
     assert.deepEqual(times, [
-      'date:2026-08-23T08:00:00.125Z',
-      '[admin.ai.jobs.unknownValue]',
+      '[admin.ai.jobs.header.created]: date:2026-08-23T08:00:00.125Z',
+      '[admin.ai.jobs.header.updated]: [admin.ai.jobs.unknownValue]',
     ]);
   } finally {
     if (previousTimezone === undefined) delete process.env.TZ;
@@ -1539,7 +1541,9 @@ test('administrator AI job renderer localizes known material and template errors
   const errors = descendants(harness.elements.adminAiJobsBody)
     .filter(node => node.className === 'admin-ai-job-error')
     .map(node => node.textContent);
-  assert.deepEqual(errors, codes.map(code => `[admin.ai.jobs.error.${code}]`));
+  assert.deepEqual(errors, codes.map(code => (
+    `[admin.ai.jobs.header.error]: [admin.ai.jobs.error.${code}]`
+  )));
 });
 
 test('administrator AI job scope and language use the active Chinese runtime', async () => {
@@ -1622,7 +1626,9 @@ test('administrator AI job status and stored error allowlists reject inherited p
     .filter(node => node.className === 'admin-ai-job-error')
     .map(node => node.textContent);
   assert.deepEqual(statuses, suspicious.map(() => '[admin.ai.jobs.unknownValue]'));
-  assert.deepEqual(errors, suspicious.map(() => '[admin.ai.jobs.error.unknown]'));
+  assert.deepEqual(errors, suspicious.map(() => (
+    '[admin.ai.jobs.header.error]: [admin.ai.jobs.error.unknown]'
+  )));
   assert.doesNotMatch(statuses.concat(errors).join(' '), /constructor|toString|__proto__/);
 });
 

@@ -857,6 +857,10 @@ function initScript() {
         if (!match) return null;
         var bookPath = '/book/' + book_hash + '/';
         if (link.pathname.indexOf(bookPath) === -1) return null;
+        // Chapter-local state such as `annotation` and `ai_result` must never
+        // follow the reader into another chapter.  A hash is retained only
+        // because a TOC entry can deliberately point at a section anchor.
+        link.search = '';
         return {
             index: parseInt(match[1], 10),
             url: link.href,
@@ -1012,12 +1016,16 @@ function initScript() {
             if (pageTitle) document.title = pageTitle.textContent;
             chapter_index = String(target.index);
             visibleChapterIndex = target.index;
+            if (options.history !== false) {
+                window.history.pushState({chapterIndex: target.index}, '', target.url);
+            } else {
+                window.history.replaceState({chapterIndex: target.index}, '', target.url);
+            }
+            // The address is now the new chapter's clean URL, so neither a
+            // previous annotation nor an AI result can be re-applied here.
+            pendingAnnotationId = requestedAnnotationId();
             syncChapterScopedControls(target.index);
             refreshPartialChapterCanvas(target.index);
-            pendingAnnotationId = requestedAnnotationId();
-            if (options.history !== false) {
-                window.history.pushState({chapterIndex: target.index}, '', url);
-            }
             refreshNormalScrollChapter(target);
         };
         xhr.onerror = function() {

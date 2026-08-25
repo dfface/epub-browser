@@ -563,8 +563,8 @@
       'ai.reflectionKicker': 'AFTER THE CHAPTER',
       'ai.reflectionTitle': 'Think further',
       'ai.reflectionDescription': 'Pause here before moving on.',
-      'ai.teachKicker': 'TEACH IT SIMPLY',
-      'ai.teachTitle': 'Explain it in plain language',
+      'ai.teachKicker': 'FEYNMAN LEARNING',
+      'ai.teachTitle': 'Teach it back in your own words',
       'ai.teachAnalogy': 'An analogy',
       'ai.teachCheck': 'Check your understanding',
       'ai.learningLayerEyebrow': 'SHARED LEARNING LAYER',
@@ -1439,8 +1439,8 @@
       'ai.reflectionKicker': '本章末尾',
       'ai.reflectionTitle': '深入思考',
       'ai.reflectionDescription': '读完后，不妨停下来想一想。',
-      'ai.teachKicker': '用简单的话讲',
-      'ai.teachTitle': '用通俗语言解释',
+      'ai.teachKicker': '费曼学习法',
+      'ai.teachTitle': '用自己的话讲明白',
       'ai.teachAnalogy': '打个比方',
       'ai.teachCheck': '检验你的理解',
       'ai.learningLayerEyebrow': '共享学习层',
@@ -4482,6 +4482,7 @@
       'annotations.shareFileFallback': 'Annotations',
       'admin.ai.configuration': 'AI configuration',
       'admin.ai.permissions': 'AI permissions',
+      'admin.ai.jobs.header.timeline': 'Timeline',
       'ai.regenerateScopeTitle': 'Regenerate AI reading?',
       'ai.regenerateScopeDescription': 'This will replace the current shared AI reading for {scope} and use your configured provider.',
       'ai.regenerateScopeAction': 'Regenerate',
@@ -4496,7 +4497,9 @@
       'reader.locateCurrentChapter': 'Locate current chapter',
       'annotations.addImageNote': 'Add image note',
       'annotations.imageNote': 'Image note',
-      'ai.annotation.vocabulary': 'Vocabulary'
+      'ai.annotation.vocabulary': 'Rare characters & vocabulary',
+      'ai.teachKicker': 'FEYNMAN LEARNING',
+      'ai.teachTitle': 'Teach it back in your own words'
     },
     'zh-CN': {
       'annotations.shareActions': '分享标注',
@@ -4511,6 +4514,7 @@
       'annotations.shareFileFallback': '标注',
       'admin.ai.configuration': 'AI 配置',
       'admin.ai.permissions': 'AI 权限',
+      'admin.ai.jobs.header.timeline': '时间',
       'ai.regenerateScopeTitle': '重新生成 AI 阅读？',
       'ai.regenerateScopeDescription': '这将重新生成 {scope} 的共享 AI 阅读，并替换当前显示的结果。',
       'ai.regenerateScopeAction': '重新生成',
@@ -4525,7 +4529,9 @@
       'reader.locateCurrentChapter': '定位当前章节',
       'annotations.addImageNote': '添加图片笔记',
       'annotations.imageNote': '图片笔记',
-      'ai.annotation.vocabulary': '词语讲解'
+      'ai.annotation.vocabulary': '生僻字词讲解',
+      'ai.teachKicker': '费曼学习法',
+      'ai.teachTitle': '用自己的话讲明白'
     },
     'zh-TW': {
       'annotations.shareActions': '分享註釋',
@@ -4540,6 +4546,7 @@
       'annotations.shareFileFallback': '註釋',
       'admin.ai.configuration': 'AI 設定',
       'admin.ai.permissions': 'AI 權限',
+      'admin.ai.jobs.header.timeline': '時間',
       'ai.regenerateScopeTitle': '重新產生 AI 閱讀？',
       'ai.regenerateScopeDescription': '這會重新產生 {scope} 的共享 AI 閱讀，並取代目前的結果。',
       'ai.regenerateScopeAction': '重新產生',
@@ -4554,7 +4561,9 @@
       'reader.locateCurrentChapter': '定位目前章節',
       'annotations.addImageNote': '新增圖片筆記',
       'annotations.imageNote': '圖片筆記',
-      'ai.annotation.vocabulary': '詞語解說'
+      'ai.annotation.vocabulary': '生僻字詞解說',
+      'ai.teachKicker': '費曼學習法',
+      'ai.teachTitle': '用自己的話講明白'
     },
     ko: {
       'annotations.shareActions': '주석 공유',
@@ -4569,6 +4578,7 @@
       'annotations.shareFileFallback': '주석',
       'admin.ai.configuration': 'AI 구성',
       'admin.ai.permissions': 'AI 권한',
+      'admin.ai.jobs.header.timeline': '시간',
       'ai.regenerateScopeTitle': 'AI 읽기를 다시 생성할까요?',
       'ai.regenerateScopeDescription': '{scope}의 공유 AI 읽기를 다시 생성하고 현재 결과를 대체합니다.',
       'ai.regenerateScopeAction': '다시 생성',
@@ -4583,7 +4593,9 @@
       'reader.locateCurrentChapter': '현재 장으로 이동',
       'annotations.addImageNote': '이미지 메모 추가',
       'annotations.imageNote': '이미지 메모',
-      'ai.annotation.vocabulary': '어휘 풀이'
+      'ai.annotation.vocabulary': '낯선 글자·어휘 풀이',
+      'ai.teachKicker': '파인만 학습법',
+      'ai.teachTitle': '내 말로 다시 설명하기'
     },
     ja: {
       'annotations.shareActions': '注釈を共有',
@@ -4598,6 +4610,7 @@
       'annotations.shareFileFallback': '注釈',
       'admin.ai.configuration': 'AI 設定',
       'admin.ai.permissions': 'AI 権限',
+      'admin.ai.jobs.header.timeline': '日時',
       'ai.regenerateScopeTitle': 'AI 読書を再生成しますか？',
       'ai.regenerateScopeDescription': '{scope} の共有 AI 読書を再生成し、現在の結果を置き換えます。',
       'ai.regenerateScopeAction': '再生成',
@@ -4612,7 +4625,9 @@
       'reader.locateCurrentChapter': '現在の章を表示',
       'annotations.addImageNote': '画像メモを追加',
       'annotations.imageNote': '画像メモ',
-      'ai.annotation.vocabulary': '語句の解説'
+      'ai.annotation.vocabulary': '難しい字句の解説',
+      'ai.teachKicker': 'ファインマン学習法',
+      'ai.teachTitle': '自分の言葉で説明する'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

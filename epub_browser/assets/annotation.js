@@ -1045,6 +1045,15 @@
             return matches[Number(meta.ordinal) || 0] || null;
         },
 
+        imageForAnnotationId: function(id) {
+            for (var index = 0; index < this.annotations.length; index++) {
+                var annotation = this.annotations[index];
+                if (annotation.id !== id || !this.isImageAnnotation(annotation)) continue;
+                return this.imageForMeta(annotation.startMeta.image, annotation.chapter_index);
+            }
+            return null;
+        },
+
         imageNoteLabel: function(key) {
             var i18n = window.EpubBrowserI18n;
             return i18n && i18n.t ? i18n.t('annotations.' + key) : tr(key);
@@ -2506,6 +2515,16 @@
                         nodes.forEach(function(node) { node.classList.add('annotation-focus-active'); });
                         nodes[0].scrollIntoView({ behavior: 'auto', block: 'center' });
                         setTimeout(function() { nodes.forEach(function(node) { node.classList.remove('annotation-focus-active'); }); }, 1800);
+                        resolve(true);
+                        return;
+                    }
+                    var image = HighlightInteraction.imageForAnnotationId(id);
+                    if (image) {
+                        image.classList.add('annotation-focus-active');
+                        image.scrollIntoView({ behavior: 'auto', block: 'center' });
+                        setTimeout(function() {
+                            image.classList.remove('annotation-focus-active');
+                        }, 1800);
                         resolve(true);
                         return;
                     }
