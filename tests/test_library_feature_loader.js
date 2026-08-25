@@ -29,7 +29,6 @@ function createHarness() {
   const window = {
     document,
     EpubBrowserLibraryFeatureAssets: {
-      bookshelfCss: '/assets/immutable/bookshelf.css',
       sortable: '/assets/immutable/sortable.js',
       bookshelf: '/assets/immutable/bookshelf.js',
     },
@@ -52,7 +51,6 @@ test('loads one Library feature only once and preserves its dependency order', a
   assert.deepEqual(
     harness.appended.map((node) => [node.tagName, node.attributes.href || node.attributes.src]),
     [
-      ['link', '/assets/immutable/bookshelf.css'],
       ['script', '/assets/immutable/sortable.js'],
       ['script', '/assets/immutable/bookshelf.js'],
     ],

@@ -2365,6 +2365,8 @@ assert.deepEqual(
         self.assertIn('window.EpubBrowserLibraryFeatureAssets=', library_html)
         self.assertRegex(library_html, r'<script\b[^>]+/assets/immutable/library-feature-loader\.[0-9a-f]{12}\.js[^>]*>')
         self.assertNotRegex(library_html, r'<script\b[^>]+/assets/immutable/(?:annotation|annotation-hub|bookshelf|sortable|pinyin-pro\.min)\.[0-9a-f]{12}\.js[^>]*>')
+        self.assertRegex(library_html, r'<link\b[^>]+/assets/immutable/bookshelf\.[0-9a-f]{12}\.css[^>]*>')
+        self.assertNotRegex(library_html, r'<link\b[^>]+/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css[^>]*>')
         self.assertNotRegex(library_html, r'ai-reading-hub\.[0-9a-f]{12}\.(?:css|js)')
         self.assertNotIn('/annotations/index.html', library_html)
         self.assertRegex(book_html, r'\bid=(?:["\'])?bookAnnotationsBtn')

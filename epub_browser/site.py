@@ -60,7 +60,6 @@ def render_library_shell(
     library_feature_assets = json.dumps({
         "pinyin": assets.url_for("pinyin-pro.min.js"),
         "sortable": assets.url_for("sortable.min.js"),
-        "bookshelfCss": assets.url_for("bookshelf.css"),
         "bookshelf": assets.url_for("bookshelf.js"),
         "annotationHubCss": assets.url_for("annotation-hub.css"),
         "annotation": assets.url_for("annotation.js"),
@@ -161,6 +160,7 @@ def render_library_shell(
 <link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
 <link rel="stylesheet" href="/assets/loading.css?v=15">
+<link rel="stylesheet" href="/assets/bookshelf.css">
     {ai_reading_stylesheet}
 {server_account_stylesheet}
 {server_progress_stylesheet}

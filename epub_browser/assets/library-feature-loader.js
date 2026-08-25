@@ -5,7 +5,7 @@
   var features = {
     pinyin: { scripts: ['pinyin'] },
     sortable: { scripts: ['sortable'] },
-    bookshelf: { styles: ['bookshelfCss'], scripts: ['sortable', 'bookshelf'] },
+    bookshelf: { scripts: ['sortable', 'bookshelf'] },
     annotations: { styles: ['annotationHubCss'], scripts: ['annotation', 'annotationHub'] }
   };
 
