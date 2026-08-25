@@ -2,7 +2,7 @@
 
 > 私有 EPUB 阅读服务，以及自包含的静态站点生成器。
 
-[English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md)
+[English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
 
 <p align="center">
   <img src="https://github.com/dfface/epub-browser/blob/aff1def01252481f74c25ebf5b17d142b7db3c5e/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser 标志" width="520">

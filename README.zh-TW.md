@@ -1,0 +1,91 @@
+# EPUB Browser
+
+> 私人 EPUB 閱讀服務，以及自包含的靜態網站產生器。
+
+[English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
+
+[![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
+[![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+
+EPUB Browser 提供兩種明確分工的部署模式：
+
+| | `ssg` | `server` |
+| --- | --- | --- |
+| 部署方式 | 靜態主機、Pages、物件儲存、Nginx | 持久化的私人閱讀服務 |
+| 帳戶 | 無 | 本機帳戶 |
+| 進度、標註、書架 | 僅目前瀏覽器 | SQLite 中已登入帳戶的資料 |
+| 更新來源 | 再次執行 `ssg` | 重啟服務或使用 `--watch` |
+| 執行期資料庫 | 無 | 必需 |
+
+需要可直接發布的普通靜態檔案時，請選擇 `ssg`；需要帳戶、跨裝置資料、書籍存取控制或自動監看來源時，請選擇 `server`。
+
+## 示範站台
+
+- **SSG 模式**：[epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
+- **Server 模式**：[epub.yuhan.tech](https://epub.yuhan.tech/) — 示範帳號與密碼皆為 `demo`。
+
+## AI 原生閱讀（僅 Server 模式）
+
+AI 閱讀會在原文上建立共享、可回看的學習層，而不是在書旁附上一份泛泛摘要：章前導讀、按需展開的章節總覽、貼近原文的證據解釋與段落提示、詞語／生僻字說明、章末的費曼式通俗講解，以及延伸思考問題都保持在閱讀流程中。結果以背景工作產生並儲存在 SQLite；有存取該書權限的讀者可共用結果，追問對話則僅屬於自己的帳戶。
+
+AI 是 Server 專屬功能。管理員必須設定 OpenAI 相容供應商並逐一授權成員；選取的 EPUB 文字會傳送到該供應商，請僅在讀者同意此資料處理時啟用。SSG 永遠不含帳戶、AI 控制項、背景工作或供應商設定。
+
+## 需求與安裝
+
+- Python 3.9 或更新版本
+- 一個或多個 `.epub` 檔案、含 EPUB 的巢狀目錄，或 Calibre 風格的書庫目錄
+
+```bash
+pip install epub-browser
+
+# 查看各模式的完整參數
+epub-browser --help
+epub-browser ssg --help
+epub-browser server --help
+```
+
+## 快速開始
+
+### 產生靜態網站
+
+```bash
+epub-browser ssg /path/to/books \
+  --output-dir /path/to/dist
+```
+
+請以 HTTP 提供 `dist/`，不要直接以 `file://` 開啟產生的頁面。若網站位於子路徑，加入 `--base-path /my-repository/`；這會改變產生的 URL，不會改變輸出資料夾。
+
+### 執行持久化 Server 書庫
+
+```bash
+epub-browser server /path/to/books \
+  --server-dir /path/to/epub-browser-state \
+  --watch
+```
+
+開啟 `http://127.0.0.1:8000/`。第一次造訪時建立初始管理員；在完成此一次性設定前，書庫不會被掃描或公開。使用 `--no-browser` 只會停止服務在本機自動開啟瀏覽器，不會關閉網頁介面。
+
+## 資料、帳戶與存取邊界
+
+每本書都有穩定的 `book_id`（網址與瀏覽器資料中亦稱 `book_hash`）。預設的 `--book-id-storage sidecar` 會在 EPUB 旁寫入可見的身分檔，不改動 EPUB 位元組；`--book-id-storage embedded` 則會寫入 OPF 中繼資料，來源必須可寫入且適合修改。
+
+Server 的 `--server-dir` 是權威狀態位置，包含 SQLite、快取與遷移備份。帳戶、書架、閱讀進度、標註、AI 結果與工作都存放在此。管理員可管理帳戶、角色、登入工作階段與受限書籍的授權；一般成員只能使用獲授權的書籍與自己的私人資料。請保護此目錄及其備份的檔案權限。
+
+臨時測試可使用：
+
+```bash
+epub-browser server book.epub --ephemeral
+```
+
+臨時狀態會在關閉時刪除，因此每次啟動都會重新設定。正式服務請始終使用 `--server-dir`。
+
+## Docker 與反向代理
+
+容器化時，將書籍目錄以唯讀方式掛載，並將 `--server-dir` 掛載到持久化磁碟區。反向代理僅應轉送來自可信任代理的標頭；公開網路部署請使用 HTTPS，並依部署說明設定可信任代理與主機名稱。
+
+完整 Docker Compose、CLI 參數、資料遷移、LAN／反向代理和疑難排解請見[英文完整 README](README.md)或[簡體中文完整 README](README.zh-CN.md)；命令列選項與兩種模式的行為在所有語言版本中相同。
+
+## 貢獻與授權
+
+歡迎提交 Issue 與 Pull Request。授權條款請見 [License.txt](License.txt)。
