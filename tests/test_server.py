@@ -3327,7 +3327,7 @@ class ServerCacheTests(unittest.TestCase):
         self.assertIn("client.navigate(client.url)", response.text)
         self.assertNotIn("caches.delete(name)", response.text.split("epub-browser-")[0])
 
-    def test_server_reader_html_uses_hash_based_restrictive_csp(self):
+    def test_server_reader_html_allows_cross_site_embedding_with_hash_based_csp(self):
         script = "window.generatedReaderBootstrap=true;"
         Path(
             self.directory.name,
@@ -3350,7 +3350,8 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("default-src 'self'", policy)
         self.assertIn("object-src 'none'", policy)
-        self.assertIn("frame-ancestors 'none'", policy)
+        self.assertIn("frame-ancestors *", policy)
+        self.assertNotIn("x-frame-options", response.headers)
         self.assertIn("'sha256-{}'".format(expected_hash), script_directive)
         self.assertNotIn("'unsafe-inline'", script_directive)
 

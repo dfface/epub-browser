@@ -289,7 +289,7 @@ def reader_content_security_policy(markup):
         "font-src 'self' data:; "
         "media-src 'self' data: blob:; "
         "connect-src 'self'; "
-        "object-src 'none'; frame-src 'none'; frame-ancestors 'none'; "
+        "object-src 'none'; frame-src 'none'; frame-ancestors *; "
         "base-uri 'none'; form-action 'self'"
     ).format(script_sources)
 
