@@ -1132,7 +1132,7 @@ function initScript() {
                     else {
                         var prev = document.querySelector(".prev-chapter").href;
                         if (prev === location.href) showNotification(i18n.t('reader.firstChapter'), 'warning');
-                        else location.href=prev;
+                        else navigateReaderChapter(prev, { history: true });
                     }
                     break;
                 case ' ':
@@ -1143,7 +1143,7 @@ function initScript() {
                     else {
                         var next = document.querySelector(".next-chapter").href;
                         if (next === location.href) showNotification(i18n.t('reader.lastChapter'), 'warning');
-                        else location.href=next;
+                        else navigateReaderChapter(next, { history: true });
                     }
                     break;
             }
@@ -1187,7 +1187,7 @@ function initScript() {
         else {
             var prev = document.querySelector(".prev-chapter").href;
             if (prev === location.href) showNotification(i18n.t('reader.first'), 'warning');
-            else location.href=prev;
+            else navigateReaderChapter(prev, { history: true });
         }
     });
     
@@ -1196,7 +1196,7 @@ function initScript() {
         else {
             var next = document.querySelector(".next-chapter").href;
             if (next === location.href) showNotification(i18n.t('reader.last'), 'warning');
-            else location.href=next;
+            else navigateReaderChapter(next, { history: true });
         }
     });
 

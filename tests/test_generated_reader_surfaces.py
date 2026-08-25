@@ -1438,6 +1438,30 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             navigation.index('var xhr = new XMLHttpRequest();'),
         )
 
+    def test_pagination_boundary_chapter_navigation_uses_ajax(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        keyboard_start = script.index('function handleKeyDown(e) {')
+        pagination_start = script.index('if (isPaginationMode) {', keyboard_start)
+        pagination_end = script.index('\n        } else {', pagination_start)
+        pagination_keyboard = script[pagination_start:pagination_end]
+        self.assertIn('navigateReaderChapter(prev, { history: true });', pagination_keyboard)
+        self.assertIn('navigateReaderChapter(next, { history: true });', pagination_keyboard)
+        self.assertNotIn('location.href=prev', pagination_keyboard)
+        self.assertNotIn('location.href=next', pagination_keyboard)
+
+        prev_handler_start = script.index("prevPageBtn.addEventListener('click', function() {")
+        prev_handler_end = script.index('\n    });', prev_handler_start)
+        prev_handler = script[prev_handler_start:prev_handler_end]
+        self.assertIn('navigateReaderChapter(prev, { history: true });', prev_handler)
+        self.assertNotIn('location.href=prev', prev_handler)
+
+        next_handler_start = script.index("nextPageBtn.addEventListener('click', function() {")
+        next_handler_end = script.index('\n    });', next_handler_start)
+        next_handler = script[next_handler_start:next_handler_end]
+        self.assertIn('navigateReaderChapter(next, { history: true });', next_handler)
+        self.assertNotIn('location.href=next', next_handler)
+
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
