@@ -2405,7 +2405,8 @@ assert.deepEqual(
             )
         book_script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
         self.assertIn("deferBookFeature('bookshelfBtn', 'bookshelf'", book_script)
-        self.assertIn("deferBookFeature('bookAnnotationsBtn', 'annotations')", book_script)
+        self.assertIn("deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading')", book_script)
+        self.assertIn("setDeferredBookFeatureLoading(button, true, loadingKey)", book_script)
         self.assertIn("loadBookFeature('sortable')", book_script)
 
     def test_server_book_ai_assets_stay_off_critical_path(self):

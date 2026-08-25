@@ -20,9 +20,17 @@
   }
   function loadStyle(name) { return loadAsset(name, 'link', 'href').then(function() { return undefined; }); }
   function loadScript(name) { return loadAsset(name, 'script', 'src'); }
+  function waitForStylePaint() {
+    if (!root.requestAnimationFrame) return Promise.resolve();
+    return new Promise(function(resolve) {
+      root.requestAnimationFrame(function() {
+        root.requestAnimationFrame(resolve);
+      });
+    });
+  }
   function ensureRenderer(language) {
-    if (language === 'math') return Promise.all([loadStyle('aiRichTextCss'), loadStyle('katexCss'), loadScript('katex')]);
-    if (language === 'mermaid') return Promise.all([loadStyle('aiRichTextCss'), loadScript('mermaid')]);
+    if (language === 'math') return Promise.all([loadStyle('aiRichTextCss'), loadStyle('katexCss'), loadScript('katex')]).then(waitForStylePaint);
+    if (language === 'mermaid') return Promise.all([loadStyle('aiRichTextCss'), loadScript('mermaid')]).then(waitForStylePaint);
     return Promise.resolve();
   }
   function el(tag, className, text) {

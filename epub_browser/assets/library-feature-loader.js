@@ -35,6 +35,18 @@
   function loadStyle(name) { return loadAsset(name, 'link', 'href'); }
   function loadScript(name) { return loadAsset(name, 'script', 'src'); }
 
+  // A stylesheet's load event can fire just before the browser has applied it.
+  // Wait for two frames so a deferred dialog is never inserted unstyled at the
+  // bottom of the document.
+  function waitForStylePaint() {
+    if (!root.requestAnimationFrame) return Promise.resolve();
+    return new Promise(function(resolve) {
+      root.requestAnimationFrame(function() {
+        root.requestAnimationFrame(resolve);
+      });
+    });
+  }
+
   function loadFeature(name) {
     var feature = features[name];
     var sequence = Promise.resolve();
@@ -42,6 +54,9 @@
     (feature.styles || []).forEach(function(style) {
       sequence = sequence.then(function() { return loadStyle(style); });
     });
+    if (feature.styles && feature.styles.length) {
+      sequence = sequence.then(waitForStylePaint);
+    }
     (feature.scripts || []).forEach(function(script) {
       sequence = sequence.then(function() { return loadScript(script); });
     });

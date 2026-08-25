@@ -94,6 +94,7 @@ function initScript() {
     var metadataCompletedRevision = -1;
     var metadataWaiters = [];
     var lastMetadataBooks = [];
+    var bookCardRenderGeneration = 0;
 
     function settleMetadataWaiters(revision, error, books) {
         var remaining = [];
@@ -354,9 +355,10 @@ function initScript() {
         setTagCloudToggleLabel(toggle, expanded);
     }
 
-    function appendBookCardsInBatches(bookGrid, cards, done) {
+    function appendBookCardsInBatches(bookGrid, cards, generation, done) {
         var offset = 0;
         function appendBatch() {
+            if (generation !== bookCardRenderGeneration) return;
             cards.slice(offset, offset + 24).forEach(function(card) {
                 bookGrid.appendChild(card);
             });
@@ -371,12 +373,29 @@ function initScript() {
         appendBatch();
     }
 
+    function uniqueBooksById(books) {
+        var seenIds = {};
+        var seenUrls = {};
+        return books.filter(function(book) {
+            var id = book && book.hash;
+            var url = book && book.url;
+            var knownId = typeof id === 'string' && id;
+            var knownUrl = typeof url === 'string' && url;
+            if ((knownId && seenIds[id]) || (knownUrl && seenUrls[url])) return false;
+            if (knownId) seenIds[id] = true;
+            if (knownUrl) seenUrls[url] = true;
+            return true;
+        });
+    }
+
     function replaceBookCards(books) {
         var bookGrid = document.querySelector('.book-grid');
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var activeTagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
+        books = uniqueBooksById(books);
         var cards = books.map(createBookCard);
         var tagNames = collectTagNames(books);
+        var generation = ++bookCardRenderGeneration;
         if (!bookGrid) return;
 
         hideBookGridLoading();
@@ -399,7 +418,7 @@ function initScript() {
             return;
         }
 
-        appendBookCardsInBatches(bookGrid, cards, function() {
+        appendBookCardsInBatches(bookGrid, cards, generation, function() {
             restoreOrder(storageKeySortableBook, 'book-grid');
             restoreOrder(storageKeySortableTag, 'tag-cloud');
             updateTagCloudCollapse();
@@ -748,18 +767,48 @@ function initScript() {
         });
     }
 
-    function deferLibraryFeature(buttonId, feature, initialize) {
+    function setDeferredFeatureLoading(button, loading, loadingKey) {
+        var label = button.querySelector('[data-i18n]');
+        var icon = button.querySelector('i');
+        if (loading) {
+            if (label) {
+                button.dataset.libraryFeatureLabel = label.textContent;
+                label.textContent = t(loadingKey);
+            }
+            if (icon) {
+                button.dataset.libraryFeatureIcon = icon.className;
+                icon.className = 'fas fa-spinner fa-spin';
+            }
+            button.classList.add('is-loading');
+            button.setAttribute('aria-busy', 'true');
+            button.setAttribute('aria-disabled', 'true');
+            button.disabled = true;
+            return;
+        }
+        if (label) label.textContent = label.getAttribute('data-i18n') ? t(label.getAttribute('data-i18n')) : button.dataset.libraryFeatureLabel;
+        if (icon && button.dataset.libraryFeatureIcon) icon.className = button.dataset.libraryFeatureIcon;
+        button.classList.remove('is-loading');
+        button.removeAttribute('aria-busy');
+        button.removeAttribute('aria-disabled');
+        button.disabled = false;
+        delete button.dataset.libraryFeatureLabel;
+        delete button.dataset.libraryFeatureIcon;
+    }
+
+    function deferLibraryFeature(buttonId, feature, initialize, loadingKey) {
         var button = document.getElementById(buttonId);
         if (!button || button.getAttribute('data-library-feature-loader') === 'true') return;
         button.setAttribute('data-library-feature-loader', 'true');
         button.addEventListener('click', function(event) {
             if (button.getAttribute('data-library-feature-ready') === 'true') return;
             event.preventDefault();
+            setDeferredFeatureLoading(button, true, loadingKey);
             loadLibraryFeature(feature).then(function() {
                 if (typeof initialize === 'function') initialize();
                 button.setAttribute('data-library-feature-ready', 'true');
+                setDeferredFeatureLoading(button, false, loadingKey);
                 button.click();
-            }, function() {});
+            }, function() { setDeferredFeatureLoading(button, false, loadingKey); });
         });
     }
 
@@ -767,8 +816,8 @@ function initScript() {
         pwaSupport();
         deferLibraryFeature('bookshelfBtn', 'bookshelf', function() {
             if (window.initBookShelf) window.initBookShelf();
-        });
-        deferLibraryFeature('annotationsBtn', 'annotations');
+        }, 'bookshelf.loading');
+        deferLibraryFeature('annotationsBtn', 'annotations', null, 'annotations.loading');
     }
 
     function hideLoading() {

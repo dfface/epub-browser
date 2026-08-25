@@ -330,6 +330,36 @@ test('renders a large Library catalog in animation-frame batches', () => {
   assert.equal(harness.cardIds().length, 25);
 });
 
+test('cancels stale card batches when a metadata refresh starts during rendering', async () => {
+  const books = Array.from({ length: 25 }, (_, index) => ({
+    hash: 'book-' + index,
+    title: 'Book ' + index,
+    authors: [],
+    tags: [],
+    url: '/book/' + index + '/',
+    cover: null,
+  }));
+  const harness = createLibraryHarness([books, books]);
+
+  harness.window.initScriptLibrary();
+  await harness.window.refreshLibraryMetadata();
+
+  assert.equal(harness.cardIds().length, 24);
+  harness.flushAnimationFrame();
+  assert.equal(harness.cardIds().length, 24);
+  harness.flushAnimationFrame();
+  assert.deepEqual(harness.cardIds(), books.map((book) => book.hash));
+});
+
+test('renders one card when metadata contains the same book more than once', () => {
+  const book = { hash: 'one', title: 'One', authors: [], tags: [], url: '/book/one/', cover: null };
+  const harness = createLibraryHarness([[book, { ...book, hash: 'legacy-one' }]]);
+
+  harness.window.initScriptLibrary();
+
+  assert.deepEqual(harness.cardIds(), ['one']);
+});
+
 test('incremental metadata refresh replaces cards and preserves filters', async () => {
   const harness = createLibraryHarness([
     [{ hash: 'one', title: 'One', authors: [], tags: ['A'], url: '/book/one/', cover: null }],

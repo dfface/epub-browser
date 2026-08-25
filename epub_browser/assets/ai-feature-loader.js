@@ -18,7 +18,27 @@
     });
     return loads[name];
   }
-  function enable(name) { return load('aiRichText').then(function() { return load(name); }); }
+  function waitForStylePaint() {
+    if (!root.requestAnimationFrame) return Promise.resolve();
+    return new Promise(function(resolve) {
+      root.requestAnimationFrame(function() {
+        root.requestAnimationFrame(resolve);
+      });
+    });
+  }
+  function enable(name) {
+    return load('aiRichText').then(function() {
+      var stylesheet = name === 'aiReadingHub'
+        ? 'aiReadingHubCss'
+        : name === 'aiCanvas'
+          ? 'aiCanvasCss'
+          : '';
+      if (!stylesheet) return load(name);
+      return root.EpubBrowserAIRich.loadStyle(stylesheet)
+        .then(waitForStylePaint)
+        .then(function() { return load(name); });
+    });
+  }
   function buttonFor(target) {
     if (!target || !target.closest) return null;
     return target.closest('[data-ai-learning-canvas], [data-ai-followup-drawer], [data-ai-book-chat], [data-ai-reading-hub]');
@@ -33,6 +53,29 @@
     button.dataset.aiFeatureReady = 'true';
     button.click();
   }
+  function setFeatureLoading(button, loading) {
+    if (!button.hasAttribute('data-ai-reading-hub') && !button.hasAttribute('data-ai-learning-canvas')) return;
+    var label = button.querySelector('[data-i18n]');
+    var icon = button.querySelector('i');
+    var i18n = root.EpubBrowserI18n;
+    if (loading) {
+      if (label) { button.dataset.aiFeatureLabel = label.textContent; label.textContent = i18n && i18n.t ? i18n.t('ai.libraryLoading') : button.dataset.aiFeatureLabel; }
+      if (icon) { button.dataset.aiFeatureIcon = icon.className; icon.className = 'fas fa-spinner fa-spin'; }
+      button.classList.add('is-loading');
+      button.setAttribute('aria-busy', 'true');
+      button.setAttribute('aria-disabled', 'true');
+      button.disabled = true;
+      return;
+    }
+    if (label) label.textContent = label.getAttribute('data-i18n') && i18n && i18n.t ? i18n.t(label.getAttribute('data-i18n')) : button.dataset.aiFeatureLabel;
+    if (icon && button.dataset.aiFeatureIcon) icon.className = button.dataset.aiFeatureIcon;
+    button.classList.remove('is-loading');
+    button.removeAttribute('aria-busy');
+    button.removeAttribute('aria-disabled');
+    button.disabled = false;
+    delete button.dataset.aiFeatureLabel;
+    delete button.dataset.aiFeatureIcon;
+  }
   document.addEventListener('click', function(event) {
     var button = buttonFor(event.target);
     if (!button || button.dataset.aiFeatureReady) return;
@@ -40,7 +83,11 @@
     if (!feature) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    enable(feature).then(function() { replay(button); }).catch(function() {});
+    setFeatureLoading(button, true);
+    enable(feature).then(function() {
+      setFeatureLoading(button, false);
+      replay(button);
+    }).catch(function() { setFeatureLoading(button, false); });
   }, true);
   function loadRequestedResult() {
     if (!root.location || root.location.search.indexOf('ai_result=') < 0) return;

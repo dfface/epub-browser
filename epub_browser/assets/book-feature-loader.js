@@ -31,6 +31,17 @@
     return loads[name];
   }
 
+  // Do not initialize a deferred dialog until its stylesheet has had a chance
+  // to paint; otherwise its markup can briefly render at document bottom.
+  function waitForStylePaint() {
+    if (!root.requestAnimationFrame) return Promise.resolve();
+    return new Promise(function(resolve) {
+      root.requestAnimationFrame(function() {
+        root.requestAnimationFrame(resolve);
+      });
+    });
+  }
+
   function loadFeature(name) {
     var feature = features[name];
     var sequence = Promise.resolve();
@@ -38,6 +49,9 @@
     (feature.styles || []).forEach(function(style) {
       sequence = sequence.then(function() { return loadAsset(style, 'link', 'href'); });
     });
+    if (feature.styles && feature.styles.length) {
+      sequence = sequence.then(waitForStylePaint);
+    }
     (feature.scripts || []).forEach(function(script) {
       sequence = sequence.then(function() { return loadAsset(script, 'script', 'src'); });
     });

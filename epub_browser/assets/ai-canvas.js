@@ -456,7 +456,6 @@
       button.addEventListener('mouseenter', function() { updateButtonScope(button, currentContext()); });
       button.addEventListener('focus', function() { updateButtonScope(button, currentContext()); });
       button.addEventListener('click', function() {
-        if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiCanvasCss');
         var context = currentContext(), key = String(context.chapterIndex);
         if (document.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + key + '"]')) {
           clearChapter(context.chapterIndex);

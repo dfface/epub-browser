@@ -143,6 +143,12 @@ html {
     color: var(--button-bg);
 }
 
+.app-nav-link.is-loading,
+.app-nav-link:disabled {
+    cursor: progress;
+    opacity: .76;
+}
+
 .app-nav-link i,
 .app-nav-action i {
     color: currentColor;

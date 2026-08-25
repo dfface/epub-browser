@@ -134,18 +134,48 @@ function initScript() {
         return features.load(name);
     }
 
-    function deferBookFeature(buttonId, featureName, initialize) {
+    function setDeferredBookFeatureLoading(button, loading, loadingKey) {
+        var label = button.querySelector('[data-i18n]');
+        var icon = button.querySelector('i');
+        if (loading) {
+            if (label) {
+                button.dataset.bookFeatureLabel = label.textContent;
+                label.textContent = bookT(loadingKey);
+            }
+            if (icon) {
+                button.dataset.bookFeatureIcon = icon.className;
+                icon.className = 'fas fa-spinner fa-spin';
+            }
+            button.classList.add('is-loading');
+            button.setAttribute('aria-busy', 'true');
+            button.setAttribute('aria-disabled', 'true');
+            button.disabled = true;
+            return;
+        }
+        if (label) label.textContent = label.getAttribute('data-i18n') ? bookT(label.getAttribute('data-i18n')) : button.dataset.bookFeatureLabel;
+        if (icon && button.dataset.bookFeatureIcon) icon.className = button.dataset.bookFeatureIcon;
+        button.classList.remove('is-loading');
+        button.removeAttribute('aria-busy');
+        button.removeAttribute('aria-disabled');
+        button.disabled = false;
+        delete button.dataset.bookFeatureLabel;
+        delete button.dataset.bookFeatureIcon;
+    }
+
+    function deferBookFeature(buttonId, featureName, initialize, loadingKey) {
         var button = document.getElementById(buttonId);
         if (!button || button.dataset.bookFeatureLoader) return;
         button.dataset.bookFeatureLoader = 'true';
         button.addEventListener('click', function(event) {
             if (button.dataset.bookFeatureReady) return;
             event.preventDefault();
+            setDeferredBookFeatureLoading(button, true, loadingKey);
             loadBookFeature(featureName).then(function() {
                 if (initialize) initialize();
                 button.dataset.bookFeatureReady = 'true';
+                setDeferredBookFeatureLoading(button, false, loadingKey);
                 button.click();
-            }).catch(function() {});
+            }).catch(function() { setDeferredBookFeatureLoading(button, false, loadingKey); });
         });
     }
 
@@ -293,8 +323,8 @@ function initScript() {
     if (!isKindleMode()) {
         deferBookFeature('bookshelfBtn', 'bookshelf', function() {
             if (window.initBookShelf) window.initBookShelf();
-        });
-        deferBookFeature('bookAnnotationsBtn', 'annotations');
+        }, 'bookshelf.loading');
+        deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading');
         enableBookSortableOnInteraction();
     }
 
