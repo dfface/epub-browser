@@ -6,8 +6,8 @@
 
 body {
     line-height: 1.6;
-    color: var(--text);
-    background: var(--background);
+    color: var(--reader-ink, var(--text));
+    background: var(--reader-canvas, var(--background));
     font-family: var(--font-family, system-ui, -apple-system, sans-serif);
     min-height: 100vh;
     padding: 0 20px;
@@ -477,20 +477,39 @@ body.reader-drawer-open {
 
 .eb-content-container {
     margin-top: 18px;
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
+    background: var(--reader-page, var(--card-bg));
+    border: 1px solid var(--reader-border, var(--border));
+    border-radius: 16px;
+    box-shadow: 0 12px 36px var(--reader-shadow, var(--shadow));
     overflow: hidden;
     position: relative;
     transition: var(--transition);
 }
 
 #eb-content {
-    padding: 40px;
-    color: var(--text);
+    padding: clamp(40px, 5vw, 72px) clamp(28px, 6vw, 80px);
+    color: var(--reader-ink, var(--text));
     transition: var(--transition);
     text-indent: 0px;
     width: 100%;
+}
+
+/* EPUBs often bring a large first-heading margin.  The page shell already
+   establishes the opening rhythm, so avoid spending the first viewport on it. */
+#eb-content > :first-child {
+    margin-top: 0 !important;
+}
+
+#eb-content > :last-child {
+    margin-bottom: 0 !important;
+}
+
+#eb-content :is(p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, figcaption) {
+    color: var(--reader-ink, var(--text)) !important;
+}
+
+#eb-content a {
+    color: var(--reader-action, var(--button-bg)) !important;
 }
 
 /* #eb-content h2, #eb-content h3, #eb-content h4 {
@@ -738,8 +757,8 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     width: 50px;
     height: 50px;
     border-radius: 50%;
-    background: var(--button-bg);
-    color: var(--button-text);
+    background: var(--reader-control-bg, var(--button-bg));
+    color: var(--reader-control-text, var(--button-text));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -754,9 +773,9 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 .reading-controls .control-btn:hover, .top-controls .control-btn:hover {
-    background: var(--button-hover);
-    color: var(--button-text);
-    transform: scale(1.1);
+    background: var(--reader-control-hover, var(--button-hover));
+    color: var(--reader-control-text, var(--button-text));
+    transform: none;
 }
 
 .top-controls .control-btn:disabled,
@@ -771,8 +790,76 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 .theme-toggle:focus-visible,
 .reading-controls .control-btn:focus-visible,
 .top-controls .control-btn:focus-visible {
-    outline: 3px solid var(--button-bg);
+    outline: 3px solid var(--reader-action, var(--button-bg));
     outline-offset: 3px;
+}
+
+@media (min-width: 769px) {
+    /* A single quiet rail reads as reading furniture rather than five competing
+       primary buttons.  Names stay available to assistive tech and on hover. */
+    .top-controls {
+        gap: 3px;
+        padding: 5px;
+        border: 1px solid var(--reader-border, var(--border));
+        border-radius: 15px;
+        background: color-mix(in srgb, var(--reader-page, var(--card-bg)) 94%, transparent);
+        box-shadow: 0 8px 24px var(--reader-shadow, var(--shadow));
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+
+    .top-controls .control-btn,
+    .reading-controls .control-btn {
+        position: relative;
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--reader-action, var(--button-bg));
+        box-shadow: none;
+    }
+
+    .top-controls .control-btn:hover,
+    .reading-controls .control-btn:hover {
+        background: color-mix(in srgb, var(--reader-action, var(--button-bg)) 12%, transparent);
+    }
+
+    .top-controls .control-btn::after,
+    .reading-controls .control-btn::after {
+        content: attr(aria-label);
+        position: absolute;
+        top: 50%;
+        right: calc(100% + 10px);
+        z-index: 1;
+        width: max-content;
+        max-width: 220px;
+        padding: 6px 8px;
+        border: 1px solid var(--reader-border, var(--border));
+        border-radius: 7px;
+        background: var(--reader-page, var(--card-bg));
+        box-shadow: var(--shadow-sm);
+        color: var(--reader-ink, var(--text));
+        font-size: .76rem;
+        font-weight: 600;
+        line-height: 1.2;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(4px, -50%);
+        transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    .top-controls .control-btn:hover::after,
+    .top-controls .control-btn:focus-visible::after,
+    .reading-controls .control-btn:hover::after,
+    .reading-controls .control-btn:focus-visible::after {
+        opacity: 1;
+        transform: translate(0, -50%);
+    }
+
+    .top-controls .control-name,
+    .reading-controls .control-name {
+        display: none;
+    }
 }
 
 .skip-link {

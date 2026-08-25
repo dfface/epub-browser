@@ -371,9 +371,12 @@ test('rerenders an open theme menu after the locale changes', () => {
 
   function element() {
     const result = {
-      style: {}, children: [], listeners: {}, className: '',
+      style: {}, children: [], listeners: {}, attributes: {}, className: '',
       appendChild(child) { this.children.push(child); return child; },
       addEventListener(type, listener) { this.listeners[type] = listener; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      getAttribute(name) { return this.attributes[name] || null; },
+      focus() {},
       querySelector(selector) { return selector === 'i' ? { className: '' } : null; },
       contains() { return false; },
       getBoundingClientRect() { return { bottom: 10, right: 10 }; },
@@ -417,4 +420,158 @@ test('rerenders an open theme menu after the locale changes', () => {
   localeChangeListener();
   assert.equal(body.children[0].children[0].children[0].textContent, 'zh-CN:theme.light');
   assert.equal(body.children[0].style.display, 'block');
+});
+
+test('theme picker exposes native choices and the active theme', () => {
+  function element(tagName) {
+    const result = {
+      tagName, style: {}, children: [], listeners: {}, attributes: {}, className: '', focusCount: 0,
+      appendChild(child) { this.children.push(child); return child; },
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      getAttribute(name) { return this.attributes[name] || null; },
+      focus() { this.focusCount += 1; },
+      querySelector(selector) { return selector === 'i' ? { className: '' } : null; },
+      contains() { return false; },
+      getBoundingClientRect() { return { bottom: 10, right: 10 }; },
+    };
+    Object.defineProperty(result, 'innerHTML', {
+      get() { return this._innerHTML || ''; },
+      set(value) { this._innerHTML = value; this.children = []; },
+    });
+    return result;
+  }
+
+  const themeToggle = element('button');
+  const body = element('body');
+  const document = {
+    cookie: '', body, listeners: {},
+    documentElement: { classList: { add() {}, remove() {} } },
+    getElementById(id) { return id === 'themeToggle' ? themeToggle : null; },
+    createElement: element,
+    createTextNode(textContent) { return { textContent }; },
+    querySelector() { return null; },
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+  };
+  const window = {
+    document, navigator: { userAgent: '' }, innerWidth: 1024,
+    localStorage: { getItem() { return 'forest'; }, setItem() {} },
+    getComputedStyle() { return { display: 'none' }; },
+    addEventListener() {},
+    EpubBrowserI18n: { t(key) { return key; }, onLocaleChange() {} },
+  };
+
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/theme.js', 'utf8'), {
+    window, document, navigator: window.navigator, localStorage: window.localStorage, Date, decodeURIComponent,
+  });
+  window.initTheme();
+  themeToggle.listeners.click({ stopPropagation() {} });
+
+  const menu = body.children[0];
+  const activeChoice = menu.children[3];
+  assert.equal(menu.getAttribute('role'), 'menu');
+  assert.equal(themeToggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(activeChoice.tagName, 'button');
+  assert.equal(activeChoice.getAttribute('role'), 'menuitemradio');
+  assert.equal(activeChoice.getAttribute('aria-checked'), 'true');
+});
+
+test('theme picker closes on Escape and restores focus to its toggle', () => {
+  function element(tagName) {
+    const result = {
+      tagName, style: {}, children: [], listeners: {}, attributes: {}, className: '', focusCount: 0,
+      appendChild(child) { this.children.push(child); return child; },
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      getAttribute(name) { return this.attributes[name] || null; },
+      focus() { this.focusCount += 1; },
+      querySelector(selector) { return selector === 'i' ? { className: '' } : null; },
+      contains() { return false; },
+      getBoundingClientRect() { return { bottom: 10, right: 10 }; },
+    };
+    Object.defineProperty(result, 'innerHTML', {
+      get() { return this._innerHTML || ''; },
+      set(value) { this._innerHTML = value; this.children = []; },
+    });
+    return result;
+  }
+
+  const themeToggle = element('button');
+  const body = element('body');
+  const document = {
+    cookie: '', body, listeners: {},
+    documentElement: { classList: { add() {}, remove() {} } },
+    getElementById(id) { return id === 'themeToggle' ? themeToggle : null; },
+    createElement: element,
+    createTextNode(textContent) { return { textContent }; },
+    querySelector() { return null; },
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+  };
+  const window = {
+    document, navigator: { userAgent: '' }, innerWidth: 1024,
+    localStorage: { getItem() { return 'light'; }, setItem() {} },
+    getComputedStyle() { return { display: 'none' }; },
+    addEventListener() {},
+    EpubBrowserI18n: { t(key) { return key; }, onLocaleChange() {} },
+  };
+
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/theme.js', 'utf8'), {
+    window, document, navigator: window.navigator, localStorage: window.localStorage, Date, decodeURIComponent,
+  });
+  window.initTheme();
+  themeToggle.listeners.click({ stopPropagation() {} });
+  (document.listeners.keydown || (() => {}))({ key: 'Escape' });
+
+  assert.equal(body.children[0].style.display, 'none');
+  assert.equal(themeToggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(themeToggle.focusCount, 1);
+});
+
+test('theme picker moves focus between choices with arrow keys', () => {
+  function element(tagName) {
+    const result = {
+      tagName, style: {}, children: [], listeners: {}, attributes: {}, className: '', focusCount: 0,
+      appendChild(child) { this.children.push(child); return child; },
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      getAttribute(name) { return this.attributes[name] || null; },
+      focus() { this.focusCount += 1; },
+      querySelector(selector) { return selector === 'i' ? { className: '' } : null; },
+      contains() { return false; },
+      getBoundingClientRect() { return { bottom: 10, right: 10 }; },
+    };
+    Object.defineProperty(result, 'innerHTML', {
+      get() { return this._innerHTML || ''; },
+      set(value) { this._innerHTML = value; this.children = []; },
+    });
+    return result;
+  }
+
+  const themeToggle = element('button');
+  const body = element('body');
+  const document = {
+    cookie: '', body, listeners: {},
+    documentElement: { classList: { add() {}, remove() {} } },
+    getElementById(id) { return id === 'themeToggle' ? themeToggle : null; },
+    createElement: element,
+    createTextNode(textContent) { return { textContent }; },
+    querySelector() { return null; },
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+  };
+  const window = {
+    document, navigator: { userAgent: '' }, innerWidth: 1024,
+    localStorage: { getItem() { return 'forest'; }, setItem() {} },
+    getComputedStyle() { return { display: 'none' }; },
+    addEventListener() {},
+    EpubBrowserI18n: { t(key) { return key; }, onLocaleChange() {} },
+  };
+
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/theme.js', 'utf8'), {
+    window, document, navigator: window.navigator, localStorage: window.localStorage, Date, decodeURIComponent,
+  });
+  window.initTheme();
+  themeToggle.listeners.click({ stopPropagation() {} });
+  document.listeners.keydown({ key: 'ArrowDown', preventDefault() {} });
+
+  assert.equal(body.children[0].children[4].focusCount, 1);
 });

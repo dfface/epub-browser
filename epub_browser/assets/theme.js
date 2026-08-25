@@ -108,19 +108,25 @@ function initTheme() {
         }
     }
 
-    function renderThemeMenu(menu) {
+    function renderThemeMenu(menu, currentTheme, themeToggle) {
         menu.innerHTML = '';
         for (var i = 0; i < themes.length; i++) {
             var theme = themes[i];
-            var item = document.createElement('div');
+            var item = document.createElement('button');
+            item.type = 'button';
             item.className = 'theme-menu-item';
+            item.setAttribute('role', 'menuitemradio');
+            item.setAttribute('aria-checked', theme.id === currentTheme ? 'true' : 'false');
             item.innerHTML = '<i class="fas ' + theme.icon + '"></i>';
             item.appendChild(document.createTextNode(window.EpubBrowserI18n.t(theme.nameKey)));
             
             item.addEventListener('click', function(themeId) {
                 return function() {
                     applyTheme(themeId);
+                    renderThemeMenu(menu, themeId, themeToggle);
                     menu.style.display = 'none';
+                    themeToggle.setAttribute('aria-expanded', 'false');
+                    themeToggle.focus();
                 };
             }(theme.id));
             
@@ -128,10 +134,27 @@ function initTheme() {
         }
     }
 
+    function themeIndex(themeId) {
+        for (var i = 0; i < themes.length; i++) {
+            if (themes[i].id === themeId) return i;
+        }
+        return 0;
+    }
+
+    function focusThemeChoice(menu, index) {
+        var choices = Array.prototype.slice.call(menu.children || []);
+        if (!choices.length) return 0;
+        var normalizedIndex = (index + choices.length) % choices.length;
+        choices[normalizedIndex].focus();
+        return normalizedIndex;
+    }
+
     // 创建主题选择菜单
     function createThemeMenu() {
         var menu = document.createElement('div');
         menu.className = 'theme-menu';
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('aria-labelledby', 'themeToggle');
         menu.style.display = 'none';
         menu.style.position = 'fixed';
         menu.style.zIndex = '10000';
@@ -156,6 +179,9 @@ function initTheme() {
         var themeToggle = document.getElementById('themeToggle');
         if (!themeToggle) return;
 
+        themeToggle.setAttribute('aria-haspopup', 'menu');
+        themeToggle.setAttribute('aria-expanded', 'false');
+
         var isKindle = isKindleDevice();
 
         // 应用初始主题
@@ -165,11 +191,12 @@ function initTheme() {
         // 初始化主题菜单
         var themeMenu = null;
         var currentToggleBtn = null;
+        var themeMenuFocusIndex = themeIndex(currentTheme);
 
         if (window.EpubBrowserI18n && window.EpubBrowserI18n.onLocaleChange) {
             window.EpubBrowserI18n.onLocaleChange(function() {
                 if (themeMenu) {
-                    renderThemeMenu(themeMenu);
+                    renderThemeMenu(themeMenu, getCurrentTheme(), themeToggle);
                 }
             });
         }
@@ -193,9 +220,14 @@ function initTheme() {
                 
                 if (themeMenu.style.display === 'none') {
                     updateThemeMenuPosition(themeMenu, themeToggle);
+                    var activeTheme = getCurrentTheme();
+                    renderThemeMenu(themeMenu, activeTheme, themeToggle);
                     themeMenu.style.display = 'block';
+                    themeToggle.setAttribute('aria-expanded', 'true');
+                    themeMenuFocusIndex = focusThemeChoice(themeMenu, themeIndex(activeTheme));
                 } else {
                     themeMenu.style.display = 'none';
+                    themeToggle.setAttribute('aria-expanded', 'false');
                 }
             }
         }
@@ -206,6 +238,31 @@ function initTheme() {
         document.addEventListener('click', function(e) {
             if (themeMenu && !themeToggle.contains(e.target) && !themeMenu.contains(e.target)) {
                 themeMenu.style.display = 'none';
+                themeToggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && themeMenu && themeMenu.style.display !== 'none') {
+                themeMenu.style.display = 'none';
+                themeToggle.setAttribute('aria-expanded', 'false');
+                themeToggle.focus();
+                return;
+            }
+            if (!themeMenu || themeMenu.style.display === 'none') return;
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                themeMenuFocusIndex = focusThemeChoice(themeMenu, themeMenuFocusIndex + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                themeMenuFocusIndex = focusThemeChoice(themeMenu, themeMenuFocusIndex - 1);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                themeMenuFocusIndex = focusThemeChoice(themeMenu, 0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                themeMenuFocusIndex = focusThemeChoice(themeMenu, themes.length - 1);
             }
         });
         
