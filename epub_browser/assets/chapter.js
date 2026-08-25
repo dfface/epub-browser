@@ -639,12 +639,9 @@ function initScript() {
         showLoading();
         var original = preprocessContent(content);
         content.innerHTML = original;
-        var contentH = content.clientHeight;
         
         setTimeout(function() {
-            var sh = content.scrollHeight;
-            var cols = Math.ceil(sh / contentH);
-            content.style.columnCount = cols;
+            content.style.columnCount = 'auto';
             content.style.columnWidth = 'auto';
             content.style.columnFill = 'auto';
             content.style.columnGap = '0';
@@ -714,6 +711,7 @@ function initScript() {
             nav.style.boxSizing = 'border-box';
         }
         pageWidth = w;
+        content.style.columnCount = 'auto';
         content.style.columnWidth = pageWidth + 'px';
         content.style.boxSizing = 'border-box';
         var sw = content.scrollWidth;
@@ -1036,6 +1034,7 @@ function initScript() {
         options = options || {};
         var target = chapterTargetFromUrl(url);
         if (!target || (!isContinuousScroll && target.index === parseInt(chapter_index, 10))) return false;
+        closeReaderDrawers(false);
         if (isContinuousScroll) {
             var loadedChapter = content.querySelector(
                 '.continuous-chapter[data-chapter-index="' + target.index + '"]'

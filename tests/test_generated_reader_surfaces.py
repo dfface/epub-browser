@@ -1407,7 +1407,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         create_pages_start = script.index('function createPages(')
         create_pages_end = script.index('\n    function scrollToPaginationTarget(', create_pages_start)
         create_pages = script[create_pages_start:create_pages_end]
-        self.assertIn('var contentH = content.clientHeight;', create_pages)
+        self.assertNotIn('var cols =', create_pages)
+        self.assertNotIn('content.style.columnCount = cols;', create_pages)
         self.assertNotIn('window.innerHeight', create_pages)
         self.assertNotIn('contentContainer.style.height', create_pages)
         self.assertNotIn('content.style.height', create_pages)
@@ -1416,8 +1417,26 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         calculate_end = script.index('\n    function showPage(', calculate_start)
         calculate_pages = script[calculate_start:calculate_end]
         self.assertIn('var w = Math.floor(contentContainer.clientWidth);', calculate_pages)
+        self.assertIn("content.style.columnCount = 'auto';", calculate_pages)
+        self.assertLess(
+            calculate_pages.index("content.style.columnCount = 'auto';"),
+            calculate_pages.index('content.style.columnWidth = pageWidth + \'px\';'),
+        )
         self.assertNotIn('contentContainer.style.width', calculate_pages)
         self.assertNotIn('contentContainer.style.flex', calculate_pages)
+
+    def test_ajax_chapter_navigation_closes_reader_drawers_before_loading(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        navigation_start = script.index('function navigateReaderChapter(')
+        navigation_end = script.index('\n    function wireReaderChapterNavigation()', navigation_start)
+        navigation = script[navigation_start:navigation_end]
+
+        self.assertIn('closeReaderDrawers(false);', navigation)
+        self.assertLess(
+            navigation.index('closeReaderDrawers(false);'),
+            navigation.index('var xhr = new XMLHttpRequest();'),
+        )
 
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
