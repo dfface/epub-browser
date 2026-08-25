@@ -1462,6 +1462,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('navigateReaderChapter(next, { history: true });', next_handler)
         self.assertNotIn('location.href=next', next_handler)
 
+    def test_pagination_chapter_toc_jumps_to_an_exact_page_boundary(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        toc_start = script.index('function generateToc() {')
+        toc_end = script.index('\n    function updateTocHighlight()', toc_start)
+        toc = script[toc_start:toc_end]
+        pagination_start = toc.index('if (isPaginationMode) {')
+        pagination_end = toc.index('\n                } else {', pagination_start)
+        pagination_jump = toc[pagination_start:pagination_end]
+
+        self.assertIn('var page = Math.floor(t.offsetLeft / pageWidth);', pagination_jump)
+        self.assertIn('showPage(page);', pagination_jump)
+        self.assertNotIn('scrollIntoView', pagination_jump)
+
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')

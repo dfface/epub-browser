@@ -1903,18 +1903,8 @@ function initScript() {
                 var t = document.getElementById(this.hash.substring(1));
                 if (!t) return;
                 if (isPaginationMode) {
-                    t.scrollIntoView({behavior:'auto', block:'start'});
-                    setTimeout(function() {
-                        var sl = content.scrollLeft;
-                        var pg = Math.round(sl / pageWidth);
-                        currentPage = Math.max(0, Math.min(pg, totalPages-1));
-                        currentPageEl.textContent = currentPage+1;
-                        pageJumpInput.value = currentPage+1;
-                        updateNavButtons();
-                        updateProgressIndicator();
-                        saveReadingProgress();
-                        updateTocHighlight();
-                    }, 500);
+                    var page = Math.floor(t.offsetLeft / pageWidth);
+                    showPage(page);
                 } else {
                     window.scrollTo({top: t.offsetTop-100, behavior:'smooth'});
                 }
