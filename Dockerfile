@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS builder
+FROM python:3.14-alpine AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -6,11 +6,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN pip install --no-cache-dir build setuptools wheel
 
 WORKDIR /build/epub-browser
-COPY . .
+# Keep the build input limited to the files that contribute to the wheel.  This
+# also prevents documentation and local development state from invalidating
+# the wheel build cache.
+COPY setup.py MANIFEST.in README.md README.zh-CN.md License.txt ./
+COPY epub_browser ./epub_browser
 RUN python -m build --wheel
 
 
-FROM python:3.14-slim
+FROM python:3.14-alpine
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,7 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY --from=builder /build/epub-browser/dist/*.whl /tmp/packages/
-RUN pip install --no-cache-dir /tmp/packages/*.whl \
+RUN pip install --no-cache-dir --no-compile /tmp/packages/*.whl \
     && rm -rf /tmp/packages
 
 # /app/Library is EPUB input. The Docker default stores book IDs in the EPUB,

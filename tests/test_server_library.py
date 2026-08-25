@@ -101,10 +101,15 @@ class ServerLibraryManagerTests(unittest.TestCase):
 
     @staticmethod
     def _latest_subscription_snapshot(loop, subscription):
-        loop.run_until_complete(asyncio.sleep(0))
+        deadline = time.monotonic() + 1
         latest = None
-        while not subscription.queue.empty():
-            latest = subscription.queue.get_nowait()
+        while time.monotonic() < deadline:
+            loop.run_until_complete(asyncio.sleep(0))
+            while not subscription.queue.empty():
+                latest = subscription.queue.get_nowait()
+            if latest is not None:
+                return latest
+            time.sleep(0.01)
         return latest
 
     def test_first_reconcile_creates_sidecar_without_modifying_epub(self):
