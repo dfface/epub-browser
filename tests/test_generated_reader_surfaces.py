@@ -2380,6 +2380,14 @@ assert.deepEqual(
         self.assertIn('.annotation-hub-header-button[hidden] { display: none; }', css)
         self.assertIn('grid-column: 3;', css)
 
+    def test_font_awesome_uses_non_blocking_font_display(self):
+        stylesheet = Path('epub_browser/assets/fa.all.min.css').read_text(
+            encoding='utf-8'
+        )
+
+        self.assertNotIn('font-display:block', stylesheet)
+        self.assertIn('font-display:swap', stylesheet)
+
     def test_annotation_modal_announces_loading_while_data_is_requested(self):
         script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
         css = Path("epub_browser/assets/annotation-hub.css").read_text(encoding="utf-8")
