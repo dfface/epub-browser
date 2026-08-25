@@ -57,6 +57,15 @@ def render_library_shell(
         },
         asset_manifest=assets,
     )
+    library_feature_assets = json.dumps({
+        "pinyin": assets.url_for("pinyin-pro.min.js"),
+        "sortable": assets.url_for("sortable.min.js"),
+        "bookshelfCss": assets.url_for("bookshelf.css"),
+        "bookshelf": assets.url_for("bookshelf.js"),
+        "annotationHubCss": assets.url_for("annotation-hub.css"),
+        "annotation": assets.url_for("annotation.js"),
+        "annotationHub": assets.url_for("annotation-hub.js"),
+    }, separators=(",", ":"))
     server_progress_stylesheet = ""
     server_progress_panel = ""
     server_progress_script = ""
@@ -84,9 +93,21 @@ def render_library_shell(
             if (window.initScriptLibrary) window.initScriptLibrary();
             {server_progress_start}"""
     if deployment_mode == "server":
-        ai_reading_stylesheet = '<link rel="stylesheet" href="/assets/ai-reading-hub.css">'
         ai_reading_navigation = '''<button type="button" class="app-nav-link" data-ai-reading-hub aria-haspopup="dialog"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="ai.library">AI readings</span></button>'''
-        ai_reading_script = '<script src="/assets/ai-reading-hub.js" defer></script>'
+        ai_feature_assets = {
+            "aiReadingHubCss": assets.url_for("ai-reading-hub.css"),
+            "aiReadingHub": assets.url_for("ai-reading-hub.js"),
+            "aiRichTextCss": assets.url_for("ai-rich-text.css"),
+            "aiRichText": assets.url_for("ai-rich-text.js"),
+            "katexCss": assets.url_for("vendor/katex/katex.min.css"),
+            "katex": assets.url_for("vendor/katex/katex.min.js"),
+            "mermaid": assets.url_for("vendor/mermaid/mermaid.min.js"),
+        }
+        ai_reading_script = (
+            '<script>window.EpubBrowserFeatureAssets='
+            + json.dumps(ai_feature_assets, separators=(",", ":"))
+            + ';</script><script src="/assets/ai-feature-loader.js" defer></script>'
+        )
         server_progress_stylesheet = '<link rel="stylesheet" href="/assets/library-progress.css">'
         server_progress_panel = """
     <section id="libraryProgress" class="library-progress" hidden aria-labelledby="libraryProgressTitle">
@@ -140,8 +161,6 @@ def render_library_shell(
 <link rel="stylesheet" href="/assets/library.css?v=13">
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=2">
 <link rel="stylesheet" href="/assets/loading.css?v=15">
-    <link rel="stylesheet" href="/assets/bookshelf.css">
-    <link rel="stylesheet" href="/assets/annotation-hub.css">
     {ai_reading_stylesheet}
 {server_account_stylesheet}
 {server_progress_stylesheet}
@@ -368,12 +387,9 @@ if (isKindle) {
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
-    <script src="/assets/pinyin-pro.min.js" defer></script>
+    <script>window.EpubBrowserLibraryFeatureAssets={library_feature_assets};</script>
+    <script src="/assets/library-feature-loader.js" defer></script>
     <script src="/assets/library.js?v=13" defer></script>
-    <script src="/assets/sortable.min.js" defer></script>
-    <script src="/assets/bookshelf.js" defer></script>
-    <script src="/assets/annotation.js" defer></script>
-    <script src="/assets/annotation-hub.js" defer></script>
 {ai_reading_script}
 {server_progress_script}
     {SERVER_LOCALE_SCRIPT}
@@ -397,6 +413,7 @@ if (isKindle) {
     library_html = library_html.replace("{server_progress_panel}", server_progress_panel)
     library_html = library_html.replace("{server_progress_script}", server_progress_script)
     library_html = library_html.replace("{server_progress_start}", server_progress_start)
+    library_html = library_html.replace("{library_feature_assets}", library_feature_assets)
     library_html = library_html.replace("{bookshelf_data_actions}", bookshelf_data_actions)
     library_html = library_html.replace("{server_account_panel}", server_account_panel)
     library_html = library_html.replace("{server_account_stylesheet}", server_account_stylesheet)
