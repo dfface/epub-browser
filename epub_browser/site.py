@@ -413,6 +413,7 @@ if (isKindle) {
     library_html = library_html.replace("{server_progress_panel}", server_progress_panel)
     library_html = library_html.replace("{server_progress_script}", server_progress_script)
     library_html = library_html.replace("{server_progress_start}", server_progress_start)
+    library_html = library_html.replace("{library_feature_assets}", library_feature_assets)
     library_html = library_html.replace("{bookshelf_data_actions}", bookshelf_data_actions)
     library_html = library_html.replace("{server_account_panel}", server_account_panel)
     library_html = library_html.replace("{server_account_stylesheet}", server_account_stylesheet)

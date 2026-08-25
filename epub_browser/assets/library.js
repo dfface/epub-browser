@@ -766,7 +766,7 @@ function initScript() {
     if (!isKindleMode()) {
         pwaSupport();
         deferLibraryFeature('bookshelfBtn', 'bookshelf', function() {
-            if (window.initBookshelf) window.initBookshelf();
+            if (window.initBookShelf) window.initBookShelf();
         });
         deferLibraryFeature('annotationsBtn', 'annotations');
     }
