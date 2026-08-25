@@ -53,6 +53,14 @@ function initScript() {
         return i18n ? i18n.t(key, params) : key;
     }
 
+    function loadLibraryFeature(name) {
+        var features = window.EpubBrowserLibraryFeatures;
+        if (!features || typeof features.load !== 'function') {
+            return Promise.reject(new Error('library_feature_loader_unavailable'));
+        }
+        return features.load(name);
+    }
+
     function loadBookMetadata(callback, failureCallback) {
         var basePath = window.EpubBrowserBasePath || "/";
         var metadataUrl = basePath + "book-metadata.json?" + Date.now();
@@ -441,12 +449,8 @@ function initScript() {
     }
 
     function initSortable() {
-        if (!isKindleMode()) {
-            restoreOrder(storageKeySortableBook, 'book-grid');
-            restoreOrder(storageKeySortableTag, 'tag-cloud');
-            restoreOrder(storageKeySortableContainer, 'container');
-        }
-        
+        if (isKindleMode() || !window.Sortable || window.__epubBrowserLibrarySortable) return;
+        window.__epubBrowserLibrarySortable = true;
         var elBook = document.querySelector('.book-grid');
         var elTag = document.querySelector('.tag-cloud');
         var elContainer = document.querySelector('.container');
@@ -485,8 +489,29 @@ function initScript() {
             });
         }
     }
-    
-    window.onBookCardsLoaded = initSortable;
+
+    function requestSortable() {
+        if (window.Sortable) {
+            initSortable();
+            return;
+        }
+        loadLibraryFeature('sortable').then(initSortable, function() {});
+    }
+
+    function enableSortableOnInteraction() {
+        var targets = [
+            document.querySelector('.book-grid'),
+            document.querySelector('.tag-cloud'),
+            document.querySelector('.container')
+        ];
+        targets.forEach(function(target) {
+            if (!target || target.getAttribute('data-library-sortable-loader') === 'true') return;
+            target.setAttribute('data-library-sortable-loader', 'true');
+            target.addEventListener('pointerdown', requestSortable);
+        });
+    }
+
+    window.onBookCardsLoaded = enableSortableOnInteraction;
 
     if (window.initTheme) {
         window.initTheme();
@@ -578,6 +603,12 @@ function initScript() {
         }
     }
 
+    function loadPinyinForSearch() {
+        var searchTerm = (searchBox && searchBox.value || '').trim();
+        if (!searchTerm || typeof pinyinPro !== 'undefined') return;
+        loadLibraryFeature('pinyin').then(applyLibraryFilters, function() {});
+    }
+
     function activateTag(tagId) {
         tagCloud.querySelectorAll('.tag-cloud-item').forEach(function(tagItem) {
             tagItem.classList.remove('active');
@@ -588,7 +619,10 @@ function initScript() {
 
     if (searchBox && searchBox.getAttribute('data-library-filter-listener') !== 'true') {
         searchBox.setAttribute('data-library-filter-listener', 'true');
-        searchBox.addEventListener('input', applyLibraryFilters);
+        searchBox.addEventListener('input', function() {
+            applyLibraryFilters();
+            loadPinyinForSearch();
+        });
     }
     if (tagCloud && tagCloud.getAttribute('data-library-filter-listener') !== 'true') {
         tagCloud.setAttribute('data-library-filter-listener', 'true');
@@ -699,17 +733,27 @@ function initScript() {
         });
     }
 
-    function bookshelfSupport() {
-        if (window.initBookshelf) {
-            window.initBookshelf();
-        } else {
-            setTimeout(bookshelfSupport, 100);
-        }
+    function deferLibraryFeature(buttonId, feature, initialize) {
+        var button = document.getElementById(buttonId);
+        if (!button || button.getAttribute('data-library-feature-loader') === 'true') return;
+        button.setAttribute('data-library-feature-loader', 'true');
+        button.addEventListener('click', function(event) {
+            if (button.getAttribute('data-library-feature-ready') === 'true') return;
+            event.preventDefault();
+            loadLibraryFeature(feature).then(function() {
+                if (typeof initialize === 'function') initialize();
+                button.setAttribute('data-library-feature-ready', 'true');
+                button.click();
+            }, function() {});
+        });
     }
 
     if (!isKindleMode()) {
         pwaSupport();
-        bookshelfSupport();
+        deferLibraryFeature('bookshelfBtn', 'bookshelf', function() {
+            if (window.initBookshelf) window.initBookshelf();
+        });
+        deferLibraryFeature('annotationsBtn', 'annotations');
     }
 
     function hideLoading() {
