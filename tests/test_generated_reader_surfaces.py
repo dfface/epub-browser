@@ -2107,6 +2107,14 @@ assert.deepEqual(
         self.assertIn('body.reader-drawer-open .reader-toolbar.top-controls', css)
         self.assertIn('#scrollToTopBtn.is-visible', css)
 
+    def test_hidden_scroll_to_top_does_not_leave_a_floating_surface(self):
+        """The single scroll action owns its visual surface, not its wrapper."""
+        css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        desktop_controls = css.split('@media (min-width: 769px)', 1)[1].split('}', 1)[0]
+
+        self.assertIn('.top-controls {', desktop_controls)
+        self.assertNotIn('.reading-controls', desktop_controls)
+
     def test_primary_navigation_is_stable_and_consistent_across_reader_pages(self):
         pages = (self._library_html(), self._book_html(), self._chapter_html())
         for html in pages:

@@ -1569,3 +1569,358 @@
 .lavender-mode .theme-logo {
     filter: sepia(0.4) hue-rotate(260deg) saturate(1.8);
 }
+
+/*
+ * Reading palettes deliberately keep the page ink neutral.  A theme's hue is
+ * an orientation aid for surfaces and actions, never a tint applied to every
+ * line of a book.  These values also provide a shared, quieter foundation for
+ * the library and book pages.
+ */
+:root {
+    --app-canvas: #f6f4ef;
+    --app-surface: #fffdf8;
+    --app-ink: #24221e;
+    --app-muted: #69645c;
+    --app-border: #e4ded4;
+    --app-hover: #f0ece5;
+    --app-active: #e8e1d7;
+    --app-action: #355d7a;
+    --app-action-hover: #294d68;
+    --app-action-text: #ffffff;
+    --app-control: #355d7a;
+    --app-control-hover: #294d68;
+    --app-control-text: #ffffff;
+    --reader-canvas: #f6f4ef;
+    --reader-page: #fffdf8;
+    --reader-ink: #24221e;
+    --reader-muted: #69645c;
+    --reader-action: #355d7a;
+    --reader-control-bg: #355d7a;
+    --reader-control-hover: #294d68;
+    --reader-control-text: #ffffff;
+    --reader-border: #e4ded4;
+    --reader-shadow: rgba(43, 37, 29, 0.08);
+}
+
+.dark-mode {
+    --app-canvas: #161615;
+    --app-surface: #211f1b;
+    --app-ink: #ece7de;
+    --app-muted: #c4bdb1;
+    --app-border: #393630;
+    --app-hover: #2d2a25;
+    --app-active: #39352f;
+    --app-action: #9fc4b1;
+    --app-action-hover: #b9d8c8;
+    --app-action-text: #15251c;
+    --app-control: #476d58;
+    --app-control-hover: #35513f;
+    --app-control-text: #ffffff;
+    --reader-canvas: #161615;
+    --reader-page: #211f1b;
+    --reader-ink: #ece7de;
+    --reader-muted: #c4bdb1;
+    --reader-action: #9fc4b1;
+    --reader-control-bg: #9fc4b1;
+    --reader-control-hover: #b9d8c8;
+    --reader-control-text: #15251c;
+    --reader-border: #393630;
+    --reader-shadow: rgba(0, 0, 0, 0.24);
+}
+
+.sepia-mode {
+    --app-canvas: #f2e7d4;
+    --app-surface: #fbf2e3;
+    --app-ink: #40362b;
+    --app-muted: #746554;
+    --app-border: #dfcfb8;
+    --app-hover: #f0e3ce;
+    --app-active: #e7d7bd;
+    --app-action: #765735;
+    --app-action-hover: #5e4428;
+    --app-action-text: #ffffff;
+    --app-control: #765735;
+    --app-control-hover: #5e4428;
+    --app-control-text: #ffffff;
+    --reader-canvas: #f2e7d4;
+    --reader-page: #fbf2e3;
+    --reader-ink: #40362b;
+    --reader-muted: #746554;
+    --reader-action: #765735;
+    --reader-control-bg: #765735;
+    --reader-control-hover: #5e4428;
+    --reader-control-text: #ffffff;
+    --reader-border: #dfcfb8;
+    --reader-shadow: rgba(76, 55, 29, 0.10);
+}
+
+.forest-mode {
+    --app-canvas: #f0f5ee;
+    --app-surface: #fafcf8;
+    --app-ink: #29362d;
+    --app-muted: #5b6a60;
+    --app-border: #d4dfd2;
+    --app-hover: #e7eee5;
+    --app-active: #dae6d8;
+    --app-action: #3f684b;
+    --app-action-hover: #2e5339;
+    --app-action-text: #ffffff;
+    --app-control: #3f684b;
+    --app-control-hover: #2e5339;
+    --app-control-text: #ffffff;
+    --reader-canvas: #f0f5ee;
+    --reader-page: #fafcf8;
+    --reader-ink: #29362d;
+    --reader-muted: #5b6a60;
+    --reader-action: #3f684b;
+    --reader-control-bg: #3f684b;
+    --reader-control-hover: #2e5339;
+    --reader-control-text: #ffffff;
+    --reader-border: #d4dfd2;
+    --reader-shadow: rgba(40, 61, 48, 0.08);
+}
+
+.ocean-mode {
+    --app-canvas: #f0f5f6;
+    --app-surface: #f8fbfc;
+    --app-ink: #29343b;
+    --app-muted: #5c6a72;
+    --app-border: #d5e0e4;
+    --app-hover: #e7eff1;
+    --app-active: #d9e6e9;
+    --app-action: #35657c;
+    --app-action-hover: #274d61;
+    --app-action-text: #ffffff;
+    --app-control: #35657c;
+    --app-control-hover: #274d61;
+    --app-control-text: #ffffff;
+    --reader-canvas: #f0f5f6;
+    --reader-page: #f8fbfc;
+    --reader-ink: #29343b;
+    --reader-muted: #5c6a72;
+    --reader-action: #35657c;
+    --reader-control-bg: #35657c;
+    --reader-control-hover: #274d61;
+    --reader-control-text: #ffffff;
+    --reader-border: #d5e0e4;
+    --reader-shadow: rgba(38, 53, 61, 0.08);
+}
+
+.peach-mode {
+    --app-canvas: #fff5f5;
+    --app-surface: #fff9f8;
+    --app-ink: #352b2e;
+    --app-muted: #6f6165;
+    --app-border: #efd9dd;
+    --app-hover: #f9e9ea;
+    --app-active: #f1dddf;
+    --app-action: #9d455a;
+    --app-action-hover: #7f3247;
+    --app-action-text: #ffffff;
+    --app-control: #9d455a;
+    --app-control-hover: #7f3247;
+    --app-control-text: #ffffff;
+    --reader-canvas: #fff5f5;
+    --reader-page: #fff9f8;
+    --reader-ink: #352b2e;
+    --reader-muted: #6f6165;
+    --reader-action: #9d455a;
+    --reader-control-bg: #9d455a;
+    --reader-control-hover: #7f3247;
+    --reader-control-text: #ffffff;
+    --reader-border: #efd9dd;
+    --reader-shadow: rgba(63, 42, 48, 0.08);
+}
+
+.lavender-mode {
+    --app-canvas: #f8f2f9;
+    --app-surface: #fbf8fc;
+    --app-ink: #342a3b;
+    --app-muted: #6b5d73;
+    --app-border: #e4d8e8;
+    --app-hover: #f0e8f2;
+    --app-active: #e8ddeb;
+    --app-action: #6b3f7c;
+    --app-action-hover: #52305f;
+    --app-action-text: #ffffff;
+    --app-control: #6b3f7c;
+    --app-control-hover: #52305f;
+    --app-control-text: #ffffff;
+    --reader-canvas: #f8f2f9;
+    --reader-page: #fbf8fc;
+    --reader-ink: #342a3b;
+    --reader-muted: #6b5d73;
+    --reader-action: #6b3f7c;
+    --reader-control-bg: #6b3f7c;
+    --reader-control-hover: #52305f;
+    --reader-control-text: #ffffff;
+    --reader-border: #e4d8e8;
+    --reader-shadow: rgba(50, 35, 59, 0.08);
+}
+
+/* Shared application bindings: Library, book detail, and reader chrome. */
+:root,
+.dark-mode,
+.sepia-mode,
+.forest-mode,
+.ocean-mode,
+.peach-mode,
+.lavender-mode {
+    --primary: var(--app-action);
+    --secondary: var(--app-action);
+    --background: var(--app-canvas);
+    --card-bg: var(--app-surface);
+    --text: var(--app-ink);
+    --text-secondary: var(--app-muted);
+    --border: var(--app-border);
+    --hover: var(--app-hover);
+    --active: var(--app-active);
+    --input-bg: var(--app-surface);
+    --input-border: var(--app-border);
+    --input-focus: var(--app-action);
+    --tag-bg: var(--app-hover);
+    --tag-text: var(--app-ink);
+    --tag-hover: var(--app-active);
+    --header-bg: var(--app-surface);
+    --header-text: var(--app-ink);
+    --header-border: var(--app-border);
+    --footer-bg: var(--app-surface);
+    --footer-text: var(--app-muted);
+    --footer-border: var(--app-border);
+    --book-card-bg: var(--app-surface);
+    --book-card-hover: var(--app-hover);
+    --book-card-border: var(--app-border);
+    --book-title: var(--app-ink);
+    --book-author: var(--app-muted);
+    --book-tag: var(--app-hover);
+    --book-tag-text: var(--app-ink);
+    --book-tag-hover: var(--app-active);
+    --search-bg: var(--app-surface);
+    --search-border: var(--app-border);
+    --search-text: var(--app-ink);
+    --tag-cloud-item: var(--app-hover);
+    --tag-cloud-item-hover: var(--app-active);
+    --tag-cloud-item-active: var(--app-action);
+    --scrollbar-track: var(--app-hover);
+    --scrollbar-thumb: var(--app-border);
+    --scrollbar-thumb-hover: var(--app-muted);
+    --button-bg: var(--app-control);
+    --button-hover: var(--app-control-hover);
+    --button-text: var(--app-control-text);
+    --button-secondary-bg: var(--app-hover);
+    --button-secondary-hover: var(--app-active);
+    --button-secondary-text: var(--app-ink);
+    --modal-content: var(--app-surface);
+    --modal-border: var(--app-border);
+    --modal-header: var(--app-hover);
+    --modal-header-text: var(--app-ink);
+    --modal-footer: var(--app-hover);
+    --modal-footer-border: var(--app-border);
+    --toast-bg: var(--app-surface);
+    --toast-text: var(--app-ink);
+    --toast-border: var(--app-border);
+    --tooltip-bg: var(--app-surface);
+    --tooltip-text: var(--app-ink);
+    --tooltip-border: var(--app-border);
+    --loading-spinner: var(--app-action);
+    --skeleton-bg: var(--app-hover);
+    --skeleton-highlight: var(--app-active);
+    --breadcrumb-link: var(--app-action);
+    --breadcrumb-link-hover: var(--app-action-hover);
+    --breadcrumb-separator: var(--app-muted);
+    --pagination-bg: var(--app-surface);
+    --pagination-border: var(--app-border);
+    --pagination-hover: var(--app-hover);
+    --pagination-active: var(--app-action);
+    --pagination-disabled: var(--app-hover);
+    --pagination-disabled-text: var(--app-muted);
+    --table-header: var(--app-hover);
+    --table-header-text: var(--app-ink);
+    --table-row: var(--app-surface);
+    --table-row-hover: var(--app-hover);
+    --table-border: var(--app-border);
+    --code-bg: var(--app-hover);
+    --code-text: var(--app-ink);
+    --code-border: var(--app-border);
+    --blockquote-bg: var(--app-hover);
+    --blockquote-border: var(--app-action);
+    --blockquote-text: var(--app-ink);
+    --list-item-hover: var(--app-hover);
+    --list-item-active: var(--app-action);
+    --list-item-text: var(--app-ink);
+    --list-item-border: var(--app-border);
+    --form-label: var(--app-ink);
+    --form-input: var(--app-surface);
+    --form-input-border: var(--app-border);
+    --form-input-focus: var(--app-action);
+    --form-input-text: var(--app-ink);
+    --form-checkbox: var(--app-surface);
+    --form-checkbox-checked: var(--app-action);
+    --form-radio: var(--app-surface);
+    --form-radio-checked: var(--app-action);
+    --form-select: var(--app-surface);
+    --form-select-border: var(--app-border);
+    --form-select-focus: var(--app-action);
+    --form-select-text: var(--app-ink);
+    --form-textarea: var(--app-surface);
+    --form-textarea-border: var(--app-border);
+    --form-textarea-focus: var(--app-action);
+    --form-textarea-text: var(--app-ink);
+    --form-button: var(--app-control);
+    --form-button-hover: var(--app-control-hover);
+    --form-button-text: var(--app-control-text);
+    --form-button-secondary: var(--app-hover);
+    --form-button-secondary-hover: var(--app-active);
+    --form-button-secondary-text: var(--app-ink);
+    --nav-link: var(--app-ink);
+    --nav-link-hover: var(--app-action);
+    --nav-link-active: var(--app-action);
+    --nav-border: var(--app-border);
+    --nav-bg: var(--app-surface);
+    --sidebar-bg: var(--app-surface);
+    --sidebar-text: var(--app-ink);
+    --sidebar-border: var(--app-border);
+    --sidebar-link: var(--app-ink);
+    --sidebar-link-hover: var(--app-action);
+    --sidebar-link-active: var(--app-action);
+    --sidebar-header: var(--app-hover);
+    --sidebar-header-text: var(--app-ink);
+    --sidebar-footer: var(--app-hover);
+    --sidebar-footer-text: var(--app-muted);
+    --sidebar-footer-border: var(--app-border);
+    --card-header: var(--app-hover);
+    --card-header-text: var(--app-ink);
+    --card-body: var(--app-surface);
+    --card-body-text: var(--app-ink);
+    --card-footer: var(--app-hover);
+    --card-footer-text: var(--app-muted);
+    --card-footer-border: var(--app-border);
+    --card-border: var(--app-border);
+    --badge-bg: var(--app-hover);
+    --badge-text: var(--app-ink);
+    --badge-border: var(--app-border);
+    --dropdown-bg: var(--app-surface);
+    --dropdown-border: var(--app-border);
+    --dropdown-item: var(--app-ink);
+    --dropdown-item-hover: var(--app-hover);
+    --dropdown-item-active: var(--app-action);
+    --dropdown-item-disabled: var(--app-hover);
+    --dropdown-item-disabled-text: var(--app-muted);
+    --popover-bg: var(--app-surface);
+    --popover-border: var(--app-border);
+    --popover-text: var(--app-ink);
+    --selection-bg: var(--app-action);
+    --selection-text: var(--app-action-text);
+    --placeholder: var(--app-muted);
+    --disabled: var(--app-hover);
+    --disabled-text: var(--app-muted);
+    --divider: var(--app-border);
+    --theme-menu-bg: var(--app-surface);
+    --theme-menu-border: var(--app-border);
+    --theme-menu-item-text: var(--app-ink);
+    --theme-menu-item-hover: var(--app-hover);
+    --shadow-sm: 0 1px 4px var(--reader-shadow);
+    --shadow-md: 0 4px 14px var(--reader-shadow);
+    --shadow-lg: 0 10px 28px var(--reader-shadow);
+    --shadow-xl: 0 18px 46px var(--reader-shadow);
+}
