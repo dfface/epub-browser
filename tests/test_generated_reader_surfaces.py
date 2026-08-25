@@ -968,6 +968,24 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertTrue(server_book_public_path_allowed("resources/cover.jpe"))
         self.assertTrue(server_book_public_path_allowed("resources/cover.jfif"))
 
+    def test_epub_images_receive_intrinsic_dimensions_when_the_source_has_none(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory)
+            extracted = Path(processor.extract_dir)
+            extracted.mkdir(parents=True)
+            (extracted / 'cover.png').write_bytes(
+                b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
+                b'\x00\x00\x02\x80\x00\x00\x01\xe0\x08\x06\x00\x00\x00'
+            )
+
+            rendered, _ = processor.process_html_content(
+                '<body><img src="cover.png" alt="Cover"></body>', 'chapter.xhtml'
+            )
+
+        self.assertIn('src="resources/cover.png"', rendered)
+        self.assertIn('width="640"', rendered)
+        self.assertIn('height="480"', rendered)
+
     def test_ssg_processor_preserves_existing_epub_markup_metadata_and_resources(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor("book.epub", directory, deployment_mode="ssg")
@@ -1335,6 +1353,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             2,
         )
         self.assertIn('generate(regenerate, context, state.contextVersion, true);', canvas_script)
+
+    def test_ai_reader_requests_are_opt_in_and_chapter_indicators_are_deduplicated(self):
+        """Opening a reader must not start AI work or duplicate the same result query."""
+        canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
+        hub_script = Path('epub_browser/assets/ai-reading-hub.js').read_text(encoding='utf-8')
+
+        init = canvas_script[canvas_script.index('function init() {'):canvas_script.index('\n  root.EpubBrowserAICanvas', canvas_script.index('function init() {'))]
+        self.assertIn('if (requestedResultId()) load(state.button, initial, state.contextVersion)', init)
+        self.assertIn('chapterIndicatorRequests: {}', hub_script)
+        self.assertIn('function loadChapterIndicators(bookId)', hub_script)
+        self.assertIn('return state.chapterIndicatorRequests[bookId];', hub_script)
 
     def test_chapter_ai_surfaces_render_feynman_teach_only_for_a_chapter_explanation(self):
         """A chapter explanation is a Server-only learning surface, never empty chrome."""
@@ -2022,7 +2051,8 @@ assert.deepEqual(
         self.assertRegex(html, r'<a\b(?=[^>]*\bclass=(?:["\'])?app-nav-brand)(?=[^>]*\baria-label=(?:["\'])?EPUB Browser(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<h1\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
-        self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
+        self.assertRegex(breadcrumb, r'/assets/immutable/favicon\.[0-9a-f]{12}\.png')
+        self.assertRegex(breadcrumb, r'app-nav-brand-mark[^>]*\bwidth=(?:"|\')?32(?:"|\')?')
         self.assertIn('app-nav-brand-mark', breadcrumb)
         self.assertIn('app-nav-links', breadcrumb)
         self.assertIn('app-nav-theme', breadcrumb)
@@ -2659,6 +2689,53 @@ assert.deepEqual(
         self.assertNotIn('ai-learning-hub', book_page)
         self.assertNotIn('ai-chat.html', book_page)
         self.assertFalse(Path(processor.web_dir, 'ai-chat.html').exists())
+
+    def test_server_reader_defers_rich_renderer_assets_until_they_are_needed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory, deployment_mode='server')
+            processor.book_title = 'A Book'
+            processor.chapters = [{'title': 'One'}]
+            chapter = processor.create_chapter_template('<p>Text</p>', '', 0, 'One')
+
+        self.assertIn('window.EpubBrowserFeatureAssets=', chapter)
+        self.assertNotIn('src="/assets/vendor/katex/katex.min.js"', chapter)
+        self.assertNotIn('src="/assets/vendor/mermaid/mermaid.min.js"', chapter)
+        self.assertNotIn('href="/assets/vendor/katex/katex.min.css"', chapter)
+        self.assertNotIn('src="/assets/ai-canvas.js"', chapter)
+        self.assertNotIn('src="/assets/ai-chat.js"', chapter)
+        self.assertNotIn('src="/assets/ai-reading-hub.js"', chapter)
+        self.assertIn('"aiCanvas":', chapter)
+        self.assertIn('"aiChat":', chapter)
+        self.assertIn('"aiReadingHub":', chapter)
+        self.assertIn('/assets/immutable/ai-feature-loader.', chapter)
+        self.assertIn('function ensureRenderer(language)', Path('epub_browser/assets/ai-rich-text.js').read_text(encoding='utf-8'))
+
+    def test_chapter_optional_scripts_do_not_block_html_parsing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory)
+            processor.book_title = 'A Book'
+            processor.chapters = [{'title': 'One'}]
+            chapter = processor.create_chapter_template('<p>Text</p>', '', 0, 'One')
+
+        for asset in ('fancybox.min.js', 'web-highlighter.min.js', 'sortable.min.js', 'highlight.min.js'):
+            self.assertRegex(chapter, r'<script src="/assets/immutable/' + re.escape(asset.rsplit('.', 1)[0]) + r'\.[0-9a-f]{12}\.js" defer></script>')
+
+    def test_reader_scroll_visual_updates_are_coalesced_per_animation_frame(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn('function scheduleProgressUpdate()', script)
+        self.assertIn('function scheduleScrollToTopVisibility()', script)
+        self.assertIn('function scheduleMobileControlsVisibility()', script)
+        self.assertIn("window.addEventListener('scroll', scheduleProgressUpdate, { passive: true });", script)
+        self.assertIn("window.addEventListener('scroll', scheduleScrollToTopVisibility, { passive: true });", script)
+        self.assertIn("window.addEventListener('scroll', scheduleMobileControlsVisibility, { passive: true });", script)
+
+    def test_solid_icon_font_swaps_instead_of_blocking_reader_text(self):
+        theme = Path('epub_browser/assets/theme.css').read_text(encoding='utf-8')
+
+        self.assertIn('font-family: "EPUB Browser Icons"', theme)
+        self.assertIn('font-display: swap', theme)
+        self.assertIn('.fas, .fa-solid', theme)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         annotation_script = Path('epub_browser/assets/annotation-hub.js').read_text(encoding='utf-8')

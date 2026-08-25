@@ -1678,7 +1678,12 @@ function initScript() {
     
     var progressBar = document.getElementById('progressBar');
     
-    window.addEventListener('scroll', function() {
+    var progressScrollPending = false;
+    function scheduleProgressUpdate() {
+        if (progressScrollPending) return;
+        progressScrollPending = true;
+        window.requestAnimationFrame(function() {
+            progressScrollPending = false;
         var wh = window.innerHeight;
         var dh = document.documentElement.scrollHeight - wh;
         var st = window.pageYOffset || document.documentElement.scrollTop;
@@ -1714,7 +1719,9 @@ function initScript() {
                 loadPrevChapter();
             }
         }
-    });
+        });
+    }
+    window.addEventListener('scroll', scheduleProgressUpdate, { passive: true });
 
     window.addEventListener('pagehide', function() {
         if (readingProgressReporter) readingProgressReporter.flush(true);
@@ -1920,7 +1927,16 @@ function initScript() {
             if (mobileTopBtn) mobileTopBtn.classList.remove('is-visible');
         }
     }
-    window.addEventListener('scroll', updateScrollToTopVisibility);
+    var scrollToTopVisibilityPending = false;
+    function scheduleScrollToTopVisibility() {
+        if (scrollToTopVisibilityPending) return;
+        scrollToTopVisibilityPending = true;
+        window.requestAnimationFrame(function() {
+            scrollToTopVisibilityPending = false;
+            updateScrollToTopVisibility();
+        });
+    }
+    window.addEventListener('scroll', scheduleScrollToTopVisibility, { passive: true });
     updateScrollToTopVisibility();
     if (mobileTopBtn) {
         mobileTopBtn.addEventListener('click', function() {
@@ -1931,7 +1947,12 @@ function initScript() {
     var lastScrollTop = 0;
     var mobileControls = document.querySelector('.mobile-controls');
     if (!isKindleMode() && !document.body.classList.contains('pagination-mode')) {
-        window.addEventListener('scroll', function() {
+        var mobileControlsScrollPending = false;
+        function scheduleMobileControlsVisibility() {
+            if (mobileControlsScrollPending) return;
+            mobileControlsScrollPending = true;
+            window.requestAnimationFrame(function() {
+                mobileControlsScrollPending = false;
             var st = window.pageYOffset || document.documentElement.scrollTop;
             if (st > lastScrollTop && st - lastScrollTop > 1) {
                 mobileControls.style.transform = 'translateY(100%)';
@@ -1939,7 +1960,9 @@ function initScript() {
                 mobileControls.style.transform = 'translateY(0)';
             }
             lastScrollTop = st;
-        });
+            });
+        }
+        window.addEventListener('scroll', scheduleMobileControlsVisibility, { passive: true });
     } else {
         mobileControls.style.transform = 'translateY(0)';
     }

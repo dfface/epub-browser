@@ -1,6 +1,30 @@
 (function(root) {
   'use strict';
   var sequence = 0;
+  var assetLoads = {};
+  function featureUrl(name) { return root.EpubBrowserFeatureAssets && root.EpubBrowserFeatureAssets[name]; }
+  function loadAsset(name, tag, attribute) {
+    var url = featureUrl(name);
+    if (!url) return Promise.reject(new Error('missing_feature_asset'));
+    if (assetLoads[name]) return assetLoads[name];
+    assetLoads[name] = new Promise(function(resolve, reject) {
+      var node = root.document.createElement(tag);
+      node.setAttribute(attribute, url);
+      if (tag === 'link') node.setAttribute('rel', 'stylesheet');
+      node.setAttribute('data-epub-browser-feature', name);
+      node.addEventListener('load', function() { resolve(); });
+      node.addEventListener('error', function() { delete assetLoads[name]; reject(new Error('feature_asset_failed')); });
+      (root.document.head || root.document.documentElement).appendChild(node);
+    });
+    return assetLoads[name];
+  }
+  function loadStyle(name) { return loadAsset(name, 'link', 'href').then(function() { return undefined; }); }
+  function loadScript(name) { return loadAsset(name, 'script', 'src'); }
+  function ensureRenderer(language) {
+    if (language === 'math') return Promise.all([loadStyle('aiRichTextCss'), loadStyle('katexCss'), loadScript('katex')]);
+    if (language === 'mermaid') return Promise.all([loadStyle('aiRichTextCss'), loadScript('mermaid')]);
+    return Promise.resolve();
+  }
   function el(tag, className, text) {
     var node = root.document.createElement(tag);
     if (className) node.className = className;
@@ -43,13 +67,22 @@
   function render(parent, language, source) {
     var text = String(source || '');
     if (language === 'math') {
-      if (!root.katex || !root.katex.render) return fallback(parent, text, language);
+      if (!root.katex || !root.katex.render) {
+        fallback(parent, text, language);
+        if (!parent.dataset.aiRichLoading) { parent.dataset.aiRichLoading = 'true'; ensureRenderer(language).then(function() { delete parent.dataset.aiRichLoading; render(parent, language, text); }).catch(function() { delete parent.dataset.aiRichLoading; }); }
+        return;
+      }
       try { root.katex.render(text, parent, { displayMode: true, throwOnError: true, trust: false, strict: 'error' }); }
       catch (_) { fallback(parent, text, language); }
       return;
     }
     if (language === 'mermaid') {
-      if (!safeMermaid(text) || !root.mermaid || !root.mermaid.render) return fallback(parent, text, language);
+      if (!safeMermaid(text)) return fallback(parent, text, language);
+      if (!root.mermaid || !root.mermaid.render) {
+        fallback(parent, text, language);
+        if (!parent.dataset.aiRichLoading) { parent.dataset.aiRichLoading = 'true'; ensureRenderer(language).then(function() { delete parent.dataset.aiRichLoading; render(parent, language, text); }).catch(function() { delete parent.dataset.aiRichLoading; }); }
+        return;
+      }
       var id = 'epub-browser-mermaid-' + (++sequence);
       root.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true });
       root.mermaid.render(id, text).then(function(result) {
@@ -98,5 +131,5 @@
     });
     flushParagraph(); flushList(); flushCode();
   }
-  root.EpubBrowserAIRich = { render: render, renderMarkdown: renderMarkdown };
+  root.EpubBrowserAIRich = { render: render, renderMarkdown: renderMarkdown, loadStyle: loadStyle, ensureRenderer: ensureRenderer };
 })(window);

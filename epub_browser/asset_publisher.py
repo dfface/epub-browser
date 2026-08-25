@@ -32,6 +32,7 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
     'ai-reading.js',
     'ai-canvas.css',
     'ai-canvas.js',
+    'ai-feature-loader.js',
     'ai-chat.css',
     'ai-chat.js',
     'ai-reading-hub.css',

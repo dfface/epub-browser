@@ -29,6 +29,7 @@ from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISIO
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import CachedStaticFiles, create_app, migrate_legacy_database
 from epub_browser.state import StateStore
+from epub_browser.version import LATEST_RELEASE_API_URL, ReleaseLookup
 
 
 def _anonymous_auth_nonce(testcase, client, path="/login"):
@@ -181,7 +182,94 @@ class CachedStaticFilesTests(unittest.TestCase):
                 {"method": "GET", "headers": []},
             )
 
-        self.assertEqual(response.headers["content-type"], "image/jpeg")
+            self.assertEqual(response.headers["content-type"], "image/jpeg")
+
+
+class VersionReleaseLookupTests(unittest.TestCase):
+    def test_lookup_uses_only_the_fixed_release_url_and_strips_response_fields(self):
+        requested_urls = []
+
+        def fetcher(url):
+            requested_urls.append(url)
+            return {
+                "tag_name": "v2.4.0",
+                "html_url": "https://github.com/dfface/epub-browser/releases/tag/v2.4.0",
+                "draft": False,
+                "prerelease": False,
+                "body": "untrusted release notes",
+            }
+
+        release = ReleaseLookup(fetcher=fetcher).fetch()
+
+        self.assertEqual(requested_urls, [LATEST_RELEASE_API_URL])
+        self.assertEqual(
+            release,
+            {
+                "tag_name": "v2.4.0",
+                "html_url": "https://github.com/dfface/epub-browser/releases/tag/v2.4.0",
+                "draft": False,
+                "prerelease": False,
+            },
+        )
+
+    def test_lookup_reuses_a_successful_release_for_the_cache_window(self):
+        calls = []
+        clock = [100.0]
+
+        def fetcher(_url):
+            calls.append(True)
+            return {
+                "tag_name": "v2.4.0",
+                "html_url": "https://github.com/dfface/epub-browser/releases/tag/v2.4.0",
+            }
+
+        lookup = ReleaseLookup(fetcher=fetcher, now=lambda: clock[0])
+        first = lookup.fetch()
+        clock[0] += 60
+        second = lookup.fetch()
+
+        self.assertEqual(calls, [True])
+        self.assertEqual(first, second)
+
+
+class VersionEndpointTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.public = Path(self.directory.name) / "public"
+        (self.public / "assets").mkdir(parents=True)
+        self.store = StateStore(Path(self.directory.name) / "state.db")
+        self.store.initialize(bootstrap=BootstrapCredentials("owner", "secret"))
+        self.auth = AuthService(self.store, AuthConfig.from_values([]))
+
+    def test_version_endpoint_is_public_and_returns_safe_release_data(self):
+        lookup = ReleaseLookup(fetcher=lambda _url: {
+            "tag_name": "v2.4.0",
+            "html_url": "https://github.com/dfface/epub-browser/releases/tag/v2.4.0",
+            "draft": False,
+            "prerelease": False,
+            "body": "must not reach the browser",
+        })
+        app = create_app(
+            self.public,
+            state_store=self.store,
+            auth_service=self.auth,
+            release_lookup=lookup,
+        )
+
+        response = TestClient(app).get("/api/version")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "tag_name": "v2.4.0",
+                "html_url": "https://github.com/dfface/epub-browser/releases/tag/v2.4.0",
+                "draft": False,
+                "prerelease": False,
+            },
+        )
+        self.assertEqual(response.headers["cache-control"], "no-cache")
 
 
 class ServerSetupBoundaryTests(unittest.TestCase):
@@ -203,6 +291,18 @@ class ServerSetupBoundaryTests(unittest.TestCase):
             "generated auth asset",
             encoding="utf-8",
         )
+        for manifest in (
+            "manifest.json",
+            "manifest.en.json",
+            "manifest.zh-CN.json",
+            "manifest.zh-TW.json",
+            "manifest.ko.json",
+            "manifest.ja.json",
+        ):
+            (self.public / "assets" / manifest).write_text(
+                '{"name":"EPUB Browser"}',
+                encoding="utf-8",
+            )
         (self.public / "book" / "id").mkdir(parents=True)
         (self.public / "book" / "id" / "index.html").write_text(
             "private book",
@@ -306,6 +406,22 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 503)
                 self.assertEqual(response.json(), {"status": "setup_required"})
+
+    def test_pending_setup_exposes_only_generated_web_manifests(self):
+        for path in (
+            "/assets/manifest.json",
+            "/assets/manifest.en.json",
+            "/assets/manifest.zh-CN.json",
+            "/assets/manifest.zh-TW.json",
+            "/assets/manifest.ko.json",
+            "/assets/manifest.ja.json",
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json(), {"name": "EPUB Browser"})
+
+        self.assertEqual(self.client.get("/assets/reader.js").status_code, 503)
 
     def test_setup_supports_all_locale_aliases_and_native_language_choices(self):
         cases = (

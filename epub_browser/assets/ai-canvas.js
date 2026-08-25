@@ -446,13 +446,17 @@
     var bookId = state.button.getAttribute('data-book-id');
     var initial = chapterContext(bookId, Number(state.button.getAttribute('data-chapter-index')));
     state.contextVersion += 1;
-    load(state.button, initial, state.contextVersion).catch(function() {});
+    // Existing results are intentionally fetched only after the reader asks
+    // for this surface.  A chapter page must remain readable without making
+    // AI requests or inserting generated content above the first paragraph.
+    if (requestedResultId()) load(state.button, initial, state.contextVersion).catch(function() {});
     buttons.forEach(function(button) {
       function currentContext() { return chapterContext(bookId, Number(button.getAttribute('data-chapter-index'))); }
       updateButtonScope(button, currentContext());
       button.addEventListener('mouseenter', function() { updateButtonScope(button, currentContext()); });
       button.addEventListener('focus', function() { updateButtonScope(button, currentContext()); });
       button.addEventListener('click', function() {
+        if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiCanvasCss');
         var context = currentContext(), key = String(context.chapterIndex);
         if (document.querySelector('[data-ai-chapter-guide][data-ai-canvas-chapter="' + key + '"]')) {
           clearChapter(context.chapterIndex);

@@ -1569,3 +1569,16 @@
 .lavender-mode .theme-logo {
     filter: sepia(0.4) hue-rotate(260deg) saturate(1.8);
 }
+
+/* Keep control icons from delaying readable text while the font downloads. */
+@font-face {
+    font-family: "EPUB Browser Icons";
+    font-style: normal;
+    font-weight: 900;
+    font-display: swap;
+    src: url("./fa-solid-900.woff2") format("woff2");
+}
+
+.fas, .fa-solid {
+    font-family: "EPUB Browser Icons";
+}

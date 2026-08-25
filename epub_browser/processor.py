@@ -34,7 +34,7 @@ from .server_chrome import (
     SERVER_LOCALE_SCRIPT,
 )
 from .urls import SiteURLs, rewrite_root_urls
-from .version import render_footer
+from .version import LATEST_RELEASE_API_URL, render_footer
 
 # Server mode stores only EPUB-derived content. Reader HTML is rendered from
 # that cache for each request, so changes to UI, i18n, permissions, or hashed
@@ -42,7 +42,7 @@ from .version import render_footer
 SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 # Bump whenever the EPUB-derived server cache schema or chapter semantics change.
 # Server reader chrome and assets are deliberately outside this revision.
-SERVER_OUTPUT_REVISION = "server-content-v8"
+SERVER_OUTPUT_REVISION = "server-content-v9"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpe", "jfif", "jpeg",
@@ -683,6 +683,33 @@ class EPUBProcessor:
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
         except Exception:
             pass
+
+    def _server_ai_feature_assets(self):
+        """Expose immutable optional AI assets without putting them on the critical path."""
+        if self.deployment_mode != "server":
+            return ""
+        logical_assets = {
+            "aiCanvasCss": "ai-canvas.css",
+            "aiCanvas": "ai-canvas.js",
+            "aiReadingHubCss": "ai-reading-hub.css",
+            "aiReadingHub": "ai-reading-hub.js",
+            "aiChatCss": "ai-chat.css",
+            "aiChat": "ai-chat.js",
+            "aiRichTextCss": "ai-rich-text.css",
+            "aiRichText": "ai-rich-text.js",
+            "katexCss": "vendor/katex/katex.min.css",
+            "katex": "vendor/katex/katex.min.js",
+            "mermaid": "vendor/mermaid/mermaid.min.js",
+        }
+        urls = {
+            name: self.asset_manifest.url_for(logical_name)
+            for name, logical_name in logical_assets.items()
+        }
+        return (
+            '<script>window.EpubBrowserFeatureAssets='
+            + json.dumps(urls, separators=(",", ":"))
+            + ';</script>'
+        )
 
     def _resolve_internal_path(self, reference, base=""):
         """Resolve an EPUB URI path without allowing it outside extraction."""
@@ -1427,10 +1454,7 @@ class EPUBProcessor:
             authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
-        ai_reading_stylesheet = (
-            '<link rel="stylesheet" href="/assets/ai-reading-hub.css">'
-            if self.deployment_mode == "server" else ""
-        )
+        ai_feature_assets = self._server_ai_feature_assets()
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
@@ -1443,13 +1467,7 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         ai_reading_script = (
-            '<script src="/assets/ai-reading-hub.js" defer></script>'
-            if self.deployment_mode == "server" else ""
-        )
-        ai_book_chat_styles = (
-            '''<link rel="stylesheet" href="/assets/ai-chat.css">
-    <link rel="stylesheet" href="/assets/vendor/katex/katex.min.css">
-    <link rel="stylesheet" href="/assets/ai-rich-text.css">'''
+            '<script src="/assets/ai-feature-loader.js" defer></script>'
             if self.deployment_mode == "server" else ""
         )
         ai_book_chat_button = (
@@ -1458,13 +1476,7 @@ class EPUBProcessor:
             '<span data-i18n="ai.askBook">Ask AI</span></button>'
             if self.deployment_mode == "server" else ""
         )
-        ai_book_chat_script = (
-            '''<script src="/assets/vendor/katex/katex.min.js" defer></script>
-<script src="/assets/vendor/mermaid/mermaid.min.js" defer></script>
-<script src="/assets/ai-rich-text.js" defer></script>
-<script src="/assets/ai-chat.js" defer></script>'''
-            if self.deployment_mode == "server" else ""
-        )
+        ai_book_chat_script = ""
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -1483,6 +1495,7 @@ class EPUBProcessor:
     <title>{book_title_text}</title>
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
+    {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     <link rel="stylesheet" href="/assets/fa.all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
@@ -1496,8 +1509,6 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/bookshelf.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
     {server_account_stylesheet}
-    {ai_reading_stylesheet}
-    {ai_book_chat_styles}
 """
         index_html += """
     <script>
@@ -1577,7 +1588,7 @@ class EPUBProcessor:
         index_html += f"""
 <header class="app-header">
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
-        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/favicon.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
@@ -1745,7 +1756,7 @@ class EPUBProcessor:
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year)}"""
+{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else LATEST_RELEASE_API_URL)}"""
 
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
@@ -2185,6 +2196,50 @@ document.addEventListener('DOMContentLoaded', function() {{
         
         return content
     
+    @staticmethod
+    def _image_dimensions(path):
+        """Return intrinsic dimensions for common EPUB raster resources."""
+        try:
+            with open(path, "rb") as image:
+                header = image.read(32)
+                if header.startswith(b"\x89PNG\r\n\x1a\n") and len(header) >= 24:
+                    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+                if header[:6] in (b"GIF87a", b"GIF89a") and len(header) >= 10:
+                    return int.from_bytes(header[6:8], "little"), int.from_bytes(header[8:10], "little")
+                if header.startswith(b"\xff\xd8"):
+                    image.seek(2)
+                    while True:
+                        marker_prefix = image.read(1)
+                        while marker_prefix == b"\xff":
+                            marker_prefix = image.read(1)
+                        if not marker_prefix:
+                            return None
+                        marker = marker_prefix[0]
+                        if marker in (0xD8, 0xD9) or 0xD0 <= marker <= 0xD7:
+                            continue
+                        length = int.from_bytes(image.read(2), "big")
+                        if length < 2:
+                            return None
+                        if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                            values = image.read(5)
+                            if len(values) < 5:
+                                return None
+                            return int.from_bytes(values[3:5], "big"), int.from_bytes(values[1:3], "big")
+                        image.seek(length - 2, os.SEEK_CUR)
+                if header.startswith(b"RIFF") and header[8:12] == b"WEBP" and len(header) >= 30:
+                    kind = header[12:16]
+                    if kind == b"VP8X":
+                        return (
+                            1 + int.from_bytes(header[24:27], "little"),
+                            1 + int.from_bytes(header[27:30], "little"),
+                        )
+                    if kind == b"VP8L" and len(header) >= 25 and header[20] == 0x2F:
+                        bits = int.from_bytes(header[21:25], "little")
+                        return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+        except OSError:
+            return None
+        return None
+
     def fix_image_links(self, content, chapter_path):
         """修复图片链接"""
         # 匹配img标签的src属性
@@ -2200,7 +2255,18 @@ document.addEventListener('DOMContentLoaded', function() {{
 
             chapter_dir = posixpath.dirname(chapter_path)
             web_src = self._resource_reference(src, chapter_dir)
-            return match.group(0).replace(f'"{src}"', f'"{web_src}"')
+            tag = match.group(0).replace(f'"{src}"', f'"{web_src}"')
+            if tag.lstrip().lower().startswith("<img") and not re.search(r"\b(?:width|height)\s*=", tag, re.IGNORECASE):
+                resource_path = self._resolve_internal_path(src, chapter_dir)
+                dimensions = self._image_dimensions(os.path.join(self.extract_dir, resource_path))
+                if dimensions and all(value > 0 for value in dimensions):
+                    width, height = dimensions
+                    tag = re.sub(
+                        r"(\s*/?>)$",
+                        f' width="{width}" height="{height}"\\1',
+                        tag,
+                    )
+            return tag
 
         replaced_content = re.sub(img_pattern1, replace_img_link, content)
         replaced_content = re.sub(img_pattern2, replace_img_link, replaced_content)
@@ -2328,12 +2394,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server"
             else ""
         )
-        ai_chapter_styles = """
-    <link rel="stylesheet" href="/assets/ai-canvas.css">
-    <link rel="stylesheet" href="/assets/ai-reading-hub.css">
-    <link rel="stylesheet" href="/assets/ai-chat.css">
-    <link rel="stylesheet" href="/assets/vendor/katex/katex.min.css">
-    <link rel="stylesheet" href="/assets/ai-rich-text.css">""" if self.deployment_mode == "server" else ""
+        ai_feature_assets = self._server_ai_feature_assets()
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
@@ -2355,13 +2416,10 @@ document.addEventListener('DOMContentLoaded', function() {{
             '<span data-i18n="ai.chapterRead">AI reading</span></button>'
             if self.deployment_mode == "server" else ""
         )
-        ai_chapter_scripts = """
-    <script src="/assets/ai-reading-hub.js" defer></script>
-    <script src="/assets/vendor/katex/katex.min.js" defer></script>
-    <script src="/assets/vendor/mermaid/mermaid.min.js" defer></script>
-    <script src="/assets/ai-rich-text.js" defer></script>
-    <script src="/assets/ai-canvas.js" defer></script>
-    <script src="/assets/ai-chat.js" defer></script>""" if self.deployment_mode == "server" else ""
+        ai_chapter_scripts = (
+            '<script src="/assets/ai-feature-loader.js" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -2395,6 +2453,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <title>{chapter_title_text} - {book_title_text}</title>
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
+    {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
     <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
@@ -2409,7 +2468,6 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
     {server_account_stylesheet}
-    {ai_chapter_styles}
     <link rel="stylesheet" href="/assets/fancybox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
@@ -2534,7 +2592,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 
     <header class="chapter-top-bar app-header">
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
-            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/favicon.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
             <div class="app-nav-links">
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
@@ -2883,7 +2941,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         </div>
     </div>
     {server_account_panel}
-    {render_footer(datetime.now().year)}
+    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else LATEST_RELEASE_API_URL)}
 """
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
@@ -2917,8 +2975,8 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
-    <script src="/assets/fancybox.min.js"></script>
-    <script src="/assets/web-highlighter.min.js"></script>
+    <script src="/assets/fancybox.min.js" defer></script>
+    <script src="/assets/web-highlighter.min.js" defer></script>
     <script src="/assets/chapter-window.js" defer></script>
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
@@ -2928,8 +2986,8 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/annotation-hub.js" defer></script>
-    <script src="/assets/sortable.min.js"></script>
-    <script src="/assets/highlight.min.js"></script>
+    <script src="/assets/sortable.min.js" defer></script>
+    <script src="/assets/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
     {ai_chapter_scripts}
     <script>

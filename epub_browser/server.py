@@ -60,7 +60,7 @@ from .server_library import library_metadata
 from .server_pages import ServerPageError, ServerPageRenderer
 from .site import render_library_shell
 from .urls import SiteURLs
-from .version import render_footer
+from .version import ReleaseLookup, render_footer
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -80,6 +80,7 @@ PUBLIC_AUTH_ENDPOINTS = frozenset({
     '/login',
     '/logout',
     '/sw.js',
+    '/api/version',
 })
 PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/account.css',
@@ -88,6 +89,14 @@ PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/theme-bootstrap.js',
     '/assets/theme.css',
     '/assets/version-check.js',
+})
+PUBLIC_WEB_MANIFESTS = frozenset({
+    '/assets/manifest.json',
+    '/assets/manifest.en.json',
+    '/assets/manifest.zh-CN.json',
+    '/assets/manifest.zh-TW.json',
+    '/assets/manifest.ko.json',
+    '/assets/manifest.ja.json',
 })
 SETUP_COPY = {
     'en': {
@@ -290,7 +299,11 @@ def error_payload(code, message):
 
 
 def route_is_public_auth_endpoint(path):
-    return path in PUBLIC_AUTH_ENDPOINTS or path in PUBLIC_LOGIN_ASSETS
+    return (
+        path in PUBLIC_AUTH_ENDPOINTS
+        or path in PUBLIC_LOGIN_ASSETS
+        or path in PUBLIC_WEB_MANIFESTS
+    )
 
 
 def normalize_login_locale(value, accept_language=''):
@@ -552,6 +565,7 @@ def create_app(
     progress_broker: Optional[LibraryProgressBroker] = None,
     library_event_heartbeat_seconds: float = 15.0,
     auth_service: Optional[AuthService] = None,
+    release_lookup: Optional[ReleaseLookup] = None,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
@@ -560,6 +574,7 @@ def create_app(
     store = state_store
     runtime_status = status or _CompatibilityRuntimeStatus()
     public_files = CachedStaticFiles(directory=base_directory, html=False)
+    release_lookup = release_lookup or ReleaseLookup()
     ai_reading = AIReadingService(store, base_directory)
     store.requeue_running_ai_jobs()
     store.requeue_running_ai_followups()
@@ -947,7 +962,7 @@ def create_app(
             else ''
         )
         language_options = locale_options(locale)
-        footer_markup = render_footer(datetime.now().year)
+        footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -1121,7 +1136,7 @@ if(localeField)localeField.value=localeSelect.value;
             + '</p>'
         )
         language_options = locale_options(locale)
-        footer_markup = render_footer(datetime.now().year)
+        footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -2410,6 +2425,8 @@ window.location.assign(payload.redirect||'/');
                 media_type='text/css' if path.endswith('.css') else 'text/javascript',
                 headers={'Cache-Control': 'no-cache'},
             )
+        if '/' + path in PUBLIC_WEB_MANIFESTS:
+            return await public_files.get_response(path, request.scope)
         principal = require_principal(request)
         book_id = extract_book_id_from_public_path(path)
         book_relative_path = None
@@ -2489,6 +2506,16 @@ window.location.assign(payload.redirect||'/');
         payload = {'status': 'ok'}
         payload.update(runtime_status.snapshot())
         return JSONResponse(payload, headers={'Cache-Control': 'no-cache'})
+
+    async def version_status(request):
+        release = await asyncio.to_thread(release_lookup.fetch)
+        if release is None:
+            return response(
+                error_payload('version_unavailable', 'Version information unavailable'),
+                503,
+                cache_control='no-store',
+            )
+        return response(release, cache_control='no-cache')
 
     async def ready(request):
         payload = runtime_status.snapshot()
@@ -2877,6 +2904,7 @@ window.location.assign(payload.redirect||'/');
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
         Route('/api/health', health),
         Route('/api/ready', ready),
+        Route('/api/version', version_status),
         Route('/api/library-events', library_events),
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
@@ -2918,7 +2946,12 @@ window.location.assign(payload.redirect||'/');
     async def auth_middleware(request, call_next):
         path = request.url.path
         if not store.has_administrator():
-            if path in {'/setup', '/sw.js'} or path in PUBLIC_LOGIN_ASSETS:
+            if (
+                path in {'/setup', '/sw.js'}
+                or path in PUBLIC_LOGIN_ASSETS
+                or path in PUBLIC_WEB_MANIFESTS
+                or path == '/api/version'
+            ):
                 return await call_next(request)
             return setup_required_response(request)
         if path == '/sw.js':
