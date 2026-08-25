@@ -354,6 +354,23 @@ function initScript() {
         setTagCloudToggleLabel(toggle, expanded);
     }
 
+    function appendBookCardsInBatches(bookGrid, cards, done) {
+        var offset = 0;
+        function appendBatch() {
+            cards.slice(offset, offset + 24).forEach(function(card) {
+                bookGrid.appendChild(card);
+            });
+            offset += 24;
+            if (offset < cards.length) {
+                if (window.requestAnimationFrame) window.requestAnimationFrame(appendBatch);
+                else setTimeout(appendBatch, 0);
+                return;
+            }
+            done();
+        }
+        appendBatch();
+    }
+
     function replaceBookCards(books) {
         var bookGrid = document.querySelector('.book-grid');
         var activeTag = document.querySelector('.tag-cloud-item.active');
@@ -382,14 +399,12 @@ function initScript() {
             return;
         }
 
-        cards.forEach(function(card) {
-            bookGrid.appendChild(card);
+        appendBookCardsInBatches(bookGrid, cards, function() {
+            restoreOrder(storageKeySortableBook, 'book-grid');
+            restoreOrder(storageKeySortableTag, 'tag-cloud');
+            updateTagCloudCollapse();
+            applyLibraryFilters();
         });
-
-        restoreOrder(storageKeySortableBook, 'book-grid');
-        restoreOrder(storageKeySortableTag, 'tag-cloud');
-        updateTagCloudCollapse();
-        applyLibraryFilters();
     }
 
     // 页面加载时恢复顺序

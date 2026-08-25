@@ -174,6 +174,7 @@ function createLibraryHarness(responses, mode = 'server') {
     setItem(key, value) { storageValues[key] = String(value); },
   };
   const windowListeners = {};
+  const animationFrames = [];
   const window = {
     navigator: { userAgent: 'Kindle' },
     EpubBrowserBasePath: '/reader/',
@@ -183,6 +184,10 @@ function createLibraryHarness(responses, mode = 'server') {
     addEventListener(type, listener) {
       windowListeners[type] = windowListeners[type] || [];
       windowListeners[type].push(listener);
+    },
+    requestAnimationFrame(callback) {
+      animationFrames.push(callback);
+      return animationFrames.length;
     },
     scrollTo() {},
   };
@@ -202,6 +207,10 @@ function createLibraryHarness(responses, mode = 'server') {
     pendingResponseCount() { return pendingResponses.length; },
     tagCloudToggle,
     resize() { (windowListeners.resize || []).forEach((listener) => listener()); },
+    flushAnimationFrame() {
+      const callback = animationFrames.shift();
+      if (callback) callback();
+    },
     resolveNextResponse() {
       const pending = pendingResponses.shift();
       completeResponse(pending.xhr, pending.response);
@@ -301,6 +310,24 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.equal(tag.textContent, book.tags[0]);
   assert.equal(content.children.length, 3);
   assert.match(requestedUrl, /^\/reader\/book-metadata\.json\?/);
+});
+
+test('renders a large Library catalog in animation-frame batches', () => {
+  const books = Array.from({ length: 25 }, (_, index) => ({
+    hash: 'book-' + index,
+    title: 'Book ' + index,
+    authors: [],
+    tags: [],
+    url: '/book/' + index + '/',
+    cover: null,
+  }));
+  const harness = createLibraryHarness([books]);
+
+  harness.window.initScriptLibrary();
+
+  assert.equal(harness.cardIds().length, 24);
+  harness.flushAnimationFrame();
+  assert.equal(harness.cardIds().length, 25);
 });
 
 test('incremental metadata refresh replaces cards and preserves filters', async () => {
