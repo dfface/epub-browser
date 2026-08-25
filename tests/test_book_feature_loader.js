@@ -53,7 +53,6 @@ test('loads a Book feature once and preserves its dependency order', async () =>
   assert.deepEqual(
     harness.appended.map((node) => [node.tagName, node.attributes.href || node.attributes.src]),
     [
-      ['link', '/assets/immutable/bookshelf.css'],
       ['script', '/assets/immutable/sortable.js'],
       ['script', '/assets/immutable/bookshelf.js'],
     ],

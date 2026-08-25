@@ -2393,9 +2393,13 @@ assert.deepEqual(
                 book_html,
                 r'<script\b[^>]+/assets/immutable/(?:bookshelf|annotation|annotation-hub|sortable)\.[0-9a-f]{12}\.js[^>]*>',
             )
+            self.assertRegex(
+                book_html,
+                r'<link\b[^>]+/assets/immutable/bookshelf\.[0-9a-f]{12}\.css[^>]*>',
+            )
             self.assertNotRegex(
                 book_html,
-                r'<link\b[^>]+/assets/immutable/(?:bookshelf|annotation-hub)\.[0-9a-f]{12}\.css[^>]*>',
+                r'<link\b[^>]+/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css[^>]*>',
             )
         book_script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
         self.assertIn("deferBookFeature('bookshelfBtn', 'bookshelf'", book_script)

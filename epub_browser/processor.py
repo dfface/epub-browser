@@ -1456,7 +1456,6 @@ class EPUBProcessor:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         ai_feature_assets = self._server_ai_feature_assets()
         book_feature_assets = json.dumps({
-            "bookshelfCss": self.asset_manifest.url_for("bookshelf.css"),
             "bookshelf": self.asset_manifest.url_for("bookshelf.js"),
             "annotationHubCss": self.asset_manifest.url_for("annotation-hub.css"),
             "annotation": self.asset_manifest.url_for("annotation.js"),
@@ -1514,6 +1513,7 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="stylesheet" href="/assets/bookshelf.css">
     {server_account_stylesheet}
 """
         index_html += """

@@ -3,7 +3,7 @@
 
   var loads = {};
   var features = {
-    bookshelf: { styles: ['bookshelfCss'], scripts: ['sortable', 'bookshelf'] },
+    bookshelf: { scripts: ['sortable', 'bookshelf'] },
     annotations: { styles: ['annotationHubCss'], scripts: ['annotation', 'annotationHub'] },
     sortable: { scripts: ['sortable'] }
   };
