@@ -1455,6 +1455,14 @@ class EPUBProcessor:
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         ai_feature_assets = self._server_ai_feature_assets()
+        book_feature_assets = json.dumps({
+            "bookshelfCss": self.asset_manifest.url_for("bookshelf.css"),
+            "bookshelf": self.asset_manifest.url_for("bookshelf.js"),
+            "annotationHubCss": self.asset_manifest.url_for("annotation-hub.css"),
+            "annotation": self.asset_manifest.url_for("annotation.js"),
+            "annotationHub": self.asset_manifest.url_for("annotation-hub.js"),
+            "sortable": self.asset_manifest.url_for("sortable.min.js"),
+        }, separators=(",", ":"))
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
@@ -1506,8 +1514,6 @@ class EPUBProcessor:
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
-    <link rel="stylesheet" href="/assets/bookshelf.css">
-    <link rel="stylesheet" href="/assets/annotation-hub.css">
     {server_account_stylesheet}
 """
         index_html += """
@@ -1792,13 +1798,11 @@ if (window.EpubBrowserCacheBoundary) {
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
 <script src="/assets/reader-layout.js" defer></script>
-    <script src="/assets/book.js?v=13" defer></script>
-<script src="/assets/bookshelf.js" defer></script>
-<script src="/assets/annotation.js" defer></script>
-<script src="/assets/annotation-hub.js" defer></script>
+<script>window.EpubBrowserBookFeatureAssets={book_feature_assets};</script>
+<script src="/assets/book-feature-loader.js" defer></script>
+<script src="/assets/book.js?v=13" defer></script>
 {ai_reading_script}
 {ai_book_chat_script}
-<script src="/assets/sortable.min.js" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {{
     {startup}

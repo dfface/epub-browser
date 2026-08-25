@@ -126,6 +126,29 @@ function initScript() {
             .catch(function() {});
     }
 
+    function loadBookFeature(name) {
+        var features = window.EpubBrowserBookFeatures;
+        if (!features || typeof features.load !== 'function') {
+            return Promise.reject(new Error('book_feature_loader_unavailable'));
+        }
+        return features.load(name);
+    }
+
+    function deferBookFeature(buttonId, featureName, initialize) {
+        var button = document.getElementById(buttonId);
+        if (!button || button.dataset.bookFeatureLoader) return;
+        button.dataset.bookFeatureLoader = 'true';
+        button.addEventListener('click', function(event) {
+            if (button.dataset.bookFeatureReady) return;
+            event.preventDefault();
+            loadBookFeature(featureName).then(function() {
+                if (initialize) initialize();
+                button.dataset.bookFeatureReady = 'true';
+                button.click();
+            }).catch(function() {});
+        });
+    }
+
     function loadReadingProgress() {
         if (isKindleMode() || !window.EpubReadingProgress || !window.EpubReadingProgress.isServerMode()) return;
         var version = ++readingProgressLoadVersion;
@@ -236,21 +259,12 @@ function initScript() {
         restoreOrder(storageKeySortableContainer, 'container');
     }
 
-    function bookshelfSupport() {
-        if (window.initBookshelf) {
-            window.initBookshelf();
-        } else {
-            setTimeout(bookshelfSupport, 100);
-        }
-    }
-
-    if (!isKindleMode()) {
-        bookshelfSupport();
-    }
-
-    var el = document.querySelector('.container');
-    if (!isKindleMode()) {
-        var sortable = Sortable.create(el, {
+    function initBookSortable() {
+        if (window.__epubBrowserBookSortable || !window.Sortable) return;
+        var el = document.querySelector('.container');
+        if (!el) return;
+        window.__epubBrowserBookSortable = true;
+        Sortable.create(el, {
             delay: 300,
             delayOnTouchOnly: true,
             filter: '.toc-container',
@@ -265,6 +279,23 @@ function initScript() {
                 localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
             }
         });
+    }
+
+    function enableBookSortableOnInteraction() {
+        var container = document.querySelector('.container');
+        if (!container || container.dataset.bookSortableLoader) return;
+        container.dataset.bookSortableLoader = 'true';
+        container.addEventListener('pointerdown', function() {
+            loadBookFeature('sortable').then(initBookSortable).catch(function() {});
+        });
+    }
+
+    if (!isKindleMode()) {
+        deferBookFeature('bookshelfBtn', 'bookshelf', function() {
+            if (window.initBookShelf) window.initBookShelf();
+        });
+        deferBookFeature('bookAnnotationsBtn', 'annotations');
+        enableBookSortableOnInteraction();
     }
 
     var currentChapter = "";

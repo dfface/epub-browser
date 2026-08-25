@@ -2017,6 +2017,14 @@ assert.deepEqual(
             processor.create_index_page()
             return Path(processor.web_dir, "index.html").read_text(encoding="utf-8")
 
+    def _server_book_html(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory, deployment_mode="server")
+            processor.book_title = "A Book"
+            Path(processor.web_dir).mkdir(parents=True)
+            processor.create_index_page()
+            return Path(processor.web_dir, "index.html").read_text(encoding="utf-8")
+
     @staticmethod
     def _write_minimal_epub(path, chapter_body="<h1>One</h1><p>Text</p>"):
         container = """<?xml version="1.0"?>
@@ -2362,7 +2370,7 @@ assert.deepEqual(
         self.assertRegex(book_html, r'\bid=(?:["\'])?bookAnnotationsBtn')
         self.assertRegex(book_html, r'\bdata-book-hash=')
         self.assertIn('aria-haspopup=dialog', book_html)
-        self.assertRegex(book_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
+        self.assertRegex(book_html, r'annotation-hub\.[0-9a-f]{12}\.css')
         self.assertRegex(chapter_html, r'\bid=(?:["\'])?chapterAnnotationsBtn')
         self.assertRegex(chapter_html, r'\bdata-book-hash=')
         self.assertRegex(chapter_html, r'/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css')
@@ -2373,6 +2381,35 @@ assert.deepEqual(
         self.assertRegex(server_html, r'\bdata-ai-reading-hub')
         self.assertRegex(server_html, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.css')
         self.assertRegex(server_html, r'/assets/immutable/ai-reading-hub\.[0-9a-f]{12}\.js')
+
+    def test_book_optional_interactions_are_deferred(self):
+        for book_html in (self._book_html(), self._server_book_html()):
+            self.assertIn('window.EpubBrowserBookFeatureAssets=', book_html)
+            self.assertRegex(
+                book_html,
+                r'<script\b[^>]+/assets/immutable/book-feature-loader\.[0-9a-f]{12}\.js[^>]*>',
+            )
+            self.assertNotRegex(
+                book_html,
+                r'<script\b[^>]+/assets/immutable/(?:bookshelf|annotation|annotation-hub|sortable)\.[0-9a-f]{12}\.js[^>]*>',
+            )
+            self.assertNotRegex(
+                book_html,
+                r'<link\b[^>]+/assets/immutable/(?:bookshelf|annotation-hub)\.[0-9a-f]{12}\.css[^>]*>',
+            )
+        book_script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
+        self.assertIn("deferBookFeature('bookshelfBtn', 'bookshelf'", book_script)
+        self.assertIn("deferBookFeature('bookAnnotationsBtn', 'annotations')", book_script)
+        self.assertIn("loadBookFeature('sortable')", book_script)
+
+    def test_server_book_ai_assets_stay_off_critical_path(self):
+        book_html = self._server_book_html()
+
+        self.assertIn('window.EpubBrowserFeatureAssets=', book_html)
+        self.assertIn('"katex":', book_html)
+        self.assertIn('"mermaid":', book_html)
+        self.assertNotRegex(book_html, r'<script\b[^>]+vendor/(?:katex|mermaid)/')
+        self.assertNotRegex(book_html, r'<link\b[^>]+vendor/katex/')
 
     def test_annotation_modal_assets_are_immutable_and_not_a_separate_page(self):
         with tempfile.TemporaryDirectory() as directory:
