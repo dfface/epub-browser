@@ -294,6 +294,8 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.equal(link.attributes.id, book.hash);
   assert.equal(link.attributes.href, book.url);
   assert.equal(cover.attributes.src, book.cover);
+  assert.equal(cover.attributes.loading, 'lazy');
+  assert.equal(cover.attributes.decoding, 'async');
   assert.equal(title.textContent, book.title);
   assert.equal(author.textContent, book.authors.join(' & '));
   assert.equal(tag.textContent, book.tags[0]);

@@ -213,6 +213,8 @@ function initScript() {
         cover.className = 'book-cover';
         cover.setAttribute('src', book.cover);
         cover.setAttribute('alt', t('library.cover'));
+        cover.setAttribute('loading', 'lazy');
+        cover.setAttribute('decoding', 'async');
 
         content.className = 'book-card-content';
         title.className = 'book-title';
