@@ -1272,11 +1272,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("i18n.t('reader.chapterNumber'", script)
         self.assertIn("i18n.t('settings.continuousScrollTip'", script)
 
-    def test_normal_scroll_chapter_navigation_swaps_only_the_reading_body(self):
+    def test_reader_chapter_navigation_swaps_only_the_reading_body(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
 
-        self.assertIn('function navigateScrollingChapter(', script)
-        start = script.index('function navigateScrollingChapter(')
+        self.assertIn('function navigateReaderChapter(', script)
+        start = script.index('function navigateReaderChapter(')
         end = script.index('\n    function handleKeyDown(', start)
         navigation = script[start:end]
 
@@ -1285,26 +1285,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("tempDiv.querySelector('#eb-content')", navigation)
         self.assertIn("chapterContent.getAttribute('data-chapter-index')", navigation)
         self.assertIn("chapterContent.getAttribute('data-book-hash')", navigation)
-        self.assertIn('while (content.firstChild) content.removeChild(content.firstChild);', navigation)
-        self.assertIn('content.appendChild(childNodes[i].cloneNode(true));', navigation)
-        cleanup = navigation.index('window.AnnotationModule.closeTransient();')
-        replacement = navigation.index(
-            'while (content.firstChild) content.removeChild(content.firstChild);'
-        )
-        self.assertLess(cleanup, replacement)
-        self.assertNotIn('content.innerHTML', navigation)
-        self.assertIn("window.history.pushState({chapterIndex: target.index}, '', target.url);", navigation)
-        self.assertIn("window.history.replaceState({chapterIndex: target.index}, '', target.url);", navigation)
-        history_update = navigation.index("window.history.pushState({chapterIndex: target.index}, '', target.url);")
-        canvas_refresh = navigation.index('refreshPartialChapterCanvas(target.index);')
-        self.assertLess(history_update, canvas_refresh)
+        self.assertIn('replaceReaderChapterContent(chapterContent, tempDiv, target);', navigation)
+        self.assertIn('replaceContinuousChapterWindow(target, chapterContent, tempDiv);', navigation)
+        self.assertIn('scrollToContinuousChapterTarget(target, loadedChapter);', navigation)
+        self.assertIn('refreshPaginationChapter(target);', navigation)
+        self.assertIn('updateReaderChapterHistory(target, options);', navigation)
         self.assertIn("window.addEventListener('popstate'", navigation)
-        self.assertIn("navigateScrollingChapter(window.location.href, { history: false });", navigation)
-        self.assertIn('if (isPaginationMode || isContinuousScroll) return false;', navigation)
+        self.assertIn("navigateReaderChapter(window.location.href, { history: false });", navigation)
         self.assertIn('target.index === parseInt(chapter_index, 10)', navigation)
-        self.assertNotIn('target.path === window.location.pathname', navigation)
-        self.assertIn('syncChapterScopedControls(target.index);', navigation)
-        self.assertIn('wireNormalScrollChapterNavigation();', script)
+        self.assertIn('function replaceReaderChapterContent(chapterContent, source, target) {', script)
+        self.assertIn('syncChapterScopedControls(target.index);', script)
+        self.assertIn('wireReaderChapterNavigation();', script)
         self.assertIn('function syncChapterScopedControls(chapterIndex) {', script)
         self.assertRegex(
             script,
@@ -1314,14 +1305,36 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("setAttribute('data-chapter-index', chapterIndex);", script)
 
         keyboard = script[script.index('function handleKeyDown('):script.index('\n    prevPageBtn.addEventListener', script.index('function handleKeyDown('))]
-        self.assertIn('navigateScrollingChapter(prev, { history: true });', keyboard)
-        self.assertIn('navigateScrollingChapter(next, { history: true });', keyboard)
+        self.assertIn('navigateReaderChapter(prev, { history: true });', keyboard)
+        self.assertIn('navigateReaderChapter(next, { history: true });', keyboard)
 
         toc_start = script.index("a.addEventListener('click', function(e) {")
         toc_end = script.index('\n                    });', toc_start)
         book_toc = script[toc_start:toc_end]
-        self.assertIn('navigateScrollingChapter(this.href, { history: true });', book_toc)
-        self.assertIn('!isPaginationMode && !isContinuousScroll', book_toc)
+        self.assertIn('navigateReaderChapter(this.href, { history: true });', book_toc)
+        self.assertIn('!isContinuousScroll', book_toc)
+
+    def test_ajax_reader_navigation_handles_continuous_and_pagination_modes(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn('function navigateReaderChapter(', script)
+        self.assertIn('function replaceContinuousChapterWindow(', script)
+        self.assertIn('function refreshPaginationChapter(', script)
+        self.assertIn('abortContinuousChapterLoad();', script)
+        self.assertIn('continuousChapterWindow = new EpubChapterWindow(target.index, 5);', script)
+        self.assertIn('loadNextChapter();', script)
+        self.assertIn('createPages(target);', script)
+        self.assertIn('scrollToPaginationTarget(target);', script)
+
+        toc_start = script.index("a.addEventListener('click', function(e) {")
+        toc_end = script.index('\n                    });', toc_start)
+        book_toc = script[toc_start:toc_end]
+        self.assertIn('navigateReaderChapter(this.href, { history: true });', book_toc)
+        self.assertIn('if (isContinuousScroll) {', book_toc)
+        continuous_start = book_toc.index('if (isContinuousScroll) {')
+        continuous_end = book_toc.index('if (!isDifferentScrollingChapter(this.href)) return;', continuous_start)
+        self.assertIn('e.preventDefault();', book_toc[continuous_start:continuous_end])
+        self.assertNotIn('window.scrollTo({top: targetTop, behavior:', book_toc)
 
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
