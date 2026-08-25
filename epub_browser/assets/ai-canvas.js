@@ -26,6 +26,10 @@
     if (transient && text) state.statusTimer = root.setTimeout(function() { status.textContent = ''; status.classList.remove('ai-canvas-status-visible'); }, error ? 7000 : 4200);
   }
   function renderMarkdown(parent, source) {
+    if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.renderMarkdown) {
+      root.EpubBrowserAIRich.renderMarkdown(parent, source, 'ai-canvas-rich-block');
+      return;
+    }
     parent.textContent = '';
     var code = null, language = '';
     function flushCode() { if (!code) return; var raw = code.join('\n'); if ((language === 'mermaid' || language === 'math') && root.EpubBrowserAIRich) { var rich = el('div', 'ai-canvas-rich-block'); parent.appendChild(rich); root.EpubBrowserAIRich.render(rich, language, raw); } else { var pre = el('pre'); pre.appendChild(el('code', '', raw)); parent.appendChild(pre); } code = null; language = ''; }

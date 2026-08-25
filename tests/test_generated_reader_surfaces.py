@@ -1375,6 +1375,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertLess(apply_renderer.index('paragraphNotes.forEach'), apply_renderer.index('appendTeach(article, result, chapterIndex);'))
         self.assertLess(apply_renderer.index('appendTeach(article, result, chapterIndex);'), apply_renderer.index('appendReflection(article, result, chapterIndex);'))
 
+    def test_canvas_notes_delegate_markdown_to_the_safe_rich_text_renderer(self):
+        canvas = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
+        rich_text = Path('epub_browser/assets/ai-rich-text.js').read_text(encoding='utf-8')
+
+        self.assertIn(
+            "root.EpubBrowserAIRich.renderMarkdown(parent, source, 'ai-canvas-rich-block')",
+            canvas,
+        )
+        self.assertIn('function renderMarkdown(parent, source, className)', rich_text)
+        self.assertIn('appendInlineMarkdown', rich_text)
+
     def test_feynman_renderers_preserve_empty_and_populated_paragraph_semantics(self):
         fixture = r'''
 const assert = require('node:assert/strict');

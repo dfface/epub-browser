@@ -548,6 +548,35 @@ def _normalize_core_result(raw: str) -> dict:
     }
 
 
+def _has_chapter_learning_core(content: dict) -> bool:
+    """Reject a provider reply that contains grounding but no learning core."""
+    quick = content.get("quick") if isinstance(content.get("quick"), dict) else {}
+    teach = content.get("teach") if isinstance(content.get("teach"), dict) else {}
+    chapter_summary = (
+        content.get("chapter_summary")
+        if isinstance(content.get("chapter_summary"), dict)
+        else {}
+    )
+    deep = content.get("deep") if isinstance(content.get("deep"), dict) else {}
+    return bool(
+        quick.get("title")
+        or quick.get("summary")
+        or quick.get("key_points")
+        or teach.get("explanation")
+        or teach.get("analogy")
+        or teach.get("check_question")
+        or (
+            chapter_summary.get("overview")
+            or chapter_summary.get("beats")
+            or chapter_summary.get("key_elements")
+            or chapter_summary.get("closing")
+        )
+        or deep.get("themes")
+        or deep.get("questions")
+        or deep.get("applications")
+    )
+
+
 def _normalize_grounding_result(raw: str) -> dict:
     """Normalize only source-grounded fields from the second-stage response."""
     value = _result_object(raw)
@@ -2089,6 +2118,35 @@ class AIReadingService:
                     task_scoped=True,
                 )
                 core = _normalize_core_result(core_raw)
+                if not _has_chapter_learning_core(core):
+                    progress_total += 1
+                    self.store.update_ai_job_progress(
+                        job_id, progress_current, progress_total, "generating_core"
+                    )
+                    repair_messages = core_call_messages + [{
+                        "role": "user",
+                        "content": (
+                            "Your previous response omitted required learning-core sections. "
+                            "Return the complete JSON schema now: quick with title and summary; "
+                            "teach with explanation; chapter_summary with content; and deep with "
+                            "at least one question. Do not return annotations or source anchors."
+                        ),
+                    }]
+                    if not self._request_fits_budget(
+                        repair_messages, budget, config.model, budget.output_tokens
+                    ):
+                        raise AIReadingError("ai_generation_failed")
+                    core_raw = await self._provider_call(
+                        principal,
+                        config,
+                        repair_messages,
+                        book_id=request.book_id,
+                        max_tokens=budget.output_tokens,
+                        task_scoped=True,
+                    )
+                    core = _normalize_core_result(core_raw)
+                    if not _has_chapter_learning_core(core):
+                        raise AIReadingError("ai_generation_failed")
                 progress_current += 1
                 self.store.update_ai_job_progress(
                     job_id, progress_current, progress_total, "grounding_source"

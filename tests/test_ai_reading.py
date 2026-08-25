@@ -143,6 +143,12 @@ class _LearningLayerEnvelopeClient:
                     "analogy": "A familiar analogy.",
                     "check_question": "Can you explain it back?",
                 },
+                "chapter_summary": {
+                    "overview": "A tiny chapter summary.",
+                    "beats": [],
+                    "key_elements": [],
+                    "closing": "",
+                },
                 "structure": {
                     "overview": "A tiny structure.",
                     "diagram_mermaid": "",
@@ -186,6 +192,67 @@ class _FailingGroundingClient:
         raise AIProviderError("provider_request_rejected")
 
 
+class _IncompleteThenCompleteChapterCoreClient:
+    calls = []
+
+    def __init__(self, config: ProviderConfig):
+        self.config = config
+
+    def complete(self, messages, *, max_tokens=None):
+        type(self).calls.append({"messages": messages, "max_tokens": max_tokens})
+        if len(type(self).calls) == 1:
+            return json.dumps({
+                "annotations": [{
+                    "chapter_index": 0,
+                    "kind": "claim",
+                    "quote": "Source sentence.",
+                    "title": "Only grounding data",
+                    "body_markdown": "This is not a chapter core.",
+                }],
+            })
+        if len(type(self).calls) == 2:
+            return json.dumps({
+                "quick": {
+                    "title": "Guide",
+                    "summary": "A complete introduction.",
+                    "key_points": ["Watch the evidence."],
+                },
+                "teach": {
+                    "explanation": "Explain the central claim back.",
+                    "analogy": "Like checking a map before travelling.",
+                    "check_question": "What evidence changes the conclusion?",
+                },
+                "chapter_summary": {
+                    "overview": "The chapter weighs a claim.",
+                    "beats": [{
+                        "label": "Claim",
+                        "title": "The opening position",
+                        "summary": "It frames the decision.",
+                    }],
+                    "key_elements": [{"name": "Evidence", "note": "Sets the limit."}],
+                    "closing": "The chapter calls for restraint.",
+                },
+                "structure": {"overview": "Claim and evidence", "nodes": [], "links": []},
+                "deep": {
+                    "themes": [{"title": "Limits", "analysis": "Evidence constrains action."}],
+                    "questions": [{"question": "What is enough?", "why": "It tests the threshold."}],
+                    "applications": [{"context": "Policy", "advice": "Match action to evidence."}],
+                },
+            })
+        return json.dumps({
+            "beat_anchors": [{"beat_index": 0, "anchor_quote": "Source sentence."}],
+            "annotations": [{
+                "chapter_index": 0,
+                "kind": "claim",
+                "quote": "Source sentence.",
+                "title": "Grounded claim",
+                "body_markdown": "**Why it matters**\n\nIt limits the conclusion.",
+            }],
+            "paragraph_notes": [],
+            "evidence": [],
+        })
+
+
 class _BlockingClient:
     calls = []
     started = threading.Event()
@@ -199,7 +266,18 @@ class _BlockingClient:
         if len(type(self).calls) == 1:
             type(self).started.set()
             type(self).release.wait(timeout=5)
-        return "Provider answer"
+        system = messages[0]["content"]
+        if "source-grounding stage" in system or system.startswith("JSON only: beat_anchors"):
+            return json.dumps({
+                "beat_anchors": [], "evidence": [], "annotations": [], "paragraph_notes": [],
+            })
+        return json.dumps({
+            "quick": {"title": "Guide", "summary": "Provider answer", "key_points": []},
+            "teach": {"explanation": "", "analogy": "", "check_question": ""},
+            "chapter_summary": {"overview": "", "beats": [], "key_elements": [], "closing": ""},
+            "structure": {"overview": "", "diagram_mermaid": "", "nodes": [], "links": []},
+            "deep": {"themes": [], "questions": [], "applications": []},
+        })
 
 
 class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -1042,6 +1120,36 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             set(content["deep"]["applications"][0]), {"context", "advice"}
+        )
+
+    async def test_chapter_generation_retries_an_incomplete_core_before_publishing(self):
+        _IncompleteThenCompleteChapterCoreClient.calls = []
+        service = AIReadingService(
+            self.store, self.root / "public", _IncompleteThenCompleteChapterCoreClient
+        )
+
+        try:
+            started = await service.submit(
+                self.member,
+                ReadingRequest(
+                    scope="chapter", book_id=self.book.book_id, chapter_index=0,
+                    language="en",
+                ),
+            )
+            completed = await self._wait_for_job(started["job"]["id"])
+        finally:
+            await service.stop_worker()
+
+        self.assertEqual(completed["status"], "complete")
+        self.assertEqual(len(_IncompleteThenCompleteChapterCoreClient.calls), 3)
+        content = self.store.get_ai_reading_result(completed["result_id"])["content"]
+        self.assertEqual(content["quick"]["title"], "Guide")
+        self.assertEqual(content["teach"]["explanation"], "Explain the central claim back.")
+        self.assertEqual(content["chapter_summary"]["overview"], "The chapter weighs a claim.")
+        self.assertEqual(content["deep"]["themes"][0]["title"], "Limits")
+        self.assertEqual(
+            content["annotations"][0]["body_markdown"],
+            "**Why it matters**\n\nIt limits the conclusion.",
         )
 
     async def test_server_content_cache_is_used_without_generated_reader_html(self):

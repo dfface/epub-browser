@@ -1,4 +1,4 @@
-VERSION = "2.3.9"
+VERSION = "2.3.10"
 
 REPOSITORY_URL = "https://github.com/dfface/epub-browser"
 LATEST_RELEASE_API_URL = "https://api.github.com/repos/dfface/epub-browser/releases/latest"
