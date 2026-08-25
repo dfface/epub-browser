@@ -4470,6 +4470,8 @@
   });
   var localeAdditions = {
     en: {
+      'account.loading': 'Loading account settings…',
+      'admin.loading': 'Loading administration…',
       'annotations.shareActions': 'Share annotations',
       'annotations.copyShare': 'Copy to clipboard',
       'annotations.exportShare': 'Export text',
@@ -4502,6 +4504,8 @@
       'ai.teachTitle': 'Teach it back in your own words'
     },
     'zh-CN': {
+      'account.loading': '正在加载账户设置…',
+      'admin.loading': '正在加载管理后台…',
       'annotations.shareActions': '分享标注',
       'annotations.copyShare': '复制到剪贴板',
       'annotations.exportShare': '导出文本',
@@ -4534,6 +4538,8 @@
       'ai.teachTitle': '用自己的话讲明白'
     },
     'zh-TW': {
+      'account.loading': '正在載入帳戶設定…',
+      'admin.loading': '正在載入管理後台…',
       'annotations.shareActions': '分享註釋',
       'annotations.copyShare': '複製到剪貼簿',
       'annotations.exportShare': '匯出文字',
@@ -4566,6 +4572,8 @@
       'ai.teachTitle': '用自己的話講明白'
     },
     ko: {
+      'account.loading': '계정 설정을 불러오는 중…',
+      'admin.loading': '관리 화면을 불러오는 중…',
       'annotations.shareActions': '주석 공유',
       'annotations.copyShare': '클립보드에 복사',
       'annotations.exportShare': '텍스트 내보내기',
@@ -4598,6 +4606,8 @@
       'ai.teachTitle': '내 말로 다시 설명하기'
     },
     ja: {
+      'account.loading': 'アカウント設定を読み込み中…',
+      'admin.loading': '管理画面を読み込み中…',
       'annotations.shareActions': '注釈を共有',
       'annotations.copyShare': 'クリップボードにコピー',
       'annotations.exportShare': 'テキストをエクスポート',

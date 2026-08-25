@@ -27,6 +27,10 @@ SERVER_ACCOUNT_PANEL = '''
         <button type="button" class="bookshelf-close-btn" id="accountClose" aria-label="Close account settings" data-i18n-aria-label="account.close"><i class="fas fa-times" aria-hidden="true"></i></button>
     </div>
 </div>
+<div class="account-panel-loading" id="accountPanelLoading" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <span class="account-panel-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="account.loading">Loading account settings…</span>
+</div>
 <div class="account-modal-body"><div class="account-layout">
 <section class="account-card account-profile-card" aria-labelledby="accountProfileTitle">
     <h3 id="accountProfileTitle" data-i18n="account.profile">Profile</h3>
@@ -57,6 +61,10 @@ SERVER_ACCOUNT_PANEL = '''
     <div class="bookshelf-header-right">
         <button type="button" class="bookshelf-close-btn" id="adminClose" aria-label="Close administration" data-i18n-aria-label="admin.close"><i class="fas fa-times" aria-hidden="true"></i></button>
     </div>
+</div>
+<div class="account-panel-loading" id="adminPanelLoading" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <span class="account-panel-loading-spinner" aria-hidden="true"></span>
+    <span data-i18n="admin.loading">Loading administration…</span>
 </div>
 <div class="account-modal-body"><div class="account-layout">
 <section class="account-admin account-admin-console" aria-labelledby="adminTitle">

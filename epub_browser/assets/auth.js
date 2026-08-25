@@ -1157,23 +1157,33 @@
         var controls = root.document.createElement('div');
         var enabled = root.document.createElement('input');
         var enabledLabel = root.document.createElement('label');
+        var enabledTrack = root.document.createElement('span');
+        var enabledText = root.document.createElement('span');
         var limit = root.document.createElement('input');
         var limitLabel = root.document.createElement('label');
+        var limitText = root.document.createElement('span');
         var access = user.ai_access || {};
         item.className = 'account-list-item admin-ai-access-item';
         name.textContent = user.username;
         controls.className = 'admin-ai-access-controls';
         enabled.type = 'checkbox';
         enabled.checked = Boolean(access.enabled);
-        enabledLabel.className = 'admin-ai-inline-label';
+        enabledLabel.className = 'admin-ai-access-toggle';
+        enabledTrack.className = 'admin-ai-access-toggle-track';
+        enabledTrack.setAttribute('aria-hidden', 'true');
+        enabledText.className = 'admin-ai-access-toggle-text';
+        enabledText.textContent = t('admin.ai.allowed');
         enabledLabel.appendChild(enabled);
-        enabledLabel.appendChild(root.document.createTextNode(t('admin.ai.allowed')));
+        enabledLabel.appendChild(enabledTrack);
+        enabledLabel.appendChild(enabledText);
         limit.type = 'number';
         limit.min = '0';
         limit.value = access.daily_limit === null || access.daily_limit === undefined ? '' : String(access.daily_limit);
         limit.placeholder = t('admin.ai.defaultLimit');
-        limitLabel.className = 'admin-ai-inline-label';
-        limitLabel.appendChild(root.document.createTextNode(t('admin.ai.dailyOverride')));
+        limitLabel.className = 'admin-ai-access-quota';
+        limitText.className = 'admin-ai-access-quota-label';
+        limitText.textContent = t('admin.ai.dailyOverride');
+        limitLabel.appendChild(limitText);
         limitLabel.appendChild(limit);
         controls.appendChild(enabledLabel);
         controls.appendChild(limitLabel);
@@ -2224,12 +2234,24 @@
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
+    function setSurfaceLoading(panelId, loadingId, loading) {
+      var panel = element(panelId);
+      var indicator = element(loadingId);
+      if (panel) panel.setAttribute('aria-busy', loading ? 'true' : 'false');
+      if (indicator) indicator.hidden = !loading;
+    }
+
     function openPanel() {
       var panel = element('accountPanel');
       if (!panel) return;
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
-      loadSessions();
+      setSurfaceLoading('accountPanel', 'accountPanelLoading', true);
+      loadSessions().then(function() {
+        setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
+      }, function() {
+        setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
+      });
     }
 
     function closePanel() {
@@ -2237,6 +2259,7 @@
       if (!panel) return;
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');
+      setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
     }
 
     function openAdminPanel() {
@@ -2247,7 +2270,12 @@
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
       setActiveAdminSection(activeAdminSection);
-      loadAdminData();
+      setSurfaceLoading('adminPanel', 'adminPanelLoading', true);
+      loadAdminData().then(function() {
+        setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
+      }, function() {
+        setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
+      });
       loadAdminAiJobs();
       startAdminAiJobPolling();
     }
@@ -2259,6 +2287,7 @@
       clearAdminDirty();
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');
+      setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
       stopAdminAiJobPolling();
     }
 

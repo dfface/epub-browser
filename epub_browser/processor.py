@@ -1594,7 +1594,7 @@ class EPUBProcessor:
         index_html += f"""
 <header class="app-header">
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
-        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/favicon.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
@@ -2596,7 +2596,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 
     <header class="chapter-top-bar app-header">
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
-            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/favicon.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
             <div class="app-nav-links">
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>

@@ -675,14 +675,18 @@ body {
 }
 
 @media (max-width: 768px) {
-    body, .container {
+    body {
         padding: 0;
+    }
+
+    .container {
+        padding: 0 15px;
     }
     
     .book-grid {
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
         gap: 15px;
-        padding: 0 15px;
+        padding: 0;
     }
     
     .book-cover {
@@ -742,7 +746,7 @@ body {
     .book-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         gap: 12px;
-        padding: 0 12px;
+        padding: 0;
     }
     
     .book-cover {

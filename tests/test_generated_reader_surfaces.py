@@ -272,6 +272,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('flex-direction: column;', body_rule)
         self.assertIn('min-height: 0;', body_rule)
         self.assertIn('overflow-y: auto;', body_rule)
+        self.assertRegex(html, r'id=(?:["\'])?accountPanelLoading(?:["\' >])')
+        self.assertRegex(html, r'id=(?:["\'])?adminPanelLoading(?:["\' >])')
 
     def test_processor_convert_preserves_caller_supplied_identity(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -2086,7 +2088,7 @@ assert.deepEqual(
         self.assertRegex(html, r'<a\b(?=[^>]*\bclass=(?:["\'])?app-nav-brand)(?=[^>]*\baria-label=(?:["\'])?EPUB Browser(?:["\'])?)[^>]*>')
         self.assertRegex(html, r'<h1\b[^>]*\bdata-i18n=(?:["\'])?library\.title(?:["\'])?[^>]*>')
         breadcrumb = html[html.index('<nav'):html.index('</nav>')]
-        self.assertRegex(breadcrumb, r'/assets/immutable/favicon\.[0-9a-f]{12}\.png')
+        self.assertRegex(breadcrumb, r'/assets/immutable/logo-mark-color\.[0-9a-f]{12}\.png')
         self.assertRegex(breadcrumb, r'app-nav-brand-mark[^>]*\bwidth=(?:"|\')?32(?:"|\')?')
         self.assertIn('app-nav-brand-mark', breadcrumb)
         self.assertIn('app-nav-links', breadcrumb)

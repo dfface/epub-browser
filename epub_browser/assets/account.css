@@ -326,6 +326,36 @@ body.auth-page {
     padding: clamp(22px, 4vw, 46px) 20px 64px;
 }
 
+.account-panel-loading {
+    position: absolute;
+    z-index: 4;
+    inset: 60px 0 0;
+    display: grid;
+    place-content: center;
+    gap: 12px;
+    padding: 24px;
+    background: color-mix(in srgb, var(--account-bg) 88%, transparent);
+    color: var(--account-muted);
+    font-size: .9rem;
+    font-weight: 650;
+    text-align: center;
+    backdrop-filter: blur(2px);
+}
+
+.account-panel-loading-spinner {
+    width: 30px;
+    height: 30px;
+    margin: 0 auto;
+    border: 3px solid color-mix(in srgb, var(--account-primary) 22%, var(--account-card));
+    border-top-color: var(--account-primary);
+    border-radius: 50%;
+    animation: account-panel-spin .72s linear infinite;
+}
+
+@keyframes account-panel-spin {
+    to { transform: rotate(360deg); }
+}
+
 .account-modal[hidden],
 .account-modal [hidden] {
     display: none !important;
@@ -1324,16 +1354,80 @@ body.auth-page {
     white-space: nowrap;
 }
 
-.admin-ai-inline-label {
+.admin-ai-access-toggle {
+    position: relative;
     display: inline-flex;
     align-items: center;
+    min-height: 36px;
+    gap: 8px;
+    color: var(--account-muted);
+    font-size: .78rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.admin-ai-access-toggle input[type="checkbox"] {
+    position: absolute;
+    width: 1px;
+    min-width: 1px;
+    min-height: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.admin-ai-access-toggle-track {
+    position: relative;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 22px;
+    border: 1px solid color-mix(in srgb, var(--account-muted) 42%, var(--account-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-muted) 14%, var(--account-card));
+    transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.admin-ai-access-toggle-track::after {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--account-card);
+    box-shadow: 0 1px 3px rgba(42, 33, 23, .24);
+    content: "";
+    transition: transform 160ms ease;
+}
+
+.admin-ai-access-toggle input:checked + .admin-ai-access-toggle-track {
+    border-color: var(--account-primary);
+    background: var(--account-primary);
+}
+
+.admin-ai-access-toggle input:checked + .admin-ai-access-toggle-track::after {
+    transform: translateX(18px);
+}
+
+.admin-ai-access-toggle input:focus-visible + .admin-ai-access-toggle-track {
+    outline: 3px solid color-mix(in srgb, var(--account-primary) 38%, transparent);
+    outline-offset: 3px;
+}
+
+.admin-ai-access-quota {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
     gap: 7px;
     color: var(--account-muted);
     font-size: .78rem;
     font-weight: 650;
 }
 
-.admin-ai-inline-label input[type="number"],
+.admin-ai-access-quota input[type="number"],
 .admin-ai-tag-item input {
     width: 116px;
     min-height: 36px;
@@ -1920,6 +2014,19 @@ body.auth-page {
         max-width: none;
     }
 
+    .admin-ai-access-controls {
+        justify-content: flex-start;
+    }
+
+    .admin-ai-access-quota {
+        flex: 1 1 180px;
+        justify-content: space-between;
+    }
+
+    .admin-ai-access-quota input[type="number"] {
+        width: min(100%, 150px);
+    }
+
     .admin-book-editor-row > td {
         padding: 12px;
     }
@@ -1944,5 +2051,12 @@ body.auth-page {
 
     .account-table-scroll {
         scroll-behavior: auto;
+    }
+
+    .account-panel-loading-spinner,
+    .admin-ai-access-toggle-track,
+    .admin-ai-access-toggle-track::after {
+        animation-duration: .01ms;
+        transition-duration: .01ms;
     }
 }

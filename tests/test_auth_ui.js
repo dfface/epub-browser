@@ -1060,6 +1060,70 @@ test('account settings and administration open as separate surfaces', async () =
   ]);
 });
 
+test('account and administration surfaces announce loading while their initial data is pending', async () => {
+  const accountSessions = deferred();
+  const adminRequests = [deferred(), deferred(), deferred(), deferred()];
+  const accountMenu = fakeElement('button');
+  const adminMenu = fakeElement('button');
+  const accountPanel = fakeElement('section');
+  const adminPanel = fakeElement('section');
+  const accountPanelLoading = fakeElement('div');
+  const adminPanelLoading = fakeElement('div');
+  accountPanelLoading.hidden = true;
+  adminPanelLoading.hidden = true;
+  const root = rootWithFetch((url) => {
+    if (url === '/api/account/sessions') return accountSessions.promise;
+    if (url === '/api/admin/users') return adminRequests[0].promise;
+    if (url === '/api/admin/books/index') return adminRequests[1].promise;
+    if (url === '/api/admin/ai/settings') return adminRequests[2].promise;
+    if (url === '/api/admin/ai/tags') return adminRequests[3].promise;
+    if (url === '/api/admin/ai/jobs?page=1&page_size=20') {
+      return Promise.resolve(response(200, aiJobsPayload([], 1, 0, 0)));
+    }
+    return Promise.resolve(response(404, {}));
+  });
+  root.document = {
+    getElementById(id) {
+      return ({
+        accountMenu,
+        adminMenu,
+        accountPanel,
+        adminPanel,
+        accountPanelLoading,
+        adminPanelLoading,
+      })[id] || null;
+    },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin' },
+    csrf_token: 'token',
+  });
+
+  await auth.init();
+  accountMenu.click();
+  assert.equal(accountPanelLoading.hidden, false);
+  assert.equal(accountPanel.getAttribute('aria-busy'), 'true');
+  accountSessions.resolve(response(200, { sessions: [] }));
+  await tick();
+  assert.equal(accountPanelLoading.hidden, true);
+  assert.equal(accountPanel.getAttribute('aria-busy'), 'false');
+
+  adminMenu.click();
+  assert.equal(adminPanelLoading.hidden, false);
+  assert.equal(adminPanel.getAttribute('aria-busy'), 'true');
+  adminRequests[0].resolve(response(200, { users: [] }));
+  adminRequests[1].resolve(response(200, { books: [] }));
+  adminRequests[2].resolve(response(200, { settings: null }));
+  adminRequests[3].resolve(response(200, { tags: [] }));
+  await tick();
+  await tick();
+  assert.equal(adminPanelLoading.hidden, true);
+  assert.equal(adminPanel.getAttribute('aria-busy'), 'false');
+});
+
 test('administration section navigation keeps one workspace visible and marks its tab current', async () => {
   const overviewTab = fakeElement('button');
   const usersTab = fakeElement('button');
