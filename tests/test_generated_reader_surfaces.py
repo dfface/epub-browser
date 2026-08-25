@@ -1195,6 +1195,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'/assets/immutable/version-check\.[0-9a-f]{12}\.js',
             )
 
+    def test_shared_footer_link_uses_the_surrounding_text_color(self):
+        css = Path("epub_browser/assets/theme.css").read_text(encoding="utf-8")
+        link_rules = css[css.index(".eb-footer a {"):css.index("}", css.index(".eb-footer a {"))]
+
+        self.assertIn("color: inherit;", link_rules)
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertRegex(html, r'/assets/immutable/theme\.[0-9a-f]{12}\.css')
+
     def test_all_generated_pages_bootstrap_shared_i18n_before_ui_scripts(self):
         for html in (self._library_html(), self._book_html(), self._chapter_html()):
             self.assertRegex(html, r'/assets/immutable/i18n\.[0-9a-f]{12}\.js')

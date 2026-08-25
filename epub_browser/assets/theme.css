@@ -1937,3 +1937,21 @@
     --shadow-lg: 0 10px 28px var(--reader-shadow);
     --shadow-xl: 0 18px 46px var(--reader-shadow);
 }
+
+/* Keep the product link quiet in the shared Library, book, and reader footer. */
+.eb-footer a {
+    color: inherit;
+    text-decoration-color: currentColor;
+    text-underline-offset: 3px;
+}
+
+.eb-footer a:hover {
+    color: inherit;
+    text-decoration-thickness: 2px;
+}
+
+.eb-footer a:focus-visible {
+    outline: 2px solid var(--app-action);
+    outline-offset: 3px;
+    border-radius: 2px;
+}
