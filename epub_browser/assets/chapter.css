@@ -1567,8 +1567,13 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 .pagination-mode .eb-content-container {
-    box-shadow: unset !important;
-    margin-bottom: 0;
+    margin: 0 !important;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none !important;
+    box-sizing: border-box;
     overflow: hidden;
     position: relative;
     /* 宽度由 JavaScript 统一设置 */
@@ -1584,10 +1589,14 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 
 /* CSS Column 分页样式 - 使用 CSS Column 实现分页 */
 .pagination-mode #eb-content {
-    margin-top: 20px !important;
     height: 100%;
-    padding: 0px !important;
-    margin: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    box-sizing: border-box;
     /* 列宽和容器宽度由 JavaScript 统一设置 */
     column-count: auto;
     column-gap: 0px;

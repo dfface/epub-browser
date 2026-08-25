@@ -1336,6 +1336,36 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('e.preventDefault();', book_toc[continuous_start:continuous_end])
         self.assertNotIn('window.scrollTo({top: targetTop, behavior:', book_toc)
 
+    def test_pagination_mode_removes_reader_card_geometry_from_its_page_canvas(self):
+        stylesheet = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+
+        container_start = stylesheet.index('.pagination-mode .eb-content-container {')
+        container_rule = stylesheet[container_start:stylesheet.index('}', container_start)]
+        content_start = stylesheet.index('.pagination-mode #eb-content {')
+        content_rule = stylesheet[content_start:stylesheet.index('}', content_start)]
+
+        for declaration in (
+            'margin: 0 !important;',
+            'padding: 0;',
+            'border: 0;',
+            'border-radius: 0;',
+            'background: transparent;',
+            'box-sizing: border-box;',
+        ):
+            self.assertIn(declaration, container_rule)
+        self.assertIn('box-shadow: none !important;', container_rule)
+
+        for declaration in (
+            'margin: 0 !important;',
+            'padding: 0 !important;',
+            'border: 0;',
+            'border-radius: 0;',
+            'background: transparent;',
+            'box-shadow: none;',
+            'box-sizing: border-box;',
+        ):
+            self.assertIn(declaration, content_rule)
+
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
