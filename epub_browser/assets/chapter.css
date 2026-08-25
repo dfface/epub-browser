@@ -1560,6 +1560,10 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 /* 翻页模式样式 */
+body.pagination-mode {
+    overflow: hidden;
+}
+
 .pagination-mode .container {
     height: 100vh;
     height: 100dvh;
@@ -1569,7 +1573,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 .pagination-mode .eb-content-container {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-height: 0;
     margin: 0 !important;
     padding: 0;
@@ -1584,6 +1588,7 @@ body:not(.pagination-mode) .navigation a:focus-visible {
 }
 
 .pagination-mode .navigation {
+    flex: 0 0 auto;
     min-height: 50px;
     margin-top: 0;
     margin-left: 0;
@@ -1928,6 +1933,15 @@ body:not(.pagination-mode) .navigation a:focus-visible {
         gap: 2px;
         flex-wrap: nowrap;
         justify-content: space-between;
+    }
+
+    .pagination-mode .container {
+        box-sizing: border-box;
+        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+
+    .pagination-mode .navigation {
+        display: none !important;
     }
 
     .pagination-mode .navigation .prev-chapter, .pagination-mode .navigation .next-chapter{

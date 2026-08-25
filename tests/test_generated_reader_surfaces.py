@@ -1379,8 +1379,30 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('height: 100vh;', container_rule)
         self.assertIn('height: 100dvh;', container_rule)
         self.assertIn('min-height: 0;', container_rule)
-        self.assertIn('flex: 1 1 auto;', content_container_rule)
+        self.assertIn('body.pagination-mode {', stylesheet)
+        pagination_body_start = stylesheet.index('body.pagination-mode {')
+        pagination_body_rule = stylesheet[
+            pagination_body_start:stylesheet.index('}', pagination_body_start)
+        ]
+        self.assertIn('overflow: hidden;', pagination_body_rule)
+        self.assertIn('flex: 1 1 0;', content_container_rule)
         self.assertIn('min-height: 0;', content_container_rule)
+
+        navigation_start = stylesheet.index('.pagination-mode .navigation {')
+        navigation_rule = stylesheet[navigation_start:stylesheet.index('}', navigation_start)]
+        self.assertIn('flex: 0 0 auto;', navigation_rule)
+
+        self.assertRegex(
+            stylesheet,
+            r'@media \(max-width: 768px\)[\s\S]*?'
+            r'\.pagination-mode \.container\s*\{[^}]*'
+            r'padding-bottom:\s*calc\(60px \+ env\(safe-area-inset-bottom\)\);',
+        )
+        self.assertRegex(
+            stylesheet,
+            r'@media \(max-width: 768px\)[\s\S]*?'
+            r'\.pagination-mode \.navigation\s*\{[^}]*display:\s*none\s*!important;',
+        )
 
         create_pages_start = script.index('function createPages(')
         create_pages_end = script.index('\n    function scrollToPaginationTarget(', create_pages_start)
