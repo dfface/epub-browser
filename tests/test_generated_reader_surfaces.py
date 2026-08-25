@@ -1416,7 +1416,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         calculate_start = script.index('function calculateTotalPages(')
         calculate_end = script.index('\n    function showPage(', calculate_start)
         calculate_pages = script[calculate_start:calculate_end]
-        self.assertIn('var w = Math.floor(contentContainer.clientWidth);', calculate_pages)
+        self.assertIn('var w = getPaginationCanvasWidth();', calculate_pages)
         self.assertIn("content.style.columnCount = 'auto';", calculate_pages)
         self.assertLess(
             calculate_pages.index("content.style.columnCount = 'auto';"),

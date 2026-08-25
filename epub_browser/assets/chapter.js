@@ -329,6 +329,8 @@ function initScript() {
     var totalPages = 0;
     var contentWidth = 0;
     var pageWidth = 0;
+    var paginationResizeObserver = null;
+    var paginationWidthSyncPending = false;
     var isClickPageEnabled = false;
     var loadedChapters = {};  // 记录已加载的章节 {chapterIndex: true}
     var isLoadingChapter = false;  // 防止重复加载
@@ -634,6 +636,55 @@ function initScript() {
         }
         return c.innerHTML;
     }
+
+    function afterPaginationLayout(callback) {
+        var schedule = window.requestAnimationFrame || function(fn) { return setTimeout(fn, 0); };
+        schedule(function() {
+            schedule(callback);
+        });
+    }
+
+    function getPaginationCanvasWidth() {
+        if (window.EpubReaderLayout && typeof window.EpubReaderLayout.getPaginationPageWidth === 'function') {
+            return window.EpubReaderLayout.getPaginationPageWidth(contentContainer);
+        }
+        var rect = contentContainer.getBoundingClientRect();
+        return rect.width || contentContainer.clientWidth;
+    }
+
+    function getPaginationScrollPosition(pageIndex) {
+        if (window.EpubReaderLayout && typeof window.EpubReaderLayout.getPaginationScrollLeft === 'function') {
+            return window.EpubReaderLayout.getPaginationScrollLeft(pageIndex, pageWidth);
+        }
+        return Math.round(pageIndex * pageWidth);
+    }
+
+    function paginationCanvasWidthChanged(nextWidth) {
+        if (window.EpubReaderLayout && typeof window.EpubReaderLayout.paginationWidthChanged === 'function') {
+            return window.EpubReaderLayout.paginationWidthChanged(pageWidth, nextWidth);
+        }
+        return Math.abs(pageWidth - nextWidth) > 0.01;
+    }
+
+    function syncPaginationCanvasWidth() {
+        paginationWidthSyncPending = false;
+        if (!isPaginationMode || !pageWidth) return;
+        var nextWidth = getPaginationCanvasWidth();
+        if (!paginationCanvasWidthChanged(nextWidth)) return;
+        var savedPage = currentPage;
+        calculateTotalPages();
+        showPage(Math.min(savedPage, totalPages - 1));
+    }
+
+    function watchPaginationCanvas() {
+        if (paginationResizeObserver || typeof window.ResizeObserver !== 'function') return;
+        paginationResizeObserver = new window.ResizeObserver(function() {
+            if (paginationWidthSyncPending) return;
+            paginationWidthSyncPending = true;
+            afterPaginationLayout(syncPaginationCanvasWidth);
+        });
+        paginationResizeObserver.observe(contentContainer);
+    }
     
     function createPages(target) {
         showLoading();
@@ -654,8 +705,9 @@ function initScript() {
             content.style.orphans = 1;
             content.style.widows = 1;
             
-            setTimeout(function() {
+            afterPaginationLayout(function() {
                 calculateTotalPages();
+                watchPaginationCanvas();
                 pageJumpInput.setAttribute('max', totalPages);
                 if (target) scrollToPaginationTarget(target);
                 setTimeout(function() {
@@ -664,7 +716,7 @@ function initScript() {
                         // Your custom options
                     });
                 }, 500);
-            }, 200);
+            });
         }, 200);
     }
 
@@ -703,7 +755,7 @@ function initScript() {
     }
     
     function calculateTotalPages() {
-        var w = Math.floor(contentContainer.clientWidth);
+        var w = getPaginationCanvasWidth();
         var nav = document.querySelector('.pagination-mode .navigation');
         if (nav) {
             nav.style.width = w + 'px';
@@ -725,7 +777,7 @@ function initScript() {
     function showPage(idx) {
         if (idx < 0) idx = 0;
         if (idx >= totalPages) idx = totalPages-1;
-        var pos = Math.floor(idx * pageWidth);
+        var pos = getPaginationScrollPosition(idx);
         content.scrollTo(pos, 0);
         currentPage = idx;
         currentPageEl.textContent = idx+1;

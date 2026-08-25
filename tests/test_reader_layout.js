@@ -5,6 +5,9 @@ const {
   applyPageWidth,
   allowsReaderNavigationEvent,
   createNavigationBehaviorController,
+  getPaginationPageWidth,
+  getPaginationScrollLeft,
+  paginationWidthChanged,
   initNavigationBehavior,
   normalizeNavigationBehavior,
   normalizePageWidth,
@@ -99,6 +102,24 @@ test('normalizes page-width presets and applies their exact reading width', () =
   assert.equal(applyPageWidth(root, '2'), '2');
   assert.equal(properties.get('--reader-page-width'), '820px');
   assert.equal(root['data-reader-page-width'], '2');
+});
+
+test('pagination keeps the container fractional width as its page stride', () => {
+  const container = {
+    clientWidth: 786,
+    getBoundingClientRect() {
+      return { width: 787.1953125 };
+    },
+  };
+
+  assert.equal(getPaginationPageWidth(container), 787.1953125);
+  assert.equal(getPaginationScrollLeft(11, getPaginationPageWidth(container)), 8659);
+});
+
+test('pagination refreshes only when the canvas width has materially settled', () => {
+  assert.equal(paginationWidthChanged(786.96875, 787.1953125), true);
+  assert.equal(paginationWidthChanged(787.1953125, 787.1953125), false);
+  assert.equal(paginationWidthChanged(787.1953125, 787.2), false);
 });
 
 test('continuous reading disables and closes both chapter-local TOC controls', () => {

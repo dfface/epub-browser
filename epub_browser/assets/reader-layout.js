@@ -34,6 +34,24 @@
         return preset;
     }
 
+    function getPaginationPageWidth(container) {
+        if (!container) return 0;
+        var rect = typeof container.getBoundingClientRect === 'function'
+            ? container.getBoundingClientRect()
+            : null;
+        var width = rect && Number(rect.width);
+        if (Number.isFinite(width) && width > 0) return width;
+        return Math.max(0, Number(container.clientWidth) || 0);
+    }
+
+    function getPaginationScrollLeft(pageIndex, pageWidth) {
+        return Math.round(Math.max(0, Number(pageIndex) || 0) * Math.max(0, Number(pageWidth) || 0));
+    }
+
+    function paginationWidthChanged(previousWidth, nextWidth) {
+        return Math.abs((Number(nextWidth) || 0) - (Number(previousWidth) || 0)) > 0.01;
+    }
+
     function readingPreferenceEnabled(value) {
         return value !== 'false';
     }
@@ -304,9 +322,12 @@
         allowsReaderNavigationEvent: allowsReaderNavigationEvent,
         applyPageWidth: applyPageWidth,
         createNavigationBehaviorController: createNavigationBehaviorController,
+        getPaginationPageWidth: getPaginationPageWidth,
+        getPaginationScrollLeft: getPaginationScrollLeft,
         initNavigationBehavior: initNavigationBehavior,
         normalizeNavigationBehavior: normalizeNavigationBehavior,
         normalizePageWidth: normalizePageWidth,
+        paginationWidthChanged: paginationWidthChanged,
         readingPreferenceEnabled: readingPreferenceEnabled,
         syncChapterTocAvailability: syncChapterTocAvailability
     };
