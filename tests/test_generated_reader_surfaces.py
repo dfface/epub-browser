@@ -1366,6 +1366,37 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ):
             self.assertIn(declaration, content_rule)
 
+    def test_pagination_uses_the_css_canvas_height_and_measures_its_real_size(self):
+        stylesheet = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        container_start = stylesheet.index('.pagination-mode .container {')
+        container_rule = stylesheet[container_start:stylesheet.index('}', container_start)]
+        content_container_start = stylesheet.index('.pagination-mode .eb-content-container {')
+        content_container_rule = stylesheet[
+            content_container_start:stylesheet.index('}', content_container_start)
+        ]
+        self.assertIn('height: 100vh;', container_rule)
+        self.assertIn('height: 100dvh;', container_rule)
+        self.assertIn('min-height: 0;', container_rule)
+        self.assertIn('flex: 1 1 auto;', content_container_rule)
+        self.assertIn('min-height: 0;', content_container_rule)
+
+        create_pages_start = script.index('function createPages(')
+        create_pages_end = script.index('\n    function scrollToPaginationTarget(', create_pages_start)
+        create_pages = script[create_pages_start:create_pages_end]
+        self.assertIn('var contentH = content.clientHeight;', create_pages)
+        self.assertNotIn('window.innerHeight', create_pages)
+        self.assertNotIn('contentContainer.style.height', create_pages)
+        self.assertNotIn('content.style.height', create_pages)
+
+        calculate_start = script.index('function calculateTotalPages(')
+        calculate_end = script.index('\n    function showPage(', calculate_start)
+        calculate_pages = script[calculate_start:calculate_end]
+        self.assertIn('var w = Math.floor(contentContainer.clientWidth);', calculate_pages)
+        self.assertNotIn('contentContainer.style.width', calculate_pages)
+        self.assertNotIn('contentContainer.style.flex', calculate_pages)
+
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')

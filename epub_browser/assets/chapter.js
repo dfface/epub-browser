@@ -638,15 +638,8 @@ function initScript() {
     function createPages(target) {
         showLoading();
         var original = preprocessContent(content);
-        var bottomNav = document.querySelector('.navigation');
-        var mobileNav = document.querySelector('.mobile-controls');
-        var navH = getElementHeight(bottomNav);
-        var mobileH = getElementHeight(mobileNav);
-        var vh = window.innerHeight;
-        var contentH = vh - navH - mobileH - 40;
-        contentContainer.style.height = (vh - navH - mobileH) + 'px';
-        content.style.height = contentH + 'px';
         content.innerHTML = original;
+        var contentH = content.clientHeight;
         
         setTimeout(function() {
             var sh = content.scrollHeight;
@@ -713,10 +706,7 @@ function initScript() {
     }
     
     function calculateTotalPages() {
-        var parent = document.querySelector('.container');
-        var w = Math.floor(parent.clientWidth);
-        contentContainer.style.width = w + 'px';
-        contentContainer.style.flex = '1';
+        var w = Math.floor(contentContainer.clientWidth);
         var nav = document.querySelector('.pagination-mode .navigation');
         if (nav) {
             nav.style.width = w + 'px';
