@@ -27,6 +27,11 @@
     var displayRoot = null, modal = null, dialog = null, trigger = null, keydownBound = false, scrollY = 0;
     function hasSavedReview() { return Boolean(savedRating); }
     function icon(name) { var node = documentTarget.createElement('i'); node.className = 'fas ' + name; node.setAttribute('aria-hidden', 'true'); return node; }
+    function placeDisplayAfterBookInfo() {
+      var bookInfo = documentTarget && documentTarget.querySelector('.book-info-card');
+      if (!displayRoot || !bookInfo || !bookInfo.parentNode || bookInfo.parentNode !== displayRoot.parentNode) return;
+      if (bookInfo.nextElementSibling !== displayRoot) bookInfo.parentNode.insertBefore(displayRoot, bookInfo.nextSibling);
+    }
     function setStatus(message, isError) {
       if (!isError) return;
       if (view.status) { view.status.textContent = message; view.status.setAttribute('data-state', 'error'); }
@@ -57,6 +62,7 @@
     }
     function renderDisplay() {
       if (!displayRoot) return;
+      placeDisplayAfterBookInfo();
       displayRoot.replaceChildren(); displayRoot.hidden = !hasSavedReview();
       if (!hasSavedReview()) return;
       var header = documentTarget.createElement('div'); header.className = 'book-review-display-header';

@@ -11,7 +11,8 @@
 body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
 
 .book-review-display {
-    margin: 20px 0;
+    --book-review-star: #9a6700;
+    margin: 0 0 20px;
     padding: 20px;
     color: var(--text);
     background: var(--card-bg);
@@ -21,6 +22,7 @@ body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
 }
 
 .book-review-display[hidden] { display: none; }
+.book-info-card:has(~ .book-review-display:not([hidden])) { margin-bottom: 20px; }
 .book-review-display-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .book-review-display h2,
 .book-review-header h2 { margin: 0; font-size: 1.15rem; line-height: 1.35; }
@@ -66,10 +68,11 @@ body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
 .book-review-rating-error { color: var(--book-review-danger-foreground); }
 .book-review-form [disabled] { cursor: wait; opacity: .55; }
 .dark-mode .book-reviews { --book-review-danger-foreground: #ffb4ab; --book-review-star: #f0bd4f; }
+.dark-mode .book-review-display { --book-review-star: #f0bd4f; }
 
 /* Keep the review action in the same 10px rhythm as the neighbouring book actions. */
-.clearReadingProgress { column-gap: 10px; }
-.clearReadingProgress > [data-book-review-toggle] { margin-inline-start: 0; }
+.clearReadingProgress { gap: 10px !important; }
+.clearReadingProgress > * { margin: 0 !important; }
 
 @keyframes book-review-enter { from { opacity: 0; transform: translateY(10px) scale(.99); } to { opacity: 1; transform: none; } }
 @media (max-width: 560px) {
