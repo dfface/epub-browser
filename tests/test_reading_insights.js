@@ -147,11 +147,11 @@ test('range label reflects the same day, week, and month bounds as the API', asy
   assert.equal(page.rangeLabel.textContent, '2026-02-01–2026-02-28');
 });
 
-test('overview range covers a complete trailing year and hides range-specific drills', async () => {
+test('overview range covers a complete natural year and hides range-specific drills', async () => {
   const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
   await page.mount();
   await page.setPeriod('overview', '2026-08-15');
-  assert.equal(page.rangeLabel.textContent, '2025-08-16–2026-08-15');
+  assert.equal(page.rangeLabel.textContent, '2026-01-01–2026-12-31');
   assert.equal(page.root.children[5].hidden, true);
   assert.equal(page.root.children[6].hidden, true);
 });

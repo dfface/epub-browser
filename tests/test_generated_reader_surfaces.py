@@ -1887,7 +1887,7 @@ assert.deepEqual(
         self.assertNotIn('data-book-reading-time', html)
         self.assertIn('data-book-reading-time', server_html)
         self.assertIn('data-book-reading-time-label', server_html)
-        self.assertLess(server_html.index('class="book-info-cover"'), server_html.index('data-book-reading-time'))
+        self.assertLess(server_html.index('class=book-info-cover'), server_html.index('data-book-reading-time'))
         self.assertIn("'/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary'", script)
         self.assertIn("bookT('book.readingTime'", script)
         self.assertIn("renderBookReadingTime(readingTime.dataset.activeSeconds)", script)

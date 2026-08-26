@@ -157,8 +157,11 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
         self.assertEqual(self.store.reading_time_for_book(self.owner.user_id, "book-1"), 1800)
         self.assertEqual(len(result["activity"]["days"]), 365)
-        self.assertEqual(result["activity"]["days"][-1], {
+        self.assertIn({
             "date": "2026-08-15", "active_seconds": 1800, "book_count": 1,
+        }, result["activity"]["days"])
+        self.assertEqual(result["activity"]["days"][-1], {
+            "date": "2026-12-31", "active_seconds": 0, "book_count": 0,
         })
 
     def test_insights_join_short_same_reader_telemetry_seams_in_the_timeline(self):
