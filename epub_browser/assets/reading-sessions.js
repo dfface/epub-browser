@@ -81,7 +81,7 @@
       chapterLabel: '',
       visible: options.visible !== false,
       focused: options.focused !== false,
-      leader: true,
+      leader: options.focused !== false,
       leaderId: clientId,
       lastInteraction: null,
       idleMs: options.idleMs || 60000,
@@ -198,6 +198,7 @@
 
     function flush(keepalive) {
       if (state.destroyed) return Promise.resolve(null);
+      refreshLeaseLeadership();
       accrue(now());
       queueBuckets();
       if (!state.leader || !state.pending.length) return Promise.resolve(null);
@@ -248,6 +249,7 @@
       if (state.destroyed || !state.heartbeatMs) return;
       state.timer = schedule(function() {
         state.timer = null;
+        refreshLeaseLeadership();
         if (!channel && localStorage && state.leader && state.focused) announce(true);
         flush(false);
         scheduleHeartbeat();
@@ -300,17 +302,29 @@
       }
     }
 
-    function electInitialLeader() {
-      if (channel || !localStorage || !state.focused) return;
+    function refreshLeaseLeadership() {
+      if (channel || !localStorage) return state.leader;
       var lease = currentLease();
       if (lease && lease.clientId !== state.clientId) {
         state.leader = false;
         state.leaderId = lease.clientId;
-      } else {
+        return false;
+      }
+      if (!state.focused) {
+        state.leader = false;
+        state.leaderId = lease ? lease.clientId : null;
+        return false;
+      }
+      if (!lease || lease.clientId !== state.clientId) {
         state.leader = true;
         state.leaderId = state.clientId;
         announce(true);
       }
+      return state.leader;
+    }
+
+    function electInitialLeader() {
+      refreshLeaseLeadership();
     }
 
     function setChapter(chapterIndex, chapterLabel) {
@@ -375,9 +389,7 @@
         setVisible(!documentTarget.hidden);
       });
       addListener(eventTarget, 'storage', function(event) {
-        if (event && event.key === COORDINATION_KEY && event.newValue) {
-          try { receiveAnnouncement(JSON.parse(event.newValue)); } catch (error) {}
-        }
+        if (event && event.key === COORDINATION_KEY) refreshLeaseLeadership();
       });
       if (channel) channel.onmessage = function(event) { receiveAnnouncement(event && event.data); };
     }

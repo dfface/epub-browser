@@ -152,6 +152,91 @@ test('local storage fallback elects one initial leader across separate tabs', ()
   second.destroy();
 });
 
+test('a background server reader never flushes a restored queue before election', async () => {
+  const sessionStorage = createStorage();
+  const localStorage = createStorage();
+  const clientId = 'background-tab';
+  sessionStorage.setItem('epub-reading-sessions:' + clientId, JSON.stringify([
+    { chapter_index: 1, active_seconds: 15, client_sequence: 1 },
+  ]));
+  const content = {
+    getAttribute(name) {
+      return { 'data-book-hash': 'book', 'data-chapter-index': '1', 'data-chapter-title': 'One' }[name] || null;
+    },
+  };
+  const target = createEventTarget();
+  const sent = [];
+  const root = Object.assign(target, {
+    EpubBrowserMode: 'server',
+    EpubBrowserAuth: { fetch: (url, options) => { sent.push({ url, options }); return Promise.resolve({ ok: true }); } },
+    sessionStorage,
+    localStorage,
+    document: { getElementById: () => content, hasFocus: () => false },
+  });
+  const tracker = Sessions.start({ root, eventTarget: target, clientId, now: () => 0, schedule() {} });
+  await tracker.flush();
+  assert.equal(tracker.isLeader(), false);
+  assert.equal(sent.length, 0);
+  tracker.destroy();
+});
+
+test('a focused follower claims a removed local storage lease and flushes its queue', () => {
+  let clock = 0;
+  const clientId = 'follower-after-removal';
+  const sessionStorage = createStorage();
+  const localStorage = createStorage();
+  const target = createEventTarget();
+  const sent = [];
+  sessionStorage.setItem('epub-reading-sessions:' + clientId, JSON.stringify([
+    { chapter_index: 1, active_seconds: 15, client_sequence: 1 },
+  ]));
+  localStorage.setItem('epub-reading-sessions:active-tab', JSON.stringify({
+    type: 'epub-reading-session-active', clientId: 'other-tab', focused: true, expiresAt: 30000,
+  }));
+  const tracker = Sessions.createTracker({
+    now: () => clock,
+    sessionStorage,
+    localStorage,
+    eventTarget: target,
+    clientId,
+    send: item => sent.push(item),
+  });
+  assert.equal(tracker.isLeader(), false);
+  localStorage.removeItem('epub-reading-sessions:active-tab');
+  target.dispatch('storage', { key: 'epub-reading-sessions:active-tab', newValue: null });
+  tracker.flush();
+  assert.equal(tracker.isLeader(), true);
+  assert.deepEqual(sent, [{ chapter_index: 1, active_seconds: 15, client_sequence: 1 }]);
+  tracker.destroy();
+});
+
+test('a focused follower claims an expired lease before flushing', () => {
+  let clock = 0;
+  const clientId = 'follower-after-expiry';
+  const sessionStorage = createStorage();
+  const localStorage = createStorage();
+  const sent = [];
+  sessionStorage.setItem('epub-reading-sessions:' + clientId, JSON.stringify([
+    { chapter_index: 2, active_seconds: 15, client_sequence: 1 },
+  ]));
+  localStorage.setItem('epub-reading-sessions:active-tab', JSON.stringify({
+    type: 'epub-reading-session-active', clientId: 'other-tab', focused: true, expiresAt: 100,
+  }));
+  const tracker = Sessions.createTracker({
+    now: () => clock,
+    sessionStorage,
+    localStorage,
+    clientId,
+    send: item => sent.push(item),
+  });
+  assert.equal(tracker.isLeader(), false);
+  clock = 101;
+  tracker.flush();
+  assert.equal(tracker.isLeader(), true);
+  assert.deepEqual(sent, [{ chapter_index: 2, active_seconds: 15, client_sequence: 1 }]);
+  tracker.destroy();
+});
+
 test('becoming visible or focused requires a fresh interaction before timing resumes', () => {
   let clock = 0;
   const sent = [];
