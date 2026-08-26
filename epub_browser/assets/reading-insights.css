@@ -1,7 +1,19 @@
+body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
+.reading-insights-modal[hidden] { display: none; }
+.reading-insights-modal { position: fixed; z-index: 10020; inset: 0; color: var(--text); font-family: var(--font-family, system-ui, -apple-system, sans-serif); }
+.reading-insights-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .56); }
+.reading-insights-dialog { position: relative; display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; max-height: 100vh; max-height: 100dvh; overflow: auto; background: var(--background); box-shadow: var(--shadow-md); animation: reading-insights-enter .18s ease-out; }
+.reading-insights-modal-header { position: sticky; z-index: 1; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; min-height: 60px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--card-bg); }
+.reading-insights-header-label { grid-column: 2; display: inline-flex; align-items: center; gap: 9px; min-width: 0; color: var(--text); font-size: clamp(1.25rem, 2vw, 1.65rem); font-weight: 600; letter-spacing: -.025em; line-height: 1.1; white-space: nowrap; }
+.reading-insights-header-label > i { font-size: .82em; }
+.reading-insights-icon-button { grid-column: 3; justify-self: end; display: inline-grid; width: 44px; min-height: 44px; place-items: center; padding: 0; border: 0; border-radius: 8px; color: var(--text); background: transparent; font: inherit; cursor: pointer; }
+.reading-insights-icon-button:hover { background: var(--hover); }
+.reading-insights-icon-button:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
+
 .reading-insights-page {
     width: min(calc(100% - 40px), 1000px);
     margin: 0 auto;
-    padding: 32px 0 56px;
+    padding: 32px 0 72px;
     color: var(--text);
 }
 
@@ -194,6 +206,7 @@
 }
 
 @media (max-width: 768px) {
+    .reading-insights-modal-header { padding: 0 10px; }
     .reading-insights-page {
         width: min(calc(100% - 32px), 1000px);
         padding-top: 24px;
@@ -214,4 +227,10 @@
 @media (prefers-reduced-motion: no-preference) {
     .reading-insights-periods button,
     .reading-insights-day-button { transition: color 180ms ease-out, background-color 180ms ease-out, border-color 180ms ease-out; }
+}
+
+@keyframes reading-insights-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .reading-insights-dialog { animation: none; }
 }

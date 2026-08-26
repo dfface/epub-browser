@@ -3090,6 +3090,25 @@ assert.deepEqual(
         self.assertIn("new CustomEvent('epub-browser:chapter-change'", chapter_script)
         self.assertGreaterEqual(chapter_script.count('announceReadingSessionChapter('), 4)
 
+    def test_reading_insights_is_a_server_only_modal_feature(self):
+        server_library = self._server_html()
+        server_book = self._server_book_html()
+        server_chapter = self._server_chapter_html()
+        for html in (server_library, server_book, server_chapter):
+            self.assertIn('data-reading-insights', html)
+            self.assertRegex(html, r'aria-haspopup=(?:["\'])?dialog')
+            self.assertIn('fa-chart-column', html)
+            self.assertNotIn('href="/reading-insights"', html)
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertNotIn('data-reading-insights', html)
+            self.assertNotIn('reading-insights.', html)
+
+        insights_script = Path('epub_browser/assets/reading-insights.js').read_text(encoding='utf-8')
+        insights_styles = Path('epub_browser/assets/reading-insights.css').read_text(encoding='utf-8')
+        self.assertIn("setAttribute('aria-modal', 'true')", insights_script)
+        self.assertIn("event.key === 'Escape'", insights_script)
+        self.assertIn('reading-insights-modal', insights_styles)
+
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')
         self.assertRegex(self._chapter_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

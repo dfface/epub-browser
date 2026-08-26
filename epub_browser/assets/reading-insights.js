@@ -38,7 +38,13 @@
       selectedDay: '',
       loading: false,
       root: null,
-      view: {}
+      view: {},
+      modal: null,
+      container: null,
+      closeButton: null,
+      opener: null,
+      scrollY: 0,
+      localeBound: false
     };
 
     function intl() { return target.Intl || Intl; }
@@ -175,6 +181,10 @@
       targetRoot.className = 'reading-insights-page';
       targetRoot.setAttribute('tabindex', '-1');
       targetRoot.setAttribute('aria-labelledby', 'readingInsightsTitle');
+      if (state.modal) {
+        state.modal.querySelector('.reading-insights-header-label span').textContent = translate(target, 'readingInsights.navigation', 'Reading insights');
+        state.closeButton.setAttribute('aria-label', translate(target, 'common.close', 'Close'));
+      }
 
       var heading = append(targetRoot, 'section', 'reading-insights-heading');
       append(heading, 'p', 'reading-insights-kicker', translate(target, 'readingInsights.privateKicker', 'Private to your account'));
@@ -348,21 +358,97 @@
       } catch (error) { state.timezone = 'UTC'; }
       build(state.root);
       var i18n = target.EpubBrowserI18n;
-      if (i18n && typeof i18n.onLocaleChange === 'function') {
+      if (!state.localeBound && i18n && typeof i18n.onLocaleChange === 'function') {
+        state.localeBound = true;
         i18n.onLocaleChange(function() { if (state.root) { build(state.root); renderInsights(); } });
       }
       return load();
     }
 
-    return { mount: mount, selectDay: selectDay, setPeriod: setPeriod, previousRange: previousRangeForPeriod, nextRange: nextRangeForPeriod, load: load, get sessionRows() { return state.view.sessionList ? state.view.sessionList.children : []; }, get periodButtons() { return state.view.periodButtons || []; }, get rangeLabel() { return state.view.rangeLabel; }, get rangeButtons() { return { previous: state.view.previousRange, next: state.view.nextRange }; } };
+    function trapFocus(event) {
+      if (event.key === 'Escape') { event.preventDefault(); close(); return; }
+      if (event.key !== 'Tab') return;
+      var focusable = state.modal.querySelectorAll('button:not([hidden]):not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (event.shiftKey && documentTarget.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && documentTarget.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+
+    function ensure() {
+      if (state.modal || !documentTarget) return state.modal;
+      var modal = documentTarget.createElement('div');
+      modal.className = 'reading-insights-modal';
+      modal.hidden = true;
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'readingInsightsTitle');
+      modal.innerHTML = '<div class="reading-insights-backdrop" data-reading-insights-close></div><section class="reading-insights-dialog"><header class="reading-insights-modal-header"><span class="reading-insights-header-label"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></span><button type="button" class="reading-insights-icon-button" data-reading-insights-close-button aria-label="Close reading insights"><i class="fas fa-times" aria-hidden="true"></i></button></header><main class="reading-insights-container" data-reading-insights tabindex="-1"></main></section>';
+      documentTarget.body.appendChild(modal);
+      state.modal = modal;
+      state.container = modal.querySelector('.reading-insights-container');
+      state.closeButton = modal.querySelector('[data-reading-insights-close-button]');
+      state.closeButton.addEventListener('click', close);
+      modal.querySelector('[data-reading-insights-close]').addEventListener('click', close);
+      modal.addEventListener('keydown', trapFocus);
+      return modal;
+    }
+
+    function open(opener) {
+      var modal = ensure();
+      if (!modal) return Promise.resolve(null);
+      if (modal.hidden) {
+        state.opener = opener || documentTarget.activeElement;
+        state.scrollY = target.scrollY || 0;
+        documentTarget.body.classList.add('reading-insights-open');
+        documentTarget.body.style.top = '-' + state.scrollY + 'px';
+        modal.hidden = false;
+      }
+      var result = mount(state.container);
+      target.setTimeout(function() { if (state.closeButton) state.closeButton.focus(); }, 0);
+      return result;
+    }
+
+    function close() {
+      if (!state.modal || state.modal.hidden) return;
+      state.modal.hidden = true;
+      documentTarget.body.classList.remove('reading-insights-open');
+      documentTarget.body.style.top = '';
+      if (typeof target.scrollTo === 'function') target.scrollTo(0, state.scrollY);
+      if (state.opener && typeof state.opener.focus === 'function') state.opener.focus();
+    }
+
+    function bind(scope) {
+      var targetScope = scope || documentTarget;
+      if (!targetScope || !targetScope.querySelectorAll) return;
+      Array.prototype.forEach.call(targetScope.querySelectorAll('[data-reading-insights]'), function(trigger) {
+        if (trigger === state.container || trigger.dataset.readingInsightsBound) return;
+        trigger.dataset.readingInsightsBound = 'true';
+        trigger.addEventListener('click', function() { open(trigger); });
+      });
+    }
+
+    return { mount: mount, open: open, close: close, bind: bind, selectDay: selectDay, setPeriod: setPeriod, previousRange: previousRangeForPeriod, nextRange: nextRangeForPeriod, load: load, get sessionRows() { return state.view.sessionList ? state.view.sessionList.children : []; }, get periodButtons() { return state.view.periodButtons || []; }, get rangeLabel() { return state.view.rangeLabel; }, get rangeButtons() { return { previous: state.view.previousRange, next: state.view.nextRange }; } };
   }
 
   var defaultClient = null;
+  function client() {
+    defaultClient = defaultClient || createClient(root);
+    return defaultClient;
+  }
+  function bind() { return client().bind(); }
+  if (root.document) {
+    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', bind);
+    else bind();
+  }
   return {
     create: createClient,
     mount: function(target) {
-      defaultClient = defaultClient || createClient(root);
-      return defaultClient.mount(target);
-    }
+      return client().mount(target);
+    },
+    open: function(opener) { return client().open(opener); },
+    close: function() { return client().close(); },
+    bind: bind
   };
 });

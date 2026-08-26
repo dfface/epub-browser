@@ -1462,6 +1462,12 @@ class EPUBProcessor:
             "annotationHub": self.asset_manifest.url_for("annotation-hub.js"),
             "sortable": self.asset_manifest.url_for("sortable.min.js"),
         }, separators=(",", ":"))
+        if self.deployment_mode == "server":
+            book_feature_assets = json.dumps({
+                **json.loads(book_feature_assets),
+                "readingInsightsCss": self.asset_manifest.url_for("reading-insights.css"),
+                "readingInsights": self.asset_manifest.url_for("reading-insights.js"),
+            }, separators=(",", ":"))
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
@@ -1470,9 +1476,9 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         reading_insights_navigation = (
-            '<a class="app-nav-link" href="/reading-insights" '
-            'data-i18n="readingInsights.navigation"><i class="fas fa-chart-column" '
-            'aria-hidden="true"></i><span>Reading insights</span></a>'
+            '<button type="button" class="app-nav-link" data-reading-insights '
+            'aria-haspopup="dialog"><i class="fas fa-chart-column" '
+            'aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'
             if self.deployment_mode == "server" else ""
         )
         ai_reading_indicators = (
@@ -2441,9 +2447,9 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server" else ""
         )
         reading_insights_navigation = (
-            '<a class="app-nav-link" href="/reading-insights" '
-            'data-i18n="readingInsights.navigation"><i class="fas fa-chart-column" '
-            'aria-hidden="true"></i><span>Reading insights</span></a>'
+            '<button type="button" class="app-nav-link" data-reading-insights '
+            'aria-haspopup="dialog"><i class="fas fa-chart-column" '
+            'aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'
             if self.deployment_mode == "server" else ""
         )
         ai_reading_indicators = (
@@ -3003,6 +3009,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server"
             else ""
         )
+        reading_insights_assets = (
+            '<link rel="stylesheet" href="' + self.asset_manifest.url_for('reading-insights.css') + '">'
+            '<script src="' + self.asset_manifest.url_for('reading-insights.js') + '" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
         auth_script = (
             SERVER_AUTH_SCRIPT
             if self.deployment_mode == "server"
@@ -3045,6 +3056,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/sortable.min.js" defer></script>
     <script src="/assets/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
+    {reading_insights_assets}
     {reading_session_script}
     {ai_chapter_scripts}
     <script>

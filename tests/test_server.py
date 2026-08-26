@@ -4078,20 +4078,15 @@ class ReadingInsightsAPITests(unittest.TestCase):
         )
         self.assertEqual(anonymous.get("/api/reading-insights").status_code, 401)
 
-    def test_reading_insights_document_requires_login_and_uses_current_asset_manifest(self):
+    def test_legacy_reading_insights_url_requires_login_and_returns_to_library(self):
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
         self.assertEqual(anonymous.get('/reading-insights').status_code, 401)
 
-        page = self.client.get('/reading-insights')
-        self.assertEqual(page.status_code, 200)
+        page = self.client.get('/reading-insights', follow_redirects=False)
+        self.assertEqual(page.status_code, 303)
+        self.assertEqual(page.headers['location'], '/')
         self.assertIn('no-cache', page.headers['cache-control'])
-        self.assertIn('data-reading-insights', page.text)
-        self.assertIn('readingInsights.navigation', page.text)
-        self.assertRegex(
-            page.text,
-            r'/assets/immutable/reading-insights\.[0-9a-f]{12}\.js',
-        )
 
     def test_review_and_heartbeat_mutations_wait_for_server_readiness(self):
         not_ready_app = create_app(

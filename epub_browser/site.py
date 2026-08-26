@@ -93,7 +93,12 @@ def render_library_shell(
             if (window.initScriptLibrary) window.initScriptLibrary();
             {server_progress_start}"""
     if deployment_mode == "server":
-        reading_insights_navigation = '''<a class="app-nav-link" href="/reading-insights" data-i18n="readingInsights.navigation">Reading insights</a>'''
+        library_feature_assets = json.dumps({
+            **json.loads(library_feature_assets),
+            "readingInsightsCss": assets.url_for("reading-insights.css"),
+            "readingInsights": assets.url_for("reading-insights.js"),
+        }, separators=(",", ":"))
+        reading_insights_navigation = '''<button type="button" class="app-nav-link" data-reading-insights aria-haspopup="dialog"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'''
         ai_reading_navigation = '''<button type="button" class="app-nav-link" data-ai-reading-hub aria-haspopup="dialog"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="ai.library">AI readings</span></button>'''
         ai_feature_assets = {
             "aiReadingHubCss": assets.url_for("ai-reading-hub.css"),
