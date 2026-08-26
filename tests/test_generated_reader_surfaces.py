@@ -3094,6 +3094,30 @@ assert.deepEqual(
         self.assertIn('.book-review-visually-hidden', review_styles)
         self.assertNotIn('@media (max-width: 768px)', review_styles)
 
+    def test_server_review_initial_data_is_runtime_only_and_escaped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory, deployment_mode='server')
+            processor.book_title = 'A Book'
+            processor.chapters = [{'title': 'One'}]
+            AssetPublisher(Path('epub_browser/assets'), directory).publish()
+            server_index = processor.create_index_page(
+                write=False,
+                initial_book_review={'rating': 4, 'review_text': '<private review>'},
+            )
+            ssg_processor = EPUBProcessor('book.epub', directory, deployment_mode='ssg')
+            ssg_processor.book_title = 'A Book'
+            ssg_processor.chapters = [{'title': 'One'}]
+            ssg_index = ssg_processor.create_index_page(
+                write=False,
+                initial_book_review={'rating': 4, 'review_text': '<private review>'},
+            )
+
+        self.assertIn('data-book-review-initial', server_index)
+        self.assertIn('&lt;private review>', server_index)
+        self.assertIn('\\u003cprivate review\\u003e', server_index)
+        self.assertNotIn('data-book-review-initial', ssg_index)
+        self.assertNotIn('private review', ssg_index)
+
     def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):
         server_chapter = self._server_chapter_html()
         ssg_chapter = self._chapter_html()

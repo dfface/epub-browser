@@ -1415,7 +1415,7 @@ class EPUBProcessor:
         # print(f"Web interface created at: {self.web_dir}")
         return self.web_dir
     
-    def create_index_page(self, write=True):
+    def create_index_page(self, write=True, initial_book_review=None):
         """创建章节索引页面"""
         sync_shelf_button = (
             ""
@@ -1509,11 +1509,63 @@ class EPUBProcessor:
             f'</section></div>'
             if self.deployment_mode == "server" else ""
         )
-        book_review_display = (
-            f'<section class="book-review-display" data-book-review-display '
-            f'data-book-id="{book_id_attribute}" hidden></section>'
-            if self.deployment_mode == "server" else ""
-        )
+        # Book reviews are account-private runtime data.  In Server mode the
+        # authenticated request may provide the current user's review so the
+        # first paint already reserves its final position.  Never use this in
+        # SSG output or persist it in the EPUB-derived content cache.
+        initial_review = None
+        if self.deployment_mode == "server" and isinstance(initial_book_review, dict):
+            initial_rating = initial_book_review.get("rating")
+            initial_text = initial_book_review.get("review_text")
+            if (
+                isinstance(initial_rating, int)
+                and not isinstance(initial_rating, bool)
+                and 1 <= initial_rating <= 5
+                and isinstance(initial_text, str)
+            ):
+                initial_review = {
+                    "rating": initial_rating,
+                    "review_text": initial_text,
+                }
+        if self.deployment_mode != "server":
+            book_review_display = ""
+            book_review_initial_data = ""
+        elif initial_review is None:
+            book_review_display = (
+                f'<section class="book-review-display" data-book-review-display '
+                f'data-book-id="{book_id_attribute}" hidden></section>'
+            )
+            book_review_initial_data = ""
+        else:
+            review_rating = initial_review["rating"]
+            review_text = initial_review["review_text"]
+            review_copy = html.escape(review_text, quote=False)
+            review_stars = "★★★★★"[:review_rating]
+            review_body = (
+                f'<p class="book-review-display-copy is-collapsed">{review_copy}</p>'
+                f'<button type="button" class="book-review-expand" data-book-review-expand '
+                f'aria-expanded="false"{"" if len(review_text) > 100 else " hidden"} '
+                f'data-i18n="bookReviews.showMore">Show more</button>'
+                if review_text else ""
+            )
+            book_review_display = f'''<section class="book-review-display" data-book-review-display data-book-id="{book_id_attribute}">
+        <div class="book-review-display-header">
+            <h2 data-i18n="bookReviews.title">My review</h2>
+            <span class="book-review-display-rating" aria-label="{review_rating}/5">
+                <span aria-hidden="true">{review_stars}</span><span class="book-review-display-score">{review_rating}/5</span>
+            </span>
+        </div>
+        <p class="book-review-display-private" data-i18n="bookReviews.private">Only visible to your account</p>
+        {review_body}
+    </section>'''
+            initial_review_json = json.dumps(initial_review, ensure_ascii=False).replace("<", "\\u003c").replace(
+                ">", "\\u003e"
+            ).replace("&", "\\u0026")
+            book_review_initial_data = (
+                '<script type="application/json" data-book-review-initial>'
+                + initial_review_json
+                + '</script>'
+            )
         book_review_trigger = (
             '<button type="button" class="css-btn secondary" data-book-review-toggle '
             'aria-controls="book-review-dialog" aria-expanded="false">'
@@ -1691,6 +1743,7 @@ class EPUBProcessor:
             </div>
     </div>
     {book_review_display}
+    {book_review_initial_data}
     {book_review_panel}
     <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
         <div class="toc-header">

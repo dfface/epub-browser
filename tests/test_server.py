@@ -3819,6 +3819,9 @@ class ReadingInsightsAPITests(unittest.TestCase):
                     "ai-rich-text.css", "ai-rich-text.js",
                     "vendor/katex/katex.min.css", "vendor/katex/katex.min.js",
                     "vendor/mermaid/mermaid.min.js",
+                    "bookshelf.js", "annotation-hub.css", "annotation.js",
+                    "annotation-hub.js", "sortable.min.js", "book-reviews.css",
+                    "book-reviews.js",
                 )
         }
         manifest.update({
@@ -3873,6 +3876,27 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(self.client.delete("/api/book-reviews/book").status_code, 204)
         self.assertEqual(self.client.get("/api/book-reviews/book").json(), {"review": None})
         self.assertEqual(self.bob_client.get("/api/book-reviews/restricted").status_code, 403)
+
+    def test_book_page_includes_only_the_current_users_review_at_first_paint(self):
+        self.assertEqual(
+            self.client.put(
+                "/api/book-reviews/book",
+                json={"rating": 4, "review_text": "<Private first-paint review>"},
+            ).status_code,
+            200,
+        )
+
+        alice_page = self.client.get("/book/book/index.html")
+        bob_page = self.bob_client.get("/book/book/index.html")
+
+        self.assertEqual(alice_page.status_code, 200)
+        self.assertIn('data-book-review-initial', alice_page.text)
+        self.assertIn('&lt;Private first-paint review>', alice_page.text)
+        self.assertIn('data-book-review-display', alice_page.text)
+        self.assertNotIn('data-book-review-display data-book-id="book" hidden', alice_page.text)
+        self.assertEqual(bob_page.status_code, 200)
+        self.assertNotIn('Private first-paint review', bob_page.text)
+        self.assertNotIn('data-book-review-initial', bob_page.text)
 
     def test_library_metadata_projects_only_the_current_users_rating(self):
         self.client.put(

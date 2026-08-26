@@ -109,6 +109,14 @@
     }
     function restoreSaved() { applyRating(savedRating); if (view.reviewText) view.reviewText.value = savedText; }
     function applyReview(review) { savedRating = review && Number.isInteger(review.rating) ? String(review.rating) : ''; savedText = review && typeof review.review_text === 'string' ? review.review_text : ''; restoreSaved(); renderDisplay(); if (view.deleteButton) view.deleteButton.hidden = !hasSavedReview(); }
+    function initialReview() {
+      var source = documentTarget && documentTarget.querySelector('[data-book-review-initial]');
+      if (!source) return null;
+      try {
+        var review = JSON.parse(source.textContent || 'null');
+        return review && Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5 && typeof review.review_text === 'string' ? review : null;
+      } catch (error) { return null; }
+    }
     function load() { return request(bookId, 'GET').then(function(payload) { applyReview(payload && payload.review); return payload && payload.review; }).catch(function() { restoreSaved(); setStatus(translate('book.error.server_error'), true); return null; }); }
     function save(rating, reviewText) {
       var normalizedRating = Number(rating);
@@ -152,6 +160,7 @@
       if (typeof rootElement === 'string' || !rootElement) { suppliedDisplayRoot = suppliedBookId; suppliedBookId = rootElement || suppliedBookId; target = documentTarget && documentTarget.querySelector('[data-book-reviews]'); }
       if (!target || !suppliedBookId) return Promise.resolve(null);
       bookId = String(suppliedBookId); displayRoot = suppliedDisplayRoot || (documentTarget && documentTarget.querySelector('[data-book-review-display]')); render(target);
+      var serverReview = initialReview(); if (serverReview) applyReview(serverReview);
       trigger = documentTarget && documentTarget.querySelector('[data-book-review-toggle]'); modal = documentTarget && documentTarget.querySelector('[data-book-review-modal]'); dialog = documentTarget && documentTarget.querySelector('[data-book-review-modal] .book-review-dialog');
       if (trigger) trigger.addEventListener('click', openPanel); if (modal) modal.addEventListener('click', function(event) { if (event.target === modal) closePanel(); }); if (view.closeButton) view.closeButton.addEventListener('click', closePanel);
       if (!keydownBound && documentTarget && documentTarget.addEventListener) { keydownBound = true; documentTarget.addEventListener('keydown', onKeydown); }

@@ -2475,7 +2475,12 @@ window.location.assign(payload.redirect||'/');
             if has_content_cache:
                 try:
                     if book_relative_path == 'index.html':
-                        markup = renderer.render_index()
+                        markup = renderer.render_index(
+                            initial_book_review=store.get_book_review(
+                                book_id,
+                                principal.user_id,
+                            )
+                        )
                         dynamic_response = HTMLResponse(
                             markup,
                             headers={'Cache-Control': 'no-cache'},
