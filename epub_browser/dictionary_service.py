@@ -6,6 +6,7 @@ import hashlib
 import io
 import shutil
 import sqlite3
+import tarfile
 import uuid
 import zipfile
 from dataclasses import dataclass
@@ -156,16 +157,21 @@ class DictionaryService:
         if not isinstance(upload_bytes, bytes) or not upload_bytes or len(upload_bytes) > 512 * 1024 * 1024:
             raise DictionaryServiceError("invalid_dictionary_archive")
         upload_name = Path(filename).name if isinstance(filename, str) else ""
-        upload_suffix = Path(upload_name).suffix.casefold()
-        if upload_suffix not in {".mdx", ".zip"}:
+        upload_name_folded = upload_name.casefold()
+        upload_suffix = next((suffix for suffix in (
+            ".tar.bz2", ".tar.gz", ".tbz2", ".tgz", ".mdx", ".zip",
+        ) if upload_name_folded.endswith(suffix)), "")
+        if not upload_suffix:
             raise DictionaryServiceError("unsupported_dictionary_format")
+        is_mdx = upload_suffix == ".mdx"
+        is_zip = upload_suffix == ".zip"
         staging = self.dictionary_directory / (".import-" + str(uuid.uuid4()))
         staging.mkdir(mode=0o700)
         try:
-            if upload_suffix == ".mdx":
+            if is_mdx:
                 source = staging / "dictionary.mdx"
                 source.write_bytes(upload_bytes)
-            else:
+            elif is_zip:
                 try:
                     archive = zipfile.ZipFile(io.BytesIO(upload_bytes))
                 except zipfile.BadZipFile as error:
@@ -183,12 +189,32 @@ class DictionaryService:
                         target = staging / relative.name
                         with archive.open(member) as source_stream, target.open("xb") as output:
                             shutil.copyfileobj(source_stream, output, 1024 * 1024)
+            else:
+                try:
+                    archive = tarfile.open(fileobj=io.BytesIO(upload_bytes), mode="r:*")
+                except (tarfile.TarError, OSError, EOFError) as error:
+                    raise DictionaryServiceError("invalid_dictionary_archive") from error
+                with archive:
+                    members = [member for member in archive.getmembers() if member.isfile()]
+                    if not members or len(members) > 16 or sum(member.size for member in members) > 1024 * 1024 * 1024:
+                        raise DictionaryServiceError("invalid_dictionary_archive")
+                    for member in members:
+                        relative = Path(member.name)
+                        if relative.is_absolute() or ".." in relative.parts or member.name.replace("\\", "/").startswith("/"):
+                            raise DictionaryServiceError("invalid_dictionary_archive")
+                        source_stream = archive.extractfile(member)
+                        if source_stream is None:
+                            raise DictionaryServiceError("invalid_dictionary_archive")
+                        target = staging / relative.name
+                        with source_stream, target.open("xb") as output:
+                            shutil.copyfileobj(source_stream, output, 1024 * 1024)
+            if not is_mdx:
                 candidates = [item for item in staging.iterdir() if item.suffix.casefold() in {".ifo", ".mdx"}]
                 if len(candidates) != 1:
                     raise DictionaryServiceError("invalid_dictionary_archive")
                 source = candidates[0]
             requested_name = display_name.strip() if isinstance(display_name, str) else ""
-            fallback_name = Path(upload_name).stem if _use_upload_name_as_default and upload_name else None
+            fallback_name = upload_name[:-len(upload_suffix)] if _use_upload_name_as_default and upload_name else None
             return self.install(source, created_by_user_id=created_by_user_id,
                                 display_name=requested_name or fallback_name,
                                 attribution=attribution)

@@ -1,7 +1,9 @@
 import struct
 import tempfile
 import unittest
+import gzip
 import io
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -11,6 +13,40 @@ from epub_browser.state import StateStore
 
 
 class DictionaryServiceTests(unittest.TestCase):
+    def test_installs_stardict_tar_bz2_with_a_nested_compressed_dictionary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = StateStore(root / "data" / "epub-browser.db")
+            admin = store.initialize(BootstrapCredentials("admin", "correct horse battery staple"))
+            definition = b"to move quickly"
+            index = b"run\0" + struct.pack(">II", 0, len(definition))
+            files = {
+                "stardict-oxford-gb-2.4.2/oxford-gb.ifo": (
+                    "StarDict's dict ifo file\nversion=2.4.2\nbookname=Oxford GB\nwordcount=1\n"
+                    "idxfilesize=" + str(len(index)) + "\nsametypesequence=m\n"
+                ).encode("utf-8"),
+                "stardict-oxford-gb-2.4.2/oxford-gb.idx": index,
+                "stardict-oxford-gb-2.4.2/oxford-gb.dict.dz": gzip.compress(definition),
+            }
+            payload = io.BytesIO()
+            with tarfile.open(fileobj=payload, mode="w:bz2") as archive:
+                for name, content in files.items():
+                    member = tarfile.TarInfo(name)
+                    member.size = len(content)
+                    archive.addfile(member, io.BytesIO(content))
+
+            service = DictionaryService(store, root)
+            try:
+                record = service.install_upload(
+                    payload.getvalue(), "stardict-oxford-gb-2.4.2.tar.bz2",
+                    created_by_user_id=admin.user_id,
+                )
+            except DictionaryServiceError as error:
+                self.fail("tar.bz2 StarDict package was rejected: " + error.code)
+
+            self.assertEqual(record.display_name, "stardict-oxford-gb-2.4.2")
+            self.assertEqual(service.lookup(record.id, "run").entries[0]["definition"], "to move quickly")
+
     def test_installs_stardict_zip_without_retaining_upload(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

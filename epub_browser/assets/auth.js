@@ -2566,7 +2566,7 @@
         var dictionaryNameInput = dictionaryForm.elements.display_name;
         dictionaryFileInput.addEventListener('change', function() {
           var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
-          var fileName = file && file.name ? file.name.replace(/\.(mdx|zip)$/i, '').trim() : '';
+          var fileName = file && file.name ? file.name.replace(/\.(?:mdx|zip|tar(?:\.(?:gz|bz2))?|tgz|tbz2)$/i, '').trim() : '';
           if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;
           dictionaryNameInput.value = fileName;
           dictionaryAutoName = fileName;
