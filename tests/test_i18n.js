@@ -104,6 +104,7 @@ test('localizes private review and reading-insight copy in all five supported lo
     'bookReviews.saved',
     'bookReviews.deleted',
     'bookReviews.deleteConfirm',
+    'book.readingTime',
     'readingInsights.navigation',
     'readingInsights.description',
     'readingInsights.pageTitle',

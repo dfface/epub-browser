@@ -3970,6 +3970,32 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(first.json()["session"]["chapter_label"], "Opening chapter")
         self.assertEqual(again.json()["session"]["active_seconds"], 15)
 
+    def test_book_reading_time_summary_is_private_and_requires_book_access(self):
+        self.assertEqual(
+            self.client.post(
+                "/api/reading-sessions/book/heartbeat",
+                json={
+                    "client_id": "summary-tab",
+                    "client_sequence": 1,
+                    "chapter_index": 0,
+                    "active_seconds": 15,
+                },
+            ).status_code,
+            200,
+        )
+
+        self.assertEqual(
+            self.client.get("/api/reading-sessions/book/summary").json(),
+            {"active_seconds": 15},
+        )
+        self.assertEqual(
+            self.bob_client.get("/api/reading-sessions/book/summary").json(),
+            {"active_seconds": 0},
+        )
+        denied = self.bob_client.get("/api/reading-sessions/restricted/summary")
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.json()["code"], "forbidden")
+
     def test_reading_heartbeat_rate_limits_a_single_client_before_recording_more_work(self):
         responses = []
         for sequence in range(1, 14):
@@ -4038,6 +4064,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
             self.bob_client.post(
                 "/api/reading-sessions/restricted/heartbeat", json={}
             ),
+            self.bob_client.get("/api/reading-sessions/restricted/summary"),
         )
         for denied in requests:
             with self.subTest(response=denied):

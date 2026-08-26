@@ -1572,6 +1572,12 @@ class EPUBProcessor:
             '<span data-i18n="bookReviews.write">Write review</span></button>'
             if self.deployment_mode == "server" else ""
         )
+        book_reading_time = (
+            '<p class="book-reading-time" data-book-reading-time hidden>'
+            '<i class="fas fa-chart-column" aria-hidden="true"></i>'
+            '<span data-book-reading-time-label></span></p>'
+            if self.deployment_mode == "server" else ""
+        )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -1739,6 +1745,7 @@ class EPUBProcessor:
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                     {book_review_trigger}
                 </div>
+                {book_reading_time}
             </div>
     </div>
     {book_review_display}

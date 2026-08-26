@@ -179,6 +179,20 @@ body {
     margin-bottom: 0;
 }
 
+.book-reading-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 12px 0 0;
+    color: var(--text-secondary);
+    font-size: .9rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+}
+
+.book-reading-time i { color: var(--button-bg); }
+.book-reading-time[hidden] { display: none; }
+
 .continue-reading-control {
     position: relative;
     display: inline-flex;

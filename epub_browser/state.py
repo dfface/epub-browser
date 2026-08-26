@@ -5414,6 +5414,18 @@ class StateStore:
             } for session in display_sessions],
         }
 
+    def reading_time_for_book(self, user_id: str, book_id: str) -> int:
+        """Return one account's de-duplicated active reading time for a book."""
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            self._require_active_book(connection, book_id)
+            rows = connection.execute(
+                "SELECT started_at, ended_at, active_seconds FROM reading_sessions "
+                "WHERE user_id = ? AND book_id = ?",
+                (user_id, book_id),
+            ).fetchall()
+        return self._merged_active_seconds(rows)
+
     def get_reading_progress(self, user_id: str, book_hash: str):
         with self._connection() as connection:
             self._require_user(connection, user_id)

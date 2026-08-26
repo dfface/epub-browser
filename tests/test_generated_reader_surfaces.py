@@ -1841,6 +1841,7 @@ assert.deepEqual(
 
     def test_book_page_offers_a_progress_aware_continue_reading_action(self):
         html = self._book_html()
+        server_html = self._server_book_html()
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
         styles = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
 
@@ -1883,6 +1884,14 @@ assert.deepEqual(
         self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
         self.assertIn("bookT('book.continueReading')", script)
         self.assertIn("bookT('book.startReading')", script)
+        self.assertNotIn('data-book-reading-time', html)
+        self.assertIn('data-book-reading-time', server_html)
+        self.assertIn('data-book-reading-time-label', server_html)
+        self.assertIn("'/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary'", script)
+        self.assertIn("bookT('book.readingTime'", script)
+        self.assertIn("renderBookReadingTime(readingTime.dataset.activeSeconds)", script)
+        self.assertIn('.book-reading-time', styles)
+        self.assertIn('font-variant-numeric: tabular-nums;', styles)
 
     def test_book_toc_marks_server_synced_reading_progress_with_the_reader_identity(self):
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")

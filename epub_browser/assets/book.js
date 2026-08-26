@@ -176,8 +176,50 @@ function initScript() {
             });
     }
 
+    function formatBookReadingDuration(seconds) {
+        var totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+        var hours = Math.floor(totalSeconds / 3600);
+        var minutes = Math.floor((totalSeconds % 3600) / 60);
+        var remainder = totalSeconds % 60;
+        var parts = [];
+        if (hours) parts.push(hours + ' ' + bookT('readingInsights.duration.hour'));
+        if (minutes) parts.push(minutes + ' ' + bookT('readingInsights.duration.minute'));
+        if (!hours && !minutes) parts.push(remainder + ' ' + bookT('readingInsights.duration.second'));
+        return parts.join(' ');
+    }
+
+    function renderBookReadingTime(seconds) {
+        var element = document.querySelector('[data-book-reading-time]');
+        var label = element && element.querySelector('[data-book-reading-time-label]');
+        var totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+        if (!element || !label) return;
+        element.dataset.activeSeconds = String(totalSeconds);
+        element.hidden = totalSeconds < 1;
+        if (totalSeconds) {
+            label.textContent = bookT('book.readingTime', {
+                duration: formatBookReadingDuration(totalSeconds)
+            });
+        }
+    }
+
+    function loadBookReadingTime() {
+        if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
+        if (!document.querySelector('[data-book-reading-time]')) return;
+        window.EpubBrowserAuth.fetch('/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary')
+            .then(function(response) {
+                if (!response.ok) throw new Error('book_reading_time_unavailable');
+                return response.json();
+            })
+            .then(function(summary) {
+                if (!summary || typeof summary.active_seconds !== 'number') return;
+                renderBookReadingTime(summary.active_seconds);
+            })
+            .catch(function() {});
+    }
+
     updateContinueReadingButton(book_hash);
     loadReadingProgress();
+    loadBookReadingTime();
     loadEffectiveBookTags();
 
     if (!isKindleMode()) {
@@ -332,6 +374,8 @@ function initScript() {
             if (activeChapter) {
                 markReadingChapter(activeChapter.id, activeChapter.getAttribute('data-sync-username') || '');
             }
+            var readingTime = document.querySelector('[data-book-reading-time]');
+            if (readingTime) renderBookReadingTime(readingTime.dataset.activeSeconds);
             if (window.refreshBookShelfButton) window.refreshBookShelfButton();
         });
     }

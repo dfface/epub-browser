@@ -3045,6 +3045,17 @@ window.location.assign(payload.redirect||'/');
         )
         return response({'session': session})
 
+    async def reading_session_summary(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return forbidden_book_response()
+        try:
+            active_seconds = store.reading_time_for_book(principal.user_id, book_id)
+        except KeyError:
+            return forbidden_book_response()
+        return response({'active_seconds': active_seconds})
+
     async def reading_insights(request):
         principal = require_principal(request)
         query = parse_qs(request.url.query, keep_blank_values=True)
@@ -3132,6 +3143,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/book-reviews/{book_id}', book_review, methods=['GET', 'PUT', 'DELETE']),
+        Route('/api/reading-sessions/{book_id}/summary', reading_session_summary, methods=['GET']),
         Route('/api/reading-sessions/{book_id}/heartbeat', reading_session_heartbeat, methods=['POST']),
         Route('/api/reading-insights', reading_insights, methods=['GET']),
         Route('/api/ai/status', ai_status, methods=['GET']),
