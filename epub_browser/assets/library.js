@@ -785,7 +785,7 @@ function initScript() {
             button.disabled = true;
             return;
         }
-        if (label) label.textContent = label.getAttribute('data-i18n') ? t(label.getAttribute('data-i18n')) : button.dataset.libraryFeatureLabel;
+        if (label) label.textContent = label.dataset.i18n ? t(label.dataset.i18n) : button.dataset.libraryFeatureLabel;
         if (icon && button.dataset.libraryFeatureIcon) icon.className = button.dataset.libraryFeatureIcon;
         button.classList.remove('is-loading');
         button.removeAttribute('aria-busy');

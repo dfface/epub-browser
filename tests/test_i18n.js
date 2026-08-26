@@ -90,7 +90,7 @@ test('translates the local annotation sharing actions in all five supported loca
   });
 });
 
-test('localizes private review validation and lifecycle messages in all five supported locales', () => {
+test('localizes private review and reading-insight copy in all five supported locales', () => {
   const keys = [
     'bookReviews.title',
     'bookReviews.rating',
@@ -104,6 +104,38 @@ test('localizes private review validation and lifecycle messages in all five sup
     'bookReviews.saved',
     'bookReviews.deleted',
     'bookReviews.deleteConfirm',
+    'readingInsights.navigation',
+    'readingInsights.description',
+    'readingInsights.pageTitle',
+    'readingInsights.library',
+    'readingInsights.privateKicker',
+    'readingInsights.title',
+    'readingInsights.intro',
+    'readingInsights.periodLabel',
+    'readingInsights.period.day',
+    'readingInsights.period.week',
+    'readingInsights.period.month',
+    'readingInsights.rangeLabel',
+    'readingInsights.previousRange',
+    'readingInsights.nextRange',
+    'readingInsights.summaryLabel',
+    'readingInsights.total',
+    'readingInsights.topBook',
+    'readingInsights.days',
+    'readingInsights.selectedDay',
+    'readingInsights.empty',
+    'readingInsights.emptyDay',
+    'readingInsights.loading',
+    'readingInsights.loaded',
+    'readingInsights.error',
+    'readingInsights.unknownBook',
+    'readingInsights.unknownChapter',
+    'readingInsights.session.start',
+    'readingInsights.session.book',
+    'readingInsights.session.chapter',
+    'readingInsights.session.duration',
+    'readingSessions.pending',
+    'readingSessions.error',
   ];
   ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
     keys.forEach(key => assert.ok(dictionaries[locale][key], `${locale}:${key}`));

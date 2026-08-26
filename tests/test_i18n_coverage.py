@@ -22,6 +22,9 @@ FIRST_PARTY = [
             'annotation.js',
             'annotation-hub.js',
             'reading-progress.js',
+            'book-reviews.js',
+            'reading-sessions.js',
+            'reading-insights.js',
             'version-check.js',
         )
     ],
@@ -36,7 +39,7 @@ PROPERTY_ASSIGNMENT = re.compile(
 SET_ATTRIBUTE_START = re.compile(r"\.\s*setAttribute\s*\(")
 VISIBLE_LITERAL = re.compile(r"(?P<quote>['\"])(?P<text>[A-Za-z][^'\"\r\n]*)(?P=quote)")
 TRANSLATION_KEY_ARGUMENT = re.compile(
-    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t|localized))\s*\(\s*$"
+    r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t|localized|translate))\s*\(\s*$"
 )
 DICTIONARY_KEY = re.compile(r"^\s*'(?P<key>[^']+)':", re.MULTILINE)
 KNOWN_TRANSLATION_KEYS = {
@@ -49,6 +52,8 @@ TR_NAMESPACES = {
     'bookshelf.js': 'bookshelf.',
     'annotation.js': 'annotations.',
     'annotation-hub.js': 'annotations.',
+    'book-reviews.js': 'bookReviews.',
+    'reading-insights.js': 'readingInsights.',
     'dialog.js': 'dialog.',
 }
 HTML_TAG = re.compile(r"<(?P<name>[A-Za-z][\w:-]*)\b(?P<attributes>[^>]*)>", re.DOTALL)
@@ -87,10 +92,23 @@ def add_failure(failures, source, path, position, reason):
 
 
 def is_known_translation_key(value, literal, path):
+    key = literal.group('text')
+    if path.name == 'reading-insights.js':
+        preceding = value[:literal.start()]
+        if (
+            key.startswith('readingInsights.')
+            and re.search(r"(?:^|[^\w.$])translate\s*\(\s*target\s*,\s*$", preceding)
+        ):
+            return key in KNOWN_TRANSLATION_KEYS
+        reading_call = re.search(
+            r"(?:^|[^\w.$])translate\s*\(\s*target\s*,\s*['\"](?P<key>readingInsights\.[A-Za-z0-9.]+)['\"]",
+            preceding,
+        )
+        if reading_call:
+            return reading_call.group('key') in KNOWN_TRANSLATION_KEYS
     call = TRANSLATION_KEY_ARGUMENT.search(value[:literal.start()])
     if not call:
         return False
-    key = literal.group('text')
     function = call.group('function').replace(' ', '')
     if function in {'tr', 'localized'}:
         namespace = TR_NAMESPACES.get(path.name)
