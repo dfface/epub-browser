@@ -135,8 +135,8 @@
     border-radius: 14px;
     background: color-mix(in srgb, var(--card-bg) 96%, transparent);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
-    font-family: var(--font-family, system-ui, -apple-system, sans-serif);
-    font-size: .9rem;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
     line-height: 1;
 }
 
@@ -149,7 +149,7 @@
     border-radius: 10px;
     background: transparent;
     color: var(--text);
-    font: 650 .9rem/1 var(--font-family, system-ui, -apple-system, sans-serif);
+    font: 650 14px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     cursor: pointer;
     touch-action: manipulation;
 }

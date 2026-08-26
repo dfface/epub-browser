@@ -1297,10 +1297,10 @@
                 self.cancelPendingDraft();
             }, 'annotation-btn-copy');
             actionButton('highlight', function() {
-                self.showColorPicker(source, 'highlight');
+                self.createAnnotationFromSource(source, Settings.defaultColor, '');
             });
             actionButton('noteAction', function() {
-                self.showNoteDialog(source, Settings.defaultColor);
+                self.showNoteDialog(source);
             });
             if (global.EpubBrowserMode === 'server' && global.EpubBrowserDictionary) {
                 actionButton('dictionary', function() {
@@ -1354,92 +1354,78 @@
             dialog.style.top = Math.round(top) + 'px';
         },
 
-        showColorPicker: function(source, intent) {
+        showNoteDialog: function(source) {
             var self = this;
             this.closeDialog();
             var dialog = document.createElement('div');
-            dialog.className = 'annotation-dialog annotation-dialog-compact annotation-color-choice';
-            dialog.setAttribute('role', 'dialog');
-            dialog.setAttribute('aria-label', tr('color'));
-            var body = document.createElement('div');
-            body.className = 'annotation-compact-body';
-            var label = document.createElement('div');
-            label.className = 'annotation-color-choice-label';
-            label.textContent = tr('color');
-            var colors = document.createElement('div');
-            colors.className = 'color-options-compact';
-            CONFIG.getColors().slice(0, 7).forEach(function(color) {
-                var choice = document.createElement('button');
-                choice.type = 'button';
-                choice.className = 'color-option-compact' + (color === Settings.defaultColor ? ' selected' : '');
-                choice.style.backgroundColor = color;
-                choice.setAttribute('aria-label', tr('color') + ' ' + color);
-                choice.addEventListener('click', function() {
-                    if (intent === 'note') self.showNoteDialog(source, color);
-                    else self.createAnnotationFromSource(source, color, '');
-                });
-                colors.appendChild(choice);
-            });
-            body.appendChild(label);
-            body.appendChild(colors);
-            dialog.appendChild(body);
-            document.body.appendChild(dialog);
-            this.positionFloatingDialog(dialog, this.getSourceAnchorRect(source));
-            this.activeDialog = dialog;
-            setTimeout(function() {
-                if (self.activeDialog !== dialog) return;
-                self.outsideClickHandler = function(event) {
-                    if (!dialog.contains(event.target)) self.cancelPendingDraft();
-                };
-                document.addEventListener('click', self.outsideClickHandler);
-            }, 10);
-        },
-
-        showNoteDialog: function(source, initialColor) {
-            var self = this;
-            this.closeDialog();
-            var dialog = document.createElement('div');
-            dialog.className = 'annotation-dialog annotation-dialog-compact';
+            dialog.className = 'annotation-dialog annotation-note-dialog';
             dialog.setAttribute('role', 'dialog');
             dialog.setAttribute('aria-label', tr('noteAction'));
+            var header = document.createElement('div');
+            header.className = 'annotation-dialog-header';
+            var title = document.createElement('span');
+            title.textContent = tr('noteAction');
+            header.appendChild(title);
+            var close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'annotation-dialog-close';
+            close.textContent = '×';
+            close.setAttribute('aria-label', tr('close'));
+            header.appendChild(close);
             var body = document.createElement('div');
-            body.className = 'annotation-compact-body';
+            body.className = 'annotation-dialog-body';
+            var preview = document.createElement('div');
+            preview.className = 'annotation-dialog-text';
+            preview.textContent = String(source.text || '').slice(0, 160);
+            body.appendChild(preview);
+            var colorPicker = document.createElement('div');
+            colorPicker.className = 'annotation-color-picker';
+            var colorLabel = document.createElement('label');
+            colorLabel.textContent = tr('color');
             var input = document.createElement('textarea');
-            input.className = 'annotation-compact-note';
             input.setAttribute('aria-label', tr('note'));
             var i18n = window.EpubBrowserI18n;
             input.placeholder = i18n && i18n.t ? i18n.t('annotations.noteOptional') : tr('noteOptional');
             var colors = document.createElement('div');
-            colors.className = 'color-options-compact';
-            var selectedColor = initialColor || Settings.defaultColor;
-            CONFIG.getColors().slice(0, 7).forEach(function(color) {
+            colors.className = 'color-options';
+            var selectedColor = Settings.defaultColor;
+            CONFIG.getColors().slice(0, 5).forEach(function(color) {
                 var choice = document.createElement('button');
                 choice.type = 'button';
-                choice.className = 'color-option-compact' + (color === selectedColor ? ' selected' : '');
+                choice.className = 'color-option' + (color === selectedColor ? ' selected' : '');
                 choice.style.backgroundColor = color;
                 choice.setAttribute('aria-label', tr('color') + ' ' + color);
                 choice.addEventListener('click', function() {
                     selectedColor = color;
-                    colors.querySelectorAll('.color-option-compact').forEach(function(option) {
+                    colors.querySelectorAll('.color-option').forEach(function(option) {
                         option.classList.toggle('selected', option === choice);
                     });
                 });
                 colors.appendChild(choice);
             });
-            body.appendChild(colors);
-            body.appendChild(input);
+            colorPicker.appendChild(colorLabel);
+            colorPicker.appendChild(colors);
+            var noteInput = document.createElement('div');
+            noteInput.className = 'annotation-note-input';
+            var noteLabel = document.createElement('label');
+            noteLabel.textContent = tr('note');
+            noteInput.appendChild(noteLabel);
+            noteInput.appendChild(input);
+            body.appendChild(colorPicker);
+            body.appendChild(noteInput);
             var footer = document.createElement('div');
-            footer.className = 'annotation-compact-footer';
+            footer.className = 'annotation-dialog-footer';
             var cancel = document.createElement('button');
             cancel.type = 'button'; cancel.className = 'annotation-btn annotation-btn-cancel'; cancel.textContent = tr('cancel');
             var save = document.createElement('button');
             save.type = 'button'; save.className = 'annotation-btn annotation-btn-confirm'; save.textContent = tr('save');
             footer.appendChild(cancel); footer.appendChild(save);
-            dialog.appendChild(body); dialog.appendChild(footer);
+            dialog.appendChild(header); dialog.appendChild(body); dialog.appendChild(footer);
             document.body.appendChild(dialog);
             this.positionFloatingDialog(dialog, this.getSourceAnchorRect(source));
             this.activeDialog = dialog;
             input.focus();
+            close.addEventListener('click', function() { self.cancelPendingDraft(); });
             cancel.addEventListener('click', function() { self.cancelPendingDraft(); });
             save.addEventListener('click', function() {
                 self.createAnnotationFromSource(source, selectedColor, input.value.trim());

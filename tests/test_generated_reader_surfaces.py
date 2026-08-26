@@ -1723,6 +1723,15 @@ assert.deepEqual(
         self.assertIn('annotation-btn-copy', script)
         self.assertIn('copyText(source.text)', script)
 
+    def test_new_annotation_actions_keep_highlight_immediate_and_note_familiar(self):
+        script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+
+        self.assertIn("self.createAnnotationFromSource(source, Settings.defaultColor, '');", script)
+        self.assertNotIn('showColorPicker', script)
+        self.assertIn("dialog.className = 'annotation-dialog annotation-note-dialog';", script)
+        self.assertIn("CONFIG.getColors().slice(0, 5)", script)
+        self.assertIn("footer.className = 'annotation-dialog-footer';", script)
+
     def test_annotation_storage_exposes_reading_independent_read_apis(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 
