@@ -264,6 +264,116 @@ class ModeIntegrationTests(unittest.TestCase):
             ).is_file()
         )
 
+    def test_private_reading_insights_survive_restart_without_reconverting_content(self):
+        server_dir = self.root / "server"
+        converter = mock.Mock(side_effect=EPUBProcessor)
+        database_path = server_dir / "data" / "epub-browser.db"
+        observed = {"content": None}
+
+        def library_factory(**kwargs):
+            return ServerLibraryManager(
+                converter_factory=converter,
+                max_workers=1,
+                **kwargs,
+            )
+
+        def snapshot_content(book_id):
+            content = server_dir / "cache" / "public" / "book" / book_id / "content"
+            return {
+                path.relative_to(content).as_posix(): path.read_bytes()
+                for path in sorted(content.rglob("*"))
+                if path.is_file()
+            }
+
+        class InspectingServer:
+            started = True
+
+            def __init__(self, config):
+                self.config = config
+
+            def run(self):
+                with TestClient(self.config.app) as client:
+                    login = _json_login(client, "admin", "admin-secret")
+                    if login.status_code != 200:
+                        raise RuntimeError("runtime administrator login failed")
+                    deadline = time.monotonic() + 5
+                    while time.monotonic() < deadline:
+                        if client.get("/api/health").json()["state"] in {"ready", "degraded"}:
+                            break
+                        time.sleep(0.01)
+                    else:
+                        raise RuntimeError("initial Server reconciliation did not finish")
+
+                    store = StateStore(database_path)
+                    book_id = store.active_books()[0].book_id
+                    csrf = client.get("/api/session").json()["csrf_token"]
+                    if observed["content"] is None:
+                        observed["content"] = snapshot_content(book_id)
+                        review = client.put(
+                            "/api/book-reviews/" + book_id,
+                            json={"rating": 5, "review_text": "Private note"},
+                            headers={"X-CSRF-Token": csrf},
+                        )
+                        if review.status_code != 200:
+                            raise RuntimeError("private review route failed")
+                        heartbeat = client.post(
+                            "/api/reading-sessions/" + book_id + "/heartbeat",
+                            json={
+                                "client_id": "mode-integration-tab",
+                                "client_sequence": 1,
+                                "chapter_index": 0,
+                                "active_seconds": 15,
+                            },
+                            headers={"X-CSRF-Token": csrf},
+                        )
+                        if heartbeat.status_code != 200:
+                            raise RuntimeError("reading-session route failed")
+                        if client.get("/reading-insights").status_code != 200:
+                            raise RuntimeError("reading-insights page failed")
+                        if observed["content"] != snapshot_content(book_id):
+                            raise RuntimeError("private data changed EPUB content cache")
+                    else:
+                        if client.get("/api/book-reviews/" + book_id).json()["review"]["rating"] != 5:
+                            raise RuntimeError("private review did not survive restart")
+                        if client.get("/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC").status_code != 200:
+                            raise RuntimeError("reading insights API did not survive restart")
+                        if client.get("/reading-insights").status_code != 200:
+                            raise RuntimeError("reading-insights page did not survive restart")
+                        if observed["content"] != snapshot_content(book_id):
+                            raise RuntimeError("restart changed EPUB content cache")
+
+        config = parse_cli(
+            [
+                "server",
+                str(self.source),
+                "--server-dir",
+                str(server_dir),
+                "--no-browser",
+            ]
+        )
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(
+                run_server(
+                    config,
+                    server_factory=InspectingServer,
+                    library_factory=library_factory,
+                ),
+                0,
+            )
+        self.assertEqual(converter.call_count, 1)
+
+        converter.reset_mock()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(
+                run_server(
+                    config,
+                    server_factory=InspectingServer,
+                    library_factory=library_factory,
+                ),
+                0,
+            )
+        converter.assert_not_called()
+
     def test_ssg_cli_output_is_quiet_without_log_and_detailed_with_log(self):
         quiet_output = self.root / "quiet"
         stdout = io.StringIO()

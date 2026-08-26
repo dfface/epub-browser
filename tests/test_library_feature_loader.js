@@ -26,6 +26,7 @@ function createHarness({ deferAnimationFrames = false } = {}) {
     },
     documentElement: null,
     addEventListener() {},
+    querySelectorAll() { return []; },
   };
   const window = {
     document,

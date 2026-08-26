@@ -36,11 +36,16 @@ from .urls import SiteURLs
 
 
 def library_metadata(
-    records: Sequence[BookRecord], public_dir: Path, state_store: Optional[StateStore] = None
+    records: Sequence[BookRecord], public_dir: Path, state_store: Optional[StateStore] = None,
+    owner_user_id: Optional[str] = None,
 ) -> list[dict]:
     """Build the published, principal-filtered catalog without writing it."""
     public_root = Path(public_dir)
     books = []
+    ratings = (
+        state_store.book_review_ratings(owner_user_id, [record.book_id for record in records])
+        if state_store is not None and owner_user_id is not None else {}
+    )
     for record in records:
         book_root = public_root / "book" / record.book_id
         if not (
@@ -69,6 +74,7 @@ def library_metadata(
                     if isinstance(cover, str) and cover
                     else None
                 ),
+                "rating": ratings.get(record.book_id),
             }
         )
     return books

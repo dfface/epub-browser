@@ -151,21 +151,6 @@ function isKindleMode() {
     return isKindle;
 }
 
-function restoreOrder(storageKey, elementClass) {
-    var savedOrder = localStorage.getItem(storageKey);
-    if (savedOrder) {
-        var itemIds = JSON.parse(savedOrder);
-        var container = document.querySelector('.' + elementClass);
-        
-        itemIds.forEach(function(id) {
-            var element = document.querySelector('[data-id="' + id + '"]');
-            if (element) {
-                container.appendChild(element);
-            }
-        });
-    }
-}
-
 function scopeCSS(cssText, scopeSelector) {
   if (!scopeSelector) scopeSelector = '[data-eb-styles]';
   var keyframesMap = {};
@@ -400,8 +385,6 @@ function initScript() {
         document.getElementById('fontFamilySelect').appendChild(opt);
     });
 
-    var storageKeySortableContainer = 'chapter-container-sortable-order';
-
     if (!isKindleMode()) {
         var currentPaginationMode = "false";
         if (window.epubBrowserCache && window.epubBrowserCache.turning) {
@@ -466,7 +449,6 @@ function initScript() {
             }
         }
         
-        restoreOrder(storageKeySortableContainer, 'container');
     } else {
         var currentPaginationMode = getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
@@ -490,26 +472,6 @@ function initScript() {
     updateFontFamily(fontFamily, fontFamilyInput);
 
     document.addEventListener('keydown', handleKeyDown);
-
-    var el = document.querySelector('.container');
-    if (!isKindleMode()) {
-        var sortable = Sortable.create(el, {
-            delay: 300,
-            delayOnTouchOnly: true,
-            filter: '#eb-content, #pageJumpInput, .page-height-adjustment, #customCssInput',
-            preventOnFilter: false,
-            onStart: function(evt) {
-                var sel = window.getSelection();
-                if (sel.toString().length > 0) return false;
-            },
-            onEnd: function(evt) {
-                var ids = Array.prototype.map.call(evt.from.children, function(c) {
-                    return c.dataset.id;
-                });
-                localStorage.setItem(storageKeySortableContainer, JSON.stringify(ids));
-            }
-        });
-    }
 
     document.querySelectorAll('.eb-content').forEach(function(item) {
         item.addEventListener('dblclick', function(e) {
@@ -780,9 +742,14 @@ function initScript() {
         pageJumpInput.value = currentPage+1;
     }
     
-    function showPage(idx) {
+    function announceReadingSessionPageTurn() {
+        window.dispatchEvent(new CustomEvent('epub:reader-page-turn'));
+    }
+
+    function showPage(idx, fromReaderNavigation) {
         if (idx < 0) idx = 0;
         if (idx >= totalPages) idx = totalPages-1;
+        var pageChanged = idx !== currentPage;
         var pos = getPaginationScrollPosition(idx);
         content.scrollTo(pos, 0);
         currentPage = idx;
@@ -793,6 +760,7 @@ function initScript() {
         updateNavButtons();
         saveReadingProgress();
         updateTocHighlight();
+        if (fromReaderNavigation && pageChanged) announceReadingSessionPageTurn();
     }
     
     function updateNavButtons() {
@@ -901,7 +869,7 @@ function initScript() {
     goToPageBtn.addEventListener('click', function() {
         var n = parseInt(pageJumpInput.value,10);
         if (n >=1 && n <= totalPages) {
-            showPage(n-1);
+            showPage(n-1, true);
         } else {
             showNotification(i18n.t('reader.pageRange', { total: totalPages }), 'warning');
             pageJumpInput.value = currentPage+1;
@@ -1060,6 +1028,13 @@ function initScript() {
         scrollToChapterTarget(target);
     }
 
+    function announceReadingSessionChapter(chapterIndex, chapterLabel) {
+        if (!window.CustomEvent || !window.dispatchEvent) return;
+        window.dispatchEvent(new CustomEvent('epub-browser:chapter-change', {
+            detail: { chapterIndex: chapterIndex, chapterLabel: chapterLabel || '' }
+        }));
+    }
+
     function replaceReaderChapterContent(chapterContent, source, target) {
         if (window.AnnotationModule && typeof window.AnnotationModule.closeTransient === 'function') {
             window.AnnotationModule.closeTransient();
@@ -1078,6 +1053,10 @@ function initScript() {
         pendingAnnotationId = requestedAnnotationId();
         syncChapterScopedControls(target.index);
         refreshPartialChapterCanvas(target.index);
+        announceReadingSessionChapter(
+            target.index,
+            content.getAttribute('data-chapter-title') || ''
+        );
     }
 
     function updateReaderChapterHistory(target, options) {
@@ -1107,6 +1086,10 @@ function initScript() {
                 setBookTocActiveChapter(target.index, true);
                 if (!isKindleMode()) localStorage.setItem(book_hash, 'eb_ci_' + target.index + (target.hash || ''));
                 else setCookie(book_hash, 'eb_ci_' + target.index + (target.hash || ''));
+                announceReadingSessionChapter(
+                    target.index,
+                    loadedChapter.getAttribute('data-chapter-title') || ''
+                );
                 scrollToContinuousChapterTarget(target, loadedChapter);
                 return true;
             }
@@ -1186,7 +1169,7 @@ function initScript() {
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
-                    if (currentPage>0) showPage(currentPage-1);
+                    if (currentPage>0) showPage(currentPage-1, true);
                     else {
                         var prev = document.querySelector(".prev-chapter").href;
                         if (prev === location.href) showNotification(i18n.t('reader.firstChapter'), 'warning');
@@ -1197,7 +1180,7 @@ function initScript() {
                 case 'Space':
                 case 'ArrowRight':
                     e.preventDefault();
-                    if (currentPage < totalPages-1) showPage(currentPage+1);
+                    if (currentPage < totalPages-1) showPage(currentPage+1, true);
                     else {
                         var next = document.querySelector(".next-chapter").href;
                         if (next === location.href) showNotification(i18n.t('reader.lastChapter'), 'warning');
@@ -1241,7 +1224,7 @@ function initScript() {
     }
 
     prevPageBtn.addEventListener('click', function() {
-        if (currentPage>0) showPage(currentPage-1);
+        if (currentPage>0) showPage(currentPage-1, true);
         else {
             var prev = document.querySelector(".prev-chapter").href;
             if (prev === location.href) showNotification(i18n.t('reader.first'), 'warning');
@@ -1250,7 +1233,7 @@ function initScript() {
     });
     
     nextPageBtn.addEventListener('click', function() {
-        if (currentPage < totalPages-1) showPage(currentPage+1);
+        if (currentPage < totalPages-1) showPage(currentPage+1, true);
         else {
             var next = document.querySelector(".next-chapter").href;
             if (next === location.href) showNotification(i18n.t('reader.last'), 'warning');
@@ -1962,7 +1945,7 @@ function initScript() {
                 if (!t) return;
                 if (isPaginationMode) {
                     var page = Math.floor(t.offsetLeft / pageWidth);
-                    showPage(page);
+                    showPage(page, true);
                 } else {
                     window.scrollTo({top: t.offsetTop-100, behavior:'smooth'});
                 }
@@ -2363,6 +2346,11 @@ function initScript() {
         syncChapterScopedControls(target.index);
         refreshPartialChapterCanvas(target.index);
 
+        announceReadingSessionChapter(
+            target.index,
+            content.getAttribute('data-chapter-title') || ''
+        );
+
         var chapterSection = document.createElement('section');
         chapterSection.className = 'continuous-chapter';
         chapterSection.setAttribute('data-chapter-index', target.index);
@@ -2432,6 +2420,13 @@ function initScript() {
         if (isNaN(currentIdx)) return;
         if (currentIdx === visibleChapterIndex) return;
         visibleChapterIndex = currentIdx;
+        var currentSection = content.querySelector(
+            '.continuous-chapter[data-chapter-index="' + currentIdx + '"]'
+        );
+        announceReadingSessionChapter(
+            currentIdx,
+            currentSection && currentSection.getAttribute('data-chapter-title') || ''
+        );
         localStorage.setItem(book_hash, 'eb_ci_' + currentIdx);
         updateContinuousScrollUrl(currentIdx);
         selectReadingChapter(currentIdx);

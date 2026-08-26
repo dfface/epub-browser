@@ -1,5 +1,11 @@
 """Reusable Server-only navigation, account, and administration chrome."""
 
+from datetime import datetime
+
+from .asset_publisher import PublishedAssets
+from .urls import SiteURLs
+from .version import render_footer
+
 SERVER_ACCOUNT_STYLESHEET = '<link rel="stylesheet" href="/assets/account.css">'
 SERVER_AUTH_SCRIPT = '<script src="/assets/auth.js" defer></script>'
 SERVER_LOCALE_SCRIPT = '<script src="/assets/locale-nav.js" defer></script>'
@@ -224,3 +230,83 @@ SERVER_ACCOUNT_PANEL = '''
 </div></div>
     </div>
 </div>'''
+
+
+def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) -> str:
+    """Render the private reading-insights shell without embedding user data."""
+    insights_css = assets.url_for('reading-insights.css')
+    insights_script = assets.url_for('reading-insights.js')
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#244548">
+<meta name="description" content="Private reading insights" data-i18n-content="readingInsights.description">
+<title data-i18n="readingInsights.pageTitle">Reading insights · EPUB Browser</title>
+<script src="/assets/i18n.js"></script>
+<script>window.EpubBrowserBasePath={urls.base_path!r};window.EpubBrowserMode="server";window.EpubBrowserI18n.init();</script>
+<link rel="stylesheet" href="/assets/fa.all.min.css">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/notification.css">
+<link rel="stylesheet" href="/assets/dialog.css">
+<link rel="stylesheet" href="/assets/library.css?v=13">
+<link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
+<link rel="stylesheet" href="/assets/loading.css?v=15">
+{SERVER_ACCOUNT_STYLESHEET}
+<link rel="stylesheet" href="{insights_css}">
+<script>try{{var epubBrowserTheme=localStorage.getItem("theme")||"light";document.documentElement.classList.add(epubBrowserTheme+"-mode");}}catch(error){{document.documentElement.classList.add("light-mode");}}</script>
+</head>
+<body>
+<header class="app-header">
+  <nav class="app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
+    <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
+    <div class="app-nav-links">
+      <a class="app-nav-link" href="/" data-i18n="readingInsights.library">Library</a>
+      <a class="app-nav-link is-active" href="/reading-insights" aria-current="page" data-i18n="readingInsights.navigation">Reading insights</a>
+    </div>
+    <div class="app-nav-actions">
+      {SERVER_LOCALE_CONTROL}
+      <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
+      {SERVER_ACCOUNT_CONTROL}
+    </div>
+  </nav>
+</header>
+<main class="reading-insights-page" data-reading-insights tabindex="-1" aria-busy="true" aria-labelledby="readingInsightsTitle">
+  <section class="reading-insights-heading">
+    <p class="reading-insights-kicker" data-i18n="readingInsights.privateKicker">Private to your account</p>
+    <h1 id="readingInsightsTitle" data-i18n="readingInsights.title">Reading insights</h1>
+    <p data-i18n="readingInsights.intro">See when you actively read and where your time went.</p>
+  </section>
+  <section class="reading-insights-periods" aria-label="Reading period" data-i18n-aria-label="readingInsights.periodLabel">
+    <button type="button" data-reading-insights-period="day" aria-pressed="false" data-i18n="readingInsights.period.day">Day</button>
+    <button type="button" data-reading-insights-period="week" aria-pressed="true" data-i18n="readingInsights.period.week">Week</button>
+    <button type="button" data-reading-insights-period="month" aria-pressed="false" data-i18n="readingInsights.period.month">Month</button>
+  </section>
+  <nav class="reading-insights-range" aria-label="Reading range" data-i18n-aria-label="readingInsights.rangeLabel">
+    <button type="button" data-reading-insights-previous aria-label="Previous range" data-i18n-aria-label="readingInsights.previousRange" data-i18n="readingInsights.previousRange">Previous range</button>
+    <p class="reading-insights-range-label" data-reading-insights-range-label aria-live="polite" aria-atomic="true">—</p>
+    <button type="button" data-reading-insights-next aria-label="Next range" data-i18n-aria-label="readingInsights.nextRange" data-i18n="readingInsights.nextRange">Next range</button>
+  </nav>
+  <p class="reading-insights-live" data-reading-insights-live role="status" aria-live="polite" aria-atomic="true" data-i18n="readingInsights.loading">Loading reading insights…</p>
+  <section class="reading-insights-summary" aria-label="Reading summary" data-i18n-aria-label="readingInsights.summaryLabel">
+    <article class="reading-insights-summary-card"><p data-i18n="readingInsights.total">Active reading</p><strong data-reading-insights-total>—</strong></article>
+    <article class="reading-insights-summary-card"><p data-i18n="readingInsights.topBook">Top book</p><strong data-reading-insights-top-book>—</strong></article>
+  </section>
+  <section class="reading-insights-days" aria-labelledby="readingInsightsDaysTitle"><h2 id="readingInsightsDaysTitle" data-i18n="readingInsights.days">Days</h2><div class="reading-insights-day-list" data-reading-insights-days></div></section>
+  <section class="reading-insights-sessions" aria-labelledby="readingInsightsSelectedDay"><h2 id="readingInsightsSelectedDay" data-reading-insights-selected-day data-i18n="readingInsights.selectedDay">Selected day</h2><ol data-reading-insights-sessions></ol></section>
+</main>
+{SERVER_ACCOUNT_PANEL}
+{render_footer(datetime.now().year, release_api_url='/api/version')}
+<script src="/assets/cache-boundary.js" defer></script>
+<script src="/assets/notification.js" defer></script>
+{SERVER_AUTH_SCRIPT}
+<script src="/assets/theme.js" defer></script>
+<script src="/assets/dialog.js" defer></script>
+<script src="/assets/version-check.js" defer></script>
+{SERVER_LOCALE_SCRIPT}
+<script src="{insights_script}" defer></script>
+<script>document.addEventListener("DOMContentLoaded",function(){{function start(){{if(!window.EpubBrowserAuth||!window.EpubReadingInsights)return;window.EpubBrowserAuth.init().then(function(session){{if(session)window.EpubReadingInsights.mount(document.querySelector("[data-reading-insights]"));}});}}if(window.EpubBrowserCacheBoundary)window.EpubBrowserCacheBoundary.start(start);else start();}});</script>
+</body>
+</html>'''

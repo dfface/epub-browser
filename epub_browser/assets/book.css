@@ -179,6 +179,21 @@ body {
     margin-bottom: 0;
 }
 
+.book-reading-time {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: .9rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+}
+
+.book-reading-time i { color: var(--button-bg); }
+.book-reading-time[hidden] { display: none; }
+
 .continue-reading-control {
     position: relative;
     display: inline-flex;
@@ -581,11 +596,20 @@ body {
 }
 
 .book-info-cover {
-    flex: 0 0 150px;
+    flex: 0 0 auto;
+    width: 150px;
     height: 200px;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.book-info-cover-wrap {
+    flex: 0 0 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
 }
 
 .book-info-cover img {
@@ -897,42 +921,50 @@ body {
 }
 
 
-/* 移动端：当 book-info-desc 不为空时，改为上下排列 */
+/* 移动端：当简介或私密书评存在时，改为上下排列 */
 @media (max-width: 768px) {
-    .book-info-card:has(.book-info-desc) {
+    .book-info-card:has(.book-info-desc),
+    .book-info-card:has([data-book-reviews]) {
         flex-direction: column;
         align-items: center;
         text-align: center;
     }
     
-    .book-info-card:has(.book-info-desc) .book-info-cover {
+    .book-info-card:has(.book-info-desc) .book-info-cover-wrap,
+    .book-info-card:has([data-book-reviews]) .book-info-cover-wrap {
         flex: 0 0 auto;
+        align-self: center;
         margin-bottom: 20px;
     }
     
-    .book-info-card:has(.book-info-desc) .book-info-content {
+    .book-info-card:has(.book-info-desc) .book-info-content,
+    .book-info-card:has([data-book-reviews]) .book-info-content {
         flex: 1;
         width: 100%;
     }
     
     /* 确保 tags 和 controls 也居中 */
-    .book-info-card:has(.book-info-desc) .book-info-tags {
+    .book-info-card:has(.book-info-desc) .book-info-tags,
+    .book-info-card:has([data-book-reviews]) .book-info-tags {
         justify-content: center;
     }
     
-    .book-info-card:has(.book-info-desc) .css-controls {
+    .book-info-card:has(.book-info-desc) .css-controls,
+    .book-info-card:has([data-book-reviews]) .css-controls {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
         gap: 10px;
     }
     
-    .book-info-card:has(.book-info-desc) .css-btn {
+    .book-info-card:has(.book-info-desc) .css-btn,
+    .book-info-card:has([data-book-reviews]) .css-btn {
         flex: 0 0 auto;
     }
     
     /* 调整内边距和间距 */
-    .book-info-card:has(.book-info-desc) {
+    .book-info-card:has(.book-info-desc),
+    .book-info-card:has([data-book-reviews]) {
         padding: 20px;
         gap: 20px;
     }

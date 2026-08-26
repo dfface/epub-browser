@@ -29,8 +29,11 @@ class ServerPageRenderer:
         self.urls = urls or SiteURLs()
         self.content_dir = self.public_dir / "book" / self.book_id / "content"
 
-    def render_index(self) -> str:
-        return self._processor().create_index_page(write=False)
+    def render_index(self, initial_book_review=None) -> str:
+        return self._processor().create_index_page(
+            write=False,
+            initial_book_review=initial_book_review,
+        )
 
     def render_chapter(self, chapter_index: int) -> str:
         payload = self._read_json(self.content_dir / f"chapter_{chapter_index}.json")

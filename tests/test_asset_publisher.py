@@ -164,6 +164,11 @@ class AssetPublisherTests(unittest.TestCase):
     def test_excluded_assets_are_not_written_or_listed(self):
         self.assertIn('account.css', SERVER_ONLY_ASSET_PATHS)
         self.assertIn('auth.js', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('book-reviews.css', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('book-reviews.js', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('reading-sessions.js', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('reading-insights.css', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('reading-insights.js', SERVER_ONLY_ASSET_PATHS)
         with tempfile.TemporaryDirectory() as output:
             published = AssetPublisher(
                 Path("epub_browser/assets"),

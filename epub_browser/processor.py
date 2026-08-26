@@ -1415,7 +1415,7 @@ class EPUBProcessor:
         # print(f"Web interface created at: {self.web_dir}")
         return self.web_dir
     
-    def create_index_page(self, write=True):
+    def create_index_page(self, write=True, initial_book_review=None):
         """创建章节索引页面"""
         sync_shelf_button = (
             ""
@@ -1462,11 +1462,23 @@ class EPUBProcessor:
             "annotationHub": self.asset_manifest.url_for("annotation-hub.js"),
             "sortable": self.asset_manifest.url_for("sortable.min.js"),
         }, separators=(",", ":"))
+        if self.deployment_mode == "server":
+            book_feature_assets = json.dumps({
+                **json.loads(book_feature_assets),
+                "readingInsightsCss": self.asset_manifest.url_for("reading-insights.css"),
+                "readingInsights": self.asset_manifest.url_for("reading-insights.js"),
+            }, separators=(",", ":"))
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
+        reading_insights_navigation = (
+            '<button type="button" class="app-nav-link" data-reading-insights '
+            'aria-haspopup="dialog"><i class="fas fa-chart-column" '
+            'aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'
             if self.deployment_mode == "server" else ""
         )
         ai_reading_indicators = (
@@ -1484,6 +1496,88 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         ai_book_chat_script = ""
+        book_review_assets = (
+            '<link rel="stylesheet" href="' + self.asset_manifest.url_for("book-reviews.css") + '">'
+            '<script src="' + self.asset_manifest.url_for("book-reviews.js") + '" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
+        book_review_panel = (
+            f'<div class="book-review-modal" data-book-review-modal hidden>'
+            f'<section class="book-review-dialog" id="book-review-dialog" role="dialog" '
+            f'aria-modal="true" aria-label="Write review" data-i18n-aria-label="bookReviews.write" tabindex="-1">'
+            f'<section data-book-reviews data-book-id="{book_id_attribute}"></section>'
+            f'</section></div>'
+            if self.deployment_mode == "server" else ""
+        )
+        # Book reviews are account-private runtime data.  In Server mode the
+        # authenticated request may provide the current user's review so the
+        # first paint already reserves its final position.  Never use this in
+        # SSG output or persist it in the EPUB-derived content cache.
+        initial_review = None
+        if self.deployment_mode == "server" and isinstance(initial_book_review, dict):
+            initial_rating = initial_book_review.get("rating")
+            initial_text = initial_book_review.get("review_text")
+            if (
+                isinstance(initial_rating, int)
+                and not isinstance(initial_rating, bool)
+                and 1 <= initial_rating <= 5
+                and isinstance(initial_text, str)
+            ):
+                initial_review = {
+                    "rating": initial_rating,
+                    "review_text": initial_text,
+                }
+        if self.deployment_mode != "server":
+            book_review_display = ""
+            book_review_initial_data = ""
+        elif initial_review is None:
+            book_review_display = (
+                f'<section class="book-review-display" data-book-review-display '
+                f'data-book-id="{book_id_attribute}" hidden></section>'
+            )
+            book_review_initial_data = ""
+        else:
+            review_rating = initial_review["rating"]
+            review_text = initial_review["review_text"]
+            review_copy = html.escape(review_text, quote=False)
+            review_stars = "★★★★★"[:review_rating]
+            review_body = (
+                f'<p class="book-review-display-copy is-collapsed">{review_copy}</p>'
+                f'<button type="button" class="book-review-expand" data-book-review-expand '
+                f'aria-expanded="false"{"" if len(review_text) > 100 else " hidden"} '
+                f'data-i18n="bookReviews.showMore">Show more</button>'
+                if review_text else ""
+            )
+            book_review_display = f'''<section class="book-review-display" data-book-review-display data-book-id="{book_id_attribute}">
+        <div class="book-review-display-header">
+            <h2 data-i18n="bookReviews.title">My review</h2>
+            <span class="book-review-display-rating" aria-label="{review_rating}/5">
+                <span aria-hidden="true">{review_stars}</span><span class="book-review-display-score">{review_rating}/5</span>
+            </span>
+        </div>
+        {review_body}
+    </section>'''
+            initial_review_json = json.dumps(initial_review, ensure_ascii=False).replace("<", "\\u003c").replace(
+                ">", "\\u003e"
+            ).replace("&", "\\u0026")
+            book_review_initial_data = (
+                '<script type="application/json" data-book-review-initial>'
+                + initial_review_json
+                + '</script>'
+            )
+        book_review_trigger = (
+            '<button type="button" class="css-btn secondary" data-book-review-toggle '
+            'aria-controls="book-review-dialog" aria-expanded="false">'
+            '<i class="fas fa-pen" aria-hidden="true"></i>'
+            '<span data-i18n="bookReviews.write">Write review</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
+        book_reading_time = (
+            '<p class="book-reading-time" data-book-reading-time hidden>'
+            '<i class="fas fa-chart-column" aria-hidden="true"></i>'
+            '<span data-book-reading-time-label></span></p>'
+            if self.deployment_mode == "server" else ""
+        )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -1515,6 +1609,7 @@ class EPUBProcessor:
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     {server_account_stylesheet}
+    {book_review_assets}
 """
         index_html += """
     <script>
@@ -1598,6 +1693,7 @@ class EPUBProcessor:
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
+            {reading_insights_navigation}
             {ai_reading_navigation}
         </div>
         <div class="app-nav-actions">
@@ -1609,8 +1705,11 @@ class EPUBProcessor:
 </header>
 <div class="container">
     <div class="book-info-card" data-id="book-info-card">
-            <div class="book-info-cover">
-                <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
+            <div class="book-info-cover-wrap">
+                <div class="book-info-cover">
+                    <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
+                </div>
+                {book_reading_time}
             </div>
             <div class="book-info-content">
                 <h2 class="book-info-title" lang="{book_language}">{book_title_text}</h2>
@@ -1647,9 +1746,13 @@ class EPUBProcessor:
                     </div>
                     {ai_book_chat_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
+                    {book_review_trigger}
                 </div>
             </div>
     </div>
+    {book_review_display}
+    {book_review_initial_data}
+    {book_review_panel}
     <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
         <div class="toc-header">
             <h2 data-i18n="book.tableOfContents">Table of contents</h2>
@@ -1777,10 +1880,18 @@ class EPUBProcessor:
         startup = (
             """function startBookClients() {
     if (!window.EpubBrowserAuth) return;
-    window.EpubBrowserAuth.init().then(function(session) {
-        if (!session) return;
-        if (window.initScriptBook) window.initScriptBook();
-    });
+        window.EpubBrowserAuth.init().then(function(session) {
+            if (!session) return;
+            if (window.initScriptBook) window.initScriptBook();
+            var reviewRoot = document.querySelector('[data-book-reviews]');
+            if (reviewRoot && window.EpubBookReviews) {
+                window.EpubBookReviews.mount(
+                    reviewRoot,
+                    reviewRoot.getAttribute('data-book-id'),
+                    document.querySelector('[data-book-review-display]')
+                );
+            }
+        });
 }
 if (window.EpubBrowserCacheBoundary) {
     window.EpubBrowserCacheBoundary.start(startBookClients);
@@ -2406,6 +2517,12 @@ document.addEventListener('DOMContentLoaded', function() {{
             '<span data-i18n="ai.library">AI readings</span></button>'
             if self.deployment_mode == "server" else ""
         )
+        reading_insights_navigation = (
+            '<button type="button" class="app-nav-link" data-reading-insights '
+            'aria-haspopup="dialog"><i class="fas fa-chart-column" '
+            'aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
             if self.deployment_mode == "server" else ""
@@ -2427,6 +2544,15 @@ document.addEventListener('DOMContentLoaded', function() {{
         dictionary_assets = (
             '<link rel="stylesheet" href="/assets/dictionary.css">\n'
             '<script src="/assets/dictionary.js" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
+        reading_session_context = (
+            f'<meta data-reading-session data-book-id="{book_id_attribute}" '
+            f'data-chapter-index="{chapter_index}" data-chapter-label="{chapter_title_attribute}">'
+            if self.deployment_mode == "server" else ""
+        )
+        reading_session_script = (
+            '<script src="' + self.asset_manifest.url_for("reading-sessions.js") + '" defer></script>'
             if self.deployment_mode == "server" else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
@@ -2460,6 +2586,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{chapter_title_text} - {book_title_text}</title>
+    {reading_session_context}
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
     {ai_feature_assets}
@@ -2605,6 +2732,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <div class="app-nav-links">
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+                {reading_insights_navigation}
                 {ai_reading_navigation}
             </div>
             <div class="app-nav-actions">
@@ -2957,6 +3085,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server"
             else ""
         )
+        reading_insights_assets = (
+            '<link rel="stylesheet" href="' + self.asset_manifest.url_for('reading-insights.css') + '">'
+            '<script src="' + self.asset_manifest.url_for('reading-insights.js') + '" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
         auth_script = (
             SERVER_AUTH_SCRIPT
             if self.deployment_mode == "server"
@@ -2968,6 +3101,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         window.EpubBrowserAuth.init().then(function(session) {
             if (!session) return;
             if (window.initScriptChapter) window.initScriptChapter();
+            if (window.EpubReadingSessions) window.EpubReadingSessions.start();
         });
     }
     if (window.EpubBrowserCacheBoundary) {
@@ -2999,6 +3133,8 @@ document.addEventListener('DOMContentLoaded', function() {{
     {dictionary_assets}
     <script src="/assets/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
+    {reading_insights_assets}
+    {reading_session_script}
     {ai_chapter_scripts}
     <script>
     document.addEventListener('DOMContentLoaded', function() {{

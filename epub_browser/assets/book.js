@@ -60,22 +60,6 @@ function showNotification(message, type) {
     return window.EpubBrowserNotification.show(message, type);
 }
 
-// 页面加载时恢复顺序
-function restoreOrder(storageKey, elementClass) {
-    var savedOrder = localStorage.getItem(storageKey);
-    if (savedOrder) {
-        var itemIds = JSON.parse(savedOrder);
-        var container = document.querySelector("." + elementClass);
-
-        itemIds.forEach(function(id) {
-            var element = document.querySelector('[data-id="' + id + '"]');
-            if (element) {
-                container.appendChild(element);
-            }
-        });
-    }
-}
-
 // 删除指定前缀的所有 localStorage 键
 function deleteKeysByPrefix(prefix) {
     var keysToDelete = [];
@@ -194,8 +178,50 @@ function initScript() {
             });
     }
 
+    function formatBookReadingDuration(seconds) {
+        var totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+        var hours = Math.floor(totalSeconds / 3600);
+        var minutes = Math.floor((totalSeconds % 3600) / 60);
+        var remainder = totalSeconds % 60;
+        var parts = [];
+        if (hours) parts.push(hours + ' ' + bookT('readingInsights.duration.hour'));
+        if (minutes) parts.push(minutes + ' ' + bookT('readingInsights.duration.minute'));
+        if (!hours && !minutes) parts.push(remainder + ' ' + bookT('readingInsights.duration.second'));
+        return parts.join(' ');
+    }
+
+    function renderBookReadingTime(seconds) {
+        var element = document.querySelector('[data-book-reading-time]');
+        var label = element && element.querySelector('[data-book-reading-time-label]');
+        var totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+        if (!element || !label) return;
+        element.dataset.activeSeconds = String(totalSeconds);
+        element.hidden = totalSeconds < 1;
+        if (totalSeconds) {
+            label.textContent = bookT('book.readingTime', {
+                duration: formatBookReadingDuration(totalSeconds)
+            });
+        }
+    }
+
+    function loadBookReadingTime() {
+        if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
+        if (!document.querySelector('[data-book-reading-time]')) return;
+        window.EpubBrowserAuth.fetch('/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary')
+            .then(function(response) {
+                if (!response.ok) throw new Error('book_reading_time_unavailable');
+                return response.json();
+            })
+            .then(function(summary) {
+                if (!summary || typeof summary.active_seconds !== 'number') return;
+                renderBookReadingTime(summary.active_seconds);
+            })
+            .catch(function() {});
+    }
+
     updateContinueReadingButton(book_hash);
     loadReadingProgress();
+    loadBookReadingTime();
     loadEffectiveBookTags();
 
     if (!isKindleMode()) {
@@ -281,44 +307,9 @@ function initScript() {
 
     }
 
-    var storageKeySortableContainer = 'book-container-sortable-order';
-
     if (isKindleMode()) {
         document.documentElement.classList.remove("kindle-mode");
         document.documentElement.classList.add("kindle-mode");
-    } else {
-        restoreOrder(storageKeySortableContainer, 'container');
-    }
-
-    function initBookSortable() {
-        if (window.__epubBrowserBookSortable || !window.Sortable) return;
-        var el = document.querySelector('.container');
-        if (!el) return;
-        window.__epubBrowserBookSortable = true;
-        Sortable.create(el, {
-            delay: 300,
-            delayOnTouchOnly: true,
-            filter: '.toc-container, .book-info-content',
-            preventOnFilter: false,
-            onEnd: function(evt) {
-                // 替换 Array.from
-                var children = evt.from.children;
-                var itemIds = [];
-                for (var i = 0; i < children.length; i++) {
-                    itemIds.push(children[i].dataset.id);
-                }
-                localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
-            }
-        });
-    }
-
-    function enableBookSortableOnInteraction() {
-        var container = document.querySelector('.container');
-        if (!container || container.dataset.bookSortableLoader) return;
-        container.dataset.bookSortableLoader = 'true';
-        container.addEventListener('pointerdown', function() {
-            loadBookFeature('sortable').then(initBookSortable).catch(function() {});
-        });
     }
 
     if (!isKindleMode()) {
@@ -328,8 +319,8 @@ function initScript() {
         deferBookFeature('toggleShelfBtn', 'bookshelf', function() {
             initBookShelfButton(book_hash);
         }, 'bookshelf.loading');
+        hydrateBookShelfMembership(book_hash);
         deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading');
-        enableBookSortableOnInteraction();
     }
 
     var currentChapter = "";
@@ -385,6 +376,8 @@ function initScript() {
             if (activeChapter) {
                 markReadingChapter(activeChapter.id, activeChapter.getAttribute('data-sync-username') || '');
             }
+            var readingTime = document.querySelector('[data-book-reading-time]');
+            if (readingTime) renderBookReadingTime(readingTime.dataset.activeSeconds);
             if (window.refreshBookShelfButton) window.refreshBookShelfButton();
         });
     }
@@ -522,6 +515,48 @@ function setClearReadingProgressAvailability(available) {
     }
     if (menu) menu.hidden = true;
     if (control) control.classList.toggle('has-reading-progress', available);
+}
+
+function hydrateBookShelfMembership(bookHash) {
+    if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
+
+    var button = document.getElementById('toggleShelfBtn');
+    var label = document.getElementById('toggleShelfBtnText');
+    var icon = button && button.querySelector('i');
+    if (!button || !label || button.dataset.bookShelfMembershipLoading) return;
+    button.dataset.bookShelfMembershipLoading = 'true';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.classList.add('is-loading');
+    label.textContent = bookT('bookshelf.loading');
+    if (icon) icon.className = 'fas fa-spinner fa-spin';
+
+    var prefix = window.EpubBrowserBasePath || '/';
+    if (prefix.charAt(prefix.length - 1) !== '/') prefix += '/';
+    window.EpubBrowserAuth.fetch(prefix + 'api/bookshelf/' + encodeURIComponent(bookHash) + '/membership')
+        .then(function(response) {
+            if (!response.ok) throw new Error('bookshelf_membership_unavailable');
+            return response.json();
+        })
+        .then(function(payload) {
+            if (!payload || typeof payload.in_shelf !== 'boolean') throw new Error('invalid_bookshelf_membership');
+            var key = payload.in_shelf ? 'book.removeFromShelf' : 'book.addToShelf';
+            label.textContent = bookT(key);
+            button.setAttribute('aria-label', label.textContent);
+            button.classList.toggle('in-shelf', payload.in_shelf);
+        })
+        .catch(function() {
+            label.textContent = bookT('book.addToShelf');
+            button.setAttribute('aria-label', label.textContent);
+            button.classList.remove('in-shelf');
+        })
+        .finally(function() {
+            if (icon) icon.className = 'fas fa-bookmark';
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            button.classList.remove('is-loading');
+            delete button.dataset.bookShelfMembershipLoading;
+        });
 }
 
 function initBookShelfButton(bookHash) {

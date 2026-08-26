@@ -411,11 +411,12 @@ Legacy-only `--keep-files` retains a temporary Server directory. Persistent Serv
 | --- | --- | --- |
 | Reading progress | Browser-local | Authenticated user's SQLite record |
 | Highlights and notes | Browser-local | Authenticated user's SQLite records |
+| Private ratings, reviews, and reading-session history | Not present | Authenticated user's SQLite records |
 | Bookshelf | Browser-local; Import/Export | Authenticated user's versioned cloud document; automatic save |
 | Accounts and sessions | Not present | SQLite under `<server-dir>/data` |
 | Book grants | Not present | SQLite under `<server-dir>/data` |
 
-Server does not offer a local/cloud storage selector: authenticated reading data is always stored on the Server. SSG never probes Server APIs and always uses the current browser origin's local storage.
+Server does not offer a local/cloud storage selector: authenticated reading data is always stored on the Server. Detailed private reading-session history is never emitted by SSG. SSG never probes Server APIs and always uses the current browser origin's local storage.
 
 ## Self-contained and network behavior
 

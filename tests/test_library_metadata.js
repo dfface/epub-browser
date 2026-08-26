@@ -226,6 +226,8 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
     title: '<img src=x onerror=alert(1)>',
     authors: ['Ada <script>alert(1)</script>', 'Bob'],
     tags: ['<svg onload=alert(1)>'],
+    rating: 4,
+    review_text: '<script>must never render</script>',
   };
   const bookGrid = element('div');
   bookGrid.className = 'book-grid';
@@ -294,7 +296,9 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
 
   const card = bookGrid.children[0];
   const link = card.children[0];
-  const cover = link.children[0];
+  const coverFrame = link.children[0];
+  const cover = coverFrame.children[0];
+  const rating = coverFrame.children[1];
   const content = link.children[1];
   const title = content.children[0];
   const author = content.children[1];
@@ -307,6 +311,11 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.equal(cover.attributes.decoding, 'async');
   assert.equal(title.textContent, book.title);
   assert.equal(author.textContent, book.authors.join(' & '));
+  assert.equal(rating.className, 'book-rating-badge');
+  assert.equal(rating.children[0].className, 'fas fa-star');
+  assert.equal(rating.children[1].textContent, '4');
+  assert.equal(rating.getAttribute('role'), 'img');
+  assert.equal(rating.getAttribute('aria-label'), 'bookReviews.ratingValue');
   assert.equal(tag.textContent, book.tags[0]);
   assert.equal(content.children.length, 3);
   assert.match(requestedUrl, /^\/reader\/book-metadata\.json\?/);
@@ -443,7 +452,7 @@ test('incremental metadata refresh leaves existing cards after a failed request'
   assert.deepEqual(harness.cardIds(), ['one']);
 });
 
-test('incremental metadata refresh preserves quoted saved card and tag order with an active tag', async () => {
+test('incremental metadata refresh preserves quoted saved card order and the active tag', async () => {
   const quotedHash = 'book"quoted';
   const quotedTag = 'tag "quoted"';
   const books = [
@@ -453,14 +462,12 @@ test('incremental metadata refresh preserves quoted saved card and tag order wit
   const harness = createLibraryHarness([books, books]);
   harness.window.initScriptLibrary();
   harness.setSavedOrder('book-grid-sortable-order', JSON.stringify(['other', quotedHash]));
-  harness.setSavedOrder('tag-cloud-sortable-order', JSON.stringify(['Other', quotedTag, 'All', 'NoTag']));
   harness.tag('All').classList.remove('active');
   harness.tag(quotedTag).classList.add('active');
 
   await harness.window.refreshLibraryMetadata();
 
   assert.deepEqual(harness.cardIds(), ['other', quotedHash]);
-  assert.deepEqual(harness.tagIds(), ['Other', quotedTag, 'All', 'NoTag']);
   assert.equal(harness.tag(quotedTag).classList.contains('active'), true);
   assert.equal(harness.card(quotedHash).style.display, 'block');
   assert.equal(harness.card('other').style.display, 'none');
@@ -478,12 +485,11 @@ test('incremental metadata refresh rejects a valid JSON non-array without replac
   assert.deepEqual(harness.cardIds(), ['one']);
 });
 
-test('incremental metadata refresh ignores malformed saved order JSON', async () => {
+test('incremental metadata refresh ignores malformed saved book-card order JSON', async () => {
   const books = [{ hash: 'one', title: 'One', authors: [], tags: ['A'], url: '/book/one/', cover: null }];
   const harness = createLibraryHarness([books, books]);
   harness.window.initScriptLibrary();
   harness.setSavedOrder('book-grid-sortable-order', '{not JSON');
-  harness.setSavedOrder('tag-cloud-sortable-order', '{not JSON');
 
   await harness.window.refreshLibraryMetadata();
 

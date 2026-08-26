@@ -1,0 +1,86 @@
+.book-reviews {
+    --book-review-danger-foreground: #b42318;
+    --book-review-star: #9a6700;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius-lg, 12px);
+    box-shadow: var(--shadow-lg);
+}
+
+body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
+
+.book-review-display {
+    --book-review-star: #9a6700;
+    margin: 0 0 20px;
+    padding: 20px;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 0;
+    border-radius: var(--border-radius-lg, 12px);
+    box-shadow: var(--shadow-md);
+}
+
+.book-review-display[hidden] { display: none; }
+.book-info-card:has(~ .book-review-display:not([hidden])) { margin-bottom: 20px; }
+.book-review-display-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.book-review-display h2 { margin: 0; font-size: 1.15rem; line-height: 1.35; }
+.book-review-display-rating,
+.book-review-display-rating > [aria-hidden="true"] { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--book-review-star) !important; font-size: 1.18rem; letter-spacing: .08em; }
+.book-review-display-score { color: var(--text-secondary); font-size: .85rem; font-weight: 650; letter-spacing: 0; }
+.book-review-hint,
+.book-review-status { margin: 6px 0 0; color: var(--text-secondary); font-size: .9rem; line-height: 1.5; }
+.book-review-display-copy { margin: 14px 0 0; white-space: pre-wrap; color: var(--text); line-height: 1.7; overflow-wrap: anywhere; }
+.book-review-display-copy.is-collapsed { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.book-review-expand { min-height: 44px; margin: 6px -10px -8px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--button-bg); background: transparent; font: inherit; font-weight: 650; cursor: pointer; }
+.book-review-expand:hover { background: var(--hover); }
+.book-review-expand:focus-visible,
+.book-review-close:focus-visible,
+.book-review-star-option:focus-visible,
+.book-review-form textarea:focus-visible,
+.book-review-actions .css-btn:focus-visible,
+.book-review-delete:focus-visible { outline: 3px solid var(--form-input-focus); outline-offset: 2px; }
+
+.book-review-modal { position: fixed; z-index: 10100; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(15, 23, 42, .56); }
+.book-review-modal[hidden] { display: none; }
+.book-review-dialog { width: min(100%, 620px); max-height: min(760px, calc(100dvh - 48px)); overflow: auto; border-radius: var(--border-radius-lg, 12px); outline: 0; animation: book-review-enter .18s ease-out; }
+.book-reviews { position: relative; padding: 24px; }
+.book-review-header { position: absolute; top: 24px; right: 24px; z-index: 1; }
+.book-review-close { display: inline-grid; width: 44px; min-height: 44px; place-items: center; padding: 0; border: 0; border-radius: 8px; color: var(--text-secondary); background: transparent; font: inherit; cursor: pointer; }
+.book-review-close:hover { color: var(--text); background: var(--hover); }
+.book-review-form { display: grid; gap: 12px; margin-top: 0; }
+.book-review-rating { min-width: 0; border: 0; padding: 0; }
+.book-review-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.book-review-rating-options,
+.book-review-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.book-review-star-option { display: inline-grid; width: 44px; min-height: 44px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 8px; color: var(--text-secondary); background: transparent; font-size: 1.55rem; cursor: pointer; touch-action: manipulation; }
+.book-review-star-option:hover { color: var(--book-review-star); background: var(--hover); }
+.book-review-star-option.is-filled { color: var(--book-review-star); }
+.book-review-star-option[aria-checked="true"] { color: var(--book-review-star); }
+.book-review-form textarea { width: 100%; max-width: 100%; box-sizing: border-box; min-height: 128px; padding: 12px 14px; color: var(--form-textarea-text); background: var(--form-textarea); border: 1px solid var(--form-textarea-border); border-radius: 8px; font: inherit; line-height: 1.6; resize: vertical; }
+.book-review-actions { justify-content: space-between; }
+.book-review-actions .css-btn { min-height: 44px; margin: 0; }
+.book-review-delete { min-height: 44px; padding: 8px 10px; border: 0; border-radius: 7px; color: var(--book-review-danger-foreground); background: transparent; font: inherit; font-weight: 650; cursor: pointer; }
+.book-review-delete:hover { background: color-mix(in srgb, var(--book-review-danger-foreground) 10%, transparent); }
+.book-review-status[data-state="error"],
+.book-review-rating-error { color: var(--book-review-danger-foreground); }
+.book-review-form [disabled] { cursor: wait; opacity: .55; }
+.dark-mode .book-reviews { --book-review-danger-foreground: #ffb4ab; --book-review-star: #f0bd4f; }
+.dark-mode .book-review-display { --book-review-star: #f0bd4f; }
+
+/* Keep the review action in the same 10px rhythm as the neighbouring book actions. */
+.clearReadingProgress { gap: 10px !important; }
+.clearReadingProgress > * { margin: 0 !important; }
+
+@keyframes book-review-enter { from { opacity: 0; transform: translateY(10px) scale(.99); } to { opacity: 1; transform: none; } }
+@media (max-width: 560px) {
+    .book-review-modal { padding: 12px; align-items: end; }
+    .book-review-dialog { max-height: calc(100dvh - 24px); }
+    .book-reviews { padding: 20px 16px; }
+    .book-review-header { top: 20px; right: 16px; }
+    .book-review-display { padding: 18px 16px; }
+    .book-review-display-header { align-items: flex-start; flex-direction: column; gap: 6px; }
+    .book-review-star-option { width: 44px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .book-review-dialog { animation: none; } }
+@media (prefers-reduced-motion: no-preference) { .book-review-star-option,.book-review-expand,.book-review-close,.book-review-actions .css-btn,.book-review-delete { transition: color 180ms ease-out, background-color 180ms ease-out, border-color 180ms ease-out; } }

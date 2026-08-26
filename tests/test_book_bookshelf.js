@@ -160,69 +160,61 @@ test('Server reader defers its shelf button until the Server store has loaded', 
   assert.deepEqual(localWrites, []);
 });
 
+test('Server book detail resolves its shelf label through the lightweight membership API', async () => {
+  const requests = [];
+  const button = {
+    dataset: {},
+    disabled: false,
+    attributes: {},
+    classList: {
+      add() {},
+      remove() {},
+      toggle(name, enabled) { button.toggles[name] = enabled; },
+    },
+    toggles: {},
+    querySelector() { return { className: 'fas fa-bookmark' }; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
+  };
+  const text = { textContent: '' };
+  const window = {
+    EpubBrowserMode: 'server',
+    EpubBrowserBasePath: '/reader/',
+    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserAuth: {
+      fetch(url) {
+        requests.push(url);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ in_shelf: true }) });
+      },
+    },
+  };
+  const context = {
+    window,
+    navigator: { userAgent: '' },
+    localStorage: { getItem() { return null; }, setItem() {} },
+    document: {
+      getElementById(id) {
+        if (id === 'toggleShelfBtn') return button;
+        if (id === 'toggleShelfBtnText') return text;
+        return null;
+      },
+    },
+    Promise,
+  };
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
+
+  context.hydrateBookShelfMembership('book-id');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(requests, ['/reader/api/bookshelf/book-id/membership']);
+  assert.equal(text.textContent, 'book.removeFromShelf');
+  assert.equal(button.toggles['in-shelf'], true);
+  assert.equal(button.disabled, false);
+});
+
 test('Server progress labels never invent a shared account identity', () => {
   const client = loadBookClient();
   client.context.window.EpubReadingProgress = { getUsername() { return ''; } };
 
   assert.equal(client.context.getProgressIdentity(), '');
-});
-
-test('book sorting leaves book metadata content available for text selection', async () => {
-  const listeners = {};
-  let sortableOptions;
-  const container = {
-    dataset: {},
-    addEventListener(type, listener) { listeners[type] = listener; },
-  };
-  const passiveButton = {
-    classList: { add() {}, remove() {} },
-    addEventListener() {},
-  };
-  const window = {
-    EpubBrowserMode: 'static',
-    epubBrowserCache: { kindle_mode: 'false' },
-    EpubBrowserI18n: { t(key) { return key; } },
-    EpubBrowserNotification: { show() {} },
-    EpubBrowserBookFeatures: { load() { return Promise.resolve(); } },
-    Sortable: {
-      create(element, options) {
-        sortableOptions = options;
-      },
-    },
-    addEventListener() {},
-    location: { pathname: '/book/book-id/index.html' },
-    scrollTo() {},
-  };
-  const document = {
-    cookie: '',
-    body: { style: {} },
-    documentElement: { classList: { add() {}, remove() {} }, dataset: {} },
-    getElementById(id) {
-      if (id === 'scrollToTopBtn') return passiveButton;
-      return null;
-    },
-    querySelector(selector) {
-      if (selector === '.container') return container;
-      return null;
-    },
-    querySelectorAll() { return []; },
-  };
-  const context = {
-    window,
-    Sortable: window.Sortable,
-    document,
-    navigator: { userAgent: '' },
-    localStorage: { getItem() { return null; }, setItem() {}, length: 0, key() { return null; }, removeItem() {} },
-    setTimeout,
-    clearTimeout,
-    Promise,
-  };
-
-  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
-  context.initScript();
-  listeners.pointerdown();
-  await new Promise((resolve) => setImmediate(resolve));
-
-  assert.match(sortableOptions.filter, /\.book-info-content/);
-  assert.equal(sortableOptions.preventOnFilter, false);
 });

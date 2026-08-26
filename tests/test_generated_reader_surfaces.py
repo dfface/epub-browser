@@ -49,6 +49,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertNotIn('auth.js', ssg_html)
         self.assertNotRegex(ssg_html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+        self.assertNotIn('readingInsights.navigation', ssg_html)
+        self.assertNotIn('reading-insights', ssg_html)
         self.assertLess(server_html.index('/immutable/auth.'), server_html.rindex('/immutable/library.'))
         self.assertNotIn('id=loginForm', server_html)
         self.assertRegex(
@@ -1496,6 +1498,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('navigateReaderChapter(next, { history: true });', next_handler)
         self.assertNotIn('location.href=next', next_handler)
 
+    def test_pagination_click_paths_notify_the_active_reading_tracker(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        tracker = Path('epub_browser/assets/reading-sessions.js').read_text(encoding='utf-8')
+
+        show_page_start = script.index('function showPage(idx, fromReaderNavigation) {')
+        show_page_end = script.index('\n    function updateNavButtons()', show_page_start)
+        show_page = script[show_page_start:show_page_end]
+        signal_start = script.index('function announceReadingSessionPageTurn() {')
+        signal_end = script.index('\n    function showPage(', signal_start)
+        self.assertIn("new CustomEvent('epub:reader-page-turn')", script[signal_start:signal_end])
+        self.assertIn('if (fromReaderNavigation && pageChanged) announceReadingSessionPageTurn();', show_page)
+        self.assertIn("addListener(eventTarget, 'epub:reader-page-turn', recordInteraction);", tracker)
+
+        prev_start = script.index("prevPageBtn.addEventListener('click', function() {")
+        prev_end = script.index('\n    });', prev_start)
+        next_start = script.index("nextPageBtn.addEventListener('click', function() {")
+        next_end = script.index('\n    });', next_start)
+        page_edge_start = script.index('function handleClickPage(e) {')
+        page_edge_end = script.index('\n    function initClickPageState()', page_edge_start)
+        self.assertIn('showPage(currentPage-1, true);', script[prev_start:prev_end])
+        self.assertIn('showPage(currentPage+1, true);', script[next_start:next_end])
+        page_edge = script[page_edge_start:page_edge_end]
+        self.assertIn('prevPageBtn.click();', page_edge)
+        self.assertIn('nextPageBtn.click();', page_edge)
+
     def test_pagination_chapter_toc_jumps_to_an_exact_page_boundary(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
 
@@ -1507,7 +1534,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         pagination_jump = toc[pagination_start:pagination_end]
 
         self.assertIn('var page = Math.floor(t.offsetLeft / pageWidth);', pagination_jump)
-        self.assertIn('showPage(page);', pagination_jump)
+        self.assertIn('showPage(page, true);', pagination_jump)
         self.assertNotIn('scrollIntoView', pagination_jump)
 
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
@@ -1893,6 +1920,7 @@ assert.deepEqual(
 
     def test_book_page_offers_a_progress_aware_continue_reading_action(self):
         html = self._book_html()
+        server_html = self._server_book_html()
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
         styles = Path("epub_browser/assets/book.css").read_text(encoding="utf-8")
 
@@ -1935,6 +1963,16 @@ assert.deepEqual(
         self.assertIn("chapterLinks[i].id.split('#')[0] === readKey", script)
         self.assertIn("bookT('book.continueReading')", script)
         self.assertIn("bookT('book.startReading')", script)
+        self.assertNotIn('data-book-reading-time', html)
+        self.assertIn('data-book-reading-time', server_html)
+        self.assertIn('data-book-reading-time-label', server_html)
+        self.assertLess(server_html.index('class=book-info-cover'), server_html.index('data-book-reading-time'))
+        self.assertIn("'/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary'", script)
+        self.assertIn("bookT('book.readingTime'", script)
+        self.assertIn("renderBookReadingTime(readingTime.dataset.activeSeconds)", script)
+        self.assertIn('.book-reading-time', styles)
+        self.assertIn('.book-info-cover-wrap', styles)
+        self.assertIn('font-variant-numeric: tabular-nums;', styles)
 
     def test_book_toc_marks_server_synced_reading_progress_with_the_reader_identity(self):
         script = Path("epub_browser/assets/book.js").read_text(encoding="utf-8")
@@ -2258,6 +2296,13 @@ assert.deepEqual(
     def _chapter_html(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor("book.epub", directory)
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            return processor.create_chapter_template("<p>Text</p>", "", 0, "One")
+
+    def _server_chapter_html(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory, deployment_mode="server")
             processor.book_title = "A Book"
             processor.chapters = [{"title": "One"}]
             return processor.create_chapter_template("<p>Text</p>", "", 0, "One")
@@ -2658,9 +2703,26 @@ assert.deepEqual(
             )
         book_script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
         self.assertIn("deferBookFeature('bookshelfBtn', 'bookshelf'", book_script)
+        self.assertIn("deferBookFeature('toggleShelfBtn', 'bookshelf'", book_script)
+        self.assertIn("hydrateBookShelfMembership(book_hash)", book_script)
+        self.assertIn("'api/bookshelf/' + encodeURIComponent(bookHash) + '/membership'", book_script)
         self.assertIn("deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading')", book_script)
         self.assertIn("setDeferredBookFeatureLoading(button, true, loadingKey)", book_script)
-        self.assertIn("loadBookFeature('sortable')", book_script)
+        self.assertNotIn("loadBookFeature('sortable')", book_script)
+        self.assertNotIn('Sortable.create(', book_script)
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        self.assertNotIn('Sortable.create(', chapter_script)
+
+    def test_drag_sorting_is_limited_to_library_books_and_bookshelf_contents(self):
+        library_script = Path('epub_browser/assets/library.js').read_text(encoding='utf-8')
+        bookshelf_script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
+
+        self.assertIn("document.querySelector('.book-grid')", library_script)
+        self.assertNotIn('storageKeySortableTag', library_script)
+        self.assertNotIn('storageKeySortableContainer', library_script)
+        self.assertNotIn("document.querySelector('.tag-cloud'),", library_script)
+        self.assertIn('new Sortable(bookshelfBody, {', bookshelf_script)
+        self.assertIn('new Sortable(groupBody, {', bookshelf_script)
 
     def test_server_book_ai_assets_stay_off_critical_path(self):
         book_html = self._server_book_html()
@@ -3085,6 +3147,114 @@ assert.deepEqual(
                 logical_path.startswith(('ai-', 'vendor/katex/', 'vendor/mermaid/'))
                 for logical_path in library.asset_manifest.assets
             ))
+
+    def test_server_book_home_contains_review_hook_but_ssg_book_home_does_not(self):
+        server_index = self._server_book_html()
+        ssg_index = self._book_html()
+
+        self.assertIn('data-book-reviews', server_index)
+        self.assertIn('/assets/immutable/book-reviews.', server_index)
+        self.assertNotIn('data-book-reviews', ssg_index)
+        self.assertNotIn('book-reviews.', ssg_index)
+
+    def test_private_review_surface_has_accessible_feedback_and_mobile_reflow(self):
+        server_index = self._server_book_html()
+        review_script = Path('epub_browser/assets/book-reviews.js').read_text(encoding='utf-8')
+        review_styles = Path('epub_browser/assets/book-reviews.css').read_text(encoding='utf-8')
+        self.assertRegex(server_index, r'<section[^>]*data-book-id=[^>]*data-book-reviews')
+        self.assertIn('data-book-review-display', server_index)
+        self.assertRegex(server_index, r'data-i18n=(?:["\'])?bookReviews\.write')
+        self.assertRegex(server_index, r'data-i18n-aria-label=(?:["\'])?bookReviews\.write')
+        self.assertNotIn('aria-labelledby=book-review-dialog-title', server_index)
+        self.assertNotIn("var heading = documentTarget.createElement('h2')", review_script)
+        self.assertIn("dialog.setAttribute('aria-label', translate('bookReviews.write'))", review_script)
+        self.assertIn("translate('bookReviews.ratingRequired')", review_script)
+        self.assertIn("ratingField.setAttribute('aria-describedby'", review_script)
+        self.assertIn("ratingError.setAttribute('role', 'alert')", review_script)
+        self.assertIn("legend.className = 'book-review-visually-hidden'", review_script)
+        self.assertIn("reviewLabel.className = 'book-review-visually-hidden'", review_script)
+        self.assertIn('.concat(view.ratingOptions || [])', review_script)
+        self.assertIn('--book-review-danger-foreground', review_styles)
+        self.assertIn('--book-review-star: #9a6700', review_styles)
+        self.assertIn('.book-info-card:has(~ .book-review-display:not([hidden]))', review_styles)
+        self.assertNotIn('placeDisplayAfterBookInfo', review_script)
+        self.assertIn('.book-review-display-rating > [aria-hidden="true"]', review_styles)
+        self.assertIn('.book-review-header { position: absolute;', review_styles)
+        self.assertIn('.book-review-form { display: grid; gap: 12px; margin-top: 0; }', review_styles)
+        self.assertNotIn('book-review-status[data-state="success"]', review_styles)
+        self.assertIn('.book-review-star-option[aria-checked="true"] { color: var(--book-review-star); }', review_styles)
+        self.assertIn('.dark-mode .book-reviews', review_styles)
+        self.assertIn('box-sizing: border-box;', review_styles)
+        self.assertIn('max-width: 100%;', review_styles)
+        self.assertIn("option.type = 'button'", review_script)
+        self.assertIn("setAttribute('aria-checked'", review_script)
+        self.assertIn('book-review-display-copy.is-collapsed', review_styles)
+        self.assertIn('book-review-display', review_styles)
+        self.assertIn('.book-review-visually-hidden', review_styles)
+        self.assertNotIn('@media (max-width: 768px)', review_styles)
+
+    def test_server_review_initial_data_is_runtime_only_and_escaped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory, deployment_mode='server')
+            processor.book_title = 'A Book'
+            processor.chapters = [{'title': 'One'}]
+            AssetPublisher(Path('epub_browser/assets'), directory).publish()
+            server_index = processor.create_index_page(
+                write=False,
+                initial_book_review={'rating': 4, 'review_text': '<private review>'},
+            )
+            ssg_processor = EPUBProcessor('book.epub', directory, deployment_mode='ssg')
+            ssg_processor.book_title = 'A Book'
+            ssg_processor.chapters = [{'title': 'One'}]
+            ssg_index = ssg_processor.create_index_page(
+                write=False,
+                initial_book_review={'rating': 4, 'review_text': '<private review>'},
+            )
+
+        self.assertIn('data-book-review-initial', server_index)
+        self.assertIn('&lt;private review>', server_index)
+        self.assertIn('\\u003cprivate review\\u003e', server_index)
+        self.assertNotIn('book-review-display-private', server_index)
+        self.assertNotIn('Only visible to your account', server_index)
+        self.assertNotIn('data-book-review-initial', ssg_index)
+        self.assertNotIn('private review', ssg_index)
+
+    def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):
+        server_chapter = self._server_chapter_html()
+        ssg_chapter = self._chapter_html()
+
+        self.assertIn('data-reading-session', server_chapter)
+        self.assertIn('/assets/immutable/reading-sessions.', server_chapter)
+        self.assertNotIn('data-reading-session', ssg_chapter)
+        self.assertNotIn('reading-sessions.', ssg_chapter)
+
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        self.assertIn("new CustomEvent('epub-browser:chapter-change'", chapter_script)
+        self.assertGreaterEqual(chapter_script.count('announceReadingSessionChapter('), 4)
+
+    def test_reading_insights_is_a_server_only_modal_feature(self):
+        server_library = self._server_html()
+        server_book = self._server_book_html()
+        server_chapter = self._server_chapter_html()
+        for html in (server_library, server_book, server_chapter):
+            self.assertIn('data-reading-insights', html)
+            self.assertRegex(html, r'aria-haspopup=(?:["\'])?dialog')
+            self.assertIn('fa-chart-column', html)
+            self.assertNotIn('href="/reading-insights"', html)
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertNotIn('data-reading-insights', html)
+            self.assertNotIn('reading-insights.', html)
+
+        insights_script = Path('epub_browser/assets/reading-insights.js').read_text(encoding='utf-8')
+        insights_styles = Path('epub_browser/assets/reading-insights.css').read_text(encoding='utf-8')
+        self.assertIn("setAttribute('aria-modal', 'true')", insights_script)
+        self.assertIn("event.key === 'Escape'", insights_script)
+        self.assertIn('reading-insights-modal', insights_styles)
+        self.assertIn('background: var(--button-bg);', insights_styles)
+        self.assertIn('color: var(--button-text);', insights_styles)
+        self.assertIn('.reading-insights-day-button[aria-pressed="true"] .reading-insights-day-name', insights_styles)
+        self.assertNotIn('#3148b7', insights_styles)
+        self.assertNotIn('.dark-mode .reading-insights-periods button[aria-pressed="true"]', insights_styles)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

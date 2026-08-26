@@ -10,11 +10,13 @@ import posixpath
 import re
 import secrets
 import sqlite3
+import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, unquote_to_bytes, urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -377,7 +379,7 @@ def unauthenticated_response(request):
             status_code=403,
             headers={'Cache-Control': 'no-store'},
         )
-    if path == '/sync' or path.startswith('/api/'):
+    if path == '/sync' or path.startswith('/api/') or path == '/reading-insights':
         return JSONResponse(
             error_payload('authentication_required', 'Authentication required'),
             status_code=401,
@@ -579,6 +581,7 @@ def create_app(
     ai_reading = AIReadingService(store, base_directory)
     dictionary_service = DictionaryService(store, base_directory)
     encyclopedia = WikimediaEncyclopedia()
+    heartbeat_attempts = {}
     store.requeue_running_ai_jobs()
     store.requeue_running_ai_followups()
     store.requeue_running_ai_book_chat_turns()
@@ -589,6 +592,18 @@ def create_app(
             status_code=status,
             headers={'Cache-Control': cache_control},
         )
+
+    def heartbeat_rate_limited(user_id, client_id):
+        """Permit the normal 15-second cadence and a few transient retries."""
+        now = time.monotonic()
+        key = (user_id, client_id)
+        attempts = [value for value in heartbeat_attempts.get(key, ()) if now - value < 60]
+        if len(attempts) >= 12:
+            heartbeat_attempts[key] = attempts
+            return True
+        attempts.append(now)
+        heartbeat_attempts[key] = attempts
+        return False
 
     def apply_reader_security_headers(target_response, file_path=None, markup=None):
         if markup is None:
@@ -2615,7 +2630,8 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         return response(
             library_metadata(
-                store.visible_books(principal), base_directory, state_store=store
+                store.visible_books(principal), base_directory, state_store=store,
+                owner_user_id=principal.user_id,
             )
         )
 
@@ -2648,6 +2664,11 @@ window.location.assign(payload.redirect||'/');
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
         return apply_reader_security_headers(response, index_path)
+
+    async def reading_insights_page(request):
+        """Keep legacy links safe now that insights lives in the shared modal hub."""
+        require_principal(request)
+        return RedirectResponse('/', status_code=303, headers={'Cache-Control': 'no-store'})
 
     async def service_worker_tombstone(request):
         return Response(
@@ -2700,7 +2721,12 @@ window.location.assign(payload.redirect||'/');
             if has_content_cache:
                 try:
                     if book_relative_path == 'index.html':
-                        markup = renderer.render_index()
+                        markup = renderer.render_index(
+                            initial_book_review=store.get_book_review(
+                                book_id,
+                                principal.user_id,
+                            )
+                        )
                         dynamic_response = HTMLResponse(
                             markup,
                             headers={'Cache-Control': 'no-cache'},
@@ -2756,11 +2782,11 @@ window.location.assign(payload.redirect||'/');
     async def version_status(request):
         release = await asyncio.to_thread(release_lookup.fetch)
         if release is None:
-            return response(
-                error_payload('version_unavailable', 'Version information unavailable'),
-                503,
-                cache_control='no-store',
-            )
+            # Version checks are explicitly optional. A blocked/offline release
+            # lookup must not surface as a failed application resource in the
+            # browser console; the client already treats an empty response as
+            # "no update information available".
+            return Response(status_code=204, headers={'Cache-Control': 'no-store'})
         return response(release, cache_control='no-cache')
 
     async def ready(request):
@@ -3038,6 +3064,24 @@ window.location.assign(payload.redirect||'/');
         version, serialized = row
         return version, json.loads(serialized)
 
+    def bookshelf_contains(book_hash, shelf):
+        if not isinstance(shelf, dict):
+            return False
+        if book_hash in shelf.get("items", []):
+            return True
+        return any(
+            bookshelf_contains(book_hash, group)
+            for group in (shelf.get("groups") or {}).values()
+        )
+
+    async def bookshelf_membership(request):
+        principal = require_principal(request)
+        try:
+            _version, shelf = bookshelf_document(principal.user_id)
+            return response({"in_shelf": bookshelf_contains(request.path_params["book_hash"], shelf)})
+        except Exception:
+            return response(error_payload('server_error', 'Internal server error'), 500)
+
     async def bookshelf(request):
         principal = require_principal(request)
         user_id = principal.user_id
@@ -3117,6 +3161,193 @@ window.location.assign(payload.redirect||'/');
         store.delete_reading_progress(principal.user_id, book_hash)
         return response({'message': 'Deleted'})
 
+    def authorized_chapter_snapshot(book_id, chapter_index):
+        """Return cache-derived labels only after the caller has book access."""
+        renderer = ServerPageRenderer(base_directory, book_id)
+        metadata = renderer._read_json(renderer.content_dir / 'metadata.json')
+        if not isinstance(metadata, dict):
+            raise ServerPageError('Book content cache is invalid')
+        chapters = metadata.get('chapters')
+        if not isinstance(chapters, list):
+            raise ServerPageError('Book content cache is invalid')
+        if not all(
+            isinstance(chapter, dict)
+            and isinstance(chapter.get('title'), str)
+            and chapter['title'].strip()
+            and isinstance(chapter.get('path'), str)
+            and chapter['path'].strip()
+            for chapter in chapters
+        ):
+            raise ServerPageError('Book content cache is invalid')
+        if chapter_index >= len(chapters):
+            raise ValueError('chapter index is outside the book')
+        renderer.render_chapter(chapter_index)
+        chapter = renderer._read_json(
+            renderer.content_dir / f'chapter_{chapter_index}.json'
+        )
+        book_title = metadata.get('title')
+        chapter_label = chapter.get('title')
+        if (
+            not isinstance(book_title, str) or not book_title.strip()
+            or not isinstance(chapter_label, str) or not chapter_label.strip()
+        ):
+            raise ServerPageError('Book content cache is invalid')
+        return book_title, chapter_label
+
+    async def book_review(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return forbidden_book_response()
+        if request.method == 'GET':
+            return response({
+                'review': store.get_book_review(book_id, principal.user_id),
+            })
+        if request.method == 'DELETE':
+            if not runtime_status.is_ready():
+                return response(error_payload('not_ready', 'Server is not ready'), 503)
+            store.delete_book_review(book_id, principal.user_id)
+            return Response(status_code=204)
+
+        if not runtime_status.is_ready():
+            return response(error_payload('not_ready', 'Server is not ready'), 503)
+        data, error = await bounded_public_json_object(request, maximum_size=4096)
+        if error:
+            return response(error_payload(error, 'Invalid book review'), 400)
+        rating = data.get('rating')
+        review_text = data.get('review_text')
+        if (
+            isinstance(rating, bool) or not isinstance(rating, int)
+            or not 1 <= rating <= 5
+            or not isinstance(review_text, str) or len(review_text.strip()) > 10_000
+        ):
+            return response(
+                error_payload('invalid_book_review', 'Invalid book review'), 400
+            )
+        review = store.upsert_book_review(
+            book_id, principal.user_id, rating, review_text
+        )
+        return response({'review': review})
+
+    async def reading_session_heartbeat(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return forbidden_book_response()
+        if not runtime_status.is_ready():
+            return response(error_payload('not_ready', 'Server is not ready'), 503)
+        data, error = await bounded_public_json_object(request, maximum_size=4096)
+        if error:
+            return response(error_payload(error, 'Invalid reading session'), 400)
+        client_id = data.get('client_id')
+        client_sequence = data.get('client_sequence')
+        chapter_index = data.get('chapter_index')
+        active_seconds = data.get('active_seconds')
+        if (
+            not isinstance(client_id, str) or not 1 <= len(client_id) <= 128
+            or isinstance(client_sequence, bool)
+            or not isinstance(client_sequence, int) or client_sequence < 0
+            or isinstance(chapter_index, bool)
+            or not isinstance(chapter_index, int) or chapter_index < 0
+            or isinstance(active_seconds, bool)
+            or not isinstance(active_seconds, int) or not 1 <= active_seconds <= 20
+        ):
+            return response(
+                error_payload('invalid_reading_session', 'Invalid reading session'),
+                400,
+            )
+        if heartbeat_rate_limited(principal.user_id, client_id):
+            return response(
+                error_payload('reading_session_rate_limited', 'Reading session rate limited'),
+                429,
+            )
+        try:
+            book_title, chapter_label = authorized_chapter_snapshot(
+                book_id, chapter_index
+            )
+        except ServerPageError:
+            return response(
+                error_payload(
+                    'reading_source_unavailable',
+                    'Reading source is unavailable',
+                ),
+                503,
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_reading_session', 'Invalid reading session'),
+                400,
+            )
+        session = store.record_reading_heartbeat(
+            user_id=principal.user_id,
+            book_id=book_id,
+            client_id=client_id,
+            client_sequence=client_sequence,
+            chapter_index=chapter_index,
+            active_seconds=active_seconds,
+            book_title=book_title,
+            chapter_label=chapter_label,
+            received_at=datetime.now(timezone.utc),
+        )
+        return response({'session': session})
+
+    async def reading_session_summary(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return forbidden_book_response()
+        try:
+            active_seconds = store.reading_time_for_book(principal.user_id, book_id)
+        except KeyError:
+            return forbidden_book_response()
+        return response({'active_seconds': active_seconds})
+
+    async def reading_insights(request):
+        principal = require_principal(request)
+        query = parse_qs(request.url.query, keep_blank_values=True)
+        if set(query) - {'period', 'anchor', 'timezone'}:
+            return response(
+                error_payload('invalid_reading_insights', 'Invalid reading insights'),
+                400,
+            )
+        values = {
+            key: query.get(key)
+            for key in ('period', 'anchor', 'timezone')
+        }
+        if any(value is None or len(value) != 1 for value in values.values()):
+            return response(
+                error_payload('invalid_reading_insights', 'Invalid reading insights'),
+                400,
+            )
+        period, anchor, timezone_name = (
+            values['period'][0], values['anchor'][0], values['timezone'][0]
+        )
+        if period not in {'overview', 'day', 'week', 'month'} or not re.fullmatch(
+            r'\d{4}-\d{2}-\d{2}', anchor
+        ):
+            return response(
+                error_payload('invalid_reading_insights', 'Invalid reading insights'),
+                400,
+            )
+        try:
+            anchor_date = date.fromisoformat(anchor)
+            ZoneInfo(timezone_name)
+        except (TypeError, ValueError, ZoneInfoNotFoundError):
+            return response(
+                error_payload('invalid_reading_insights', 'Invalid reading insights'),
+                400,
+            )
+        try:
+            insights = store.reading_insights(
+                principal.user_id, period, anchor_date, timezone_name
+            )
+        except (OverflowError, ValueError):
+            return response(
+                error_payload('invalid_reading_insights', 'Invalid reading insights'),
+                400,
+            )
+        return response({'insights': insights})
+
     routes = [
         Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
@@ -3152,14 +3383,20 @@ window.location.assign(payload.redirect||'/');
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
         Route('/', library_index),
         Route('/index.html', library_index),
+        Route('/reading-insights', reading_insights_page, methods=['GET']),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
         Route('/api/health', health),
         Route('/api/ready', ready),
         Route('/api/version', version_status),
         Route('/api/library-events', library_events),
+        Route('/api/bookshelf/{book_hash}/membership', bookshelf_membership, methods=['GET']),
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
+        Route('/api/book-reviews/{book_id}', book_review, methods=['GET', 'PUT', 'DELETE']),
+        Route('/api/reading-sessions/{book_id}/summary', reading_session_summary, methods=['GET']),
+        Route('/api/reading-sessions/{book_id}/heartbeat', reading_session_heartbeat, methods=['POST']),
+        Route('/api/reading-insights', reading_insights, methods=['GET']),
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/books/{book_id}/dictionary/lookup', dictionary_lookup, methods=['POST']),

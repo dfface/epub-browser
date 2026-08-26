@@ -208,6 +208,7 @@ function initScript() {
     function createBookCard(book) {
         var card = document.createElement('div');
         var link = document.createElement('a');
+        var coverFrame = document.createElement('div');
         var cover = document.createElement('img');
         var content = document.createElement('div');
         var title = document.createElement('h3');
@@ -219,11 +220,13 @@ function initScript() {
         link.setAttribute('id', book.hash);
         link.setAttribute('href', book.url);
 
+        coverFrame.className = 'book-cover-frame';
         cover.className = 'book-cover';
         cover.setAttribute('src', book.cover);
         cover.setAttribute('alt', t('library.cover'));
         cover.setAttribute('loading', 'lazy');
         cover.setAttribute('decoding', 'async');
+        coverFrame.appendChild(cover);
 
         content.className = 'book-card-content';
         title.className = 'book-title';
@@ -233,6 +236,22 @@ function initScript() {
 
         content.appendChild(title);
         content.appendChild(author);
+
+        if (Number.isInteger(book.rating) && book.rating >= 1 && book.rating <= 5) {
+            var rating = document.createElement('span');
+            var icon = document.createElement('i');
+            var score = document.createElement('span');
+            rating.className = 'book-rating-badge';
+            rating.setAttribute('role', 'img');
+            rating.setAttribute('aria-label', t('bookReviews.ratingValue', { rating: book.rating }));
+            icon.className = 'fas fa-star';
+            icon.setAttribute('aria-hidden', 'true');
+            score.setAttribute('aria-hidden', 'true');
+            score.textContent = String(book.rating);
+            rating.appendChild(icon);
+            rating.appendChild(score);
+            coverFrame.appendChild(rating);
+        }
 
         if (book.tags && book.tags.length > 0) {
             var tags = document.createElement('div');
@@ -246,7 +265,7 @@ function initScript() {
             content.appendChild(tags);
         }
 
-        link.appendChild(cover);
+        link.appendChild(coverFrame);
         link.appendChild(content);
         card.appendChild(link);
         return card;
@@ -412,7 +431,6 @@ function initScript() {
                 'empty'
             );
             restoreOrder(storageKeySortableBook, 'book-grid');
-            restoreOrder(storageKeySortableTag, 'tag-cloud');
             updateTagCloudCollapse();
             applyLibraryFilters();
             return;
@@ -420,7 +438,6 @@ function initScript() {
 
         appendBookCardsInBatches(bookGrid, cards, generation, function() {
             restoreOrder(storageKeySortableBook, 'book-grid');
-            restoreOrder(storageKeySortableTag, 'tag-cloud');
             updateTagCloudCollapse();
             applyLibraryFilters();
         });
@@ -474,8 +491,6 @@ function initScript() {
     }
 
     var storageKeySortableBook = 'book-grid-sortable-order';
-    var storageKeySortableTag = 'tag-cloud-sortable-order';
-    var storageKeySortableContainer = 'library-container-sortable-order';
 
     if (isKindleMode()) {
         document.documentElement.classList.remove("kindle-mode");
@@ -486,10 +501,8 @@ function initScript() {
         if (isKindleMode() || !window.Sortable || window.__epubBrowserLibrarySortable) return;
         window.__epubBrowserLibrarySortable = true;
         var elBook = document.querySelector('.book-grid');
-        var elTag = document.querySelector('.tag-cloud');
-        var elContainer = document.querySelector('.container');
         if (!isKindleMode()) {
-            var sortableBook = Sortable.create(elBook, {
+            Sortable.create(elBook, {
                 delay: 300,
                 delayOnTouchOnly: true,
                 onEnd: function(evt) {
@@ -497,28 +510,6 @@ function initScript() {
                         return child.dataset.id;
                     });
                     localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
-                }
-            });
-            var sortableTag = Sortable.create(elTag, {
-                delay: 300,
-                delayOnTouchOnly: true,
-                onEnd: function(evt) {
-                    var itemIds = Array.from(evt.from.children).map(function(child) {
-                        return child.dataset.id;
-                    });
-                    localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
-                }
-            });
-            var sortableContainer = Sortable.create(elContainer, {
-                delay: 300,
-                delayOnTouchOnly: true,
-                filter: '.book-grid, .search-box',
-                preventOnFilter: false,
-                onEnd: function(evt) {
-                    var itemIds = Array.from(evt.from.children).map(function(child) {
-                        return child.dataset.id;
-                    });
-                    localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
                 }
             });
         }
@@ -533,11 +524,7 @@ function initScript() {
     }
 
     function enableSortableOnInteraction() {
-        var targets = [
-            document.querySelector('.book-grid'),
-            document.querySelector('.tag-cloud'),
-            document.querySelector('.container')
-        ];
+        var targets = [document.querySelector('.book-grid')];
         targets.forEach(function(target) {
             if (!target || target.getAttribute('data-library-sortable-loader') === 'true') return;
             target.setAttribute('data-library-sortable-loader', 'true');

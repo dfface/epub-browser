@@ -9,9 +9,10 @@ import unicodedata
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional, Sequence
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .auth import (
     BootstrapCredentials,
@@ -24,7 +25,13 @@ from .identity import new_server_book_id
 from .locales import SUPPORTED_LOCALE_SET
 
 
-DB_SCHEMA_VERSION = 14
+DB_SCHEMA_VERSION = 15
+
+
+# A browser may briefly reload or restore a reader while the person remains in
+# the same chapter.  The persistence layer keeps those heartbeats distinct for
+# auditability; the personal timeline joins this short telemetry seam instead.
+READING_INSIGHTS_CONTINUITY_SECONDS = 30
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -269,9 +276,7 @@ class StateStore:
             self._validate_password_hashes(connection)
             if empty_database:
                 self._create_v11_indexes(connection)
-                self._create_v14_dictionary_indexes(connection)
-                self._require_foreign_key_integrity(connection)
-                connection.execute("PRAGMA user_version = 14")
+                self._migrate_schema_v14(connection, version)
             elif version < 11:
                 self._migrate_schema_v11(connection, version)
                 self._migrate_schema_v12(connection, 11)
@@ -286,10 +291,14 @@ class StateStore:
                 self._migrate_schema_v14(connection, 13)
             elif version < 14:
                 self._migrate_schema_v14(connection, version)
+            if version < 15:
+                self._migrate_schema_v15(connection, max(version, 14))
             else:
                 self._create_v11_indexes(connection)
-                self._create_v14_dictionary_schema(connection)
-                self._create_v14_dictionary_indexes(connection)
+                self._create_v14_review_tables(connection)
+                self._create_v14_indexes(connection)
+                self._create_v15_dictionary_schema(connection)
+                self._create_v15_dictionary_indexes(connection)
                 self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
@@ -311,7 +320,7 @@ class StateStore:
     def _create_compatible_schema(self, connection, *, latest: bool = False) -> None:
         self._migrate_historical_annotations(connection)
         self._create_account_schema(connection, latest=latest)
-        self._create_v14_dictionary_schema(connection)
+        self._create_v15_dictionary_schema(connection)
         self._add_column_if_missing(
             connection,
             "users",
@@ -421,6 +430,8 @@ class StateStore:
             "TEXT NOT NULL DEFAULT 'authenticated' "
             "CHECK(visibility IN ('authenticated', 'restricted'))",
         )
+        if latest:
+            self._create_v14_review_tables(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS book_access (
@@ -1290,7 +1301,7 @@ class StateStore:
         connection.execute("PRAGMA user_version = 13")
 
     @staticmethod
-    def _create_v14_dictionary_schema(connection) -> None:
+    def _create_v15_dictionary_schema(connection) -> None:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS dictionaries (
@@ -1338,7 +1349,42 @@ class StateStore:
         )
 
     @staticmethod
-    def _create_v14_dictionary_indexes(connection) -> None:
+    def _create_v14_review_tables(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS book_reviews (
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                review_text TEXT NOT NULL CHECK(length(review_text) <= 10000),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, book_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reading_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                book_title_snapshot TEXT NOT NULL CHECK(length(book_title_snapshot) > 0),
+                chapter_label_snapshot TEXT NOT NULL CHECK(length(chapter_label_snapshot) > 0),
+                started_at REAL NOT NULL,
+                ended_at REAL NOT NULL CHECK(ended_at >= started_at),
+                active_seconds INTEGER NOT NULL CHECK(active_seconds >= 1),
+                client_id TEXT NOT NULL CHECK(length(client_id) BETWEEN 1 AND 128),
+                last_client_sequence INTEGER NOT NULL CHECK(last_client_sequence >= 0),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v15_dictionary_indexes(connection) -> None:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_dictionaries_source_enabled "
             "ON dictionaries(source_language, enabled)"
@@ -1352,17 +1398,42 @@ class StateStore:
             "ON dictionary_import_jobs(dictionary_id) WHERE dictionary_id IS NOT NULL"
         )
 
+    @staticmethod
+    def _create_v14_indexes(connection) -> None:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_book_reviews_user_updated "
+            "ON book_reviews(user_id, updated_at DESC, book_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_started "
+            "ON reading_sessions(user_id, started_at, id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_book_chapter_started "
+            "ON reading_sessions(user_id, book_id, chapter_index, started_at)"
+        )
+
     def _migrate_schema_v14(self, connection, source_version) -> None:
         if source_version >= 14:
             return
-        self._create_v14_dictionary_schema(connection)
+        self._create_v14_review_tables(connection)
+        self._create_v14_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 14")
+
+    def _migrate_schema_v15(self, connection, source_version) -> None:
+        if source_version >= 15:
+            return
+        self._create_v14_review_tables(connection)
+        self._create_v14_indexes(connection)
+        self._create_v15_dictionary_schema(connection)
         connection.execute(
             "UPDATE dictionary_import_jobs SET status = 'interrupted', "
             "updated_at = CURRENT_TIMESTAMP WHERE status = 'running'"
         )
-        self._create_v14_dictionary_indexes(connection)
+        self._create_v15_dictionary_indexes(connection)
         self._require_foreign_key_integrity(connection)
-        connection.execute("PRAGMA user_version = 14")
+        connection.execute("PRAGMA user_version = 15")
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -2265,6 +2336,16 @@ class StateStore:
             (user_id,),
         ).fetchone() is None:
             raise KeyError(f"Unknown user ID: {user_id}")
+
+    @staticmethod
+    def _require_active_book(connection, book_id: str) -> None:
+        if not isinstance(book_id, str) or not book_id.strip():
+            raise ValueError("Book ID must not be empty")
+        if connection.execute(
+            "SELECT 1 FROM books WHERE book_id = ? AND active = 1",
+            (book_id,),
+        ).fetchone() is None:
+            raise KeyError(f"Unknown active book ID: {book_id}")
 
     def create_user(
         self,
@@ -5384,6 +5465,572 @@ class StateStore:
                 """,
                 (version, serialized, user_id),
             )
+
+    def get_book_review(self, book_id: str, user_id: str) -> Optional[dict]:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            row = connection.execute(
+                """
+                SELECT user_id, book_id, rating, review_text, created_at, updated_at
+                FROM book_reviews
+                WHERE user_id = ? AND book_id = ?
+                """,
+                (user_id, book_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def upsert_book_review(
+        self,
+        book_id: str,
+        user_id: str,
+        rating: int,
+        review_text: str,
+    ) -> dict:
+        if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5:
+            raise ValueError("rating must be an integer from 1 through 5")
+        if not isinstance(review_text, str):
+            raise ValueError("review text must be a string")
+        review_text = review_text.strip()
+        if len(review_text) > 10_000:
+            raise ValueError("review text is too long")
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            self._require_active_book(connection, book_id)
+            connection.execute(
+                "INSERT INTO book_reviews (user_id, book_id, rating, review_text) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(user_id, book_id) DO UPDATE SET "
+                "rating = excluded.rating, review_text = excluded.review_text, "
+                "updated_at = CURRENT_TIMESTAMP",
+                (user_id, book_id, rating, review_text),
+            )
+            row = connection.execute(
+                """
+                SELECT user_id, book_id, rating, review_text, created_at, updated_at
+                FROM book_reviews
+                WHERE user_id = ? AND book_id = ?
+                """,
+                (user_id, book_id),
+            ).fetchone()
+        return dict(row)
+
+    def delete_book_review(self, book_id: str, user_id: str) -> None:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            connection.execute(
+                "DELETE FROM book_reviews WHERE user_id = ? AND book_id = ?",
+                (user_id, book_id),
+            )
+
+    def book_review_ratings(self, user_id: str, book_ids: Sequence[str]) -> dict[str, int]:
+        """Return one owner's ratings in one query; review text never leaves this projection."""
+        if not book_ids:
+            return {}
+        unique_ids = tuple(dict.fromkeys(book_ids))
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                "SELECT book_id, rating FROM book_reviews WHERE user_id = ? AND book_id IN ("
+                + ", ".join("?" for _ in unique_ids) + ")",
+                (user_id, *unique_ids),
+            ).fetchall()
+        return {row["book_id"]: row["rating"] for row in rows}
+
+    @staticmethod
+    def _reading_session_data(row) -> dict:
+        return {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "book_id": row["book_id"],
+            "chapter_index": row["chapter_index"],
+            "book_title": row["book_title_snapshot"],
+            "chapter_label": row["chapter_label_snapshot"],
+            "started_at": StateStore._utc_timestamp(row["started_at"]),
+            "ended_at": StateStore._utc_timestamp(row["ended_at"]),
+            "active_seconds": row["active_seconds"],
+            "client_id": row["client_id"],
+            "last_client_sequence": row["last_client_sequence"],
+        }
+
+    @staticmethod
+    def _utc_timestamp(value: float) -> str:
+        return datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _distribute_active_seconds(active_seconds: int, durations: Sequence[float]) -> list[int]:
+        """Split integer active time across timeline pieces without losing seconds."""
+        total_duration = sum(durations)
+        if not durations or total_duration <= 0:
+            return [0] * len(durations)
+        portions = [active_seconds * duration / total_duration for duration in durations]
+        allocated = [math.floor(portion) for portion in portions]
+        remaining = active_seconds - sum(allocated)
+        for index in sorted(
+            range(len(durations)), key=lambda item: (-(portions[item] - allocated[item]), item)
+        )[:remaining]:
+            allocated[index] += 1
+        return allocated
+
+    @staticmethod
+    def _merged_active_seconds(intervals: Sequence[dict]) -> int:
+        """Measure merged wall-clock spans without allowing sparse heartbeats to inflate time."""
+        active_intervals = sorted(
+            (interval for interval in intervals if interval["active_seconds"] > 0),
+            key=lambda interval: (interval["started_at"], interval["ended_at"]),
+        )
+        total = 0
+        current_start = current_end = None
+        current_active_seconds = 0
+        for interval in active_intervals:
+            if current_end is None or interval["started_at"] > current_end:
+                if current_end is not None:
+                    total += min(
+                        int(round(current_end - current_start)), current_active_seconds
+                    )
+                current_start = interval["started_at"]
+                current_end = interval["ended_at"]
+                current_active_seconds = interval["active_seconds"]
+                continue
+            current_end = max(current_end, interval["ended_at"])
+            current_active_seconds += interval["active_seconds"]
+        if current_end is not None:
+            total += min(int(round(current_end - current_start)), current_active_seconds)
+        return total
+
+    @staticmethod
+    def _merge_reading_session_segments(segments: Sequence[dict]) -> list[dict]:
+        """Join short same-reader telemetry seams without inflating active time."""
+        groups = []
+        for segment in sorted(segments, key=lambda item: (item["started_at"], item["id"])):
+            previous = groups[-1] if groups else None
+            compatible = (
+                previous is not None
+                and previous["display_date"] == segment["display_date"]
+                and previous["client_id"] == segment["client_id"]
+                and previous["book_id"] == segment["book_id"]
+                and previous["chapter_index"] == segment["chapter_index"]
+                and segment["started_at"] - previous["ended_at"] <= READING_INSIGHTS_CONTINUITY_SECONDS
+            )
+            if not compatible:
+                groups.append({
+                    **segment,
+                    "intervals": [{
+                        "started_at": segment["started_at"],
+                        "ended_at": segment["ended_at"],
+                        "active_seconds": segment["active_seconds"],
+                    }],
+                })
+                continue
+            previous["ended_at"] = max(previous["ended_at"], segment["ended_at"])
+            previous["intervals"].append({
+                "started_at": segment["started_at"],
+                "ended_at": segment["ended_at"],
+                "active_seconds": segment["active_seconds"],
+            })
+        return groups
+
+    @staticmethod
+    def _insight_bounds(period: str, anchor_date: date, zone: ZoneInfo) -> tuple[float, float]:
+        if not isinstance(anchor_date, date) or isinstance(anchor_date, datetime):
+            raise ValueError("anchor date must be a date")
+        if period == "day":
+            starts_on = anchor_date
+            ends_on = anchor_date + timedelta(days=1)
+        elif period == "week":
+            starts_on = anchor_date - timedelta(days=anchor_date.weekday())
+            ends_on = starts_on + timedelta(days=7)
+        elif period == "month":
+            starts_on = anchor_date.replace(day=1)
+            ends_on = (
+                starts_on.replace(year=starts_on.year + 1, month=1)
+                if starts_on.month == 12
+                else starts_on.replace(month=starts_on.month + 1)
+            )
+        elif period == "overview":
+            starts_on = anchor_date.replace(month=1, day=1)
+            ends_on = starts_on.replace(year=starts_on.year + 1)
+        else:
+            raise ValueError("period must be overview, day, week, or month")
+        return (
+            datetime.combine(starts_on, datetime.min.time(), zone).timestamp(),
+            datetime.combine(ends_on, datetime.min.time(), zone).timestamp(),
+        )
+
+    def _reading_activity_days(
+        self,
+        rows: Sequence[sqlite3.Row],
+        *,
+        range_start: float,
+        range_end: float,
+        zone: ZoneInfo,
+    ) -> list[dict]:
+        """Return a compact, de-duplicated daily activity history for insights."""
+        first_day = datetime.fromtimestamp(range_start, zone).date()
+        last_day = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        day_intervals = {}
+        day_book_intervals = {}
+        for row in rows:
+            started_at = max(row["started_at"], range_start)
+            ended_at = min(row["ended_at"], range_end)
+            if ended_at <= started_at:
+                continue
+            active_seconds = self._distribute_active_seconds(
+                row["active_seconds"],
+                (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
+            )[1]
+            local_start_date = datetime.fromtimestamp(started_at, zone).date()
+            local_end_date = datetime.fromtimestamp(ended_at - 0.000001, zone).date()
+            boundaries = []
+            current_day = local_start_date
+            while current_day <= local_end_date:
+                next_day = current_day + timedelta(days=1)
+                boundaries.append((
+                    current_day,
+                    max(started_at, datetime.combine(current_day, datetime.min.time(), zone).timestamp()),
+                    min(ended_at, datetime.combine(next_day, datetime.min.time(), zone).timestamp()),
+                ))
+                current_day = next_day
+            distributed = self._distribute_active_seconds(
+                active_seconds,
+                tuple(day_end - day_start for _, day_start, day_end in boundaries),
+            )
+            for (day, day_start, day_end), seconds in zip(boundaries, distributed):
+                interval = {"started_at": day_start, "ended_at": day_end, "active_seconds": seconds}
+                day_intervals.setdefault(day, []).append(interval)
+                day_book_intervals.setdefault(day, {}).setdefault(row["book_id"], []).append(interval)
+
+        activity = []
+        current_day = first_day
+        while current_day <= last_day:
+            book_intervals = day_book_intervals.get(current_day, {})
+            activity.append({
+                "date": current_day.isoformat(),
+                "active_seconds": self._merged_active_seconds(day_intervals.get(current_day, ())),
+                "book_count": sum(
+                    self._merged_active_seconds(intervals) > 0
+                    for intervals in book_intervals.values()
+                ),
+            })
+            current_day += timedelta(days=1)
+        return activity
+
+    def _reading_trend(
+        self,
+        rows: Sequence[sqlite3.Row],
+        *,
+        period: str,
+        range_start: float,
+        range_end: float,
+        zone: ZoneInfo,
+    ) -> dict:
+        """Aggregate a selected insights range at its useful visual granularity."""
+        first_day = datetime.fromtimestamp(range_start, zone).date()
+        last_day = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        buckets = []
+        if period == "overview":
+            current = first_day.replace(day=1)
+            while current <= last_day:
+                next_month = (
+                    current.replace(year=current.year + 1, month=1)
+                    if current.month == 12 else current.replace(month=current.month + 1)
+                )
+                buckets.append((
+                    current.isoformat()[:7],
+                    datetime.combine(current, datetime.min.time(), zone).timestamp(),
+                    datetime.combine(next_month, datetime.min.time(), zone).timestamp(),
+                ))
+                current = next_month
+            granularity = "month"
+        elif period == "day":
+            day_start = datetime.combine(first_day, datetime.min.time(), zone)
+            for hour in range(24):
+                start = day_start + timedelta(hours=hour)
+                end = day_start + timedelta(hours=hour + 1)
+                buckets.append((str(hour), start.timestamp(), end.timestamp()))
+            granularity = "hour"
+        else:
+            current = first_day
+            while current <= last_day:
+                next_day = current + timedelta(days=1)
+                buckets.append((
+                    current.isoformat(),
+                    datetime.combine(current, datetime.min.time(), zone).timestamp(),
+                    datetime.combine(next_day, datetime.min.time(), zone).timestamp(),
+                ))
+                current = next_day
+            granularity = "day"
+
+        intervals = {bucket_id: [] for bucket_id, _, _ in buckets}
+        book_intervals = {bucket_id: {} for bucket_id, _, _ in buckets}
+        for row in rows:
+            for bucket_id, bucket_start, bucket_end in buckets:
+                started_at = max(row["started_at"], bucket_start)
+                ended_at = min(row["ended_at"], bucket_end)
+                if ended_at <= started_at:
+                    continue
+                active_seconds = self._distribute_active_seconds(
+                    row["active_seconds"],
+                    (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
+                )[1]
+                interval = {
+                    "started_at": started_at,
+                    "ended_at": ended_at,
+                    "active_seconds": active_seconds,
+                }
+                intervals[bucket_id].append(interval)
+                book_intervals[bucket_id].setdefault(row["book_id"], []).append(interval)
+
+        return {
+            "granularity": granularity,
+            "start_date": first_day.isoformat(),
+            "end_date": last_day.isoformat(),
+            "points": [{
+                "bucket": bucket_id,
+                "active_seconds": self._merged_active_seconds(intervals[bucket_id]),
+                "book_count": sum(
+                    self._merged_active_seconds(per_book) > 0
+                    for per_book in book_intervals[bucket_id].values()
+                ),
+            } for bucket_id, _, _ in buckets],
+        }
+
+    def record_reading_heartbeat(
+        self,
+        *,
+        user_id: str,
+        book_id: str,
+        client_id: str,
+        client_sequence: int,
+        chapter_index: int,
+        active_seconds: int,
+        book_title: str,
+        chapter_label: str,
+        received_at: datetime,
+    ) -> dict:
+        if isinstance(active_seconds, bool) or not isinstance(active_seconds, int) or not 1 <= active_seconds <= 20:
+            raise ValueError("active seconds must be an integer from 1 through 20")
+        if isinstance(client_sequence, bool) or not isinstance(client_sequence, int) or client_sequence < 0:
+            raise ValueError("client sequence must be a non-negative integer")
+        if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
+            raise ValueError("chapter index must be a non-negative integer")
+        if not isinstance(client_id, str) or not 1 <= len(client_id) <= 128:
+            raise ValueError("client ID must contain from 1 through 128 characters")
+        if not isinstance(book_title, str) or not book_title.strip():
+            raise ValueError("book title must not be empty")
+        if not isinstance(chapter_label, str) or not chapter_label.strip():
+            raise ValueError("chapter label must not be empty")
+        if not isinstance(received_at, datetime) or received_at.tzinfo is None or received_at.utcoffset() is None:
+            raise ValueError("received at must be timezone-aware")
+
+        received_epoch = received_at.astimezone(timezone.utc).timestamp()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, user_id)
+            self._require_active_book(connection, book_id)
+            previous = connection.execute(
+                "SELECT * FROM reading_sessions WHERE user_id = ? AND client_id = ? "
+                "ORDER BY last_client_sequence DESC, id DESC LIMIT 1",
+                (user_id, client_id),
+            ).fetchone()
+            if previous is not None and client_sequence <= previous["last_client_sequence"]:
+                return self._reading_session_data(previous)
+            compatible = (
+                previous is not None
+                and previous["book_id"] == book_id
+                and previous["chapter_index"] == chapter_index
+                and 0 <= received_epoch - previous["ended_at"] <= 20
+            )
+            if compatible:
+                connection.execute(
+                    "UPDATE reading_sessions SET ended_at = ?, "
+                    "active_seconds = active_seconds + ?, last_client_sequence = ?, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (received_epoch, active_seconds, client_sequence, previous["id"]),
+                )
+                row = connection.execute(
+                    "SELECT * FROM reading_sessions WHERE id = ?", (previous["id"],)
+                ).fetchone()
+                return self._reading_session_data(row)
+            session_id = str(uuid.uuid4())
+            connection.execute(
+                "INSERT INTO reading_sessions ("
+                "id, user_id, book_id, chapter_index, book_title_snapshot, "
+                "chapter_label_snapshot, started_at, ended_at, active_seconds, "
+                "client_id, last_client_sequence"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    session_id, user_id, book_id, chapter_index, book_title,
+                    chapter_label, received_epoch - active_seconds, received_epoch,
+                    active_seconds, client_id, client_sequence,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM reading_sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            return self._reading_session_data(row)
+
+    def reading_insights(
+        self,
+        user_id: str,
+        period: str,
+        anchor_date: date,
+        timezone_name: str,
+    ) -> dict:
+        try:
+            zone = ZoneInfo(timezone_name)
+        except (TypeError, ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("unknown timezone") from exc
+        range_start, range_end = self._insight_bounds(period, anchor_date, zone)
+        # The calendar uses the natural year that contains the selected date,
+        # rather than a fixed trailing-day window. Empty future cells preserve
+        # the full annual coordinate system in the overview.
+        activity_start_date = anchor_date.replace(month=1, day=1)
+        activity_end_date = activity_start_date.replace(year=activity_start_date.year + 1) - timedelta(days=1)
+        activity_start = datetime.combine(activity_start_date, datetime.min.time(), zone).timestamp()
+        activity_end = datetime.combine(activity_end_date + timedelta(days=1), datetime.min.time(), zone).timestamp()
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                "SELECT * FROM reading_sessions WHERE user_id = ? "
+                "AND started_at < ? AND ended_at > ? "
+                "ORDER BY started_at DESC, id DESC",
+                (user_id, range_end, activity_start),
+            ).fetchall()
+
+        clipped_sessions = []
+        session_segments = []
+        day_intervals = {}
+        book_intervals = {}
+        book_titles = {}
+        for row in rows:
+            started_at = max(row["started_at"], range_start)
+            ended_at = min(row["ended_at"], range_end)
+            if ended_at <= started_at:
+                continue
+            in_range_active_seconds = self._distribute_active_seconds(
+                row["active_seconds"],
+                (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
+            )[1]
+            interval = {
+                "started_at": started_at,
+                "ended_at": ended_at,
+                "active_seconds": in_range_active_seconds,
+            }
+            clipped_sessions.append(interval)
+            book_id = row["book_id"]
+            book_intervals.setdefault(book_id, []).append(interval)
+            book_titles.setdefault(book_id, row["book_title_snapshot"])
+
+            local_start_date = datetime.fromtimestamp(started_at, zone).date()
+            local_end_date = datetime.fromtimestamp(ended_at - 0.000001, zone).date()
+            day_boundaries = []
+            current_day = local_start_date
+            while current_day <= local_end_date:
+                next_day = current_day + timedelta(days=1)
+                day_boundaries.append(
+                    (
+                        current_day,
+                        max(started_at, datetime.combine(current_day, datetime.min.time(), zone).timestamp()),
+                        min(ended_at, datetime.combine(next_day, datetime.min.time(), zone).timestamp()),
+                    )
+                )
+                current_day = next_day
+            day_active_seconds = self._distribute_active_seconds(
+                in_range_active_seconds,
+                tuple(day_end - day_start for _, day_start, day_end in day_boundaries),
+            )
+            for (day, day_start, day_end), active_seconds_for_day in zip(day_boundaries, day_active_seconds):
+                day_intervals.setdefault(day, []).append({
+                    "started_at": day_start,
+                    "ended_at": day_end,
+                    "active_seconds": active_seconds_for_day,
+                })
+                session_segments.append({
+                    "id": row["id"],
+                    "started_at": day_start,
+                    "ended_at": day_end,
+                    "active_seconds": active_seconds_for_day,
+                    "book_id": row["book_id"],
+                    "book_title": row["book_title_snapshot"],
+                    "chapter_index": row["chapter_index"],
+                    "chapter_label": row["chapter_label_snapshot"],
+                    "client_id": row["client_id"],
+                    "display_date": day.isoformat(),
+                })
+
+        book_totals = {
+            book_id: self._merged_active_seconds(intervals)
+            for book_id, intervals in book_intervals.items()
+        }
+        top_book = None
+        if book_totals:
+            top_book_id = min(
+                book_totals,
+                key=lambda book_id: (-book_totals[book_id], book_titles[book_id], book_id),
+            )
+            top_book = {
+                "book_id": top_book_id,
+                "title": book_titles[top_book_id],
+                "active_seconds": book_totals[top_book_id],
+            }
+        first_day = datetime.fromtimestamp(range_start, zone).date()
+        last_day = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        days = []
+        current_day = first_day
+        while current_day <= last_day:
+            intervals = day_intervals.get(current_day, ())
+            days.append({
+                "date": current_day.isoformat(),
+                "active_seconds": self._merged_active_seconds(intervals),
+            })
+            current_day += timedelta(days=1)
+        display_sessions = self._merge_reading_session_segments(session_segments)
+        return {
+            "period": period,
+            "anchor_date": anchor_date.isoformat(),
+            "timezone": timezone_name,
+            "total_active_seconds": self._merged_active_seconds(clipped_sessions),
+            "top_book": top_book,
+            "days": days,
+            "activity": {
+                "start_date": activity_start_date.isoformat(),
+                "end_date": activity_end_date.isoformat(),
+                "days": self._reading_activity_days(
+                    rows,
+                    range_start=activity_start,
+                    range_end=activity_end,
+                    zone=zone,
+                ),
+            },
+            "trend": self._reading_trend(
+                rows,
+                period=period,
+                range_start=range_start,
+                range_end=range_end,
+                zone=zone,
+            ),
+            "sessions": [{
+                "id": session["id"],
+                "started_at": self._utc_timestamp(session["started_at"]),
+                "active_seconds": self._merged_active_seconds(session["intervals"]),
+                "book_id": session["book_id"],
+                "book_title": session["book_title"],
+                "chapter_index": session["chapter_index"],
+                "chapter_label": session["chapter_label"],
+            } for session in display_sessions],
+        }
+
+    def reading_time_for_book(self, user_id: str, book_id: str) -> int:
+        """Return one account's de-duplicated active reading time for a book."""
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            self._require_active_book(connection, book_id)
+            rows = connection.execute(
+                "SELECT started_at, ended_at, active_seconds FROM reading_sessions "
+                "WHERE user_id = ? AND book_id = ?",
+                (user_id, book_id),
+            ).fetchall()
+        return self._merged_active_seconds(rows)
 
     def get_reading_progress(self, user_id: str, book_hash: str):
         with self._connection() as connection:

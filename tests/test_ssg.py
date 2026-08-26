@@ -136,6 +136,43 @@ class SSGPublicationTests(unittest.TestCase):
                     r"window\.EpubBrowserBasePath=(?:[\"'`])/reader/(?:[\"'`])",
                 )
 
+    def test_server_only_personal_reading_insight_assets_are_never_emitted_by_ssg(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:personal-reading-insights")
+
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+
+            manifest = json.loads(
+                (output / "assets" / "asset-manifest.json").read_text(encoding="utf-8")
+            )
+            server_only = (
+                "book-reviews.js",
+                "book-reviews.css",
+                "reading-sessions.js",
+                "reading-insights.js",
+                "reading-insights.css",
+            )
+            for logical_name in server_only:
+                self.assertNotIn(logical_name, manifest)
+
+            output_text = "\n".join(
+                path.read_text(encoding="utf-8", errors="ignore")
+                for path in output.rglob("*.html")
+            )
+            for forbidden in (
+                "/api/book-reviews",
+                "/api/reading-sessions",
+                "/api/reading-insights",
+                "/reading-insights",
+                *server_only,
+            ):
+                self.assertNotIn(forbidden, output_text)
+
     def test_non_root_snapshot_has_only_resolvable_base_path_urls(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

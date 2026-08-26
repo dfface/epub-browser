@@ -4,11 +4,17 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
+
+
+def _utc(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
 def table_columns(connection, table):
@@ -58,6 +64,189 @@ class StateStoreTests(unittest.TestCase):
         self.owner = self.store.initialize(
             bootstrap=BootstrapCredentials("owner", "secret")
         )
+
+    def _reading_book(self, book_id="book-1"):
+        return self.store.resolve_book(
+            Path(self.temporary.name, f"{book_id}.epub"),
+            book_id,
+            f"{book_id}-fingerprint",
+            {},
+            authoritative_book_id=book_id,
+        )
+
+    def test_heartbeat_is_idempotent_and_changes_chapter_session(self):
+        self._reading_book()
+        first = self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=1, chapter_index=2, active_seconds=15,
+            book_title="Book", chapter_label="Chapter 3", received_at=_utc("2026-08-15T00:00:15Z"),
+        )
+        duplicate = self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=1, chapter_index=2, active_seconds=15,
+            book_title="Book", chapter_label="Chapter 3", received_at=_utc("2026-08-15T00:00:16Z"),
+        )
+        changed = self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=2, chapter_index=3, active_seconds=15,
+            book_title="Book", chapter_label="Chapter 4", received_at=_utc("2026-08-15T00:00:30Z"),
+        )
+        self.assertEqual(first["active_seconds"], 15)
+        self.assertEqual(duplicate["active_seconds"], 15)
+        self.assertNotEqual(first["id"], changed["id"])
+
+    def test_heartbeat_retry_is_idempotent_when_receipts_arrive_out_of_order(self):
+        self._reading_book()
+        values = {
+            "user_id": self.owner.user_id,
+            "book_id": "book-1",
+            "client_id": "tab-a",
+            "chapter_index": 2,
+            "active_seconds": 15,
+            "book_title": "Book",
+            "chapter_label": "Chapter 3",
+        }
+        self.store.record_reading_heartbeat(
+            **(values | {
+                "client_sequence": 1,
+                "received_at": _utc("2026-08-15T00:00:20Z"),
+            })
+        )
+        second = self.store.record_reading_heartbeat(
+            **(values | {
+                "client_sequence": 2,
+                "received_at": _utc("2026-08-15T00:00:10Z"),
+            })
+        )
+        retry = self.store.record_reading_heartbeat(
+            **(values | {
+                "client_sequence": 2,
+                "received_at": _utc("2026-08-15T00:00:10Z"),
+            })
+        )
+
+        with self.store._connection() as connection:
+            rows = connection.execute(
+                "SELECT id, active_seconds FROM reading_sessions "
+                "WHERE user_id = ? AND client_id = ? ORDER BY last_client_sequence",
+                (self.owner.user_id, "tab-a"),
+            ).fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(retry["id"], second["id"])
+        self.assertEqual(rows[1]["active_seconds"], 15)
+
+    def test_insights_use_callers_timezone_and_merge_overlapping_device_sessions(self):
+        self._reading_book()
+        with self.store._connection() as connection:
+            connection.executemany(
+                """
+                INSERT INTO reading_sessions (
+                    id, user_id, book_id, chapter_index, book_title_snapshot,
+                    chapter_label_snapshot, started_at, ended_at, active_seconds,
+                    client_id, last_client_sequence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ("session-a", self.owner.user_id, "book-1", 2, "Book", "Chapter 3", _utc("2026-08-14T16:00:00Z").timestamp(), _utc("2026-08-14T16:30:00Z").timestamp(), 1800, "tab-a", 1),
+                    ("session-b", self.owner.user_id, "book-1", 2, "Book", "Chapter 3", _utc("2026-08-14T16:00:00Z").timestamp(), _utc("2026-08-14T16:30:00Z").timestamp(), 1800, "tab-b", 1),
+                ),
+            )
+        result = self.store.reading_insights(self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai")
+        self.assertEqual(result["total_active_seconds"], 1800)
+        self.assertEqual(result["days"][0]["date"], "2026-08-15")
+        self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
+        self.assertEqual(self.store.reading_time_for_book(self.owner.user_id, "book-1"), 1800)
+        self.assertEqual(result["trend"]["granularity"], "hour")
+        self.assertEqual(len(result["trend"]["points"]), 24)
+        self.assertEqual(result["trend"]["points"][0], {
+            "bucket": "0", "active_seconds": 1800, "book_count": 1,
+        })
+        self.assertEqual(len(result["activity"]["days"]), 365)
+        self.assertIn({
+            "date": "2026-08-15", "active_seconds": 1800, "book_count": 1,
+        }, result["activity"]["days"])
+        self.assertEqual(result["activity"]["days"][-1], {
+            "date": "2026-12-31", "active_seconds": 0, "book_count": 0,
+        })
+
+        overview = self.store.reading_insights(
+            self.owner.user_id, "overview", date(2026, 8, 15), "Asia/Shanghai"
+        )
+        self.assertEqual(overview["trend"]["granularity"], "month")
+        self.assertEqual(len(overview["trend"]["points"]), 12)
+        self.assertEqual(overview["trend"]["points"][7], {
+            "bucket": "2026-08", "active_seconds": 1800, "book_count": 1,
+        })
+
+    def test_insights_join_short_same_reader_telemetry_seams_in_the_timeline(self):
+        self._reading_book()
+        values = {
+            "user_id": self.owner.user_id,
+            "book_id": "book-1",
+            "client_id": "tab-a",
+            "chapter_index": 2,
+            "book_title": "Book",
+            "chapter_label": "Chapter 3",
+        }
+        self.store.record_reading_heartbeat(**(values | {
+            "client_sequence": 17,
+            "active_seconds": 4,
+            "received_at": _utc("2026-08-15T08:46:23Z"),
+        }))
+        self.store.record_reading_heartbeat(**(values | {
+            "client_sequence": 19,
+            "active_seconds": 9,
+            "received_at": _utc("2026-08-15T08:46:55Z"),
+        }))
+
+        with self.store._connection() as connection:
+            raw_count = connection.execute(
+                "SELECT COUNT(*) FROM reading_sessions WHERE user_id = ?",
+                (self.owner.user_id,),
+            ).fetchone()[0]
+        result = self.store.reading_insights(
+            self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai"
+        )
+
+        self.assertEqual(raw_count, 2)
+        self.assertEqual(result["total_active_seconds"], 13)
+        self.assertEqual(len(result["sessions"]), 1)
+        self.assertEqual(result["sessions"][0]["active_seconds"], 13)
+
+    def test_insights_split_session_at_local_midnight_without_losing_seconds(self):
+        self._reading_book()
+        self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=1, chapter_index=0, active_seconds=20,
+            book_title="Book", chapter_label="Chapter 1", received_at=_utc("2026-08-15T16:00:10Z"),
+        )
+        result = self.store.reading_insights(self.owner.user_id, "week", date(2026, 8, 16), "Asia/Shanghai")
+        self.assertEqual(sum(day["active_seconds"] for day in result["days"]), 20)
+        self.assertEqual(len(result["days"]), 7)
+        self.assertIn(0, [day["active_seconds"] for day in result["days"]])
+        zone = ZoneInfo("Asia/Shanghai")
+        by_date = {
+            datetime.fromisoformat(item["started_at"].replace("Z", "+00:00")).astimezone(zone).date().isoformat(): item
+            for item in result["sessions"]
+        }
+        self.assertEqual(by_date["2026-08-15"]["active_seconds"] + by_date["2026-08-16"]["active_seconds"], 20)
+
+    def test_heartbeat_rejects_invalid_owner_book_sequence_and_increment(self):
+        self._reading_book()
+        values = {
+            "user_id": self.owner.user_id, "book_id": "book-1", "client_id": "tab-a",
+            "client_sequence": 1, "chapter_index": 0, "active_seconds": 15,
+            "book_title": "Book", "chapter_label": "Chapter 1",
+            "received_at": _utc("2026-08-15T00:00:15Z"),
+        }
+        with self.assertRaises(ValueError):
+            self.store.record_reading_heartbeat(**(values | {"client_sequence": -1}))
+        with self.assertRaises(ValueError):
+            self.store.record_reading_heartbeat(**(values | {"active_seconds": 21}))
+        with self.assertRaises(KeyError):
+            self.store.record_reading_heartbeat(**(values | {"user_id": "missing"}))
+        with self.assertRaises(KeyError):
+            self.store.record_reading_heartbeat(**(values | {"book_id": "missing"}))
 
     def test_connections_enable_busy_timeout_foreign_keys_and_normal_sync(self):
         with self.store._connection() as connection:
@@ -164,7 +353,7 @@ class StateStoreTests(unittest.TestCase):
                 )
             }
 
-        self.assertEqual(version, 14)
+        self.assertEqual(version, DB_SCHEMA_VERSION)
         self.assertTrue(
             {"dictionaries", "dictionary_defaults", "dictionary_import_jobs"}
             <= tables
@@ -217,6 +406,70 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(
             [record.id for record in self.store.list_enabled_dictionaries()],
             [newer.id, older.id],
+        )
+
+    def test_latest_schema_creates_private_reviews_and_sessions_tables(self):
+        with self.store._connection() as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], DB_SCHEMA_VERSION)
+            self.assertEqual(
+                table_columns(connection, "book_reviews"),
+                {
+                    "user_id", "book_id", "rating", "review_text",
+                    "created_at", "updated_at",
+                },
+            )
+            self.assertTrue({"reading_sessions", "book_reviews"} <= {
+                row[0] for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            })
+
+    def test_book_review_is_upserted_validated_and_owner_scoped(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "source.epub"),
+            "book-1",
+            "fingerprint",
+            {},
+            authoritative_book_id="book-1",
+        )
+        saved = self.store.upsert_book_review(
+            book.book_id, self.owner.user_id, 5, "  Excellent.  "
+        )
+        self.assertEqual(saved["rating"], 5)
+        self.assertEqual(saved["review_text"], "Excellent.")
+        self.assertEqual(
+            self.store.get_book_review(book.book_id, self.owner.user_id), saved
+        )
+        other = self.store.create_user("other-reviewer", hash_password("secret"))
+        self.assertIsNone(self.store.get_book_review(book.book_id, other.user_id))
+        with self.assertRaises(ValueError):
+            self.store.upsert_book_review(book.book_id, self.owner.user_id, 0, "")
+
+    def test_v13_upgrade_creates_empty_review_tables_without_losing_progress(self):
+        database = Path(self.temporary.name, "v13.db")
+        self._create_v13_database_with_progress(database)
+
+        store = StateStore(database)
+        store.initialize()
+
+        self.assertEqual(store.get_reading_progress("admin", "legacy-book"), 4)
+        self.assertIsNone(store.get_book_review("legacy-book", "admin"))
+
+    def test_delete_book_review_cannot_delete_another_users_row(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "delete-review.epub"),
+            "book-1",
+            "fingerprint",
+            {},
+            authoritative_book_id="book-1",
+        )
+        self.store.upsert_book_review(book.book_id, self.owner.user_id, 4, "Mine")
+        other = self.store.create_user("other", hash_password("secret"))
+
+        self.store.delete_book_review(book.book_id, other.user_id)
+
+        self.assertEqual(
+            self.store.get_book_review(book.book_id, self.owner.user_id)["rating"], 4
         )
 
     def test_initialize_adds_session_client_metadata_to_existing_account_database(self):
@@ -987,15 +1240,15 @@ class StateStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "newer schema"):
             StateStore(future).initialize()
 
-    def test_v13_fresh_database_has_latest_contract(self):
-        database = Path(self.temporary.name, "fresh-v13.db")
+    def test_v14_fresh_database_has_latest_contract(self):
+        database = Path(self.temporary.name, "fresh-v14.db")
         StateStore(database).initialize(
             bootstrap=BootstrapCredentials("fresh-owner", "secret")
         )
         StateStore(database).initialize()
 
         with sqlite3.connect(database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], DB_SCHEMA_VERSION)
             self.assertFalse(
                 {"username"} & table_columns(connection, "annotations")
             )
@@ -1434,7 +1687,7 @@ class StateStoreTests(unittest.TestCase):
                 (1, "Original summary.", "2026-07"),
             )
             self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], DB_SCHEMA_VERSION)
 
     def test_concurrent_initializer_rereads_user_version_after_lock(self):
         self._downgrade_selected_tables_to_v10(self.database)
@@ -1506,7 +1759,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], DB_SCHEMA_VERSION)
             self.assertEqual(
                 connection.execute(
                     "SELECT attempt_number, retried_from_job_id, retry_root_job_id, "
@@ -2317,7 +2570,7 @@ class StateStoreTests(unittest.TestCase):
                 {"quota_reserved", "generation_stage"}
                 <= table_columns(connection, "ai_reading_jobs")
             )
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], DB_SCHEMA_VERSION)
 
     def test_admin_retry_of_migrated_v11_failed_root_is_quota_exempt(self):
         member = self.store.create_user(
@@ -2612,7 +2865,7 @@ class StateStoreTests(unittest.TestCase):
 
         with sqlite3.connect(self.database) as connection:
             after = self._v13_migration_sensitive_snapshot(connection)
-            self.assertEqual(after['version'], 14)
+            self.assertEqual(after['version'], DB_SCHEMA_VERSION)
             self.assertEqual(after['rows'], before['rows'])
             self.assertEqual(after['indexes'], before['indexes'])
             self.assertEqual(after['foreign_keys'], before['foreign_keys'])
@@ -3626,6 +3879,28 @@ class StateStoreTests(unittest.TestCase):
             "Why?",
         )
         self.assertIsNone(self.store.get_ai_followup(followup["id"], self.owner.user_id))
+
+    def _create_v13_database_with_progress(self, database):
+        store = StateStore(database)
+        store.initialize(bootstrap=BootstrapCredentials("legacy-owner", "secret"))
+        with store._connection() as connection:
+            connection.execute(
+                "INSERT INTO users (id, username, role, enabled, password_hash) "
+                "VALUES ('admin', 'legacy-admin', 'admin', 1, ?)",
+                (hash_password("secret"),),
+            )
+        book = store.resolve_book(
+            Path(self.temporary.name, "legacy-book.epub"),
+            "legacy-book",
+            "legacy-fingerprint",
+            {},
+            authoritative_book_id="legacy-book",
+        )
+        store.set_reading_progress("admin", book.book_id, 4)
+        with sqlite3.connect(database) as connection:
+            connection.execute("DROP TABLE reading_sessions")
+            connection.execute("DROP TABLE book_reviews")
+            connection.execute("PRAGMA user_version = 13")
 
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,

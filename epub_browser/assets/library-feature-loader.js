@@ -6,7 +6,8 @@
     pinyin: { scripts: ['pinyin'] },
     sortable: { scripts: ['sortable'] },
     bookshelf: { scripts: ['sortable', 'bookshelf'] },
-    annotations: { styles: ['annotationHubCss'], scripts: ['annotation', 'annotationHub'] }
+    annotations: { styles: ['annotationHubCss'], scripts: ['annotation', 'annotationHub'] },
+    readingInsights: { styles: ['readingInsightsCss'], scripts: ['readingInsights'] }
   };
 
   function assetUrl(name) {
@@ -66,4 +67,29 @@
   root.EpubBrowserLibraryFeatures = {
     load: loadFeature
   };
+  function bindReadingInsights() {
+    Array.prototype.forEach.call(root.document.querySelectorAll('[data-reading-insights]'), function(button) {
+      if (button.dataset.readingInsightsLoaderBound) return;
+      button.dataset.readingInsightsLoaderBound = 'true';
+      button.addEventListener('click', function(event) {
+        if (root.EpubReadingInsights && root.EpubReadingInsights.open) return;
+        event.preventDefault();
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        loadFeature('readingInsights').then(function() {
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+          if (root.EpubReadingInsights && root.EpubReadingInsights.open) root.EpubReadingInsights.open(button);
+        }).catch(function() {
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+          if (root.EpubBrowserNotification && root.EpubBrowserNotification.show) {
+            root.EpubBrowserNotification.show('Unable to open reading insights. Please try again.', 'error');
+          }
+        });
+      });
+    });
+  }
+  if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', bindReadingInsights);
+  else bindReadingInsights();
 })(window);
