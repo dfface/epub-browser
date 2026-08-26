@@ -312,6 +312,18 @@
       return root.confirm(t(key, params));
     }
 
+    function confirmAdminDiscardChanges() {
+      if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') {
+        return Promise.resolve(false);
+      }
+      return Promise.resolve(root.EpubDialog.confirm({
+        title: t('admin.close'),
+        message: t('admin.confirmDiscardChanges'),
+        confirmText: t('admin.discardChanges'),
+        destructive: true
+      }));
+    }
+
     function confirmAdminBookBulkOperation(operation, params) {
       var actionKey = operation === 'restrict'
         ? 'admin.books.bulk.restrict'
@@ -2399,10 +2411,10 @@
       startAdminAiJobPolling();
     }
 
-    function closeAdminPanel() {
+    async function closeAdminPanel() {
       var panel = element('adminPanel');
       if (!panel) return;
-      if (adminHasUnsavedChanges && !confirmAdminAction('admin.confirmDiscardChanges')) return;
+      if (adminHasUnsavedChanges && !await confirmAdminDiscardChanges()) return;
       clearAdminDirty();
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');

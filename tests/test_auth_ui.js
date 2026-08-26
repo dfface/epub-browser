@@ -1199,7 +1199,7 @@ test('clearing all AI results requires an explicit administrator confirmation', 
   )));
 });
 
-test('closing administration keeps unsaved form changes until the administrator confirms', async () => {
+test('closing administration with unsaved changes uses the standard confirmation dialog', async () => {
   const adminPanel = fakeElement('section');
   const adminClose = fakeElement('button');
   const aiSettingsForm = fakeElement('form');
@@ -1207,7 +1207,10 @@ test('closing administration keeps unsaved form changes until the administrator 
   const root = rootWithFetch(() => Promise.resolve(response(200, {
     user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token',
   })));
-  root.confirm = () => discard;
+  // A native confirmation would accept this close, while the standard dialog
+  // initially cancels it. The panel must follow the standard dialog result.
+  root.confirm = () => true;
+  root.EpubDialog = { confirm() { return Promise.resolve(discard); } };
   root.document = {
     getElementById(id) {
       return ({ adminPanel, adminClose, adminAiSettingsForm: aiSettingsForm })[id] || null;
@@ -1221,10 +1224,12 @@ test('closing administration keeps unsaved form changes until the administrator 
   adminPanel.classList.add('active');
   if (aiSettingsForm.listeners.input) aiSettingsForm.listeners.input();
   adminClose.click();
+  await tick();
   assert.equal(adminPanel.classList.contains('active'), true);
 
   discard = true;
   adminClose.click();
+  await tick();
   assert.equal(adminPanel.classList.contains('active'), false);
 });
 
