@@ -95,8 +95,11 @@
     function activityTone(seconds) {
       var value = Math.max(0, Number(seconds) || 0);
       if (!value) return 0;
-      if (value < 60) return 1;
-      if (value < 15 * 60) return 2;
+      // These are deliberate, stable session-length bands rather than a
+      // data-relative scale. A colour must mean the same thing every time a
+      // reader opens a different year or changes their reading history.
+      if (value < 5 * 60) return 1;
+      if (value < 20 * 60) return 2;
       if (value < 60 * 60) return 3;
       return 4;
     }
@@ -369,7 +372,7 @@
       var activityScale = translate(
         target,
         'readingInsights.activityScale',
-        'Color reflects active reading per day: under 1 minute, 1–15 minutes, 15–60 minutes, and 1 hour or more.'
+        'Color reflects active reading per day: under 5 minutes, 5–20 minutes, 20–60 minutes, and 1 hour or more.'
       );
       var activityInfo = append(legend, 'button', 'reading-insights-activity-info');
       activityInfo.type = 'button';

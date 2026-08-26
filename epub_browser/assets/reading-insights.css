@@ -375,7 +375,14 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-session-time { color: var(--text-secondary); font-size: .82rem; white-space: nowrap; }
 .reading-insights-session-details { display: grid; min-width: 0; gap: 2px; }
 .reading-insights-session-book,
-.reading-insights-session-chapter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reading-insights-session-chapter {
+    align-self: start;
+    justify-self: start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .reading-insights-session-book { color: var(--text); font-size: .92rem; font-weight: 700; text-decoration: none; }
 .reading-insights-session-chapter { color: var(--text-secondary); font-size: .8rem; text-decoration: none; }
 .reading-insights-session-book[href]:hover,

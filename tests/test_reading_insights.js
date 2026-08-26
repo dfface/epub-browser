@@ -92,8 +92,11 @@ test('renders a theme-token-ready activity calendar and switches its daily trend
     activity: {
       days: [
         { date: '2026-08-10', active_seconds: 1, book_count: 1 },
-        { date: '2026-08-11', active_seconds: 60, book_count: 1 },
-        { date: '2026-08-12', active_seconds: 3600, book_count: 2 },
+        { date: '2026-08-11', active_seconds: 299, book_count: 1 },
+        { date: '2026-08-12', active_seconds: 300, book_count: 1 },
+        { date: '2026-08-13', active_seconds: 1199, book_count: 1 },
+        { date: '2026-08-14', active_seconds: 1200, book_count: 1 },
+        { date: '2026-08-15', active_seconds: 3600, book_count: 2 },
       ],
     },
     sessions: [],
@@ -101,9 +104,12 @@ test('renders a theme-token-ready activity calendar and switches its daily trend
   await page.mount();
 
   assert.match(page.activityCells[0].className, /is-level-1/);
-  assert.match(page.activityCells[1].className, /is-level-2/);
-  assert.match(page.activityCells[2].className, /is-level-4/);
-  assert.equal(page.activityCells[2].getAttribute('aria-label'), 'Sat, Aug 15, 2026: 1 hr. Books read: 2');
+  assert.match(page.activityCells[1].className, /is-level-1/);
+  assert.match(page.activityCells[2].className, /is-level-2/);
+  assert.match(page.activityCells[3].className, /is-level-2/);
+  assert.match(page.activityCells[4].className, /is-level-3/);
+  assert.match(page.activityCells[5].className, /is-level-4/);
+  assert.equal(page.activityCells[5].getAttribute('aria-label'), 'Sat, Aug 15, 2026: 1 hr. Books read: 2');
   page.metricButtons[1].click();
   assert.equal(page.metricButtons[0].getAttribute('aria-pressed'), 'false');
   assert.equal(page.metricButtons[1].getAttribute('aria-pressed'), 'true');
