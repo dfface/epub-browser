@@ -4149,6 +4149,8 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(insights.status_code, 200)
         self.assertEqual(insights.json()["insights"]["period"], "week")
         self.assertEqual(len(insights.json()["insights"]["activity"]["days"]), 365)
+        self.assertEqual(insights.json()["insights"]["trend"]["granularity"], "day")
+        self.assertEqual(len(insights.json()["insights"]["trend"]["points"]), 7)
         self.assertTrue(any(
             day["book_count"] == 1
             for day in insights.json()["insights"]["activity"]["days"]

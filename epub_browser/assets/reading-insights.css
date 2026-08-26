@@ -190,6 +190,7 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-analytics { margin: 0 0 28px; }
 .reading-insights-analytics > h2 { font-size: 1.24rem; letter-spacing: -.02em; }
 .reading-insights-analytics-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; margin-top: 14px; }
+.reading-insights-analytics-grid.is-trend-only { grid-template-columns: minmax(0, 1fr); }
 .reading-insights-analytics-card { min-width: 0; padding: 20px; }
 .reading-insights-analytics-card h3 { font-size: 1rem; line-height: 1.35; }
 .reading-insights-analytics-description { margin-top: 4px !important; color: var(--text-secondary); font-size: .82rem; }
@@ -267,16 +268,15 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-metric-button[aria-pressed="true"] { border-color: var(--button-bg); color: var(--button-text); background: var(--button-bg); }
 .reading-insights-metric-button:hover { border-color: var(--button-bg); }
 .reading-insights-metric-button:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
-.reading-insights-trend-axis { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
-.reading-insights-trend-y-axis { display: flex; flex-direction: column; justify-content: space-between; min-height: 116px; padding: 2px 0 8px; color: var(--text-secondary); font-size: .72rem; }
-.reading-insights-trend-y-label { writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: .03em; }
-.reading-insights-trend-y-max { color: var(--text-secondary); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.reading-insights-trend-axis { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
+.reading-insights-trend-y-axis { display: flex; flex-direction: column; justify-content: space-between; min-height: 116px; padding: 2px 0 8px; color: var(--text-secondary); font-size: .72rem; font-variant-numeric: tabular-nums; text-align: right; }
+.reading-insights-trend-y-tick { display: block; }
 .reading-insights-trend-chart { height: 116px; border-bottom: 1px solid var(--border); background: linear-gradient(to bottom, transparent 24%, var(--hover) 25%, transparent 26%, transparent 49%, var(--hover) 50%, transparent 51%, transparent 74%, var(--hover) 75%, transparent 76%); }
 .reading-insights-trend-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .reading-insights-trend-area { fill: color-mix(in srgb, var(--button-bg) 18%, transparent); }
 .reading-insights-trend-line { fill: none; stroke: var(--button-bg); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .reading-insights-trend-value { margin-top: 10px !important; color: var(--text); font-size: .88rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.reading-insights-trend-x-axis { display: flex; justify-content: space-between; margin: 5px 0 0 66px; color: var(--text-secondary); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.reading-insights-trend-x-axis { display: flex; justify-content: space-between; margin: 5px 0 0 54px; color: var(--text-secondary); font-size: .72rem; font-variant-numeric: tabular-nums; }
 
 .reading-insights-days,
 .reading-insights-sessions {
@@ -366,8 +366,8 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
     .reading-insights-range { gap: 6px; }
     .reading-insights-range-label { min-width: 0; flex: 1 1 auto; }
     .reading-insights-day-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .reading-insights-trend-axis { grid-template-columns: 46px minmax(0, 1fr); }
-    .reading-insights-trend-x-axis { margin-left: 54px; }
+    .reading-insights-trend-axis { grid-template-columns: 42px minmax(0, 1fr); }
+    .reading-insights-trend-x-axis { margin-left: 50px; }
     .reading-insights-session { grid-template-columns: auto minmax(0, 1fr); }
     .reading-insights-session-duration { grid-column: 2; justify-self: start; }
 }

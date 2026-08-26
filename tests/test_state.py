@@ -156,12 +156,26 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(result["days"][0]["date"], "2026-08-15")
         self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
         self.assertEqual(self.store.reading_time_for_book(self.owner.user_id, "book-1"), 1800)
+        self.assertEqual(result["trend"]["granularity"], "hour")
+        self.assertEqual(len(result["trend"]["points"]), 24)
+        self.assertEqual(result["trend"]["points"][0], {
+            "bucket": "0", "active_seconds": 1800, "book_count": 1,
+        })
         self.assertEqual(len(result["activity"]["days"]), 365)
         self.assertIn({
             "date": "2026-08-15", "active_seconds": 1800, "book_count": 1,
         }, result["activity"]["days"])
         self.assertEqual(result["activity"]["days"][-1], {
             "date": "2026-12-31", "active_seconds": 0, "book_count": 0,
+        })
+
+        overview = self.store.reading_insights(
+            self.owner.user_id, "overview", date(2026, 8, 15), "Asia/Shanghai"
+        )
+        self.assertEqual(overview["trend"]["granularity"], "month")
+        self.assertEqual(len(overview["trend"]["points"]), 12)
+        self.assertEqual(overview["trend"]["points"][7], {
+            "bucket": "2026-08", "active_seconds": 1800, "book_count": 1,
         })
 
     def test_insights_join_short_same_reader_telemetry_seams_in_the_timeline(self):

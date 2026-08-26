@@ -129,6 +129,29 @@
       }
     }
 
+    function formatTrendBucket(bucket, granularity) {
+      if (granularity === 'month') {
+        try {
+          return new intl().DateTimeFormat(locale(), { month: 'short', timeZone: 'UTC' }).format(new Date(bucket + '-01T12:00:00Z'));
+        } catch (error) { return bucket; }
+      }
+      if (granularity === 'day') return formatDayNumber(bucket);
+      var hour = Math.max(0, Math.min(23, Number(bucket) || 0));
+      try {
+        return new intl().DateTimeFormat(locale(), { hour: 'numeric', hourCycle: 'h23', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, 0, 1, hour)));
+      } catch (error) { return hour + ':00'; }
+    }
+
+    function trendScaleMaximum(value, metric) {
+      var raw = Math.max(1, Number(value) || 0);
+      if (metric === 'book_count') return Math.max(1, Math.ceil(raw));
+      var steps = [10, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 43200, 86400];
+      for (var index = 0; index < steps.length; index += 1) {
+        if (raw <= steps[index]) return steps[index];
+      }
+      return Math.ceil(raw / 86400) * 86400;
+    }
+
     function selectedDayLabel(value) {
       return value === localIsoDate()
         ? translate(target, 'readingInsights.today', 'Today')
@@ -324,8 +347,6 @@
       });
       var trendAxis = append(trendCard, 'div', 'reading-insights-trend-axis');
       var trendYAxis = append(trendAxis, 'div', 'reading-insights-trend-y-axis');
-      var trendYLabel = append(trendYAxis, 'span', 'reading-insights-trend-y-label');
-      var trendYMax = append(trendYAxis, 'strong', 'reading-insights-trend-y-max');
       var trendChart = append(trendAxis, 'div', 'reading-insights-trend-chart');
       trendChart.setAttribute('role', 'img');
       var trendXAxis = append(trendCard, 'div', 'reading-insights-trend-x-axis');
@@ -340,7 +361,7 @@
       selectedDay.id = 'readingInsightsSelectedDay';
       sessions.setAttribute('aria-labelledby', selectedDay.id);
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, analytics: analytics, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYLabel: trendYLabel, trendYMax: trendYMax, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, analytics: analytics, analyticsTitle: analyticsTitle, analyticsGrid: analyticsGrid, heatmapCard: heatmapCard, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYAxis: trendYAxis, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
       updatePeriodControls();
       updateRangeControls();
     }
@@ -419,14 +440,19 @@
         });
       }
       (state.view.metricButtons || []).forEach(function(button) {
+        var isBooksMetric = button.getAttribute('data-reading-insights-metric') === 'books';
+        button.hidden = state.period === 'day' && isBooksMetric;
         var isSelected = button.getAttribute('data-reading-insights-metric') === state.activityMetric;
         button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
       });
-      var trendMonth = state.anchor.slice(0, 7);
-      var trendDays = days.filter(function(day) { return day.date.slice(0, 7) === trendMonth; });
-      var trendRangeText = formatDateRange('month', state.anchor);
+      var trend = state.insights && state.insights.trend || {};
+      var trendPoints = Array.isArray(trend.points) ? trend.points : [];
+      var trendGranularity = trend.granularity || 'day';
+      var trendRangeText = trend.start_date && trend.end_date
+        ? formatDateRange(trendGranularity === 'month' ? 'overview' : trendGranularity === 'hour' ? 'day' : state.period, state.anchor)
+        : formatDateRange(state.period, state.anchor);
       if (state.view.trendRange) state.view.trendRange.textContent = trendRangeText;
-      var values = trendDays.map(function(day) { return Math.max(0, Number(day[metric]) || 0); });
+      var values = trendPoints.map(function(point) { return Math.max(0, Number(point[metric]) || 0); });
       var total = values.reduce(function(sum, value) { return sum + value; }, 0);
       var trendValueText = metric === 'active_seconds'
         ? formatDuration(total)
@@ -435,26 +461,23 @@
         state.view.trendValue.textContent = trendValueText;
       }
       if (!state.view.trendChart) return;
-      var maximum = Math.max.apply(Math, values.concat([1]));
-      var trendAxisText = metric === 'active_seconds'
-        ? translate(target, 'readingInsights.axis.readingTime', 'Reading time')
-        : translate(target, 'readingInsights.axis.books', 'Books');
-      if (state.view.trendYLabel) {
-        state.view.trendYLabel.textContent = trendAxisText;
-      }
-      var trendMaximumText = metric === 'active_seconds'
-        ? formatDuration(maximum)
-        : translate(target, 'readingInsights.booksRead', 'Books read: ' + maximum, { count: maximum });
-      if (state.view.trendYMax) {
-        state.view.trendYMax.textContent = trendMaximumText;
+      var maximum = trendScaleMaximum(Math.max.apply(Math, values.concat([1])), metric);
+      if (state.view.trendYAxis) {
+        state.view.trendYAxis.replaceChildren();
+        [maximum, maximum / 2, 0].forEach(function(value) {
+          var label = metric === 'active_seconds'
+            ? formatDuration(Math.round(value))
+            : String(Math.round(value));
+          append(state.view.trendYAxis, 'span', 'reading-insights-trend-y-tick', label);
+        });
       }
       if (state.view.trendXAxis) {
         state.view.trendXAxis.replaceChildren();
-        if (trendDays.length) {
-          [0, Math.floor((trendDays.length - 1) / 2), trendDays.length - 1].filter(function(index, position, indices) {
+        if (trendPoints.length) {
+          [0, Math.floor((trendPoints.length - 1) / 2), trendPoints.length - 1].filter(function(index, position, indices) {
             return indices.indexOf(index) === position;
           }).forEach(function(index) {
-            append(state.view.trendXAxis, 'span', '', formatDayNumber(trendDays[index].date));
+            append(state.view.trendXAxis, 'span', '', formatTrendBucket(trendPoints[index].bucket, trendGranularity));
           });
         }
       }
@@ -463,7 +486,7 @@
       var trendAriaLabel = translate(target, trendTitleKey, trendTitleFallback) + ': ' + trendValueText;
       state.view.trendChart.setAttribute('aria-label', trendAriaLabel);
       state.view.trendChart.replaceChildren();
-      if (!trendDays.length || !documentTarget.createElementNS) return;
+      if (!trendPoints.length || !documentTarget.createElementNS) return;
       var svg = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 100 40');
       svg.setAttribute('preserveAspectRatio', 'none');
@@ -495,8 +518,12 @@
       state.view.total.textContent = formatDuration(insights.total_active_seconds);
       state.view.topBook.textContent = insights.top_book
         ? insights.top_book.title + ' · ' + formatDuration(insights.top_book.active_seconds) : '—';
+      if (state.period === 'day') state.activityMetric = 'duration';
       renderActivity();
-      state.view.analytics.hidden = state.period !== 'overview';
+      var isOverview = state.period === 'overview';
+      state.view.analyticsTitle.hidden = !isOverview;
+      state.view.heatmapCard.hidden = !isOverview;
+      state.view.analyticsGrid.className = 'reading-insights-analytics-grid' + (isOverview ? '' : ' is-trend-only');
       state.view.days.hidden = state.period === 'day' || state.period === 'overview';
       state.view.sessions.hidden = state.period === 'overview';
       state.view.dayList.replaceChildren();

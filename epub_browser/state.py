@@ -5272,6 +5272,86 @@ class StateStore:
             current_day += timedelta(days=1)
         return activity
 
+    def _reading_trend(
+        self,
+        rows: Sequence[sqlite3.Row],
+        *,
+        period: str,
+        range_start: float,
+        range_end: float,
+        zone: ZoneInfo,
+    ) -> dict:
+        """Aggregate a selected insights range at its useful visual granularity."""
+        first_day = datetime.fromtimestamp(range_start, zone).date()
+        last_day = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        buckets = []
+        if period == "overview":
+            current = first_day.replace(day=1)
+            while current <= last_day:
+                next_month = (
+                    current.replace(year=current.year + 1, month=1)
+                    if current.month == 12 else current.replace(month=current.month + 1)
+                )
+                buckets.append((
+                    current.isoformat()[:7],
+                    datetime.combine(current, datetime.min.time(), zone).timestamp(),
+                    datetime.combine(next_month, datetime.min.time(), zone).timestamp(),
+                ))
+                current = next_month
+            granularity = "month"
+        elif period == "day":
+            day_start = datetime.combine(first_day, datetime.min.time(), zone)
+            for hour in range(24):
+                start = day_start + timedelta(hours=hour)
+                end = day_start + timedelta(hours=hour + 1)
+                buckets.append((str(hour), start.timestamp(), end.timestamp()))
+            granularity = "hour"
+        else:
+            current = first_day
+            while current <= last_day:
+                next_day = current + timedelta(days=1)
+                buckets.append((
+                    current.isoformat(),
+                    datetime.combine(current, datetime.min.time(), zone).timestamp(),
+                    datetime.combine(next_day, datetime.min.time(), zone).timestamp(),
+                ))
+                current = next_day
+            granularity = "day"
+
+        intervals = {bucket_id: [] for bucket_id, _, _ in buckets}
+        book_intervals = {bucket_id: {} for bucket_id, _, _ in buckets}
+        for row in rows:
+            for bucket_id, bucket_start, bucket_end in buckets:
+                started_at = max(row["started_at"], bucket_start)
+                ended_at = min(row["ended_at"], bucket_end)
+                if ended_at <= started_at:
+                    continue
+                active_seconds = self._distribute_active_seconds(
+                    row["active_seconds"],
+                    (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
+                )[1]
+                interval = {
+                    "started_at": started_at,
+                    "ended_at": ended_at,
+                    "active_seconds": active_seconds,
+                }
+                intervals[bucket_id].append(interval)
+                book_intervals[bucket_id].setdefault(row["book_id"], []).append(interval)
+
+        return {
+            "granularity": granularity,
+            "start_date": first_day.isoformat(),
+            "end_date": last_day.isoformat(),
+            "points": [{
+                "bucket": bucket_id,
+                "active_seconds": self._merged_active_seconds(intervals[bucket_id]),
+                "book_count": sum(
+                    self._merged_active_seconds(per_book) > 0
+                    for per_book in book_intervals[bucket_id].values()
+                ),
+            } for bucket_id, _, _ in buckets],
+        }
+
     def record_reading_heartbeat(
         self,
         *,
@@ -5480,6 +5560,13 @@ class StateStore:
                     zone=zone,
                 ),
             },
+            "trend": self._reading_trend(
+                rows,
+                period=period,
+                range_start=range_start,
+                range_end=range_end,
+                zone=zone,
+            ),
             "sessions": [{
                 "id": session["id"],
                 "started_at": self._utc_timestamp(session["started_at"]),
