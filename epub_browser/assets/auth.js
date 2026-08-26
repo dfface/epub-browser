@@ -2520,6 +2520,8 @@
       var dictionaryForm = element('adminDictionaryForm');
       var dictionarySubmit = element('adminDictionarySubmit');
       var dictionaryAutoName = '';
+      var setDictionaryFormat = function() {};
+      var updateDictionaryFileLabels = function() {};
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
       var aiJobsStatus = element('adminAiJobsStatus');
@@ -2682,10 +2684,10 @@
           if (output) output.textContent = label;
           if (control) control.classList.toggle('has-file', Boolean(file));
         }
-        function updateDictionaryFileLabels() {
+        updateDictionaryFileLabels = function() {
           dictionaryFileInputs.forEach(updateDictionaryFileLabel);
-        }
-        function setDictionaryFormat(format) {
+        };
+        setDictionaryFormat = function(format) {
           Array.prototype.forEach.call(dictionaryFormatInputs, function(input) {
             var selected = input.value === format;
             input.checked = selected;
@@ -2699,7 +2701,7 @@
               input.required = selected && input.name === (format === 'mdict' ? 'mdx' : 'archive');
             });
           });
-        }
+        };
         Array.prototype.forEach.call(dictionaryFormatInputs, function(input) {
           input.addEventListener('change', function() { setDictionaryFormat(input.value); });
         });
