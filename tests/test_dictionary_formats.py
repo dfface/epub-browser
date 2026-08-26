@@ -10,7 +10,7 @@ class DictionaryFormatTests(unittest.TestCase):
     def test_reads_stardict_words_aliases_and_plain_text_definitions(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory) / "sample"
-            definition = b"<b>to move</b><script>alert(1)</script> quickly"
+            definition = b"<b>to `move`</b><script>alert(1)</script> quickly"
             index = b"run\0" + struct.pack(">II", 0, len(definition))
             (base.with_suffix(".ifo")).write_text(
                 "StarDict's dict ifo file\nversion=2.4.2\nbookname=Sample\nwordcount=1\nidxfilesize="

@@ -122,39 +122,41 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* Selection actions are intentionally flat: creating a highlight, saving a
-   note, looking up a local dictionary and opening an encyclopedia are distinct
-   operations rather than variants of one annotation form. */
 .annotation-selection-menu {
     position: fixed;
     z-index: 10001;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 2px;
     max-width: calc(100vw - 20px);
     overflow-x: auto;
-    padding: 8px;
+    padding: 4px;
     border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--card-bg);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--card-bg) 96%, transparent);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+    font-family: var(--font-family, system-ui, -apple-system, sans-serif);
+    font-size: .9rem;
+    line-height: 1;
 }
 
 .annotation-selection-action {
     flex: 0 0 auto;
-    min-width: 44px;
+    min-width: 48px;
     min-height: 44px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
+    padding: 8px 11px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
     color: var(--text);
-    font: inherit;
+    font: 650 .9rem/1 var(--font-family, system-ui, -apple-system, sans-serif);
     cursor: pointer;
+    touch-action: manipulation;
 }
 
 .annotation-selection-action:hover {
-    border-color: var(--button-bg);
+    background: color-mix(in srgb, var(--button-bg) 9%, var(--card-bg));
+    color: var(--button-bg);
 }
 
 .annotation-selection-action:focus-visible {
@@ -172,16 +174,17 @@
 
 .color-options-compact {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
 .color-option-compact {
-    width: 24px;
-    height: 24px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid transparent;
-    transition: transform 0.2s, border-color 0.2s;
+    transition: transform 0.18s ease, border-color 0.18s ease;
     padding: 0;
 }
 
@@ -191,6 +194,14 @@
 
 .color-option-compact.selected {
     border-color: var(--text);
+    box-shadow: 0 0 0 2px var(--button-bg);
+}
+
+.annotation-color-choice-label {
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: .82rem;
+    font-weight: 650;
 }
 
 .annotation-compact-body {

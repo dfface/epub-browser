@@ -41,16 +41,31 @@
       (data.entries || []).forEach(function(entry) {
         var item = element('article', 'dictionary-entry');
         item.appendChild(element('strong', '', entry.headword));
-        item.appendChild(element('p', '', entry.definition));
+        item.appendChild(element('p', '', String(entry.definition || '').replace(/`/g, '')));
         result.appendChild(item);
       });
     }
     var previous = content.querySelector('.dictionary-results');
     if (previous) previous.remove();
     content.appendChild(result);
+    if (content.parentNode) positionDialog(content.parentNode, content.parentNode._epubAnchor);
   }
 
-  function show(kind, text) {
+  function positionDialog(dialog, anchor) {
+    var margin = 12;
+    var width = dialog.offsetWidth || 400;
+    var height = dialog.offsetHeight || 260;
+    var hasAnchor = anchor && typeof anchor.left === 'number';
+    var left = hasAnchor ? anchor.left + ((anchor.width || 0) - width) / 2 : (root.innerWidth - width) / 2;
+    var top = hasAnchor ? anchor.bottom + margin : (root.innerHeight - height) / 2;
+    left = Math.max(margin, Math.min(left, root.innerWidth - width - margin));
+    if (hasAnchor && top + height > root.innerHeight - margin) top = anchor.top - height - margin;
+    top = Math.max(margin, Math.min(top, root.innerHeight - height - margin));
+    dialog.style.left = Math.round(left) + 'px';
+    dialog.style.top = Math.round(top) + 'px';
+  }
+
+  function show(kind, text, anchor) {
     close();
     var dialog = element('section', 'dictionary-dialog');
     dialog.setAttribute('role', 'dialog');
@@ -65,13 +80,15 @@
     var content = element('div', 'dictionary-dialog-content', t('loading'));
     dialog.appendChild(content);
     root.document.body.appendChild(dialog);
+    dialog._epubAnchor = anchor;
+    positionDialog(dialog, anchor);
     activeDialog = dialog;
     button.focus();
 
     var article = root.document.getElementById('eb-content');
     var bookId = article && article.getAttribute('data-book-hash');
     if (!bookId || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) {
-      content.textContent = t('unavailable'); return;
+      content.textContent = t('unavailable'); positionDialog(dialog, dialog._epubAnchor); return;
     }
     if (kind === 'dictionary') {
       activeController = new AbortController();
@@ -81,7 +98,7 @@
         if (activeDialog !== dialog) return;
         var choices = data.dictionaries || [];
         content.textContent = '';
-        if (!choices.length) { content.textContent = t('notConfigured'); return; }
+        if (!choices.length) { content.textContent = t('notConfigured'); positionDialog(dialog, dialog._epubAnchor); return; }
         var label = element('label', 'dictionary-picker');
         label.appendChild(element('span', '', t('choose')));
         var select = element('select', 'dictionary-picker-select');
@@ -92,6 +109,7 @@
         });
         label.appendChild(select);
         content.appendChild(label);
+        positionDialog(dialog, dialog._epubAnchor);
         function lookup() {
           if (activeController) activeController.abort();
           activeController = new AbortController();
@@ -109,7 +127,9 @@
         select.addEventListener('change', lookup);
         lookup();
       }).catch(function(error) {
-        if (error.name !== 'AbortError' && activeDialog === dialog) content.textContent = t('unavailable');
+        if (error.name !== 'AbortError' && activeDialog === dialog) {
+          content.textContent = t('unavailable'); positionDialog(dialog, dialog._epubAnchor);
+        }
       });
       return;
     }
@@ -123,7 +143,7 @@
     }).then(function(data) {
       if (activeDialog !== dialog) return;
       content.textContent = '';
-      if (!data.found) { content.textContent = t('notFound'); return; }
+      if (!data.found) { content.textContent = t('notFound'); positionDialog(dialog, dialog._epubAnchor); return; }
       if (kind !== 'dictionary') {
         content.appendChild(element('strong', '', data.title || text));
         if (data.description) content.appendChild(element('p', 'dictionary-source', data.description));
@@ -135,9 +155,11 @@
         }
         content.appendChild(element('small', 'dictionary-attribution', data.attribution || 'Wikipedia · CC BY-SA 4.0'));
       }
+      positionDialog(dialog, dialog._epubAnchor);
     }).catch(function(error) {
       if (error.name === 'AbortError' || activeDialog !== dialog) return;
       content.textContent = t('unavailable');
+      positionDialog(dialog, dialog._epubAnchor);
     });
   }
 

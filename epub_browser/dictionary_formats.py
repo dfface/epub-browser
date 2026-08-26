@@ -93,7 +93,7 @@ def clean_definition(value: str) -> str:
         parser.close()
     except (html.parser.HTMLParseError, ValueError):
         raise DictionaryFormatError("invalid_dictionary_definition")
-    text = unicodedata.normalize("NFC", parser.text())
+    text = unicodedata.normalize("NFC", parser.text()).replace("`", "")
     if not text:
         raise DictionaryFormatError("empty_dictionary_definition")
     if len(text.encode("utf-8")) > MAX_DEFINITION_BYTES:

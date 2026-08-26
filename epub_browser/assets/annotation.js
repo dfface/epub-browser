@@ -876,7 +876,7 @@
                 this.bindHighlighterEvents(hl);
                 this.isBound = true;
             }
-            if (!this.keyboardBound) {
+            if (!this.keyboardBound && typeof document.addEventListener === 'function') {
                 var self = this;
                 document.addEventListener('keydown', function(event) {
                     if (event.key === 'Escape' && self.activeDialog) self.cancelPendingDraft();
@@ -1291,55 +1291,32 @@
                 dialog.appendChild(btn);
             };
             actionButton('copy', function() {
-                Utils.copyText(source.text).then(function() {
-                    Utils.showNotification(tr('copied'), 'success');
-                }).catch(function() {
+                Utils.copyText(source.text).catch(function() {
                     Utils.showNotification(tr('unableToCopy'), 'error');
                 });
                 self.cancelPendingDraft();
             }, 'annotation-btn-copy');
             actionButton('highlight', function() {
-                self.createAnnotationFromSource(source, Settings.defaultColor, '');
+                self.showColorPicker(source, 'highlight');
             });
             actionButton('noteAction', function() {
-                self.showNoteDialog(source);
+                self.showNoteDialog(source, Settings.defaultColor);
             });
             if (global.EpubBrowserMode === 'server' && global.EpubBrowserDictionary) {
                 actionButton('dictionary', function() {
-                    var anchor = self.getHighlightNodesByAnnotationId(source.id)[0];
+                    var anchor = self.getSourceAnchorRect(source);
                     self.cancelPendingDraft();
                     global.EpubBrowserDictionary.open('dictionary', source.text, anchor);
                 });
                 actionButton('encyclopedia', function() {
-                    var anchor = self.getHighlightNodesByAnnotationId(source.id)[0];
+                    var anchor = self.getSourceAnchorRect(source);
                     self.cancelPendingDraft();
                     global.EpubBrowserDictionary.open('encyclopedia', source.text, anchor);
                 });
             }
 
-            // Position near the highlighted text or, for an image note, the image itself.
-            var nodes = self.getHighlightNodesByAnnotationId(source.id);
-            var sourceNode = nodes[0] || source.imageElement;
-            if (sourceNode && sourceNode.getBoundingClientRect) {
-                var rect = sourceNode.getBoundingClientRect();
-                var dialogW = 240;
-                var dialogH = 140;
-                var left = rect.left + (rect.width - dialogW) / 2;
-                var top = rect.bottom + 8;
-                // Keep within viewport
-                left = Math.max(10, Math.min(left, window.innerWidth - dialogW - 10));
-                if (top + dialogH > window.innerHeight - 10) {
-                    top = rect.top - dialogH - 8;
-                }
-                if (top < 10) top = 10;
-                dialog.style.left = left + 'px';
-                dialog.style.top = top + 'px';
-            } else {
-                dialog.style.left = Math.max(10, (window.innerWidth - 240) / 2) + 'px';
-                dialog.style.top = Math.max(10, (window.innerHeight - 140) / 2) + 'px';
-            }
-
             document.body.appendChild(dialog);
+            self.positionFloatingDialog(dialog, self.getSourceAnchorRect(source));
             this.activeDialog = dialog;
             setTimeout(function() {
                 if (self.activeDialog !== dialog) return;
@@ -1352,7 +1329,73 @@
             }, 10);
         },
 
-        showNoteDialog: function(source) {
+        getSourceAnchorRect: function(source) {
+            var nodes = source && source.id ? this.getHighlightNodesByAnnotationId(source.id) : [];
+            var node = nodes[0] || (source && source.imageElement);
+            if (!node || !node.getBoundingClientRect) return null;
+            var rect = node.getBoundingClientRect();
+            return {
+                left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+                width: rect.width, height: rect.height
+            };
+        },
+
+        positionFloatingDialog: function(dialog, anchorRect) {
+            var margin = 12;
+            var width = dialog.offsetWidth || 280;
+            var height = dialog.offsetHeight || 160;
+            var rect = anchorRect;
+            var left = rect ? rect.left + (rect.width - width) / 2 : (window.innerWidth - width) / 2;
+            var top = rect ? rect.bottom + margin : (window.innerHeight - height) / 2;
+            left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+            if (rect && top + height > window.innerHeight - margin) top = rect.top - height - margin;
+            top = Math.max(margin, Math.min(top, window.innerHeight - height - margin));
+            dialog.style.left = Math.round(left) + 'px';
+            dialog.style.top = Math.round(top) + 'px';
+        },
+
+        showColorPicker: function(source, intent) {
+            var self = this;
+            this.closeDialog();
+            var dialog = document.createElement('div');
+            dialog.className = 'annotation-dialog annotation-dialog-compact annotation-color-choice';
+            dialog.setAttribute('role', 'dialog');
+            dialog.setAttribute('aria-label', tr('color'));
+            var body = document.createElement('div');
+            body.className = 'annotation-compact-body';
+            var label = document.createElement('div');
+            label.className = 'annotation-color-choice-label';
+            label.textContent = tr('color');
+            var colors = document.createElement('div');
+            colors.className = 'color-options-compact';
+            CONFIG.getColors().slice(0, 7).forEach(function(color) {
+                var choice = document.createElement('button');
+                choice.type = 'button';
+                choice.className = 'color-option-compact' + (color === Settings.defaultColor ? ' selected' : '');
+                choice.style.backgroundColor = color;
+                choice.setAttribute('aria-label', tr('color') + ' ' + color);
+                choice.addEventListener('click', function() {
+                    if (intent === 'note') self.showNoteDialog(source, color);
+                    else self.createAnnotationFromSource(source, color, '');
+                });
+                colors.appendChild(choice);
+            });
+            body.appendChild(label);
+            body.appendChild(colors);
+            dialog.appendChild(body);
+            document.body.appendChild(dialog);
+            this.positionFloatingDialog(dialog, this.getSourceAnchorRect(source));
+            this.activeDialog = dialog;
+            setTimeout(function() {
+                if (self.activeDialog !== dialog) return;
+                self.outsideClickHandler = function(event) {
+                    if (!dialog.contains(event.target)) self.cancelPendingDraft();
+                };
+                document.addEventListener('click', self.outsideClickHandler);
+            }, 10);
+        },
+
+        showNoteDialog: function(source, initialColor) {
             var self = this;
             this.closeDialog();
             var dialog = document.createElement('div');
@@ -1363,8 +1406,27 @@
             body.className = 'annotation-compact-body';
             var input = document.createElement('textarea');
             input.className = 'annotation-compact-note';
+            input.setAttribute('aria-label', tr('note'));
             var i18n = window.EpubBrowserI18n;
             input.placeholder = i18n && i18n.t ? i18n.t('annotations.noteOptional') : tr('noteOptional');
+            var colors = document.createElement('div');
+            colors.className = 'color-options-compact';
+            var selectedColor = initialColor || Settings.defaultColor;
+            CONFIG.getColors().slice(0, 7).forEach(function(color) {
+                var choice = document.createElement('button');
+                choice.type = 'button';
+                choice.className = 'color-option-compact' + (color === selectedColor ? ' selected' : '');
+                choice.style.backgroundColor = color;
+                choice.setAttribute('aria-label', tr('color') + ' ' + color);
+                choice.addEventListener('click', function() {
+                    selectedColor = color;
+                    colors.querySelectorAll('.color-option-compact').forEach(function(option) {
+                        option.classList.toggle('selected', option === choice);
+                    });
+                });
+                colors.appendChild(choice);
+            });
+            body.appendChild(colors);
             body.appendChild(input);
             var footer = document.createElement('div');
             footer.className = 'annotation-compact-footer';
@@ -1375,11 +1437,12 @@
             footer.appendChild(cancel); footer.appendChild(save);
             dialog.appendChild(body); dialog.appendChild(footer);
             document.body.appendChild(dialog);
+            this.positionFloatingDialog(dialog, this.getSourceAnchorRect(source));
             this.activeDialog = dialog;
             input.focus();
             cancel.addEventListener('click', function() { self.cancelPendingDraft(); });
             save.addEventListener('click', function() {
-                self.createAnnotationFromSource(source, Settings.defaultColor, input.value.trim());
+                self.createAnnotationFromSource(source, selectedColor, input.value.trim());
             });
         },
 
