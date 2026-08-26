@@ -28,8 +28,9 @@
     function hasSavedReview() { return Boolean(savedRating); }
     function icon(name) { var node = documentTarget.createElement('i'); node.className = 'fas ' + name; node.setAttribute('aria-hidden', 'true'); return node; }
     function setStatus(message, isError) {
-      if (view.status) { view.status.textContent = message; view.status.setAttribute('data-state', isError ? 'error' : 'success'); }
-      if (root.EpubBrowserNotification && root.EpubBrowserNotification.show) root.EpubBrowserNotification.show(message, isError ? 'error' : 'success');
+      if (!isError) return;
+      if (view.status) { view.status.textContent = message; view.status.setAttribute('data-state', 'error'); }
+      if (root.EpubBrowserNotification && root.EpubBrowserNotification.show) root.EpubBrowserNotification.show(message, 'error');
     }
     function setBusy(busy) {
       [view.rating, view.reviewText, view.saveButton, view.deleteButton].concat(view.ratingOptions || []).forEach(function(control) { if (control) control.disabled = busy; });
@@ -113,13 +114,13 @@
       var normalizedRating = Number(rating);
       if (!Number.isInteger(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) { showRatingError(); return Promise.resolve(null); }
       clearRatingError(); setBusy(true);
-      return request(bookId, 'PUT', { rating: normalizedRating, review_text: String(reviewText || '') }).then(function(payload) { applyReview(payload && payload.review ? payload.review : { rating: normalizedRating, review_text: String(reviewText || '') }); setStatus(translate('bookReviews.saved'), false); closePanel(); return payload; }).catch(function() { restoreSaved(); setStatus(translate('book.error.server_error'), true); return null; }).finally(function() { setBusy(false); });
+      return request(bookId, 'PUT', { rating: normalizedRating, review_text: String(reviewText || '') }).then(function(payload) { applyReview(payload && payload.review ? payload.review : { rating: normalizedRating, review_text: String(reviewText || '') }); closePanel(); return payload; }).catch(function() { restoreSaved(); setStatus(translate('book.error.server_error'), true); return null; }).finally(function() { setBusy(false); });
     }
     function deleteReview() {
       if (!hasSavedReview()) return Promise.resolve(null);
       if (typeof root.confirm === 'function' && !root.confirm(translate('bookReviews.deleteConfirm'))) return Promise.resolve(null);
       setBusy(true);
-      return request(bookId, 'DELETE').then(function() { applyReview(null); setStatus(translate('bookReviews.deleted'), false); closePanel(); return true; }).catch(function() { restoreSaved(); setStatus(translate('book.error.server_error'), true); return null; }).finally(function() { setBusy(false); });
+      return request(bookId, 'DELETE').then(function() { applyReview(null); closePanel(); return true; }).catch(function() { restoreSaved(); setStatus(translate('book.error.server_error'), true); return null; }).finally(function() { setBusy(false); });
     }
     function focusEditor() { var selected = (view.ratingOptions || []).filter(function(option) { return option.getAttribute('aria-checked') === 'true'; })[0]; var control = selected || (view.ratingOptions || [])[0] || view.reviewText || dialog; if (control && control.focus) control.focus(); }
     function closePanel() {
