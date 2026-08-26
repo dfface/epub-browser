@@ -25,7 +25,7 @@
 - 仅向已登录且可阅读该书的 Server 阅读页提供查词和百科。
 - 管理员安装用户合法持有的本地 **StarDict** 与 **MDict** 词典。
 - StarDict 支持 `.ifo` + `.idx` + `.dict` 或 `.dict.dz`，可选 `.syn`；MDict 支持 `.mdx`，可选同名 `.mdd`。
-- 每种输入语言可启用多个本地词典，并配置一个全局默认词典；首次仅顺序查询默认词典。
+- 所有启用的本地词典对所有书籍可用；读者在每次查词时从词典选择器中决定使用哪一本。
 - 固定、无密钥的 Wikimedia 百科摘要服务；服务端代理请求、速率限制与归因。
 - 五语言 i18n、键盘和触摸可达，以及 Server API 的认证、书籍 ACL、CSRF 和输入限制。
 
@@ -50,11 +50,14 @@
 
 ## 4. 数据与 API
 
-主状态库新增词典目录和默认映射（格式、语言、显示名称、条目数、内容散列、启用状态、归因、创建时间），但不保存词典正文。主状态 schema 仅在本地词典功能实现时迁移。
+主状态库新增词典目录（格式、显示名称、条目数、内容散列、启用状态、归因、创建时间），但不保存词典正文。历史 schema 中保留的语言/默认映射字段仅为兼容旧库，不参与安装、展示、选择或查询。
 
 ```text
-POST /api/books/{book_id}/dictionary/lookup { text }
-  → require principal → book ACL → metadata language → default local dictionary
+GET /api/books/{book_id}/dictionaries
+  → require principal → book ACL → enabled local dictionaries
+
+POST /api/books/{book_id}/dictionary/lookup { text, dictionary_id }
+  → require principal → book ACL → selected enabled local dictionary
   → { found, query, dictionary, entries[] }
 
 POST /api/books/{book_id}/encyclopedia/lookup { text }
@@ -62,9 +65,9 @@ POST /api/books/{book_id}/encyclopedia/lookup { text }
   → { found, title, description?, extract?, source_url, attribution }
 ```
 
-两条接口都使用 POST、`Cache-Control: private, no-store`，不接受浏览器指定的词典 ID、语言或上游 URL。查询文本最大 120 Unicode code points，拒绝控制字符。
+查询接口使用 POST、`Cache-Control: private, no-store`；词典 ID 只能是前一受 ACL 保护的词典列表中的启用 UUID，服务端仍会在查询时重新验证。百科不接受浏览器提交的语言或上游 URL。查询文本最大 120 Unicode code points，拒绝控制字符。
 
-管理员 API 负责安装、列出、启停、设默认与删除本地词典；所有写操作必须是管理员且经 CSRF。API 不返回上传路径、解析堆栈或原始词典内容。
+管理员 API 负责安装、列出、启停与删除本地词典；所有写操作必须是管理员且经 CSRF。API 不返回上传路径、解析堆栈或原始词典内容。
 
 ## 5. 在线百科
 
@@ -80,7 +83,7 @@ POST /api/books/{book_id}/encyclopedia/lookup { text }
 
 ## 7. 验收
 
-- 安装 StarDict 与 MDict 均能通过同一查词 API 命中词头和别名；停用/删除默认词典后不再查询。
+- 安装 StarDict 与 MDict 后，任意可读书籍都可从选择器使用它们；停用/删除词典后不再出现在选择器且查询被拒绝。
 - 未登录、无书籍权限、非管理员、无 CSRF、非法包和超限输入均被安全拒绝。
 - 本地查词断网仍可用；百科失败不影响查词，且返回结果有来源归因。
 - 查词/百科无数据库历史、无 URL 查询参数、无 EPUB 缓存改动；不提高 `SERVER_OUTPUT_REVISION`。

@@ -202,18 +202,50 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
     if mdx_path.suffix.casefold() != ".mdx":
         raise DictionaryFormatError("invalid_mdict")
     try:
-        from mdict_utils.base.readmdict import MDX
+        from mdict_utils.base import lzo as bundled_lzo
+        from mdict_utils.base import readmdict
     except ImportError as error:  # pragma: no cover - packaging failure guard
         raise DictionaryFormatError("mdict_reader_unavailable") from error
+
+    # mdict-utils ships a MIT-licensed pure-Python LZO decoder, but its reader
+    # only uses it when a separately installed ``lzo`` module is present.  MDX
+    # 1.x files commonly use LZO, so adapt the bundled decoder to the reader's
+    # tiny ``lzo.decompress(header + payload)`` interface.  This avoids adding
+    # the GPL-licensed python-lzo dependency to this MIT project.
+    if readmdict.lzo is None:
+        class _BundledLzoAdapter:
+            @staticmethod
+            def decompress(payload: bytes) -> bytes:
+                if len(payload) < 5 or payload[0] != 0xF0:
+                    raise ValueError("invalid_lzo_payload")
+                decompressed_size = struct.unpack(">I", payload[1:5])[0]
+                return bundled_lzo.decompress(
+                    payload[5:], initSize=decompressed_size, blockSize=decompressed_size,
+                )
+
+        readmdict.lzo = _BundledLzoAdapter
+
+    def decode_mdict_text(value: bytes, declared_encoding: str) -> str:
+        # Some older dictionaries declare GBK/GB18030 but store entries in
+        # UTF-8.  Prefer UTF-8 because it is unambiguous for these files, then
+        # honor the declared encoding for genuine legacy dictionaries.
+        encodings = ("utf-8", declared_encoding, "gb18030")
+        for encoding in dict.fromkeys(item for item in encodings if item):
+            try:
+                return value.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        raise UnicodeDecodeError("mdict", value, 0, len(value), "unsupported entry encoding")
+
     try:
-        reader = MDX(str(mdx_path), "", False, None)
+        reader = readmdict.MDX(str(mdx_path), "", False, None)
         header = reader.header
         name = header.get(b"Title", header.get(b"title", mdx_path.stem.encode("utf-8")))
-        display_name = name.decode(reader._encoding).strip() or mdx_path.stem
+        display_name = decode_mdict_text(name, reader._encoding).strip() or mdx_path.stem
         entries = []
         for key, value in reader.items():
-            headword = key.decode(reader._encoding)
-            definition = value.decode(reader._encoding)
+            headword = decode_mdict_text(key, reader._encoding)
+            definition = decode_mdict_text(value, reader._encoding)
             entries.append(DictionaryEntry(headword.strip(), normalize_lookup(headword), (), clean_definition(definition)))
             if len(entries) > MAX_ENTRIES:
                 raise DictionaryFormatError("dictionary_too_large")

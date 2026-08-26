@@ -2,7 +2,7 @@
 
 **Goal:** 在 Server 阅读页提供本地 StarDict/MDict 查词和在线 Wikimedia 百科；选区菜单为复制、高亮、笔记、查词、百科五项，SSG 保持前三项。
 
-**Architecture:** 本地格式适配器把合法安装包转换为独立只读 SQLite 词典；主 StateStore 只保存目录和默认映射。词典查询和百科查询使用两个独立、受 ACL 保护的 POST API。百科通过受限的 Wikimedia 服务端客户端获取摘要。前端统一管理选择草稿，分别呈现本地释义和百科摘要。
+**Architecture:** 本地格式适配器把合法安装包转换为独立只读 SQLite 词典；主 StateStore 只保存目录。读者先读取受 ACL 保护的启用词典列表，再选择词典进行查词；百科查询使用独立的受 ACL 保护 POST API。百科通过受限的 Wikimedia 服务端客户端获取摘要。前端统一管理选择草稿，分别呈现本地释义和百科摘要。
 
 ## Constraints
 
@@ -22,7 +22,7 @@
 
 ### 2. Build the local dictionary foundation
 
-- [ ] Add StateStore schema for dictionary metadata and per-language defaults only.
+- [ ] Add StateStore schema for dictionary metadata only; legacy language/default data is never used for new dictionaries.
 - [ ] Define adapter interface and bounded normalized entry model.
 - [ ] Implement and test StarDict parsing (`.ifo/.idx/.dict[.dz]/.syn`).
 - [ ] Implement and test MDict reading (`.mdx`, safely ignore optional `.mdd` resources) using a permissively licensed or project-native reader.
@@ -30,8 +30,8 @@
 
 ### 3. Add protected Server services
 
-- [ ] Add admin install/list/enable/default/delete APIs, authentication and CSRF coverage.
-- [ ] Add reader local-dictionary lookup API with ACL before metadata/lookup and `private, no-store`.
+- [ ] Add admin install/list/enable/delete APIs, authentication and CSRF coverage.
+- [ ] Add reader local-dictionary choices and lookup APIs with ACL before lookup and `private, no-store`.
 - [ ] Add fixed-host Wikimedia summary client, timeout/concurrency/Retry-After handling, attribution and no persistent cache.
 - [ ] Add reader encyclopedia lookup API with the same ACL and privacy headers.
 

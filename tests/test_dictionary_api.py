@@ -43,17 +43,30 @@ class DictionaryApiTests(unittest.TestCase):
         base.with_suffix(".idx").write_bytes(index)
         base.with_suffix(".dict").write_bytes(definition)
         service = DictionaryService(self.store, self.root)
-        dictionary = service.install(base.with_suffix(".ifo"), source_language="en", target_language="en", created_by_user_id=self.admin.user_id)
-        service.set_default("en", dictionary.id, self.admin.user_id)
+        self.dictionary = service.install(base.with_suffix(".ifo"), created_by_user_id=self.admin.user_id)
 
     def test_dictionary_lookup_requires_acl_and_never_caches_query(self):
-        response = self.client.post("/api/books/book/dictionary/lookup", json={"text": "run"})
+        response = self.client.post(
+            "/api/books/book/dictionary/lookup",
+            json={"text": "run", "dictionary_id": self.dictionary.id},
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "private, no-store")
         self.assertEqual(response.json()["entries"][0]["definition"], "to move quickly")
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
-        self.assertEqual(anonymous.post("/api/books/book/dictionary/lookup", json={"text": "run"}).status_code, 401)
+        self.assertEqual(anonymous.post(
+            "/api/books/book/dictionary/lookup",
+            json={"text": "run", "dictionary_id": self.dictionary.id},
+        ).status_code, 401)
+
+    def test_dictionary_choices_are_book_acl_protected(self):
+        response = self.client.get("/api/books/book/dictionaries")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["cache-control"], "private, no-store")
+        self.assertEqual(response.json()["dictionaries"], [{
+            "id": self.dictionary.id, "display_name": "Local", "entry_count": 1,
+        }])
 
     @mock.patch("epub_browser.server.WikimediaEncyclopedia.lookup")
     def test_encyclopedia_is_separate_from_local_dictionary(self, lookup):

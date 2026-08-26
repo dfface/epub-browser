@@ -277,6 +277,17 @@ body.auth-page {
     line-height: 1;
 }
 
+.auth-alert.success {
+    border-color: color-mix(in srgb, var(--account-success) 28%, transparent);
+    background: color-mix(in srgb, var(--account-success) 8%, var(--account-card));
+    color: var(--account-success);
+}
+
+.auth-alert.success::before {
+    background: var(--account-success);
+    content: "✓";
+}
+
 .account-status {
     box-sizing: border-box;
     margin: 0;

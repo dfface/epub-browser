@@ -1,8 +1,10 @@
 .dictionary-dialog { position: fixed; z-index: 10002; right: 16px; bottom: 16px; width: min(360px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); color: var(--text); box-shadow: 0 12px 36px rgba(0,0,0,.22); }
 .dictionary-dialog-header { display: flex; min-height: 44px; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .dictionary-dialog-close { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text); font-size: 1.5rem; cursor: pointer; }
-.dictionary-dialog-close:focus-visible, .dictionary-source-link:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent); outline-offset: 2px; }
+.dictionary-dialog-close:focus-visible, .dictionary-source-link:focus-visible, .dictionary-picker-select:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent); outline-offset: 2px; }
 .dictionary-dialog-content { padding: 12px; line-height: 1.55; white-space: pre-wrap; }
+.dictionary-picker { display: grid; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: .9rem; }
+.dictionary-picker-select { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
 .dictionary-entry + .dictionary-entry { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .dictionary-source, .dictionary-attribution { display: block; color: var(--text-secondary); }
 .dictionary-source-link { display: inline-block; min-height: 44px; padding: 10px 0; color: var(--button-bg); }

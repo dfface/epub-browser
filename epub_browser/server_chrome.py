@@ -104,14 +104,13 @@ SERVER_ACCOUNT_PANEL = '''
     </section>
     <section class="account-admin-section account-card-wide" id="adminDictionariesSection" role="tabpanel" aria-labelledby="adminSectionDictionariesTab" data-admin-panel="dictionaries" hidden>
         <h4 data-i18n="admin.dictionaries">Dictionaries</h4>
-        <p class="account-section-copy" data-i18n="admin.dictionariesDescription">Install a local StarDict or MDict package. The first dictionary for a source language becomes its default.</p>
+        <p class="account-section-copy" data-i18n="admin.dictionariesDescription">Install a local MDict or StarDict dictionary. You can choose it when looking up a word.</p>
         <form class="account-form" id="adminDictionaryForm">
-            <label><span data-i18n="admin.dictionaryPackage">Dictionary package</span><input name="archive" type="file" accept=".zip,application/zip" required></label>
-            <label><span data-i18n="admin.dictionarySourceLanguage">Source language</span><input name="source_language" type="text" value="en" maxlength="35" required></label>
-            <label><span data-i18n="admin.dictionaryTargetLanguage">Target language</span><input name="target_language" type="text" value="en" maxlength="35" required></label>
+            <label><span data-i18n="admin.dictionaryPackage">Dictionary package</span><input name="archive" type="file" accept=".mdx,.zip,application/zip,application/octet-stream" required aria-describedby="adminDictionaryPackageHelp"><small id="adminDictionaryPackageHelp" data-i18n="admin.dictionaryPackageHelp">Choose an .mdx file directly. For StarDict, put .ifo, .idx and .dict files in one ZIP.</small></label>
             <label><span data-i18n="admin.dictionaryName">Display name</span><input name="display_name" type="text" maxlength="160"></label>
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminDictionarySubmit" data-i18n="admin.installDictionary">Install dictionary</button>
         </form>
+        <p id="adminDictionaryMessage" class="auth-alert" role="alert" hidden></p>
         <p id="adminDictionaryLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
         <ul class="account-list" id="adminDictionaryList"></ul>
     </section>

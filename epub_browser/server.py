@@ -231,7 +231,6 @@ LOCALE_NATIVE_NAMES = {
     'ja': '日本語',
 }
 
-
 def locale_options(locale):
     return '\n'.join(
         '<option value="{}"{} data-i18n="locale.name.{}">{}</option>'.format(
@@ -2078,12 +2077,12 @@ window.location.assign(payload.redirect||'/');
         if book_access_denied(principal, book_id):
             return forbidden_book_response()
         data, error = await bounded_public_json_object(request, maximum_size=2048)
-        if error or not isinstance(data.get("text"), str):
+        if error or not isinstance(data.get("text"), str) or not isinstance(data.get("dictionary_id"), str):
             return response(error_payload("invalid_dictionary_query", "Invalid dictionary query"), 400, "private, no-store")
         try:
-            result = dictionary_service.lookup(book_language(book_id), data["text"])
+            result = dictionary_service.lookup(data["dictionary_id"], data["text"])
         except DictionaryServiceError as error:
-            status = 404 if error.code == "dictionary_not_configured" else 400
+            status = 404 if error.code == "dictionary_unavailable" else 400
             return response(error_payload(error.code, "Dictionary lookup failed"), status, "private, no-store")
         except ValueError:
             return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
@@ -2093,11 +2092,19 @@ window.location.assign(payload.redirect||'/');
             "dictionary": {
                 "id": result.dictionary.id,
                 "display_name": result.dictionary.display_name,
-                "source_language": result.dictionary.source_language,
-                "target_language": result.dictionary.target_language,
             },
             "entries": list(result.entries),
         }, cache_control="private, no-store")
+
+    async def dictionary_choices(request):
+        principal = require_principal(request)
+        book_id = request.path_params["book_id"]
+        if book_access_denied(principal, book_id):
+            return forbidden_book_response()
+        return response({"dictionaries": [
+            {"id": record.id, "display_name": record.display_name, "entry_count": record.entry_count}
+            for record in dictionary_service.list_available()
+        ]}, cache_control="private, no-store")
 
     async def encyclopedia_lookup(request):
         principal = require_principal(request)
@@ -2126,8 +2133,6 @@ window.location.assign(payload.redirect||'/');
     def dictionary_record_data(record):
         return {
             "id": record.id, "display_name": record.display_name,
-            "source_language": record.source_language,
-            "target_language": record.target_language,
             "entry_count": record.entry_count, "attribution": record.attribution,
             "enabled": record.enabled,
         }
@@ -2138,8 +2143,7 @@ window.location.assign(payload.redirect||'/');
             return response({"dictionaries": [dictionary_record_data(item) for item in dictionary_service.store.list_dictionaries()]})
         if not runtime_status.is_ready():
             return response(error_payload("not_ready", "Server is not ready"), 503)
-        source_language = request.headers.get("x-epub-browser-source-language", "")
-        target_language = request.headers.get("x-epub-browser-target-language", "")
+        filename = request.headers.get("x-epub-browser-dictionary-filename", "")
         display_name = request.headers.get("x-epub-browser-dictionary-name")
         content_length = request.headers.get("content-length")
         try:
@@ -2150,13 +2154,10 @@ window.location.assign(payload.redirect||'/');
                 body.extend(chunk)
                 if len(body) > 512 * 1024 * 1024:
                     return response(error_payload("body_too_large", "Dictionary archive is too large"), 413)
-            record = dictionary_service.install_archive(
-                bytes(body), source_language=source_language,
-                target_language=target_language, created_by_user_id=principal.user_id,
+            record = dictionary_service.install_upload(
+                bytes(body), filename, created_by_user_id=principal.user_id,
                 display_name=display_name,
             )
-            if dictionary_service.store.get_dictionary_default(source_language) is None:
-                dictionary_service.set_default(source_language, record.id, principal.user_id)
         except (DictionaryServiceError, ValueError) as error:
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_dictionary_archive"
             return response(error_payload(code, "Dictionary installation failed"), 400)
@@ -2178,17 +2179,6 @@ window.location.assign(payload.redirect||'/');
             record = dictionary_service.set_enabled(dictionary_id, data["enabled"])
         except KeyError:
             return response(error_payload("not_found", "Not Found"), 404)
-        return response({"dictionary": dictionary_record_data(record)})
-
-    async def admin_dictionary_default(request):
-        principal = require_admin(request)
-        data, error = await bounded_public_json_object(request)
-        if error or not isinstance(data.get("dictionary_id"), str):
-            return response(error_payload("invalid_dictionary_default", "Invalid dictionary default"), 400)
-        try:
-            record = dictionary_service.set_default(request.path_params["source_language"], data["dictionary_id"], principal.user_id)
-        except (KeyError, ValueError):
-            return response(error_payload("invalid_dictionary_default", "Invalid dictionary default"), 400)
         return response({"dictionary": dictionary_record_data(record)})
 
     async def ai_reading_request(request):
@@ -3035,7 +3025,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
         Route('/api/admin/dictionaries', admin_dictionaries, methods=['GET', 'POST']),
         Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
-        Route('/api/admin/dictionary-defaults/{source_language}', admin_dictionary_default, methods=['PUT']),
+        Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),

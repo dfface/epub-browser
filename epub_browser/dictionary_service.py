@@ -59,7 +59,7 @@ class DictionaryService:
         return digest.hexdigest()
 
     @staticmethod
-    def _create_file(path: Path, dictionary: ImportedDictionary, source_language: str, target_language: str, digest: str) -> None:
+    def _create_file(path: Path, dictionary: ImportedDictionary, digest: str) -> None:
         temporary = path.with_suffix(".sqlite.tmp")
         try:
             with sqlite3.connect(temporary) as connection:
@@ -75,8 +75,7 @@ class DictionaryService:
                 connection.execute("CREATE INDEX idx_dictionary_forms ON forms(normalized_form, entry_id)")
                 connection.executemany(
                     "INSERT INTO meta(key, value) VALUES (?, ?)",
-                    (("format", dictionary.format), ("source_language", source_language),
-                     ("target_language", target_language), ("content_sha256", digest)),
+                    (("format", dictionary.format), ("content_sha256", digest)),
                 )
                 for entry in dictionary.entries:
                     cursor = connection.execute(
@@ -99,8 +98,6 @@ class DictionaryService:
         self,
         source: Path,
         *,
-        source_language: str,
-        target_language: str,
         created_by_user_id: str,
         display_name: str | None = None,
         attribution: str = "",
@@ -112,13 +109,15 @@ class DictionaryService:
             raise DictionaryServiceError(error.code) from error
         dictionary_id = str(uuid.uuid4())
         target = self.dictionary_directory / (dictionary_id + ".sqlite")
-        self._create_file(target, parsed, source_language, target_language, digest)
+        self._create_file(target, parsed, digest)
         try:
             return self.store.create_dictionary(
                 dictionary_id=dictionary_id,
                 display_name=display_name or parsed.display_name,
-                source_language=source_language,
-                target_language=target_language,
+                # These fields are retained only to read databases created by
+                # earlier versions. Dictionary availability is not language-bound.
+                source_language="und",
+                target_language="und",
                 entry_count=len(parsed.entries),
                 content_sha256=digest,
                 attribution=attribution,
@@ -132,54 +131,78 @@ class DictionaryService:
         self,
         archive_bytes: bytes,
         *,
-        source_language: str,
-        target_language: str,
         created_by_user_id: str,
         display_name: str | None = None,
         attribution: str = "",
     ) -> DictionaryRecord:
         """Install one dictionary from a bounded zip without trusting its paths."""
-        if not isinstance(archive_bytes, bytes) or not archive_bytes or len(archive_bytes) > 512 * 1024 * 1024:
+        return self.install_upload(
+            archive_bytes, "dictionary.zip", created_by_user_id=created_by_user_id,
+            display_name=display_name, attribution=attribution,
+        )
+
+    def install_upload(
+        self,
+        upload_bytes: bytes,
+        filename: str,
+        *,
+        created_by_user_id: str,
+        display_name: str | None = None,
+        attribution: str = "",
+    ) -> DictionaryRecord:
+        """Install a direct MDX upload or a safe ZIP StarDict/MDX package."""
+        if not isinstance(upload_bytes, bytes) or not upload_bytes or len(upload_bytes) > 512 * 1024 * 1024:
             raise DictionaryServiceError("invalid_dictionary_archive")
+        upload_name = Path(filename).name if isinstance(filename, str) else ""
+        upload_suffix = Path(upload_name).suffix.casefold()
+        if upload_suffix not in {".mdx", ".zip"}:
+            raise DictionaryServiceError("unsupported_dictionary_format")
         staging = self.dictionary_directory / (".import-" + str(uuid.uuid4()))
         staging.mkdir(mode=0o700)
         try:
-            try:
-                archive = zipfile.ZipFile(io.BytesIO(archive_bytes))
-            except zipfile.BadZipFile as error:
-                raise DictionaryServiceError("invalid_dictionary_archive") from error
-            with archive:
-                members = [member for member in archive.infolist() if not member.is_dir()]
-                if not members or len(members) > 16 or sum(member.file_size for member in members) > 1024 * 1024 * 1024:
+            if upload_suffix == ".mdx":
+                source = staging / "dictionary.mdx"
+                source.write_bytes(upload_bytes)
+            else:
+                try:
+                    archive = zipfile.ZipFile(io.BytesIO(upload_bytes))
+                except zipfile.BadZipFile as error:
+                    raise DictionaryServiceError("invalid_dictionary_archive") from error
+                with archive:
+                    members = [member for member in archive.infolist() if not member.is_dir()]
+                    if not members or len(members) > 16 or sum(member.file_size for member in members) > 1024 * 1024 * 1024:
+                        raise DictionaryServiceError("invalid_dictionary_archive")
+                    for member in members:
+                        relative = Path(member.filename)
+                        if relative.is_absolute() or ".." in relative.parts or member.filename.replace("\\", "/").startswith("/"):
+                            raise DictionaryServiceError("invalid_dictionary_archive")
+                        if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                            raise DictionaryServiceError("invalid_dictionary_archive")
+                        target = staging / relative.name
+                        with archive.open(member) as source_stream, target.open("xb") as output:
+                            shutil.copyfileobj(source_stream, output, 1024 * 1024)
+                candidates = [item for item in staging.iterdir() if item.suffix.casefold() in {".ifo", ".mdx"}]
+                if len(candidates) != 1:
                     raise DictionaryServiceError("invalid_dictionary_archive")
-                for member in members:
-                    relative = Path(member.filename)
-                    if relative.is_absolute() or ".." in relative.parts or member.filename.replace("\\", "/").startswith("/"):
-                        raise DictionaryServiceError("invalid_dictionary_archive")
-                    if (member.external_attr >> 16) & 0o170000 == 0o120000:
-                        raise DictionaryServiceError("invalid_dictionary_archive")
-                    target = staging / relative.name
-                    with archive.open(member) as source, target.open("xb") as output:
-                        shutil.copyfileobj(source, output, 1024 * 1024)
-            candidates = [item for item in staging.iterdir() if item.suffix.casefold() in {".ifo", ".mdx"}]
-            if len(candidates) != 1:
-                raise DictionaryServiceError("invalid_dictionary_archive")
-            return self.install(
-                candidates[0], source_language=source_language,
-                target_language=target_language, created_by_user_id=created_by_user_id,
-                display_name=display_name, attribution=attribution,
-            )
+                source = candidates[0]
+            return self.install(source, created_by_user_id=created_by_user_id,
+                                display_name=display_name, attribution=attribution)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
 
-    def lookup(self, source_language: str, text: str) -> DictionaryLookup:
+    def list_available(self) -> tuple[DictionaryRecord, ...]:
+        return self.store.list_enabled_dictionaries()
+
+    def lookup(self, dictionary_id: str, text: str) -> DictionaryLookup:
         try:
             query = normalize_lookup(text)
         except DictionaryFormatError as error:
             raise DictionaryServiceError("invalid_dictionary_query") from error
-        dictionary = self.store.get_dictionary_default(source_language)
-        if dictionary is None:
-            raise DictionaryServiceError("dictionary_not_configured")
+        if not isinstance(dictionary_id, str) or not dictionary_id:
+            raise DictionaryServiceError("invalid_dictionary_selection")
+        dictionary = self.store.get_dictionary(dictionary_id)
+        if dictionary is None or not dictionary.enabled:
+            raise DictionaryServiceError("dictionary_unavailable")
         path = self.dictionary_directory / (dictionary.id + ".sqlite")
         if not path.is_file():
             raise DictionaryServiceError("dictionary_unavailable")
@@ -200,9 +223,6 @@ class DictionaryService:
             raise DictionaryServiceError("dictionary_unavailable") from error
         entries = tuple({"headword": row["headword"], "definition": row["definition_text"]} for row in rows)
         return DictionaryLookup(bool(entries), dictionary, query, entries)
-
-    def set_default(self, source_language: str, dictionary_id: str, user_id: str) -> DictionaryRecord:
-        return self.store.set_dictionary_default(source_language, dictionary_id, user_id)
 
     def set_enabled(self, dictionary_id: str, enabled: bool) -> DictionaryRecord:
         return self.store.set_dictionary_enabled(dictionary_id, enabled)

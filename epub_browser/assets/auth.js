@@ -244,6 +244,14 @@
         user_disabled: true,
         forbidden: true,
         csrf_required: true,
+        invalid_dictionary_archive: true,
+        unsupported_dictionary_format: true,
+        invalid_mdict: true,
+        mdict_reader_unavailable: true,
+        invalid_stardict: true,
+        dictionary_has_no_entries: true,
+        dictionary_too_large: true,
+        body_too_large: true,
         network: true
       } : {
         authentication_required: true,
@@ -274,6 +282,26 @@
     function showResponseError(response, scope) {
       return readJson(response).then(function(payload) {
         showStatus(messageKey(scope, payload && payload.code), 'error');
+        return payload;
+      });
+    }
+
+    function showDictionaryMessage(key, type) {
+      var message = element('adminDictionaryMessage');
+      var live = element('adminDictionaryLive');
+      var text = t(key);
+      if (live) live.textContent = text;
+      if (!message) return;
+      message.textContent = text;
+      message.hidden = !type;
+      message.className = type === 'error' ? 'auth-alert' : 'auth-alert success';
+    }
+
+    function showDictionaryResponseError(response) {
+      return readJson(response).then(function(payload) {
+        var key = messageKey('admin', payload && payload.code);
+        showDictionaryMessage(key, 'error');
+        showStatus(key, 'error');
         return payload;
       });
     }
@@ -869,7 +897,7 @@
       dictionaries.forEach(function(dictionary) {
         var item = root.document.createElement('li');
         item.className = 'account-list-item';
-        item.textContent = dictionary.display_name + ' · ' + dictionary.source_language + ' → ' + dictionary.target_language + ' · ' + dictionary.entry_count;
+        item.textContent = dictionary.display_name + ' · ' + dictionary.entry_count;
         list.appendChild(item);
       });
     }
@@ -2430,24 +2458,28 @@
         event.preventDefault();
         var archive = dictionaryForm.elements.archive.files[0];
         if (!archive) return;
+        showDictionaryMessage('', '');
         runButtonOperation(dictionarySubmit, 'admin.installingDictionary', function() {
           return archive.arrayBuffer().then(function(contents) {
             return authenticatedFetch('/api/admin/dictionaries', {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/zip',
-                'X-EPUB-Browser-Source-Language': dictionaryForm.elements.source_language.value,
-                'X-EPUB-Browser-Target-Language': dictionaryForm.elements.target_language.value,
+                'Content-Type': archive.type || 'application/octet-stream',
+                'X-EPUB-Browser-Dictionary-Filename': archive.name,
                 'X-EPUB-Browser-Dictionary-Name': dictionaryForm.elements.display_name.value
               }, body: contents
             });
           }).then(function(response) {
-            if (!response.ok) return showResponseError(response, 'admin');
+            if (!response.ok) return showDictionaryResponseError(response);
             dictionaryForm.reset();
             clearAdminDirty();
+            showDictionaryMessage('admin.dictionaryInstalled', 'success');
             showStatus('admin.dictionaryInstalled', 'success');
             return loadAdminData();
-          }).catch(function() { showStatus('admin.error.network', 'error'); });
+          }).catch(function() {
+            showDictionaryMessage('admin.error.network', 'error');
+            showStatus('admin.error.network', 'error');
+          });
         });
       });
       if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {

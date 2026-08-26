@@ -23,6 +23,33 @@
     return item;
   }
 
+  function readJson(response) {
+    return response.json().catch(function() { return {}; }).then(function(body) {
+      if (!response.ok) throw new Error(body.code || 'unavailable');
+      return body;
+    });
+  }
+
+  function renderDictionaryResult(content, data) {
+    var result = element('div', 'dictionary-results');
+    if (!data.found) {
+      result.textContent = t('notFound');
+    } else {
+      if (data.dictionary && data.dictionary.display_name) {
+        result.appendChild(element('p', 'dictionary-source', data.dictionary.display_name));
+      }
+      (data.entries || []).forEach(function(entry) {
+        var item = element('article', 'dictionary-entry');
+        item.appendChild(element('strong', '', entry.headword));
+        item.appendChild(element('p', '', entry.definition));
+        result.appendChild(item);
+      });
+    }
+    var previous = content.querySelector('.dictionary-results');
+    if (previous) previous.remove();
+    content.appendChild(result);
+  }
+
   function show(kind, text) {
     close();
     var dialog = element('section', 'dictionary-dialog');
@@ -46,28 +73,58 @@
     if (!bookId || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) {
       content.textContent = t('unavailable'); return;
     }
+    if (kind === 'dictionary') {
+      activeController = new AbortController();
+      root.EpubBrowserAuth.fetch('/api/books/' + encodeURIComponent(bookId) + '/dictionaries', {
+        signal: activeController.signal
+      }).then(readJson).then(function(data) {
+        if (activeDialog !== dialog) return;
+        var choices = data.dictionaries || [];
+        content.textContent = '';
+        if (!choices.length) { content.textContent = t('notConfigured'); return; }
+        var label = element('label', 'dictionary-picker');
+        label.appendChild(element('span', '', t('choose')));
+        var select = element('select', 'dictionary-picker-select');
+        choices.forEach(function(choice) {
+          var option = element('option', '', choice.display_name);
+          option.value = choice.id;
+          select.appendChild(option);
+        });
+        label.appendChild(select);
+        content.appendChild(label);
+        function lookup() {
+          if (activeController) activeController.abort();
+          activeController = new AbortController();
+          root.EpubBrowserAuth.fetch('/api/books/' + encodeURIComponent(bookId) + '/dictionary/lookup', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text, dictionary_id: select.value}), signal: activeController.signal
+          }).then(readJson).then(function(result) {
+            if (activeDialog === dialog) renderDictionaryResult(content, result);
+          }).catch(function(error) {
+            if (error.name !== 'AbortError' && activeDialog === dialog) {
+              renderDictionaryResult(content, {found: false});
+            }
+          });
+        }
+        select.addEventListener('change', lookup);
+        lookup();
+      }).catch(function(error) {
+        if (error.name !== 'AbortError' && activeDialog === dialog) content.textContent = t('unavailable');
+      });
+      return;
+    }
+
     activeController = new AbortController();
     root.EpubBrowserAuth.fetch('/api/books/' + encodeURIComponent(bookId) + '/' + kind + '/lookup', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({text: text}), signal: activeController.signal
     }).then(function(response) {
-      return response.json().catch(function() { return {}; }).then(function(body) {
-        if (!response.ok) throw new Error(body.code || 'unavailable');
-        return body;
-      });
+      return readJson(response);
     }).then(function(data) {
       if (activeDialog !== dialog) return;
       content.textContent = '';
       if (!data.found) { content.textContent = t('notFound'); return; }
-      if (kind === 'dictionary') {
-        if (data.dictionary && data.dictionary.display_name) content.appendChild(element('p', 'dictionary-source', data.dictionary.display_name));
-        (data.entries || []).forEach(function(entry) {
-          var item = element('article', 'dictionary-entry');
-          item.appendChild(element('strong', '', entry.headword));
-          item.appendChild(element('p', '', entry.definition));
-          content.appendChild(item);
-        });
-      } else {
+      if (kind !== 'dictionary') {
         content.appendChild(element('strong', '', data.title || text));
         if (data.description) content.appendChild(element('p', 'dictionary-source', data.description));
         if (data.extract) content.appendChild(element('p', '', data.extract));
@@ -80,7 +137,7 @@
       }
     }).catch(function(error) {
       if (error.name === 'AbortError' || activeDialog !== dialog) return;
-      content.textContent = error.message === 'dictionary_not_configured' ? t('notConfigured') : t('unavailable');
+      content.textContent = t('unavailable');
     });
   }
 

@@ -4509,22 +4509,30 @@
       'dictionary.loading': 'Looking up…',
       'dictionary.close': 'Close',
       'dictionary.notFound': 'No entry found.',
-      'dictionary.notConfigured': 'No local dictionary is configured for this book language.',
+      'dictionary.notConfigured': 'No local dictionary is installed.',
+      'dictionary.choose': 'Dictionary',
       'dictionary.unavailable': 'This service is temporarily unavailable.',
       'dictionary.source': 'Open source',
       'ai.annotation.vocabulary': 'Rare characters & vocabulary',
       'ai.teachKicker': 'FEYNMAN LEARNING',
       'ai.teachTitle': 'Teach it back in your own words'
       ,'admin.dictionaries': 'Dictionaries'
-      ,'admin.dictionariesDescription': 'Install a local StarDict or MDict package. The first dictionary for a source language becomes its default.'
+      ,'admin.dictionariesDescription': 'Install a local MDict or StarDict dictionary. Readers choose a dictionary when looking up a word.'
       ,'admin.dictionaryPackage': 'Dictionary package'
-      ,'admin.dictionarySourceLanguage': 'Source language'
-      ,'admin.dictionaryTargetLanguage': 'Target language'
+      ,'admin.dictionaryPackageHelp': 'Choose an .mdx file directly. For StarDict, put .ifo, .idx and .dict files in one ZIP.'
       ,'admin.dictionaryName': 'Display name'
       ,'admin.installDictionary': 'Install dictionary'
       ,'admin.installingDictionary': 'Installing…'
       ,'admin.dictionaryInstalled': 'Dictionary installed.'
       ,'admin.noDictionaries': 'No local dictionaries installed.'
+      ,'admin.error.invalid_dictionary_archive': 'The ZIP package is invalid. Include exactly one .mdx file, or one StarDict .ifo file with its .idx and .dict files.'
+      ,'admin.error.unsupported_dictionary_format': 'Choose an .mdx file, or a ZIP package for a StarDict dictionary.'
+      ,'admin.error.invalid_mdict': 'This MDict file could not be read. It may be encrypted or damaged.'
+      ,'admin.error.mdict_reader_unavailable': 'MDict support is unavailable. Install the server dependencies and try again.'
+      ,'admin.error.invalid_stardict': 'This StarDict package is incomplete or damaged.'
+      ,'admin.error.dictionary_has_no_entries': 'This dictionary has no readable entries.'
+      ,'admin.error.dictionary_too_large': 'This dictionary exceeds the import limit.'
+      ,'admin.error.body_too_large': 'This dictionary file exceeds the 512 MB upload limit.'
     },
     'zh-CN': {
       'account.loading': '正在加载账户设置…',
@@ -4566,22 +4574,30 @@
       'dictionary.loading': '查询中…',
       'dictionary.close': '关闭',
       'dictionary.notFound': '未找到词条。',
-      'dictionary.notConfigured': '尚未为本书语言配置本地词典。',
+      'dictionary.notConfigured': '尚未安装本地词典。',
+      'dictionary.choose': '选择词典',
       'dictionary.unavailable': '服务暂时不可用。',
       'dictionary.source': '打开来源',
       'ai.annotation.vocabulary': '生僻字词讲解',
       'ai.teachKicker': '费曼学习法',
       'ai.teachTitle': '用自己的话讲明白'
       ,'admin.dictionaries': '词典'
-      ,'admin.dictionariesDescription': '安装本地 StarDict 或 MDict 词典包。某个源语言安装的第一个词典会成为默认词典。'
+      ,'admin.dictionariesDescription': '安装本地 MDict 或 StarDict 词典。读者查词时自行选择要使用的词典。'
       ,'admin.dictionaryPackage': '词典包'
-      ,'admin.dictionarySourceLanguage': '源语言'
-      ,'admin.dictionaryTargetLanguage': '目标语言'
+      ,'admin.dictionaryPackageHelp': '可直接选择 .mdx 文件；StarDict 请将 .ifo、.idx 和 .dict 一起压缩为 ZIP。'
       ,'admin.dictionaryName': '显示名称'
       ,'admin.installDictionary': '安装词典'
       ,'admin.installingDictionary': '正在安装…'
       ,'admin.dictionaryInstalled': '词典已安装。'
       ,'admin.noDictionaries': '尚未安装本地词典。'
+      ,'admin.error.invalid_dictionary_archive': 'ZIP 词典包无效：请包含一个 .mdx 文件，或一个 .ifo 文件及对应的 .idx、.dict 文件。'
+      ,'admin.error.unsupported_dictionary_format': '请选择 .mdx 文件，或包含 StarDict 文件的 ZIP 包。'
+      ,'admin.error.invalid_mdict': '无法读取这个 MDict 文件：它可能已加密或已损坏。'
+      ,'admin.error.mdict_reader_unavailable': 'MDict 支持不可用，请安装服务端依赖后重试。'
+      ,'admin.error.invalid_stardict': 'StarDict 词典包不完整或已损坏。'
+      ,'admin.error.dictionary_has_no_entries': '这个词典没有可读取的词条。'
+      ,'admin.error.dictionary_too_large': '这个词典超过导入大小限制。'
+      ,'admin.error.body_too_large': '词典文件超过 512 MB 上传限制。'
     },
     'zh-TW': {
       'account.loading': '正在載入帳戶設定…',
@@ -4623,22 +4639,30 @@
       'dictionary.loading': '查詢中…',
       'dictionary.close': '關閉',
       'dictionary.notFound': '找不到詞條。',
-      'dictionary.notConfigured': '尚未為本書語言設定本機詞典。',
+      'dictionary.notConfigured': '尚未安裝本機詞典。',
+      'dictionary.choose': '選擇詞典',
       'dictionary.unavailable': '服務暫時無法使用。',
       'dictionary.source': '開啟來源',
       'ai.annotation.vocabulary': '生僻字詞解說',
       'ai.teachKicker': '費曼學習法',
       'ai.teachTitle': '用自己的話講明白'
       ,'admin.dictionaries': '詞典'
-      ,'admin.dictionariesDescription': '安裝本機 StarDict 或 MDict 詞典包。某個來源語言安裝的第一本詞典會成為預設詞典。'
+      ,'admin.dictionariesDescription': '安裝本機 MDict 或 StarDict 詞典。讀者查詞時可自行選擇要使用的詞典。'
       ,'admin.dictionaryPackage': '詞典包'
-      ,'admin.dictionarySourceLanguage': '來源語言'
-      ,'admin.dictionaryTargetLanguage': '目標語言'
+      ,'admin.dictionaryPackageHelp': '可直接選擇 .mdx 檔案；StarDict 請將 .ifo、.idx 和 .dict 一起壓縮為 ZIP。'
       ,'admin.dictionaryName': '顯示名稱'
       ,'admin.installDictionary': '安裝詞典'
       ,'admin.installingDictionary': '正在安裝…'
       ,'admin.dictionaryInstalled': '詞典已安裝。'
       ,'admin.noDictionaries': '尚未安裝本機詞典。'
+      ,'admin.error.invalid_dictionary_archive': 'ZIP 詞典包無效：請包含一個 .mdx 檔案，或一個 .ifo 檔案及對應的 .idx、.dict 檔案。'
+      ,'admin.error.unsupported_dictionary_format': '請選擇 .mdx 檔案，或包含 StarDict 檔案的 ZIP 包。'
+      ,'admin.error.invalid_mdict': '無法讀取這個 MDict 檔案：它可能已加密或已損壞。'
+      ,'admin.error.mdict_reader_unavailable': 'MDict 支援無法使用，請安裝伺服器相依套件後再試。'
+      ,'admin.error.invalid_stardict': 'StarDict 詞典包不完整或已損壞。'
+      ,'admin.error.dictionary_has_no_entries': '這個詞典沒有可讀取的詞條。'
+      ,'admin.error.dictionary_too_large': '這個詞典超過匯入大小限制。'
+      ,'admin.error.body_too_large': '詞典檔案超過 512 MB 上傳限制。'
     },
     ko: {
       'account.loading': '계정 설정을 불러오는 중…',
@@ -4680,22 +4704,30 @@
       'dictionary.loading': '조회 중…',
       'dictionary.close': '닫기',
       'dictionary.notFound': '항목을 찾을 수 없습니다.',
-      'dictionary.notConfigured': '이 책의 언어에 맞는 로컬 사전이 설정되지 않았습니다.',
+      'dictionary.notConfigured': '설치된 로컬 사전이 없습니다.',
+      'dictionary.choose': '사전 선택',
       'dictionary.unavailable': '서비스를 일시적으로 사용할 수 없습니다.',
       'dictionary.source': '원문 열기',
       'ai.annotation.vocabulary': '낯선 글자·어휘 풀이',
       'ai.teachKicker': '파인만 학습법',
       'ai.teachTitle': '내 말로 다시 설명하기'
       ,'admin.dictionaries': '사전'
-      ,'admin.dictionariesDescription': '로컬 StarDict 또는 MDict 패키지를 설치합니다. 소스 언어별 첫 사전이 기본 사전이 됩니다.'
+      ,'admin.dictionariesDescription': '로컬 MDict 또는 StarDict 사전을 설치합니다. 독자가 조회할 때 사용할 사전을 선택합니다.'
       ,'admin.dictionaryPackage': '사전 패키지'
-      ,'admin.dictionarySourceLanguage': '원본 언어'
-      ,'admin.dictionaryTargetLanguage': '대상 언어'
+      ,'admin.dictionaryPackageHelp': '.mdx 파일은 바로 선택하세요. StarDict는 .ifo, .idx, .dict 파일을 ZIP 하나에 넣으세요.'
       ,'admin.dictionaryName': '표시 이름'
       ,'admin.installDictionary': '사전 설치'
       ,'admin.installingDictionary': '설치 중…'
       ,'admin.dictionaryInstalled': '사전을 설치했습니다.'
       ,'admin.noDictionaries': '설치된 로컬 사전이 없습니다.'
+      ,'admin.error.invalid_dictionary_archive': 'ZIP 사전 패키지가 올바르지 않습니다. .mdx 하나 또는 StarDict .ifo, .idx, .dict 파일을 포함하세요.'
+      ,'admin.error.unsupported_dictionary_format': '.mdx 파일 또는 StarDict 파일이 든 ZIP 패키지를 선택하세요.'
+      ,'admin.error.invalid_mdict': '이 MDict 파일을 읽을 수 없습니다. 암호화되었거나 손상되었을 수 있습니다.'
+      ,'admin.error.mdict_reader_unavailable': 'MDict 지원을 사용할 수 없습니다. 서버 의존성을 설치한 뒤 다시 시도하세요.'
+      ,'admin.error.invalid_stardict': 'StarDict 패키지가 불완전하거나 손상되었습니다.'
+      ,'admin.error.dictionary_has_no_entries': '읽을 수 있는 표제어가 없습니다.'
+      ,'admin.error.dictionary_too_large': '이 사전은 가져오기 크기 제한을 초과합니다.'
+      ,'admin.error.body_too_large': '사전 파일이 512MB 업로드 제한을 초과합니다.'
     },
     ja: {
       'account.loading': 'アカウント設定を読み込み中…',
@@ -4737,22 +4769,30 @@
       'dictionary.loading': '検索中…',
       'dictionary.close': '閉じる',
       'dictionary.notFound': '項目が見つかりません。',
-      'dictionary.notConfigured': 'この本の言語にはローカル辞書が設定されていません。',
+      'dictionary.notConfigured': 'ローカル辞書はまだインストールされていません。',
+      'dictionary.choose': '辞書を選択',
       'dictionary.unavailable': 'サービスを一時的に利用できません。',
       'dictionary.source': '出典を開く',
       'ai.annotation.vocabulary': '難しい字句の解説',
       'ai.teachKicker': 'ファインマン学習法',
       'ai.teachTitle': '自分の言葉で説明する'
       ,'admin.dictionaries': '辞書'
-      ,'admin.dictionariesDescription': 'ローカルの StarDict または MDict パッケージをインストールします。ソース言語ごとの最初の辞書が既定になります。'
+      ,'admin.dictionariesDescription': 'ローカルの MDict または StarDict 辞書をインストールします。読者は検索時に使う辞書を選べます。'
       ,'admin.dictionaryPackage': '辞書パッケージ'
-      ,'admin.dictionarySourceLanguage': 'ソース言語'
-      ,'admin.dictionaryTargetLanguage': '対象言語'
+      ,'admin.dictionaryPackageHelp': '.mdx ファイルは直接選択できます。StarDict は .ifo、.idx、.dict を 1 つの ZIP にまとめてください。'
       ,'admin.dictionaryName': '表示名'
       ,'admin.installDictionary': '辞書をインストール'
       ,'admin.installingDictionary': 'インストール中…'
       ,'admin.dictionaryInstalled': '辞書をインストールしました。'
       ,'admin.noDictionaries': 'ローカル辞書はまだインストールされていません。'
+      ,'admin.error.invalid_dictionary_archive': 'ZIP 辞書パッケージが無効です。.mdx 1 件、または StarDict の .ifo、.idx、.dict を含めてください。'
+      ,'admin.error.unsupported_dictionary_format': '.mdx ファイル、または StarDict ファイルを含む ZIP を選択してください。'
+      ,'admin.error.invalid_mdict': 'この MDict ファイルは読み取れません。暗号化または破損している可能性があります。'
+      ,'admin.error.mdict_reader_unavailable': 'MDict サポートを利用できません。サーバー依存関係をインストールしてから再試行してください。'
+      ,'admin.error.invalid_stardict': 'StarDict パッケージが不完全か破損しています。'
+      ,'admin.error.dictionary_has_no_entries': '読み取れる項目がありません。'
+      ,'admin.error.dictionary_too_large': 'この辞書はインポートのサイズ上限を超えています。'
+      ,'admin.error.body_too_large': '辞書ファイルが 512 MB のアップロード上限を超えています。'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

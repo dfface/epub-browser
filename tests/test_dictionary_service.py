@@ -24,9 +24,29 @@ class DictionaryServiceTests(unittest.TestCase):
                 archive.writestr("sample.idx", index)
                 archive.writestr("sample.dict", definition)
             service = DictionaryService(store, root)
-            record = service.install_archive(payload.getvalue(), source_language="en", target_language="en", created_by_user_id=admin.user_id)
+            record = service.install_archive(payload.getvalue(), created_by_user_id=admin.user_id)
             self.assertEqual(record.display_name, "Zip")
             self.assertEqual(list((root / "data" / "dictionaries").glob(".import-*")), [])
+
+    def test_installs_an_mdx_upload_directly(self):
+        try:
+            from mdict_utils.base.writemdict import MDictWriter
+        except ImportError:
+            self.skipTest("mdict-utils is installed with the server dependency")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = StateStore(root / "data" / "epub-browser.db")
+            admin = store.initialize(BootstrapCredentials("admin", "correct horse battery staple"))
+            payload = io.BytesIO()
+            MDictWriter(
+                {"词典": "<b>本地释义</b>"}, title="Sample", description="",
+                encoding="utf8", compression_type=2, version="2.0",
+            ).write(payload)
+
+            service = DictionaryService(store, root)
+            record = service.install_upload(payload.getvalue(), "sample.mdx", created_by_user_id=admin.user_id)
+
+            self.assertEqual(service.lookup(record.id, "词典").entries[0]["definition"], "本地释义")
 
     def test_installs_stardict_into_isolated_sqlite_and_looks_up_aliases(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -45,23 +65,22 @@ class DictionaryServiceTests(unittest.TestCase):
             base.with_suffix(".syn").write_bytes(b"running\0" + struct.pack(">I", 0))
             service = DictionaryService(store, root)
 
-            record = service.install(base.with_suffix(".ifo"), source_language="en", target_language="en", created_by_user_id=admin.user_id)
-            service.set_default("en", record.id, admin.user_id)
-            result = service.lookup("en", "running")
+            record = service.install(base.with_suffix(".ifo"), created_by_user_id=admin.user_id)
+            result = service.lookup(record.id, "running")
 
             self.assertTrue(result.found)
             self.assertEqual(result.entries[0]["headword"], "run")
             self.assertEqual(result.entries[0]["definition"], "to move quickly")
             self.assertTrue((root / "data" / "dictionaries" / (record.id + ".sqlite")).is_file())
 
-    def test_missing_default_does_not_create_query_history(self):
+    def test_missing_dictionary_does_not_create_query_history(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = StateStore(root / "data" / "epub-browser.db")
             store.initialize(BootstrapCredentials("admin", "correct horse battery staple"))
             service = DictionaryService(store, root)
-            with self.assertRaisesRegex(DictionaryServiceError, "dictionary_not_configured"):
-                service.lookup("en", "run")
+            with self.assertRaisesRegex(DictionaryServiceError, "dictionary_unavailable"):
+                service.lookup("missing", "run")
 
 
 if __name__ == "__main__":
