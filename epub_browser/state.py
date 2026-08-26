@@ -5010,6 +5010,25 @@ class StateStore:
             ).fetchone()
         return self._dictionary_record(row) if row is not None else None
 
+    def rename_dictionary(self, dictionary_id: str, display_name: str) -> DictionaryRecord:
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise ValueError("Dictionary name is invalid")
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE dictionaries
+                SET display_name = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (display_name.strip(), dictionary_id),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(f"Unknown dictionary ID: {dictionary_id}")
+            row = connection.execute(
+                "SELECT * FROM dictionaries WHERE id = ?", (dictionary_id,)
+            ).fetchone()
+        return self._dictionary_record(row)
+
     def set_dictionary_enabled(self, dictionary_id: str, enabled: bool) -> DictionaryRecord:
         if not isinstance(enabled, bool):
             raise ValueError("Dictionary enabled flag must be a boolean")

@@ -2217,7 +2217,22 @@ window.location.assign(payload.redirect||'/');
                 return response(error_payload("not_found", "Not Found"), 404)
             return Response(status_code=204, headers={"Cache-Control": "no-cache"})
         data, error = await bounded_public_json_object(request)
-        if error or not isinstance(data.get("enabled"), bool):
+        if error:
+            return response(error_payload("invalid_dictionary_update", "Invalid dictionary update"), 400)
+        if "display_name" in data:
+            if not isinstance(data["display_name"], str):
+                return response(error_payload("invalid_dictionary_name", "Invalid dictionary name"), 400)
+            try:
+                record = dictionary_service.rename(dictionary_id, data["display_name"])
+            except KeyError:
+                return response(error_payload("not_found", "Not Found"), 404)
+            except ValueError:
+                return response(error_payload("invalid_dictionary_name", "Invalid dictionary name"), 400)
+            default = dictionary_service.store.get_global_dictionary_default()
+            return response({"dictionary": dictionary_record_data(
+                record, default.id if default else None,
+            )})
+        if not isinstance(data.get("enabled"), bool):
             return response(error_payload("invalid_dictionary_update", "Invalid dictionary update"), 400)
         try:
             record = dictionary_service.set_enabled(dictionary_id, data["enabled"])

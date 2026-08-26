@@ -103,6 +103,26 @@ class DictionaryApiTests(unittest.TestCase):
         choices = self.client.get("/api/books/book/dictionaries").json()
         self.assertEqual(choices["default_dictionary_id"], self.dictionary.id)
 
+    def test_admin_can_rename_a_dictionary(self):
+        renamed = self.client.put(
+            "/api/admin/dictionaries/" + self.dictionary.id,
+            json={"display_name": "Fast English"},
+        )
+
+        self.assertEqual(renamed.status_code, 200)
+        self.assertEqual(renamed.json()["dictionary"]["display_name"], "Fast English")
+        self.assertEqual(
+            self.client.get("/api/admin/dictionaries").json()["dictionaries"][0]["display_name"],
+            "Fast English",
+        )
+
+        invalid = self.client.put(
+            "/api/admin/dictionaries/" + self.dictionary.id,
+            json={"display_name": "   "},
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["code"], "invalid_dictionary_name")
+
     def test_admin_upload_decodes_a_unicode_filename_as_the_default_name(self):
         definition = b"a different definition"
         index = b"word\0" + struct.pack(">II", 0, len(definition))

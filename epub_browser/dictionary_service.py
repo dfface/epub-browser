@@ -424,6 +424,9 @@ class DictionaryService:
             self.store.ensure_global_dictionary_default()
         return record
 
+    def rename(self, dictionary_id: str, display_name: str) -> DictionaryRecord:
+        return self.store.rename_dictionary(dictionary_id, display_name)
+
     def delete(self, dictionary_id: str) -> None:
         self.store.delete_dictionary(dictionary_id)
         (self.dictionary_directory / (dictionary_id + ".sqlite")).unlink(missing_ok=True)

@@ -255,6 +255,7 @@
         invalid_stardict: true,
         dictionary_has_no_entries: true,
         invalid_dictionary_update: true,
+        invalid_dictionary_name: true,
         network: true
       } : {
         authentication_required: true,
@@ -944,15 +945,43 @@
       });
     }
 
-    function loadDictionaries() {
+    function loadDictionaries(options) {
+      var silent = options && options.silent;
       return authenticatedFetch('/api/admin/dictionaries').then(function(dictionaryResponse) {
-        if (!dictionaryResponse.ok) return showDictionaryResponseError(dictionaryResponse);
+        if (!dictionaryResponse.ok) {
+          return silent ? readJson(dictionaryResponse) : showDictionaryResponseError(dictionaryResponse);
+        }
         return readJson(dictionaryResponse).then(function(payload) {
           dictionaries = payload.dictionaries || [];
           renderDictionaries();
         });
       }).catch(function() {
-        showDictionaryMessage('admin.error.network', 'error');
+        if (!silent) showDictionaryMessage('admin.error.network', 'error');
+      });
+    }
+
+    function renameDictionary(dictionary) {
+      if (!root.EpubDialog || typeof root.EpubDialog.prompt !== 'function') return Promise.resolve(null);
+      return Promise.resolve(root.EpubDialog.prompt({
+        title: t('admin.renameDictionary'),
+        inputLabel: t('admin.dictionaryName'),
+        defaultValue: dictionary.display_name,
+        selectOnOpen: true,
+        confirmText: t('admin.renameDictionary')
+      })).then(function(displayName) {
+        if (displayName === null) return null;
+        return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {
+          method: 'PUT', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({display_name: displayName})
+        }).then(function(response) {
+          if (!response.ok) return showDictionaryResponseError(response);
+          showDictionaryMessage('admin.dictionaryRenamed', 'success');
+          showStatus('admin.dictionaryRenamed', 'success');
+          return loadDictionaries();
+        }).catch(function() {
+          showDictionaryMessage('admin.error.network', 'error');
+          showStatus('admin.error.network', 'error');
+        });
       });
     }
 
@@ -998,6 +1027,9 @@
             return setDefaultDictionary(dictionary);
           }));
         }
+        actions.appendChild(actionButton('admin.renameDictionary', function() {
+          return renameDictionary(dictionary);
+        }));
         actions.appendChild(actionButton(
           dictionary.enabled ? 'admin.disableDictionary' : 'admin.enableDictionary',
           function() {
@@ -2613,7 +2645,8 @@
             setDictionaryProgress('');
             showDictionaryMessage('admin.dictionaryInstalled', 'success');
             showStatus('admin.dictionaryInstalled', 'success');
-            return loadAdminData();
+            loadDictionaries({silent: true});
+            return null;
           }).catch(function(error) {
             setDictionaryProgress('');
             if (error && /dictionary_(?:media_)?upload_failed/.test(error.message)) return;
