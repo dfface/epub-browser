@@ -3944,6 +3944,18 @@ class ReadingInsightsAPITests(unittest.TestCase):
         for suffix, content in (
             ("missing", {"title": "Book", "authors": [], "tags": [], "toc": []}),
             ("non-list", {"title": "Book", "authors": [], "tags": [], "chapters": {}, "toc": []}),
+            (
+                "invalid-entry",
+                {"title": "Book", "authors": [], "tags": [], "chapters": [None], "toc": []},
+            ),
+            (
+                "missing-path",
+                {"title": "Book", "authors": [], "tags": [], "chapters": [{"title": "Opening chapter"}], "toc": []},
+            ),
+            (
+                "missing-title",
+                {"title": "Book", "authors": [], "tags": [], "chapters": [{"path": "chapter.xhtml"}], "toc": []},
+            ),
             ("malformed", "{not json"),
         ):
             with self.subTest(cache=suffix):

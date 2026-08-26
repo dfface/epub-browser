@@ -2918,6 +2918,15 @@ window.location.assign(payload.redirect||'/');
         chapters = metadata.get('chapters')
         if not isinstance(chapters, list):
             raise ServerPageError('Book content cache is invalid')
+        if not all(
+            isinstance(chapter, dict)
+            and isinstance(chapter.get('title'), str)
+            and chapter['title'].strip()
+            and isinstance(chapter.get('path'), str)
+            and chapter['path'].strip()
+            for chapter in chapters
+        ):
+            raise ServerPageError('Book content cache is invalid')
         if chapter_index >= len(chapters):
             raise ValueError('chapter index is outside the book')
         renderer.render_chapter(chapter_index)
