@@ -247,6 +247,11 @@
         invalid_dictionary_archive: true,
         unsupported_dictionary_format: true,
         invalid_mdict: true,
+        empty_dictionary_definition: true,
+        invalid_mdict_resource: true,
+        mdict_resources_not_found: true,
+        unsupported_mdict_resource: true,
+        mdict_resource_too_large: true,
         mdict_reader_unavailable: true,
         invalid_stardict: true,
         dictionary_has_no_entries: true,
@@ -2534,46 +2539,89 @@
       });
       if (dictionaryForm) dictionaryForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        var archive = dictionaryForm.elements.archive.files[0];
-        if (!archive) return;
+        var format = dictionaryForm.elements.dictionary_format.value;
+        var dictionaryFile = format === 'mdict'
+          ? dictionaryForm.elements.mdx.files[0]
+          : dictionaryForm.elements.archive.files[0];
+        var mediaFile = format === 'mdict' && dictionaryForm.elements.mdd.files[0];
+        if (!dictionaryFile) return;
         showDictionaryMessage('', '');
         runButtonOperation(dictionarySubmit, 'admin.installingDictionary', function() {
-          return archive.arrayBuffer().then(function(contents) {
-            return authenticatedFetch('/api/admin/dictionaries', {
-              method: 'POST',
-              headers: {
-                'Content-Type': archive.type || 'application/octet-stream',
-                'X-EPUB-Browser-Dictionary-Filename': encodeURIComponent(archive.name),
-                'X-EPUB-Browser-Dictionary-Name': encodeURIComponent(dictionaryForm.elements.display_name.value.trim())
-              }, body: contents
+          function upload(file, target) {
+            return file.arrayBuffer().then(function(contents) {
+              return authenticatedFetch(target, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': file.type || 'application/octet-stream',
+                  'X-EPUB-Browser-Dictionary-Filename': encodeURIComponent(file.name),
+                  'X-EPUB-Browser-Dictionary-Name': encodeURIComponent(dictionaryForm.elements.display_name.value.trim())
+                }, body: contents
+              });
             });
-          }).then(function(response) {
-            if (!response.ok) return showDictionaryResponseError(response);
+          }
+          return upload(dictionaryFile, '/api/admin/dictionaries').then(function(response) {
+            if (!response.ok) return showDictionaryResponseError(response).then(function() { throw new Error('dictionary_upload_failed'); });
+            return readJson(response);
+          }).then(function(payload) {
+            if (!mediaFile) return payload;
+            var dictionary = payload && payload.dictionary;
+            return upload(mediaFile, '/api/admin/dictionaries/' + encodeURIComponent(dictionary.id) + '/resources').then(function(response) {
+              if (response.ok) return payload;
+              return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {method: 'DELETE'})
+                .finally(function() {
+                  return showDictionaryResponseError(response).then(function() { throw new Error('dictionary_media_upload_failed'); });
+                });
+            });
+          }).then(function() {
             dictionaryForm.reset();
+            setDictionaryFormat('mdict');
             dictionaryAutoName = '';
             clearAdminDirty();
             showDictionaryMessage('admin.dictionaryInstalled', 'success');
             showStatus('admin.dictionaryInstalled', 'success');
             return loadAdminData();
-          }).catch(function() {
+          }).catch(function(error) {
+            if (error && /dictionary_(?:media_)?upload_failed/.test(error.message)) return;
             showDictionaryMessage('admin.error.network', 'error');
             showStatus('admin.error.network', 'error');
           });
         });
       });
       if (dictionaryForm) {
-        var dictionaryFileInput = dictionaryForm.elements.archive;
+        var dictionaryFormatInputs = dictionaryForm.querySelectorAll('input[name="dictionary_format"]');
+        var dictionaryFileInputs = [dictionaryForm.elements.mdx, dictionaryForm.elements.archive];
         var dictionaryNameInput = dictionaryForm.elements.display_name;
-        dictionaryFileInput.addEventListener('change', function() {
-          var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
-          var fileName = file && file.name ? file.name.replace(/\.(?:mdx|zip|tar(?:\.(?:gz|bz2))?|tgz|tbz2)$/i, '').trim() : '';
-          if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;
-          dictionaryNameInput.value = fileName;
-          dictionaryAutoName = fileName;
+        function setDictionaryFormat(format) {
+          Array.prototype.forEach.call(dictionaryFormatInputs, function(input) {
+            var selected = input.value === format;
+            input.checked = selected;
+            input.closest('.dictionary-format-option').classList.toggle('is-selected', selected);
+          });
+          Array.prototype.forEach.call(dictionaryForm.querySelectorAll('[data-dictionary-upload]'), function(group) {
+            var selected = group.getAttribute('data-dictionary-upload') === format;
+            group.hidden = !selected;
+            Array.prototype.forEach.call(group.querySelectorAll('input[type="file"]'), function(input) {
+              input.disabled = !selected;
+              input.required = selected && input.name === (format === 'mdict' ? 'mdx' : 'archive');
+            });
+          });
+        }
+        Array.prototype.forEach.call(dictionaryFormatInputs, function(input) {
+          input.addEventListener('change', function() { setDictionaryFormat(input.value); });
+        });
+        dictionaryFileInputs.forEach(function(dictionaryFileInput) {
+          dictionaryFileInput.addEventListener('change', function() {
+            var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
+            var fileName = file && file.name ? file.name.replace(/\.(?:mdx|zip|tar(?:\.(?:gz|bz2))?|tgz|tbz2)$/i, '').trim() : '';
+            if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;
+            dictionaryNameInput.value = fileName;
+            dictionaryAutoName = fileName;
+          });
         });
         dictionaryNameInput.addEventListener('input', function() {
           if (dictionaryNameInput.value !== dictionaryAutoName) dictionaryAutoName = '';
         });
+        setDictionaryFormat('mdict');
       }
       if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {
         event.preventDefault();

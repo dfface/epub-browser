@@ -68,7 +68,28 @@
     });
   }
 
-  function renderDictionaryResult(content, data) {
+  function appendMedia(item, entry, bookId) {
+    (entry.media || []).forEach(function(media) {
+      if (!media || !media.id || (media.kind !== 'image' && media.kind !== 'audio')) return;
+      var source = '/api/books/' + encodeURIComponent(bookId) + '/dictionaries/'
+        + encodeURIComponent(entry.dictionary_id || '') + '/resources/' + encodeURIComponent(media.id);
+      if (media.kind === 'image') {
+        var image = element('img', 'dictionary-entry-image');
+        image.src = source;
+        image.loading = 'lazy';
+        image.alt = entry.headword || '';
+        item.appendChild(image);
+      } else {
+        var audio = element('audio', 'dictionary-entry-audio');
+        audio.src = source;
+        audio.controls = true;
+        audio.preload = 'metadata';
+        item.appendChild(audio);
+      }
+    });
+  }
+
+  function renderDictionaryResult(content, data, bookId) {
     var result = element('div', 'dictionary-results');
     if (!data.found) {
       result.textContent = t('notFound');
@@ -77,6 +98,8 @@
         var item = element('article', 'dictionary-entry');
         item.appendChild(element('strong', '', entry.headword));
         item.appendChild(definitionElement(entry.definition));
+        entry.dictionary_id = data.dictionary && data.dictionary.id;
+        appendMedia(item, entry, bookId);
         result.appendChild(item);
       });
     }
@@ -158,10 +181,10 @@
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({text: text, dictionary_id: select ? select.value : dictionaryId}), signal: activeController.signal
           }).then(readJson).then(function(result) {
-            if (activeDialog === dialog) renderDictionaryResult(content, result);
+            if (activeDialog === dialog) renderDictionaryResult(content, result, bookId);
           }).catch(function(error) {
             if (error.name !== 'AbortError' && activeDialog === dialog) {
-              renderDictionaryResult(content, {found: false});
+              renderDictionaryResult(content, {found: false}, bookId);
             }
           });
         }

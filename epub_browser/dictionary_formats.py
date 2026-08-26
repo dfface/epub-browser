@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import gzip
 import html.parser
+import posixpath
 import re
 import struct
 import unicodedata
+from urllib.parse import unquote
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -20,6 +22,8 @@ from typing import Iterable
 MAX_ENTRIES = 500_000
 MAX_HEADWORD_LENGTH = 256
 MAX_DEFINITION_BYTES = 16 * 1024
+MAX_MDICT_MEDIA_ITEMS = 128
+MAX_MDICT_MEDIA_BYTES = 128 * 1024 * 1024
 
 
 class DictionaryFormatError(ValueError):
@@ -36,6 +40,7 @@ class DictionaryEntry:
     normalized_headword: str
     aliases: tuple[str, ...]
     definition_text: str
+    media_references: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -85,7 +90,7 @@ class _PlainTextExtractor(html.parser.HTMLParser):
         )
 
 
-def clean_definition(value: str) -> str:
+def clean_definition(value: str, *, allow_empty: bool = False) -> str:
     if not isinstance(value, str):
         raise DictionaryFormatError("invalid_dictionary_definition")
     parser = _PlainTextExtractor()
@@ -95,11 +100,50 @@ def clean_definition(value: str) -> str:
     except (html.parser.HTMLParseError, ValueError):
         raise DictionaryFormatError("invalid_dictionary_definition")
     text = unicodedata.normalize("NFC", parser.text())
-    if not text:
+    if not text and not allow_empty:
         raise DictionaryFormatError("empty_dictionary_definition")
     if len(text.encode("utf-8")) > MAX_DEFINITION_BYTES:
         text = text.encode("utf-8")[:MAX_DEFINITION_BYTES].decode("utf-8", "ignore").rstrip()
     return text
+
+
+def _canonical_mdict_resource_path(value: str) -> str | None:
+    """Return the safe, case-insensitive MDD key for a file:// resource."""
+    if not isinstance(value, str):
+        return None
+    value = unquote(value).strip()
+    if not value.casefold().startswith("file://"):
+        return None
+    value = value[7:].replace("\\", "/").lstrip("/")
+    value = posixpath.normpath(value)
+    if not value or value in {".", ".."} or value.startswith("../") or "\x00" in value:
+        return None
+    return value.casefold()
+
+
+class _MdictMediaExtractor(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.references: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag, attrs):
+        kind = {"img": "image", "audio": "audio"}.get(tag.casefold())
+        if not kind:
+            return
+        source = dict(attrs).get("src")
+        path = _canonical_mdict_resource_path(source)
+        if path and (kind, path) not in self.references:
+            self.references.append((kind, path))
+
+
+def mdict_media_references(value: str) -> tuple[tuple[str, str], ...]:
+    parser = _MdictMediaExtractor()
+    try:
+        parser.feed(value)
+        parser.close()
+    except (html.parser.HTMLParseError, ValueError):
+        raise DictionaryFormatError("invalid_dictionary_definition")
+    return tuple(parser.references)
 
 
 def _parse_ifo(path: Path) -> dict[str, str]:
@@ -198,10 +242,8 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
     return ImportedDictionary("stardict", values["bookname"], tuple(finalized))
 
 
-def parse_mdict(mdx_path: Path) -> ImportedDictionary:
-    """Read unencrypted MDX through the MIT-licensed mdict-utils package."""
-    if mdx_path.suffix.casefold() != ".mdx":
-        raise DictionaryFormatError("invalid_mdict")
+def _mdict_reader_runtime():
+    """Load mdict-utils and activate its bundled MIT LZO implementation."""
     try:
         from mdict_utils.base import lzo as bundled_lzo
         from mdict_utils.base import readmdict
@@ -226,28 +268,51 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
 
         readmdict.lzo = _BundledLzoAdapter
 
-    def decode_mdict_text(value: bytes, declared_encoding: str) -> str:
-        # Some older dictionaries declare GBK/GB18030 but store entries in
-        # UTF-8.  Prefer UTF-8 because it is unambiguous for these files, then
-        # honor the declared encoding for genuine legacy dictionaries.
-        encodings = ("utf-8", declared_encoding, "gb18030")
-        for encoding in dict.fromkeys(item for item in encodings if item):
-            try:
-                return value.decode(encoding)
-            except UnicodeDecodeError:
-                continue
-        raise UnicodeDecodeError("mdict", value, 0, len(value), "unsupported entry encoding")
+    return readmdict
+
+
+def _decode_mdict_text(value: bytes, declared_encoding: str) -> str:
+    # Some older dictionaries declare GBK/GB18030 but store entries in UTF-8.
+    # Prefer UTF-8 because it is unambiguous for these files, then honor the
+    # declared encoding for genuine legacy dictionaries.
+    encodings = ("utf-8", declared_encoding, "gb18030")
+    for encoding in dict.fromkeys(item for item in encodings if item):
+        try:
+            return value.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise UnicodeDecodeError("mdict", value, 0, len(value), "unsupported entry encoding")
+
+
+def parse_mdict(mdx_path: Path) -> ImportedDictionary:
+    """Read unencrypted MDX through the MIT-licensed mdict-utils package."""
+    if mdx_path.suffix.casefold() != ".mdx":
+        raise DictionaryFormatError("invalid_mdict")
+    readmdict = _mdict_reader_runtime()
 
     try:
         reader = readmdict.MDX(str(mdx_path), "", False, None)
         header = reader.header
         name = header.get(b"Title", header.get(b"title", mdx_path.stem.encode("utf-8")))
-        display_name = decode_mdict_text(name, reader._encoding).strip() or mdx_path.stem
+        display_name = _decode_mdict_text(name, reader._encoding).strip() or mdx_path.stem
         entries = []
         for key, value in reader.items():
-            headword = decode_mdict_text(key, reader._encoding)
-            definition = decode_mdict_text(value, reader._encoding)
-            entries.append(DictionaryEntry(headword.strip(), normalize_lookup(headword), (), clean_definition(definition)))
+            headword = _decode_mdict_text(key, reader._encoding)
+            definition = _decode_mdict_text(value, reader._encoding)
+            media_references = mdict_media_references(definition)
+            try:
+                definition_text = clean_definition(definition, allow_empty=bool(media_references))
+            except DictionaryFormatError as error:
+                # A few real-world MDX files contain empty or remote-image-only
+                # placeholders next to otherwise usable entries. They cannot
+                # contribute anything safely, so omit only those entries.
+                if error.code == "empty_dictionary_definition":
+                    continue
+                raise
+            entries.append(DictionaryEntry(
+                headword.strip(), normalize_lookup(headword), (),
+                definition_text, media_references,
+            ))
             if len(entries) > MAX_ENTRIES:
                 raise DictionaryFormatError("dictionary_too_large")
     except DictionaryFormatError:
@@ -257,6 +322,36 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
     if not entries:
         raise DictionaryFormatError("dictionary_has_no_entries")
     return ImportedDictionary("mdict", display_name, tuple(entries))
+
+
+def read_mdict_resources(mdd_path: Path, references: set[str]) -> dict[str, bytes]:
+    """Read only referenced, bounded MDD resources; source HTML is never kept."""
+    if mdd_path.suffix.casefold() != ".mdd":
+        raise DictionaryFormatError("invalid_mdict_resource")
+    if not references:
+        return {}
+    readmdict = _mdict_reader_runtime()
+    found: dict[str, bytes] = {}
+    total = 0
+    try:
+        reader = readmdict.MDD(str(mdd_path), None)
+        for key, value in reader.items():
+            path = _canonical_mdict_resource_path("file://" + _decode_mdict_text(key, reader._encoding))
+            if path not in references or path in found:
+                continue
+            if not isinstance(value, bytes) or len(value) > MAX_MDICT_MEDIA_BYTES:
+                raise DictionaryFormatError("mdict_resource_too_large")
+            total += len(value)
+            if len(found) >= MAX_MDICT_MEDIA_ITEMS or total > MAX_MDICT_MEDIA_BYTES:
+                raise DictionaryFormatError("mdict_resource_too_large")
+            found[path] = value
+    except DictionaryFormatError:
+        raise
+    except (OSError, UnicodeDecodeError, ValueError, AssertionError, EOFError) as error:
+        raise DictionaryFormatError("invalid_mdict_resource") from error
+    if not found:
+        raise DictionaryFormatError("mdict_resources_not_found")
+    return found
 
 
 def parse_local_dictionary(path: Path) -> ImportedDictionary:

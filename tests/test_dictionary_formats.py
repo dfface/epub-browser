@@ -45,6 +45,21 @@ class DictionaryFormatTests(unittest.TestCase):
         self.assertEqual(result.format, "mdict")
         self.assertEqual(result.entries[0].definition_text, "to move")
 
+    def test_skips_unusable_empty_mdict_entries_without_rejecting_the_dictionary(self):
+        try:
+            from mdict_utils.base.writemdict import MDictWriter
+        except ImportError:
+            self.skipTest("mdict-utils is installed with the server extra")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.mdx"
+            with path.open("wb") as handle:
+                MDictWriter(
+                    {"usable": "definition", "empty": "<img src=\"https://example.test/image.png\">"},
+                    title="Sample", description="", encoding="utf8", compression_type=2, version="2.0",
+                ).write(handle)
+            result = parse_local_dictionary(path)
+        self.assertEqual([entry.headword for entry in result.entries], ["usable"])
+
 
 if __name__ == "__main__":
     unittest.main()

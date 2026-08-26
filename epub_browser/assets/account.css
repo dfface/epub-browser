@@ -598,6 +598,59 @@ body.auth-page {
     gap: 14px;
 }
 
+.dictionary-format-chooser {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.dictionary-format-chooser legend {
+    margin-bottom: 8px;
+    color: var(--account-text);
+    font-weight: 700;
+}
+
+.dictionary-format-option {
+    display: flex;
+    min-height: 76px;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: var(--account-card);
+    cursor: pointer;
+}
+
+.dictionary-format-option:has(input:focus-visible) {
+    outline: 3px solid color-mix(in srgb, var(--account-primary) 40%, transparent);
+    outline-offset: 2px;
+}
+
+.dictionary-format-option.is-selected {
+    border-color: var(--account-primary);
+    background: color-mix(in srgb, var(--account-primary) 7%, var(--account-card));
+}
+
+.dictionary-format-option input {
+    width: auto;
+    min-height: 20px;
+    margin: 2px 0 0;
+}
+
+.dictionary-format-option span {
+    display: grid;
+    gap: 3px;
+}
+
+.dictionary-upload-fields {
+    display: grid;
+    gap: 14px;
+}
+
 .dictionary-install-form small {
     color: var(--account-muted);
     font-size: .78rem;
@@ -607,6 +660,12 @@ body.auth-page {
 
 .dictionary-install-form .auth-alert {
     margin: 0;
+}
+
+@media (max-width: 520px) {
+    .dictionary-format-chooser {
+        grid-template-columns: 1fr;
+    }
 }
 
 .account-details {

@@ -8,6 +8,8 @@
 .dictionary-entry { overflow-wrap: anywhere; }
 .dictionary-entry strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 15px; }
 .dictionary-entry p { margin: 0; }
+.dictionary-entry-image { display: block; max-width: 100%; max-height: 240px; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; object-fit: contain; }
+.dictionary-entry-audio { display: block; width: 100%; margin-top: 10px; }
 .dictionary-entry code { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }
 .dictionary-entry + .dictionary-entry { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .dictionary-source, .dictionary-attribution { display: block; color: var(--text-secondary); }

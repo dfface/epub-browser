@@ -108,6 +108,56 @@ class DictionaryApiTests(unittest.TestCase):
         self.assertEqual(deleted.status_code, 204)
         self.assertEqual(self.client.get("/api/admin/dictionaries").json()["dictionaries"], [])
 
+    def test_mdd_resource_upload_and_reader_media_are_acl_protected(self):
+        try:
+            from mdict_utils.base.writemdict import MDictWriter
+        except ImportError:
+            self.skipTest("mdict-utils is installed with the server dependency")
+        mdx = io.BytesIO()
+        MDictWriter(
+            {"run": "to move<img src=\"file://\\\\images\\\\run.png\">"},
+            title="Media", description="", compression_type=2, version="2.0",
+        ).write(mdx)
+        created = self.client.post(
+            "/api/admin/dictionaries", content=mdx.getvalue(),
+            headers={
+                "content-type": "application/octet-stream",
+                "x-epub-browser-dictionary-filename": quote("media.mdx"),
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        dictionary_id = created.json()["dictionary"]["id"]
+        mdd = io.BytesIO()
+        MDictWriter(
+            {"\\\\images\\\\run.png": b"\x89PNG\r\n\x1a\nimage-data"},
+            title="Media", description="", compression_type=2, version="2.0", is_mdd=True,
+        ).write(mdd)
+        attached = self.client.post(
+            "/api/admin/dictionaries/" + dictionary_id + "/resources", content=mdd.getvalue(),
+            headers={
+                "content-type": "application/octet-stream",
+                "x-epub-browser-dictionary-filename": quote("media.mdd"),
+            },
+        )
+        self.assertEqual(attached.status_code, 204)
+
+        lookup = self.client.post(
+            "/api/books/book/dictionary/lookup", json={"text": "run", "dictionary_id": dictionary_id},
+        )
+        media_id = lookup.json()["entries"][0]["media"][0]["id"]
+        media = self.client.get(
+            "/api/books/book/dictionaries/" + dictionary_id + "/resources/" + media_id,
+        )
+        self.assertEqual(media.status_code, 200)
+        self.assertEqual(media.headers["content-type"], "image/png")
+        self.assertEqual(media.headers["cache-control"], "private, no-store")
+        self.assertEqual(media.content, b"\x89PNG\r\n\x1a\nimage-data")
+        anonymous = TestClient(self.app)
+        self.addCleanup(anonymous.close)
+        self.assertEqual(anonymous.get(
+            "/api/books/book/dictionaries/" + dictionary_id + "/resources/" + media_id,
+        ).status_code, 401)
+
     @mock.patch("epub_browser.server.WikimediaEncyclopedia.lookup")
     def test_encyclopedia_is_separate_from_local_dictionary(self, lookup):
         lookup.return_value = EncyclopediaSummary(True, "Run", "motion", "An act of running", "https://en.wikipedia.org/wiki/Run")

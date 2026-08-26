@@ -2106,6 +2106,22 @@ window.location.assign(payload.redirect||'/');
             for record in dictionary_service.list_available()
         ]}, cache_control="private, no-store")
 
+    async def dictionary_media(request):
+        principal = require_principal(request)
+        book_id = request.path_params["book_id"]
+        if book_access_denied(principal, book_id):
+            return forbidden_book_response()
+        try:
+            media = dictionary_service.get_media(
+                request.path_params["dictionary_id"], request.path_params["media_id"],
+            )
+        except DictionaryServiceError:
+            return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
+        return Response(
+            media["content"], media_type=media["content_type"],
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+
     async def encyclopedia_lookup(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
@@ -2180,6 +2196,28 @@ window.location.assign(payload.redirect||'/');
         except KeyError:
             return response(error_payload("not_found", "Not Found"), 404)
         return response({"dictionary": dictionary_record_data(record)})
+
+    async def admin_dictionary_resources(request):
+        require_admin(request)
+        if not runtime_status.is_ready():
+            return response(error_payload("not_ready", "Server is not ready"), 503)
+        filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
+        content_length = request.headers.get("content-length")
+        try:
+            if content_length and int(content_length) > 512 * 1024 * 1024:
+                return response(error_payload("body_too_large", "Dictionary resource is too large"), 413)
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > 512 * 1024 * 1024:
+                    return response(error_payload("body_too_large", "Dictionary resource is too large"), 413)
+            dictionary_service.attach_mdict_resources(
+                request.path_params["dictionary_id"], bytes(body), filename,
+            )
+        except (DictionaryServiceError, ValueError) as error:
+            code = error.code if isinstance(error, DictionaryServiceError) else "invalid_mdict_resource"
+            return response(error_payload(code, "Dictionary resource installation failed"), 400)
+        return Response(status_code=204, headers={"Cache-Control": "no-cache"})
 
     async def ai_reading_request(request):
         principal = require_principal(request)
@@ -3024,6 +3062,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/ai/jobs', admin_ai_jobs, methods=['GET']),
         Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
         Route('/api/admin/dictionaries', admin_dictionaries, methods=['GET', 'POST']),
+        Route('/api/admin/dictionaries/{dictionary_id}/resources', admin_dictionary_resources, methods=['POST']),
         Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
         Route('/', library_index),
@@ -3039,6 +3078,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/books/{book_id}/dictionary/lookup', dictionary_lookup, methods=['POST']),
+        Route('/api/books/{book_id}/dictionaries/{dictionary_id}/resources/{media_id}', dictionary_media, methods=['GET']),
         Route('/api/books/{book_id}/encyclopedia/lookup', encyclopedia_lookup, methods=['POST']),
         Route('/api/ai/reading', ai_reading_request, methods=['POST']),
         Route('/api/ai/library', ai_reading_library, methods=['GET']),

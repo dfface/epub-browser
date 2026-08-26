@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import shutil
 import sqlite3
 import tarfile
@@ -12,7 +13,10 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .dictionary_formats import DictionaryFormatError, ImportedDictionary, normalize_lookup, parse_local_dictionary
+from .dictionary_formats import (
+    DictionaryFormatError, ImportedDictionary, normalize_lookup, parse_local_dictionary,
+    read_mdict_resources,
+)
 from .state import DictionaryRecord, StateStore
 
 
@@ -67,21 +71,30 @@ class DictionaryService:
                 connection.execute("PRAGMA journal_mode = OFF")
                 connection.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
                 connection.execute(
-                    "CREATE TABLE entries (id INTEGER PRIMARY KEY, headword TEXT NOT NULL, normalized_headword TEXT NOT NULL, definition_text TEXT NOT NULL)"
+                    "CREATE TABLE entries (id INTEGER PRIMARY KEY, headword TEXT NOT NULL, normalized_headword TEXT NOT NULL, definition_text TEXT NOT NULL, media_json TEXT NOT NULL DEFAULT '[]')"
                 )
                 connection.execute(
                     "CREATE TABLE forms (normalized_form TEXT NOT NULL, entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE, PRIMARY KEY(normalized_form, entry_id))"
                 )
                 connection.execute("CREATE INDEX idx_dictionary_entries ON entries(normalized_headword, id)")
                 connection.execute("CREATE INDEX idx_dictionary_forms ON forms(normalized_form, entry_id)")
+                connection.execute(
+                    "CREATE TABLE resources (id TEXT PRIMARY KEY, content_type TEXT NOT NULL, content BLOB NOT NULL)"
+                )
                 connection.executemany(
                     "INSERT INTO meta(key, value) VALUES (?, ?)",
                     (("format", dictionary.format), ("content_sha256", digest)),
                 )
                 for entry in dictionary.entries:
                     cursor = connection.execute(
-                        "INSERT INTO entries(headword, normalized_headword, definition_text) VALUES (?, ?, ?)",
-                        (entry.headword, entry.normalized_headword, entry.definition_text),
+                        "INSERT INTO entries(headword, normalized_headword, definition_text, media_json) VALUES (?, ?, ?, ?)",
+                        (
+                            entry.headword, entry.normalized_headword, entry.definition_text,
+                            json.dumps([
+                                {"kind": kind, "reference": reference}
+                                for kind, reference in entry.media_references
+                            ], separators=(",", ":")),
+                        ),
                     )
                     connection.executemany(
                         "INSERT OR IGNORE INTO forms(normalized_form, entry_id) VALUES (?, ?)",
@@ -221,6 +234,116 @@ class DictionaryService:
         finally:
             shutil.rmtree(staging, ignore_errors=True)
 
+    @staticmethod
+    def _media_content_type(kind: str, content: bytes) -> str | None:
+        if kind == "image":
+            if content.startswith(b"\x89PNG\r\n\x1a\n"):
+                return "image/png"
+            if content.startswith(b"\xff\xd8\xff"):
+                return "image/jpeg"
+            if content.startswith((b"GIF87a", b"GIF89a")):
+                return "image/gif"
+            if len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+                return "image/webp"
+        if kind == "audio":
+            if content.startswith(b"ID3") or content.startswith((b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")):
+                return "audio/mpeg"
+            if len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WAVE":
+                return "audio/wav"
+            if content.startswith(b"OggS"):
+                return "audio/ogg"
+        return None
+
+    def attach_mdict_resources(self, dictionary_id: str, upload_bytes: bytes, filename: str) -> None:
+        """Attach supported MDD media to a previously installed MDict atomically."""
+        if not isinstance(upload_bytes, bytes) or not upload_bytes or len(upload_bytes) > 512 * 1024 * 1024:
+            raise DictionaryServiceError("invalid_mdict_resource")
+        if Path(filename).suffix.casefold() != ".mdd":
+            raise DictionaryServiceError("invalid_mdict_resource")
+        dictionary = self.store.get_dictionary(dictionary_id)
+        if dictionary is None:
+            raise DictionaryServiceError("dictionary_unavailable")
+        path = self.dictionary_directory / (dictionary.id + ".sqlite")
+        if not path.is_file():
+            raise DictionaryServiceError("dictionary_unavailable")
+        try:
+            with sqlite3.connect(path) as connection:
+                format_row = connection.execute("SELECT value FROM meta WHERE key = 'format'").fetchone()
+                if format_row is None or format_row[0] != "mdict":
+                    raise DictionaryServiceError("invalid_mdict_resource")
+                rows = connection.execute("SELECT id, media_json FROM entries WHERE media_json != '[]'").fetchall()
+                entry_media = {
+                    row[0]: json.loads(row[1]) for row in rows
+                }
+        except (sqlite3.Error, json.JSONDecodeError) as error:
+            raise DictionaryServiceError("dictionary_unavailable") from error
+        references = {
+            item["reference"] for media in entry_media.values() for item in media
+            if isinstance(item, dict) and isinstance(item.get("reference"), str)
+        }
+        if not references:
+            raise DictionaryServiceError("mdict_resources_not_found")
+        staging = self.dictionary_directory / (".resource-" + str(uuid.uuid4()) + ".mdd")
+        try:
+            staging.write_bytes(upload_bytes)
+            resources = read_mdict_resources(staging, references)
+        except DictionaryFormatError as error:
+            raise DictionaryServiceError(error.code) from error
+        finally:
+            staging.unlink(missing_ok=True)
+
+        replacements: dict[str, tuple[str, str]] = {}
+        for entry in entry_media.values():
+            for item in entry:
+                if not isinstance(item, dict):
+                    continue
+                reference, kind = item.get("reference"), item.get("kind")
+                content = resources.get(reference)
+                content_type = self._media_content_type(kind, content) if isinstance(kind, str) and content else None
+                if not content_type:
+                    continue
+                resource_id = hashlib.sha256(content).hexdigest()
+                replacements[reference] = (resource_id, content_type)
+        if not replacements:
+            raise DictionaryServiceError("unsupported_mdict_resource")
+        try:
+            with sqlite3.connect(path) as connection:
+                for reference, (resource_id, content_type) in replacements.items():
+                    connection.execute(
+                        "INSERT OR IGNORE INTO resources(id, content_type, content) VALUES (?, ?, ?)",
+                        (resource_id, content_type, resources[reference]),
+                    )
+                for entry_id, media in entry_media.items():
+                    attached = [
+                        {"kind": item["kind"], "id": replacements[item["reference"]][0]}
+                        for item in media
+                        if isinstance(item, dict) and item.get("reference") in replacements
+                    ]
+                    connection.execute(
+                        "UPDATE entries SET media_json = ? WHERE id = ?",
+                        (json.dumps(attached, separators=(",", ":")), entry_id),
+                    )
+        except sqlite3.Error as error:
+            raise DictionaryServiceError("dictionary_unavailable") from error
+
+    def get_media(self, dictionary_id: str, media_id: str) -> dict:
+        if not isinstance(media_id, str) or len(media_id) != 64 or any(char not in "0123456789abcdef" for char in media_id):
+            raise DictionaryServiceError("dictionary_media_unavailable")
+        dictionary = self.store.get_dictionary(dictionary_id)
+        path = self.dictionary_directory / (dictionary_id + ".sqlite") if dictionary else None
+        if dictionary is None or not dictionary.enabled or not path.is_file():
+            raise DictionaryServiceError("dictionary_media_unavailable")
+        try:
+            with sqlite3.connect("file:" + path.as_posix() + "?mode=ro", uri=True) as connection:
+                row = connection.execute(
+                    "SELECT content_type, content FROM resources WHERE id = ?", (media_id,)
+                ).fetchone()
+        except sqlite3.Error as error:
+            raise DictionaryServiceError("dictionary_media_unavailable") from error
+        if row is None:
+            raise DictionaryServiceError("dictionary_media_unavailable")
+        return {"content_type": row[0], "content": bytes(row[1])}
+
     def list_available(self) -> tuple[DictionaryRecord, ...]:
         return self.store.list_enabled_dictionaries()
 
@@ -241,18 +364,24 @@ class DictionaryService:
             connection = sqlite3.connect("file:" + path.as_posix() + "?mode=ro", uri=True)
             connection.row_factory = sqlite3.Row
             try:
+                columns = {
+                    row[1] for row in connection.execute("PRAGMA table_info(entries)").fetchall()
+                }
+                media_column = "entries.media_json" if "media_json" in columns else "'[]' AS media_json"
                 rows = connection.execute(
-                    """
-                    SELECT entries.headword, entries.definition_text FROM forms
+                    """SELECT entries.headword, entries.definition_text, %s FROM forms
                     JOIN entries ON entries.id = forms.entry_id
                     WHERE forms.normalized_form = ? ORDER BY entries.id LIMIT 3
-                    """, (query,)
+                    """ % media_column, (query,)
                 ).fetchall()
             finally:
                 connection.close()
         except sqlite3.Error as error:
             raise DictionaryServiceError("dictionary_unavailable") from error
-        entries = tuple({"headword": row["headword"], "definition": row["definition_text"]} for row in rows)
+        entries = tuple({
+            "headword": row["headword"], "definition": row["definition_text"],
+            "media": [item for item in json.loads(row["media_json"]) if isinstance(item, dict) and item.get("id")],
+        } for row in rows)
         return DictionaryLookup(bool(entries), dictionary, query, entries)
 
     def set_enabled(self, dictionary_id: str, enabled: bool) -> DictionaryRecord:
