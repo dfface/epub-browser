@@ -10,6 +10,7 @@ import posixpath
 import re
 import secrets
 import sqlite3
+import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -578,6 +579,7 @@ def create_app(
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     release_lookup = release_lookup or ReleaseLookup()
     ai_reading = AIReadingService(store, base_directory)
+    heartbeat_attempts = {}
     store.requeue_running_ai_jobs()
     store.requeue_running_ai_followups()
     store.requeue_running_ai_book_chat_turns()
@@ -588,6 +590,18 @@ def create_app(
             status_code=status,
             headers={'Cache-Control': cache_control},
         )
+
+    def heartbeat_rate_limited(user_id, client_id):
+        """Permit the normal 15-second cadence and a few transient retries."""
+        now = time.monotonic()
+        key = (user_id, client_id)
+        attempts = [value for value in heartbeat_attempts.get(key, ()) if now - value < 60]
+        if len(attempts) >= 12:
+            heartbeat_attempts[key] = attempts
+            return True
+        attempts.append(now)
+        heartbeat_attempts[key] = attempts
+        return False
 
     def apply_reader_security_headers(target_response, file_path=None, markup=None):
         if markup is None:
@@ -2371,7 +2385,8 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         return response(
             library_metadata(
-                store.visible_books(principal), base_directory, state_store=store
+                store.visible_books(principal), base_directory, state_store=store,
+                owner_user_id=principal.user_id,
             )
         )
 
@@ -2897,8 +2912,11 @@ window.location.assign(payload.redirect||'/');
     def authorized_chapter_snapshot(book_id, chapter_index):
         """Return cache-derived labels only after the caller has book access."""
         renderer = ServerPageRenderer(base_directory, book_id)
-        renderer.render_chapter(chapter_index)
         metadata = renderer._read_json(renderer.content_dir / 'metadata.json')
+        chapters = metadata.get('chapters')
+        if not isinstance(chapters, list) or chapter_index >= len(chapters):
+            raise ValueError('chapter index is outside the book')
+        renderer.render_chapter(chapter_index)
         chapter = renderer._read_json(
             renderer.content_dir / f'chapter_{chapter_index}.json'
         )
@@ -2973,9 +2991,19 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_reading_session', 'Invalid reading session'),
                 400,
             )
+        if heartbeat_rate_limited(principal.user_id, client_id):
+            return response(
+                error_payload('reading_session_rate_limited', 'Reading session rate limited'),
+                429,
+            )
         try:
             book_title, chapter_label = authorized_chapter_snapshot(
                 book_id, chapter_index
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_reading_session', 'Invalid reading session'),
+                400,
             )
         except ServerPageError:
             return response(
@@ -3033,9 +3061,15 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_reading_insights', 'Invalid reading insights'),
                 400,
             )
-        insights = store.reading_insights(
-            principal.user_id, period, anchor_date, timezone_name
-        )
+        try:
+            insights = store.reading_insights(
+                principal.user_id, period, anchor_date, timezone_name
+            )
+        except (OverflowError, ValueError):
+            return response(
+                error_payload('invalid_reading_insights', 'Invalid reading insights'),
+                400,
+            )
         return response({'insights': insights})
 
     routes = [

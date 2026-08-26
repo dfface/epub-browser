@@ -226,6 +226,8 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
     title: '<img src=x onerror=alert(1)>',
     authors: ['Ada <script>alert(1)</script>', 'Bob'],
     tags: ['<svg onload=alert(1)>'],
+    rating: 4,
+    review_text: '<script>must never render</script>',
   };
   const bookGrid = element('div');
   bookGrid.className = 'book-grid';
@@ -298,7 +300,8 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   const content = link.children[1];
   const title = content.children[0];
   const author = content.children[1];
-  const tag = content.children[2].children[0];
+  const rating = content.children[2];
+  const tag = content.children[3].children[0];
 
   assert.equal(link.attributes.id, book.hash);
   assert.equal(link.attributes.href, book.url);
@@ -307,8 +310,11 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.equal(cover.attributes.decoding, 'async');
   assert.equal(title.textContent, book.title);
   assert.equal(author.textContent, book.authors.join(' & '));
+  assert.equal(rating.className, 'book-private-rating');
+  assert.equal(rating.children[0].textContent, '★★★★');
+  assert.equal(rating.getAttribute('aria-label'), 'bookReviews.ratingValue');
   assert.equal(tag.textContent, book.tags[0]);
-  assert.equal(content.children.length, 3);
+  assert.equal(content.children.length, 4);
   assert.match(requestedUrl, /^\/reader\/book-metadata\.json\?/);
 });
 

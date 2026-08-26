@@ -234,6 +234,17 @@ function initScript() {
         content.appendChild(title);
         content.appendChild(author);
 
+        if (Number.isInteger(book.rating) && book.rating >= 1 && book.rating <= 5) {
+            var rating = document.createElement('span');
+            var stars = document.createElement('span');
+            rating.className = 'book-private-rating';
+            rating.setAttribute('aria-label', t('bookReviews.ratingValue', { rating: book.rating }));
+            stars.setAttribute('aria-hidden', 'true');
+            stars.textContent = '★★★★★'.slice(0, book.rating);
+            rating.appendChild(stars);
+            content.appendChild(rating);
+        }
+
         if (book.tags && book.tags.length > 0) {
             var tags = document.createElement('div');
             tags.className = 'book-tags';

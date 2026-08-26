@@ -139,6 +139,7 @@ test('localizes private review and reading-insight copy in all five supported lo
     'readingInsights.duration.hour',
     'readingSessions.pending',
     'readingSessions.error',
+    'readingSessions.discarded',
   ];
   ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
     keys.forEach(key => assert.ok(dictionaries[locale][key], `${locale}:${key}`));

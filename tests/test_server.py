@@ -3873,6 +3873,21 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/book-reviews/book").json(), {"review": None})
         self.assertEqual(self.bob_client.get("/api/book-reviews/restricted").status_code, 403)
 
+    def test_library_metadata_projects_only_the_current_users_rating(self):
+        self.client.put(
+            "/api/book-reviews/book",
+            json={"rating": 4, "review_text": "A private note"},
+        )
+        self.bob_client.put(
+            "/api/book-reviews/book",
+            json={"rating": 2, "review_text": "Different private note"},
+        )
+        alice = {item["hash"]: item for item in self.client.get("/api/library-metadata").json()}
+        bob = {item["hash"]: item for item in self.bob_client.get("/api/library-metadata").json()}
+        self.assertEqual(alice["book"]["rating"], 4)
+        self.assertEqual(bob["book"]["rating"], 2)
+        self.assertNotIn("review_text", alice["book"])
+
     def test_reading_heartbeat_requires_csrf_is_idempotent_and_uses_cached_titles(self):
         payload = {
             "client_id": "tab-a",
@@ -3897,6 +3912,17 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(first.json()["session"]["book_title"], "Book")
         self.assertEqual(first.json()["session"]["chapter_label"], "Opening chapter")
         self.assertEqual(again.json()["session"]["active_seconds"], 15)
+
+    def test_reading_heartbeat_rate_limits_a_single_client_before_recording_more_work(self):
+        responses = []
+        for sequence in range(1, 14):
+            responses.append(self.client.post(
+                "/api/reading-sessions/book/heartbeat",
+                json={"client_id": "rate-tab", "client_sequence": sequence, "chapter_index": 0, "active_seconds": 1},
+            ))
+        self.assertTrue(all(result.status_code == 200 for result in responses[:12]))
+        self.assertEqual(responses[12].status_code, 429)
+        self.assertEqual(responses[12].json()["code"], "reading_session_rate_limited")
 
     def test_review_and_session_routes_do_not_expose_restricted_books(self):
         requests = (
@@ -3952,6 +3978,13 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(
             self.client.post(
                 "/api/reading-sessions/book/heartbeat",
+                json={"client_id": "tab-invalid", "client_sequence": 1, "chapter_index": 99, "active_seconds": 1},
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/reading-sessions/book/heartbeat",
                 content=b"{}",
                 headers={"Content-Type": "text/plain"},
             ).json()["code"],
@@ -3961,6 +3994,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
             "period=year&anchor=2026-08-15&timezone=UTC",
             "period=week&anchor=nope&timezone=UTC",
             "period=week&anchor=2026-08-15&timezone=Bad/Zone",
+            "period=month&anchor=9999-12-31&timezone=UTC",
         ):
             with self.subTest(query=query):
                 self.assertEqual(

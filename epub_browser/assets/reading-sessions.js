@@ -10,6 +10,7 @@
   var COORDINATION_KEY = STORAGE_PREFIX + 'active-tab';
   var MAX_PENDING = 4;
   var MAX_SECONDS = 20;
+  var PENDING_TTL_MS = 5 * 60 * 1000;
 
   function randomClientId() {
     return 'reading-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
@@ -53,7 +54,8 @@
   function validPayload(value) {
     return value && Number.isInteger(value.chapter_index) && value.chapter_index >= 0 &&
       Number.isInteger(value.active_seconds) && value.active_seconds >= 1 && value.active_seconds <= MAX_SECONDS &&
-      Number.isInteger(value.client_sequence) && value.client_sequence >= 1;
+      Number.isInteger(value.client_sequence) && value.client_sequence >= 1 &&
+      Number.isFinite(value.queued_at) && value.queued_at >= 0;
   }
 
   function openChannel(channel) {
@@ -112,7 +114,12 @@
       try {
         var saved = JSON.parse(storage.getItem(queueKey) || '[]');
         if (!Array.isArray(saved)) return;
-        state.pending = saved.filter(validPayload).slice(0, MAX_PENDING);
+        state.pending = saved.map(function(payload) {
+          if (payload && !Number.isFinite(payload.queued_at)) payload.queued_at = now();
+          return payload;
+        }).filter(validPayload).filter(function(payload) {
+          return now() - payload.queued_at <= PENDING_TTL_MS;
+        }).slice(0, MAX_PENDING);
         state.pending.forEach(function(payload) {
           state.nextSequence = Math.max(state.nextSequence, payload.client_sequence + 1);
         });
@@ -168,6 +175,7 @@
         nextSequence: state.nextSequence,
         chapterIndex: bucket.chapter_index
       }, seconds);
+      payload.queued_at = now();
       state.nextSequence += 1;
       saveNextSequence();
       bucket.seconds -= seconds;
@@ -195,7 +203,20 @@
       }
     }
 
-    function settle(payload, successful) {
+    function retryable(error) {
+      var status = error && error.status;
+      return !Number.isInteger(status) || status === 429 || status >= 500;
+    }
+
+    function discardPending(payload) {
+      removePending(payload);
+      state.consecutiveFailures = 0;
+      state.retryAnnounced = false;
+      state.failureAnnounced = false;
+      if (typeof options.onStatus === 'function') options.onStatus('discarded');
+    }
+
+    function settle(payload, successful, error) {
       state.inFlight = null;
       state.inFlightPayload = null;
       if (successful) {
@@ -205,12 +226,15 @@
           state.retryAnnounced = false;
           state.failureAnnounced = false;
         }
-      } else retryLater(payload);
+      } else if (retryable(error)) retryLater(payload);
+      else discardPending(payload);
       if (state.requestedFlush && !state.destroyed) {
         var keepalive = state.requestedKeepalive;
         state.requestedFlush = false;
         state.requestedKeepalive = false;
         flush(keepalive);
+      } else if (!successful && !retryable(error) && state.pending.length && !state.destroyed) {
+        flush(false);
       }
     }
 
@@ -231,7 +255,7 @@
       try {
         result = (options.send || function() {})(asSendPayload(payload), !!keepalive);
       } catch (error) {
-        retryLater(payload);
+        settle(payload, false, error);
         return Promise.resolve(null);
       }
       if (!result || typeof result.then !== 'function') {
@@ -242,8 +266,8 @@
       state.inFlight = Promise.resolve(result).then(function(response) {
         settle(payload, true);
         return response;
-      }, function() {
-        settle(payload, false);
+      }, function(error) {
+        settle(payload, false, error);
         return null;
       });
       return state.inFlight;
@@ -394,7 +418,13 @@
 
     function bindBrowserEvents() {
       addListener(eventTarget, 'scroll', recordInteraction);
-      addListener(eventTarget, 'keydown', recordInteraction);
+      addListener(eventTarget, 'keydown', function(event) {
+        var key = event && event.key;
+        var target = event && event.target;
+        var tag = target && target.tagName && target.tagName.toLowerCase();
+        if (target && (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select')) return;
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar'].indexOf(key) >= 0) recordInteraction();
+      });
       addListener(eventTarget, 'epub:reader-page-turn', recordInteraction);
       addListener(eventTarget, 'focus', function() { setFocused(true); });
       addListener(eventTarget, 'blur', function() { setFocused(false); });
@@ -402,9 +432,13 @@
       addListener(eventTarget, 'epub-browser:chapter-change', function(event) {
         var detail = event && event.detail || {};
         setChapter(detail.chapterIndex === undefined ? detail.index : detail.chapterIndex, detail.chapterLabel || detail.title);
+        recordInteraction();
       });
       addListener(documentTarget, 'visibilitychange', function() {
-        setVisible(!documentTarget.hidden);
+        if (documentTarget.hidden) {
+          flush(true);
+          setVisible(false);
+        } else setVisible(true);
       });
       addListener(eventTarget, 'storage', function(event) {
         if (event && event.key === COORDINATION_KEY) refreshLeaseLeadership();
@@ -469,11 +503,11 @@
     var clientId = options.clientId || storedClientId(storage);
     function notifyStatus(status) {
       var i18n = browser.EpubBrowserI18n;
-      var key = status === 'error' ? 'readingSessions.error' : 'readingSessions.pending';
+      var key = status === 'error' ? 'readingSessions.error' : status === 'discarded' ? 'readingSessions.discarded' : 'readingSessions.pending';
       var message = i18n && typeof i18n.t === 'function' ? i18n.t(key) : key;
       var notification = browser.EpubBrowserNotification;
       if (notification && typeof notification.show === 'function') {
-        notification.show(message, status === 'error' ? 'error' : 'warning');
+        notification.show(message, status === 'error' || status === 'discarded' ? 'error' : 'warning');
       }
     }
     var tracker = createTracker({
@@ -504,7 +538,11 @@
         };
         if (keepalive) request.keepalive = true;
         return Promise.resolve(browser.EpubBrowserAuth.fetch(endpoint, request)).then(function(response) {
-          if (!response || !response.ok) throw new Error('reading_session_heartbeat_failed');
+          if (!response || !response.ok) {
+            var error = new Error('reading_session_heartbeat_failed');
+            error.status = response && response.status;
+            throw error;
+          }
           return response;
         });
       }

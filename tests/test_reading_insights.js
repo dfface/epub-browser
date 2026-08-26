@@ -26,7 +26,9 @@ function clientFor(payload, translations) {
         return {
           resolvedOptions() { return { timeZone: 'UTC' }; },
           format(value) {
-            return options.hour ? '08:18' : new Date(value).toISOString().slice(0, 10);
+            if (options.hour) return '08:18';
+            if (options.weekday) return 'Sat, Aug 15, 2026';
+            return new Date(value).toISOString().slice(0, 10);
           },
           formatRange(start, end) {
             return new Date(start).toISOString().slice(0, 10) + '–' + new Date(end).toISOString().slice(0, 10);
@@ -44,6 +46,7 @@ function clientFor(payload, translations) {
   };
   const page = Insights.create(browser);
   page.requests = requests;
+  page.root = root;
   return page;
 }
 
@@ -110,4 +113,11 @@ test('range label reflects the same day, week, and month bounds as the API', asy
   assert.equal(page.rangeLabel.textContent, '2026-08-10–2026-08-16');
   await page.setPeriod('month', '2026-02-15');
   assert.equal(page.rangeLabel.textContent, '2026-02-01–2026-02-28');
+});
+
+test('day labels use the locale formatter rather than exposing raw ISO dates', async () => {
+  const page = clientFor({ total_active_seconds: 0, days: [{ date: '2026-08-15', active_seconds: 0 }], sessions: [] });
+  await page.mount();
+  const dayList = page.root.children[5].children[1];
+  assert.equal(dayList.children[0].textContent, 'Sat, Aug 15, 2026 0 sec');
 });

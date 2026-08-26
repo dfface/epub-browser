@@ -5075,6 +5075,20 @@ class StateStore:
                 (user_id, book_id),
             )
 
+    def book_review_ratings(self, user_id: str, book_ids: Sequence[str]) -> dict[str, int]:
+        """Return one owner's ratings in one query; review text never leaves this projection."""
+        if not book_ids:
+            return {}
+        unique_ids = tuple(dict.fromkeys(book_ids))
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                "SELECT book_id, rating FROM book_reviews WHERE user_id = ? AND book_id IN ("
+                + ", ".join("?" for _ in unique_ids) + ")",
+                (user_id, *unique_ids),
+            ).fetchall()
+        return {row["book_id"]: row["rating"] for row in rows}
+
     @staticmethod
     def _reading_session_data(row) -> dict:
         return {
@@ -5260,6 +5274,7 @@ class StateStore:
             ).fetchall()
 
         clipped_sessions = []
+        session_segments = []
         day_intervals = {}
         book_intervals = {}
         book_titles = {}
@@ -5304,6 +5319,15 @@ class StateStore:
                     "ended_at": day_end,
                     "active_seconds": active_seconds_for_day,
                 })
+                session_segments.append({
+                    "id": row["id"],
+                    "started_at": self._utc_timestamp(day_start),
+                    "active_seconds": active_seconds_for_day,
+                    "book_id": row["book_id"],
+                    "book_title": row["book_title_snapshot"],
+                    "chapter_index": row["chapter_index"],
+                    "chapter_label": row["chapter_label_snapshot"],
+                })
 
         book_totals = {
             book_id: self._merged_active_seconds(intervals)
@@ -5320,29 +5344,25 @@ class StateStore:
                 "title": book_titles[top_book_id],
                 "active_seconds": book_totals[top_book_id],
             }
-        sessions = []
-        for row, interval in zip(rows, clipped_sessions):
-            sessions.append({
-                "id": row["id"],
-                "started_at": self._utc_timestamp(interval["started_at"]),
-                "active_seconds": interval["active_seconds"],
-                "book_id": row["book_id"],
-                "book_title": row["book_title_snapshot"],
-                "chapter_index": row["chapter_index"],
-                "chapter_label": row["chapter_label_snapshot"],
+        first_day = datetime.fromtimestamp(range_start, zone).date()
+        last_day = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        days = []
+        current_day = first_day
+        while current_day <= last_day:
+            intervals = day_intervals.get(current_day, ())
+            days.append({
+                "date": current_day.isoformat(),
+                "active_seconds": self._merged_active_seconds(intervals),
             })
+            current_day += timedelta(days=1)
         return {
             "period": period,
             "anchor_date": anchor_date.isoformat(),
             "timezone": timezone_name,
             "total_active_seconds": self._merged_active_seconds(clipped_sessions),
             "top_book": top_book,
-            "days": [
-                {"date": day.isoformat(), "active_seconds": self._merged_active_seconds(intervals)}
-                for day, intervals in sorted(day_intervals.items())
-                if self._merged_active_seconds(intervals) > 0
-            ],
-            "sessions": sessions,
+            "days": days,
+            "sessions": sorted(session_segments, key=lambda item: (item["started_at"], item["id"])),
         }
 
     def get_reading_progress(self, user_id: str, book_hash: str):

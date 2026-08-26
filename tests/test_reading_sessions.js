@@ -276,6 +276,45 @@ test('pagehide sends the current bounded increment with keepalive', () => {
   assert.deepEqual(sent, [{ item: { chapter_index: 4, active_seconds: 12, client_sequence: 1 }, keepalive: true }]);
 });
 
+test('visibility loss performs a final keepalive flush', () => {
+  let clock = 0;
+  const target = createEventTarget();
+  const documentTarget = Object.assign(createEventTarget(), { hidden: false });
+  const sent = [];
+  const tracker = Sessions.createTracker({ now: () => clock, eventTarget: target, document: documentTarget, send: (item, keepalive) => sent.push({ item, keepalive }) });
+  tracker.setChapter(4, 'Five'); tracker.recordInteraction(); clock = 12000;
+  documentTarget.hidden = true; documentTarget.dispatch('visibilitychange');
+  assert.deepEqual(sent, [{ item: { chapter_index: 4, active_seconds: 12, client_sequence: 1 }, keepalive: true }]);
+  tracker.destroy();
+});
+
+test('only reader navigation keys count and editable targets are ignored', () => {
+  let clock = 0;
+  const target = createEventTarget();
+  const sent = [];
+  const tracker = Sessions.createTracker({ now: () => clock, eventTarget: target, send: item => sent.push(item) });
+  tracker.setChapter(1, 'One');
+  target.dispatch('keydown', { key: 'a', target: { tagName: 'DIV' } }); clock = 15000; tracker.flush();
+  assert.equal(sent.length, 0);
+  target.dispatch('keydown', { key: 'ArrowRight', target: { tagName: 'INPUT' } }); clock = 30000; tracker.flush();
+  assert.equal(sent.length, 0);
+  target.dispatch('keydown', { key: 'ArrowRight', target: { tagName: 'DIV' } }); clock = 45000; tracker.flush();
+  assert.equal(sent[0].active_seconds, 15);
+  tracker.destroy();
+});
+
+test('chapter navigation refreshes active reader state', () => {
+  let clock = 0;
+  const target = createEventTarget();
+  const sent = [];
+  const tracker = Sessions.createTracker({ now: () => clock, eventTarget: target, send: item => sent.push(item) });
+  target.dispatch('epub-browser:chapter-change', { detail: { chapterIndex: 3, title: 'Four' } });
+  clock = 15000; tracker.flush();
+  assert.equal(sent[0].chapter_index, 3);
+  assert.equal(sent[0].active_seconds, 15);
+  tracker.destroy();
+});
+
 test('heartbeat payloads cap a long active interval at twenty seconds', () => {
   let clock = 0;
   const sent = [];
@@ -403,6 +442,25 @@ test('announces queued persistence once and escalates a sustained retry failure 
   await tracker.flush();
   await tracker.flush();
   assert.deepEqual(statuses, ['pending', 'error']);
+  tracker.destroy();
+});
+
+test('drops expired and permanent failures so a queue head cannot block later time', async () => {
+  let clock = 0;
+  const statuses = [];
+  const storage = createStorage();
+  storage.setItem('epub-reading-sessions:expired', JSON.stringify([{ chapter_index: 1, active_seconds: 15, client_sequence: 1, queued_at: 0 }]));
+  const expired = Sessions.createTracker({ now: () => 300001, sessionStorage: storage, clientId: 'expired', send() { throw new Error('must not send'); } });
+  assert.equal(expired.pendingCount(), 0);
+  expired.destroy();
+  const sent = [];
+  const tracker = Sessions.createTracker({ now: () => clock, onStatus: status => statuses.push(status), send: item => {
+    sent.push(item); const error = new Error('bad request'); error.status = 400; return Promise.reject(error);
+  } });
+  tracker.setChapter(1, 'One'); tracker.recordInteraction(); clock = 15000;
+  await tracker.flush();
+  assert.equal(tracker.pendingCount(), 0);
+  assert.deepEqual(statuses, ['discarded']);
   tracker.destroy();
 });
 

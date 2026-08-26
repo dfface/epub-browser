@@ -75,6 +75,16 @@
       }
     }
 
+    function formatDay(value) {
+      try {
+        return new intl().DateTimeFormat(locale(), {
+          weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
+        }).format(new Date(value + 'T12:00:00Z'));
+      } catch (error) {
+        return value;
+      }
+    }
+
     function sessionDate(value) {
       var date = new Date(value);
       try {
@@ -252,12 +262,15 @@
         var button = append(state.view.dayList, 'button', 'reading-insights-day-button');
         button.type = 'button';
         button.setAttribute('aria-pressed', day.date === state.selectedDay ? 'true' : 'false');
-        button.setAttribute('aria-label', day.date + ': ' + formatDuration(day.active_seconds));
-        button.textContent = day.date + ' ' + formatDuration(day.active_seconds);
+        var dayLabel = formatDay(day.date);
+        button.setAttribute('aria-label', dayLabel + ': ' + formatDuration(day.active_seconds));
+        button.textContent = dayLabel + ' ' + formatDuration(day.active_seconds);
         button.addEventListener('click', function() { selectDay(day.date); });
         return button;
       });
-      state.view.selectedDay.textContent = state.selectedDay || translate(target, 'readingInsights.selectedDay', 'Selected day');
+      state.view.selectedDay.textContent = state.selectedDay
+        ? formatDay(state.selectedDay)
+        : translate(target, 'readingInsights.selectedDay', 'Selected day');
       renderSessions();
       setLive(days.length ? translate(target, 'readingInsights.loaded', 'Reading insights updated.') : translate(target, 'readingInsights.empty', 'No active reading recorded yet.'));
     }

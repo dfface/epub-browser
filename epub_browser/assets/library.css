@@ -427,6 +427,14 @@ body {
     text-overflow: ellipsis;
 }
 
+.book-private-rating {
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.5;
+}
+
 .book-tags {
     position: absolute;
     bottom: 0;

@@ -7,6 +7,7 @@ import unittest
 from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
@@ -164,6 +165,14 @@ class StateStoreTests(unittest.TestCase):
         )
         result = self.store.reading_insights(self.owner.user_id, "week", date(2026, 8, 16), "Asia/Shanghai")
         self.assertEqual(sum(day["active_seconds"] for day in result["days"]), 20)
+        self.assertEqual(len(result["days"]), 7)
+        self.assertIn(0, [day["active_seconds"] for day in result["days"]])
+        zone = ZoneInfo("Asia/Shanghai")
+        by_date = {
+            datetime.fromisoformat(item["started_at"].replace("Z", "+00:00")).astimezone(zone).date().isoformat(): item
+            for item in result["sessions"]
+        }
+        self.assertEqual(by_date["2026-08-15"]["active_seconds"] + by_date["2026-08-16"]["active_seconds"], 20)
 
     def test_heartbeat_rejects_invalid_owner_book_sequence_and_increment(self):
         self._reading_book()
