@@ -92,6 +92,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
     def test_dictionary_import_uses_custom_file_controls_and_a_live_progress_surface(self):
         server_html = self._server_html()
+        account_css = Path('epub_browser/assets/account.css').read_text(encoding='utf-8')
 
         self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdx)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
         self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdd)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
@@ -106,6 +107,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('500,000 entries', server_html)
         self.assertNotIn('16 KB', server_html)
         self.assertNotIn('1–4 requests', server_html)
+        self.assertIn('.dictionary-format-option input {', account_css)
+        self.assertIn('appearance: none;', account_css)
+        self.assertIn('.dictionary-format-option input:checked {', account_css)
 
     def test_server_admin_ai_jobs_surface_is_semantic_and_localized(self):
         server_html = self._server_html()
