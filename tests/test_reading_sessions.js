@@ -387,6 +387,50 @@ test('offline payload storage retains four unacknowledged heartbeats and retries
   assert.equal(sent[1].client_sequence, 1);
 });
 
+test('announces queued persistence once and escalates a sustained retry failure once', async () => {
+  let clock = 0;
+  const statuses = [];
+  const tracker = Sessions.createTracker({
+    now: () => clock,
+    onStatus: status => statuses.push(status),
+    send: () => Promise.reject(new Error('offline')),
+  });
+  tracker.setChapter(1, 'One');
+  tracker.recordInteraction();
+  clock = 15000;
+  await tracker.flush();
+  await tracker.flush();
+  await tracker.flush();
+  await tracker.flush();
+  assert.deepEqual(statuses, ['pending', 'error']);
+  tracker.destroy();
+});
+
+test('browser tracker sends localized retry feedback through the shared notification UI', async () => {
+  const content = {
+    getAttribute(name) {
+      return { 'data-book-hash': 'book', 'data-chapter-index': '0', 'data-chapter-title': 'One' }[name] || null;
+    },
+  };
+  const target = createEventTarget();
+  const notifications = [];
+  let clock = 0;
+  const root = Object.assign(target, {
+    EpubBrowserMode: 'server',
+    EpubBrowserI18n: { t(key) { return key === 'readingSessions.pending' ? '将在联网后保存阅读时长。' : key; } },
+    EpubBrowserNotification: { show(message, type) { notifications.push({ message, type }); } },
+    EpubBrowserAuth: { fetch() { return Promise.reject(new Error('offline')); } },
+    sessionStorage: createStorage(),
+    document: { getElementById: () => content, hasFocus: () => true },
+  });
+  const tracker = Sessions.start({ root, eventTarget: target, now: () => clock, schedule() {} });
+  tracker.recordInteraction();
+  clock = 15000;
+  await tracker.flush();
+  assert.deepEqual(notifications, [{ message: '将在联网后保存阅读时长。', type: 'warning' }]);
+  tracker.destroy();
+});
+
 test('destroy clears heartbeat timers, browser listeners, and the coordination channel', () => {
   const channel = createFakeChannel();
   const target = createEventTarget();

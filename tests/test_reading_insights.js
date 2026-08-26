@@ -15,12 +15,12 @@ function element(tagName) {
   };
 }
 
-function clientFor(payload) {
+function clientFor(payload, translations) {
   const root = element('main');
   const requests = [];
   const browser = {
     document: { createElement: element, querySelector: () => root },
-    EpubBrowserI18n: { t(key) { return key; }, getLocale() { return 'en'; } },
+    EpubBrowserI18n: { t(key) { return translations && translations[key] || key; }, getLocale() { return translations && translations.locale || 'en'; } },
     Intl: {
       DateTimeFormat(_locale, options = {}) {
         return {
@@ -57,6 +57,22 @@ test('selecting a day fetches and safely renders chronological sessions', async 
   await page.mount();
   await page.selectDay('2026-08-15');
   assert.equal(page.sessionRows[0].textContent, '08:18 Book Chapter 6 31 min');
+});
+
+test('duration fallback uses the active locale unit copy when DurationFormat is unavailable', async () => {
+  const page = clientFor({
+    total_active_seconds: 3661,
+    top_book: { title: '书', active_seconds: 3661 },
+    days: [{ date: '2026-08-15', active_seconds: 3661 }],
+    sessions: [{ started_at: '2026-08-15T08:18:00+00:00', book_title: '书', chapter_label: '第一章', active_seconds: 3661 }],
+  }, {
+    locale: 'zh-CN',
+    'readingInsights.duration.second': '秒',
+    'readingInsights.duration.minute': '分钟',
+    'readingInsights.duration.hour': '小时',
+  });
+  await page.mount();
+  assert.equal(page.sessionRows[0].textContent, '08:18 书 第一章 1 小时 1 分钟');
 });
 
 test('activating a period updates its pressed state before requesting the new range', async () => {

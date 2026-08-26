@@ -4544,8 +4544,11 @@
       'readingInsights.session.book': 'Book',
       'readingInsights.session.chapter': 'Chapter',
       'readingInsights.session.duration': 'Duration',
+      'readingInsights.duration.second': 'sec',
+      'readingInsights.duration.minute': 'min',
+      'readingInsights.duration.hour': 'hr',
       'readingSessions.pending': 'Reading time will be saved when you are back online.',
-      'readingSessions.error': 'Unable to save reading time. Please try again.'
+      'readingSessions.error': 'Unable to save reading time. Retrying automatically.'
     },
     'zh-CN': {
       'account.loading': '正在加载账户设置…',
@@ -4622,8 +4625,11 @@
       'readingInsights.session.book': '书籍',
       'readingInsights.session.chapter': '章节',
       'readingInsights.session.duration': '时长',
+      'readingInsights.duration.second': '秒',
+      'readingInsights.duration.minute': '分钟',
+      'readingInsights.duration.hour': '小时',
       'readingSessions.pending': '恢复网络后会保存阅读时长。',
-      'readingSessions.error': '无法保存阅读时长，请重试。'
+      'readingSessions.error': '无法保存阅读时长，正在自动重试。'
     },
     'zh-TW': {
       'account.loading': '正在載入帳戶設定…',
@@ -4700,8 +4706,11 @@
       'readingInsights.session.book': '書籍',
       'readingInsights.session.chapter': '章節',
       'readingInsights.session.duration': '時長',
+      'readingInsights.duration.second': '秒',
+      'readingInsights.duration.minute': '分鐘',
+      'readingInsights.duration.hour': '小時',
       'readingSessions.pending': '恢復連線後會儲存閱讀時長。',
-      'readingSessions.error': '無法儲存閱讀時長，請再試一次。'
+      'readingSessions.error': '無法儲存閱讀時長，正在自動重試。'
     },
     ko: {
       'account.loading': '계정 설정을 불러오는 중…',
@@ -4778,8 +4787,11 @@
       'readingInsights.session.book': '책',
       'readingInsights.session.chapter': '장',
       'readingInsights.session.duration': '시간',
+      'readingInsights.duration.second': '초',
+      'readingInsights.duration.minute': '분',
+      'readingInsights.duration.hour': '시간',
       'readingSessions.pending': '온라인 상태가 되면 독서 시간을 저장합니다.',
-      'readingSessions.error': '독서 시간을 저장할 수 없습니다. 다시 시도하세요.'
+      'readingSessions.error': '독서 시간을 저장할 수 없습니다. 자동으로 다시 시도합니다.'
     },
     ja: {
       'account.loading': 'アカウント設定を読み込み中…',
@@ -4856,8 +4868,11 @@
       'readingInsights.session.book': '本',
       'readingInsights.session.chapter': '章',
       'readingInsights.session.duration': '時間',
+      'readingInsights.duration.second': '秒',
+      'readingInsights.duration.minute': '分',
+      'readingInsights.duration.hour': '時間',
       'readingSessions.pending': 'オンラインに戻ると読書時間を保存します。',
-      'readingSessions.error': '読書時間を保存できません。もう一度お試しください。'
+      'readingSessions.error': '読書時間を保存できません。自動的に再試行します。'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

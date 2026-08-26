@@ -57,10 +57,12 @@
           });
         } catch (error) {}
       }
-      if (value < 60) return Math.floor(value) + ' sec';
+      if (value < 60) return Math.floor(value) + ' ' + translate(target, 'readingInsights.duration.second', 'sec');
       var hours = Math.floor(value / 3600);
       var minutes = Math.floor(value % 3600 / 60);
-      return hours ? hours + ' hr' + (minutes ? ' ' + minutes + ' min' : '') : minutes + ' min';
+      var hour = translate(target, 'readingInsights.duration.hour', 'hr');
+      var minute = translate(target, 'readingInsights.duration.minute', 'min');
+      return hours ? hours + ' ' + hour + (minutes ? ' ' + minutes + ' ' + minute : '') : minutes + ' ' + minute;
     }
 
     function formatTime(value) {

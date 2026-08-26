@@ -134,6 +134,9 @@ test('localizes private review and reading-insight copy in all five supported lo
     'readingInsights.session.book',
     'readingInsights.session.chapter',
     'readingInsights.session.duration',
+    'readingInsights.duration.second',
+    'readingInsights.duration.minute',
+    'readingInsights.duration.hour',
     'readingSessions.pending',
     'readingSessions.error',
   ];

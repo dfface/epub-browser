@@ -95,6 +95,9 @@
       inFlightPayload: null,
       requestedFlush: false,
       requestedKeepalive: false,
+      consecutiveFailures: 0,
+      retryAnnounced: false,
+      failureAnnounced: false,
       timer: null,
       destroyed: false
     };
@@ -181,13 +184,28 @@
 
     function retryLater(payload) {
       savePending();
+      state.consecutiveFailures += 1;
+      if (!state.retryAnnounced) {
+        state.retryAnnounced = true;
+        if (typeof options.onStatus === 'function') options.onStatus('pending');
+      }
+      if (state.consecutiveFailures >= 3 && !state.failureAnnounced) {
+        state.failureAnnounced = true;
+        if (typeof options.onStatus === 'function') options.onStatus('error');
+      }
     }
 
     function settle(payload, successful) {
       state.inFlight = null;
       state.inFlightPayload = null;
-      if (successful) removePending(payload);
-      else retryLater(payload);
+      if (successful) {
+        removePending(payload);
+        state.consecutiveFailures = 0;
+        if (!state.pending.length) {
+          state.retryAnnounced = false;
+          state.failureAnnounced = false;
+        }
+      } else retryLater(payload);
       if (state.requestedFlush && !state.destroyed) {
         var keepalive = state.requestedKeepalive;
         state.requestedFlush = false;
@@ -449,6 +467,15 @@
       try { channel = new browser.BroadcastChannel('epub-reading-sessions'); } catch (error) {}
     }
     var clientId = options.clientId || storedClientId(storage);
+    function notifyStatus(status) {
+      var i18n = browser.EpubBrowserI18n;
+      var key = status === 'error' ? 'readingSessions.error' : 'readingSessions.pending';
+      var message = i18n && typeof i18n.t === 'function' ? i18n.t(key) : key;
+      var notification = browser.EpubBrowserNotification;
+      if (notification && typeof notification.show === 'function') {
+        notification.show(message, status === 'error' ? 'error' : 'warning');
+      }
+    }
     var tracker = createTracker({
       now: options.now,
       schedule: options.schedule,
@@ -463,6 +490,7 @@
       document: options.document || documentTarget,
       visible: !documentTarget || !documentTarget.hidden,
       focused: !documentTarget || !documentTarget.hasFocus || documentTarget.hasFocus(),
+      onStatus: notifyStatus,
       send: function(payload, keepalive) {
         var request = {
           method: 'POST',
