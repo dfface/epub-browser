@@ -1,8 +1,8 @@
-"""Bounded readers for administrator-installed local dictionary packages.
+"""Readers for administrator-installed local dictionary packages.
 
-Dictionary definition HTML is untrusted third-party input and is never
-rendered by the reader application. Plain-text Markdown markers are retained
-for the reader's small, safe inline renderer (for example, `` `1` `` senses).
+Dictionary definitions are retained exactly as published. Rendering happens in
+an isolated reader surface rather than rewriting a dictionary's markup during
+import.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ class DictionaryEntry:
     normalized_headword: str
     aliases: tuple[str, ...]
     definition_text: str
+    definition_format: str = "text"
     media_references: tuple[tuple[str, str], ...] = ()
 
 
@@ -51,51 +52,6 @@ def normalize_lookup(value: str) -> str:
     if not value:
         raise DictionaryFormatError("invalid_dictionary_text")
     return value.casefold()
-
-
-class _PlainTextExtractor(html.parser.HTMLParser):
-    _BLOCK_TAGS = frozenset({"p", "div", "br", "li", "dt", "dd", "tr", "h1", "h2", "h3", "h4"})
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self._parts: list[str] = []
-        self._ignored_depth = 0
-
-    def handle_starttag(self, tag, attrs):
-        if tag in {"script", "style", "iframe", "object"}:
-            self._ignored_depth += 1
-        elif self._ignored_depth == 0 and tag.casefold() in self._BLOCK_TAGS:
-            self._parts.append("\n")
-
-    def handle_endtag(self, tag):
-        if tag in {"script", "style", "iframe", "object"} and self._ignored_depth:
-            self._ignored_depth -= 1
-        elif self._ignored_depth == 0 and tag.casefold() in self._BLOCK_TAGS:
-            self._parts.append("\n")
-
-    def handle_data(self, data):
-        if self._ignored_depth == 0:
-            self._parts.append(data)
-
-    def text(self) -> str:
-        return "\n".join(
-            part.strip() for part in "".join(self._parts).splitlines() if part.strip()
-        )
-
-
-def clean_definition(value: str, *, allow_empty: bool = False) -> str:
-    if not isinstance(value, str):
-        raise DictionaryFormatError("invalid_dictionary_definition")
-    parser = _PlainTextExtractor()
-    try:
-        parser.feed(value)
-        parser.close()
-    except (html.parser.HTMLParseError, ValueError):
-        raise DictionaryFormatError("invalid_dictionary_definition")
-    text = unicodedata.normalize("NFC", parser.text())
-    if not text and not allow_empty:
-        raise DictionaryFormatError("empty_dictionary_definition")
-    return text
 
 
 def _canonical_mdict_resource_path(value: str) -> str | None:
@@ -172,6 +128,32 @@ def _read_stardict_data(path: Path) -> bytes:
         raise DictionaryFormatError("invalid_stardict")
 
 
+def _split_stardict_record(record: bytes, sequence: str) -> tuple[bytes, ...]:
+    """Split a StarDict article using its published same-type sequence rules."""
+    parts = []
+    cursor = 0
+    for index, type_code in enumerate(sequence):
+        if index == len(sequence) - 1:
+            parts.append(record[cursor:])
+            break
+        if type_code.islower():
+            terminator = record.find(b"\0", cursor)
+            if terminator < cursor:
+                raise DictionaryFormatError("invalid_stardict")
+            parts.append(record[cursor:terminator])
+            cursor = terminator + 1
+        else:
+            if cursor + 4 > len(record):
+                raise DictionaryFormatError("invalid_stardict")
+            length = struct.unpack(">I", record[cursor:cursor + 4])[0]
+            cursor += 4
+            if cursor + length > len(record):
+                raise DictionaryFormatError("invalid_stardict")
+            parts.append(record[cursor:cursor + length])
+            cursor += length
+    return tuple(parts)
+
+
 def parse_stardict(ifo_path: Path) -> ImportedDictionary:
     if ifo_path.suffix.casefold() != ".ifo":
         raise DictionaryFormatError("invalid_stardict")
@@ -182,6 +164,7 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
         data = _read_stardict_data(_stardict_data_path(base))
     except OSError:
         raise DictionaryFormatError("stardict_index_missing")
+    sequence = values.get("sametypesequence", "m")
     entries: list[DictionaryEntry] = []
     offset = 0
     cursor = 0
@@ -198,9 +181,15 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
         if record_offset + record_length > len(data):
             raise DictionaryFormatError("invalid_stardict")
         try:
-            definition = data[record_offset:record_offset + record_length].decode("utf-8")
+            raw_parts = _split_stardict_record(
+                data[record_offset:record_offset + record_length], sequence,
+            )
+            definition = "\n".join(part.decode("utf-8") for part in raw_parts)
             normalized = normalize_lookup(headword)
-            entries.append(DictionaryEntry(headword.strip(), normalized, (), clean_definition(definition)))
+            entries.append(DictionaryEntry(
+                headword.strip(), normalized, (), definition,
+                "stardict:" + sequence,
+            ))
         except UnicodeDecodeError:
             raise DictionaryFormatError("invalid_stardict")
     aliases_by_index: dict[int, list[str]] = {}
@@ -225,7 +214,10 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
     finalized = []
     for index, entry in enumerate(entries):
         aliases = tuple(alias for alias in aliases_by_index.get(index, ()) if alias != entry.normalized_headword)
-        finalized.append(DictionaryEntry(entry.headword, entry.normalized_headword, aliases, entry.definition_text))
+        finalized.append(DictionaryEntry(
+            entry.headword, entry.normalized_headword, aliases,
+            entry.definition_text, entry.definition_format,
+        ))
     if not finalized:
         raise DictionaryFormatError("dictionary_has_no_entries")
     return ImportedDictionary("stardict", values["bookname"], tuple(finalized))
@@ -280,7 +272,9 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
     readmdict = _mdict_reader_runtime()
 
     try:
-        reader = readmdict.MDX(str(mdx_path), "", False, None)
+        # MDict's StyleSheet is part of its article format. Let mdict-utils
+        # expand the inline style markers before storing the source unchanged.
+        reader = readmdict.MDX(str(mdx_path), "", True, None)
         header = reader.header
         name = header.get(b"Title", header.get(b"title", mdx_path.stem.encode("utf-8")))
         display_name = _decode_mdict_text(name, reader._encoding).strip() or mdx_path.stem
@@ -289,18 +283,9 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
             headword = _decode_mdict_text(key, reader._encoding)
             definition = _decode_mdict_text(value, reader._encoding)
             media_references = mdict_media_references(definition)
-            try:
-                definition_text = clean_definition(definition, allow_empty=bool(media_references))
-            except DictionaryFormatError as error:
-                # A few real-world MDX files contain empty or remote-image-only
-                # placeholders next to otherwise usable entries. They cannot
-                # contribute anything safely, so omit only those entries.
-                if error.code == "empty_dictionary_definition":
-                    continue
-                raise
             entries.append(DictionaryEntry(
                 headword.strip(), normalize_lookup(headword), (),
-                definition_text, media_references,
+                definition, "mdict", media_references,
             ))
     except DictionaryFormatError:
         raise

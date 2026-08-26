@@ -105,7 +105,9 @@ class DictionaryServiceTests(unittest.TestCase):
             record = service.install_upload(payload.getvalue(), "sample.mdx", created_by_user_id=admin.user_id)
 
             self.assertEqual(record.display_name, "sample")
-            self.assertEqual(service.lookup(record.id, "词典").entries[0]["definition"], "本地释义")
+            entry = service.lookup(record.id, "词典").entries[0]
+            self.assertEqual(entry["definition"], "<b>本地释义</b>")
+            self.assertEqual(entry["definition_format"], "mdict")
 
     def test_attaches_mdd_images_and_audio_referenced_by_mdx_entries(self):
         try:
@@ -138,7 +140,11 @@ class DictionaryServiceTests(unittest.TestCase):
             service.attach_mdict_resources(record.id, mdd.getvalue(), "media.mdd")
 
             entry = service.lookup(record.id, "run").entries[0]
-            self.assertEqual(entry["definition"], "to move")
+            self.assertEqual(
+                entry["definition"],
+                '<p>to move</p><img src="file://\\\\images\\\\run.png"><audio src="file://\\\\audio\\\\run.mp3"></audio>',
+            )
+            self.assertEqual(entry["definition_format"], "mdict")
             self.assertEqual([item["kind"] for item in entry["media"]], ["image", "audio"])
             image = service.get_media(record.id, entry["media"][0]["id"])
             audio = service.get_media(record.id, entry["media"][1]["id"])
@@ -181,7 +187,7 @@ class DictionaryServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(DictionaryServiceError, "dictionary_unavailable"):
                 service.lookup("missing", "run")
 
-    def test_lookup_keeps_existing_pre_media_dictionary_files_usable(self):
+    def test_discards_existing_dictionary_files_that_lost_source_formatting(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = StateStore(root / "data" / "epub-browser.db")
@@ -201,9 +207,10 @@ class DictionaryServiceTests(unittest.TestCase):
                 connection.execute("INSERT INTO entries(id, headword, normalized_headword, definition_text) VALUES (1, 'run', 'run', 'legacy definition')")
                 connection.execute("INSERT INTO forms(normalized_form, entry_id) VALUES ('run', 1)")
 
-            result = DictionaryService(store, root).lookup(dictionary_id, "run")
-            self.assertEqual(result.entries, ({"headword": "run", "definition": "legacy definition", "media": []},))
-            self.assertEqual(store.get_global_dictionary_default().id, dictionary_id)
+            DictionaryService(store, root)
+
+            self.assertIsNone(store.get_dictionary(dictionary_id))
+            self.assertFalse((dictionary_directory / (dictionary_id + ".sqlite")).exists())
 
 
 if __name__ == "__main__":

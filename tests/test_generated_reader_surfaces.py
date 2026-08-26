@@ -1772,6 +1772,10 @@ assert.deepEqual(
         self.assertIn('function dictionaryChoiceId(choices, defaultDictionaryId)', dictionary)
         self.assertIn('dictionaryChoiceId(choices, data.default_dictionary_id)', dictionary)
         self.assertIn('savePreferredDictionary(select.value);', dictionary)
+        self.assertIn("definition.sandbox = '';", dictionary)
+        self.assertIn("default-src \\'none\\'; style-src \\'unsafe-inline\\';", dictionary)
+        self.assertIn("/^stardict:[ml]+$/.test(format)", dictionary)
+        self.assertNotIn('appendInlineMarkdown', dictionary)
         self.assertIn('display: inline-flex', css)
         self.assertIn('max-width: 220px', css)
 

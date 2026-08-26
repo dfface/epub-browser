@@ -2,15 +2,14 @@
 .dictionary-dialog-header { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--border); }
 .dictionary-dialog-close { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text); font-size: 1.5rem; cursor: pointer; }
 .dictionary-dialog-close:focus-visible, .dictionary-source-link:focus-visible, .dictionary-picker-select:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent); outline-offset: 2px; }
-.dictionary-dialog-content { padding: 14px; font-size: 14px; line-height: 1.62; white-space: pre-wrap; }
+.dictionary-dialog-content { padding: 14px; font-size: 14px; line-height: 1.62; }
 .dictionary-picker { display: inline-flex; max-width: 100%; align-items: center; gap: 8px; margin: -2px 0 10px; color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
 .dictionary-picker-select { min-width: 0; max-width: 220px; min-height: 36px; padding: 5px 28px 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
 .dictionary-entry { overflow-wrap: anywhere; }
 .dictionary-entry strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 15px; }
-.dictionary-entry p { margin: 0; }
+.dictionary-entry-document { display: block; width: 100%; min-height: 72px; max-height: 360px; margin: 0; border: 0; background: transparent; }
 .dictionary-entry-image { display: block; max-width: 100%; max-height: 240px; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; object-fit: contain; }
 .dictionary-entry-audio { display: block; width: 100%; margin-top: 10px; }
-.dictionary-entry code { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }
 .dictionary-entry + .dictionary-entry { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .dictionary-source, .dictionary-attribution { display: block; color: var(--text-secondary); }
 .dictionary-source-link { display: inline-block; min-height: 44px; padding: 10px 0; color: var(--button-bg); }

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from epub_browser.dictionary_formats import clean_definition, parse_local_dictionary, read_mdict_resources
+from epub_browser.dictionary_formats import parse_local_dictionary, read_mdict_resources
 
 
 class DictionaryFormatTests(unittest.TestCase):
@@ -26,7 +26,11 @@ class DictionaryFormatTests(unittest.TestCase):
         self.assertEqual(result.display_name, "Sample")
         self.assertEqual(result.entries[0].headword, "run")
         self.assertEqual(result.entries[0].aliases, ("running",))
-        self.assertEqual(result.entries[0].definition_text, "to `move` quickly")
+        self.assertEqual(
+            result.entries[0].definition_text,
+            "<b>to `move`</b><script>alert(1)</script> quickly",
+        )
+        self.assertEqual(result.entries[0].definition_format, "stardict:m")
 
     def test_reads_unencrypted_mdict_entries_when_optional_runtime_is_installed(self):
         try:
@@ -43,9 +47,27 @@ class DictionaryFormatTests(unittest.TestCase):
                 writer.write(handle)
             result = parse_local_dictionary(path)
         self.assertEqual(result.format, "mdict")
-        self.assertEqual(result.entries[0].definition_text, "to move")
+        self.assertEqual(result.entries[0].definition_text, "<b>to move</b>")
+        self.assertEqual(result.entries[0].definition_format, "mdict")
 
-    def test_skips_unusable_empty_mdict_entries_without_rejecting_the_dictionary(self):
+    def test_keeps_stardict_html_fields_as_html(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "sample"
+            definition = b"<div class=\"sense\"><b>to move</b></div>"
+            index = b"run\0" + struct.pack(">II", 0, len(definition))
+            base.with_suffix(".ifo").write_text(
+                "StarDict's dict ifo file\nversion=2.4.2\nbookname=Sample\nwordcount=1\n"
+                "idxfilesize=" + str(len(index)) + "\nsametypesequence=h\n",
+                encoding="utf-8",
+            )
+            base.with_suffix(".idx").write_bytes(index)
+            base.with_suffix(".dict").write_bytes(definition)
+            result = parse_local_dictionary(base.with_suffix(".ifo"))
+
+        self.assertEqual(result.entries[0].definition_text, definition.decode("utf-8"))
+        self.assertEqual(result.entries[0].definition_format, "stardict:h")
+
+    def test_keeps_media_only_mdict_entries_without_rewriting_them(self):
         try:
             from mdict_utils.base.writemdict import MDictWriter
         except ImportError:
@@ -58,11 +80,7 @@ class DictionaryFormatTests(unittest.TestCase):
                     title="Sample", description="", encoding="utf8", compression_type=2, version="2.0",
                 ).write(handle)
             result = parse_local_dictionary(path)
-        self.assertEqual([entry.headword for entry in result.entries], ["usable"])
-
-    def test_keeps_a_definition_larger_than_the_former_16_kib_import_limit(self):
-        definition = "释义" * 10_000
-        self.assertEqual(clean_definition(definition), definition)
+        self.assertEqual([entry.headword for entry in result.entries], ["empty", "usable"])
 
     def test_reads_mdd_resources_without_an_arbitrary_asset_count_limit(self):
         try:

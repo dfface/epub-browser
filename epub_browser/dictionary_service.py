@@ -40,7 +40,24 @@ class DictionaryService:
         self.server_directory = Path(server_directory)
         self.dictionary_directory = self.server_directory / "data" / "dictionaries"
         self.dictionary_directory.mkdir(parents=True, exist_ok=True)
+        self._discard_legacy_dictionary_cache()
         self.store.ensure_global_dictionary_default()
+
+    def _discard_legacy_dictionary_cache(self) -> None:
+        """Remove imports created before definitions were retained verbatim."""
+        for record in self.store.list_dictionaries():
+            path = self.dictionary_directory / (record.id + ".sqlite")
+            try:
+                with sqlite3.connect(path) as connection:
+                    row = connection.execute(
+                        "SELECT value FROM meta WHERE key = 'definition_rendering_revision'"
+                    ).fetchone()
+            except sqlite3.Error:
+                row = None
+            if row and row[0] == "2":
+                continue
+            self.store.delete_dictionary(record.id)
+            path.unlink(missing_ok=True)
 
     @staticmethod
     def _source_digest(source: Path) -> str:
@@ -70,7 +87,7 @@ class DictionaryService:
                 connection.execute("PRAGMA journal_mode = OFF")
                 connection.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
                 connection.execute(
-                    "CREATE TABLE entries (id INTEGER PRIMARY KEY, headword TEXT NOT NULL, normalized_headword TEXT NOT NULL, definition_text TEXT NOT NULL, media_json TEXT NOT NULL DEFAULT '[]')"
+                    "CREATE TABLE entries (id INTEGER PRIMARY KEY, headword TEXT NOT NULL, normalized_headword TEXT NOT NULL, definition_text TEXT NOT NULL, definition_format TEXT NOT NULL, media_json TEXT NOT NULL DEFAULT '[]')"
                 )
                 connection.execute(
                     "CREATE TABLE forms (normalized_form TEXT NOT NULL, entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE, PRIMARY KEY(normalized_form, entry_id))"
@@ -82,13 +99,14 @@ class DictionaryService:
                 )
                 connection.executemany(
                     "INSERT INTO meta(key, value) VALUES (?, ?)",
-                    (("format", dictionary.format), ("content_sha256", digest)),
+                    (("format", dictionary.format), ("content_sha256", digest), ("definition_rendering_revision", "2")),
                 )
                 for entry in dictionary.entries:
                     cursor = connection.execute(
-                        "INSERT INTO entries(headword, normalized_headword, definition_text, media_json) VALUES (?, ?, ?, ?)",
+                        "INSERT INTO entries(headword, normalized_headword, definition_text, definition_format, media_json) VALUES (?, ?, ?, ?, ?)",
                         (
                             entry.headword, entry.normalized_headword, entry.definition_text,
+                            entry.definition_format,
                             json.dumps([
                                 {"kind": kind, "reference": reference}
                                 for kind, reference in entry.media_references
@@ -402,11 +420,12 @@ class DictionaryService:
                     row[1] for row in connection.execute("PRAGMA table_info(entries)").fetchall()
                 }
                 media_column = "entries.media_json" if "media_json" in columns else "'[]' AS media_json"
+                format_column = "entries.definition_format" if "definition_format" in columns else "'text' AS definition_format"
                 rows = connection.execute(
-                    """SELECT entries.headword, entries.definition_text, %s FROM forms
+                    """SELECT entries.headword, entries.definition_text, %s, %s FROM forms
                     JOIN entries ON entries.id = forms.entry_id
                     WHERE forms.normalized_form = ? ORDER BY entries.id LIMIT 3
-                    """ % media_column, (query,)
+                    """ % (format_column, media_column), (query,)
                 ).fetchall()
             finally:
                 connection.close()
@@ -414,6 +433,7 @@ class DictionaryService:
             raise DictionaryServiceError("dictionary_unavailable") from error
         entries = tuple({
             "headword": row["headword"], "definition": row["definition_text"],
+            "definition_format": row["definition_format"],
             "media": [item for item in json.loads(row["media_json"]) if isinstance(item, dict) and item.get("id")],
         } for row in rows)
         return DictionaryLookup(bool(entries), dictionary, query, entries)
