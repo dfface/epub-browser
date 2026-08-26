@@ -191,6 +191,28 @@
       return item;
     }
 
+    function attachTooltip(trigger, label) {
+      if (!trigger || !label) return;
+      trigger.setAttribute('aria-describedby', 'readingInsightsTooltip');
+      function show() {
+        var tooltip = state.view.tooltip;
+        if (!tooltip) return;
+        tooltip.textContent = label;
+        tooltip.hidden = false;
+        if (!trigger.getBoundingClientRect || !tooltip.style) return;
+        var rect = trigger.getBoundingClientRect();
+        tooltip.style.left = Math.round(rect.left + rect.width / 2) + 'px';
+        tooltip.style.top = Math.round(rect.top) + 'px';
+      }
+      function hide() {
+        if (state.view.tooltip) state.view.tooltip.hidden = true;
+      }
+      trigger.addEventListener('mouseenter', show);
+      trigger.addEventListener('focus', show);
+      trigger.addEventListener('mouseleave', hide);
+      trigger.addEventListener('blur', hide);
+    }
+
     function setBusy(busy) {
       state.loading = busy;
       if (state.root) state.root.setAttribute('aria-busy', busy ? 'true' : 'false');
@@ -311,6 +333,10 @@
       nextRange.addEventListener('click', function() { nextRangeForPeriod(); });
       var live = append(targetRoot, 'p', 'reading-insights-live', translate(target, 'readingInsights.loading', 'Loading reading insights…'));
       live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
+      var tooltip = append(targetRoot, 'div', 'reading-insights-tooltip');
+      tooltip.id = 'readingInsightsTooltip';
+      tooltip.setAttribute('role', 'tooltip');
+      tooltip.hidden = true;
       var summary = append(targetRoot, 'section', 'reading-insights-summary');
       summary.setAttribute('aria-label', translate(target, 'readingInsights.summaryLabel', 'Reading summary'));
       var totalCard = append(summary, 'article', 'reading-insights-summary-card');
@@ -340,6 +366,16 @@
       var legendScale = append(legend, 'span', 'reading-insights-heatmap-legend-scale');
       [0, 1, 2, 3, 4].forEach(function(level) { append(legendScale, 'i', 'is-level-' + level); });
       append(legend, 'span', '', translate(target, 'readingInsights.activityMore', 'More'));
+      var activityScale = translate(
+        target,
+        'readingInsights.activityScale',
+        'Color reflects active reading per day: under 1 minute, 1–15 minutes, 15–60 minutes, and 1 hour or more.'
+      );
+      var activityInfo = append(legend, 'button', 'reading-insights-activity-info');
+      activityInfo.type = 'button';
+      activityInfo.setAttribute('aria-label', activityScale);
+      activityInfo.innerHTML = '<i class="fas fa-circle-info" aria-hidden="true"></i>';
+      attachTooltip(activityInfo, activityScale);
       var trendCard = append(analyticsGrid, 'article', 'reading-insights-analytics-card reading-insights-trend-card');
       append(trendCard, 'h3', '', translate(target, 'readingInsights.trend', 'Trend chart'));
       var trendRange = append(trendCard, 'p', 'reading-insights-analytics-description');
@@ -373,7 +409,7 @@
       selectedDay.id = 'readingInsightsSelectedDay';
       sessions.setAttribute('aria-labelledby', selectedDay.id);
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, analytics: analytics, analyticsTitle: analyticsTitle, analyticsGrid: analyticsGrid, heatmapCard: heatmapCard, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYAxis: trendYAxis, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, tooltip: tooltip, total: total, topBook: topBook, analytics: analytics, analyticsTitle: analyticsTitle, analyticsGrid: analyticsGrid, heatmapCard: heatmapCard, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYAxis: trendYAxis, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
       updatePeriodControls();
       updateRangeControls();
     }
@@ -452,7 +488,7 @@
           var cell = append(state.view.heatmap, 'button', 'reading-insights-heatmap-cell is-level-' + activityTone(seconds));
           cell.type = 'button';
           cell.setAttribute('aria-label', label);
-          cell.setAttribute('title', label);
+          attachTooltip(cell, label);
           cell.addEventListener('click', function() { setPeriod('day', day.date); });
         });
       }
@@ -472,8 +508,8 @@
       var values = trendPoints.map(function(point) { return Math.max(0, Number(point[metric]) || 0); });
       var total = values.reduce(function(sum, value) { return sum + value; }, 0);
       var trendValueText = metric === 'active_seconds'
-        ? formatDuration(total)
-        : translate(target, 'readingInsights.booksRead', 'Books read: ' + total, { count: total });
+        ? translate(target, 'readingInsights.trendTotalDuration', 'Total reading time: ' + formatDuration(total), { duration: formatDuration(total) })
+        : translate(target, 'readingInsights.trendTotalBooks', 'Total books read: ' + total, { count: total });
       if (state.view.trendValue) {
         state.view.trendValue.textContent = trendValueText;
       }
@@ -521,6 +557,24 @@
       line.setAttribute('d', 'M ' + points.join(' L '));
       svg.appendChild(area);
       svg.appendChild(line);
+      trendPoints.forEach(function(point, index) {
+        var value = values[index];
+        var x = values.length === 1 ? 50 : index * 100 / (values.length - 1);
+        var y = 36 - value / maximum * 30;
+        var marker = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        var pointValue = metric === 'active_seconds'
+          ? formatDuration(value)
+          : translate(target, 'readingInsights.booksRead', 'Books read: ' + value, { count: value });
+        var pointLabel = formatTrendBucket(point.bucket, trendGranularity) + ': ' + pointValue;
+        marker.setAttribute('class', 'reading-insights-trend-point');
+        marker.setAttribute('cx', x.toFixed(2));
+        marker.setAttribute('cy', y.toFixed(2));
+        marker.setAttribute('r', '4');
+        marker.setAttribute('tabindex', '0');
+        marker.setAttribute('aria-label', pointLabel);
+        attachTooltip(marker, pointLabel);
+        svg.appendChild(marker);
+      });
       state.view.trendChart.appendChild(svg);
     }
 

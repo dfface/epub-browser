@@ -155,21 +155,21 @@ test('overview range covers a complete natural year and hides range-specific dri
   await page.mount();
   await page.setPeriod('overview', '2026-08-15');
   assert.equal(page.rangeLabel.textContent, '2026-01-01–2026-12-31');
-  assert.equal(page.root.children[4].hidden, false);
-  assert.equal(page.root.children[5].hidden, true);
+  assert.equal(page.root.children[5].hidden, false);
   assert.equal(page.root.children[6].hidden, true);
+  assert.equal(page.root.children[7].hidden, true);
 
   await page.setPeriod('month', '2026-08-15');
-  assert.equal(page.root.children[4].hidden, false);
-  assert.equal(page.root.children[4].children[0].hidden, true);
-  assert.equal(page.root.children[4].children[1].children[0].hidden, true);
+  assert.equal(page.root.children[5].hidden, false);
+  assert.equal(page.root.children[5].children[0].hidden, true);
+  assert.equal(page.root.children[5].children[1].children[0].hidden, true);
 });
 
 test('week and month use compact visual day labels while preserving full dates for assistive technology', async () => {
   const page = clientFor({ total_active_seconds: 0, days: [{ date: '2026-08-15', active_seconds: 0 }], sessions: [] });
   await page.mount();
   await page.setPeriod('week', '2026-08-15');
-  const dayList = page.root.children[5].children[1];
+  const dayList = page.root.children[6].children[1];
   const button = dayList.children[0];
   assert.equal(button.children[0].textContent, 'Sat');
   assert.equal(button.children[1].textContent, '8/15');
@@ -189,11 +189,11 @@ test('week and month prefer today over the range end when today is visible', asy
 
   await page.mount();
   await page.setPeriod('week', todayIso);
-  let dayList = page.root.children[5].children[1];
+  let dayList = page.root.children[6].children[1];
   assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
   assert.equal(dayList.children[1].getAttribute('aria-pressed'), 'false');
 
   await page.setPeriod('month', todayIso);
-  dayList = page.root.children[5].children[1];
+  dayList = page.root.children[6].children[1];
   assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
 });
