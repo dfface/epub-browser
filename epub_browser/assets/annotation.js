@@ -721,6 +721,7 @@
     // ========== 存储管理器 ==========
     var StorageManager = {
         currentType: 'idb',
+        pendingCreates: {},
         adapters: {
             idb: IDBStorage,
             backend: BackendStorage
@@ -786,7 +787,17 @@
         
         // CRUD 操作
         create: function(data) {
-            return this.getAdapter().create(data);
+            var self = this;
+            var creation = Promise.resolve(this.getAdapter().create(data));
+            if (!data || !data.id) return creation;
+            this.pendingCreates[data.id] = creation;
+            return creation.then(function(result) {
+                if (self.pendingCreates[data.id] === creation) delete self.pendingCreates[data.id];
+                return result;
+            }, function(error) {
+                if (self.pendingCreates[data.id] === creation) delete self.pendingCreates[data.id];
+                throw error;
+            });
         },
         
         update: function(id, data) {
@@ -798,7 +809,14 @@
         },
         
         getById: function(id) {
-            return this.getAdapter().getById(id);
+            var self = this;
+            var pending = this.pendingCreates[id];
+            if (!pending) return this.getAdapter().getById(id);
+            return pending.then(function() {
+                return self.getAdapter().getById(id);
+            }, function() {
+                return self.getAdapter().getById(id);
+            });
         },
         
         getByBook: function(bookHash) {
