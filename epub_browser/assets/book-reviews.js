@@ -86,7 +86,7 @@
       header.appendChild(heading); header.appendChild(closeButton);
       var form = documentTarget.createElement('form'); form.className = 'book-review-form'; form.setAttribute('novalidate', '');
       var ratingField = documentTarget.createElement('fieldset'); ratingField.className = 'book-review-rating'; ratingField.setAttribute('aria-describedby', id + '-rating-error');
-      var legend = documentTarget.createElement('legend'); legend.textContent = translate('bookReviews.rating');
+      var legend = documentTarget.createElement('legend'); legend.className = 'book-review-visually-hidden'; legend.textContent = translate('bookReviews.rating');
       var options = documentTarget.createElement('div'); options.className = 'book-review-rating-options'; options.setAttribute('role', 'radiogroup'); options.setAttribute('aria-label', translate('bookReviews.rating'));
       var rating = documentTarget.createElement('input'); rating.type = 'hidden'; rating.value = '';
       var ratingOptions = [];
@@ -96,7 +96,7 @@
       }
       var ratingError = documentTarget.createElement('p'); ratingError.id = id + '-rating-error'; ratingError.className = 'book-review-rating-error'; ratingError.setAttribute('role', 'alert'); ratingError.hidden = true;
       ratingField.appendChild(legend); ratingField.appendChild(options); ratingField.appendChild(ratingError);
-      var reviewLabel = documentTarget.createElement('label'); reviewLabel.className = 'book-review-label'; reviewLabel.setAttribute('for', id + '-text'); reviewLabel.textContent = translate('bookReviews.review');
+      var reviewLabel = documentTarget.createElement('label'); reviewLabel.className = 'book-review-visually-hidden'; reviewLabel.setAttribute('for', id + '-text'); reviewLabel.textContent = translate('bookReviews.review');
       var reviewText = documentTarget.createElement('textarea'); reviewText.id = id + '-text'; reviewText.maxLength = 10000; reviewText.setAttribute('maxlength', '10000'); reviewText.setAttribute('aria-describedby', id + '-hint');
       var hint = documentTarget.createElement('p'); hint.id = id + '-hint'; hint.className = 'book-review-hint'; hint.textContent = translate('bookReviews.reviewHint');
       var actions = documentTarget.createElement('div'); actions.className = 'book-review-actions';
