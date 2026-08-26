@@ -26,7 +26,7 @@ class DictionaryFormatTests(unittest.TestCase):
         self.assertEqual(result.display_name, "Sample")
         self.assertEqual(result.entries[0].headword, "run")
         self.assertEqual(result.entries[0].aliases, ("running",))
-        self.assertEqual(result.entries[0].definition_text, "to move quickly")
+        self.assertEqual(result.entries[0].definition_text, "to `move` quickly")
 
     def test_reads_unencrypted_mdict_entries_when_optional_runtime_is_installed(self):
         try:

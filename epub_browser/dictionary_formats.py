@@ -1,7 +1,8 @@
 """Bounded readers for administrator-installed local dictionary packages.
 
-The readers intentionally produce plain text.  Dictionary definition HTML is
-untrusted third-party input and is never rendered by the reader application.
+Dictionary definition HTML is untrusted third-party input and is never
+rendered by the reader application. Plain-text Markdown markers are retained
+for the reader's small, safe inline renderer (for example, `` `1` `` senses).
 """
 
 from __future__ import annotations
@@ -93,7 +94,7 @@ def clean_definition(value: str) -> str:
         parser.close()
     except (html.parser.HTMLParseError, ValueError):
         raise DictionaryFormatError("invalid_dictionary_definition")
-    text = unicodedata.normalize("NFC", parser.text()).replace("`", "")
+    text = unicodedata.normalize("NFC", parser.text())
     if not text:
         raise DictionaryFormatError("empty_dictionary_definition")
     if len(text.encode("utf-8")) > MAX_DEFINITION_BYTES:

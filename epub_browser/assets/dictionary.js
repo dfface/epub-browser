@@ -23,6 +23,31 @@
     return item;
   }
 
+  // Dictionary definitions are imported as plain text: never interpret source
+  // HTML.  This deliberately small Markdown subset retains useful typography
+  // (including the numbered senses often written as `1`) without giving a
+  // third-party dictionary executable markup or script capabilities.
+  function appendInlineMarkdown(parent, source) {
+    var text = String(source || '');
+    var token = /\*\*([^*\n]+)\*\*|__([^_\n]+)__|`([^`\n]+)`|\*([^*\n]+)\*|_([^_\n]+)_/g;
+    var index = 0;
+    text.replace(token, function(match, boldA, boldB, code, italicA, italicB, offset) {
+      if (offset > index) parent.appendChild(root.document.createTextNode(text.slice(index, offset)));
+      if (boldA || boldB) parent.appendChild(element('strong', '', boldA || boldB));
+      else if (code) parent.appendChild(element('code', '', code));
+      else parent.appendChild(element('em', '', italicA || italicB));
+      index = offset + match.length;
+      return match;
+    });
+    if (index < text.length) parent.appendChild(root.document.createTextNode(text.slice(index)));
+  }
+
+  function definitionElement(source) {
+    var definition = element('p');
+    appendInlineMarkdown(definition, source);
+    return definition;
+  }
+
   function readJson(response) {
     return response.json().catch(function() { return {}; }).then(function(body) {
       if (!response.ok) throw new Error(body.code || 'unavailable');
@@ -41,7 +66,7 @@
       (data.entries || []).forEach(function(entry) {
         var item = element('article', 'dictionary-entry');
         item.appendChild(element('strong', '', entry.headword));
-        item.appendChild(element('p', '', String(entry.definition || '').replace(/`/g, '')));
+        item.appendChild(definitionElement(entry.definition));
         result.appendChild(item);
       });
     }

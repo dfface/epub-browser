@@ -1,13 +1,14 @@
-.dictionary-dialog { position: fixed; z-index: 10002; width: min(420px, calc(100vw - 24px)); max-height: min(68dvh, 520px); overflow: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); color: var(--text); box-shadow: 0 16px 42px rgba(0,0,0,.20); font-family: var(--font-family, system-ui, -apple-system, sans-serif); }
+.dictionary-dialog { position: fixed; z-index: 10002; width: min(420px, calc(100vw - 24px)); max-height: min(68dvh, 520px); overflow: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); color: var(--text); box-shadow: 0 16px 42px rgba(0,0,0,.20); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .dictionary-dialog-header { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--border); }
 .dictionary-dialog-close { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text); font-size: 1.5rem; cursor: pointer; }
 .dictionary-dialog-close:focus-visible, .dictionary-source-link:focus-visible, .dictionary-picker-select:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent); outline-offset: 2px; }
-.dictionary-dialog-content { padding: 14px; font-size: .92rem; line-height: 1.62; white-space: pre-wrap; }
-.dictionary-picker { display: grid; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: .9rem; }
+.dictionary-dialog-content { padding: 14px; font-size: 14px; line-height: 1.62; white-space: pre-wrap; }
+.dictionary-picker { display: grid; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: 14px; }
 .dictionary-picker-select { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
 .dictionary-entry { overflow-wrap: anywhere; }
-.dictionary-entry strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 1rem; }
+.dictionary-entry strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 15px; }
 .dictionary-entry p { margin: 0; }
+.dictionary-entry code { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }
 .dictionary-entry + .dictionary-entry { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .dictionary-source, .dictionary-attribution { display: block; color: var(--text-secondary); }
 .dictionary-source-link { display: inline-block; min-height: 44px; padding: 10px 0; color: var(--button-bg); }
