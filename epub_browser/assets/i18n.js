@@ -4515,6 +4515,16 @@
       'ai.annotation.vocabulary': 'Rare characters & vocabulary',
       'ai.teachKicker': 'FEYNMAN LEARNING',
       'ai.teachTitle': 'Teach it back in your own words'
+      ,'admin.dictionaries': 'Dictionaries'
+      ,'admin.dictionariesDescription': 'Install a local StarDict or MDict package. The first dictionary for a source language becomes its default.'
+      ,'admin.dictionaryPackage': 'Dictionary package'
+      ,'admin.dictionarySourceLanguage': 'Source language'
+      ,'admin.dictionaryTargetLanguage': 'Target language'
+      ,'admin.dictionaryName': 'Display name'
+      ,'admin.installDictionary': 'Install dictionary'
+      ,'admin.installingDictionary': 'Installing…'
+      ,'admin.dictionaryInstalled': 'Dictionary installed.'
+      ,'admin.noDictionaries': 'No local dictionaries installed.'
     },
     'zh-CN': {
       'account.loading': '正在加载账户设置…',
@@ -4562,6 +4572,16 @@
       'ai.annotation.vocabulary': '生僻字词讲解',
       'ai.teachKicker': '费曼学习法',
       'ai.teachTitle': '用自己的话讲明白'
+      ,'admin.dictionaries': '词典'
+      ,'admin.dictionariesDescription': '安装本地 StarDict 或 MDict 词典包。某个源语言安装的第一个词典会成为默认词典。'
+      ,'admin.dictionaryPackage': '词典包'
+      ,'admin.dictionarySourceLanguage': '源语言'
+      ,'admin.dictionaryTargetLanguage': '目标语言'
+      ,'admin.dictionaryName': '显示名称'
+      ,'admin.installDictionary': '安装词典'
+      ,'admin.installingDictionary': '正在安装…'
+      ,'admin.dictionaryInstalled': '词典已安装。'
+      ,'admin.noDictionaries': '尚未安装本地词典。'
     },
     'zh-TW': {
       'account.loading': '正在載入帳戶設定…',
@@ -4609,6 +4629,16 @@
       'ai.annotation.vocabulary': '生僻字詞解說',
       'ai.teachKicker': '費曼學習法',
       'ai.teachTitle': '用自己的話講明白'
+      ,'admin.dictionaries': '詞典'
+      ,'admin.dictionariesDescription': '安裝本機 StarDict 或 MDict 詞典包。某個來源語言安裝的第一本詞典會成為預設詞典。'
+      ,'admin.dictionaryPackage': '詞典包'
+      ,'admin.dictionarySourceLanguage': '來源語言'
+      ,'admin.dictionaryTargetLanguage': '目標語言'
+      ,'admin.dictionaryName': '顯示名稱'
+      ,'admin.installDictionary': '安裝詞典'
+      ,'admin.installingDictionary': '正在安裝…'
+      ,'admin.dictionaryInstalled': '詞典已安裝。'
+      ,'admin.noDictionaries': '尚未安裝本機詞典。'
     },
     ko: {
       'account.loading': '계정 설정을 불러오는 중…',
@@ -4656,6 +4686,16 @@
       'ai.annotation.vocabulary': '낯선 글자·어휘 풀이',
       'ai.teachKicker': '파인만 학습법',
       'ai.teachTitle': '내 말로 다시 설명하기'
+      ,'admin.dictionaries': '사전'
+      ,'admin.dictionariesDescription': '로컬 StarDict 또는 MDict 패키지를 설치합니다. 소스 언어별 첫 사전이 기본 사전이 됩니다.'
+      ,'admin.dictionaryPackage': '사전 패키지'
+      ,'admin.dictionarySourceLanguage': '원본 언어'
+      ,'admin.dictionaryTargetLanguage': '대상 언어'
+      ,'admin.dictionaryName': '표시 이름'
+      ,'admin.installDictionary': '사전 설치'
+      ,'admin.installingDictionary': '설치 중…'
+      ,'admin.dictionaryInstalled': '사전을 설치했습니다.'
+      ,'admin.noDictionaries': '설치된 로컬 사전이 없습니다.'
     },
     ja: {
       'account.loading': 'アカウント設定を読み込み中…',
@@ -4703,6 +4743,16 @@
       'ai.annotation.vocabulary': '難しい字句の解説',
       'ai.teachKicker': 'ファインマン学習法',
       'ai.teachTitle': '自分の言葉で説明する'
+      ,'admin.dictionaries': '辞書'
+      ,'admin.dictionariesDescription': 'ローカルの StarDict または MDict パッケージをインストールします。ソース言語ごとの最初の辞書が既定になります。'
+      ,'admin.dictionaryPackage': '辞書パッケージ'
+      ,'admin.dictionarySourceLanguage': 'ソース言語'
+      ,'admin.dictionaryTargetLanguage': '対象言語'
+      ,'admin.dictionaryName': '表示名'
+      ,'admin.installDictionary': '辞書をインストール'
+      ,'admin.installingDictionary': 'インストール中…'
+      ,'admin.dictionaryInstalled': '辞書をインストールしました。'
+      ,'admin.noDictionaries': 'ローカル辞書はまだインストールされていません。'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {

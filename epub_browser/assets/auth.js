@@ -14,6 +14,7 @@
     var books = [];
     var aiSettings = null;
     var aiTags = [];
+    var dictionaries = [];
     var adminBooksState = {
       books: [],
       query: '',
@@ -813,14 +814,14 @@
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) !== -1
+      return ['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) !== -1
         ? section : '';
     }
 
     function adminPanelIsAvailable(panel) { return Boolean(panel); }
 
     function setActiveAdminSection(section) {
-      if (['overview', 'users', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) === -1) return;
+      if (['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
@@ -854,6 +855,22 @@
       if (live) live.textContent = t('admin.overview.liveLoaded', {
         users: users.length,
         books: adminBooksState.books.length
+      });
+    }
+
+    function renderDictionaries() {
+      var list = element('adminDictionaryList');
+      if (!list) return;
+      list.textContent = '';
+      if (!dictionaries.length) {
+        list.appendChild(createTextElement('li', 'account-list-empty', 'admin.noDictionaries'));
+        return;
+      }
+      dictionaries.forEach(function(dictionary) {
+        var item = root.document.createElement('li');
+        item.className = 'account-list-item';
+        item.textContent = dictionary.display_name + ' · ' + dictionary.source_language + ' → ' + dictionary.target_language + ' · ' + dictionary.entry_count;
+        list.appendChild(item);
       });
     }
 
@@ -2230,6 +2247,15 @@
           renderAiUserAccess();
           renderAiTags();
           renderAdminOverview();
+          if (element('adminDictionaryList')) {
+            authenticatedFetch('/api/admin/dictionaries').then(function(dictionaryResponse) {
+              if (!dictionaryResponse.ok) return;
+              return readJson(dictionaryResponse).then(function(payload) {
+                dictionaries = payload.dictionaries || [];
+                renderDictionaries();
+              });
+            });
+          }
         });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
@@ -2304,6 +2330,8 @@
       var aiSettingsSubmit = element('adminAiSettingsSubmit');
       var aiTagForm = element('adminAiTagForm');
       var aiTagSubmit = element('adminAiTagSubmit');
+      var dictionaryForm = element('adminDictionaryForm');
+      var dictionarySubmit = element('adminDictionarySubmit');
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
       var aiJobsStatus = element('adminAiJobsStatus');
@@ -2322,7 +2350,7 @@
       var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
-      [createUserForm, aiSettingsForm, aiTagForm].forEach(function(form) {
+      [createUserForm, aiSettingsForm, aiTagForm, dictionaryForm].forEach(function(form) {
         if (!form) return;
         form.addEventListener('input', markAdminDirty);
         form.addEventListener('change', markAdminDirty);
@@ -2394,6 +2422,30 @@
             createUserForm.reset();
             clearAdminDirty();
             showStatus('admin.userCreated', 'success');
+            return loadAdminData();
+          }).catch(function() { showStatus('admin.error.network', 'error'); });
+        });
+      });
+      if (dictionaryForm) dictionaryForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var archive = dictionaryForm.elements.archive.files[0];
+        if (!archive) return;
+        runButtonOperation(dictionarySubmit, 'admin.installingDictionary', function() {
+          return archive.arrayBuffer().then(function(contents) {
+            return authenticatedFetch('/api/admin/dictionaries', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/zip',
+                'X-EPUB-Browser-Source-Language': dictionaryForm.elements.source_language.value,
+                'X-EPUB-Browser-Target-Language': dictionaryForm.elements.target_language.value,
+                'X-EPUB-Browser-Dictionary-Name': dictionaryForm.elements.display_name.value
+              }, body: contents
+            });
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            dictionaryForm.reset();
+            clearAdminDirty();
+            showStatus('admin.dictionaryInstalled', 'success');
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
         });

@@ -2155,6 +2155,8 @@ window.location.assign(payload.redirect||'/');
                 target_language=target_language, created_by_user_id=principal.user_id,
                 display_name=display_name,
             )
+            if dictionary_service.store.get_dictionary_default(source_language) is None:
+                dictionary_service.set_default(source_language, record.id, principal.user_id)
         except (DictionaryServiceError, ValueError) as error:
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_dictionary_archive"
             return response(error_payload(code, "Dictionary installation failed"), 400)

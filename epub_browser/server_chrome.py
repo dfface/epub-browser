@@ -72,6 +72,7 @@ SERVER_ACCOUNT_PANEL = '''
     <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
         <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
         <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
+        <button type="button" class="admin-section-tab" id="adminSectionDictionariesTab" role="tab" aria-selected="false" aria-controls="adminDictionariesSection" data-admin-section="dictionaries" data-i18n="admin.dictionaries">Dictionaries</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiConfigurationTab" role="tab" aria-selected="false" aria-controls="adminAiConfigurationSection" data-admin-section="ai-configuration" data-i18n="admin.ai.configuration">AI configuration</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions" data-i18n="admin.ai.permissions">AI permissions</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiJobsTab" role="tab" aria-selected="false" aria-controls="adminAiJobsSection" data-admin-section="ai-jobs" data-i18n="admin.ai.jobs.title">AI jobs</button>
@@ -100,6 +101,19 @@ SERVER_ACCOUNT_PANEL = '''
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminUserSubmit" data-i18n="admin.createUser">Create user</button>
         </form>
         <ul class="account-list" id="adminUserList"></ul>
+    </section>
+    <section class="account-admin-section account-card-wide" id="adminDictionariesSection" role="tabpanel" aria-labelledby="adminSectionDictionariesTab" data-admin-panel="dictionaries" hidden>
+        <h4 data-i18n="admin.dictionaries">Dictionaries</h4>
+        <p class="account-section-copy" data-i18n="admin.dictionariesDescription">Install a local StarDict or MDict package. The first dictionary for a source language becomes its default.</p>
+        <form class="account-form" id="adminDictionaryForm">
+            <label><span data-i18n="admin.dictionaryPackage">Dictionary package</span><input name="archive" type="file" accept=".zip,application/zip" required></label>
+            <label><span data-i18n="admin.dictionarySourceLanguage">Source language</span><input name="source_language" type="text" value="en" maxlength="35" required></label>
+            <label><span data-i18n="admin.dictionaryTargetLanguage">Target language</span><input name="target_language" type="text" value="en" maxlength="35" required></label>
+            <label><span data-i18n="admin.dictionaryName">Display name</span><input name="display_name" type="text" maxlength="160"></label>
+            <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminDictionarySubmit" data-i18n="admin.installDictionary">Install dictionary</button>
+        </form>
+        <p id="adminDictionaryLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
+        <ul class="account-list" id="adminDictionaryList"></ul>
     </section>
     <section class="account-admin-section account-card-wide account-ai-section admin-ai-configuration-panel" id="adminAiConfigurationSection" role="tabpanel" aria-labelledby="adminSectionAiConfigurationTab" data-admin-panel="ai-configuration" hidden>
             <h4 id="adminAiConfigurationTitle" data-i18n="admin.ai.configuration">AI configuration</h4>
