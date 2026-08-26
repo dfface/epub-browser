@@ -17,7 +17,7 @@
 ### 本期包含
 
 - 仅在已登录、可阅读该书的 Server 阅读页显示“查词”。
-- 导入用户已合法取得、未加密的 Kindle/Mobipocket 字典：`.mobi`、`.azw3`（含 KF8）。
+- 导入用户已合法取得、未加密的 Kindle/Mobipocket **Mobi 7** 字典：`.mobi`，以及实际容器为 Mobi 7 的 `.azw`。
 - 管理员导入、查看状态、启用/停用、删除、为输入语言设置一个全局默认词典。
 - 词典索引词、变形词与纯文本释义的本地查询。
 - 以书籍语言决定默认词典；无法得到书籍语言时返回“未配置词典”，不猜测用户语言。
@@ -27,7 +27,7 @@
 
 - SSG 查词、SSG 词典资源或任何 `/api/*` 依赖。
 - 调用 Kindle 设备/应用已安装词典、Amazon 登录、购买、下载，或规避 DRM。
-- KFX、加密 MOBI/AZW、普通 Kindle 图书作为词典、在线翻译、机器翻译。
+- KFX、AZW3/KF8、加密 MOBI/AZW、普通 Kindle 图书作为词典、在线翻译、机器翻译。
 - 用户私有上传、个人词典顺序、查询历史、背单词、词典内全文检索。
 - 复杂富文本或原始 Kindle HTML 的输出；V1 只返回安全的纯文本释义。
 
@@ -163,12 +163,12 @@ CREATE INDEX idx_forms_normalized_form ON forms(normalized_form, rank, entry_id)
 
 ## 6. Kindle 导入器
 
-新增一个窄范围、可单测的 `kindle_dictionary.py` 适配器，而不是引入 Calibre 全量依赖。它使用经过许可证审查且固定版本的非 DRM Kindle/Mobipocket 解析实现；从 Kindle 字典索引恢复 `<idx:entry>`、`<idx:orth>` 和 `<idx:iform>`，并读取 source/target language 元数据。实现可参考 KindleUnpack 的公开 dictionary-index 处理逻辑，但必须在实现前记录实际采用依赖/代码的许可证、版本和 SHA。
+新增一个窄范围、可单测的 `kindle_dictionary.py` 适配器，而不是引入 Calibre 或 GPL 解析器依赖。它以 Mobi 7 的公开 PalmDB/MOBI 记录结构实现最小读取器，从 Kindle 字典索引恢复 `<idx:entry>`、`<idx:orth>` 和 `<idx:iform>`，并读取 source/target language 元数据；不得复制或链接 GPL KindleUnpack 代码。
 
 导入规则：
 
-- 只接受扩展名和魔数都匹配的 MOBI/AZW3；最大原始文件 512 MiB，文件名最长 200 Unicode 字符。
-- 明确检测并拒绝 DRM/encryption、KFX、未知容器、非字典内容、损坏索引、缺少可用源语言或零条目结果。
+- 只接受扩展名和魔数都匹配的 Mobi 7 `.mobi`，或容器验证为 Mobi 7 的 `.azw`；最大原始文件 512 MiB，文件名最长 200 Unicode 字符。
+- 明确检测并拒绝 DRM/encryption、AZW3/KF8、KFX、未知容器、非字典内容、损坏索引、缺少可用源语言或零条目结果。
 - 解析运行在独立受限 worker 进程；主 Server 只负责持久化任务状态。worker 有可配置的 CPU/墙钟时间、内存、条目数、每条词形数、累计释义字节和解压输出上限。超限产生稳定错误码并清理临时文件。
 - 规范化使用 Unicode NFC、首尾空白折叠、语言无关的大小写折叠；保留原始词头显示。空字符串、超过 120 个 Unicode code points 的查询、包含控制字符的查询被拒绝。
 - 解析器剥离脚本、样式、外部 URL 和所有 HTML 标签，再将块级文本以换行连接，限制最大释义 12 KiB。不能安全抽取的条目跳过，并在完成前检查仍有足够有效条目。
@@ -229,7 +229,7 @@ CREATE INDEX idx_forms_normalized_form ON forms(normalized_form, rank, entry_id)
 ### 单元与迁移
 
 - 新库初始化直接得到 schema 14；12、13 版本数据库正确迁移；运行中任务被中断标记；外键、默认项、启用状态、重复 SHA 和删除级联均受约束。
-- 导入器覆盖 MOBI 字典、AZW3/KF8 字典、词头/变形词、Unicode 规范化、纯文本清洗、重复导入、超限、DRM、KFX、普通书、损坏容器和零条目。
+- 导入器覆盖 Mobi 7 字典、Mobi 7 容器的 `.azw`、词头/变形词、Unicode 规范化、纯文本清洗、重复导入、超限、DRM、AZW3/KF8、KFX、普通书、损坏容器和零条目。
 - 词典 SQLite 创建后通过 integrity check；缺文件、篡改 meta、无效 URI 和临时文件清理不会使服务崩溃。
 
 ### Server API 与权限
