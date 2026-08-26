@@ -154,6 +154,70 @@ class StateStoreTests(unittest.TestCase):
             {"annotations", "bookshelves", "reading_progress", "books"} <= tables
         )
 
+    def test_v14_creates_private_reviews_and_sessions_tables(self):
+        with self.store._connection() as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
+            self.assertEqual(
+                table_columns(connection, "book_reviews"),
+                {
+                    "user_id", "book_id", "rating", "review_text",
+                    "created_at", "updated_at",
+                },
+            )
+            self.assertTrue({"reading_sessions", "book_reviews"} <= {
+                row[0] for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            })
+
+    def test_book_review_is_upserted_validated_and_owner_scoped(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "source.epub"),
+            "book-1",
+            "fingerprint",
+            {},
+            authoritative_book_id="book-1",
+        )
+        saved = self.store.upsert_book_review(
+            book.book_id, self.owner.user_id, 5, "  Excellent.  "
+        )
+        self.assertEqual(saved["rating"], 5)
+        self.assertEqual(saved["review_text"], "Excellent.")
+        self.assertEqual(
+            self.store.get_book_review(book.book_id, self.owner.user_id), saved
+        )
+        other = self.store.create_user("other-reviewer", hash_password("secret"))
+        self.assertIsNone(self.store.get_book_review(book.book_id, other.user_id))
+        with self.assertRaises(ValueError):
+            self.store.upsert_book_review(book.book_id, self.owner.user_id, 0, "")
+
+    def test_v13_upgrade_creates_empty_review_tables_without_losing_progress(self):
+        database = Path(self.temporary.name, "v13.db")
+        self._create_v13_database_with_progress(database)
+
+        store = StateStore(database)
+        store.initialize()
+
+        self.assertEqual(store.get_reading_progress("admin", "legacy-book"), 4)
+        self.assertIsNone(store.get_book_review("legacy-book", "admin"))
+
+    def test_delete_book_review_cannot_delete_another_users_row(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "delete-review.epub"),
+            "book-1",
+            "fingerprint",
+            {},
+            authoritative_book_id="book-1",
+        )
+        self.store.upsert_book_review(book.book_id, self.owner.user_id, 4, "Mine")
+        other = self.store.create_user("other", hash_password("secret"))
+
+        self.store.delete_book_review(book.book_id, other.user_id)
+
+        self.assertEqual(
+            self.store.get_book_review(book.book_id, self.owner.user_id)["rating"], 4
+        )
+
     def test_initialize_adds_session_client_metadata_to_existing_account_database(self):
         database = Path(self.temporary.name, "legacy-session.db")
         password_hash = hash_password("secret")
@@ -922,15 +986,15 @@ class StateStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "newer schema"):
             StateStore(future).initialize()
 
-    def test_v13_fresh_database_has_latest_contract(self):
-        database = Path(self.temporary.name, "fresh-v13.db")
+    def test_v14_fresh_database_has_latest_contract(self):
+        database = Path(self.temporary.name, "fresh-v14.db")
         StateStore(database).initialize(
             bootstrap=BootstrapCredentials("fresh-owner", "secret")
         )
         StateStore(database).initialize()
 
         with sqlite3.connect(database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
             self.assertFalse(
                 {"username"} & table_columns(connection, "annotations")
             )
@@ -1369,7 +1433,7 @@ class StateStoreTests(unittest.TestCase):
                 (1, "Original summary.", "2026-07"),
             )
             self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
 
     def test_concurrent_initializer_rereads_user_version_after_lock(self):
         self._downgrade_selected_tables_to_v10(self.database)
@@ -1441,7 +1505,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
             self.assertEqual(
                 connection.execute(
                     "SELECT attempt_number, retried_from_job_id, retry_root_job_id, "
@@ -2252,7 +2316,7 @@ class StateStoreTests(unittest.TestCase):
                 {"quota_reserved", "generation_stage"}
                 <= table_columns(connection, "ai_reading_jobs")
             )
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
 
     def test_admin_retry_of_migrated_v11_failed_root_is_quota_exempt(self):
         member = self.store.create_user(
@@ -2547,7 +2611,7 @@ class StateStoreTests(unittest.TestCase):
 
         with sqlite3.connect(self.database) as connection:
             after = self._v13_migration_sensitive_snapshot(connection)
-            self.assertEqual(after['version'], 13)
+            self.assertEqual(after['version'], 14)
             self.assertEqual(after['rows'], before['rows'])
             self.assertEqual(after['indexes'], before['indexes'])
             self.assertEqual(after['foreign_keys'], before['foreign_keys'])
@@ -3554,6 +3618,28 @@ class StateStoreTests(unittest.TestCase):
             "Why?",
         )
         self.assertIsNone(self.store.get_ai_followup(followup["id"], self.owner.user_id))
+
+    def _create_v13_database_with_progress(self, database):
+        store = StateStore(database)
+        store.initialize(bootstrap=BootstrapCredentials("legacy-owner", "secret"))
+        with store._connection() as connection:
+            connection.execute(
+                "INSERT INTO users (id, username, role, enabled, password_hash) "
+                "VALUES ('admin', 'legacy-admin', 'admin', 1, ?)",
+                (hash_password("secret"),),
+            )
+        book = store.resolve_book(
+            Path(self.temporary.name, "legacy-book.epub"),
+            "legacy-book",
+            "legacy-fingerprint",
+            {},
+            authoritative_book_id="legacy-book",
+        )
+        store.set_reading_progress("admin", book.book_id, 4)
+        with sqlite3.connect(database) as connection:
+            connection.execute("DROP TABLE reading_sessions")
+            connection.execute("DROP TABLE book_reviews")
+            connection.execute("PRAGMA user_version = 13")
 
     def _create_v1_database_with_annotation_bookshelf_and_progress(
         self,

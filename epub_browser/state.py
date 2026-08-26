@@ -24,7 +24,7 @@ from .identity import new_server_book_id
 from .locales import SUPPORTED_LOCALE_SET
 
 
-DB_SCHEMA_VERSION = 13
+DB_SCHEMA_VERSION = 14
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -241,17 +241,21 @@ class StateStore:
             self._validate_password_hashes(connection)
             if empty_database:
                 self._create_v11_indexes(connection)
-                self._require_foreign_key_integrity(connection)
-                connection.execute("PRAGMA user_version = 13")
+                self._migrate_schema_v14(connection, version)
             elif version < 11:
                 self._migrate_schema_v11(connection, version)
                 self._migrate_schema_v12(connection, 11)
                 self._migrate_schema_v13(connection, 12)
+                self._migrate_schema_v14(connection, 13)
             elif version < 12:
                 self._migrate_schema_v12(connection, version)
                 self._migrate_schema_v13(connection, 12)
+                self._migrate_schema_v14(connection, 13)
             elif version < 13:
                 self._migrate_schema_v13(connection, version)
+                self._migrate_schema_v14(connection, 13)
+            elif version < 14:
+                self._migrate_schema_v14(connection, version)
             else:
                 self._create_v11_indexes(connection)
                 self._require_foreign_key_integrity(connection)
@@ -384,6 +388,8 @@ class StateStore:
             "TEXT NOT NULL DEFAULT 'authenticated' "
             "CHECK(visibility IN ('authenticated', 'restricted'))",
         )
+        if latest:
+            self._create_v14_review_tables(connection)
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS book_access (
@@ -1251,6 +1257,64 @@ class StateStore:
         self._create_v11_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 13")
+
+    @staticmethod
+    def _create_v14_review_tables(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS book_reviews (
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                review_text TEXT NOT NULL CHECK(length(review_text) <= 10000),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, book_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS reading_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                book_title_snapshot TEXT NOT NULL CHECK(length(book_title_snapshot) > 0),
+                chapter_label_snapshot TEXT NOT NULL CHECK(length(chapter_label_snapshot) > 0),
+                started_at REAL NOT NULL,
+                ended_at REAL NOT NULL CHECK(ended_at >= started_at),
+                active_seconds INTEGER NOT NULL CHECK(active_seconds >= 1),
+                client_id TEXT NOT NULL CHECK(length(client_id) BETWEEN 1 AND 128),
+                last_client_sequence INTEGER NOT NULL CHECK(last_client_sequence >= 0),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v14_indexes(connection) -> None:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_book_reviews_user_updated "
+            "ON book_reviews(user_id, updated_at DESC, book_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_started "
+            "ON reading_sessions(user_id, started_at, id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_book_chapter_started "
+            "ON reading_sessions(user_id, book_id, chapter_index, started_at)"
+        )
+
+    def _migrate_schema_v14(self, connection, source_version) -> None:
+        if source_version >= 14:
+            return
+        self._create_v14_review_tables(connection)
+        self._create_v14_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 14")
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -2153,6 +2217,16 @@ class StateStore:
             (user_id,),
         ).fetchone() is None:
             raise KeyError(f"Unknown user ID: {user_id}")
+
+    @staticmethod
+    def _require_active_book(connection, book_id: str) -> None:
+        if not isinstance(book_id, str) or not book_id.strip():
+            raise ValueError("Book ID must not be empty")
+        if connection.execute(
+            "SELECT 1 FROM books WHERE book_id = ? AND active = 1",
+            (book_id,),
+        ).fetchone() is None:
+            raise KeyError(f"Unknown active book ID: {book_id}")
 
     def create_user(
         self,
@@ -4942,6 +5016,62 @@ class StateStore:
                 WHERE user_id = ?
                 """,
                 (version, serialized, user_id),
+            )
+
+    def get_book_review(self, book_id: str, user_id: str) -> Optional[dict]:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            row = connection.execute(
+                """
+                SELECT user_id, book_id, rating, review_text, created_at, updated_at
+                FROM book_reviews
+                WHERE user_id = ? AND book_id = ?
+                """,
+                (user_id, book_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def upsert_book_review(
+        self,
+        book_id: str,
+        user_id: str,
+        rating: int,
+        review_text: str,
+    ) -> dict:
+        if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5:
+            raise ValueError("rating must be an integer from 1 through 5")
+        if not isinstance(review_text, str):
+            raise ValueError("review text must be a string")
+        review_text = review_text.strip()
+        if len(review_text) > 10_000:
+            raise ValueError("review text is too long")
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            self._require_active_book(connection, book_id)
+            connection.execute(
+                "INSERT INTO book_reviews (user_id, book_id, rating, review_text) "
+                "VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(user_id, book_id) DO UPDATE SET "
+                "rating = excluded.rating, review_text = excluded.review_text, "
+                "updated_at = CURRENT_TIMESTAMP",
+                (user_id, book_id, rating, review_text),
+            )
+            row = connection.execute(
+                """
+                SELECT user_id, book_id, rating, review_text, created_at, updated_at
+                FROM book_reviews
+                WHERE user_id = ? AND book_id = ?
+                """,
+                (user_id, book_id),
+            ).fetchone()
+        return dict(row)
+
+    def delete_book_review(self, book_id: str, user_id: str) -> None:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            connection.execute(
+                "DELETE FROM book_reviews WHERE user_id = ? AND book_id = ?",
+                (user_id, book_id),
             )
 
     def get_reading_progress(self, user_id: str, book_hash: str):
