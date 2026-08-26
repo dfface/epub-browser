@@ -24,7 +24,7 @@ from .identity import new_server_book_id
 from .locales import SUPPORTED_LOCALE_SET
 
 
-DB_SCHEMA_VERSION = 13
+DB_SCHEMA_VERSION = 14
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -148,6 +148,34 @@ class SessionRecord:
     user_agent: Optional[str]
 
 
+@dataclass(frozen=True)
+class DictionaryRecord:
+    id: str
+    display_name: str
+    source_language: str
+    target_language: str
+    entry_count: int
+    content_sha256: str
+    attribution: str
+    enabled: bool
+    created_by_user_id: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class DictionaryImportJob:
+    id: str
+    original_filename: str
+    content_sha256: Optional[str]
+    status: str
+    error_code: Optional[str]
+    dictionary_id: Optional[str]
+    requested_by_user_id: str
+    created_at: str
+    updated_at: str
+
+
 class StateStore:
     def __init__(
         self,
@@ -241,19 +269,27 @@ class StateStore:
             self._validate_password_hashes(connection)
             if empty_database:
                 self._create_v11_indexes(connection)
+                self._create_v14_dictionary_indexes(connection)
                 self._require_foreign_key_integrity(connection)
-                connection.execute("PRAGMA user_version = 13")
+                connection.execute("PRAGMA user_version = 14")
             elif version < 11:
                 self._migrate_schema_v11(connection, version)
                 self._migrate_schema_v12(connection, 11)
                 self._migrate_schema_v13(connection, 12)
+                self._migrate_schema_v14(connection, 13)
             elif version < 12:
                 self._migrate_schema_v12(connection, version)
                 self._migrate_schema_v13(connection, 12)
+                self._migrate_schema_v14(connection, 13)
             elif version < 13:
                 self._migrate_schema_v13(connection, version)
+                self._migrate_schema_v14(connection, 13)
+            elif version < 14:
+                self._migrate_schema_v14(connection, version)
             else:
                 self._create_v11_indexes(connection)
+                self._create_v14_dictionary_schema(connection)
+                self._create_v14_dictionary_indexes(connection)
                 self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
@@ -275,6 +311,7 @@ class StateStore:
     def _create_compatible_schema(self, connection, *, latest: bool = False) -> None:
         self._migrate_historical_annotations(connection)
         self._create_account_schema(connection, latest=latest)
+        self._create_v14_dictionary_schema(connection)
         self._add_column_if_missing(
             connection,
             "users",
@@ -1251,6 +1288,81 @@ class StateStore:
         self._create_v11_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 13")
+
+    @staticmethod
+    def _create_v14_dictionary_schema(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionaries (
+                id TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                source_language TEXT NOT NULL,
+                target_language TEXT NOT NULL,
+                entry_count INTEGER NOT NULL CHECK(entry_count > 0),
+                content_sha256 TEXT NOT NULL UNIQUE,
+                attribution TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+                created_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionary_defaults (
+                source_language TEXT PRIMARY KEY,
+                dictionary_id TEXT NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
+                updated_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dictionary_import_jobs (
+                id TEXT PRIMARY KEY,
+                original_filename TEXT NOT NULL,
+                content_sha256 TEXT,
+                status TEXT NOT NULL CHECK(status IN (
+                    'queued', 'running', 'complete', 'failed', 'interrupted'
+                )),
+                error_code TEXT,
+                dictionary_id TEXT REFERENCES dictionaries(id) ON DELETE SET NULL,
+                requested_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK((status = 'failed') = (error_code IS NOT NULL))
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v14_dictionary_indexes(connection) -> None:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dictionaries_source_enabled "
+            "ON dictionaries(source_language, enabled)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dictionary_import_jobs_queue "
+            "ON dictionary_import_jobs(created_at, id) WHERE status = 'queued'"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_dictionary_import_jobs_dictionary "
+            "ON dictionary_import_jobs(dictionary_id) WHERE dictionary_id IS NOT NULL"
+        )
+
+    def _migrate_schema_v14(self, connection, source_version) -> None:
+        if source_version >= 14:
+            return
+        self._create_v14_dictionary_schema(connection)
+        connection.execute(
+            "UPDATE dictionary_import_jobs SET status = 'interrupted', "
+            "updated_at = CURRENT_TIMESTAMP WHERE status = 'running'"
+        )
+        self._create_v14_dictionary_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 14")
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -4793,6 +4905,257 @@ class StateStore:
                 (canonical_path,),
             ).fetchone()
         return self._book_record(row) if row else None
+
+    @staticmethod
+    def _dictionary_record(row) -> DictionaryRecord:
+        return DictionaryRecord(
+            id=row["id"],
+            display_name=row["display_name"],
+            source_language=row["source_language"],
+            target_language=row["target_language"],
+            entry_count=int(row["entry_count"]),
+            content_sha256=row["content_sha256"],
+            attribution=row["attribution"],
+            enabled=bool(row["enabled"]),
+            created_by_user_id=row["created_by_user_id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    def _dictionary_import_job(row) -> DictionaryImportJob:
+        return DictionaryImportJob(
+            id=row["id"],
+            original_filename=row["original_filename"],
+            content_sha256=row["content_sha256"],
+            status=row["status"],
+            error_code=row["error_code"],
+            dictionary_id=row["dictionary_id"],
+            requested_by_user_id=row["requested_by_user_id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    def _dictionary_language(value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Dictionary language must be a string")
+        normalized = value.strip()
+        if not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*", normalized):
+            raise ValueError("Dictionary language is invalid")
+        return normalized
+
+    def create_dictionary(
+        self,
+        *,
+        dictionary_id: str,
+        display_name: str,
+        source_language: str,
+        target_language: str,
+        entry_count: int,
+        content_sha256: str,
+        attribution: str,
+        created_by_user_id: str,
+    ) -> DictionaryRecord:
+        if not isinstance(dictionary_id, str) or not dictionary_id:
+            raise ValueError("Dictionary ID is invalid")
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise ValueError("Dictionary name is invalid")
+        if isinstance(entry_count, bool) or not isinstance(entry_count, int) or entry_count < 1:
+            raise ValueError("Dictionary entry count is invalid")
+        if not isinstance(content_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", content_sha256):
+            raise ValueError("Dictionary content digest is invalid")
+        if not isinstance(attribution, str):
+            raise ValueError("Dictionary attribution is invalid")
+        source_language = self._dictionary_language(source_language)
+        target_language = self._dictionary_language(target_language)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, created_by_user_id)
+            connection.execute(
+                """
+                INSERT INTO dictionaries (
+                    id, display_name, source_language, target_language, entry_count,
+                    content_sha256, attribution, created_by_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    dictionary_id, display_name.strip(), source_language, target_language,
+                    entry_count, content_sha256, attribution, created_by_user_id,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM dictionaries WHERE id = ?", (dictionary_id,)
+            ).fetchone()
+        return self._dictionary_record(row)
+
+    def list_dictionaries(self) -> tuple[DictionaryRecord, ...]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM dictionaries ORDER BY source_language, display_name, id"
+            ).fetchall()
+        return tuple(self._dictionary_record(row) for row in rows)
+
+    def get_dictionary(self, dictionary_id: str) -> Optional[DictionaryRecord]:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM dictionaries WHERE id = ?", (dictionary_id,)
+            ).fetchone()
+        return self._dictionary_record(row) if row is not None else None
+
+    def set_dictionary_enabled(self, dictionary_id: str, enabled: bool) -> DictionaryRecord:
+        if not isinstance(enabled, bool):
+            raise ValueError("Dictionary enabled flag must be a boolean")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                "UPDATE dictionaries SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (int(enabled), dictionary_id),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(f"Unknown dictionary ID: {dictionary_id}")
+            if not enabled:
+                connection.execute(
+                    "DELETE FROM dictionary_defaults WHERE dictionary_id = ?", (dictionary_id,)
+                )
+            row = connection.execute(
+                "SELECT * FROM dictionaries WHERE id = ?", (dictionary_id,)
+            ).fetchone()
+        return self._dictionary_record(row)
+
+    def set_dictionary_default(
+        self, source_language: str, dictionary_id: str, updated_by_user_id: str
+    ) -> DictionaryRecord:
+        source_language = self._dictionary_language(source_language)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, updated_by_user_id)
+            row = connection.execute(
+                "SELECT * FROM dictionaries WHERE id = ? AND enabled = 1", (dictionary_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown enabled dictionary ID: {dictionary_id}")
+            if row["source_language"] != source_language:
+                raise ValueError("Dictionary default language must match dictionary source language")
+            connection.execute(
+                """
+                INSERT INTO dictionary_defaults (source_language, dictionary_id, updated_by_user_id)
+                VALUES (?, ?, ?)
+                ON CONFLICT(source_language) DO UPDATE SET
+                    dictionary_id = excluded.dictionary_id,
+                    updated_by_user_id = excluded.updated_by_user_id,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (source_language, dictionary_id, updated_by_user_id),
+            )
+        return self._dictionary_record(row)
+
+    def get_dictionary_default(self, source_language: str) -> Optional[DictionaryRecord]:
+        source_language = self._dictionary_language(source_language)
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT dictionaries.* FROM dictionary_defaults
+                JOIN dictionaries ON dictionaries.id = dictionary_defaults.dictionary_id
+                WHERE dictionary_defaults.source_language = ? AND dictionaries.enabled = 1
+                """,
+                (source_language,),
+            ).fetchone()
+        return self._dictionary_record(row) if row is not None else None
+
+    def delete_dictionary(self, dictionary_id: str) -> None:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "DELETE FROM dictionary_defaults WHERE dictionary_id = ?", (dictionary_id,)
+            )
+            cursor = connection.execute("DELETE FROM dictionaries WHERE id = ?", (dictionary_id,))
+            if cursor.rowcount != 1:
+                raise KeyError(f"Unknown dictionary ID: {dictionary_id}")
+
+    def create_dictionary_import_job(
+        self, *, job_id: str, original_filename: str, content_sha256: Optional[str],
+        requested_by_user_id: str,
+    ) -> DictionaryImportJob:
+        if not isinstance(job_id, str) or not job_id:
+            raise ValueError("Dictionary import job ID is invalid")
+        if not isinstance(original_filename, str) or not original_filename.strip():
+            raise ValueError("Dictionary import filename is invalid")
+        if content_sha256 is not None and (
+            not isinstance(content_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", content_sha256)
+        ):
+            raise ValueError("Dictionary import digest is invalid")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, requested_by_user_id)
+            connection.execute(
+                """
+                INSERT INTO dictionary_import_jobs (
+                    id, original_filename, content_sha256, status, requested_by_user_id
+                ) VALUES (?, ?, ?, 'queued', ?)
+                """,
+                (job_id, original_filename.strip(), content_sha256, requested_by_user_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM dictionary_import_jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+        return self._dictionary_import_job(row)
+
+    def claim_next_dictionary_import_job(self) -> Optional[DictionaryImportJob]:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT id FROM dictionary_import_jobs WHERE status = 'queued' "
+                "ORDER BY created_at, id LIMIT 1"
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                "UPDATE dictionary_import_jobs SET status = 'running', updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ?", (row["id"],)
+            )
+            claimed = connection.execute(
+                "SELECT * FROM dictionary_import_jobs WHERE id = ?", (row["id"],)
+            ).fetchone()
+        return self._dictionary_import_job(claimed)
+
+    def complete_dictionary_import_job(self, job_id: str, dictionary_id: str) -> DictionaryImportJob:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                """
+                UPDATE dictionary_import_jobs
+                SET status = 'complete', error_code = NULL, dictionary_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'running'
+                """,
+                (dictionary_id, job_id),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(f"Dictionary import job cannot complete: {job_id}")
+            row = connection.execute(
+                "SELECT * FROM dictionary_import_jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+        return self._dictionary_import_job(row)
+
+    def fail_dictionary_import_job(self, job_id: str, error_code: str) -> DictionaryImportJob:
+        if not isinstance(error_code, str) or not re.fullmatch(r"[a-z0-9_]{1,80}", error_code):
+            raise ValueError("Dictionary import error code is invalid")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                """
+                UPDATE dictionary_import_jobs
+                SET status = 'failed', error_code = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status IN ('queued', 'running', 'interrupted')
+                """,
+                (error_code, job_id),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(f"Dictionary import job cannot fail: {job_id}")
+            row = connection.execute(
+                "SELECT * FROM dictionary_import_jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+        return self._dictionary_import_job(row)
 
     def get_annotation(self, annotation_id: str, user_id: str):
         with self._connection() as connection:
