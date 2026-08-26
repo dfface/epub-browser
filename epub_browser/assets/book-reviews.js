@@ -59,12 +59,11 @@
       displayRoot.replaceChildren(); displayRoot.hidden = !hasSavedReview();
       if (!hasSavedReview()) return;
       var header = documentTarget.createElement('div'); header.className = 'book-review-display-header';
-      var meta = documentTarget.createElement('div'); meta.className = 'book-review-display-meta';
       var title = documentTarget.createElement('h2'); title.textContent = translate('bookReviews.title');
       var rating = documentTarget.createElement('span'); rating.className = 'book-review-display-rating'; rating.setAttribute('aria-label', translate('bookReviews.ratingValue').replace('{rating}', savedRating));
       var stars = documentTarget.createElement('span'); stars.setAttribute('aria-hidden', 'true'); stars.textContent = '★★★★★'.slice(0, Number(savedRating));
       var score = documentTarget.createElement('span'); score.className = 'book-review-display-score'; score.textContent = savedRating + '/5';
-      rating.appendChild(stars); rating.appendChild(score); meta.appendChild(title); meta.appendChild(rating); header.appendChild(meta); displayRoot.appendChild(header);
+      rating.appendChild(stars); rating.appendChild(score); header.appendChild(title); header.appendChild(rating); displayRoot.appendChild(header);
       var privacy = documentTarget.createElement('p'); privacy.className = 'book-review-display-private'; privacy.textContent = translate('bookReviews.private'); displayRoot.appendChild(privacy);
       if (!savedText) return;
       var copy = documentTarget.createElement('p'); copy.className = 'book-review-display-copy is-collapsed'; copy.textContent = savedText; displayRoot.appendChild(copy);
@@ -94,12 +93,6 @@
         var option = documentTarget.createElement('button'); option.type = 'button'; option.value = String(value); option.className = 'book-review-star-option'; option.setAttribute('role', 'radio'); option.setAttribute('aria-checked', 'false'); option.setAttribute('aria-label', translate('bookReviews.ratingValue').replace('{rating}', String(value))); option.appendChild(icon('fa-star'));
         option.addEventListener('click', (function(selected) { return function() { applyRating(String(selected)); }; })(value)); options.appendChild(option); ratingOptions.push(option);
       }
-      options.addEventListener('keydown', function(event) {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-        var current = Number(currentRating() || 1);
-        var next = Math.max(1, Math.min(5, current + (event.key === 'ArrowRight' ? 1 : -1)));
-        event.preventDefault(); applyRating(String(next)); ratingOptions[next - 1].focus();
-      });
       var ratingError = documentTarget.createElement('p'); ratingError.id = id + '-rating-error'; ratingError.className = 'book-review-rating-error'; ratingError.setAttribute('role', 'alert'); ratingError.hidden = true;
       ratingField.appendChild(legend); ratingField.appendChild(options); ratingField.appendChild(ratingError);
       var reviewLabel = documentTarget.createElement('label'); reviewLabel.className = 'book-review-label'; reviewLabel.setAttribute('for', id + '-text'); reviewLabel.textContent = translate('bookReviews.review');
