@@ -4,11 +4,16 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest import mock
 
 from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
+
+
+def _utc(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
 def table_columns(connection, table):
@@ -58,6 +63,84 @@ class StateStoreTests(unittest.TestCase):
         self.owner = self.store.initialize(
             bootstrap=BootstrapCredentials("owner", "secret")
         )
+
+    def _reading_book(self, book_id="book-1"):
+        return self.store.resolve_book(
+            Path(self.temporary.name, f"{book_id}.epub"),
+            book_id,
+            f"{book_id}-fingerprint",
+            {},
+            authoritative_book_id=book_id,
+        )
+
+    def test_heartbeat_is_idempotent_and_changes_chapter_session(self):
+        self._reading_book()
+        first = self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=1, chapter_index=2, active_seconds=15,
+            book_title="Book", chapter_label="Chapter 3", received_at=_utc("2026-08-15T00:00:15Z"),
+        )
+        duplicate = self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=1, chapter_index=2, active_seconds=15,
+            book_title="Book", chapter_label="Chapter 3", received_at=_utc("2026-08-15T00:00:16Z"),
+        )
+        changed = self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=2, chapter_index=3, active_seconds=15,
+            book_title="Book", chapter_label="Chapter 4", received_at=_utc("2026-08-15T00:00:30Z"),
+        )
+        self.assertEqual(first["active_seconds"], 15)
+        self.assertEqual(duplicate["active_seconds"], 15)
+        self.assertNotEqual(first["id"], changed["id"])
+
+    def test_insights_use_callers_timezone_and_merge_overlapping_device_sessions(self):
+        self._reading_book()
+        with self.store._connection() as connection:
+            connection.executemany(
+                """
+                INSERT INTO reading_sessions (
+                    id, user_id, book_id, chapter_index, book_title_snapshot,
+                    chapter_label_snapshot, started_at, ended_at, active_seconds,
+                    client_id, last_client_sequence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ("session-a", self.owner.user_id, "book-1", 2, "Book", "Chapter 3", _utc("2026-08-14T16:00:00Z").timestamp(), _utc("2026-08-14T16:30:00Z").timestamp(), 1800, "tab-a", 1),
+                    ("session-b", self.owner.user_id, "book-1", 2, "Book", "Chapter 3", _utc("2026-08-14T16:00:00Z").timestamp(), _utc("2026-08-14T16:30:00Z").timestamp(), 1800, "tab-b", 1),
+                ),
+            )
+        result = self.store.reading_insights(self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai")
+        self.assertEqual(result["total_active_seconds"], 1800)
+        self.assertEqual(result["days"][0]["date"], "2026-08-15")
+        self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
+
+    def test_insights_split_session_at_local_midnight_without_losing_seconds(self):
+        self._reading_book()
+        self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id, book_id="book-1", client_id="tab-a",
+            client_sequence=1, chapter_index=0, active_seconds=20,
+            book_title="Book", chapter_label="Chapter 1", received_at=_utc("2026-08-15T16:00:10Z"),
+        )
+        result = self.store.reading_insights(self.owner.user_id, "week", date(2026, 8, 16), "Asia/Shanghai")
+        self.assertEqual(sum(day["active_seconds"] for day in result["days"]), 20)
+
+    def test_heartbeat_rejects_invalid_owner_book_sequence_and_increment(self):
+        self._reading_book()
+        values = {
+            "user_id": self.owner.user_id, "book_id": "book-1", "client_id": "tab-a",
+            "client_sequence": 1, "chapter_index": 0, "active_seconds": 15,
+            "book_title": "Book", "chapter_label": "Chapter 1",
+            "received_at": _utc("2026-08-15T00:00:15Z"),
+        }
+        with self.assertRaises(ValueError):
+            self.store.record_reading_heartbeat(**(values | {"client_sequence": -1}))
+        with self.assertRaises(ValueError):
+            self.store.record_reading_heartbeat(**(values | {"active_seconds": 21}))
+        with self.assertRaises(KeyError):
+            self.store.record_reading_heartbeat(**(values | {"user_id": "missing"}))
+        with self.assertRaises(KeyError):
+            self.store.record_reading_heartbeat(**(values | {"book_id": "missing"}))
 
     def test_connections_enable_busy_timeout_foreign_keys_and_normal_sync(self):
         with self.store._connection() as connection:

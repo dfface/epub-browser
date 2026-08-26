@@ -9,9 +9,10 @@ import unicodedata
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Optional, Sequence
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .auth import (
     BootstrapCredentials,
@@ -5073,6 +5074,276 @@ class StateStore:
                 "DELETE FROM book_reviews WHERE user_id = ? AND book_id = ?",
                 (user_id, book_id),
             )
+
+    @staticmethod
+    def _reading_session_data(row) -> dict:
+        return {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "book_id": row["book_id"],
+            "chapter_index": row["chapter_index"],
+            "book_title": row["book_title_snapshot"],
+            "chapter_label": row["chapter_label_snapshot"],
+            "started_at": StateStore._utc_timestamp(row["started_at"]),
+            "ended_at": StateStore._utc_timestamp(row["ended_at"]),
+            "active_seconds": row["active_seconds"],
+            "client_id": row["client_id"],
+            "last_client_sequence": row["last_client_sequence"],
+        }
+
+    @staticmethod
+    def _utc_timestamp(value: float) -> str:
+        return datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _distribute_active_seconds(active_seconds: int, durations: Sequence[float]) -> list[int]:
+        """Split integer active time across timeline pieces without losing seconds."""
+        total_duration = sum(durations)
+        if not durations or total_duration <= 0:
+            return [0] * len(durations)
+        portions = [active_seconds * duration / total_duration for duration in durations]
+        allocated = [math.floor(portion) for portion in portions]
+        remaining = active_seconds - sum(allocated)
+        for index in sorted(
+            range(len(durations)), key=lambda item: (-(portions[item] - allocated[item]), item)
+        )[:remaining]:
+            allocated[index] += 1
+        return allocated
+
+    @staticmethod
+    def _merged_active_seconds(intervals: Sequence[dict]) -> int:
+        """Measure merged wall-clock spans without allowing sparse heartbeats to inflate time."""
+        active_intervals = sorted(
+            (interval for interval in intervals if interval["active_seconds"] > 0),
+            key=lambda interval: (interval["started_at"], interval["ended_at"]),
+        )
+        total = 0
+        current_start = current_end = None
+        current_active_seconds = 0
+        for interval in active_intervals:
+            if current_end is None or interval["started_at"] > current_end:
+                if current_end is not None:
+                    total += min(
+                        int(round(current_end - current_start)), current_active_seconds
+                    )
+                current_start = interval["started_at"]
+                current_end = interval["ended_at"]
+                current_active_seconds = interval["active_seconds"]
+                continue
+            current_end = max(current_end, interval["ended_at"])
+            current_active_seconds += interval["active_seconds"]
+        if current_end is not None:
+            total += min(int(round(current_end - current_start)), current_active_seconds)
+        return total
+
+    @staticmethod
+    def _insight_bounds(period: str, anchor_date: date, zone: ZoneInfo) -> tuple[float, float]:
+        if not isinstance(anchor_date, date) or isinstance(anchor_date, datetime):
+            raise ValueError("anchor date must be a date")
+        if period == "day":
+            starts_on = anchor_date
+            ends_on = anchor_date + timedelta(days=1)
+        elif period == "week":
+            starts_on = anchor_date - timedelta(days=anchor_date.weekday())
+            ends_on = starts_on + timedelta(days=7)
+        elif period == "month":
+            starts_on = anchor_date.replace(day=1)
+            ends_on = (
+                starts_on.replace(year=starts_on.year + 1, month=1)
+                if starts_on.month == 12
+                else starts_on.replace(month=starts_on.month + 1)
+            )
+        elif period == "year":
+            starts_on = anchor_date.replace(month=1, day=1)
+            ends_on = starts_on.replace(year=starts_on.year + 1)
+        else:
+            raise ValueError("period must be day, week, month, or year")
+        return (
+            datetime.combine(starts_on, datetime.min.time(), zone).timestamp(),
+            datetime.combine(ends_on, datetime.min.time(), zone).timestamp(),
+        )
+
+    def record_reading_heartbeat(
+        self,
+        *,
+        user_id: str,
+        book_id: str,
+        client_id: str,
+        client_sequence: int,
+        chapter_index: int,
+        active_seconds: int,
+        book_title: str,
+        chapter_label: str,
+        received_at: datetime,
+    ) -> dict:
+        if isinstance(active_seconds, bool) or not isinstance(active_seconds, int) or not 1 <= active_seconds <= 20:
+            raise ValueError("active seconds must be an integer from 1 through 20")
+        if isinstance(client_sequence, bool) or not isinstance(client_sequence, int) or client_sequence < 0:
+            raise ValueError("client sequence must be a non-negative integer")
+        if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
+            raise ValueError("chapter index must be a non-negative integer")
+        if not isinstance(client_id, str) or not 1 <= len(client_id) <= 128:
+            raise ValueError("client ID must contain from 1 through 128 characters")
+        if not isinstance(book_title, str) or not book_title.strip():
+            raise ValueError("book title must not be empty")
+        if not isinstance(chapter_label, str) or not chapter_label.strip():
+            raise ValueError("chapter label must not be empty")
+        if not isinstance(received_at, datetime) or received_at.tzinfo is None or received_at.utcoffset() is None:
+            raise ValueError("received at must be timezone-aware")
+
+        received_epoch = received_at.astimezone(timezone.utc).timestamp()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._require_user(connection, user_id)
+            self._require_active_book(connection, book_id)
+            previous = connection.execute(
+                "SELECT * FROM reading_sessions WHERE user_id = ? AND client_id = ? "
+                "ORDER BY ended_at DESC, id DESC LIMIT 1",
+                (user_id, client_id),
+            ).fetchone()
+            if previous is not None and client_sequence <= previous["last_client_sequence"]:
+                return self._reading_session_data(previous)
+            compatible = (
+                previous is not None
+                and previous["book_id"] == book_id
+                and previous["chapter_index"] == chapter_index
+                and 0 <= received_epoch - previous["ended_at"] <= 20
+            )
+            if compatible:
+                connection.execute(
+                    "UPDATE reading_sessions SET ended_at = ?, "
+                    "active_seconds = active_seconds + ?, last_client_sequence = ?, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (received_epoch, active_seconds, client_sequence, previous["id"]),
+                )
+                row = connection.execute(
+                    "SELECT * FROM reading_sessions WHERE id = ?", (previous["id"],)
+                ).fetchone()
+                return self._reading_session_data(row)
+            session_id = str(uuid.uuid4())
+            connection.execute(
+                "INSERT INTO reading_sessions ("
+                "id, user_id, book_id, chapter_index, book_title_snapshot, "
+                "chapter_label_snapshot, started_at, ended_at, active_seconds, "
+                "client_id, last_client_sequence"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    session_id, user_id, book_id, chapter_index, book_title,
+                    chapter_label, received_epoch - active_seconds, received_epoch,
+                    active_seconds, client_id, client_sequence,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM reading_sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            return self._reading_session_data(row)
+
+    def reading_insights(
+        self,
+        user_id: str,
+        period: str,
+        anchor_date: date,
+        timezone_name: str,
+    ) -> dict:
+        try:
+            zone = ZoneInfo(timezone_name)
+        except (TypeError, ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("unknown timezone") from exc
+        range_start, range_end = self._insight_bounds(period, anchor_date, zone)
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                "SELECT * FROM reading_sessions WHERE user_id = ? "
+                "AND started_at < ? AND ended_at > ? "
+                "ORDER BY started_at DESC, id DESC",
+                (user_id, range_end, range_start),
+            ).fetchall()
+
+        clipped_sessions = []
+        day_intervals = {}
+        book_intervals = {}
+        book_titles = {}
+        for row in rows:
+            started_at = max(row["started_at"], range_start)
+            ended_at = min(row["ended_at"], range_end)
+            in_range_active_seconds = self._distribute_active_seconds(
+                row["active_seconds"],
+                (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
+            )[1]
+            interval = {
+                "started_at": started_at,
+                "ended_at": ended_at,
+                "active_seconds": in_range_active_seconds,
+            }
+            clipped_sessions.append(interval)
+            book_id = row["book_id"]
+            book_intervals.setdefault(book_id, []).append(interval)
+            book_titles.setdefault(book_id, row["book_title_snapshot"])
+
+            local_start_date = datetime.fromtimestamp(started_at, zone).date()
+            local_end_date = datetime.fromtimestamp(ended_at - 0.000001, zone).date()
+            day_boundaries = []
+            current_day = local_start_date
+            while current_day <= local_end_date:
+                next_day = current_day + timedelta(days=1)
+                day_boundaries.append(
+                    (
+                        current_day,
+                        max(started_at, datetime.combine(current_day, datetime.min.time(), zone).timestamp()),
+                        min(ended_at, datetime.combine(next_day, datetime.min.time(), zone).timestamp()),
+                    )
+                )
+                current_day = next_day
+            day_active_seconds = self._distribute_active_seconds(
+                in_range_active_seconds,
+                tuple(day_end - day_start for _, day_start, day_end in day_boundaries),
+            )
+            for (day, day_start, day_end), active_seconds_for_day in zip(day_boundaries, day_active_seconds):
+                day_intervals.setdefault(day, []).append({
+                    "started_at": day_start,
+                    "ended_at": day_end,
+                    "active_seconds": active_seconds_for_day,
+                })
+
+        book_totals = {
+            book_id: self._merged_active_seconds(intervals)
+            for book_id, intervals in book_intervals.items()
+        }
+        top_book = None
+        if book_totals:
+            top_book_id = min(
+                book_totals,
+                key=lambda book_id: (-book_totals[book_id], book_titles[book_id], book_id),
+            )
+            top_book = {
+                "book_id": top_book_id,
+                "title": book_titles[top_book_id],
+                "active_seconds": book_totals[top_book_id],
+            }
+        sessions = []
+        for row, interval in zip(rows, clipped_sessions):
+            sessions.append({
+                "id": row["id"],
+                "started_at": self._utc_timestamp(interval["started_at"]),
+                "active_seconds": interval["active_seconds"],
+                "book_id": row["book_id"],
+                "book_title": row["book_title_snapshot"],
+                "chapter_index": row["chapter_index"],
+                "chapter_label": row["chapter_label_snapshot"],
+            })
+        return {
+            "period": period,
+            "anchor_date": anchor_date.isoformat(),
+            "timezone": timezone_name,
+            "total_active_seconds": self._merged_active_seconds(clipped_sessions),
+            "top_book": top_book,
+            "days": [
+                {"date": day.isoformat(), "active_seconds": self._merged_active_seconds(intervals)}
+                for day, intervals in sorted(day_intervals.items())
+                if self._merged_active_seconds(intervals) > 0
+            ],
+            "sessions": sessions,
+        }
 
     def get_reading_progress(self, user_id: str, book_hash: str):
         with self._connection() as connection:
