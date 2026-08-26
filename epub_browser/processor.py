@@ -1515,7 +1515,7 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         book_review_trigger = (
-            '<button type="button" class="css-btn secondary" data-book-review-toggle '
+            '<button type="button" class="book-review-trigger" data-book-review-toggle '
             'aria-controls="book-review-dialog" aria-expanded="false">'
             '<i class="fas fa-pen" aria-hidden="true"></i>'
             '<span data-i18n="bookReviews.write">Write review</span></button>'
@@ -1676,6 +1676,9 @@ class EPUBProcessor:
                 index_html += """<span class="book-tag">{}</span>""".format(tag_text)
         index_html += f"""
                 </div>
+                <div class="book-review-entry">
+                    {book_review_trigger}
+                </div>
                 <div class="css-controls clearReadingProgress">
                     <div class="continue-reading-control" id="continueReadingControl">
                         <a class="css-btn primary" id="continueReadingBtn" href="#" aria-label="Start reading" data-i18n-aria-label="book.startReading"><i class="fas fa-book-open"></i><span id="continueReadingBtnText" data-i18n="book.startReading">Start reading</span></a>
@@ -1686,7 +1689,6 @@ class EPUBProcessor:
                     </div>
                     {ai_book_chat_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
-                    {book_review_trigger}
                 </div>
             </div>
     </div>
