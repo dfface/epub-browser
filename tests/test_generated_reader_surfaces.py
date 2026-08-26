@@ -3043,8 +3043,11 @@ assert.deepEqual(
             review_styles.index('.book-review-star-option:has(input:disabled)'):
             review_styles.index('}', review_styles.index('.book-review-star-option:has(input:disabled)'))
         ]
+        self.assertIn('color: var(--book-review-disabled-foreground);', disabled_star_rule)
         self.assertIn('cursor: not-allowed;', disabled_star_rule)
-        self.assertIn('opacity: 0.45;', disabled_star_rule)
+        self.assertIn('opacity: 1;', disabled_star_rule)
+        self.assertIn('--book-review-disabled-foreground: #7a746a;', review_styles)
+        self.assertIn('--book-review-disabled-foreground: #918b80;', review_styles)
         self.assertIn('.book-info-card:has([data-book-reviews])', book_styles)
 
     def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):

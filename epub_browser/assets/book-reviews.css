@@ -2,6 +2,7 @@
     /* AA foregrounds: each token is paired with this component's app surface. */
     --book-review-danger-foreground: #b42318;
     --book-review-success-foreground: #176b3a;
+    --book-review-disabled-foreground: #7a746a;
     margin-top: 24px;
     padding: 20px;
     color: var(--text);
@@ -105,8 +106,9 @@
 }
 
 .book-review-star-option:has(input:disabled) {
+    color: var(--book-review-disabled-foreground);
     cursor: not-allowed;
-    opacity: 0.45;
+    opacity: 1;
 }
 
 .book-review-form textarea {
@@ -156,6 +158,7 @@
 .dark-mode .book-reviews {
     --book-review-danger-foreground: #ffb4ab;
     --book-review-success-foreground: #8ee6ad;
+    --book-review-disabled-foreground: #918b80;
 }
 
 @media (max-width: 375px) {
