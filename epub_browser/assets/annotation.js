@@ -1343,6 +1343,18 @@
             };
         },
 
+        getAnnotationAnchorRect: function(annotation) {
+            var rect = this.getSourceAnchorRect(annotation);
+            if (rect) return rect;
+            var image = annotation && this.imageForAnnotationId(annotation.id);
+            if (!image || !image.getBoundingClientRect) return null;
+            rect = image.getBoundingClientRect();
+            return {
+                left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+                width: rect.width, height: rect.height
+            };
+        },
+
         positionFloatingDialog: function(dialog, anchorRect) {
             var margin = 12;
             var width = dialog.offsetWidth || 280;
@@ -1452,11 +1464,13 @@
 
                 var textPreview = annotation.text.substring(0, 100) + (annotation.text.length > 100 ? '...' : '');
                 var dialog = document.createElement('div');
-                dialog.className = 'annotation-dialog';
+                dialog.className = 'annotation-dialog annotation-detail-dialog';
+                dialog.setAttribute('role', 'dialog');
+                dialog.setAttribute('aria-label', tr('details'));
                 dialog.innerHTML = '\
                     <div class="annotation-dialog-header">\
-                        <span><i class="fas fa-highlighter"></i> ' + tr('details') + '</span>\
-                        <button class="annotation-dialog-close" title="' + tr('close') + '" aria-label="' + tr('close') + '"><i class="fas fa-times"></i></button>\
+                        <strong>' + tr('details') + '</strong>\
+                        <button class="annotation-dialog-close" title="' + tr('close') + '" aria-label="' + tr('close') + '">×</button>\
                     </div>\
                     <div class="annotation-dialog-body">\
                         <div class="annotation-dialog-text">' + Utils.escapeHtml(textPreview) + '</div>\
@@ -1497,10 +1511,9 @@
                     colorOptions.appendChild(btn);
                 });
 
-                dialog.style.left = Math.max(10, Math.min((window.innerWidth - 300) / 2, window.innerWidth - 310)) + 'px';
-                dialog.style.top = Math.max(10, Math.min((window.innerHeight - 320) / 2, window.innerHeight - 330)) + 'px';
-
                 document.body.appendChild(dialog);
+                dialog._epubAnchor = self.getAnnotationAnchorRect(annotation);
+                self.positionFloatingDialog(dialog, dialog._epubAnchor);
                 self.activeDialog = dialog;
                 self.bindDialogOutsideClick(dialog, function() { self.closeDialog(); });
 
