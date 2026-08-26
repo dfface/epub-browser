@@ -31,7 +31,7 @@
   function createClient(target) {
     var documentTarget = target.document;
     var state = {
-      period: 'day',
+      period: 'overview',
       anchor: localIsoDate(),
       timezone: 'UTC',
       insights: null,
@@ -177,6 +177,11 @@
 
     function dateRange(period, anchor) {
       var anchorDate = new Date(anchor + 'T12:00:00Z');
+      if (period === 'overview') {
+        var overviewStart = new Date(anchorDate);
+        overviewStart.setUTCDate(overviewStart.getUTCDate() - 364);
+        return [overviewStart, anchorDate];
+      }
       if (period === 'day') return [anchorDate, anchorDate];
       if (period === 'week') {
         var mondayOffset = (anchorDate.getUTCDay() + 6) % 7;
@@ -243,7 +248,7 @@
       var controls = append(targetRoot, 'section', 'reading-insights-controls');
       var periods = append(controls, 'div', 'reading-insights-periods');
       periods.setAttribute('aria-label', translate(target, 'readingInsights.periodLabel', 'Reading period'));
-      var periodButtons = ['day', 'week', 'month'].map(function(period) {
+      var periodButtons = ['overview', 'day', 'week', 'month'].map(function(period) {
         var button = append(periods, 'button', '', periodLabel(period));
         button.type = 'button';
         button.setAttribute('data-reading-insights-period', period);
@@ -285,8 +290,13 @@
       var analyticsGrid = append(analytics, 'div', 'reading-insights-analytics-grid');
       var heatmapCard = append(analyticsGrid, 'article', 'reading-insights-analytics-card reading-insights-heatmap-card');
       append(heatmapCard, 'h3', '', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
-      append(heatmapCard, 'p', 'reading-insights-analytics-description', translate(target, 'readingInsights.activityRange', 'Last 12 weeks'));
-      var heatmap = append(heatmapCard, 'div', 'reading-insights-heatmap');
+      var heatmapRange = append(heatmapCard, 'p', 'reading-insights-analytics-description');
+      var heatmapScroll = append(heatmapCard, 'div', 'reading-insights-heatmap-scroll');
+      heatmapScroll.setAttribute('tabindex', '0');
+      heatmapScroll.setAttribute('aria-label', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
+      var heatmapMonths = append(heatmapScroll, 'div', 'reading-insights-heatmap-months');
+      heatmapMonths.setAttribute('aria-hidden', 'true');
+      var heatmap = append(heatmapScroll, 'div', 'reading-insights-heatmap');
       heatmap.setAttribute('role', 'group');
       heatmap.setAttribute('aria-label', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
       var legend = append(heatmapCard, 'div', 'reading-insights-heatmap-legend');
@@ -296,6 +306,7 @@
       append(legend, 'span', '', translate(target, 'readingInsights.activityMore', 'More'));
       var trendCard = append(analyticsGrid, 'article', 'reading-insights-analytics-card reading-insights-trend-card');
       append(trendCard, 'h3', '', translate(target, 'readingInsights.trend', 'Daily trend'));
+      append(trendCard, 'p', 'reading-insights-analytics-description', translate(target, 'readingInsights.trendRange', 'Last 30 days'));
       var metricButtons = ['duration', 'books'].map(function(metric) {
         var key = metric === 'duration' ? 'readingInsights.trend.duration' : 'readingInsights.trend.books';
         var fallback = metric === 'duration' ? 'Reading time' : 'Books read';
@@ -310,8 +321,13 @@
         });
         return button;
       });
-      var trendChart = append(trendCard, 'div', 'reading-insights-trend-chart');
+      var trendAxis = append(trendCard, 'div', 'reading-insights-trend-axis');
+      var trendYAxis = append(trendAxis, 'div', 'reading-insights-trend-y-axis');
+      var trendYLabel = append(trendYAxis, 'span', 'reading-insights-trend-y-label');
+      var trendYMax = append(trendYAxis, 'strong', 'reading-insights-trend-y-max');
+      var trendChart = append(trendAxis, 'div', 'reading-insights-trend-chart');
       trendChart.setAttribute('role', 'img');
+      var trendXAxis = append(trendCard, 'div', 'reading-insights-trend-x-axis');
       var trendValue = append(trendCard, 'p', 'reading-insights-trend-value', '—');
       var days = append(targetRoot, 'section', 'reading-insights-days');
       var daysTitle = append(days, 'h2', '', translate(target, 'readingInsights.days', 'Days'));
@@ -323,7 +339,7 @@
       selectedDay.id = 'readingInsightsSelectedDay';
       sessions.setAttribute('aria-labelledby', selectedDay.id);
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, heatmap: heatmap, trendChart: trendChart, trendValue: trendValue, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessionList: sessionList, dayButtons: [] };
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendYLabel: trendYLabel, trendYMax: trendYMax, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
       updatePeriodControls();
       updateRangeControls();
     }
@@ -356,11 +372,32 @@
       var activity = state.insights && state.insights.activity;
       var days = activity && Array.isArray(activity.days) ? activity.days : [];
       var metric = state.activityMetric === 'books' ? 'book_count' : 'active_seconds';
+      if (state.view.heatmapRange) {
+        state.view.heatmapRange.textContent = days.length
+          ? formatDateRange('overview', days[days.length - 1].date)
+          : translate(target, 'readingInsights.activityRange', 'Past year');
+      }
       if (state.view.heatmap) {
         state.view.heatmap.replaceChildren();
+        if (state.view.heatmapMonths) state.view.heatmapMonths.replaceChildren();
         if (days.length) {
           var first = new Date(days[0].date + 'T12:00:00Z');
           var leadingDays = (first.getUTCDay() + 6) % 7;
+          var weeks = Math.ceil((leadingDays + days.length) / 7);
+          var monthLabels = {};
+          days.forEach(function(day, index) {
+            var date = new Date(day.date + 'T12:00:00Z');
+            if (index === 0 || date.getUTCDate() === 1) {
+              var column = Math.floor((leadingDays + index) / 7);
+              try {
+                monthLabels[column] = new intl().DateTimeFormat(locale(), { month: 'short', timeZone: 'UTC' }).format(date);
+              } catch (error) { monthLabels[column] = day.date.slice(5, 7); }
+            }
+          });
+          if (state.view.heatmapMonths) {
+            state.view.heatmapMonths.setAttribute('style', '--reading-insights-heatmap-weeks:' + weeks);
+            for (var week = 0; week < weeks; week += 1) append(state.view.heatmapMonths, 'span', '', monthLabels[week] || '');
+          }
           for (var index = 0; index < leadingDays; index += 1) append(state.view.heatmap, 'span', 'reading-insights-heatmap-spacer');
         }
         days.forEach(function(day) {
@@ -383,7 +420,8 @@
         var isSelected = button.getAttribute('data-reading-insights-metric') === state.activityMetric;
         button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
       });
-      var values = days.map(function(day) { return Math.max(0, Number(day[metric]) || 0); });
+      var trendDays = days.slice(-30);
+      var values = trendDays.map(function(day) { return Math.max(0, Number(day[metric]) || 0); });
       var total = values.reduce(function(sum, value) { return sum + value; }, 0);
       if (state.view.trendValue) {
         state.view.trendValue.textContent = metric === 'active_seconds'
@@ -391,6 +429,27 @@
           : translate(target, 'readingInsights.booksRead', 'Books read: ' + total, { count: total });
       }
       if (!state.view.trendChart) return;
+      var maximum = Math.max.apply(Math, values.concat([1]));
+      if (state.view.trendYLabel) {
+        state.view.trendYLabel.textContent = metric === 'active_seconds'
+          ? translate(target, 'readingInsights.axis.readingTime', 'Reading time')
+          : translate(target, 'readingInsights.axis.books', 'Books');
+      }
+      if (state.view.trendYMax) {
+        state.view.trendYMax.textContent = metric === 'active_seconds'
+          ? formatDuration(maximum)
+          : translate(target, 'readingInsights.booksRead', 'Books read: ' + maximum, { count: maximum });
+      }
+      if (state.view.trendXAxis) {
+        state.view.trendXAxis.replaceChildren();
+        if (trendDays.length) {
+          [0, Math.floor((trendDays.length - 1) / 2), trendDays.length - 1].filter(function(index, position, indices) {
+            return indices.indexOf(index) === position;
+          }).forEach(function(index) {
+            append(state.view.trendXAxis, 'span', '', formatDayNumber(trendDays[index].date));
+          });
+        }
+      }
       state.view.trendChart.setAttribute(
         'aria-label',
         translate(
@@ -400,8 +459,7 @@
         ) + ': ' + (state.view.trendValue ? state.view.trendValue.textContent : '')
       );
       state.view.trendChart.replaceChildren();
-      if (!days.length || !documentTarget.createElementNS) return;
-      var maximum = Math.max.apply(Math, values.concat([1]));
+      if (!trendDays.length || !documentTarget.createElementNS) return;
       var svg = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 100 40');
       svg.setAttribute('preserveAspectRatio', 'none');
@@ -434,7 +492,8 @@
       state.view.topBook.textContent = insights.top_book
         ? insights.top_book.title + ' · ' + formatDuration(insights.top_book.active_seconds) : '—';
       renderActivity();
-      state.view.days.hidden = state.period === 'day';
+      state.view.days.hidden = state.period === 'day' || state.period === 'overview';
+      state.view.sessions.hidden = state.period === 'overview';
       state.view.dayList.replaceChildren();
       state.view.dayButtons = days.map(function(day) {
         var button = append(state.view.dayList, 'button', 'reading-insights-day-button');
@@ -492,6 +551,9 @@
       var year = parts[0];
       var month = parts[1] - 1;
       var day = parts[2];
+      if (period === 'overview') {
+        return utcIsoDate(new Date(Date.UTC(year + amount, month, day)));
+      }
       if (period === 'month') {
         var shiftedMonth = new Date(Date.UTC(year, month + amount, 1));
         var lastDay = new Date(Date.UTC(shiftedMonth.getUTCFullYear(), shiftedMonth.getUTCMonth() + 1, 0)).getUTCDate();
@@ -510,7 +572,7 @@
     }
 
     function setPeriod(period, anchor) {
-      if (!['day', 'week', 'month'].includes(period)) return Promise.resolve(null);
+      if (!['overview', 'day', 'week', 'month'].includes(period)) return Promise.resolve(null);
       if (period === state.period && (!anchor || anchor === state.anchor)) return Promise.resolve(state.insights);
       state.period = period;
       state.anchor = anchor || localIsoDate();
@@ -569,9 +631,9 @@
       var modal = ensure();
       if (!modal) return Promise.resolve(null);
       if (modal.hidden) {
-        // Insights always opens at today's timeline.  Week/month are intentional
-        // comparisons inside the dialog, not sticky state from a previous visit.
-        state.period = 'day';
+        // Start with the annual overview; day/week/month are drills into a
+        // specific range, not sticky state from a previous visit.
+        state.period = 'overview';
         state.anchor = localIsoDate();
         state.selectedDay = '';
         state.opener = opener || documentTarget.activeElement;

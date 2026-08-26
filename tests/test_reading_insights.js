@@ -106,17 +106,19 @@ test('renders a theme-token-ready activity calendar and switches its daily trend
   assert.equal(page.metricButtons[1].getAttribute('aria-pressed'), 'true');
 });
 
-test('opens on the current day and activating a period updates its pressed state before requesting the new range', async () => {
+test('opens on the annual overview and activating a period updates its pressed state before requesting the new range', async () => {
   const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
   await page.mount();
+  const overview = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'overview');
   const day = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'day');
   const week = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'week');
 
-  assert.equal(day.getAttribute('aria-pressed'), 'true');
-  assert.match(page.requests[0], /period=day/);
+  assert.equal(overview.getAttribute('aria-pressed'), 'true');
+  assert.equal(day.getAttribute('aria-pressed'), 'false');
+  assert.match(page.requests[0], /period=overview/);
   week.click();
 
-  assert.equal(day.getAttribute('aria-pressed'), 'false');
+  assert.equal(overview.getAttribute('aria-pressed'), 'false');
   assert.equal(week.getAttribute('aria-pressed'), 'true');
   await Promise.resolve();
   assert.match(page.requests.at(-1), /period=week/);
@@ -143,6 +145,15 @@ test('range label reflects the same day, week, and month bounds as the API', asy
   assert.equal(page.rangeLabel.textContent, '2026-08-10–2026-08-16');
   await page.setPeriod('month', '2026-02-15');
   assert.equal(page.rangeLabel.textContent, '2026-02-01–2026-02-28');
+});
+
+test('overview range covers a complete trailing year and hides range-specific drills', async () => {
+  const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
+  await page.mount();
+  await page.setPeriod('overview', '2026-08-15');
+  assert.equal(page.rangeLabel.textContent, '2025-08-16–2026-08-15');
+  assert.equal(page.root.children[5].hidden, true);
+  assert.equal(page.root.children[6].hidden, true);
 });
 
 test('week and month use compact visual day labels while preserving full dates for assistive technology', async () => {

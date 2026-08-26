@@ -31,7 +31,7 @@ DB_SCHEMA_VERSION = 14
 # the same chapter.  The persistence layer keeps those heartbeats distinct for
 # auditability; the personal timeline joins this short telemetry seam instead.
 READING_INSIGHTS_CONTINUITY_SECONDS = 30
-READING_INSIGHTS_ACTIVITY_DAYS = 84
+READING_INSIGHTS_ACTIVITY_DAYS = 365
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -5205,11 +5205,14 @@ class StateStore:
                 if starts_on.month == 12
                 else starts_on.replace(month=starts_on.month + 1)
             )
-        elif period == "year":
-            starts_on = anchor_date.replace(month=1, day=1)
-            ends_on = starts_on.replace(year=starts_on.year + 1)
+        elif period == "overview":
+            # The overview is deliberately a rolling year, matching the familiar
+            # contribution-calendar mental model: every cell represents one day
+            # ending on the selected date, rather than an incomplete calendar year.
+            starts_on = anchor_date - timedelta(days=READING_INSIGHTS_ACTIVITY_DAYS - 1)
+            ends_on = anchor_date + timedelta(days=1)
         else:
-            raise ValueError("period must be day, week, month, or year")
+            raise ValueError("period must be overview, day, week, or month")
         return (
             datetime.combine(starts_on, datetime.min.time(), zone).timestamp(),
             datetime.combine(ends_on, datetime.min.time(), zone).timestamp(),
@@ -5360,9 +5363,12 @@ class StateStore:
         except (TypeError, ValueError, ZoneInfoNotFoundError) as exc:
             raise ValueError("unknown timezone") from exc
         range_start, range_end = self._insight_bounds(period, anchor_date, zone)
-        activity_end_date = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        # Keep the annual activity calendar anchored to the date the user selected.
+        # Week/month ranges can otherwise show future, all-zero cells after today.
+        activity_end_date = anchor_date
         activity_start_date = activity_end_date - timedelta(days=READING_INSIGHTS_ACTIVITY_DAYS - 1)
         activity_start = datetime.combine(activity_start_date, datetime.min.time(), zone).timestamp()
+        activity_end = datetime.combine(activity_end_date + timedelta(days=1), datetime.min.time(), zone).timestamp()
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
@@ -5473,7 +5479,7 @@ class StateStore:
                 "days": self._reading_activity_days(
                     rows,
                     range_start=activity_start,
-                    range_end=range_end,
+                    range_end=activity_end,
                     zone=zone,
                 ),
             },

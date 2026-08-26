@@ -4148,7 +4148,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
         )
         self.assertEqual(insights.status_code, 200)
         self.assertEqual(insights.json()["insights"]["period"], "week")
-        self.assertEqual(len(insights.json()["insights"]["activity"]["days"]), 84)
+        self.assertEqual(len(insights.json()["insights"]["activity"]["days"]), 365)
         self.assertTrue(any(
             day["book_count"] == 1
             for day in insights.json()["insights"]["activity"]["days"]
@@ -4171,6 +4171,17 @@ class ReadingInsightsAPITests(unittest.TestCase):
             401,
         )
         self.assertEqual(anonymous.get("/api/reading-insights").status_code, 401)
+
+    def test_reading_insights_overview_is_a_trailing_year(self):
+        response = self.client.get(
+            "/api/reading-insights?period=overview&anchor=2026-08-26&timezone=UTC"
+        )
+        self.assertEqual(response.status_code, 200)
+        insights = response.json()["insights"]
+        self.assertEqual(insights["period"], "overview")
+        self.assertEqual(insights["days"][0]["date"], "2025-08-27")
+        self.assertEqual(insights["days"][-1]["date"], "2026-08-26")
+        self.assertEqual(len(insights["activity"]["days"]), 365)
 
     def test_legacy_reading_insights_url_requires_login_and_returns_to_library(self):
         anonymous = TestClient(self.app)

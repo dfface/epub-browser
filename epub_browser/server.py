@@ -3076,7 +3076,7 @@ window.location.assign(payload.redirect||'/');
         period, anchor, timezone_name = (
             values['period'][0], values['anchor'][0], values['timezone'][0]
         )
-        if period not in {'day', 'week', 'month'} or not re.fullmatch(
+        if period not in {'overview', 'day', 'week', 'month'} or not re.fullmatch(
             r'\d{4}-\d{2}-\d{2}', anchor
         ):
             return response(

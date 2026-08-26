@@ -156,7 +156,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(result["days"][0]["date"], "2026-08-15")
         self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
         self.assertEqual(self.store.reading_time_for_book(self.owner.user_id, "book-1"), 1800)
-        self.assertEqual(len(result["activity"]["days"]), 84)
+        self.assertEqual(len(result["activity"]["days"]), 365)
         self.assertEqual(result["activity"]["days"][-1], {
             "date": "2026-08-15", "active_seconds": 1800, "book_count": 1,
         })
