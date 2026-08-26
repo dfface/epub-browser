@@ -40,14 +40,16 @@
 }
 
 .reading-insights-periods,
-.reading-insights-day-list {
+.reading-insights-day-list,
+.reading-insights-range {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
 .reading-insights-periods button,
-.reading-insights-day-button {
+.reading-insights-day-button,
+.reading-insights-range button {
     min-height: 44px;
     border: 1px solid var(--border);
     border-radius: 9px;
@@ -69,7 +71,8 @@
 }
 
 .reading-insights-periods button:hover,
-.reading-insights-day-button:hover {
+.reading-insights-day-button:hover,
+.reading-insights-range button:hover {
     border-color: var(--button-bg);
     background: var(--hover);
 }
@@ -80,13 +83,15 @@
 }
 
 .reading-insights-periods button:focus-visible,
-.reading-insights-day-button:focus-visible {
+.reading-insights-day-button:focus-visible,
+.reading-insights-range button:focus-visible {
     outline: 3px solid #1d3ab1;
     outline-offset: 3px;
 }
 
 .reading-insights-periods button:disabled,
-.reading-insights-day-button:disabled {
+.reading-insights-day-button:disabled,
+.reading-insights-range button:disabled {
     cursor: progress;
     opacity: .6;
 }
@@ -95,6 +100,22 @@
     min-height: 1.5em;
     margin: 16px 0 0;
     color: var(--text-secondary);
+}
+
+.reading-insights-range {
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+.reading-insights-range-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: .92rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
 }
 
 .reading-insights-summary {
@@ -185,6 +206,8 @@
     .reading-insights-sessions,
     .reading-insights-summary-card { padding: 16px; }
     .reading-insights-periods button { flex: 1 1 0; }
+    .reading-insights-range { gap: 6px; }
+    .reading-insights-range button { padding-inline: 10px; }
     .reading-insights-day-button { flex: 1 1 100%; text-align: left; }
 }
 

@@ -17,6 +17,7 @@ function element(tagName) {
 
 function clientFor(payload) {
   const root = element('main');
+  const requests = [];
   const browser = {
     document: { createElement: element, querySelector: () => root },
     EpubBrowserI18n: { t(key) { return key; }, getLocale() { return 'en'; } },
@@ -24,9 +25,16 @@ function clientFor(payload) {
       DateTimeFormat() { return { resolvedOptions() { return { timeZone: 'UTC' }; }, format() { return '08:18'; } }; },
       NumberFormat() { return { format(value) { return String(value); } }; },
     },
-    EpubBrowserAuth: { fetch() { return Promise.resolve({ ok: true, json: () => Promise.resolve({ insights: payload }) }); } },
+    EpubBrowserAuth: {
+      fetch(url) {
+        requests.push(url);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ insights: payload }) });
+      },
+    },
   };
-  return Insights.create(browser);
+  const page = Insights.create(browser);
+  page.requests = requests;
+  return page;
 }
 
 test('selecting a day fetches and safely renders chronological sessions', async () => {
@@ -39,4 +47,30 @@ test('selecting a day fetches and safely renders chronological sessions', async 
   await page.mount();
   await page.selectDay('2026-08-15');
   assert.equal(page.sessionRows[0].textContent, '08:18 Book Chapter 6 31 min');
+});
+
+test('activating a period updates its pressed state before requesting the new range', async () => {
+  const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
+  await page.mount();
+  const day = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'day');
+  const week = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'week');
+
+  day.click();
+
+  assert.equal(day.getAttribute('aria-pressed'), 'true');
+  assert.equal(week.getAttribute('aria-pressed'), 'false');
+  await Promise.resolve();
+  assert.match(page.requests.at(-1), /period=day/);
+});
+
+test('previous and next range controls preserve period and shift the API anchor', async () => {
+  const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
+  await page.mount();
+  await page.setPeriod('week', '2026-08-15');
+  await page.previousRange();
+  assert.match(page.requests.at(-1), /period=week&anchor=2026-08-08/);
+  await page.nextRange();
+  assert.match(page.requests.at(-1), /period=week&anchor=2026-08-15/);
+  assert.equal(page.rangeButtons.previous.getAttribute('aria-label'), 'Previous range');
+  assert.equal(page.rangeButtons.next.getAttribute('aria-label'), 'Next range');
 });

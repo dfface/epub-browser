@@ -265,6 +265,11 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
     <button type="button" data-reading-insights-period="week" aria-pressed="true" data-i18n="readingInsights.period.week">Week</button>
     <button type="button" data-reading-insights-period="month" aria-pressed="false" data-i18n="readingInsights.period.month">Month</button>
   </section>
+  <nav class="reading-insights-range" aria-label="Reading range" data-i18n-aria-label="readingInsights.rangeLabel">
+    <button type="button" data-reading-insights-previous aria-label="Previous range" data-i18n-aria-label="readingInsights.previousRange">Previous</button>
+    <p class="reading-insights-range-label" data-reading-insights-range-label aria-live="polite" aria-atomic="true">Week</p>
+    <button type="button" data-reading-insights-next aria-label="Next range" data-i18n-aria-label="readingInsights.nextRange">Next</button>
+  </nav>
   <p class="reading-insights-live" data-reading-insights-live role="status" aria-live="polite" aria-atomic="true" data-i18n="readingInsights.loading">Loading reading insights…</p>
   <section class="reading-insights-summary" aria-label="Reading summary" data-i18n-aria-label="readingInsights.summaryLabel">
     <article class="reading-insights-summary-card"><p data-i18n="readingInsights.total">Active reading</p><strong data-reading-insights-total>—</strong></article>

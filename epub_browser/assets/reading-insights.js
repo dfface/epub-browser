@@ -16,6 +16,11 @@
     return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
   }
 
+  function utcIsoDate(value) {
+    var date = value instanceof Date ? value : new Date(value);
+    return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-');
+  }
+
   function endpoint(target, period, anchor, timezone) {
     var path = '/api/reading-insights?period=' + encodeURIComponent(period) +
       '&anchor=' + encodeURIComponent(anchor) + '&timezone=' + encodeURIComponent(timezone);
@@ -94,10 +99,43 @@
       if (state.root) state.root.setAttribute('aria-busy', busy ? 'true' : 'false');
       (state.view.periodButtons || []).forEach(function(button) { button.disabled = busy; });
       (state.view.dayButtons || []).forEach(function(button) { button.disabled = busy; });
+      if (state.view.previousRange) state.view.previousRange.disabled = busy;
+      if (state.view.nextRange) state.view.nextRange.disabled = busy;
     }
 
     function setLive(message) {
       if (state.view.live) state.view.live.textContent = message;
+    }
+
+    function periodLabel(period) {
+      return translate(target, 'readingInsights.period.' + period, period.charAt(0).toUpperCase() + period.slice(1));
+    }
+
+    function formatAnchor(anchor) {
+      try {
+        return new intl().DateTimeFormat(locale(), {
+          day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
+        }).format(new Date(anchor + 'T12:00:00Z'));
+      } catch (error) {
+        return anchor;
+      }
+    }
+
+    function updatePeriodControls() {
+      (state.view.periodButtons || []).forEach(function(button) {
+        button.setAttribute(
+          'aria-pressed',
+          button.getAttribute('data-reading-insights-period') === state.period ? 'true' : 'false'
+        );
+      });
+    }
+
+    function updateRangeControls() {
+      if (state.view.rangeLabel) {
+        state.view.rangeLabel.textContent = periodLabel(state.period) + ' · ' + formatAnchor(state.anchor);
+      }
+      if (state.view.previousRange) state.view.previousRange.setAttribute('aria-label', translate(target, 'readingInsights.previousRange', 'Previous range'));
+      if (state.view.nextRange) state.view.nextRange.setAttribute('aria-label', translate(target, 'readingInsights.nextRange', 'Next range'));
     }
 
     function build(targetRoot) {
@@ -115,13 +153,25 @@
       var periods = append(targetRoot, 'section', 'reading-insights-periods');
       periods.setAttribute('aria-label', translate(target, 'readingInsights.periodLabel', 'Reading period'));
       var periodButtons = ['day', 'week', 'month'].map(function(period) {
-        var button = append(periods, 'button', '', translate(target, 'readingInsights.period.' + period, period.charAt(0).toUpperCase() + period.slice(1)));
+        var button = append(periods, 'button', '', periodLabel(period));
         button.type = 'button';
         button.setAttribute('data-reading-insights-period', period);
         button.setAttribute('aria-pressed', period === state.period ? 'true' : 'false');
         button.addEventListener('click', function() { setPeriod(period); });
         return button;
       });
+      var range = append(targetRoot, 'nav', 'reading-insights-range');
+      range.setAttribute('aria-label', translate(target, 'readingInsights.rangeLabel', 'Reading range'));
+      var previousRange = append(range, 'button', '', translate(target, 'readingInsights.previousRange', 'Previous range'));
+      previousRange.type = 'button';
+      previousRange.setAttribute('data-reading-insights-previous', '');
+      previousRange.addEventListener('click', function() { previousRangeForPeriod(); });
+      var rangeLabel = append(range, 'p', 'reading-insights-range-label');
+      rangeLabel.setAttribute('aria-live', 'polite'); rangeLabel.setAttribute('aria-atomic', 'true');
+      var nextRange = append(range, 'button', '', translate(target, 'readingInsights.nextRange', 'Next range'));
+      nextRange.type = 'button';
+      nextRange.setAttribute('data-reading-insights-next', '');
+      nextRange.addEventListener('click', function() { nextRangeForPeriod(); });
       var live = append(targetRoot, 'p', 'reading-insights-live', translate(target, 'readingInsights.loading', 'Loading reading insights…'));
       live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
       var summary = append(targetRoot, 'section', 'reading-insights-summary');
@@ -142,7 +192,9 @@
       selectedDay.id = 'readingInsightsSelectedDay';
       sessions.setAttribute('aria-labelledby', selectedDay.id);
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, live: live, total: total, topBook: topBook, dayList: dayList, selectedDay: selectedDay, sessionList: sessionList, dayButtons: [] };
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, dayList: dayList, selectedDay: selectedDay, sessionList: sessionList, dayButtons: [] };
+      updatePeriodControls();
+      updateRangeControls();
     }
 
     function renderSessions() {
@@ -219,12 +271,37 @@
       return Promise.resolve(state.insights);
     }
 
+    function shiftAnchor(anchor, period, amount) {
+      var parts = String(anchor).split('-').map(Number);
+      if (parts.length !== 3 || parts.some(function(value) { return !Number.isInteger(value); })) return localIsoDate();
+      var year = parts[0];
+      var month = parts[1] - 1;
+      var day = parts[2];
+      if (period === 'month') {
+        var shiftedMonth = new Date(Date.UTC(year, month + amount, 1));
+        var lastDay = new Date(Date.UTC(shiftedMonth.getUTCFullYear(), shiftedMonth.getUTCMonth() + 1, 0)).getUTCDate();
+        return utcIsoDate(new Date(Date.UTC(shiftedMonth.getUTCFullYear(), shiftedMonth.getUTCMonth(), Math.min(day, lastDay))));
+      }
+      var shifted = new Date(Date.UTC(year, month, day + (period === 'week' ? amount * 7 : amount)));
+      return utcIsoDate(shifted);
+    }
+
+    function previousRangeForPeriod() {
+      return setPeriod(state.period, shiftAnchor(state.anchor, state.period, -1));
+    }
+
+    function nextRangeForPeriod() {
+      return setPeriod(state.period, shiftAnchor(state.anchor, state.period, 1));
+    }
+
     function setPeriod(period, anchor) {
       if (!['day', 'week', 'month'].includes(period)) return Promise.resolve(null);
       if (period === state.period && (!anchor || anchor === state.anchor)) return Promise.resolve(state.insights);
       state.period = period;
       state.anchor = anchor || localIsoDate();
       state.selectedDay = '';
+      updatePeriodControls();
+      updateRangeControls();
       return load();
     }
 
@@ -242,7 +319,7 @@
       return load();
     }
 
-    return { mount: mount, selectDay: selectDay, setPeriod: setPeriod, load: load, get sessionRows() { return state.view.sessionList ? state.view.sessionList.children : []; } };
+    return { mount: mount, selectDay: selectDay, setPeriod: setPeriod, previousRange: previousRangeForPeriod, nextRange: nextRangeForPeriod, load: load, get sessionRows() { return state.view.sessionList ? state.view.sessionList.children : []; }, get periodButtons() { return state.view.periodButtons || []; }, get rangeButtons() { return { previous: state.view.previousRange, next: state.view.nextRange }; } };
   }
 
   var defaultClient = null;
