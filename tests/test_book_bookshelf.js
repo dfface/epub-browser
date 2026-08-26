@@ -166,3 +166,63 @@ test('Server progress labels never invent a shared account identity', () => {
 
   assert.equal(client.context.getProgressIdentity(), '');
 });
+
+test('book sorting leaves book metadata content available for text selection', async () => {
+  const listeners = {};
+  let sortableOptions;
+  const container = {
+    dataset: {},
+    addEventListener(type, listener) { listeners[type] = listener; },
+  };
+  const passiveButton = {
+    classList: { add() {}, remove() {} },
+    addEventListener() {},
+  };
+  const window = {
+    EpubBrowserMode: 'static',
+    epubBrowserCache: { kindle_mode: 'false' },
+    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserNotification: { show() {} },
+    EpubBrowserBookFeatures: { load() { return Promise.resolve(); } },
+    Sortable: {
+      create(element, options) {
+        sortableOptions = options;
+      },
+    },
+    addEventListener() {},
+    location: { pathname: '/book/book-id/index.html' },
+    scrollTo() {},
+  };
+  const document = {
+    cookie: '',
+    body: { style: {} },
+    documentElement: { classList: { add() {}, remove() {} }, dataset: {} },
+    getElementById(id) {
+      if (id === 'scrollToTopBtn') return passiveButton;
+      return null;
+    },
+    querySelector(selector) {
+      if (selector === '.container') return container;
+      return null;
+    },
+    querySelectorAll() { return []; },
+  };
+  const context = {
+    window,
+    Sortable: window.Sortable,
+    document,
+    navigator: { userAgent: '' },
+    localStorage: { getItem() { return null; }, setItem() {}, length: 0, key() { return null; }, removeItem() {} },
+    setTimeout,
+    clearTimeout,
+    Promise,
+  };
+
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
+  context.initScript();
+  listeners.pointerdown();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.match(sortableOptions.filter, /\.book-info-content/);
+  assert.equal(sortableOptions.preventOnFilter, false);
+});

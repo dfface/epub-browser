@@ -298,7 +298,7 @@ function initScript() {
         Sortable.create(el, {
             delay: 300,
             delayOnTouchOnly: true,
-            filter: '.toc-container',
+            filter: '.toc-container, .book-info-content',
             preventOnFilter: false,
             onEnd: function(evt) {
                 // 替换 Array.from
