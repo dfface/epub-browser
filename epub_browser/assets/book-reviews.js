@@ -113,10 +113,10 @@
       var id = 'book-review-' + (++instanceCount);
       target.replaceChildren();
       target.className = (target.className ? target.className + ' ' : '') + 'book-reviews';
-      target.setAttribute('aria-labelledby', id + '-title');
+      target.setAttribute('aria-labelledby', 'book-review-dialog-title');
 
       var heading = documentTarget.createElement('h2');
-      heading.id = id + '-title';
+      heading.id = 'book-review-dialog-title';
       heading.textContent = translate('bookReviews.title');
       var closeButton = documentTarget.createElement('button');
       closeButton.type = 'button';
@@ -293,23 +293,44 @@
       bookId = String(suppliedBookId);
       render(target);
       var toggle = documentTarget && documentTarget.querySelector('[data-book-review-toggle]');
+      var modal = documentTarget && documentTarget.querySelector('[data-book-review-modal]');
+      var dialog = documentTarget && documentTarget.querySelector('[data-book-review-modal] .book-review-dialog');
       function closePanel() {
-        target.hidden = true;
-        target.setAttribute('aria-hidden', 'true');
+        if (modal) modal.hidden = true;
+        if (documentTarget && typeof documentTarget.removeEventListener === 'function') {
+          documentTarget.removeEventListener('keydown', onKeydown);
+        }
         if (toggle) {
           toggle.setAttribute('aria-expanded', 'false');
           if (typeof toggle.focus === 'function') toggle.focus();
         }
       }
+      function focusFirstControl() {
+        if (view.ratingOptions && view.ratingOptions[0] && typeof view.ratingOptions[0].focus === 'function') {
+          view.ratingOptions[0].focus();
+        } else if (dialog && typeof dialog.focus === 'function') dialog.focus();
+      }
+      function onKeydown(event) {
+        if (!modal || modal.hidden) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closePanel();
+        }
+      }
       if (toggle) {
         toggle.addEventListener('click', function() {
-          var opening = target.hidden;
-          target.hidden = !opening;
-          target.setAttribute('aria-hidden', opening ? 'false' : 'true');
-          toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
-          if (opening && view.ratingOptions && view.ratingOptions[0]) view.ratingOptions[0].focus();
+          if (!modal) return;
+          modal.hidden = false;
+          toggle.setAttribute('aria-expanded', 'true');
+          if (documentTarget && typeof documentTarget.addEventListener === 'function') {
+            documentTarget.addEventListener('keydown', onKeydown);
+          }
+          focusFirstControl();
         });
       }
+      if (modal) modal.addEventListener('click', function(event) {
+        if (event.target === modal) closePanel();
+      });
       if (view.closeButton) view.closeButton.addEventListener('click', closePanel);
       return load();
     }

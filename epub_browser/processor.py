@@ -1471,7 +1471,8 @@ class EPUBProcessor:
         )
         reading_insights_navigation = (
             '<a class="app-nav-link" href="/reading-insights" '
-            'data-i18n="readingInsights.navigation">Reading insights</a>'
+            'data-i18n="readingInsights.navigation"><i class="fas fa-chart-column" '
+            'aria-hidden="true"></i><span>Reading insights</span></a>'
             if self.deployment_mode == "server" else ""
         )
         ai_reading_indicators = (
@@ -1495,13 +1496,18 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         book_review_panel = (
-            f'<div class="book-review-entry">'
-            f'<button type="button" class="css-btn secondary" data-book-review-toggle '
-            f'aria-controls="book-review-panel" aria-expanded="false">'
-            f'<i class="fas fa-star" aria-hidden="true"></i>'
-            f'<span data-i18n="bookReviews.title">My review</span></button>'
-            f'<section id="book-review-panel" data-book-reviews data-book-id="{book_id_attribute}" hidden></section>'
-            f'</div>'
+            f'<div class="book-review-modal" data-book-review-modal hidden>'
+            f'<section class="book-review-dialog" id="book-review-dialog" role="dialog" '
+            f'aria-modal="true" aria-labelledby="book-review-dialog-title" tabindex="-1">'
+            f'<section data-book-reviews data-book-id="{book_id_attribute}"></section>'
+            f'</section></div>'
+            if self.deployment_mode == "server" else ""
+        )
+        book_review_trigger = (
+            '<button type="button" class="css-btn secondary" data-book-review-toggle '
+            'aria-controls="book-review-dialog" aria-expanded="false">'
+            '<i class="fas fa-star" aria-hidden="true"></i>'
+            '<span data-i18n="bookReviews.title">My review</span></button>'
             if self.deployment_mode == "server" else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
@@ -1669,6 +1675,7 @@ class EPUBProcessor:
                     </div>
                     {ai_book_chat_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
+                    {book_review_trigger}
                 </div>
                 {book_review_panel}
             </div>
@@ -2435,7 +2442,8 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         reading_insights_navigation = (
             '<a class="app-nav-link" href="/reading-insights" '
-            'data-i18n="readingInsights.navigation">Reading insights</a>'
+            'data-i18n="readingInsights.navigation"><i class="fas fa-chart-column" '
+            'aria-hidden="true"></i><span>Reading insights</span></a>'
             if self.deployment_mode == "server" else ""
         )
         ai_reading_indicators = (
