@@ -185,6 +185,12 @@ function initBookshelf() {
         return i18n ? i18n.t('bookshelf.' + key, params) : key;
     }
 
+    function ratingLabel(rating) {
+        return i18n && i18n.t
+            ? i18n.t('bookReviews.ratingValue', { rating: rating })
+            : String(rating) + '/5';
+    }
+
     function syncErrorMessage(code) {
         var knownCodes = {
             username_required: true,
@@ -300,7 +306,8 @@ function initBookshelf() {
                     title: book.title,
                     author: authors,
                     cover: bookshelfCoverUrl(book),
-                    tags: book.tags || []
+                    tags: book.tags || [],
+                    rating: book.rating
                 };
             }
         }
@@ -451,6 +458,21 @@ function initBookshelf() {
             coverElement.appendChild(image);
         } else {
             appendIcon(coverElement, 'fas fa-book');
+        }
+        if (Number.isInteger(bookInfo.rating) && bookInfo.rating >= 1 && bookInfo.rating <= 5) {
+            var ratingElement = document.createElement('span');
+            var ratingIcon = document.createElement('i');
+            var ratingScore = document.createElement('span');
+            ratingElement.className = 'book-rating-badge';
+            ratingElement.setAttribute('role', 'img');
+            ratingElement.setAttribute('aria-label', ratingLabel(bookInfo.rating));
+            ratingIcon.className = 'fas fa-star';
+            ratingIcon.setAttribute('aria-hidden', 'true');
+            ratingScore.setAttribute('aria-hidden', 'true');
+            ratingScore.textContent = String(bookInfo.rating);
+            ratingElement.appendChild(ratingIcon);
+            ratingElement.appendChild(ratingScore);
+            coverElement.appendChild(ratingElement);
         }
         titleElement.textContent = bookInfo.title;
         authorElement.textContent = bookInfo.author;

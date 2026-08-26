@@ -296,12 +296,13 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
 
   const card = bookGrid.children[0];
   const link = card.children[0];
-  const cover = link.children[0];
+  const coverFrame = link.children[0];
+  const cover = coverFrame.children[0];
+  const rating = coverFrame.children[1];
   const content = link.children[1];
   const title = content.children[0];
   const author = content.children[1];
-  const rating = content.children[2];
-  const tag = content.children[3].children[0];
+  const tag = content.children[2].children[0];
 
   assert.equal(link.attributes.id, book.hash);
   assert.equal(link.attributes.href, book.url);
@@ -310,11 +311,13 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.equal(cover.attributes.decoding, 'async');
   assert.equal(title.textContent, book.title);
   assert.equal(author.textContent, book.authors.join(' & '));
-  assert.equal(rating.className, 'book-private-rating');
-  assert.equal(rating.children[0].textContent, '★★★★');
+  assert.equal(rating.className, 'book-rating-badge');
+  assert.equal(rating.children[0].className, 'fas fa-star');
+  assert.equal(rating.children[1].textContent, '4');
+  assert.equal(rating.getAttribute('role'), 'img');
   assert.equal(rating.getAttribute('aria-label'), 'bookReviews.ratingValue');
   assert.equal(tag.textContent, book.tags[0]);
-  assert.equal(content.children.length, 4);
+  assert.equal(content.children.length, 3);
   assert.match(requestedUrl, /^\/reader\/book-metadata\.json\?/);
 });
 
