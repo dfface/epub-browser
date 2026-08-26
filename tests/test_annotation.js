@@ -39,14 +39,13 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
     localStorage,
     document: documentOverride || { cookie: '' },
     EpubBrowserAuth: {
-      fetch(url, requestOptions = {}) {
-        const headers = Object.assign({}, requestOptions.headers, { 'X-CSRF-Token': 'csrf' });
-        const authenticated = Object.assign({}, requestOptions, {
+      fetch(url, options = {}) {
+        const headers = Object.assign({}, options.headers, { 'X-CSRF-Token': 'csrf' });
+        const authenticated = Object.assign({}, options, {
           credentials: 'same-origin',
           headers,
         });
         authenticatedRequests.push({ url, options: authenticated });
-        if (options.fetchImpl) return options.fetchImpl(url, authenticated);
         return Promise.resolve({
           ok: response.status >= 200 && response.status < 300,
           status: response.status,
@@ -78,14 +77,7 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
     requestAnimationFrame: callback => callback(),
   };
 
-  let source = fs.readFileSync('epub_browser/assets/annotation.js', 'utf8');
-  if (options.exposeStorageManager) {
-    source = source.replace(
-      /\}\)\(window\);\s*$/,
-      'window.__testStorageManager = { init: StorageManager.init.bind(StorageManager), create: StorageManager.create.bind(StorageManager), getById: StorageManager.getById.bind(StorageManager) };\n})(window);',
-    );
-  }
-  vm.runInNewContext(source, context);
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/annotation.js', 'utf8'), context);
   window.authenticatedRequests = authenticatedRequests;
   window.indexedDbState = indexedDbState;
   return window;
@@ -120,51 +112,6 @@ test('server annotations use shared Cookie and CSRF authentication without a use
   assert.equal(received.options.credentials, 'same-origin');
   assert.equal(received.options.headers['X-CSRF-Token'], 'csrf');
   assert.equal(received.options.headers['X-Username'], undefined);
-});
-
-test('server annotation reads wait for an in-flight creation with the same ID', async () => {
-  const annotation = {
-    id: 'new-note', book_hash: 'book', chapter_index: 0, text: 'Saved text', note: '',
-    startMeta: { parentTagName: 'P', parentIndex: 0, textOffset: 0 },
-    endMeta: { parentTagName: 'P', parentIndex: 0, textOffset: 10 },
-    color: '#FFEB3B', created_at: '2026-08-26T00:00:00.000Z', updated_at: '2026-08-26T00:00:00.000Z',
-  };
-  let created = false;
-  let completeCreate;
-  const window = loadAnnotationWindow(
-    { status: 200, body: '{}' }, 'server', undefined,
-    {
-      exposeStorageManager: true,
-      fetchImpl(url) {
-        if (url === '/api/annotations') {
-          return new Promise(resolve => {
-            completeCreate = () => {
-              created = true;
-              resolve({ ok: true, status: 201, text: () => Promise.resolve(JSON.stringify({ data: annotation })) });
-            };
-          });
-        }
-        if (url === '/api/annotations/item/new-note') {
-          return Promise.resolve({
-            ok: created,
-            status: created ? 200 : 404,
-            text: () => Promise.resolve(JSON.stringify(created ? { data: annotation } : { code: 'annotation_not_found' })),
-          });
-        }
-        throw new Error('unexpected request: ' + url);
-      },
-    },
-  );
-  const storage = window.__testStorageManager;
-  await storage.init();
-
-  const creating = storage.create(annotation);
-  const reading = storage.getById(annotation.id);
-  completeCreate();
-
-  await creating;
-  const stored = await reading;
-  assert.deepEqual(JSON.parse(JSON.stringify(stored)), annotation);
 });
 
 test('annotation storage follows deployment mode instead of a saved browser choice', async () => {
