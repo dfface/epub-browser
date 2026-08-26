@@ -129,3 +129,25 @@ test('week and month use compact visual day labels while preserving full dates f
   assert.equal(button.children[1].textContent, '8/15');
   assert.equal(button.getAttribute('aria-label'), 'Sat, Aug 15, 2026: 0 sec');
 });
+
+test('week and month prefer today over the range end when today is visible', async () => {
+  const today = new Date();
+  const todayIso = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const tomorrowIso = [tomorrow.getFullYear(), String(tomorrow.getMonth() + 1).padStart(2, '0'), String(tomorrow.getDate()).padStart(2, '0')].join('-');
+  const page = clientFor({
+    total_active_seconds: 0,
+    days: [{ date: todayIso, active_seconds: 0 }, { date: tomorrowIso, active_seconds: 0 }],
+    sessions: [],
+  });
+
+  await page.mount();
+  await page.setPeriod('week', todayIso);
+  let dayList = page.root.children[4].children[1];
+  assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
+  assert.equal(dayList.children[1].getAttribute('aria-pressed'), 'false');
+
+  await page.setPeriod('month', todayIso);
+  dayList = page.root.children[4].children[1];
+  assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
+});

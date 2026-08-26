@@ -297,7 +297,9 @@
       var insights = state.insights || {};
       var days = Array.isArray(insights.days) ? insights.days : [];
       if (!state.selectedDay || !days.some(function(day) { return day.date === state.selectedDay; })) {
-        state.selectedDay = days.length ? days[days.length - 1].date : state.anchor;
+        var today = localIsoDate();
+        state.selectedDay = days.some(function(day) { return day.date === today; })
+          ? today : (days.length ? days[days.length - 1].date : state.anchor);
       }
       state.view.total.textContent = formatDuration(insights.total_active_seconds);
       state.view.topBook.textContent = insights.top_book

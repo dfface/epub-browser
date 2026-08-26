@@ -85,9 +85,9 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 
 .reading-insights-periods button[aria-pressed="true"],
 .reading-insights-day-button[aria-pressed="true"] {
-    border-color: #3148b7;
-    color: #fff;
-    background: #3148b7;
+    border-color: var(--button-bg);
+    color: var(--button-text);
+    background: var(--button-bg);
 }
 
 .reading-insights-periods button:hover,
@@ -99,13 +99,14 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 
 .reading-insights-periods button[aria-pressed="true"]:hover,
 .reading-insights-day-button[aria-pressed="true"]:hover {
-    background: #263b9c;
+    border-color: var(--button-hover);
+    background: var(--button-hover);
 }
 
 .reading-insights-periods button:focus-visible,
 .reading-insights-day-button:focus-visible,
 .reading-insights-range button:focus-visible {
-    outline: 3px solid #1d3ab1;
+    outline: 3px solid var(--button-bg);
     outline-offset: 3px;
 }
 
@@ -225,13 +226,6 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-empty {
     border-left-color: var(--border);
     color: var(--text-secondary);
-}
-
-.dark-mode .reading-insights-periods button[aria-pressed="true"],
-.dark-mode .reading-insights-day-button[aria-pressed="true"] {
-    border-color: #b5c2ff;
-    color: #13235d;
-    background: #b5c2ff;
 }
 
 @media (max-width: 768px) {
