@@ -2183,6 +2183,13 @@ assert.deepEqual(
             processor.chapters = [{"title": "One"}]
             return processor.create_chapter_template("<p>Text</p>", "", 0, "One")
 
+    def _server_chapter_html(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor("book.epub", directory, deployment_mode="server")
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            return processor.create_chapter_template("<p>Text</p>", "", 0, "One")
+
     def _book_html(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor("book.epub", directory)
@@ -3006,6 +3013,28 @@ assert.deepEqual(
                 logical_path.startswith(('ai-', 'vendor/katex/', 'vendor/mermaid/'))
                 for logical_path in library.asset_manifest.assets
             ))
+
+    def test_server_book_home_contains_review_hook_but_ssg_book_home_does_not(self):
+        server_index = self._server_book_html()
+        ssg_index = self._book_html()
+
+        self.assertIn('data-book-reviews', server_index)
+        self.assertIn('/assets/immutable/book-reviews.', server_index)
+        self.assertNotIn('data-book-reviews', ssg_index)
+        self.assertNotIn('book-reviews.', ssg_index)
+
+    def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):
+        server_chapter = self._server_chapter_html()
+        ssg_chapter = self._chapter_html()
+
+        self.assertIn('data-reading-session', server_chapter)
+        self.assertIn('/assets/immutable/reading-sessions.', server_chapter)
+        self.assertNotIn('data-reading-session', ssg_chapter)
+        self.assertNotIn('reading-sessions.', ssg_chapter)
+
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        self.assertIn("new CustomEvent('epub-browser:chapter-change'", chapter_script)
+        self.assertGreaterEqual(chapter_script.count('announceReadingSessionChapter('), 4)
 
     def test_library_and_chapter_link_the_shared_loading_stylesheet(self):
         self.assertRegex(self._library_html(), r'/assets/immutable/loading\.[0-9a-f]{12}\.css')

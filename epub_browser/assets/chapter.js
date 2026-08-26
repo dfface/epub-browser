@@ -1060,6 +1060,13 @@ function initScript() {
         scrollToChapterTarget(target);
     }
 
+    function announceReadingSessionChapter(chapterIndex, chapterLabel) {
+        if (!window.CustomEvent || !window.dispatchEvent) return;
+        window.dispatchEvent(new CustomEvent('epub-browser:chapter-change', {
+            detail: { chapterIndex: chapterIndex, chapterLabel: chapterLabel || '' }
+        }));
+    }
+
     function replaceReaderChapterContent(chapterContent, source, target) {
         if (window.AnnotationModule && typeof window.AnnotationModule.closeTransient === 'function') {
             window.AnnotationModule.closeTransient();
@@ -1078,6 +1085,10 @@ function initScript() {
         pendingAnnotationId = requestedAnnotationId();
         syncChapterScopedControls(target.index);
         refreshPartialChapterCanvas(target.index);
+        announceReadingSessionChapter(
+            target.index,
+            content.getAttribute('data-chapter-title') || ''
+        );
     }
 
     function updateReaderChapterHistory(target, options) {
@@ -1107,6 +1118,10 @@ function initScript() {
                 setBookTocActiveChapter(target.index, true);
                 if (!isKindleMode()) localStorage.setItem(book_hash, 'eb_ci_' + target.index + (target.hash || ''));
                 else setCookie(book_hash, 'eb_ci_' + target.index + (target.hash || ''));
+                announceReadingSessionChapter(
+                    target.index,
+                    loadedChapter.getAttribute('data-chapter-title') || ''
+                );
                 scrollToContinuousChapterTarget(target, loadedChapter);
                 return true;
             }
@@ -2363,6 +2378,11 @@ function initScript() {
         syncChapterScopedControls(target.index);
         refreshPartialChapterCanvas(target.index);
 
+        announceReadingSessionChapter(
+            target.index,
+            content.getAttribute('data-chapter-title') || ''
+        );
+
         var chapterSection = document.createElement('section');
         chapterSection.className = 'continuous-chapter';
         chapterSection.setAttribute('data-chapter-index', target.index);
@@ -2432,6 +2452,13 @@ function initScript() {
         if (isNaN(currentIdx)) return;
         if (currentIdx === visibleChapterIndex) return;
         visibleChapterIndex = currentIdx;
+        var currentSection = content.querySelector(
+            '.continuous-chapter[data-chapter-index="' + currentIdx + '"]'
+        );
+        announceReadingSessionChapter(
+            currentIdx,
+            currentSection && currentSection.getAttribute('data-chapter-title') || ''
+        );
         localStorage.setItem(book_hash, 'eb_ci_' + currentIdx);
         updateContinuousScrollUrl(currentIdx);
         selectReadingChapter(currentIdx);

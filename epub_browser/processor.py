@@ -1484,6 +1484,15 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         ai_book_chat_script = ""
+        book_review_assets = (
+            '<link rel="stylesheet" href="' + self.asset_manifest.url_for("book-reviews.css") + '">'
+            '<script src="' + self.asset_manifest.url_for("book-reviews.js") + '" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
+        book_review_panel = (
+            f'<section data-book-reviews data-book-id="{book_id_attribute}"></section>'
+            if self.deployment_mode == "server" else ""
+        )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -1515,6 +1524,7 @@ class EPUBProcessor:
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     {server_account_stylesheet}
+    {book_review_assets}
 """
         index_html += """
     <script>
@@ -1648,6 +1658,7 @@ class EPUBProcessor:
                     {ai_book_chat_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                 </div>
+                {book_review_panel}
             </div>
     </div>
     <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
@@ -1777,10 +1788,14 @@ class EPUBProcessor:
         startup = (
             """function startBookClients() {
     if (!window.EpubBrowserAuth) return;
-    window.EpubBrowserAuth.init().then(function(session) {
-        if (!session) return;
-        if (window.initScriptBook) window.initScriptBook();
-    });
+        window.EpubBrowserAuth.init().then(function(session) {
+            if (!session) return;
+            if (window.initScriptBook) window.initScriptBook();
+            var reviewRoot = document.querySelector('[data-book-reviews]');
+            if (reviewRoot && window.EpubBookReviews) {
+                window.EpubBookReviews.mount(reviewRoot, reviewRoot.getAttribute('data-book-id'));
+            }
+        });
 }
 if (window.EpubBrowserCacheBoundary) {
     window.EpubBrowserCacheBoundary.start(startBookClients);
@@ -2424,6 +2439,15 @@ document.addEventListener('DOMContentLoaded', function() {{
             '<script src="/assets/ai-feature-loader.js" defer></script>'
             if self.deployment_mode == "server" else ""
         )
+        reading_session_context = (
+            f'<meta data-reading-session data-book-id="{book_id_attribute}" '
+            f'data-chapter-index="{chapter_index}" data-chapter-label="{chapter_title_attribute}">'
+            if self.deployment_mode == "server" else ""
+        )
+        reading_session_script = (
+            '<script src="/assets/reading-sessions.js" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -2455,6 +2479,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{chapter_title_text} - {book_title_text}</title>
+    {reading_session_context}
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
     {ai_feature_assets}
@@ -2963,6 +2988,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         window.EpubBrowserAuth.init().then(function(session) {
             if (!session) return;
             if (window.initScriptChapter) window.initScriptChapter();
+            if (window.EpubReadingSessions) window.EpubReadingSessions.start();
         });
     }
     if (window.EpubBrowserCacheBoundary) {
@@ -2993,6 +3019,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/sortable.min.js" defer></script>
     <script src="/assets/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
+    {reading_session_script}
     {ai_chapter_scripts}
     <script>
     document.addEventListener('DOMContentLoaded', function() {{

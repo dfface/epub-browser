@@ -4501,7 +4501,18 @@
       'annotations.imageNote': 'Image note',
       'ai.annotation.vocabulary': 'Rare characters & vocabulary',
       'ai.teachKicker': 'FEYNMAN LEARNING',
-      'ai.teachTitle': 'Teach it back in your own words'
+      'ai.teachTitle': 'Teach it back in your own words',
+      'bookReviews.title': 'My review',
+      'bookReviews.rating': 'Rating',
+      'bookReviews.ratingValue': '{rating} out of 5 stars',
+      'bookReviews.review': 'Review',
+      'bookReviews.reviewHint': 'Private to your account. Up to 10,000 characters.',
+      'bookReviews.save': 'Save review',
+      'bookReviews.delete': 'Delete review',
+      'bookReviews.savedRating': 'Your saved rating',
+      'bookReviews.saved': 'Review saved.',
+      'bookReviews.deleted': 'Review deleted.',
+      'bookReviews.deleteConfirm': 'Delete your private review? This cannot be undone.'
     },
     'zh-CN': {
       'account.loading': '正在加载账户设置…',
@@ -4535,7 +4546,18 @@
       'annotations.imageNote': '图片笔记',
       'ai.annotation.vocabulary': '生僻字词讲解',
       'ai.teachKicker': '费曼学习法',
-      'ai.teachTitle': '用自己的话讲明白'
+      'ai.teachTitle': '用自己的话讲明白',
+      'bookReviews.title': '我的书评',
+      'bookReviews.rating': '评分',
+      'bookReviews.ratingValue': '5 星制 {rating} 星',
+      'bookReviews.review': '书评',
+      'bookReviews.reviewHint': '仅你的账户可见，最多 10,000 个字符。',
+      'bookReviews.save': '保存书评',
+      'bookReviews.delete': '删除书评',
+      'bookReviews.savedRating': '你保存的评分',
+      'bookReviews.saved': '书评已保存。',
+      'bookReviews.deleted': '书评已删除。',
+      'bookReviews.deleteConfirm': '删除你的私人书评？此操作无法撤销。'
     },
     'zh-TW': {
       'account.loading': '正在載入帳戶設定…',
@@ -4569,7 +4591,18 @@
       'annotations.imageNote': '圖片筆記',
       'ai.annotation.vocabulary': '生僻字詞解說',
       'ai.teachKicker': '費曼學習法',
-      'ai.teachTitle': '用自己的話講明白'
+      'ai.teachTitle': '用自己的話講明白',
+      'bookReviews.title': '我的書評',
+      'bookReviews.rating': '評分',
+      'bookReviews.ratingValue': '滿分 5 星中的 {rating} 星',
+      'bookReviews.review': '書評',
+      'bookReviews.reviewHint': '僅你的帳戶可見，最多 10,000 個字元。',
+      'bookReviews.save': '儲存書評',
+      'bookReviews.delete': '刪除書評',
+      'bookReviews.savedRating': '你儲存的評分',
+      'bookReviews.saved': '書評已儲存。',
+      'bookReviews.deleted': '書評已刪除。',
+      'bookReviews.deleteConfirm': '要刪除你的私人書評嗎？此操作無法復原。'
     },
     ko: {
       'account.loading': '계정 설정을 불러오는 중…',
@@ -4603,7 +4636,18 @@
       'annotations.imageNote': '이미지 메모',
       'ai.annotation.vocabulary': '낯선 글자·어휘 풀이',
       'ai.teachKicker': '파인만 학습법',
-      'ai.teachTitle': '내 말로 다시 설명하기'
+      'ai.teachTitle': '내 말로 다시 설명하기',
+      'bookReviews.title': '내 서평',
+      'bookReviews.rating': '평점',
+      'bookReviews.ratingValue': '5점 만점에 {rating}점',
+      'bookReviews.review': '서평',
+      'bookReviews.reviewHint': '내 계정에만 표시됩니다. 최대 10,000자입니다.',
+      'bookReviews.save': '서평 저장',
+      'bookReviews.delete': '서평 삭제',
+      'bookReviews.savedRating': '저장한 평점',
+      'bookReviews.saved': '서평을 저장했습니다.',
+      'bookReviews.deleted': '서평을 삭제했습니다.',
+      'bookReviews.deleteConfirm': '비공개 서평을 삭제할까요? 이 작업은 되돌릴 수 없습니다.'
     },
     ja: {
       'account.loading': 'アカウント設定を読み込み中…',
@@ -4637,7 +4681,18 @@
       'annotations.imageNote': '画像メモ',
       'ai.annotation.vocabulary': '難しい字句の解説',
       'ai.teachKicker': 'ファインマン学習法',
-      'ai.teachTitle': '自分の言葉で説明する'
+      'ai.teachTitle': '自分の言葉で説明する',
+      'bookReviews.title': '自分のレビュー',
+      'bookReviews.rating': '評価',
+      'bookReviews.ratingValue': '5 段階中 {rating}',
+      'bookReviews.review': 'レビュー',
+      'bookReviews.reviewHint': '自分のアカウントだけに表示されます。最大 10,000 文字です。',
+      'bookReviews.save': 'レビューを保存',
+      'bookReviews.delete': 'レビューを削除',
+      'bookReviews.savedRating': '保存した評価',
+      'bookReviews.saved': 'レビューを保存しました。',
+      'bookReviews.deleted': 'レビューを削除しました。',
+      'bookReviews.deleteConfirm': '非公開レビューを削除しますか？この操作は元に戻せません。'
     }
   };
   Object.keys(localeAdditions).forEach(function(code) {
