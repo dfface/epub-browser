@@ -7,6 +7,7 @@
 
   var STORAGE_PREFIX = 'epub-reading-sessions:';
   var CLIENT_ID_KEY = STORAGE_PREFIX + 'client-id';
+  var COORDINATION_KEY = STORAGE_PREFIX + 'active-tab';
   var MAX_PENDING = 4;
   var MAX_SECONDS = 20;
 
@@ -63,6 +64,7 @@
   function createTracker(options) {
     options = options || {};
     var storage = options.sessionStorage;
+    var localStorage = options.localStorage || null;
     var clientId = options.clientId || storedClientId(storage);
     var now = options.now || function() { return Date.now(); };
     var schedule = options.schedule || function(callback, delay) {
@@ -97,8 +99,10 @@
       destroyed: false
     };
     var queueKey = STORAGE_PREFIX + clientId;
+    var sequenceKey = queueKey + ':next-sequence';
     var listeners = [];
     var channel = openChannel(options.channel);
+    var leaseMs = options.leaderLeaseMs || Math.max(state.heartbeatMs * 2, 30000);
 
     function restorePending() {
       if (!storage) return;
@@ -112,6 +116,19 @@
       } catch (error) {}
     }
 
+    function restoreNextSequence() {
+      if (!storage) return;
+      try {
+        var saved = parseInt(storage.getItem(sequenceKey), 10);
+        if (Number.isInteger(saved) && saved >= 1) state.nextSequence = saved;
+      } catch (error) {}
+    }
+
+    function saveNextSequence() {
+      if (!storage) return;
+      try { storage.setItem(sequenceKey, String(state.nextSequence)); } catch (error) {}
+    }
+
     function savePending() {
       if (!storage) return;
       try {
@@ -121,8 +138,9 @@
     }
 
     function accrue(current) {
-      if (isActive(state, current)) {
-        state.unaccountedMs += Math.max(0, current - state.lastTick);
+      if (state.visible && state.focused && state.leader && state.chapterIndex !== null && state.lastInteraction !== null) {
+        var activeUntil = Math.min(current, state.lastInteraction + state.idleMs);
+        state.unaccountedMs += Math.max(0, activeUntil - state.lastTick);
         var seconds = Math.floor(state.unaccountedMs / 1000);
         if (seconds) {
           state.unaccountedMs -= seconds * 1000;
@@ -148,6 +166,7 @@
         chapterIndex: bucket.chapter_index
       }, seconds);
       state.nextSequence += 1;
+      saveNextSequence();
       bucket.seconds -= seconds;
       state.pending.push(payload);
       if (!bucket.seconds) state.buckets.shift();
@@ -161,11 +180,6 @@
     }
 
     function retryLater(payload) {
-      var index = state.pending.indexOf(payload);
-      if (index >= 0 && index < state.pending.length - 1) {
-        state.pending.splice(index, 1);
-        state.pending.push(payload);
-      }
       savePending();
     }
 
@@ -188,6 +202,7 @@
       queueBuckets();
       if (!state.leader || !state.pending.length) return Promise.resolve(null);
       if (state.inFlight) {
+        if (keepalive && state.inFlightPayload) sendKeepalive(state.inFlightPayload);
         state.requestedFlush = true;
         state.requestedKeepalive = state.requestedKeepalive || !!keepalive;
         return state.inFlight;
@@ -215,30 +230,86 @@
       return state.inFlight;
     }
 
+    function sendKeepalive(payload) {
+      var result;
+      try {
+        result = (options.send || function() {})(asSendPayload(payload), true);
+      } catch (error) {
+        return;
+      }
+      if (result && typeof result.then === 'function') {
+        Promise.resolve(result).then(function() { removePending(payload); }, function() {});
+      } else {
+        removePending(payload);
+      }
+    }
+
     function scheduleHeartbeat() {
       if (state.destroyed || !state.heartbeatMs) return;
       state.timer = schedule(function() {
         state.timer = null;
+        if (!channel && localStorage && state.leader && state.focused) announce(true);
         flush(false);
         scheduleHeartbeat();
       }, state.heartbeatMs);
     }
 
+    function leaseMessage(focused) {
+      return {
+        type: 'epub-reading-session-active',
+        clientId: state.clientId,
+        focused: focused,
+        expiresAt: focused ? now() + leaseMs : 0
+      };
+    }
+
+    function currentLease() {
+      if (!localStorage) return null;
+      try {
+        var saved = JSON.parse(localStorage.getItem(COORDINATION_KEY) || 'null');
+        if (!saved || saved.type !== 'epub-reading-session-active' || !saved.focused || !saved.clientId ||
+          !Number.isFinite(saved.expiresAt) || saved.expiresAt <= now()) return null;
+        return saved;
+      } catch (error) {
+        return null;
+      }
+    }
+
     function announce(focused) {
-      var message = { type: 'epub-reading-session-active', clientId: state.clientId, focused: focused };
+      var message = leaseMessage(focused);
       if (channel && typeof channel.postMessage === 'function') channel.postMessage(message);
-      else if (storage) {
-        try { storage.setItem(STORAGE_PREFIX + 'active-tab', JSON.stringify(message)); } catch (error) {}
+      else if (localStorage) {
+        try {
+          if (focused) localStorage.setItem(COORDINATION_KEY, JSON.stringify(message));
+          else {
+            var lease = currentLease();
+            if (lease && lease.clientId === state.clientId) localStorage.removeItem(COORDINATION_KEY);
+          }
+        } catch (error) {}
       }
     }
 
     function receiveAnnouncement(message) {
       if (!message || message.type !== 'epub-reading-session-active' || message.clientId === state.clientId) return;
       if (message.focused) {
+        if (message.expiresAt !== undefined && message.expiresAt <= now()) return;
         accrue(now());
         state.leaderId = message.clientId;
         state.leader = false;
         state.lastInteraction = null;
+      }
+    }
+
+    function electInitialLeader() {
+      if (channel || !localStorage || !state.focused) return;
+      var lease = currentLease();
+      if (lease && lease.clientId !== state.clientId) {
+        state.leader = false;
+        state.leaderId = lease.clientId;
+      } else {
+        state.leader = true;
+        state.leaderId = state.clientId;
+        announce(true);
       }
     }
 
@@ -304,7 +375,7 @@
         setVisible(!documentTarget.hidden);
       });
       addListener(eventTarget, 'storage', function(event) {
-        if (event && event.key === STORAGE_PREFIX + 'active-tab' && event.newValue) {
+        if (event && event.key === COORDINATION_KEY && event.newValue) {
           try { receiveAnnouncement(JSON.parse(event.newValue)); } catch (error) {}
         }
       });
@@ -326,7 +397,10 @@
       }
     }
 
+    restoreNextSequence();
     restorePending();
+    saveNextSequence();
+    electInitialLeader();
     bindBrowserEvents();
     scheduleHeartbeat();
     return {
@@ -370,6 +444,7 @@
       idleMs: options.idleMs,
       heartbeatMs: options.heartbeatMs,
       sessionStorage: storage,
+      localStorage: options.localStorage || browser.localStorage,
       clientId: clientId,
       channel: channel,
       eventTarget: options.eventTarget || browser,
