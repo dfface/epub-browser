@@ -425,6 +425,38 @@ test('opening an authenticated reader starts an active reading interval before t
   tracker.destroy();
 });
 
+test('a focused reader persists its first actual second without waiting for the normal heartbeat cadence', () => {
+  const content = {
+    getAttribute(name) {
+      return { 'data-book-hash': 'book', 'data-chapter-index': '1', 'data-chapter-title': 'Two' }[name] || null;
+    },
+  };
+  const target = createEventTarget();
+  const scheduled = [];
+  const calls = [];
+  let clock = 0;
+  const root = Object.assign(target, {
+    EpubBrowserMode: 'server',
+    EpubBrowserAuth: { fetch(_url, options) { calls.push(options); return Promise.resolve({ ok: true }); } },
+    sessionStorage: createStorage(),
+    document: { getElementById: () => content, hasFocus: () => true },
+  });
+
+  const tracker = Sessions.start({
+    root,
+    eventTarget: target,
+    now: () => clock,
+    schedule(callback, delay) { scheduled.push({ callback, delay }); return callback; },
+    cancel() {},
+  });
+  assert.equal(scheduled[0].delay, 1000);
+  clock = 1000;
+  scheduled[0].callback();
+  assert.equal(JSON.parse(calls[0].body).active_seconds, 1);
+  assert.equal(scheduled[1].delay, 15000);
+  tracker.destroy();
+});
+
 test('offline payload storage retains four unacknowledged heartbeats and retries their sequence', async () => {
   let clock = 0;
   const sent = [];

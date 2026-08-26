@@ -88,6 +88,8 @@
       lastInteraction: null,
       idleMs: options.idleMs || 60000,
       heartbeatMs: options.heartbeatMs || 15000,
+      firstHeartbeatMs: options.firstHeartbeatMs === undefined ? 1000 : options.firstHeartbeatMs,
+      hasSentHeartbeat: false,
       lastTick: now(),
       unaccountedMs: 0,
       buckets: [],
@@ -314,8 +316,9 @@
         refreshLeaseLeadership();
         if (!channel && localStorage && state.leader && state.focused) announce(true);
         flush(false);
+        state.hasSentHeartbeat = true;
         scheduleHeartbeat();
-      }, state.heartbeatMs);
+      }, state.hasSentHeartbeat ? state.heartbeatMs : state.firstHeartbeatMs);
     }
 
     function leaseMessage(focused) {

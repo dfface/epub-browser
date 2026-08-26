@@ -156,6 +156,41 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(result["days"][0]["date"], "2026-08-15")
         self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
 
+    def test_insights_join_short_same_reader_telemetry_seams_in_the_timeline(self):
+        self._reading_book()
+        values = {
+            "user_id": self.owner.user_id,
+            "book_id": "book-1",
+            "client_id": "tab-a",
+            "chapter_index": 2,
+            "book_title": "Book",
+            "chapter_label": "Chapter 3",
+        }
+        self.store.record_reading_heartbeat(**(values | {
+            "client_sequence": 17,
+            "active_seconds": 4,
+            "received_at": _utc("2026-08-15T08:46:23Z"),
+        }))
+        self.store.record_reading_heartbeat(**(values | {
+            "client_sequence": 19,
+            "active_seconds": 9,
+            "received_at": _utc("2026-08-15T08:46:55Z"),
+        }))
+
+        with self.store._connection() as connection:
+            raw_count = connection.execute(
+                "SELECT COUNT(*) FROM reading_sessions WHERE user_id = ?",
+                (self.owner.user_id,),
+            ).fetchone()[0]
+        result = self.store.reading_insights(
+            self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai"
+        )
+
+        self.assertEqual(raw_count, 2)
+        self.assertEqual(result["total_active_seconds"], 13)
+        self.assertEqual(len(result["sessions"]), 1)
+        self.assertEqual(result["sessions"][0]["active_seconds"], 13)
+
     def test_insights_split_session_at_local_midnight_without_losing_seconds(self):
         self._reading_book()
         self.store.record_reading_heartbeat(

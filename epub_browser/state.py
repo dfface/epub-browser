@@ -27,6 +27,11 @@ from .locales import SUPPORTED_LOCALE_SET
 
 DB_SCHEMA_VERSION = 14
 
+# A browser may briefly reload or restore a reader while the person remains in
+# the same chapter.  The persistence layer keeps those heartbeats distinct for
+# auditability; the personal timeline joins this short telemetry seam instead.
+READING_INSIGHTS_CONTINUITY_SECONDS = 30
+
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
     "ai_not_authorized",
@@ -5151,6 +5156,38 @@ class StateStore:
         return total
 
     @staticmethod
+    def _merge_reading_session_segments(segments: Sequence[dict]) -> list[dict]:
+        """Join short same-reader telemetry seams without inflating active time."""
+        groups = []
+        for segment in sorted(segments, key=lambda item: (item["started_at"], item["id"])):
+            previous = groups[-1] if groups else None
+            compatible = (
+                previous is not None
+                and previous["display_date"] == segment["display_date"]
+                and previous["client_id"] == segment["client_id"]
+                and previous["book_id"] == segment["book_id"]
+                and previous["chapter_index"] == segment["chapter_index"]
+                and segment["started_at"] - previous["ended_at"] <= READING_INSIGHTS_CONTINUITY_SECONDS
+            )
+            if not compatible:
+                groups.append({
+                    **segment,
+                    "intervals": [{
+                        "started_at": segment["started_at"],
+                        "ended_at": segment["ended_at"],
+                        "active_seconds": segment["active_seconds"],
+                    }],
+                })
+                continue
+            previous["ended_at"] = max(previous["ended_at"], segment["ended_at"])
+            previous["intervals"].append({
+                "started_at": segment["started_at"],
+                "ended_at": segment["ended_at"],
+                "active_seconds": segment["active_seconds"],
+            })
+        return groups
+
+    @staticmethod
     def _insight_bounds(period: str, anchor_date: date, zone: ZoneInfo) -> tuple[float, float]:
         if not isinstance(anchor_date, date) or isinstance(anchor_date, datetime):
             raise ValueError("anchor date must be a date")
@@ -5321,12 +5358,15 @@ class StateStore:
                 })
                 session_segments.append({
                     "id": row["id"],
-                    "started_at": self._utc_timestamp(day_start),
+                    "started_at": day_start,
+                    "ended_at": day_end,
                     "active_seconds": active_seconds_for_day,
                     "book_id": row["book_id"],
                     "book_title": row["book_title_snapshot"],
                     "chapter_index": row["chapter_index"],
                     "chapter_label": row["chapter_label_snapshot"],
+                    "client_id": row["client_id"],
+                    "display_date": day.isoformat(),
                 })
 
         book_totals = {
@@ -5355,6 +5395,7 @@ class StateStore:
                 "active_seconds": self._merged_active_seconds(intervals),
             })
             current_day += timedelta(days=1)
+        display_sessions = self._merge_reading_session_segments(session_segments)
         return {
             "period": period,
             "anchor_date": anchor_date.isoformat(),
@@ -5362,7 +5403,15 @@ class StateStore:
             "total_active_seconds": self._merged_active_seconds(clipped_sessions),
             "top_book": top_book,
             "days": days,
-            "sessions": sorted(session_segments, key=lambda item: (item["started_at"], item["id"])),
+            "sessions": [{
+                "id": session["id"],
+                "started_at": self._utc_timestamp(session["started_at"]),
+                "active_seconds": self._merged_active_seconds(session["intervals"]),
+                "book_id": session["book_id"],
+                "book_title": session["book_title"],
+                "chapter_index": session["chapter_index"],
+                "chapter_label": session["chapter_label"],
+            } for session in display_sessions],
         }
 
     def get_reading_progress(self, user_id: str, book_hash: str):
