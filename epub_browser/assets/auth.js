@@ -315,6 +315,18 @@
       return root.confirm(t(key, params));
     }
 
+    function confirmDictionaryAction(actionKey, messageKey, params) {
+      if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') {
+        return Promise.resolve(false);
+      }
+      return Promise.resolve(root.EpubDialog.confirm({
+        title: t(actionKey),
+        message: t(messageKey, params),
+        confirmText: t(actionKey),
+        destructive: true
+      }));
+    }
+
     function confirmAdminDiscardChanges() {
       if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') {
         return Promise.resolve(false);
@@ -1033,15 +1045,24 @@
         actions.appendChild(actionButton(
           dictionary.enabled ? 'admin.disableDictionary' : 'admin.enableDictionary',
           function() {
-            if (dictionary.enabled && !confirmAdminAction('admin.confirmDisableDictionary', {
-              name: dictionary.display_name
-            })) return;
+            if (dictionary.enabled) {
+              return confirmDictionaryAction(
+                'admin.disableDictionary', 'admin.confirmDisableDictionary',
+                {name: dictionary.display_name}
+              ).then(function(confirmed) {
+                return confirmed ? updateDictionary(dictionary, false) : null;
+              });
+            }
             return updateDictionary(dictionary, !dictionary.enabled);
           }, dictionary.enabled ? 'danger' : undefined
         ));
         actions.appendChild(actionButton('admin.deleteDictionary', function() {
-          if (!confirmAdminAction('admin.confirmDeleteDictionary', {name: dictionary.display_name})) return;
-          return deleteDictionary(dictionary);
+          return confirmDictionaryAction(
+            'admin.deleteDictionary', 'admin.confirmDeleteDictionary',
+            {name: dictionary.display_name}
+          ).then(function(confirmed) {
+            return confirmed ? deleteDictionary(dictionary) : null;
+          });
         }, 'danger'));
         item.appendChild(actions);
         list.appendChild(item);
