@@ -1,0 +1,407 @@
+(function(root, factory) {
+  var exported = factory(root);
+  if (typeof module === 'object' && module.exports) module.exports = exported;
+  root.EpubReadingSessions = exported;
+})(typeof window !== 'undefined' ? window : globalThis, function(root) {
+  'use strict';
+
+  var STORAGE_PREFIX = 'epub-reading-sessions:';
+  var CLIENT_ID_KEY = STORAGE_PREFIX + 'client-id';
+  var MAX_PENDING = 4;
+  var MAX_SECONDS = 20;
+
+  function randomClientId() {
+    return 'reading-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  }
+
+  function storedClientId(storage) {
+    if (!storage) return randomClientId();
+    try {
+      var existing = storage.getItem(CLIENT_ID_KEY);
+      if (existing) return existing;
+      var created = randomClientId();
+      storage.setItem(CLIENT_ID_KEY, created);
+      return created;
+    } catch (error) {
+      return randomClientId();
+    }
+  }
+
+  function heartbeatPayload(state, seconds) {
+    return {
+      client_id: state.clientId,
+      client_sequence: state.nextSequence,
+      chapter_index: state.chapterIndex,
+      active_seconds: Math.min(MAX_SECONDS, seconds)
+    };
+  }
+
+  function isActive(state, now) {
+    return state.visible && state.focused && state.leader && state.chapterIndex !== null &&
+      state.lastInteraction !== null && now - state.lastInteraction < state.idleMs;
+  }
+
+  function asSendPayload(payload) {
+    return {
+      chapter_index: payload.chapter_index,
+      active_seconds: payload.active_seconds,
+      client_sequence: payload.client_sequence
+    };
+  }
+
+  function validPayload(value) {
+    return value && Number.isInteger(value.chapter_index) && value.chapter_index >= 0 &&
+      Number.isInteger(value.active_seconds) && value.active_seconds >= 1 && value.active_seconds <= MAX_SECONDS &&
+      Number.isInteger(value.client_sequence) && value.client_sequence >= 1;
+  }
+
+  function openChannel(channel) {
+    if (!channel) return null;
+    return typeof channel.open === 'function' ? channel.open() : channel;
+  }
+
+  function createTracker(options) {
+    options = options || {};
+    var storage = options.sessionStorage;
+    var clientId = options.clientId || storedClientId(storage);
+    var now = options.now || function() { return Date.now(); };
+    var schedule = options.schedule || function(callback, delay) {
+      var timer = setTimeout(callback, delay);
+      if (timer && typeof timer.unref === 'function') timer.unref();
+      return timer;
+    };
+    var cancel = options.cancel || function(timer) { clearTimeout(timer); };
+    var eventTarget = options.eventTarget || null;
+    var documentTarget = options.document || null;
+    var state = {
+      clientId: clientId,
+      chapterIndex: null,
+      chapterLabel: '',
+      visible: options.visible !== false,
+      focused: options.focused !== false,
+      leader: true,
+      leaderId: clientId,
+      lastInteraction: null,
+      idleMs: options.idleMs || 60000,
+      heartbeatMs: options.heartbeatMs || 15000,
+      lastTick: now(),
+      unaccountedMs: 0,
+      buckets: [],
+      pending: [],
+      nextSequence: 1,
+      inFlight: null,
+      inFlightPayload: null,
+      requestedFlush: false,
+      requestedKeepalive: false,
+      timer: null,
+      destroyed: false
+    };
+    var queueKey = STORAGE_PREFIX + clientId;
+    var listeners = [];
+    var channel = openChannel(options.channel);
+
+    function restorePending() {
+      if (!storage) return;
+      try {
+        var saved = JSON.parse(storage.getItem(queueKey) || '[]');
+        if (!Array.isArray(saved)) return;
+        state.pending = saved.filter(validPayload).slice(0, MAX_PENDING);
+        state.pending.forEach(function(payload) {
+          state.nextSequence = Math.max(state.nextSequence, payload.client_sequence + 1);
+        });
+      } catch (error) {}
+    }
+
+    function savePending() {
+      if (!storage) return;
+      try {
+        if (state.pending.length) storage.setItem(queueKey, JSON.stringify(state.pending));
+        else storage.removeItem(queueKey);
+      } catch (error) {}
+    }
+
+    function accrue(current) {
+      if (isActive(state, current)) {
+        state.unaccountedMs += Math.max(0, current - state.lastTick);
+        var seconds = Math.floor(state.unaccountedMs / 1000);
+        if (seconds) {
+          state.unaccountedMs -= seconds * 1000;
+          var latest = state.buckets[state.buckets.length - 1];
+          if (latest && latest.chapter_index === state.chapterIndex) latest.seconds += seconds;
+          else state.buckets.push({ chapter_index: state.chapterIndex, seconds: seconds });
+        }
+      }
+      state.lastTick = current;
+    }
+
+    function queueBuckets() {
+      if (!state.buckets.length || state.pending.length >= MAX_PENDING) return;
+      var bucket = state.buckets[0];
+      if (!bucket.seconds) {
+        state.buckets.shift();
+        return queueBuckets();
+      }
+      var seconds = Math.min(MAX_SECONDS, bucket.seconds);
+      var payload = heartbeatPayload({
+        clientId: state.clientId,
+        nextSequence: state.nextSequence,
+        chapterIndex: bucket.chapter_index
+      }, seconds);
+      state.nextSequence += 1;
+      bucket.seconds -= seconds;
+      state.pending.push(payload);
+      if (!bucket.seconds) state.buckets.shift();
+      savePending();
+    }
+
+    function removePending(payload) {
+      var index = state.pending.indexOf(payload);
+      if (index >= 0) state.pending.splice(index, 1);
+      savePending();
+    }
+
+    function retryLater(payload) {
+      var index = state.pending.indexOf(payload);
+      if (index >= 0 && index < state.pending.length - 1) {
+        state.pending.splice(index, 1);
+        state.pending.push(payload);
+      }
+      savePending();
+    }
+
+    function settle(payload, successful) {
+      state.inFlight = null;
+      state.inFlightPayload = null;
+      if (successful) removePending(payload);
+      else retryLater(payload);
+      if (state.requestedFlush && !state.destroyed) {
+        var keepalive = state.requestedKeepalive;
+        state.requestedFlush = false;
+        state.requestedKeepalive = false;
+        flush(keepalive);
+      }
+    }
+
+    function flush(keepalive) {
+      if (state.destroyed) return Promise.resolve(null);
+      accrue(now());
+      queueBuckets();
+      if (!state.leader || !state.pending.length) return Promise.resolve(null);
+      if (state.inFlight) {
+        state.requestedFlush = true;
+        state.requestedKeepalive = state.requestedKeepalive || !!keepalive;
+        return state.inFlight;
+      }
+      var payload = state.pending[0];
+      var result;
+      try {
+        result = (options.send || function() {})(asSendPayload(payload), !!keepalive);
+      } catch (error) {
+        retryLater(payload);
+        return Promise.resolve(null);
+      }
+      if (!result || typeof result.then !== 'function') {
+        settle(payload, true);
+        return Promise.resolve(result || null);
+      }
+      state.inFlightPayload = payload;
+      state.inFlight = Promise.resolve(result).then(function(response) {
+        settle(payload, true);
+        return response;
+      }, function() {
+        settle(payload, false);
+        return null;
+      });
+      return state.inFlight;
+    }
+
+    function scheduleHeartbeat() {
+      if (state.destroyed || !state.heartbeatMs) return;
+      state.timer = schedule(function() {
+        state.timer = null;
+        flush(false);
+        scheduleHeartbeat();
+      }, state.heartbeatMs);
+    }
+
+    function announce(focused) {
+      var message = { type: 'epub-reading-session-active', clientId: state.clientId, focused: focused };
+      if (channel && typeof channel.postMessage === 'function') channel.postMessage(message);
+      else if (storage) {
+        try { storage.setItem(STORAGE_PREFIX + 'active-tab', JSON.stringify(message)); } catch (error) {}
+      }
+    }
+
+    function receiveAnnouncement(message) {
+      if (!message || message.type !== 'epub-reading-session-active' || message.clientId === state.clientId) return;
+      if (message.focused) {
+        accrue(now());
+        state.leaderId = message.clientId;
+        state.leader = false;
+        state.lastInteraction = null;
+      }
+    }
+
+    function setChapter(chapterIndex, chapterLabel) {
+      if (!Number.isInteger(chapterIndex) || chapterIndex < 0) return;
+      var current = now();
+      accrue(current);
+      queueBuckets();
+      state.chapterIndex = chapterIndex;
+      state.chapterLabel = typeof chapterLabel === 'string' ? chapterLabel : '';
+      state.lastTick = current;
+    }
+
+    function recordInteraction() {
+      var current = now();
+      accrue(current);
+      state.lastInteraction = current;
+      state.lastTick = current;
+    }
+
+    function setVisible(visible) {
+      var current = now();
+      accrue(current);
+      state.visible = !!visible;
+      state.lastInteraction = null;
+      state.lastTick = current;
+    }
+
+    function setFocused(focused) {
+      var current = now();
+      accrue(current);
+      state.focused = !!focused;
+      state.lastInteraction = null;
+      state.lastTick = current;
+      if (state.focused) {
+        state.leader = true;
+        state.leaderId = state.clientId;
+        announce(true);
+      } else if (state.leader) {
+        state.leader = false;
+        announce(false);
+      }
+    }
+
+    function addListener(target, type, handler) {
+      if (!target || typeof target.addEventListener !== 'function') return;
+      target.addEventListener(type, handler);
+      listeners.push({ target: target, type: type, handler: handler });
+    }
+
+    function bindBrowserEvents() {
+      addListener(eventTarget, 'scroll', recordInteraction);
+      addListener(eventTarget, 'keydown', recordInteraction);
+      addListener(eventTarget, 'epub:reader-page-turn', recordInteraction);
+      addListener(eventTarget, 'focus', function() { setFocused(true); });
+      addListener(eventTarget, 'blur', function() { setFocused(false); });
+      addListener(eventTarget, 'pagehide', function() { flush(true); });
+      addListener(eventTarget, 'epub-browser:chapter-change', function(event) {
+        var detail = event && event.detail || {};
+        setChapter(detail.chapterIndex === undefined ? detail.index : detail.chapterIndex, detail.chapterLabel || detail.title);
+      });
+      addListener(documentTarget, 'visibilitychange', function() {
+        setVisible(!documentTarget.hidden);
+      });
+      addListener(eventTarget, 'storage', function(event) {
+        if (event && event.key === STORAGE_PREFIX + 'active-tab' && event.newValue) {
+          try { receiveAnnouncement(JSON.parse(event.newValue)); } catch (error) {}
+        }
+      });
+      if (channel) channel.onmessage = function(event) { receiveAnnouncement(event && event.data); };
+    }
+
+    function destroy() {
+      if (state.destroyed) return;
+      state.destroyed = true;
+      if (state.timer !== null) cancel(state.timer);
+      state.timer = null;
+      listeners.forEach(function(listener) {
+        listener.target.removeEventListener(listener.type, listener.handler);
+      });
+      listeners = [];
+      if (channel) {
+        channel.onmessage = null;
+        if (typeof channel.close === 'function') channel.close();
+      }
+    }
+
+    restorePending();
+    bindBrowserEvents();
+    scheduleHeartbeat();
+    return {
+      recordInteraction: recordInteraction,
+      setChapter: setChapter,
+      setVisible: setVisible,
+      setFocused: setFocused,
+      flush: flush,
+      destroy: destroy,
+      isLeader: function() { return state.leader; },
+      pendingCount: function() { return state.pending.length; },
+      clientId: state.clientId
+    };
+  }
+
+  function start(options) {
+    options = options || {};
+    var browser = options.root || root;
+    if (!browser || browser.EpubBrowserMode !== 'server' || !browser.EpubBrowserAuth ||
+      typeof browser.EpubBrowserAuth.fetch !== 'function') return null;
+    var documentTarget = browser.document;
+    var content = options.content || (documentTarget && documentTarget.getElementById('eb-content'));
+    if (!content) return null;
+    var bookId = options.bookId || content.getAttribute('data-book-hash');
+    var chapterIndex = options.chapterIndex;
+    if (chapterIndex === undefined) chapterIndex = parseInt(content.getAttribute('data-chapter-index'), 10);
+    if (!bookId || !Number.isInteger(chapterIndex)) return null;
+    var publicPath = browser.EpubBrowserURL && browser.EpubBrowserURL.publicPath;
+    var endpoint = (publicPath ? publicPath('/api/reading-sessions/' + encodeURIComponent(bookId) + '/heartbeat') :
+      '/api/reading-sessions/' + encodeURIComponent(bookId) + '/heartbeat');
+    var storage = options.sessionStorage || browser.sessionStorage;
+    var channel = options.channel;
+    if (!channel && browser.BroadcastChannel) {
+      try { channel = new browser.BroadcastChannel('epub-reading-sessions'); } catch (error) {}
+    }
+    var clientId = options.clientId || storedClientId(storage);
+    var tracker = createTracker({
+      now: options.now,
+      schedule: options.schedule,
+      cancel: options.cancel,
+      idleMs: options.idleMs,
+      heartbeatMs: options.heartbeatMs,
+      sessionStorage: storage,
+      clientId: clientId,
+      channel: channel,
+      eventTarget: options.eventTarget || browser,
+      document: options.document || documentTarget,
+      visible: !documentTarget || !documentTarget.hidden,
+      focused: !documentTarget || !documentTarget.hasFocus || documentTarget.hasFocus(),
+      send: function(payload, keepalive) {
+        var request = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: clientId,
+            client_sequence: payload.client_sequence,
+            chapter_index: payload.chapter_index,
+            active_seconds: payload.active_seconds
+          })
+        };
+        if (keepalive) request.keepalive = true;
+        return Promise.resolve(browser.EpubBrowserAuth.fetch(endpoint, request)).then(function(response) {
+          if (!response || !response.ok) throw new Error('reading_session_heartbeat_failed');
+          return response;
+        });
+      }
+    });
+    tracker.setChapter(chapterIndex, options.chapterLabel || content.getAttribute('data-chapter-title') || '');
+    return tracker;
+  }
+
+  return {
+    createTracker: createTracker,
+    start: start,
+    heartbeatPayload: heartbeatPayload,
+    isActive: isActive
+  };
+});
