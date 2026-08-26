@@ -38,3 +38,11 @@ The requested `python` binary is unavailable in this environment, so the equival
 ## Concerns
 
 - None known for Task 5.
+
+## Focused UI review fix round
+
+- Replaced review status and destructive-action foregrounds with component semantic tokens. Measured contrast is 6.57:1 (danger) and 6.56:1 (success) on the light app surface, and 9.69:1 and 11.02:1 respectively on the dark app surface. Text labels remain the state indicators.
+- Added manual missing-rating validation for the `novalidate` form. The localized `role=alert` message is associated with the rating fieldset; the first rating option receives focus and the typed review remains intact without a network request or generic server error.
+- Busy state now disables every visible rating radio as well as the form controls for writes and deletes.
+- At `<=768px`, a book card containing a review panel reflows to one column even with no description. The textarea is constrained with `box-sizing: border-box` and `max-width: 100%`.
+- Added JavaScript, i18n, server-template, and CSS regression coverage for those paths. The focused self-review followed the required UI skills: semantic tokens and independent light/dark contrast checks; nearby, announced field errors; keyboard focus recovery; native radios; disabled async controls; and no narrow-screen horizontal overflow.

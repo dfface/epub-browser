@@ -3023,6 +3023,24 @@ assert.deepEqual(
         self.assertNotIn('data-book-reviews', ssg_index)
         self.assertNotIn('book-reviews.', ssg_index)
 
+    def test_private_review_surface_has_accessible_feedback_and_mobile_reflow(self):
+        server_index = self._server_book_html()
+        review_script = Path('epub_browser/assets/book-reviews.js').read_text(encoding='utf-8')
+        review_styles = Path('epub_browser/assets/book-reviews.css').read_text(encoding='utf-8')
+        book_styles = Path('epub_browser/assets/book.css').read_text(encoding='utf-8')
+
+        self.assertRegex(server_index, r'<section[^>]*data-book-id=[^>]*data-book-reviews')
+        self.assertIn("translate('bookReviews.ratingRequired')", review_script)
+        self.assertIn("ratingField.setAttribute('aria-describedby'", review_script)
+        self.assertIn("ratingError.setAttribute('role', 'alert')", review_script)
+        self.assertIn('.concat(view.ratingOptions || [])', review_script)
+        self.assertIn('--book-review-danger-foreground', review_styles)
+        self.assertIn('--book-review-success-foreground', review_styles)
+        self.assertIn('.dark-mode .book-reviews', review_styles)
+        self.assertIn('box-sizing: border-box;', review_styles)
+        self.assertIn('max-width: 100%;', review_styles)
+        self.assertIn('.book-info-card:has([data-book-reviews])', book_styles)
+
     def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):
         server_chapter = self._server_chapter_html()
         ssg_chapter = self._chapter_html()

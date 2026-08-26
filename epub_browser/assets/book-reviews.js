@@ -53,10 +53,27 @@
     }
 
     function setBusy(busy) {
-      [view.rating, view.reviewText, view.saveButton, view.deleteButton].forEach(function(control) {
+      [view.rating, view.reviewText, view.saveButton, view.deleteButton]
+        .concat(view.ratingOptions || []).forEach(function(control) {
         if (control) control.disabled = busy;
       });
       if (view.root) view.root.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+
+    function clearRatingError() {
+      if (!view.ratingError || !view.ratingField) return;
+      view.ratingError.textContent = '';
+      view.ratingError.hidden = true;
+      view.ratingField.removeAttribute('aria-invalid');
+    }
+
+    function showRatingError() {
+      if (!view.ratingError || !view.ratingField) return;
+      view.ratingError.textContent = translate('bookReviews.ratingRequired');
+      view.ratingError.hidden = false;
+      view.ratingField.setAttribute('aria-invalid', 'true');
+      var firstOption = (view.ratingOptions || [])[0];
+      if (firstOption && typeof firstOption.focus === 'function') firstOption.focus();
     }
 
     function currentRating() {
@@ -110,6 +127,7 @@
       form.setAttribute('novalidate', '');
       var ratingField = documentTarget.createElement('fieldset');
       ratingField.className = 'book-review-rating';
+      ratingField.setAttribute('aria-describedby', id + '-rating-error');
       var legend = documentTarget.createElement('legend');
       legend.textContent = translate('bookReviews.rating');
       var options = documentTarget.createElement('div');
@@ -128,7 +146,10 @@
         if (value === 1) input.required = true;
         input.setAttribute('aria-label', translate('bookReviews.ratingValue').replace('{rating}', String(value)));
         input.addEventListener('change', (function(selected) {
-          return function() { rating.value = String(selected); };
+          return function() {
+            rating.value = String(selected);
+            clearRatingError();
+          };
         })(value));
         var star = documentTarget.createElement('span');
         star.setAttribute('aria-hidden', 'true');
@@ -138,8 +159,14 @@
         options.appendChild(label);
         ratingOptions.push(input);
       }
+      var ratingError = documentTarget.createElement('p');
+      ratingError.id = id + '-rating-error';
+      ratingError.className = 'book-review-rating-error';
+      ratingError.setAttribute('role', 'alert');
+      ratingError.hidden = true;
       ratingField.appendChild(legend);
       ratingField.appendChild(options);
+      ratingField.appendChild(ratingError);
 
       var reviewLabel = documentTarget.createElement('label');
       reviewLabel.className = 'book-review-label';
@@ -184,7 +211,7 @@
       target.appendChild(form);
       target.appendChild(status);
       view = { root: target, rating: rating, ratingOptions: ratingOptions, reviewText: reviewText, saveButton: saveButton,
-        deleteButton: deleteButton, status: status, summary: summary };
+        deleteButton: deleteButton, status: status, summary: summary, ratingField: ratingField, ratingError: ratingError };
 
       form.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -215,10 +242,10 @@
     function save(rating, reviewText) {
       var normalizedRating = Number(rating);
       if (!Number.isInteger(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
-        restoreSaved();
-        setStatus(translate('book.error.server_error'), true);
+        showRatingError();
         return Promise.resolve(null);
       }
+      clearRatingError();
       setBusy(true);
       return request(bookId, 'PUT', { rating: normalizedRating, review_text: String(reviewText || '') })
         .then(function(payload) {
@@ -265,7 +292,9 @@
       deleteReview: deleteReview,
       get rating() { return view.rating; },
       get ratingOptions() { return view.ratingOptions || []; },
-      get reviewText() { return view.reviewText; }
+      get reviewText() { return view.reviewText; },
+      get ratingError() { return view.ratingError; },
+      get ratingField() { return view.ratingField; }
     };
   }
 

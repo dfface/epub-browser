@@ -90,6 +90,26 @@ test('translates the local annotation sharing actions in all five supported loca
   });
 });
 
+test('localizes private review validation and lifecycle messages in all five supported locales', () => {
+  const keys = [
+    'bookReviews.title',
+    'bookReviews.rating',
+    'bookReviews.ratingValue',
+    'bookReviews.ratingRequired',
+    'bookReviews.review',
+    'bookReviews.reviewHint',
+    'bookReviews.save',
+    'bookReviews.delete',
+    'bookReviews.savedRating',
+    'bookReviews.saved',
+    'bookReviews.deleted',
+    'bookReviews.deleteConfirm',
+  ];
+  ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
+    keys.forEach(key => assert.ok(dictionaries[locale][key], `${locale}:${key}`));
+  });
+});
+
 test('provides native locale names and translated AI language labels', () => {
   const nativeNames = {
     en: 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ko: '한국어', ja: '日本語'

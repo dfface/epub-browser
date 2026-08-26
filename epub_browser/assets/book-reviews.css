@@ -1,4 +1,7 @@
 .book-reviews {
+    /* AA foregrounds: each token is paired with this component's app surface. */
+    --book-review-danger-foreground: #b42318;
+    --book-review-success-foreground: #176b3a;
     margin-top: 24px;
     padding: 20px;
     color: var(--text);
@@ -103,6 +106,8 @@
 
 .book-review-form textarea {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     min-height: 112px;
     padding: 10px 12px;
     color: var(--form-textarea-text);
@@ -126,20 +131,26 @@
 }
 
 .book-review-delete {
-    color: var(--form-error) !important;
+    color: var(--book-review-danger-foreground) !important;
 }
 
-.book-review-status[data-state="error"] {
-    color: var(--form-error);
+.book-review-status[data-state="error"],
+.book-review-rating-error {
+    color: var(--book-review-danger-foreground);
 }
 
 .book-review-status[data-state="success"] {
-    color: var(--form-success);
+    color: var(--book-review-success-foreground);
 }
 
 .book-review-form [disabled] {
     cursor: not-allowed;
     opacity: 0.55;
+}
+
+.dark-mode .book-reviews {
+    --book-review-danger-foreground: #ffb4ab;
+    --book-review-success-foreground: #8ee6ad;
 }
 
 @media (max-width: 375px) {

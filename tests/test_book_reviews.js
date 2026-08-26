@@ -18,8 +18,10 @@ function makeElement(tagName) {
     replaceChildren(...nodes) { this.children = []; nodes.forEach(node => this.appendChild(node)); },
     setAttribute(name, value) { this.attributes[name] = String(value); },
     getAttribute(name) { return this.attributes[name] || null; },
+    removeAttribute(name) { delete this.attributes[name]; },
     addEventListener(type, handler) { (listeners[type] || (listeners[type] = [])).push(handler); },
     dispatch(type) { (listeners[type] || []).forEach(handler => handler({ preventDefault() {} })); },
+    focus() { this.focused = true; },
   };
 }
 
@@ -66,4 +68,51 @@ test('review editor restores saved fields after a failed write', async () => {
   await client.save(5, 'Changed');
   assert.equal(client.rating.value, '4');
   assert.equal(client.reviewText.value, 'Useful');
+});
+
+test('a missing rating preserves typed review text and announces the field-specific error without a request', async () => {
+  const client = loadReviewClient({ review: { rating: 4, review_text: 'Useful' } });
+  await client.mount('book-id');
+  client.rating.value = '';
+  client.ratingOptions.forEach(option => { option.checked = false; });
+  client.reviewText.value = 'Keep this draft';
+
+  await client.save('', client.reviewText.value);
+
+  assert.equal(client.requests.length, 1);
+  assert.equal(client.reviewText.value, 'Keep this draft');
+  assert.equal(client.ratingError.textContent, 'bookReviews.ratingRequired');
+  assert.equal(client.ratingError.hidden, false);
+  assert.equal(client.ratingField.getAttribute('aria-invalid'), 'true');
+  assert.equal(client.ratingOptions[0].focused, true);
+});
+
+test('a review write disables every visible rating choice until the request finishes', async () => {
+  const root = makeElement('section');
+  let resolveWrite;
+  const browser = {
+    document: {
+      createElement: makeElement,
+      querySelector() { return root; },
+    },
+    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserAuth: {
+      fetch(_url, options) {
+        if (options.method === 'GET') return Promise.resolve({ ok: true, json: () => Promise.resolve({ review: null }) });
+        return new Promise(resolve => { resolveWrite = () => resolve({ ok: true, json: () => Promise.resolve({ review: { rating: 5, review_text: 'Done' } }) }); });
+      },
+    },
+  };
+  const client = Reviews.create(browser);
+  await client.mount('book-id');
+
+  const writing = client.save(5, 'Done');
+  assert.equal(client.rating.disabled, true);
+  assert.equal(client.reviewText.disabled, true);
+  assert.ok(client.ratingOptions.every(option => option.disabled));
+
+  resolveWrite();
+  await writing;
+  assert.equal(client.rating.disabled, false);
+  assert.ok(client.ratingOptions.every(option => !option.disabled));
 });
