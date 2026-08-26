@@ -108,8 +108,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('16 KB', server_html)
         self.assertNotIn('1–4 requests', server_html)
         self.assertIn('.dictionary-format-option input {', account_css)
-        self.assertIn('appearance: none;', account_css)
-        self.assertIn('.dictionary-format-option input:checked {', account_css)
+        self.assertIn('clip-path: inset(50%);', account_css)
+        self.assertNotIn('.dictionary-format-option input:checked {', account_css)
 
     def test_server_admin_ai_jobs_surface_is_semantic_and_localized(self):
         server_html = self._server_html()

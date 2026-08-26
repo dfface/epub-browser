@@ -615,6 +615,7 @@ body.auth-page {
 
 .dictionary-format-option {
     display: flex;
+    position: relative;
     min-height: 76px;
     align-items: flex-start;
     gap: 10px;
@@ -636,25 +637,14 @@ body.auth-page {
 }
 
 .dictionary-format-option input {
-    appearance: none;
-    flex: 0 0 20px;
+    position: absolute;
     width: 20px;
-    min-height: 20px;
     height: 20px;
-    margin: 2px 0 0;
-    border: 2px solid var(--account-muted);
-    border-radius: 50%;
-    background: var(--account-card);
-    box-shadow: inset 0 0 0 3px var(--account-card);
-}
-
-.dictionary-format-option input:checked {
-    border-color: var(--account-primary);
-    background: var(--account-primary);
-}
-
-.dictionary-format-option input:hover {
-    border-color: var(--account-primary);
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 .dictionary-format-option span {
