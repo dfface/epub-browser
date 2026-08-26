@@ -2615,7 +2615,21 @@ assert.deepEqual(
         self.assertIn("deferBookFeature('bookshelfBtn', 'bookshelf'", book_script)
         self.assertIn("deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading')", book_script)
         self.assertIn("setDeferredBookFeatureLoading(button, true, loadingKey)", book_script)
-        self.assertIn("loadBookFeature('sortable')", book_script)
+        self.assertNotIn("loadBookFeature('sortable')", book_script)
+        self.assertNotIn('Sortable.create(', book_script)
+        chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        self.assertNotIn('Sortable.create(', chapter_script)
+
+    def test_drag_sorting_is_limited_to_library_books_and_bookshelf_contents(self):
+        library_script = Path('epub_browser/assets/library.js').read_text(encoding='utf-8')
+        bookshelf_script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
+
+        self.assertIn("document.querySelector('.book-grid')", library_script)
+        self.assertNotIn('storageKeySortableTag', library_script)
+        self.assertNotIn('storageKeySortableContainer', library_script)
+        self.assertNotIn("document.querySelector('.tag-cloud'),", library_script)
+        self.assertIn('new Sortable(bookshelfBody, {', bookshelf_script)
+        self.assertIn('new Sortable(groupBody, {', bookshelf_script)
 
     def test_server_book_ai_assets_stay_off_critical_path(self):
         book_html = self._server_book_html()
@@ -3055,10 +3069,7 @@ assert.deepEqual(
         review_script = Path('epub_browser/assets/book-reviews.js').read_text(encoding='utf-8')
         review_styles = Path('epub_browser/assets/book-reviews.css').read_text(encoding='utf-8')
         self.assertRegex(server_index, r'<section[^>]*data-book-id=[^>]*data-book-reviews')
-        self.assertRegex(
-            server_index,
-            r'<section(?=[^>]*\bdata-id=(?:["\'])?book-review-display)(?=[^>]*\bdata-book-review-display)[^>]*>',
-        )
+        self.assertIn('data-book-review-display', server_index)
         self.assertRegex(server_index, r'data-i18n=(?:["\'])?bookReviews\.write')
         self.assertIn("translate('bookReviews.ratingRequired')", review_script)
         self.assertIn("ratingField.setAttribute('aria-describedby'", review_script)

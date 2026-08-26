@@ -151,21 +151,6 @@ function isKindleMode() {
     return isKindle;
 }
 
-function restoreOrder(storageKey, elementClass) {
-    var savedOrder = localStorage.getItem(storageKey);
-    if (savedOrder) {
-        var itemIds = JSON.parse(savedOrder);
-        var container = document.querySelector('.' + elementClass);
-        
-        itemIds.forEach(function(id) {
-            var element = document.querySelector('[data-id="' + id + '"]');
-            if (element) {
-                container.appendChild(element);
-            }
-        });
-    }
-}
-
 function scopeCSS(cssText, scopeSelector) {
   if (!scopeSelector) scopeSelector = '[data-eb-styles]';
   var keyframesMap = {};
@@ -400,8 +385,6 @@ function initScript() {
         document.getElementById('fontFamilySelect').appendChild(opt);
     });
 
-    var storageKeySortableContainer = 'chapter-container-sortable-order';
-
     if (!isKindleMode()) {
         var currentPaginationMode = "false";
         if (window.epubBrowserCache && window.epubBrowserCache.turning) {
@@ -466,7 +449,6 @@ function initScript() {
             }
         }
         
-        restoreOrder(storageKeySortableContainer, 'container');
     } else {
         var currentPaginationMode = getCookie('turning') || "false";
         isPaginationMode = currentPaginationMode == "true";
@@ -490,26 +472,6 @@ function initScript() {
     updateFontFamily(fontFamily, fontFamilyInput);
 
     document.addEventListener('keydown', handleKeyDown);
-
-    var el = document.querySelector('.container');
-    if (!isKindleMode()) {
-        var sortable = Sortable.create(el, {
-            delay: 300,
-            delayOnTouchOnly: true,
-            filter: '#eb-content, #pageJumpInput, .page-height-adjustment, #customCssInput',
-            preventOnFilter: false,
-            onStart: function(evt) {
-                var sel = window.getSelection();
-                if (sel.toString().length > 0) return false;
-            },
-            onEnd: function(evt) {
-                var ids = Array.prototype.map.call(evt.from.children, function(c) {
-                    return c.dataset.id;
-                });
-                localStorage.setItem(storageKeySortableContainer, JSON.stringify(ids));
-            }
-        });
-    }
 
     document.querySelectorAll('.eb-content').forEach(function(item) {
         item.addEventListener('dblclick', function(e) {

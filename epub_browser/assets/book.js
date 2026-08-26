@@ -60,52 +60,6 @@ function showNotification(message, type) {
     return window.EpubBrowserNotification.show(message, type);
 }
 
-// 页面加载时恢复顺序。只持久化可排序卡片，避免把隐藏弹窗等非卡片节点写成空值。
-function restoreOrder(storageKey, elementClass) {
-    var savedOrder = localStorage.getItem(storageKey);
-    var container = document.querySelector("." + elementClass);
-    if (!savedOrder || !container) return;
-
-    var itemIds;
-    try {
-        itemIds = JSON.parse(savedOrder);
-    } catch (error) {
-        localStorage.removeItem(storageKey);
-        return;
-    }
-    if (!Array.isArray(itemIds)) return;
-
-    var sortableItems = [];
-    var children = container.children;
-    for (var i = 0; i < children.length; i++) {
-        var childId = children[i].dataset && children[i].dataset.id;
-        if (childId) sortableItems.push(children[i]);
-    }
-
-    var available = {};
-    for (var j = 0; j < sortableItems.length; j++) available[sortableItems[j].dataset.id] = sortableItems[j];
-
-    var restoredIds = [];
-    for (var k = 0; k < itemIds.length; k++) {
-        var savedId = itemIds[k];
-        if (typeof savedId === 'string' && available[savedId] && restoredIds.indexOf(savedId) === -1) restoredIds.push(savedId);
-    }
-
-    // Upgrade old saved layouts that predate the review card without discarding the user's card order.
-    if (available['book-review-display'] && restoredIds.indexOf('book-review-display') === -1) {
-        var bookInfoIndex = restoredIds.indexOf('book-info-card');
-        if (bookInfoIndex === -1) restoredIds.push('book-review-display');
-        else restoredIds.splice(bookInfoIndex + 1, 0, 'book-review-display');
-    }
-    for (var m = 0; m < sortableItems.length; m++) {
-        var currentId = sortableItems[m].dataset.id;
-        if (restoredIds.indexOf(currentId) === -1) restoredIds.push(currentId);
-    }
-
-    for (var n = 0; n < restoredIds.length; n++) container.appendChild(available[restoredIds[n]]);
-    localStorage.setItem(storageKey, JSON.stringify(restoredIds));
-}
-
 // 删除指定前缀的所有 localStorage 键
 function deleteKeysByPrefix(prefix) {
     var keysToDelete = [];
@@ -309,45 +263,9 @@ function initScript() {
 
     }
 
-    var storageKeySortableContainer = 'book-container-sortable-order';
-
     if (isKindleMode()) {
         document.documentElement.classList.remove("kindle-mode");
         document.documentElement.classList.add("kindle-mode");
-    } else {
-        restoreOrder(storageKeySortableContainer, 'container');
-    }
-
-    function initBookSortable() {
-        if (window.__epubBrowserBookSortable || !window.Sortable) return;
-        var el = document.querySelector('.container');
-        if (!el) return;
-        window.__epubBrowserBookSortable = true;
-        Sortable.create(el, {
-            delay: 300,
-            delayOnTouchOnly: true,
-            filter: '.toc-container, [data-book-review-modal]',
-            preventOnFilter: false,
-            onEnd: function(evt) {
-                // 替换 Array.from
-                var children = evt.from.children;
-                var itemIds = [];
-                for (var i = 0; i < children.length; i++) {
-                    var itemId = children[i].dataset && children[i].dataset.id;
-                    if (itemId) itemIds.push(itemId);
-                }
-                localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
-            }
-        });
-    }
-
-    function enableBookSortableOnInteraction() {
-        var container = document.querySelector('.container');
-        if (!container || container.dataset.bookSortableLoader) return;
-        container.dataset.bookSortableLoader = 'true';
-        container.addEventListener('pointerdown', function() {
-            loadBookFeature('sortable').then(initBookSortable).catch(function() {});
-        });
     }
 
     if (!isKindleMode()) {
@@ -358,7 +276,6 @@ function initScript() {
             initBookShelfButton(book_hash);
         }, 'bookshelf.loading');
         deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading');
-        enableBookSortableOnInteraction();
     }
 
     var currentChapter = "";

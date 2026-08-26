@@ -423,7 +423,6 @@ function initScript() {
                 'empty'
             );
             restoreOrder(storageKeySortableBook, 'book-grid');
-            restoreOrder(storageKeySortableTag, 'tag-cloud');
             updateTagCloudCollapse();
             applyLibraryFilters();
             return;
@@ -431,7 +430,6 @@ function initScript() {
 
         appendBookCardsInBatches(bookGrid, cards, generation, function() {
             restoreOrder(storageKeySortableBook, 'book-grid');
-            restoreOrder(storageKeySortableTag, 'tag-cloud');
             updateTagCloudCollapse();
             applyLibraryFilters();
         });
@@ -485,8 +483,6 @@ function initScript() {
     }
 
     var storageKeySortableBook = 'book-grid-sortable-order';
-    var storageKeySortableTag = 'tag-cloud-sortable-order';
-    var storageKeySortableContainer = 'library-container-sortable-order';
 
     if (isKindleMode()) {
         document.documentElement.classList.remove("kindle-mode");
@@ -497,10 +493,8 @@ function initScript() {
         if (isKindleMode() || !window.Sortable || window.__epubBrowserLibrarySortable) return;
         window.__epubBrowserLibrarySortable = true;
         var elBook = document.querySelector('.book-grid');
-        var elTag = document.querySelector('.tag-cloud');
-        var elContainer = document.querySelector('.container');
         if (!isKindleMode()) {
-            var sortableBook = Sortable.create(elBook, {
+            Sortable.create(elBook, {
                 delay: 300,
                 delayOnTouchOnly: true,
                 onEnd: function(evt) {
@@ -508,28 +502,6 @@ function initScript() {
                         return child.dataset.id;
                     });
                     localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
-                }
-            });
-            var sortableTag = Sortable.create(elTag, {
-                delay: 300,
-                delayOnTouchOnly: true,
-                onEnd: function(evt) {
-                    var itemIds = Array.from(evt.from.children).map(function(child) {
-                        return child.dataset.id;
-                    });
-                    localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
-                }
-            });
-            var sortableContainer = Sortable.create(elContainer, {
-                delay: 300,
-                delayOnTouchOnly: true,
-                filter: '.book-grid, .search-box',
-                preventOnFilter: false,
-                onEnd: function(evt) {
-                    var itemIds = Array.from(evt.from.children).map(function(child) {
-                        return child.dataset.id;
-                    });
-                    localStorage.setItem(storageKeySortableContainer, JSON.stringify(itemIds));
                 }
             });
         }
@@ -544,11 +516,7 @@ function initScript() {
     }
 
     function enableSortableOnInteraction() {
-        var targets = [
-            document.querySelector('.book-grid'),
-            document.querySelector('.tag-cloud'),
-            document.querySelector('.container')
-        ];
+        var targets = [document.querySelector('.book-grid')];
         targets.forEach(function(target) {
             if (!target || target.getAttribute('data-library-sortable-loader') === 'true') return;
             target.setAttribute('data-library-sortable-loader', 'true');

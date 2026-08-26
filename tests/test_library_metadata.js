@@ -449,7 +449,7 @@ test('incremental metadata refresh leaves existing cards after a failed request'
   assert.deepEqual(harness.cardIds(), ['one']);
 });
 
-test('incremental metadata refresh preserves quoted saved card and tag order with an active tag', async () => {
+test('incremental metadata refresh preserves quoted saved card order and the active tag', async () => {
   const quotedHash = 'book"quoted';
   const quotedTag = 'tag "quoted"';
   const books = [
@@ -459,14 +459,12 @@ test('incremental metadata refresh preserves quoted saved card and tag order wit
   const harness = createLibraryHarness([books, books]);
   harness.window.initScriptLibrary();
   harness.setSavedOrder('book-grid-sortable-order', JSON.stringify(['other', quotedHash]));
-  harness.setSavedOrder('tag-cloud-sortable-order', JSON.stringify(['Other', quotedTag, 'All', 'NoTag']));
   harness.tag('All').classList.remove('active');
   harness.tag(quotedTag).classList.add('active');
 
   await harness.window.refreshLibraryMetadata();
 
   assert.deepEqual(harness.cardIds(), ['other', quotedHash]);
-  assert.deepEqual(harness.tagIds(), ['Other', quotedTag, 'All', 'NoTag']);
   assert.equal(harness.tag(quotedTag).classList.contains('active'), true);
   assert.equal(harness.card(quotedHash).style.display, 'block');
   assert.equal(harness.card('other').style.display, 'none');
@@ -484,12 +482,11 @@ test('incremental metadata refresh rejects a valid JSON non-array without replac
   assert.deepEqual(harness.cardIds(), ['one']);
 });
 
-test('incremental metadata refresh ignores malformed saved order JSON', async () => {
+test('incremental metadata refresh ignores malformed saved book-card order JSON', async () => {
   const books = [{ hash: 'one', title: 'One', authors: [], tags: ['A'], url: '/book/one/', cover: null }];
   const harness = createLibraryHarness([books, books]);
   harness.window.initScriptLibrary();
   harness.setSavedOrder('book-grid-sortable-order', '{not JSON');
-  harness.setSavedOrder('tag-cloud-sortable-order', '{not JSON');
 
   await harness.window.refreshLibraryMetadata();
 
