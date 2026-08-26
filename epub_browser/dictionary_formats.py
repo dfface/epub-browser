@@ -7,8 +7,10 @@ import.
 
 from __future__ import annotations
 
+import base64
 import gzip
 import html.parser
+import json
 import posixpath
 import re
 import struct
@@ -103,6 +105,11 @@ def mdict_media_references(value: str) -> tuple[tuple[str, str], ...]:
     return tuple(parser.references)
 
 
+_STARDICT_TEXT_TYPES = frozenset("mlgtxyknrwh")
+_STARDICT_BINARY_TYPES = frozenset("WPX")
+_STARDICT_TYPES = _STARDICT_TEXT_TYPES | _STARDICT_BINARY_TYPES
+
+
 def _parse_ifo(path: Path) -> dict[str, str]:
     try:
         raw = path.read_text(encoding="utf-8-sig")
@@ -116,7 +123,8 @@ def _parse_ifo(path: Path) -> dict[str, str]:
     if values.get("StarDict's dict ifo file") is not None:
         # Some writers use the marker as a key; it is still a valid file.
         pass
-    if not values.get("bookname") or values.get("sametypesequence", "m")[:1] not in {"m", "l", "g", "h", "x"}:
+    sequence = values.get("sametypesequence", "")
+    if not values.get("bookname") or any(type_code not in _STARDICT_TYPES for type_code in sequence):
         raise DictionaryFormatError("invalid_stardict")
     return values
 
@@ -164,6 +172,67 @@ def _split_stardict_record(record: bytes, sequence: str) -> tuple[bytes, ...]:
     return tuple(parts)
 
 
+def _split_tagged_stardict_record(record: bytes) -> tuple[tuple[str, bytes], ...]:
+    """Read a record without ``sametypesequence`` from its type markers."""
+    parts: list[tuple[str, bytes]] = []
+    cursor = 0
+    while cursor < len(record):
+        try:
+            type_code = chr(record[cursor])
+        except (TypeError, ValueError):  # pragma: no cover - bytes guard
+            raise DictionaryFormatError("invalid_stardict")
+        cursor += 1
+        if type_code not in _STARDICT_TYPES:
+            raise DictionaryFormatError("invalid_stardict")
+        if type_code in _STARDICT_TEXT_TYPES:
+            terminator = record.find(b"\0", cursor)
+            if terminator < cursor:
+                raise DictionaryFormatError("invalid_stardict")
+            parts.append((type_code, record[cursor:terminator]))
+            cursor = terminator + 1
+        else:
+            if cursor + 4 > len(record):
+                raise DictionaryFormatError("invalid_stardict")
+            length = struct.unpack(">I", record[cursor:cursor + 4])[0]
+            cursor += 4
+            if cursor + length > len(record):
+                raise DictionaryFormatError("invalid_stardict")
+            parts.append((type_code, record[cursor:cursor + length]))
+            cursor += length
+    if not parts:
+        raise DictionaryFormatError("invalid_stardict")
+    return tuple(parts)
+
+
+def _decode_stardict_text(value: bytes) -> str:
+    """Preserve legacy locale text when a StarDict file does not use UTF-8."""
+    for encoding in ("utf-8", "gb18030", "latin-1"):
+        try:
+            return value.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise DictionaryFormatError("invalid_stardict")  # pragma: no cover - latin-1 always decodes
+
+
+def _serialize_stardict_parts(parts: tuple[tuple[str, bytes], ...]) -> str:
+    """Store typed fields without flattening StarDict's original structure."""
+    serialized = []
+    for type_code, value in parts:
+        if type_code in _STARDICT_TEXT_TYPES:
+            serialized.append({"type": type_code, "text": _decode_stardict_text(value)})
+        else:
+            serialized.append({"type": type_code, "data": base64.b64encode(value).decode("ascii")})
+    return json.dumps(serialized, ensure_ascii=False, separators=(",", ":"))
+
+
+def _stardict_definition(parts: tuple[tuple[str, bytes], ...]) -> tuple[str, str]:
+    """Keep simple text/HTML compatible and retain every other field as typed data."""
+    if len(parts) == 1 and parts[0][0] in {"m", "l", "h"}:
+        type_code, value = parts[0]
+        return _decode_stardict_text(value), "stardict:" + type_code
+    return _serialize_stardict_parts(parts), "stardict:parts"
+
+
 def parse_stardict(ifo_path: Path) -> ImportedDictionary:
     if ifo_path.suffix.casefold() != ".ifo":
         raise DictionaryFormatError("invalid_stardict")
@@ -174,7 +243,7 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
         data = _read_stardict_data(_stardict_data_path(base))
     except OSError:
         raise DictionaryFormatError("stardict_index_missing")
-    sequence = values.get("sametypesequence", "m")
+    sequence = values.get("sametypesequence", "")
     entries: list[DictionaryEntry] = []
     offset = 0
     cursor = 0
@@ -191,16 +260,18 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
         if record_offset + record_length > len(data):
             raise DictionaryFormatError("invalid_stardict")
         try:
-            raw_parts = _split_stardict_record(
-                data[record_offset:record_offset + record_length], sequence,
+            record = data[record_offset:record_offset + record_length]
+            parts = (
+                tuple(zip(sequence, _split_stardict_record(record, sequence)))
+                if sequence else _split_tagged_stardict_record(record)
             )
-            definition = "\n".join(part.decode("utf-8") for part in raw_parts)
+            definition, definition_format = _stardict_definition(parts)
             normalized = normalize_lookup(headword)
             entries.append(DictionaryEntry(
                 headword.strip(), normalized, (), definition,
-                "stardict:" + sequence,
+                definition_format,
             ))
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, DictionaryFormatError):
             raise DictionaryFormatError("invalid_stardict")
     aliases_by_index: dict[int, list[str]] = {}
     synonym_path = base.with_suffix(".syn")

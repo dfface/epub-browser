@@ -65,6 +65,44 @@ class DictionaryServiceTests(unittest.TestCase):
             self.assertEqual(record.display_name, "Zip")
             self.assertEqual(list((root / "data" / "dictionaries").glob(".import-*")), [])
 
+    def test_stardict_package_retains_html_presentation_assets_and_script_setting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = StateStore(root / "data" / "epub-browser.db")
+            admin = store.initialize(BootstrapCredentials("admin", "correct horse battery staple"))
+            definition = b'<link rel="stylesheet" href="styles/entry.css"><img src="images/run.png"><script src="entry.js"></script>'
+            index = b"run\0" + struct.pack(">II", 0, len(definition))
+            package = root / "stardict.zip"
+            with zipfile.ZipFile(package, "w") as archive:
+                archive.writestr(
+                    "packages/sample/sample.ifo",
+                    "StarDict's dict ifo file\nversion=2.4.2\nbookname=Sample\nwordcount=1\n"
+                    "idxfilesize=" + str(len(index)) + "\nsametypesequence=h\n",
+                )
+                archive.writestr("packages/sample/sample.idx", index)
+                archive.writestr("packages/sample/sample.dict", definition)
+                archive.writestr("packages/sample/styles/entry.css", ".entry { background: url(file://images/run.png); }")
+                archive.writestr("packages/sample/images/run.png", b"\x89PNG\r\n\x1a\nimage-data")
+                archive.writestr("packages/sample/entry.js", "window.dictionaryPackageScript = true;")
+
+            service = DictionaryService(store, root)
+            record = service.install_stardict_package_file(
+                package, "stardict.zip", created_by_user_id=admin.user_id,
+            )
+            lookup = service.lookup(record.id, "run")
+
+            self.assertEqual(lookup.asset_base_path, "packages/sample")
+            self.assertFalse(lookup.allow_scripts)
+            self.assertEqual(lookup.entries[0]["definition_format"], "stardict:h")
+            stylesheet = service.get_asset(record.id, "packages/sample/styles/entry.css")
+            image = service.get_asset(record.id, "packages/sample/images/run.png")
+            script = service.get_asset(record.id, "packages/sample/entry.js")
+            self.assertIn(b"url(../images/run.png)", stylesheet["content"])
+            self.assertEqual(image["content_type"], "image/png")
+            self.assertEqual(script["content_type"], "text/javascript; charset=utf-8")
+            service.set_script_execution_enabled(record.id, True)
+            self.assertTrue(service.lookup(record.id, "run").allow_scripts)
+
     def test_installs_stardict_archive_with_more_than_the_former_16_file_limit(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -157,6 +195,48 @@ class DictionaryServiceTests(unittest.TestCase):
             self.assertEqual(audio["content_type"], "audio/mpeg")
             self.assertEqual(audio["content"], b"ID3audio-data")
 
+    def test_installs_mdict_zip_with_styles_and_mdd_assets_at_their_package_paths(self):
+        try:
+            from mdict_utils.base.writemdict import MDictWriter
+        except ImportError:
+            self.skipTest("mdict-utils is installed with the server dependency")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = StateStore(root / "data" / "epub-browser.db")
+            admin = store.initialize(BootstrapCredentials("admin", "correct horse battery staple"))
+            mdx = io.BytesIO()
+            MDictWriter(
+                {"run": '<link rel="stylesheet" href="styles/entry.css">'},
+                title="Package", description="", encoding="utf8", compression_type=2, version="2.0",
+            ).write(mdx)
+            mdd = io.BytesIO()
+            MDictWriter(
+                {"\\images\\run.png": b"\x89PNG\r\n\x1a\nimage-data"},
+                title="Package", description="", compression_type=2, version="2.0", is_mdd=True,
+            ).write(mdd)
+            package = root / "package.zip"
+            with zipfile.ZipFile(package, "w") as archive:
+                archive.writestr("dictionary/package.mdx", mdx.getvalue())
+                archive.writestr("dictionary/package.mdd", mdd.getvalue())
+                archive.writestr("dictionary/styles/entry.css", ".entry { background: url(file://images/run.png); }")
+                archive.writestr("dictionary/hycd_3rd.js", "window.packageScript = true;")
+                archive.writestr("__MACOSX/._package.mdx", b"Finder metadata")
+
+            service = DictionaryService(store, root)
+            record = service.install_mdict_package_file(
+                package, "package.zip", created_by_user_id=admin.user_id,
+            )
+            lookup = service.lookup(record.id, "run")
+
+            self.assertEqual(lookup.asset_base_path, "dictionary")
+            stylesheet = service.get_asset(record.id, "dictionary/styles/entry.css")
+            image = service.get_asset(record.id, "dictionary/images/run.png")
+            script = service.get_asset(record.id, "dictionary/hycd_3rd.js")
+            self.assertEqual(stylesheet["content_type"], "text/css; charset=utf-8")
+            self.assertIn(b"url(../images/run.png)", stylesheet["content"])
+            self.assertEqual(image["content_type"], "image/png")
+            self.assertEqual(script["content_type"], "text/javascript; charset=utf-8")
+
     def test_installs_stardict_into_isolated_sqlite_and_looks_up_aliases(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -191,7 +271,7 @@ class DictionaryServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(DictionaryServiceError, "dictionary_unavailable"):
                 service.lookup("missing", "run")
 
-    def test_discards_existing_dictionary_files_that_lost_source_formatting(self):
+    def test_preserves_existing_dictionary_files_when_upgrading_dictionary_rendering(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = StateStore(root / "data" / "epub-browser.db")
@@ -211,10 +291,11 @@ class DictionaryServiceTests(unittest.TestCase):
                 connection.execute("INSERT INTO entries(id, headword, normalized_headword, definition_text) VALUES (1, 'run', 'run', 'legacy definition')")
                 connection.execute("INSERT INTO forms(normalized_form, entry_id) VALUES ('run', 1)")
 
-            DictionaryService(store, root)
+            service = DictionaryService(store, root)
 
-            self.assertIsNone(store.get_dictionary(dictionary_id))
-            self.assertFalse((dictionary_directory / (dictionary_id + ".sqlite")).exists())
+            self.assertIsNotNone(store.get_dictionary(dictionary_id))
+            self.assertTrue((dictionary_directory / (dictionary_id + ".sqlite")).exists())
+            self.assertTrue(service.lookup(dictionary_id, "run").found)
 
 
 if __name__ == "__main__":

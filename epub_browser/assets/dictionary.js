@@ -37,16 +37,30 @@
     return item;
   }
 
-  function dictionaryResourceUrl(bookId, dictionaryId, mediaId) {
-    return '/api/books/' + encodeURIComponent(bookId) + '/dictionaries/'
-      + encodeURIComponent(dictionaryId || '') + '/resources/' + encodeURIComponent(mediaId);
+  function dictionaryOrigin() {
+    var origin = root.location && typeof root.location.origin === 'string' ? root.location.origin : '';
+    return /^https?:\/\//i.test(origin) ? origin : '';
   }
 
-  function canonicalMdictResourceReference(value, allowRelative) {
+  function dictionaryAssetBaseUrl(bookId, dictionaryId, assetBasePath) {
+    var encodedPath = String(assetBasePath || '').split('/').filter(Boolean).map(function(part) {
+      return encodeURIComponent(part);
+    }).join('/');
+    return dictionaryOrigin() + '/api/books/' + encodeURIComponent(bookId) + '/dictionaries/'
+      + encodeURIComponent(dictionaryId || '') + '/assets/' + (encodedPath ? encodedPath + '/' : '');
+  }
+
+  function dictionaryAssetUrl(bookId, dictionaryId, assetBasePath, reference) {
+    return dictionaryAssetBaseUrl(bookId, dictionaryId, assetBasePath)
+      + reference.split('/').map(function(part) { return encodeURIComponent(part); }).join('/');
+  }
+
+  function canonicalPackageResourceReference(value, allowRelative) {
     if (typeof value !== 'string') return null;
     try { value = decodeURIComponent(value).trim(); } catch (error) { return null; }
-    if (/^file:\/\//i.test(value)) value = value.slice(7);
-    else if (!allowRelative || value.indexOf('://') >= 0 || /^[/#]/.test(value)) return null;
+    if (/^(?:file|sound):\/\//i.test(value)) value = value.replace(/^[a-z]+:\/\//i, '');
+    else if (!allowRelative || /^[a-z][a-z0-9+.-]*:/i.test(value) || /^[/#]/.test(value)) return null;
+    value = value.split(/[?#]/, 1)[0];
     value = value.replace(/\\/g, '/').replace(/^\/+/, '');
     var parts = [];
     value.split('/').forEach(function(part) {
@@ -57,39 +71,97 @@
     return parts.length ? parts.join('/').toLowerCase() : null;
   }
 
-  function resolveMdictResources(source, entry, bookId) {
-    var resources = {};
-    (entry.media || []).forEach(function(media) {
-      var reference = canonicalMdictResourceReference(
-        String(media && media.reference || ''), media && media.kind === 'stylesheet'
-      );
-      if (reference && media.id) resources[reference] = dictionaryResourceUrl(bookId, entry.dictionary_id, media.id);
-    });
+  function resolveDictionaryPackageResources(source, entry, bookId, assetBasePath) {
     return source.replace(/\b(src|href)\s*=\s*(["'])(.*?)\2/gi, function(attribute, name, quote, value) {
-      var replacement = resources[canonicalMdictResourceReference(value, name.toLowerCase() === 'href')];
+      var reference = canonicalPackageResourceReference(value, true);
+      var replacement = reference && dictionaryAssetUrl(bookId, entry.dictionary_id, assetBasePath, reference);
       return replacement ? name + '=' + quote + replacement + quote : attribute;
     });
   }
 
-  function definitionElement(entry, bookId) {
+  function escapeHtml(value) {
+    return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function stardictResourceUrl(bookId, dictionaryId, assetBasePath, reference) {
+    var safeReference = canonicalPackageResourceReference(reference, true);
+    return safeReference
+      ? dictionaryAssetUrl(bookId, dictionaryId, assetBasePath, 'res/' + safeReference)
+      : null;
+  }
+
+  function renderStarDictResourceList(value, entry, bookId, assetBasePath) {
+    return String(value || '').split(/\r?\n/).map(function(line) {
+      var separator = line.indexOf(':');
+      if (separator < 1) return '';
+      var kind = line.slice(0, separator).toLowerCase();
+      var url = stardictResourceUrl(bookId, entry.dictionary_id, assetBasePath, line.slice(separator + 1));
+      if (!url) return '';
+      if (kind === 'img') return '<img src="' + escapeHtml(url) + '" alt="">';
+      if (kind === 'snd') return '<audio controls src="' + escapeHtml(url) + '"></audio>';
+      if (kind === 'vdo') return '<video controls src="' + escapeHtml(url) + '"></video>';
+      return '<a href="' + escapeHtml(url) + '" download>' + escapeHtml(line.slice(separator + 1)) + '</a>';
+    }).join('');
+  }
+
+  function renderXdxfResourceReferences(source, entry, bookId, assetBasePath) {
+    return source.replace(/<rref\b([^>]*)>([\s\S]*?)<\/rref>/gi, function(original, attributes, reference) {
+      var type = /\btype\s*=\s*(["'])(.*?)\1/i.exec(attributes || '');
+      var url = stardictResourceUrl(bookId, entry.dictionary_id, assetBasePath, reference);
+      if (!url) return original;
+      var kind = type && type[2].toLowerCase();
+      if (kind === 'image') return '<img src="' + escapeHtml(url) + '" alt="">';
+      if (kind === 'sound') return '<audio controls src="' + escapeHtml(url) + '"></audio>';
+      if (kind === 'video') return '<video controls src="' + escapeHtml(url) + '"></video>';
+      return '<a href="' + escapeHtml(url) + '" download>' + escapeHtml(reference) + '</a>';
+    });
+  }
+
+  function renderStarDictParts(source, entry, bookId, assetBasePath) {
+    var parts;
+    try { parts = JSON.parse(source); } catch (error) { return '<pre>' + escapeHtml(source) + '</pre>'; }
+    if (!Array.isArray(parts)) return '<pre>' + escapeHtml(source) + '</pre>';
+    return parts.map(function(part) {
+      if (!part || typeof part.type !== 'string') return '';
+      var type = part.type;
+      var text = typeof part.text === 'string' ? part.text : '';
+      if (type === 'h') return resolveDictionaryPackageResources(text, entry, bookId, assetBasePath);
+      if (type === 'g' || type === 'k') return resolveDictionaryPackageResources(text, entry, bookId, assetBasePath);
+      if (type === 'x') return renderXdxfResourceReferences(
+        resolveDictionaryPackageResources(text, entry, bookId, assetBasePath), entry, bookId, assetBasePath
+      );
+      if (type === 'r') return renderStarDictResourceList(text, entry, bookId, assetBasePath);
+      if (type === 't' || type === 'y') return '<div class="stardict-phonetic">' + escapeHtml(text) + '</div>';
+      if (type === 'W') return '<audio controls src="data:audio/wav;base64,' + escapeHtml(part.data) + '"></audio>';
+      if (type === 'P') return '<img src="data:image/*;base64,' + escapeHtml(part.data) + '" alt="">';
+      if (type === 'X') return '<a download href="data:application/octet-stream;base64,' + escapeHtml(part.data) + '">attachment</a>';
+      return '<pre>' + escapeHtml(text) + '</pre>';
+    }).join('');
+  }
+
+  function definitionElement(entry, bookId, assetBasePath, allowScripts) {
     var definition = element('iframe', 'dictionary-entry-document');
     var source = String(entry.definition || '');
     var format = String(entry.definition_format || '');
+    var isPackagedHtml = format === 'mdict' || format === 'stardict:h';
+    var isStarDictParts = format === 'stardict:parts';
     var isPlainText = /^stardict:[ml]+$/.test(format)
       || (format === 'mdict' && !/<[A-Za-z!/][^>]*>/.test(source));
-    if (format === 'mdict') source = resolveMdictResources(source, entry, bookId);
-    definition.sandbox = 'allow-same-origin';
+    if (isPackagedHtml) source = resolveDictionaryPackageResources(source, entry, bookId, assetBasePath);
+    if (isStarDictParts) source = renderStarDictParts(source, entry, bookId, assetBasePath);
+    var origin = dictionaryOrigin() || "'self'";
+    var scriptSource = allowScripts && (isPackagedHtml || isStarDictParts) ? origin + " 'unsafe-inline'" : "'none'";
+    definition.sandbox = allowScripts && (isPackagedHtml || isStarDictParts)
+      ? 'allow-same-origin allow-scripts' : 'allow-same-origin';
     definition.referrerPolicy = 'no-referrer';
     definition.setAttribute('title', entry.headword || '');
     definition.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" '
-      + 'content="default-src \'none\'; base-uri \'none\'; connect-src \'none\'; form-action \'none\'; '
-      + 'frame-src \'none\'; object-src \'none\'; script-src \'none\'; style-src \'self\' \'unsafe-inline\'; '
-      + 'img-src \'self\' data:; media-src \'self\' data:">'
+      + 'content="default-src \'none\'; base-uri ' + origin + '; connect-src \'none\'; form-action \'none\'; '
+      + 'frame-src \'none\'; object-src \'none\'; script-src ' + scriptSource + '; style-src ' + origin + ' \'unsafe-inline\'; '
+      + 'img-src ' + origin + ' data:; media-src ' + origin + ' data:; font-src ' + origin + ' data:">'
       + '<style>body{margin:0;color:inherit;font:14px/1.62 system-ui,sans-serif;overflow-wrap:anywhere}'
       + 'pre{margin:0;white-space:pre-wrap;font:inherit}img{max-width:100%;height:auto}'
-      + 'table{max-width:100%;border-collapse:collapse}td{vertical-align:top}.hycd_3rd a{color:inherit;text-decoration:none}'
-      + '.hycd_3rd_cixing,.hycd_3rd_pinyin{display:flex;gap:.45em;margin:.25em 0}.hycd_3rd_cixing_part,.hycd_3rd_pinyin_part{display:inline-block}'
-      + '.hycd_3rd_part{margin-top:.4em}.hycd_3rd .citouci{font-weight:700}.hycd_3rd .hycd_3rd_en{color:#52606d}</style>'
+      + 'table{max-width:100%;border-collapse:collapse}td{vertical-align:top}</style>'
       + (isPlainText ? '<pre>' + source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>' : source);
     return definition;
   }
@@ -129,7 +201,7 @@
         var item = element('article', 'dictionary-entry');
         item.appendChild(element('strong', '', entry.headword));
         entry.dictionary_id = data.dictionary && data.dictionary.id;
-        item.appendChild(definitionElement(entry, bookId));
+        item.appendChild(definitionElement(entry, bookId, data.asset_base_path, Boolean(data.allow_scripts)));
         result.appendChild(item);
       });
     }

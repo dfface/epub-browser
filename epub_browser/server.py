@@ -2089,6 +2089,8 @@ window.location.assign(payload.redirect||'/');
         return response({
             "found": result.found,
             "query": result.query,
+            "asset_base_path": result.asset_base_path,
+            "allow_scripts": result.allow_scripts,
             "dictionary": {
                 "id": result.dictionary.id,
                 "display_name": result.dictionary.display_name,
@@ -2129,6 +2131,22 @@ window.location.assign(payload.redirect||'/');
             headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         )
 
+    async def dictionary_asset(request):
+        principal = require_principal(request)
+        book_id = request.path_params["book_id"]
+        if book_access_denied(principal, book_id):
+            return forbidden_book_response()
+        try:
+            asset = dictionary_service.get_asset(
+                request.path_params["dictionary_id"], request.path_params["asset_path"],
+            )
+        except DictionaryServiceError:
+            return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
+        return Response(
+            asset["content"], media_type=asset["content_type"],
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+
     async def encyclopedia_lookup(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
@@ -2158,6 +2176,7 @@ window.location.assign(payload.redirect||'/');
             "id": record.id, "display_name": record.display_name,
             "entry_count": record.entry_count, "attribution": record.attribution,
             "enabled": record.enabled,
+            "allow_scripts": dictionary_service.allows_scripts(record.id),
             "is_default": record.id == default_dictionary_id,
         }
 
@@ -2177,15 +2196,24 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload("not_ready", "Server is not ready"), 503)
         filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
         display_name = unquote(request.headers.get("x-epub-browser-dictionary-name", ""))
+        dictionary_format = request.headers.get("x-epub-browser-dictionary-format", "")
         upload = dictionary_service.dictionary_directory / (".upload-" + secrets.token_urlsafe(24))
         try:
             with upload.open("xb") as output:
                 async for chunk in request.stream():
                     output.write(chunk)
-            record = dictionary_service.install_upload_file(
-                upload, filename, created_by_user_id=principal.user_id,
-                display_name=display_name,
-            )
+            if dictionary_format == "mdict":
+                record = dictionary_service.install_mdict_package_file(
+                    upload, filename, created_by_user_id=principal.user_id,
+                    display_name=display_name,
+                )
+            elif dictionary_format == "stardict":
+                record = dictionary_service.install_stardict_package_file(
+                    upload, filename, created_by_user_id=principal.user_id,
+                    display_name=display_name,
+                )
+            else:
+                raise DictionaryServiceError("unsupported_dictionary_format")
         except (DictionaryServiceError, OSError, ValueError) as error:
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_dictionary_archive"
             return response(error_payload(code, "Dictionary installation failed"), 400)
@@ -2228,6 +2256,21 @@ window.location.assign(payload.redirect||'/');
                 return response(error_payload("not_found", "Not Found"), 404)
             except ValueError:
                 return response(error_payload("invalid_dictionary_name", "Invalid dictionary name"), 400)
+            default = dictionary_service.store.get_global_dictionary_default()
+            return response({"dictionary": dictionary_record_data(
+                record, default.id if default else None,
+            )})
+        if "allow_scripts" in data:
+            if not isinstance(data["allow_scripts"], bool):
+                return response(error_payload("invalid_dictionary_update", "Invalid dictionary update"), 400)
+            try:
+                record = dictionary_service.set_script_execution_enabled(
+                    dictionary_id, data["allow_scripts"],
+                )
+            except KeyError:
+                return response(error_payload("not_found", "Not Found"), 404)
+            except DictionaryServiceError:
+                return response(error_payload("dictionary_unavailable", "Dictionary unavailable"), 400)
             default = dictionary_service.store.get_global_dictionary_default()
             return response({"dictionary": dictionary_record_data(
                 record, default.id if default else None,
@@ -3120,6 +3163,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/books/{book_id}/dictionary/lookup', dictionary_lookup, methods=['POST']),
+        Route('/api/books/{book_id}/dictionaries/{dictionary_id}/assets/{asset_path:path}', dictionary_asset, methods=['GET']),
         Route('/api/books/{book_id}/dictionaries/{dictionary_id}/resources/{media_id}', dictionary_media, methods=['GET']),
         Route('/api/books/{book_id}/encyclopedia/lookup', encyclopedia_lookup, methods=['POST']),
         Route('/api/ai/reading', ai_reading_request, methods=['POST']),

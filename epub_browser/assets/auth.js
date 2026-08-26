@@ -929,6 +929,21 @@
       });
     }
 
+    function updateDictionaryScripts(dictionary, allowScripts) {
+      return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({allow_scripts: allowScripts})
+      }).then(function(response) {
+        if (!response.ok) return showDictionaryResponseError(response);
+        showDictionaryMessage('admin.dictionaryUpdated', 'success');
+        showStatus('admin.dictionaryUpdated', 'success');
+        return loadDictionaries();
+      }).catch(function() {
+        showDictionaryMessage('admin.error.network', 'error');
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
     function setDefaultDictionary(dictionary) {
       return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id) + '/default', {
         method: 'PUT'
@@ -1042,6 +1057,21 @@
         actions.appendChild(actionButton('admin.renameDictionary', function() {
           return renameDictionary(dictionary);
         }));
+        actions.appendChild(actionButton(
+          dictionary.allow_scripts ? 'admin.disableDictionaryScripts' : 'admin.enableDictionaryScripts',
+          function() {
+            var allowScripts = !dictionary.allow_scripts;
+            var confirmation = allowScripts
+              ? 'admin.confirmEnableDictionaryScripts'
+              : 'admin.confirmDisableDictionaryScripts';
+            return confirmDictionaryAction(
+              dictionary.allow_scripts ? 'admin.disableDictionaryScripts' : 'admin.enableDictionaryScripts',
+              confirmation, {name: dictionary.display_name}
+            ).then(function(confirmed) {
+              return confirmed ? updateDictionaryScripts(dictionary, allowScripts) : null;
+            });
+          }, dictionary.allow_scripts ? 'danger' : undefined
+        ));
         actions.appendChild(actionButton(
           dictionary.enabled ? 'admin.disableDictionary' : 'admin.enableDictionary',
           function() {
@@ -2620,9 +2650,8 @@
         event.preventDefault();
         var format = dictionaryForm.elements.dictionary_format.value;
         var dictionaryFile = format === 'mdict'
-          ? dictionaryForm.elements.mdx.files[0]
-          : dictionaryForm.elements.archive.files[0];
-        var mediaFile = format === 'mdict' && dictionaryForm.elements.mdd.files[0];
+          ? dictionaryForm.elements.mdict_archive.files[0]
+          : dictionaryForm.elements.stardict_archive.files[0];
         if (!dictionaryFile) return;
         showDictionaryMessage('', '');
         runButtonOperation(dictionarySubmit, 'admin.installingDictionary', function() {
@@ -2633,7 +2662,8 @@
                 headers: {
                   'Content-Type': file.type || 'application/octet-stream',
                   'X-EPUB-Browser-Dictionary-Filename': encodeURIComponent(file.name),
-                  'X-EPUB-Browser-Dictionary-Name': encodeURIComponent(dictionaryForm.elements.display_name.value.trim())
+                  'X-EPUB-Browser-Dictionary-Name': encodeURIComponent(dictionaryForm.elements.display_name.value.trim()),
+                  'X-EPUB-Browser-Dictionary-Format': format
                 }, body: contents
               });
             });
@@ -2641,16 +2671,6 @@
           return upload(dictionaryFile, '/api/admin/dictionaries').then(function(response) {
             if (!response.ok) return showDictionaryResponseError(response).then(function() { throw new Error('dictionary_upload_failed'); });
             return readJson(response);
-          }).then(function(payload) {
-            if (!mediaFile) return payload;
-            var dictionary = payload && payload.dictionary;
-            return upload(mediaFile, '/api/admin/dictionaries/' + encodeURIComponent(dictionary.id) + '/resources').then(function(response) {
-              if (response.ok) return payload;
-              return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {method: 'DELETE'})
-                .finally(function() {
-                  return showDictionaryResponseError(response).then(function() { throw new Error('dictionary_media_upload_failed'); });
-                });
-            });
           }).then(function(payload) {
             dictionaryForm.reset();
             setDictionaryFormat('mdict');
@@ -2665,7 +2685,7 @@
             }
             return null;
           }, function(error) {
-            if (error && /dictionary_(?:media_)?upload_failed/.test(error.message)) return;
+            if (error && /dictionary_upload_failed/.test(error.message)) return;
             showDictionaryMessage('admin.error.network', 'error');
             showStatus('admin.error.network', 'error');
           });
@@ -2673,7 +2693,7 @@
       });
       if (dictionaryForm) {
         var dictionaryFormatInputs = dictionaryForm.querySelectorAll('input[name="dictionary_format"]');
-        var dictionaryFileInputs = [dictionaryForm.elements.mdx, dictionaryForm.elements.mdd, dictionaryForm.elements.archive];
+        var dictionaryFileInputs = [dictionaryForm.elements.mdict_archive, dictionaryForm.elements.stardict_archive];
         var dictionaryNameInput = dictionaryForm.elements.display_name;
         function updateDictionaryFileLabel(input) {
           if (!input) return;
@@ -2698,7 +2718,7 @@
             group.hidden = !selected;
             Array.prototype.forEach.call(group.querySelectorAll('input[type="file"]'), function(input) {
               input.disabled = !selected;
-              input.required = selected && input.name === (format === 'mdict' ? 'mdx' : 'archive');
+              input.required = selected;
             });
           });
         };
@@ -2708,7 +2728,6 @@
         dictionaryFileInputs.forEach(function(dictionaryFileInput) {
           dictionaryFileInput.addEventListener('change', function() {
             updateDictionaryFileLabel(dictionaryFileInput);
-            if (dictionaryFileInput.name === 'mdd') return;
             var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
             var fileName = file && file.name ? file.name.replace(/\.(?:mdx|zip|tar(?:\.(?:gz|bz2))?|tgz|tbz2)$/i, '').trim() : '';
             if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;

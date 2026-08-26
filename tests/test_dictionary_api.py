@@ -142,11 +142,55 @@ class DictionaryApiTests(unittest.TestCase):
                 "content-type": "application/zip",
                 "x-epub-browser-dictionary-filename": quote("现代汉语词典.zip"),
                 "x-epub-browser-dictionary-name": "",
+                "x-epub-browser-dictionary-format": "stardict",
             },
         )
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["dictionary"]["display_name"], "现代汉语词典")
+
+    def test_stardict_html_package_assets_are_available_to_the_reader(self):
+        definition = b'<link rel="stylesheet" href="styles/entry.css"><img src="images/run.png"><script src="entry.js"></script>'
+        index = b"run\0" + struct.pack(">II", 0, len(definition))
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w") as archive:
+            archive.writestr(
+                "package/sample.ifo",
+                "StarDict's dict ifo file\nversion=2.4.2\nbookname=HTML\nwordcount=1\n"
+                "idxfilesize=" + str(len(index)) + "\nsametypesequence=h\n",
+            )
+            archive.writestr("package/sample.idx", index)
+            archive.writestr("package/sample.dict", definition)
+            archive.writestr("package/styles/entry.css", ".entry{color:#123456}")
+            archive.writestr("package/images/run.png", b"\x89PNG\r\n\x1a\nimage-data")
+            archive.writestr("package/entry.js", "window.packageScript = true;")
+
+        created = self.client.post(
+            "/api/admin/dictionaries", content=payload.getvalue(),
+            headers={
+                "content-type": "application/zip",
+                "x-epub-browser-dictionary-filename": "html.zip",
+                "x-epub-browser-dictionary-format": "stardict",
+            },
+        )
+
+        self.assertEqual(created.status_code, 201)
+        dictionary_id = created.json()["dictionary"]["id"]
+        lookup = self.client.post(
+            "/api/books/book/dictionary/lookup", json={"text": "run", "dictionary_id": dictionary_id},
+        )
+        self.assertEqual(lookup.json()["asset_base_path"], "package")
+        self.assertFalse(lookup.json()["allow_scripts"])
+        self.assertEqual(lookup.json()["entries"][0]["definition_format"], "stardict:h")
+        self.assertEqual(self.client.get(
+            "/api/books/book/dictionaries/" + dictionary_id + "/assets/package/styles/entry.css",
+        ).status_code, 200)
+        self.assertEqual(self.client.get(
+            "/api/books/book/dictionaries/" + dictionary_id + "/assets/package/images/run.png",
+        ).headers["content-type"], "image/png")
+        self.assertEqual(self.client.put(
+            "/api/admin/dictionaries/" + dictionary_id, json={"allow_scripts": True},
+        ).json()["dictionary"]["allow_scripts"], True)
 
     def test_admin_can_disable_and_delete_a_dictionary(self):
         disabled = self.client.put(
@@ -160,7 +204,7 @@ class DictionaryApiTests(unittest.TestCase):
         self.assertEqual(deleted.status_code, 204)
         self.assertEqual(self.client.get("/api/admin/dictionaries").json()["dictionaries"], [])
 
-    def test_mdd_resource_upload_and_reader_media_are_acl_protected(self):
+    def test_mdict_package_assets_are_acl_protected(self):
         try:
             from mdict_utils.base.writemdict import MDictWriter
         except ImportError:
@@ -170,35 +214,32 @@ class DictionaryApiTests(unittest.TestCase):
             {"run": "to move<img src=\"file://\\\\images\\\\run.png\">"},
             title="Media", description="", compression_type=2, version="2.0",
         ).write(mdx)
-        created = self.client.post(
-            "/api/admin/dictionaries", content=mdx.getvalue(),
-            headers={
-                "content-type": "application/octet-stream",
-                "x-epub-browser-dictionary-filename": quote("media.mdx"),
-            },
-        )
-        self.assertEqual(created.status_code, 201)
-        dictionary_id = created.json()["dictionary"]["id"]
         mdd = io.BytesIO()
         MDictWriter(
             {"\\\\images\\\\run.png": b"\x89PNG\r\n\x1a\nimage-data"},
             title="Media", description="", compression_type=2, version="2.0", is_mdd=True,
         ).write(mdd)
-        attached = self.client.post(
-            "/api/admin/dictionaries/" + dictionary_id + "/resources", content=mdd.getvalue(),
+        package = io.BytesIO()
+        with zipfile.ZipFile(package, "w") as archive:
+            archive.writestr("media/media.mdx", mdx.getvalue())
+            archive.writestr("media/media.mdd", mdd.getvalue())
+        created = self.client.post(
+            "/api/admin/dictionaries", content=package.getvalue(),
             headers={
-                "content-type": "application/octet-stream",
-                "x-epub-browser-dictionary-filename": quote("media.mdd"),
+                "content-type": "application/zip",
+                "x-epub-browser-dictionary-filename": quote("media.zip"),
+                "x-epub-browser-dictionary-format": "mdict",
             },
         )
-        self.assertEqual(attached.status_code, 204)
+        self.assertEqual(created.status_code, 201)
+        dictionary_id = created.json()["dictionary"]["id"]
 
         lookup = self.client.post(
             "/api/books/book/dictionary/lookup", json={"text": "run", "dictionary_id": dictionary_id},
         )
-        media_id = lookup.json()["entries"][0]["media"][0]["id"]
+        self.assertEqual(lookup.json()["asset_base_path"], "media")
         media = self.client.get(
-            "/api/books/book/dictionaries/" + dictionary_id + "/resources/" + media_id,
+            "/api/books/book/dictionaries/" + dictionary_id + "/assets/media/images/run.png",
         )
         self.assertEqual(media.status_code, 200)
         self.assertEqual(media.headers["content-type"], "image/png")
@@ -207,7 +248,7 @@ class DictionaryApiTests(unittest.TestCase):
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
         self.assertEqual(anonymous.get(
-            "/api/books/book/dictionaries/" + dictionary_id + "/resources/" + media_id,
+            "/api/books/book/dictionaries/" + dictionary_id + "/assets/media/images/run.png",
         ).status_code, 401)
 
     @mock.patch("epub_browser.server.WikimediaEncyclopedia.lookup")

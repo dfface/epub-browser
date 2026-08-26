@@ -1,6 +1,7 @@
 import struct
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from epub_browser.dictionary_formats import parse_local_dictionary, read_mdict_resources
@@ -73,6 +74,66 @@ class DictionaryFormatTests(unittest.TestCase):
 
         self.assertEqual(result.entries[0].definition_text, definition.decode("utf-8"))
         self.assertEqual(result.entries[0].definition_format, "stardict:h")
+
+    def test_keeps_typed_stardict_fields_instead_of_flattening_them(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "sample"
+            definition = "tʊn\0a spinning object".encode("utf-8")
+            index = b"turn\0" + struct.pack(">II", 0, len(definition))
+            base.with_suffix(".ifo").write_text(
+                "StarDict's dict ifo file\nversion=2.4.2\nbookname=Typed\nwordcount=1\n"
+                "idxfilesize=" + str(len(index)) + "\nsametypesequence=tm\n",
+                encoding="utf-8",
+            )
+            base.with_suffix(".idx").write_bytes(index)
+            base.with_suffix(".dict").write_bytes(definition)
+            result = parse_local_dictionary(base.with_suffix(".ifo"))
+
+        self.assertEqual(result.entries[0].definition_format, "stardict:parts")
+        self.assertEqual(json.loads(result.entries[0].definition_text), [
+            {"type": "t", "text": "tʊn"},
+            {"type": "m", "text": "a spinning object"},
+        ])
+
+    def test_reads_type_markers_when_sametypesequence_is_omitted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "sample"
+            definition = b"t`t3:n\0mdefinition\0"
+            index = b"tagged\0" + struct.pack(">II", 0, len(definition))
+            base.with_suffix(".ifo").write_text(
+                "StarDict's dict ifo file\nversion=2.4.2\nbookname=Tagged\nwordcount=1\n"
+                "idxfilesize=" + str(len(index)) + "\n",
+                encoding="utf-8",
+            )
+            base.with_suffix(".idx").write_bytes(index)
+            base.with_suffix(".dict").write_bytes(definition)
+            result = parse_local_dictionary(base.with_suffix(".ifo"))
+
+        self.assertEqual(result.entries[0].definition_format, "stardict:parts")
+        self.assertEqual(json.loads(result.entries[0].definition_text), [
+            {"type": "t", "text": "`t3:n"},
+            {"type": "m", "text": "definition"},
+        ])
+
+    def test_preserves_embedded_stardict_picture_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "sample"
+            image = b"\x89PNG\r\n\x1a\nimage-data"
+            definition = b"P" + struct.pack(">I", len(image)) + image
+            index = b"picture\0" + struct.pack(">II", 0, len(definition))
+            base.with_suffix(".ifo").write_text(
+                "StarDict's dict ifo file\nversion=2.4.2\nbookname=Binary\nwordcount=1\n"
+                "idxfilesize=" + str(len(index)) + "\n",
+                encoding="utf-8",
+            )
+            base.with_suffix(".idx").write_bytes(index)
+            base.with_suffix(".dict").write_bytes(definition)
+            result = parse_local_dictionary(base.with_suffix(".ifo"))
+
+        self.assertEqual(result.entries[0].definition_format, "stardict:parts")
+        self.assertEqual(json.loads(result.entries[0].definition_text), [
+            {"type": "P", "data": "iVBORw0KGgppbWFnZS1kYXRh"},
+        ])
 
     def test_keeps_media_only_mdict_entries_without_rewriting_them(self):
         try:
