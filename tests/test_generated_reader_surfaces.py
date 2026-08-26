@@ -3089,6 +3089,8 @@ assert.deepEqual(
         self.assertIn('.book-info-card:has(~ .book-review-display:not([hidden]))', review_styles)
         self.assertNotIn('placeDisplayAfterBookInfo', review_script)
         self.assertIn('.book-review-display-rating > [aria-hidden="true"]', review_styles)
+        self.assertIn('.book-review-header { position: absolute;', review_styles)
+        self.assertIn('.book-review-form { display: grid; gap: 12px; margin-top: 0; }', review_styles)
         self.assertNotIn('book-review-status[data-state="success"]', review_styles)
         self.assertIn('.book-review-star-option[aria-checked="true"] { color: var(--book-review-star); }', review_styles)
         self.assertIn('.dark-mode .book-reviews', review_styles)
