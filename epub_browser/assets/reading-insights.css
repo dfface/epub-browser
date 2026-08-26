@@ -248,6 +248,18 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
     scrollbar-color: var(--border) transparent;
 }
 
+/* A complete year fits at this width; center the compact calendar rather
+   than leaving the visual weight pinned to the card's left edge. Smaller
+   layouts retain the natural left origin so an overflowed calendar remains
+   discoverable and scrollable. */
+@media (min-width: 900px) {
+    .reading-insights-heatmap-scroll {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
 .reading-insights-heatmap-scroll:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 3px; }
 .reading-insights-heatmap-months {
     display: grid;
