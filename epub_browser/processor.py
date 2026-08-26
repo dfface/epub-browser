@@ -2424,6 +2424,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             '<script src="/assets/ai-feature-loader.js" defer></script>'
             if self.deployment_mode == "server" else ""
         )
+        dictionary_assets = (
+            '<link rel="stylesheet" href="/assets/dictionary.css">\n'
+            '<script src="/assets/dictionary.js" defer></script>'
+            if self.deployment_mode == "server" else ""
+        )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -2991,6 +2996,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/annotation-hub.js" defer></script>
     <script src="/assets/sortable.min.js" defer></script>
+    {dictionary_assets}
     <script src="/assets/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
     {ai_chapter_scripts}

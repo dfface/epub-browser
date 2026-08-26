@@ -1,6 +1,14 @@
-# Server Kindle 词典导入与查词：详细设计
+# 已废弃：Server Kindle 词典导入与查词
 
-**状态：待评审**
+**状态：已废弃（2026-08-26）**
+
+本设计曾计划导入 Kindle/MOBI 词典。产品方向现已变更：不导入 Kindle 文件，也不引入其解析器或 GPL 依赖。
+
+现行设计见：[本地词典与百科查阅详细设计](2026-08-26-local-dictionary-and-encyclopedia-design.md)。
+
+---
+
+以下内容仅保留作决策记录，不作为实施依据。
 
 **范围：Server 模式 V1**
 
@@ -163,13 +171,13 @@ CREATE INDEX idx_forms_normalized_form ON forms(normalized_form, rank, entry_id)
 
 ## 6. Kindle 导入器
 
-新增一个窄范围、可单测的 `kindle_dictionary.py` 适配器，而不是引入 Calibre 或 GPL 解析器依赖。它以 Mobi 7 的公开 PalmDB/MOBI 记录结构实现最小读取器，从 Kindle 字典索引恢复 `<idx:entry>`、`<idx:orth>` 和 `<idx:iform>`，并读取 source/target language 元数据；不得复制或链接 GPL KindleUnpack 代码。
+词典版发行物直接依赖 `mobi==0.4.1`（GPL-3.0-only），使用其 `mobi.extract()` 解包无 DRM Mobi 7 文件，并从恢复后的 `<idx:entry>`、`<idx:orth>`、`<idx:iform>` HTML 读取词头和变形词。项目所有者已授权将包含该依赖的发行物按 GPLv3 发布；不再维护自有的 Mobi 二进制解析器，也不引入 Calibre。
 
 导入规则：
 
-- 只接受扩展名和魔数都匹配的 Mobi 7 `.mobi`，或容器验证为 Mobi 7 的 `.azw`；最大原始文件 512 MiB，文件名最长 200 Unicode 字符。
+- 只接受扩展名和 `mobi` 解包器均验证为 Mobi 7 的 `.mobi`，或容器验证为 Mobi 7 的 `.azw`；最大原始文件 512 MiB，文件名最长 200 Unicode 字符。
 - 明确检测并拒绝 DRM/encryption、AZW3/KF8、KFX、未知容器、非字典内容、损坏索引、缺少可用源语言或零条目结果。
-- 解析运行在独立受限 worker 进程；主 Server 只负责持久化任务状态。worker 有可配置的 CPU/墙钟时间、内存、条目数、每条词形数、累计释义字节和解压输出上限。超限产生稳定错误码并清理临时文件。
+- 解析运行在独立受限 worker 进程；主 Server 只负责持久化任务状态。worker 调用 `mobi.extract()` 并有可配置的 CPU/墙钟时间、内存、条目数、每条词形数、累计释义字节和解压输出上限。超限产生稳定错误码并清理临时文件。
 - 规范化使用 Unicode NFC、首尾空白折叠、语言无关的大小写折叠；保留原始词头显示。空字符串、超过 120 个 Unicode code points 的查询、包含控制字符的查询被拒绝。
 - 解析器剥离脚本、样式、外部 URL 和所有 HTML 标签，再将块级文本以换行连接，限制最大释义 12 KiB。不能安全抽取的条目跳过，并在完成前检查仍有足够有效条目。
 - 同 SHA-256 的已完成导入不再重复构建，返回已存在词典及一个完成任务；同 SHA 的排队/运行任务返回原任务，不启动第二个 worker。
@@ -216,6 +224,14 @@ CREATE INDEX idx_forms_normalized_form ON forms(normalized_form, rank, entry_id)
 - 每次 lookup 在目录读取和文件打开之间重新验证 `enabled` 与默认映射；文件缺失或完整性失败时返回受控 `dictionary_unavailable`，并记录服务器端错误，不将 SQL/文件细节交给读者。
 
 `server.py` 在通用 `/api/{path:path}` 标注回退路由之前注册所有词典路由。管理员页面继续由 `server_chrome.py` 壳和 `auth.js` 的账户页行为承载；词典管理界面只在 Server 的管理员会话中出现。
+
+## 8.1 许可证与发行边界
+
+本项目的词典发行物直接导入 GPL-3.0-only 的 Python `mobi` 包，因此该发行物按 GPLv3 发布。既有代码的来源与历史 MIT 版权声明保留在 `NOTICE`；但 `setup.py`、README 和容器元数据不得继续将含词典功能的发行物标为 MIT-only。
+
+- `setup.py` 固定 `mobi==0.4.1` 并声明 GPL-3.0-only；软件包包含 GPLv3 文本和第三方声明。
+- Docker 构建下载同一版本的 `mobi` source distribution，随镜像放置在 `/usr/share/licenses/epub-browser/mobi-0.4.1/`，并附带来源 URL、版本与 SHA-256。
+- README 说明普通 SSG/Server 功能与词典版的许可证边界，以及获得对应源码的位置；发布前仍需对依赖版本与许可证做人工审阅。
 
 ## 9. 前端实施边界
 

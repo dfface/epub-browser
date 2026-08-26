@@ -47,6 +47,8 @@ from .ai_reading import (
     validate_reading_request,
 )
 from .asset_publisher import PublishedAssets
+from .dictionary_service import DictionaryService, DictionaryServiceError
+from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
@@ -576,6 +578,8 @@ def create_app(
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     release_lookup = release_lookup or ReleaseLookup()
     ai_reading = AIReadingService(store, base_directory)
+    dictionary_service = DictionaryService(store, base_directory)
+    encyclopedia = WikimediaEncyclopedia()
     store.requeue_running_ai_jobs()
     store.requeue_running_ai_followups()
     store.requeue_running_ai_book_chat_turns()
@@ -2057,6 +2061,134 @@ window.location.assign(payload.redirect||'/');
             'ai_profile': store.get_book_ai_profile(book_id),
         })
 
+    def book_language(book_id):
+        book = store.book_by_id(book_id)
+        if book is None:
+            raise ValueError("book_not_found")
+        try:
+            metadata = json.loads(book.metadata_json)
+        except json.JSONDecodeError:
+            metadata = {}
+        language = metadata.get("language")
+        return language if isinstance(language, str) and language.strip() else "en"
+
+    async def dictionary_lookup(request):
+        principal = require_principal(request)
+        book_id = request.path_params["book_id"]
+        if book_access_denied(principal, book_id):
+            return forbidden_book_response()
+        data, error = await bounded_public_json_object(request, maximum_size=2048)
+        if error or not isinstance(data.get("text"), str):
+            return response(error_payload("invalid_dictionary_query", "Invalid dictionary query"), 400, "private, no-store")
+        try:
+            result = dictionary_service.lookup(book_language(book_id), data["text"])
+        except DictionaryServiceError as error:
+            status = 404 if error.code == "dictionary_not_configured" else 400
+            return response(error_payload(error.code, "Dictionary lookup failed"), status, "private, no-store")
+        except ValueError:
+            return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
+        return response({
+            "found": result.found,
+            "query": result.query,
+            "dictionary": {
+                "id": result.dictionary.id,
+                "display_name": result.dictionary.display_name,
+                "source_language": result.dictionary.source_language,
+                "target_language": result.dictionary.target_language,
+            },
+            "entries": list(result.entries),
+        }, cache_control="private, no-store")
+
+    async def encyclopedia_lookup(request):
+        principal = require_principal(request)
+        book_id = request.path_params["book_id"]
+        if book_access_denied(principal, book_id):
+            return forbidden_book_response()
+        data, error = await bounded_public_json_object(request, maximum_size=2048)
+        if error or not isinstance(data.get("text"), str):
+            return response(error_payload("invalid_encyclopedia_query", "Invalid encyclopedia query"), 400, "private, no-store")
+        try:
+            result = await asyncio.to_thread(encyclopedia.lookup, book_language(book_id), data["text"])
+        except EncyclopediaError as error:
+            status = 429 if error.code == "encyclopedia_rate_limited" else 400
+            return response(error_payload(error.code, "Encyclopedia lookup failed"), status, "private, no-store")
+        except ValueError:
+            return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
+        return response({
+            "found": result.found,
+            "title": result.title,
+            "description": result.description,
+            "extract": result.extract,
+            "source_url": result.source_url,
+            "attribution": result.attribution,
+        }, cache_control="private, no-store")
+
+    def dictionary_record_data(record):
+        return {
+            "id": record.id, "display_name": record.display_name,
+            "source_language": record.source_language,
+            "target_language": record.target_language,
+            "entry_count": record.entry_count, "attribution": record.attribution,
+            "enabled": record.enabled,
+        }
+
+    async def admin_dictionaries(request):
+        principal = require_admin(request)
+        if request.method == "GET":
+            return response({"dictionaries": [dictionary_record_data(item) for item in dictionary_service.store.list_dictionaries()]})
+        if not runtime_status.is_ready():
+            return response(error_payload("not_ready", "Server is not ready"), 503)
+        source_language = request.headers.get("x-epub-browser-source-language", "")
+        target_language = request.headers.get("x-epub-browser-target-language", "")
+        display_name = request.headers.get("x-epub-browser-dictionary-name")
+        content_length = request.headers.get("content-length")
+        try:
+            if content_length and int(content_length) > 512 * 1024 * 1024:
+                return response(error_payload("body_too_large", "Dictionary archive is too large"), 413)
+            body = bytearray()
+            async for chunk in request.stream():
+                body.extend(chunk)
+                if len(body) > 512 * 1024 * 1024:
+                    return response(error_payload("body_too_large", "Dictionary archive is too large"), 413)
+            record = dictionary_service.install_archive(
+                bytes(body), source_language=source_language,
+                target_language=target_language, created_by_user_id=principal.user_id,
+                display_name=display_name,
+            )
+        except (DictionaryServiceError, ValueError) as error:
+            code = error.code if isinstance(error, DictionaryServiceError) else "invalid_dictionary_archive"
+            return response(error_payload(code, "Dictionary installation failed"), 400)
+        return response({"dictionary": dictionary_record_data(record)}, 201)
+
+    async def admin_dictionary(request):
+        require_admin(request)
+        dictionary_id = request.path_params["dictionary_id"]
+        if request.method == "DELETE":
+            try:
+                dictionary_service.delete(dictionary_id)
+            except KeyError:
+                return response(error_payload("not_found", "Not Found"), 404)
+            return Response(status_code=204, headers={"Cache-Control": "no-cache"})
+        data, error = await bounded_public_json_object(request)
+        if error or not isinstance(data.get("enabled"), bool):
+            return response(error_payload("invalid_dictionary_update", "Invalid dictionary update"), 400)
+        try:
+            record = dictionary_service.set_enabled(dictionary_id, data["enabled"])
+        except KeyError:
+            return response(error_payload("not_found", "Not Found"), 404)
+        return response({"dictionary": dictionary_record_data(record)})
+
+    async def admin_dictionary_default(request):
+        principal = require_admin(request)
+        data, error = await bounded_public_json_object(request)
+        if error or not isinstance(data.get("dictionary_id"), str):
+            return response(error_payload("invalid_dictionary_default", "Invalid dictionary default"), 400)
+        try:
+            record = dictionary_service.set_default(request.path_params["source_language"], data["dictionary_id"], principal.user_id)
+        except (KeyError, ValueError):
+            return response(error_payload("invalid_dictionary_default", "Invalid dictionary default"), 400)
+        return response({"dictionary": dictionary_record_data(record)})
+
     async def ai_reading_request(request):
         principal = require_principal(request)
         data, error = await bounded_public_json_object(request)
@@ -2899,6 +3031,9 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/ai/results', admin_ai_results, methods=['DELETE']),
         Route('/api/admin/ai/jobs', admin_ai_jobs, methods=['GET']),
         Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
+        Route('/api/admin/dictionaries', admin_dictionaries, methods=['GET', 'POST']),
+        Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
+        Route('/api/admin/dictionary-defaults/{source_language}', admin_dictionary_default, methods=['PUT']),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
@@ -2911,6 +3046,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
+        Route('/api/books/{book_id}/dictionary/lookup', dictionary_lookup, methods=['POST']),
+        Route('/api/books/{book_id}/encyclopedia/lookup', encyclopedia_lookup, methods=['POST']),
         Route('/api/ai/reading', ai_reading_request, methods=['POST']),
         Route('/api/ai/library', ai_reading_library, methods=['GET']),
         Route('/api/ai/books/{book_id}/results', ai_book_results, methods=['GET']),
@@ -2985,7 +3122,11 @@ window.location.assign(payload.redirect||'/');
         authorized = await call_next(request)
         if new_proxy_session is not None:
             set_session_cookie(authorized, new_proxy_session)
-        authorized.headers['Cache-Control'] = 'private, no-cache'
+        # Lookup text is sensitive reading data.  Its handlers deliberately
+        # request no-store; preserve that stronger policy instead of replacing
+        # it with the authenticated page default.
+        if authorized.headers.get('Cache-Control') != 'private, no-store':
+            authorized.headers['Cache-Control'] = 'private, no-cache'
         return authorized
 
     app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)

@@ -1,0 +1,89 @@
+/* Server-only local dictionary and Wikimedia encyclopedia result dialog. */
+(function(root) {
+  'use strict';
+  var activeController = null;
+  var activeDialog = null;
+
+  function t(key) {
+    var i18n = root.EpubBrowserI18n;
+    return i18n && i18n.t ? i18n.t('dictionary.' + key) : key;
+  }
+
+  function close() {
+    if (activeController) activeController.abort();
+    activeController = null;
+    if (activeDialog) activeDialog.remove();
+    activeDialog = null;
+  }
+
+  function element(tag, className, text) {
+    var item = root.document.createElement(tag);
+    if (className) item.className = className;
+    if (text !== undefined && text !== null) item.textContent = text;
+    return item;
+  }
+
+  function show(kind, text) {
+    close();
+    var dialog = element('section', 'dictionary-dialog');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-live', 'polite');
+    dialog.setAttribute('aria-label', t(kind === 'dictionary' ? 'title' : 'encyclopediaTitle'));
+    var header = element('header', 'dictionary-dialog-header');
+    header.appendChild(element('strong', '', t(kind === 'dictionary' ? 'title' : 'encyclopediaTitle')));
+    var button = element('button', 'dictionary-dialog-close', '×');
+    button.type = 'button'; button.setAttribute('aria-label', t('close'));
+    button.addEventListener('click', close); header.appendChild(button);
+    dialog.appendChild(header);
+    var content = element('div', 'dictionary-dialog-content', t('loading'));
+    dialog.appendChild(content);
+    root.document.body.appendChild(dialog);
+    activeDialog = dialog;
+    button.focus();
+
+    var article = root.document.getElementById('eb-content');
+    var bookId = article && article.getAttribute('data-book-hash');
+    if (!bookId || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) {
+      content.textContent = t('unavailable'); return;
+    }
+    activeController = new AbortController();
+    root.EpubBrowserAuth.fetch('/api/books/' + encodeURIComponent(bookId) + '/' + kind + '/lookup', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: text}), signal: activeController.signal
+    }).then(function(response) {
+      return response.json().catch(function() { return {}; }).then(function(body) {
+        if (!response.ok) throw new Error(body.code || 'unavailable');
+        return body;
+      });
+    }).then(function(data) {
+      if (activeDialog !== dialog) return;
+      content.textContent = '';
+      if (!data.found) { content.textContent = t('notFound'); return; }
+      if (kind === 'dictionary') {
+        if (data.dictionary && data.dictionary.display_name) content.appendChild(element('p', 'dictionary-source', data.dictionary.display_name));
+        (data.entries || []).forEach(function(entry) {
+          var item = element('article', 'dictionary-entry');
+          item.appendChild(element('strong', '', entry.headword));
+          item.appendChild(element('p', '', entry.definition));
+          content.appendChild(item);
+        });
+      } else {
+        content.appendChild(element('strong', '', data.title || text));
+        if (data.description) content.appendChild(element('p', 'dictionary-source', data.description));
+        if (data.extract) content.appendChild(element('p', '', data.extract));
+        if (data.source_url) {
+          var link = element('a', 'dictionary-source-link', t('source'));
+          link.href = data.source_url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          content.appendChild(link);
+        }
+        content.appendChild(element('small', 'dictionary-attribution', data.attribution || 'Wikipedia · CC BY-SA 4.0'));
+      }
+    }).catch(function(error) {
+      if (error.name === 'AbortError' || activeDialog !== dialog) return;
+      content.textContent = error.message === 'dictionary_not_configured' ? t('notConfigured') : t('unavailable');
+    });
+  }
+
+  root.document.addEventListener('keydown', function(event) { if (event.key === 'Escape') close(); });
+  root.EpubBrowserDictionary = { open: show, close: close };
+})(window);

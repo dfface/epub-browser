@@ -40,6 +40,7 @@ setup(
         "starlette>=0.37,<1.0",
         "uvicorn[standard]>=0.30,<1.0",
         "argon2-cffi>=23.1,<26.0",
+        "mdict-utils==1.3.14",
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
         'console_scripts': [

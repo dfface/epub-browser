@@ -1,4 +1,12 @@
-# Server Kindle 词典导入与查词 Implementation Plan
+# 已废弃：Server Kindle 词典导入与查词 Implementation Plan
+
+**状态：已废弃（2026-08-26）**
+
+本计划不再执行。现行计划见：[本地词典与百科查阅 Implementation Plan](2026-08-26-local-dictionary-and-encyclopedia.md)。
+
+---
+
+以下内容仅保留作决策记录，不作为实施依据。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -13,7 +21,7 @@
 ## Global Constraints
 
 - 仅支持无 DRM Mobi 7 .mobi 与实际容器为 Mobi 7 的 .azw；拒绝 AZW3/KF8、KFX、加密或非词典文件。
-- 不引入 Calibre、GPL 代码或 GPL 运行时依赖；实现独立的最小 Mobi 7 解析器。
+- 词典发行物按 GPLv3 分发，直接固定依赖 GPL-3.0-only 的 Python `mobi==0.4.1`；不引入 Calibre。
 - 不提高 SERVER_OUTPUT_REVISION；不改变 book/<id>/content/ 或要求 EPUB 重转。
 - 词典正文只存于 <server-dir>/data/dictionaries/<uuid>.sqlite；不得进入主状态库、EPUB 缓存或 SSG。
 - 所有写操作经登录、管理员角色和 CSRF；查词先经书籍 ACL，使用 POST 与 private, no-store，且不保存历史。
@@ -25,7 +33,7 @@
 | File | Responsibility |
 | --- | --- |
 | epub_browser/state.py | Schema 14 与字典目录、默认项、任务的事务 API。 |
-| epub_browser/kindle_dictionary.py | 受限 Mobi 7/PalmDOC/IDX 解析与纯文本抽取。 |
+| epub_browser/kindle_dictionary.py | `mobi.extract()` 适配、恢复 HTML 的受限词典条目抽取与纯文本清洗。 |
 | epub_browser/dictionary_service.py | 独立 SQLite 生成、队列、清理及只读 lookup。 |
 | epub_browser/server.py | 生命周期和管理员/读者 API。 |
 | epub_browser/asset_publisher.py, processor.py | Server-only 资源和章节 runtime config。 |
@@ -89,7 +97,7 @@ git add epub_browser/state.py tests/test_state.py
 git commit -m "feat: add dictionary state schema"
 ~~~
 
-### Task 2: Implement a bounded Mobi 7 dictionary extractor
+### Task 2: Adapt the GPL Mobi extractor to bounded dictionary entries
 
 **Files:**
 - Create: epub_browser/kindle_dictionary.py
@@ -100,13 +108,13 @@ git commit -m "feat: add dictionary state schema"
 - Produces extract_kindle_dictionary(path, *, limits=KindleDictionaryLimits()).
 - Consumed by DictionaryService in Task 3.
 
-- [ ] **Step 1: Write failing binary-fixture tests**
+- [ ] **Step 1: Write failing extractor-adapter tests**
 
-Build deterministic PalmDB/Mobi 7 fixture bytes in the test: record directory, Mobi header, uncompressed and PalmDOC records, dictionary IDX/ORDT data and one run/runs/running entry. Include malformed record offsets, DRM field, KF8 boundary, bad compression, ordinary book and zero-entry fixtures.
+Mock `mobi.extract()` to return a temporary directory and a recovered dictionary HTML file containing `idx:entry`, `idx:orth` and `idx:iform` markup. Include an extractor exception, a recovered ordinary book, malformed dictionary HTML, zero-entry output and oversized source inputs.
 
 ~~~
 def test_extracts_headword_inflections_and_plain_definition(self):
-    result = extract_kindle_dictionary(self.write_fixture(make_mobi7_dictionary()))
+    result = extract_kindle_dictionary(self.write_fixture(b"MOBI fixture"))
     self.assertEqual(result.entries[0].headword, "run")
     self.assertEqual(result.entries[0].forms, ("run", "runs", "running"))
     self.assertEqual(result.entries[0].definition_text, "to move quickly")
@@ -118,9 +126,9 @@ Run: python3 -m unittest tests.test_kindle_dictionary
 
 Expected: FAIL because the module is absent.
 
-- [ ] **Step 3: Implement only supported format paths**
+- [ ] **Step 3: Implement the `mobi` adapter and HTML sanitizer**
 
-Validate max bytes, PalmDB record count, monotonic in-range offsets, Mobi 7 header, encryption flags and dictionary record structure before decoding. Support PalmDOC compression 1 and 2 only; reject Huff/CDIC as unsupported_compression. Parse IDX/ORDT data into headwords/forms, NFC-casefold and collapse whitespace, strip markup with HTMLParser into plain text, and enforce entry/form/definition limits at parse time.
+Validate filename, extension, source size and canonical temporary paths before invoking `mobi.extract()`. Convert its known unpacking errors into stable error codes. Parse only recovered `<idx:entry>` blocks, NFC-casefold and collapse whitespace for forms, preserve the human-readable headword, strip all tags/scripts/styles/external URLs with HTMLParser, and enforce entry/form/definition limits while extracting. Always remove the `mobi.extract()` temporary directory in `finally`.
 
 ~~~
 @dataclass(frozen=True)
@@ -132,7 +140,7 @@ class KindleDictionaryLimits:
     max_definition_bytes: int = 12 * 1024
 ~~~
 
-- [ ] **Step 4: Verify parser and syntax**
+- [ ] **Step 4: Verify adapter and syntax**
 
 Run: python3 -m unittest tests.test_kindle_dictionary && python3 -m py_compile epub_browser/kindle_dictionary.py
 
@@ -142,7 +150,7 @@ Expected: PASS.
 
 ~~~
 git add epub_browser/kindle_dictionary.py tests/test_kindle_dictionary.py
-git commit -m "feat: parse Mobi 7 dictionary entries"
+git commit -m "feat: extract Kindle dictionary entries with mobi"
 ~~~
 
 ### Task 3: Build DictionaryService and isolated dictionary files

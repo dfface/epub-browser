@@ -122,6 +122,46 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
+/* Selection actions are intentionally flat: creating a highlight, saving a
+   note, looking up a local dictionary and opening an encyclopedia are distinct
+   operations rather than variants of one annotation form. */
+.annotation-selection-menu {
+    position: fixed;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 20px);
+    overflow-x: auto;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
+.annotation-selection-action {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.annotation-selection-action:hover {
+    border-color: var(--button-bg);
+}
+
+.annotation-selection-action:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent);
+    outline-offset: 2px;
+}
+
 .annotation-compact-header {
     display: flex;
     justify-content: space-between;

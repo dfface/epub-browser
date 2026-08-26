@@ -864,6 +864,7 @@
         isRendering: false,
         isListening: false,
         isBound: false,
+        keyboardBound: false,
         pendingDraft: null,
         imageNoteButtons: [],
         renderVersion: 0,
@@ -874,6 +875,13 @@
             if (hl && !this.isBound) {
                 this.bindHighlighterEvents(hl);
                 this.isBound = true;
+            }
+            if (!this.keyboardBound) {
+                var self = this;
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Escape' && self.activeDialog) self.cancelPendingDraft();
+                });
+                this.keyboardBound = true;
             }
             this.syncEnabledState();
         },
@@ -1269,48 +1277,45 @@
         showCreateDialogFromSource: function(source) {
             var self = this;
             this.closeDialog();
-
             var dialog = document.createElement('div');
-            dialog.className = 'annotation-dialog annotation-dialog-compact';
-            dialog.innerHTML = '\
-                <div class="annotation-compact-header">\
-                    <div class="color-options-compact"></div>\
-                    <button class="annotation-dialog-close" title="' + tr('close') + '" aria-label="' + tr('close') + '"><i class="fas fa-times"></i></button>\
-                </div>\
-                <div class="annotation-compact-body">\
-                    <textarea class="annotation-compact-note"></textarea>\
-                </div>\
-                <div class="annotation-compact-footer">\
-                    <button class="annotation-btn annotation-btn-cancel">' + tr('cancel') + '</button>\
-                    <button class="annotation-btn annotation-btn-copy">' + tr('copy') + '</button>\
-                    <button class="annotation-btn annotation-btn-confirm">' + tr('add') + '</button>\
-                </div>';
-
-            var colorOptions = dialog.querySelector('.color-options-compact');
-            var noteInput = dialog.querySelector('textarea');
-            var colors = CONFIG.getColors();
-            var i18n = window.EpubBrowserI18n;
-            noteInput.setAttribute('placeholder', i18n && i18n.t ? i18n.t('annotations.noteOptional') : tr('noteOptional'));
-
-            colors.slice(0, 4).forEach(function(color) {
+            dialog.className = 'annotation-selection-menu';
+            dialog.setAttribute('role', 'toolbar');
+            dialog.setAttribute('aria-label', tr('selectionActions'));
+            var actionButton = function(key, handler, legacyClass) {
                 var btn = document.createElement('button');
-                btn.className = 'color-option-compact' + (color === Settings.defaultColor ? ' selected' : '');
-                btn.style.backgroundColor = color;
-                btn.setAttribute('data-color', color);
-                btn.addEventListener('click', function() {
-                    var newColor = this.getAttribute('data-color');
-                    colorOptions.querySelectorAll('.color-option-compact').forEach(function(option) {
-                        option.classList.remove('selected');
-                    });
-                    this.classList.add('selected');
-                    self.applyHighlightStyles({
-                        id: source.id,
-                        color: newColor,
-                        note: ''
-                    }, self.getHighlightNodesByAnnotationId(source.id));
+                btn.type = 'button';
+                btn.className = 'annotation-selection-action' + (legacyClass ? ' ' + legacyClass : '');
+                btn.textContent = tr(key);
+                btn.setAttribute('aria-label', tr(key));
+                btn.addEventListener('click', handler);
+                dialog.appendChild(btn);
+            };
+            actionButton('copy', function() {
+                Utils.copyText(source.text).then(function() {
+                    Utils.showNotification(tr('copied'), 'success');
+                }).catch(function() {
+                    Utils.showNotification(tr('unableToCopy'), 'error');
                 });
-                colorOptions.appendChild(btn);
+                self.cancelPendingDraft();
+            }, 'annotation-btn-copy');
+            actionButton('highlight', function() {
+                self.createAnnotationFromSource(source, Settings.defaultColor, '');
             });
+            actionButton('noteAction', function() {
+                self.showNoteDialog(source);
+            });
+            if (global.EpubBrowserMode === 'server' && global.EpubBrowserDictionary) {
+                actionButton('dictionary', function() {
+                    var anchor = self.getHighlightNodesByAnnotationId(source.id)[0];
+                    self.cancelPendingDraft();
+                    global.EpubBrowserDictionary.open('dictionary', source.text, anchor);
+                });
+                actionButton('encyclopedia', function() {
+                    var anchor = self.getHighlightNodesByAnnotationId(source.id)[0];
+                    self.cancelPendingDraft();
+                    global.EpubBrowserDictionary.open('encyclopedia', source.text, anchor);
+                });
+            }
 
             // Position near the highlighted text or, for an image note, the image itself.
             var nodes = self.getHighlightNodesByAnnotationId(source.id);
@@ -1336,27 +1341,8 @@
 
             document.body.appendChild(dialog);
             this.activeDialog = dialog;
-
-            dialog.querySelector('.annotation-dialog-close').addEventListener('click', function() {
-                self.cancelPendingDraft();
-            });
-            dialog.querySelector('.annotation-btn-cancel').addEventListener('click', function() {
-                self.cancelPendingDraft();
-            });
-            dialog.querySelector('.annotation-btn-copy').addEventListener('click', function() {
-                Utils.copyText(source.text).then(function() {
-                    Utils.showNotification(tr('copied'), 'success');
-                }).catch(function() {
-                    Utils.showNotification(tr('unableToCopy'), 'error');
-                });
-            });
-            dialog.querySelector('.annotation-btn-confirm').addEventListener('click', function() {
-                var selectedColor = colorOptions.querySelector('.color-option-compact.selected');
-                var color = selectedColor ? selectedColor.getAttribute('data-color') : Settings.defaultColor;
-                self.createAnnotationFromSource(source, color, noteInput.value.trim());
-            });
-
             setTimeout(function() {
+                if (self.activeDialog !== dialog) return;
                 self.outsideClickHandler = function(e) {
                     if (dialog && !dialog.contains(e.target)) {
                         self.cancelPendingDraft();
@@ -1364,6 +1350,37 @@
                 };
                 document.addEventListener('click', self.outsideClickHandler);
             }, 10);
+        },
+
+        showNoteDialog: function(source) {
+            var self = this;
+            this.closeDialog();
+            var dialog = document.createElement('div');
+            dialog.className = 'annotation-dialog annotation-dialog-compact';
+            dialog.setAttribute('role', 'dialog');
+            dialog.setAttribute('aria-label', tr('noteAction'));
+            var body = document.createElement('div');
+            body.className = 'annotation-compact-body';
+            var input = document.createElement('textarea');
+            input.className = 'annotation-compact-note';
+            var i18n = window.EpubBrowserI18n;
+            input.placeholder = i18n && i18n.t ? i18n.t('annotations.noteOptional') : tr('noteOptional');
+            body.appendChild(input);
+            var footer = document.createElement('div');
+            footer.className = 'annotation-compact-footer';
+            var cancel = document.createElement('button');
+            cancel.type = 'button'; cancel.className = 'annotation-btn annotation-btn-cancel'; cancel.textContent = tr('cancel');
+            var save = document.createElement('button');
+            save.type = 'button'; save.className = 'annotation-btn annotation-btn-confirm'; save.textContent = tr('save');
+            footer.appendChild(cancel); footer.appendChild(save);
+            dialog.appendChild(body); dialog.appendChild(footer);
+            document.body.appendChild(dialog);
+            this.activeDialog = dialog;
+            input.focus();
+            cancel.addEventListener('click', function() { self.cancelPendingDraft(); });
+            save.addEventListener('click', function() {
+                self.createAnnotationFromSource(source, Settings.defaultColor, input.value.trim());
+            });
         },
 
         showDetailDialog: function(id) {
