@@ -154,6 +154,41 @@ class StateStoreTests(unittest.TestCase):
             {"annotations", "bookshelves", "reading_progress", "books"} <= tables
         )
 
+    def test_dictionary_schema_creates_catalog_defaults_and_import_jobs(self):
+        with sqlite3.connect(self.database) as connection:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+
+        self.assertEqual(version, 14)
+        self.assertTrue(
+            {"dictionaries", "dictionary_defaults", "dictionary_import_jobs"}
+            <= tables
+        )
+
+    def test_disabling_dictionary_clears_its_language_default(self):
+        dictionary = self.store.create_dictionary(
+            dictionary_id="dictionary-en",
+            display_name="English dictionary",
+            source_language="en",
+            target_language="zh-CN",
+            entry_count=1,
+            content_sha256="a" * 64,
+            attribution="",
+            created_by_user_id=self.owner.user_id,
+        )
+        self.store.set_dictionary_default(
+            "en", dictionary.id, self.owner.user_id
+        )
+
+        self.store.set_dictionary_enabled(dictionary.id, False)
+
+        self.assertIsNone(self.store.get_dictionary_default("en"))
+
     def test_initialize_adds_session_client_metadata_to_existing_account_database(self):
         database = Path(self.temporary.name, "legacy-session.db")
         password_hash = hash_password("secret")
@@ -930,7 +965,7 @@ class StateStoreTests(unittest.TestCase):
         StateStore(database).initialize()
 
         with sqlite3.connect(database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
             self.assertFalse(
                 {"username"} & table_columns(connection, "annotations")
             )
@@ -1369,7 +1404,7 @@ class StateStoreTests(unittest.TestCase):
                 (1, "Original summary.", "2026-07"),
             )
             self.assertEqual(connection.execute("PRAGMA foreign_key_check").fetchall(), [])
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
 
     def test_concurrent_initializer_rereads_user_version_after_lock(self):
         self._downgrade_selected_tables_to_v10(self.database)
@@ -1441,7 +1476,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
         with sqlite3.connect(self.database) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
             self.assertEqual(
                 connection.execute(
                     "SELECT attempt_number, retried_from_job_id, retry_root_job_id, "
@@ -2252,7 +2287,7 @@ class StateStoreTests(unittest.TestCase):
                 {"quota_reserved", "generation_stage"}
                 <= table_columns(connection, "ai_reading_jobs")
             )
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 13)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 14)
 
     def test_admin_retry_of_migrated_v11_failed_root_is_quota_exempt(self):
         member = self.store.create_user(
@@ -2547,7 +2582,7 @@ class StateStoreTests(unittest.TestCase):
 
         with sqlite3.connect(self.database) as connection:
             after = self._v13_migration_sensitive_snapshot(connection)
-            self.assertEqual(after['version'], 13)
+            self.assertEqual(after['version'], 14)
             self.assertEqual(after['rows'], before['rows'])
             self.assertEqual(after['indexes'], before['indexes'])
             self.assertEqual(after['foreign_keys'], before['foreign_keys'])
