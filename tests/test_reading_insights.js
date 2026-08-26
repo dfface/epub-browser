@@ -22,7 +22,17 @@ function clientFor(payload) {
     document: { createElement: element, querySelector: () => root },
     EpubBrowserI18n: { t(key) { return key; }, getLocale() { return 'en'; } },
     Intl: {
-      DateTimeFormat() { return { resolvedOptions() { return { timeZone: 'UTC' }; }, format() { return '08:18'; } }; },
+      DateTimeFormat(_locale, options = {}) {
+        return {
+          resolvedOptions() { return { timeZone: 'UTC' }; },
+          format(value) {
+            return options.hour ? '08:18' : new Date(value).toISOString().slice(0, 10);
+          },
+          formatRange(start, end) {
+            return new Date(start).toISOString().slice(0, 10) + '–' + new Date(end).toISOString().slice(0, 10);
+          },
+        };
+      },
       NumberFormat() { return { format(value) { return String(value); } }; },
     },
     EpubBrowserAuth: {
@@ -73,4 +83,15 @@ test('previous and next range controls preserve period and shift the API anchor'
   assert.match(page.requests.at(-1), /period=week&anchor=2026-08-15/);
   assert.equal(page.rangeButtons.previous.getAttribute('aria-label'), 'Previous range');
   assert.equal(page.rangeButtons.next.getAttribute('aria-label'), 'Next range');
+});
+
+test('range label reflects the same day, week, and month bounds as the API', async () => {
+  const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
+  await page.mount();
+  await page.setPeriod('day', '2026-08-15');
+  assert.equal(page.rangeLabel.textContent, '2026-08-15');
+  await page.setPeriod('week', '2026-08-15');
+  assert.equal(page.rangeLabel.textContent, '2026-08-10–2026-08-16');
+  await page.setPeriod('month', '2026-02-15');
+  assert.equal(page.rangeLabel.textContent, '2026-02-01–2026-02-28');
 });
