@@ -65,7 +65,6 @@
       var stars = documentTarget.createElement('span'); stars.setAttribute('aria-hidden', 'true'); stars.textContent = '★★★★★'.slice(0, Number(savedRating));
       var score = documentTarget.createElement('span'); score.className = 'book-review-display-score'; score.textContent = savedRating + '/5';
       rating.appendChild(stars); rating.appendChild(score); header.appendChild(title); header.appendChild(rating); displayRoot.appendChild(header);
-      var privacy = documentTarget.createElement('p'); privacy.className = 'book-review-display-private'; privacy.textContent = translate('bookReviews.private'); displayRoot.appendChild(privacy);
       if (!savedText) return;
       var copy = documentTarget.createElement('p'); copy.className = 'book-review-display-copy is-collapsed'; copy.textContent = savedText; displayRoot.appendChild(copy);
       var expand = documentTarget.createElement('button'); expand.type = 'button'; expand.className = 'book-review-expand'; expand.textContent = translate('bookReviews.showMore'); expand.setAttribute('aria-expanded', 'false'); expand.hidden = savedText.length <= 100;

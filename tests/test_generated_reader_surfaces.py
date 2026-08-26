@@ -3124,6 +3124,8 @@ assert.deepEqual(
         self.assertIn('data-book-review-initial', server_index)
         self.assertIn('&lt;private review>', server_index)
         self.assertIn('\\u003cprivate review\\u003e', server_index)
+        self.assertNotIn('book-review-display-private', server_index)
+        self.assertNotIn('Only visible to your account', server_index)
         self.assertNotIn('data-book-review-initial', ssg_index)
         self.assertNotIn('private review', ssg_index)
 

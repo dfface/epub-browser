@@ -28,7 +28,6 @@ body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
 .book-review-display-rating,
 .book-review-display-rating > [aria-hidden="true"] { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--book-review-star) !important; font-size: 1.18rem; letter-spacing: .08em; }
 .book-review-display-score { color: var(--text-secondary); font-size: .85rem; font-weight: 650; letter-spacing: 0; }
-.book-review-display-private,
 .book-review-hint,
 .book-review-status { margin: 6px 0 0; color: var(--text-secondary); font-size: .9rem; line-height: 1.5; }
 .book-review-display-copy { margin: 14px 0 0; white-space: pre-wrap; color: var(--text); line-height: 1.7; overflow-wrap: anywhere; }

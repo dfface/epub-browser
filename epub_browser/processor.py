@@ -1555,7 +1555,6 @@ class EPUBProcessor:
                 <span aria-hidden="true">{review_stars}</span><span class="book-review-display-score">{review_rating}/5</span>
             </span>
         </div>
-        <p class="book-review-display-private" data-i18n="bookReviews.private">Only visible to your account</p>
         {review_body}
     </section>'''
             initial_review_json = json.dumps(initial_review, ensure_ascii=False).replace("<", "\\u003c").replace(

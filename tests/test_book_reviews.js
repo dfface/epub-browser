@@ -153,6 +153,8 @@ test('review display and editor copy refresh when the active locale changes', as
   client.localeListeners[0]();
 
   assert.equal(display.children[0].children[0].textContent, 'bookReviews.title');
+  assert.equal(display.children.length, 3);
+  assert.ok(display.children.every(child => child.className !== 'book-review-display-private'));
   assert.equal(client.deleteButton.textContent, 'bookReviews.delete');
   assert.equal(client.ratingOptions[3].getAttribute('aria-label'), 'bookReviews.ratingValue');
   assert.equal(client.dialog.getAttribute('aria-label'), 'bookReviews.write');
