@@ -2101,9 +2101,16 @@ window.location.assign(payload.redirect||'/');
         book_id = request.path_params["book_id"]
         if book_access_denied(principal, book_id):
             return forbidden_book_response()
-        return response({"dictionaries": [
+        available = list(dictionary_service.list_available())
+        default = dictionary_service.store.get_global_dictionary_default()
+        default_dictionary_id = default.id if default and any(
+            record.id == default.id for record in available
+        ) else None
+        if default_dictionary_id:
+            available.sort(key=lambda record: record.id != default_dictionary_id)
+        return response({"default_dictionary_id": default_dictionary_id, "dictionaries": [
             {"id": record.id, "display_name": record.display_name, "entry_count": record.entry_count}
-            for record in dictionary_service.list_available()
+            for record in available
         ]}, cache_control="private, no-store")
 
     async def dictionary_media(request):
@@ -2146,17 +2153,26 @@ window.location.assign(payload.redirect||'/');
             "attribution": result.attribution,
         }, cache_control="private, no-store")
 
-    def dictionary_record_data(record):
+    def dictionary_record_data(record, default_dictionary_id=None):
         return {
             "id": record.id, "display_name": record.display_name,
             "entry_count": record.entry_count, "attribution": record.attribution,
             "enabled": record.enabled,
+            "is_default": record.id == default_dictionary_id,
         }
 
     async def admin_dictionaries(request):
         principal = require_admin(request)
         if request.method == "GET":
-            return response({"dictionaries": [dictionary_record_data(item) for item in dictionary_service.store.list_dictionaries()]})
+            default = dictionary_service.store.get_global_dictionary_default()
+            default_dictionary_id = default.id if default else None
+            return response({
+                "default_dictionary_id": default_dictionary_id,
+                "dictionaries": [
+                    dictionary_record_data(item, default_dictionary_id)
+                    for item in dictionary_service.store.list_dictionaries()
+                ],
+            })
         if not runtime_status.is_ready():
             return response(error_payload("not_ready", "Server is not ready"), 503)
         filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
@@ -2175,7 +2191,21 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload(code, "Dictionary installation failed"), 400)
         finally:
             upload.unlink(missing_ok=True)
-        return response({"dictionary": dictionary_record_data(record)}, 201)
+        default = dictionary_service.store.get_global_dictionary_default()
+        return response({"dictionary": dictionary_record_data(
+            record, default.id if default else None,
+        )}, 201)
+
+    async def admin_dictionary_default(request):
+        principal = require_admin(request)
+        dictionary_id = request.path_params["dictionary_id"]
+        try:
+            record = dictionary_service.store.set_global_dictionary_default(
+                dictionary_id, principal.user_id,
+            )
+        except KeyError:
+            return response(error_payload("not_found", "Not Found"), 404)
+        return response({"dictionary": dictionary_record_data(record, record.id)})
 
     async def admin_dictionary(request):
         require_admin(request)
@@ -3059,6 +3089,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
         Route('/api/admin/dictionaries', admin_dictionaries, methods=['GET', 'POST']),
         Route('/api/admin/dictionaries/{dictionary_id}/resources', admin_dictionary_resources, methods=['POST']),
+        Route('/api/admin/dictionaries/{dictionary_id}/default', admin_dictionary_default, methods=['PUT']),
         Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
         Route('/', library_index),

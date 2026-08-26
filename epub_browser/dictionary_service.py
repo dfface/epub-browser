@@ -40,6 +40,7 @@ class DictionaryService:
         self.server_directory = Path(server_directory)
         self.dictionary_directory = self.server_directory / "data" / "dictionaries"
         self.dictionary_directory.mkdir(parents=True, exist_ok=True)
+        self.store.ensure_global_dictionary_default()
 
     @staticmethod
     def _source_digest(source: Path) -> str:
@@ -123,7 +124,7 @@ class DictionaryService:
         target = self.dictionary_directory / (dictionary_id + ".sqlite")
         self._create_file(target, parsed, digest)
         try:
-            return self.store.create_dictionary(
+            record = self.store.create_dictionary(
                 dictionary_id=dictionary_id,
                 display_name=display_name or parsed.display_name,
                 # These fields are retained only to read databases created by
@@ -135,6 +136,8 @@ class DictionaryService:
                 attribution=attribution,
                 created_by_user_id=created_by_user_id,
             )
+            self.store.ensure_global_dictionary_default()
+            return record
         except Exception:
             target.unlink(missing_ok=True)
             raise
@@ -416,8 +419,12 @@ class DictionaryService:
         return DictionaryLookup(bool(entries), dictionary, query, entries)
 
     def set_enabled(self, dictionary_id: str, enabled: bool) -> DictionaryRecord:
-        return self.store.set_dictionary_enabled(dictionary_id, enabled)
+        record = self.store.set_dictionary_enabled(dictionary_id, enabled)
+        if not enabled:
+            self.store.ensure_global_dictionary_default()
+        return record
 
     def delete(self, dictionary_id: str) -> None:
         self.store.delete_dictionary(dictionary_id)
         (self.dictionary_directory / (dictionary_id + ".sqlite")).unlink(missing_ok=True)
+        self.store.ensure_global_dictionary_default()

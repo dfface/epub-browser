@@ -1716,6 +1716,13 @@ body.auth-page {
     font-weight: 700;
 }
 
+.dictionary-record-states {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 .dictionary-record-state.is-enabled {
     background: color-mix(in srgb, var(--account-success) 12%, var(--account-card));
     color: var(--account-success);
@@ -1724,6 +1731,11 @@ body.auth-page {
 .dictionary-record-state.is-disabled {
     background: color-mix(in srgb, var(--account-danger) 8%, var(--account-card));
     color: var(--account-danger);
+}
+
+.dictionary-record-state.is-default {
+    background: color-mix(in srgb, var(--account-accent) 13%, var(--account-card));
+    color: var(--account-accent);
 }
 
 .dictionary-record-actions {

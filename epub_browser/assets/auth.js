@@ -916,6 +916,20 @@
       });
     }
 
+    function setDefaultDictionary(dictionary) {
+      return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id) + '/default', {
+        method: 'PUT'
+      }).then(function(response) {
+        if (!response.ok) return showDictionaryResponseError(response);
+        showDictionaryMessage('admin.dictionaryDefaultUpdated', 'success');
+        showStatus('admin.dictionaryDefaultUpdated', 'success');
+        return loadDictionaries();
+      }).catch(function() {
+        showDictionaryMessage('admin.error.network', 'error');
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
     function deleteDictionary(dictionary) {
       return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {
         method: 'DELETE'
@@ -958,19 +972,32 @@
           'span', 'dictionary-record-metadata', 'admin.dictionaryEntries',
           {count: dictionary.entry_count}
         );
+        var states = root.document.createElement('div');
         var state = root.document.createElement('span');
         var actions = root.document.createElement('div');
         item.className = 'account-list-item';
         summary.className = 'dictionary-record-summary';
         name.className = 'dictionary-record-name';
         state.className = 'dictionary-record-state ' + (dictionary.enabled ? 'is-enabled' : 'is-disabled');
+        states.className = 'dictionary-record-states';
         actions.className = 'dictionary-record-actions';
         name.textContent = dictionary.display_name;
         state.textContent = enabledLabel(dictionary.enabled);
         summary.appendChild(name);
         summary.appendChild(metadata);
         item.appendChild(summary);
-        item.appendChild(state);
+        if (dictionary.is_default) {
+          states.appendChild(createTextElement(
+            'span', 'dictionary-record-state is-default', 'admin.defaultDictionary'
+          ));
+        }
+        states.appendChild(state);
+        item.appendChild(states);
+        if (dictionary.enabled && !dictionary.is_default) {
+          actions.appendChild(actionButton('admin.setDefaultDictionary', function() {
+            return setDefaultDictionary(dictionary);
+          }));
+        }
         actions.appendChild(actionButton(
           dictionary.enabled ? 'admin.disableDictionary' : 'admin.enableDictionary',
           function() {

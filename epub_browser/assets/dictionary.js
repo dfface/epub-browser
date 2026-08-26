@@ -4,6 +4,7 @@
   var activeController = null;
   var activeDialog = null;
   var outsideClickHandler = null;
+  var preferredDictionaryStorageKey = 'epub-browser.dictionary-preference';
 
   function t(key) {
     var i18n = root.EpubBrowserI18n;
@@ -66,6 +67,25 @@
       if (!response.ok) throw new Error(body.code || 'unavailable');
       return body;
     });
+  }
+
+  function readPreferredDictionary() {
+    try { return root.localStorage.getItem(preferredDictionaryStorageKey); } catch (error) { return null; }
+  }
+
+  function savePreferredDictionary(dictionaryId) {
+    try { root.localStorage.setItem(preferredDictionaryStorageKey, dictionaryId); } catch (error) { /* Optional preference. */ }
+  }
+
+  function dictionaryChoiceId(choices, defaultDictionaryId) {
+    var preferredId = readPreferredDictionary();
+    if (preferredId && choices.some(function(choice) { return choice.id === preferredId; })) {
+      return preferredId;
+    }
+    if (defaultDictionaryId && choices.some(function(choice) { return choice.id === defaultDictionaryId; })) {
+      return defaultDictionaryId;
+    }
+    return choices[0].id;
   }
 
   function appendMedia(item, entry, bookId) {
@@ -158,7 +178,7 @@
         var choices = data.dictionaries || [];
         content.textContent = '';
         if (!choices.length) { content.textContent = t('notConfigured'); positionDialog(dialog, dialog._epubAnchor); return; }
-        var dictionaryId = choices[0].id;
+        var dictionaryId = dictionaryChoiceId(choices, data.default_dictionary_id);
         var select = null;
         if (choices.length > 1) {
           var picker = element('div', 'dictionary-picker');
@@ -170,6 +190,7 @@
             option.value = choice.id;
             select.appendChild(option);
           });
+          select.value = dictionaryId;
           picker.appendChild(select);
           content.appendChild(picker);
           positionDialog(dialog, dialog._epubAnchor);
@@ -188,7 +209,10 @@
             }
           });
         }
-        if (select) select.addEventListener('change', lookup);
+        if (select) select.addEventListener('change', function() {
+          savePreferredDictionary(select.value);
+          lookup();
+        });
         lookup();
       }).catch(function(error) {
         if (error.name !== 'AbortError' && activeDialog === dialog) {

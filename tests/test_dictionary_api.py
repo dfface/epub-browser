@@ -67,9 +67,41 @@ class DictionaryApiTests(unittest.TestCase):
         response = self.client.get("/api/books/book/dictionaries")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "private, no-store")
-        self.assertEqual(response.json()["dictionaries"], [{
+        self.assertEqual(response.json(), {
+            "default_dictionary_id": self.dictionary.id,
+            "dictionaries": [{
             "id": self.dictionary.id, "display_name": "Local", "entry_count": 1,
-        }])
+            }],
+        })
+
+    def test_admin_can_change_the_default_dictionary(self):
+        base = self.root / "alternate"
+        definition = b"to travel quickly"
+        index = b"run\0" + struct.pack(">II", 0, len(definition))
+        base.with_suffix(".ifo").write_text(
+            "StarDict's dict ifo file\nversion=2.4.2\nbookname=Alternate\nwordcount=1\n"
+            "idxfilesize=" + str(len(index)) + "\nsametypesequence=m\n", encoding="utf-8"
+        )
+        base.with_suffix(".idx").write_bytes(index)
+        base.with_suffix(".dict").write_bytes(definition)
+        alternate = DictionaryService(self.store, self.root).install(
+            base.with_suffix(".ifo"), created_by_user_id=self.admin.user_id,
+        )
+
+        changed = self.client.put("/api/admin/dictionaries/" + alternate.id + "/default")
+
+        self.assertEqual(changed.status_code, 200)
+        self.assertTrue(changed.json()["dictionary"]["is_default"])
+        choices = self.client.get("/api/books/book/dictionaries").json()
+        self.assertEqual(choices["default_dictionary_id"], alternate.id)
+        self.assertEqual(choices["dictionaries"][0]["id"], alternate.id)
+
+        disabled = self.client.put(
+            "/api/admin/dictionaries/" + alternate.id, json={"enabled": False},
+        )
+        self.assertEqual(disabled.status_code, 200)
+        choices = self.client.get("/api/books/book/dictionaries").json()
+        self.assertEqual(choices["default_dictionary_id"], self.dictionary.id)
 
     def test_admin_upload_decodes_a_unicode_filename_as_the_default_name(self):
         definition = b"a different definition"

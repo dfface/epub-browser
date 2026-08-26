@@ -1768,6 +1768,10 @@ assert.deepEqual(
         self.assertIn('closeWhenClickedOutside(dialog);', dictionary)
         self.assertIn('if (choices.length > 1)', dictionary)
         self.assertIn("select.setAttribute('aria-label', t('choose'));", dictionary)
+        self.assertIn("var preferredDictionaryStorageKey = 'epub-browser.dictionary-preference';", dictionary)
+        self.assertIn('function dictionaryChoiceId(choices, defaultDictionaryId)', dictionary)
+        self.assertIn('dictionaryChoiceId(choices, data.default_dictionary_id)', dictionary)
+        self.assertIn('savePreferredDictionary(select.value);', dictionary)
         self.assertIn('display: inline-flex', css)
         self.assertIn('max-width: 220px', css)
 

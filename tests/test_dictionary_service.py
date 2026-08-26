@@ -203,6 +203,7 @@ class DictionaryServiceTests(unittest.TestCase):
 
             result = DictionaryService(store, root).lookup(dictionary_id, "run")
             self.assertEqual(result.entries, ({"headword": "run", "definition": "legacy definition", "media": []},))
+            self.assertEqual(store.get_global_dictionary_default().id, dictionary_id)
 
 
 if __name__ == "__main__":

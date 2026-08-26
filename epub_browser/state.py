@@ -5070,6 +5070,58 @@ class StateStore:
             ).fetchone()
         return self._dictionary_record(row) if row is not None else None
 
+    def set_global_dictionary_default(
+        self, dictionary_id: str, updated_by_user_id: str
+    ) -> DictionaryRecord:
+        """Set the one dictionary readers use before choosing a preference."""
+        return self.set_dictionary_default("und", dictionary_id, updated_by_user_id)
+
+    def get_global_dictionary_default(self) -> Optional[DictionaryRecord]:
+        """Return the enabled global default dictionary, if an administrator chose one."""
+        return self.get_dictionary_default("und")
+
+    def ensure_global_dictionary_default(self) -> Optional[DictionaryRecord]:
+        """Backfill the global default from the first enabled local dictionary."""
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute(
+                """
+                SELECT dictionaries.* FROM dictionary_defaults
+                JOIN dictionaries ON dictionaries.id = dictionary_defaults.dictionary_id
+                WHERE dictionary_defaults.source_language = ? AND dictionaries.enabled = 1
+                """,
+                ("und",),
+            ).fetchone()
+            if current is not None:
+                return self._dictionary_record(current)
+            row = connection.execute(
+                """
+                SELECT * FROM dictionaries
+                WHERE enabled = 1
+                ORDER BY created_at, id
+                LIMIT 1
+                """
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                """
+                INSERT INTO dictionary_defaults (source_language, dictionary_id, updated_by_user_id)
+                VALUES (?, ?, ?)
+                ON CONFLICT(source_language) DO NOTHING
+                """,
+                ("und", row["id"], row["created_by_user_id"]),
+            )
+            current = connection.execute(
+                """
+                SELECT dictionaries.* FROM dictionary_defaults
+                JOIN dictionaries ON dictionaries.id = dictionary_defaults.dictionary_id
+                WHERE dictionary_defaults.source_language = ? AND dictionaries.enabled = 1
+                """,
+                ("und",),
+            ).fetchone()
+        return self._dictionary_record(current) if current is not None else None
+
     def delete_dictionary(self, dictionary_id: str) -> None:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
