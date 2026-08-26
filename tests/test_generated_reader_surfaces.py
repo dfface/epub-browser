@@ -90,15 +90,18 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ):
             self.assertNotIn(control_id, ssg_html)
 
-    def test_dictionary_import_uses_custom_file_controls_and_a_live_progress_surface(self):
+    def test_dictionary_import_uses_custom_file_controls_without_a_progress_surface(self):
         server_html = self._server_html()
         account_css = Path('epub_browser/assets/account.css').read_text(encoding='utf-8')
+        auth_js = Path('epub_browser/assets/auth.js').read_text(encoding='utf-8')
 
         self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdx)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
         self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdd)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
         self.assertRegex(server_html, r'\bdata-dictionary-file-name=(?:["\'])?mdx(?:["\' >])')
         self.assertRegex(server_html, r'\bdata-dictionary-file-name=(?:["\'])?mdd(?:["\' >])')
-        self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminDictionaryProgress)(?=[^>]*aria-live=(?:["\'])?polite)')
+        self.assertNotIn('adminDictionaryProgress', server_html)
+        self.assertNotIn('setDictionaryProgress', auth_js)
+        self.assertNotIn("loadDictionaries({silent: true})", auth_js)
         self.assertRegex(server_html, r'<section\b[^>]*id=(?:["\'])?adminSystemLimits')
         self.assertIn('data-i18n=admin.systemLimits', server_html)
         self.assertIn('data-i18n=admin.systemLimitsDescription', server_html)

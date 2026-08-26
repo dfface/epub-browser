@@ -710,44 +710,6 @@ body.auth-page {
     color: var(--account-text);
 }
 
-.dictionary-install-progress {
-    display: flex;
-    width: min(100%, 480px);
-    align-items: center;
-    gap: 9px;
-    margin: 0;
-    color: var(--account-muted);
-    font-size: .86rem;
-    font-weight: 600;
-}
-
-.dictionary-install-progress-bar {
-    position: relative;
-    width: 64px;
-    height: 5px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--account-primary) 16%, var(--account-card));
-}
-
-.dictionary-install-progress-bar > span {
-    position: absolute;
-    inset: 0 auto 0 -52%;
-    width: 52%;
-    border-radius: inherit;
-    background: var(--account-primary);
-    animation: dictionary-install-progress 1.15s ease-in-out infinite;
-}
-
-@keyframes dictionary-install-progress {
-    from { transform: translateX(0); }
-    to { transform: translateX(300%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .dictionary-install-progress-bar > span { animation: none; inset-inline-start: 24%; }
-}
-
 .dictionary-install-form small {
     color: var(--account-muted);
     font-size: .78rem;

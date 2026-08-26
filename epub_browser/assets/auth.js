@@ -2499,12 +2499,6 @@
       var dictionaryForm = element('adminDictionaryForm');
       var dictionarySubmit = element('adminDictionarySubmit');
       var dictionaryAutoName = '';
-      var dictionaryProgress = element('adminDictionaryProgress');
-      var dictionaryProgressText = element('adminDictionaryProgressText');
-      function setDictionaryProgress(key) {
-        if (dictionaryProgressText) dictionaryProgressText.textContent = key ? t(key) : '';
-        if (dictionaryProgress) dictionaryProgress.hidden = !key;
-      }
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
       var aiJobsStatus = element('adminAiJobsStatus');
@@ -2608,7 +2602,6 @@
         var mediaFile = format === 'mdict' && dictionaryForm.elements.mdd.files[0];
         if (!dictionaryFile) return;
         showDictionaryMessage('', '');
-        setDictionaryProgress(mediaFile ? 'admin.dictionaryProgressMdxWithMdd' : 'admin.dictionaryProgressMdx');
         runButtonOperation(dictionarySubmit, 'admin.installingDictionary', function() {
           function upload(file, target) {
             return file.arrayBuffer().then(function(contents) {
@@ -2628,7 +2621,6 @@
           }).then(function(payload) {
             if (!mediaFile) return payload;
             var dictionary = payload && payload.dictionary;
-            setDictionaryProgress('admin.dictionaryProgressMdd');
             return upload(mediaFile, '/api/admin/dictionaries/' + encodeURIComponent(dictionary.id) + '/resources').then(function(response) {
               if (response.ok) return payload;
               return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {method: 'DELETE'})
@@ -2636,19 +2628,20 @@
                   return showDictionaryResponseError(response).then(function() { throw new Error('dictionary_media_upload_failed'); });
                 });
             });
-          }).then(function() {
+          }).then(function(payload) {
             dictionaryForm.reset();
             setDictionaryFormat('mdict');
             updateDictionaryFileLabels();
             dictionaryAutoName = '';
             clearAdminDirty();
-            setDictionaryProgress('');
             showDictionaryMessage('admin.dictionaryInstalled', 'success');
             showStatus('admin.dictionaryInstalled', 'success');
-            loadDictionaries({silent: true});
+            if (payload && payload.dictionary) {
+              dictionaries = [payload.dictionary].concat(dictionaries);
+              renderDictionaries();
+            }
             return null;
           }).catch(function(error) {
-            setDictionaryProgress('');
             if (error && /dictionary_(?:media_)?upload_failed/.test(error.message)) return;
             showDictionaryMessage('admin.error.network', 'error');
             showStatus('admin.error.network', 'error');

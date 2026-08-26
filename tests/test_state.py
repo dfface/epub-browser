@@ -189,6 +189,36 @@ class StateStoreTests(unittest.TestCase):
 
         self.assertIsNone(self.store.get_dictionary_default("en"))
 
+    def test_dictionary_lists_keep_newest_import_first_after_rename(self):
+        older = self.store.create_dictionary(
+            dictionary_id="dictionary-older", display_name="A dictionary",
+            source_language="en", target_language="zh-CN", entry_count=1,
+            content_sha256="a" * 64, attribution="", created_by_user_id=self.owner.user_id,
+        )
+        newer = self.store.create_dictionary(
+            dictionary_id="dictionary-newer", display_name="Z dictionary",
+            source_language="en", target_language="zh-CN", entry_count=1,
+            content_sha256="b" * 64, attribution="", created_by_user_id=self.owner.user_id,
+        )
+        with self.store._connection() as connection:
+            connection.execute(
+                "UPDATE dictionaries SET created_at = ? WHERE id = ?", ("2025-01-01 00:00:00", older.id)
+            )
+            connection.execute(
+                "UPDATE dictionaries SET created_at = ? WHERE id = ?", ("2025-01-02 00:00:00", newer.id)
+            )
+
+        self.store.rename_dictionary(newer.id, "0 dictionary")
+
+        self.assertEqual(
+            [record.id for record in self.store.list_dictionaries()],
+            [newer.id, older.id],
+        )
+        self.assertEqual(
+            [record.id for record in self.store.list_enabled_dictionaries()],
+            [newer.id, older.id],
+        )
+
     def test_initialize_adds_session_client_metadata_to_existing_account_database(self):
         database = Path(self.temporary.name, "legacy-session.db")
         password_hash = hash_password("secret")

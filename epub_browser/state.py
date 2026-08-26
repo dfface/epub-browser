@@ -4992,14 +4992,14 @@ class StateStore:
     def list_dictionaries(self) -> tuple[DictionaryRecord, ...]:
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT * FROM dictionaries ORDER BY source_language, display_name, id"
+                "SELECT * FROM dictionaries ORDER BY created_at DESC, id DESC"
             ).fetchall()
         return tuple(self._dictionary_record(row) for row in rows)
 
     def list_enabled_dictionaries(self) -> tuple[DictionaryRecord, ...]:
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT * FROM dictionaries WHERE enabled = 1 ORDER BY display_name, id"
+                "SELECT * FROM dictionaries WHERE enabled = 1 ORDER BY created_at DESC, id DESC"
             ).fetchall()
         return tuple(self._dictionary_record(row) for row in rows)
 
