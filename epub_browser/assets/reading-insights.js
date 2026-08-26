@@ -561,19 +561,15 @@
         var value = values[index];
         var x = values.length === 1 ? 50 : index * 100 / (values.length - 1);
         var y = 36 - value / maximum * 30;
-        var marker = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'circle');
         var pointValue = metric === 'active_seconds'
           ? formatDuration(value)
           : translate(target, 'readingInsights.booksRead', 'Books read: ' + value, { count: value });
         var pointLabel = formatTrendBucket(point.bucket, trendGranularity) + ': ' + pointValue;
-        marker.setAttribute('class', 'reading-insights-trend-point');
-        marker.setAttribute('cx', x.toFixed(2));
-        marker.setAttribute('cy', y.toFixed(2));
-        marker.setAttribute('r', '4');
-        marker.setAttribute('tabindex', '0');
-        marker.setAttribute('aria-label', pointLabel);
-        attachTooltip(marker, pointLabel);
-        svg.appendChild(marker);
+        var hitArea = append(state.view.trendChart, 'button', 'reading-insights-trend-point-hit');
+        hitArea.type = 'button';
+        hitArea.setAttribute('aria-label', pointLabel);
+        hitArea.setAttribute('style', '--reading-insights-point-x:' + x.toFixed(2) + '%;--reading-insights-point-y:' + (y / 40 * 100).toFixed(2) + '%');
+        attachTooltip(hitArea, pointLabel);
       });
       state.view.trendChart.appendChild(svg);
     }
