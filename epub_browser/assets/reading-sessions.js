@@ -147,6 +147,19 @@
       } catch (error) {}
     }
 
+    function discardExpiredPending(current) {
+      var before = state.pending.length;
+      state.pending = state.pending.filter(function(payload) {
+        return current - payload.queued_at <= PENDING_TTL_MS;
+      });
+      if (state.inFlightPayload && current - state.inFlightPayload.queued_at > PENDING_TTL_MS) {
+        state.inFlight = null;
+        state.inFlightPayload = null;
+      }
+      if (state.pending.length !== before) savePending();
+      return before !== state.pending.length;
+    }
+
     function accrue(current) {
       if (state.visible && state.focused && state.leader && state.chapterIndex !== null && state.lastInteraction !== null) {
         var activeUntil = Math.min(current, state.lastInteraction + state.idleMs);
@@ -191,6 +204,7 @@
     }
 
     function retryLater(payload) {
+      discardExpiredPending(now());
       savePending();
       state.consecutiveFailures += 1;
       if (!state.retryAnnounced) {
@@ -217,8 +231,12 @@
     }
 
     function settle(payload, successful, error) {
-      state.inFlight = null;
-      state.inFlightPayload = null;
+      var isCurrentRequest = state.inFlightPayload === payload;
+      if (isCurrentRequest) {
+        state.inFlight = null;
+        state.inFlightPayload = null;
+      }
+      if (state.pending.indexOf(payload) < 0) return;
       if (successful) {
         removePending(payload);
         state.consecutiveFailures = 0;
@@ -241,7 +259,9 @@
     function flush(keepalive) {
       if (state.destroyed) return Promise.resolve(null);
       refreshLeaseLeadership();
-      accrue(now());
+      var current = now();
+      accrue(current);
+      discardExpiredPending(current);
       queueBuckets();
       if (!state.leader || !state.pending.length) return Promise.resolve(null);
       if (state.inFlight) {

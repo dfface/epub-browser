@@ -3924,6 +3924,40 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(responses[12].status_code, 429)
         self.assertEqual(responses[12].json()["code"], "reading_session_rate_limited")
 
+    def test_reading_heartbeat_distinguishes_invalid_chapter_index_from_damaged_cache(self):
+        metadata_path = Path(self.directory.name) / "book" / "book" / "content" / "metadata.json"
+        payload = {
+            "client_id": "cache-status",
+            "client_sequence": 1,
+            "chapter_index": 0,
+            "active_seconds": 1,
+        }
+
+        metadata_path.write_text(json.dumps({
+            "title": "Book", "authors": [], "tags": [], "chapters": [], "toc": [],
+        }), encoding="utf-8")
+        self.assertEqual(
+            self.client.post("/api/reading-sessions/book/heartbeat", json=payload).status_code,
+            400,
+        )
+
+        for suffix, content in (
+            ("missing", {"title": "Book", "authors": [], "tags": [], "toc": []}),
+            ("non-list", {"title": "Book", "authors": [], "tags": [], "chapters": {}, "toc": []}),
+            ("malformed", "{not json"),
+        ):
+            with self.subTest(cache=suffix):
+                if isinstance(content, str):
+                    metadata_path.write_text(content, encoding="utf-8")
+                else:
+                    metadata_path.write_text(json.dumps(content), encoding="utf-8")
+                result = self.client.post(
+                    "/api/reading-sessions/book/heartbeat",
+                    json=payload | {"client_id": "cache-status-" + suffix},
+                )
+                self.assertEqual(result.status_code, 503)
+                self.assertEqual(result.json()["code"], "reading_source_unavailable")
+
     def test_review_and_session_routes_do_not_expose_restricted_books(self):
         requests = (
             self.bob_client.get("/api/book-reviews/restricted"),

@@ -780,9 +780,14 @@ function initScript() {
         pageJumpInput.value = currentPage+1;
     }
     
-    function showPage(idx) {
+    function announceReadingSessionPageTurn() {
+        window.dispatchEvent(new CustomEvent('epub:reader-page-turn'));
+    }
+
+    function showPage(idx, fromReaderNavigation) {
         if (idx < 0) idx = 0;
         if (idx >= totalPages) idx = totalPages-1;
+        var pageChanged = idx !== currentPage;
         var pos = getPaginationScrollPosition(idx);
         content.scrollTo(pos, 0);
         currentPage = idx;
@@ -793,6 +798,7 @@ function initScript() {
         updateNavButtons();
         saveReadingProgress();
         updateTocHighlight();
+        if (fromReaderNavigation && pageChanged) announceReadingSessionPageTurn();
     }
     
     function updateNavButtons() {
@@ -901,7 +907,7 @@ function initScript() {
     goToPageBtn.addEventListener('click', function() {
         var n = parseInt(pageJumpInput.value,10);
         if (n >=1 && n <= totalPages) {
-            showPage(n-1);
+            showPage(n-1, true);
         } else {
             showNotification(i18n.t('reader.pageRange', { total: totalPages }), 'warning');
             pageJumpInput.value = currentPage+1;
@@ -1201,7 +1207,7 @@ function initScript() {
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
-                    if (currentPage>0) showPage(currentPage-1);
+                    if (currentPage>0) showPage(currentPage-1, true);
                     else {
                         var prev = document.querySelector(".prev-chapter").href;
                         if (prev === location.href) showNotification(i18n.t('reader.firstChapter'), 'warning');
@@ -1212,7 +1218,7 @@ function initScript() {
                 case 'Space':
                 case 'ArrowRight':
                     e.preventDefault();
-                    if (currentPage < totalPages-1) showPage(currentPage+1);
+                    if (currentPage < totalPages-1) showPage(currentPage+1, true);
                     else {
                         var next = document.querySelector(".next-chapter").href;
                         if (next === location.href) showNotification(i18n.t('reader.lastChapter'), 'warning');
@@ -1256,7 +1262,7 @@ function initScript() {
     }
 
     prevPageBtn.addEventListener('click', function() {
-        if (currentPage>0) showPage(currentPage-1);
+        if (currentPage>0) showPage(currentPage-1, true);
         else {
             var prev = document.querySelector(".prev-chapter").href;
             if (prev === location.href) showNotification(i18n.t('reader.first'), 'warning');
@@ -1265,7 +1271,7 @@ function initScript() {
     });
     
     nextPageBtn.addEventListener('click', function() {
-        if (currentPage < totalPages-1) showPage(currentPage+1);
+        if (currentPage < totalPages-1) showPage(currentPage+1, true);
         else {
             var next = document.querySelector(".next-chapter").href;
             if (next === location.href) showNotification(i18n.t('reader.last'), 'warning');
@@ -1977,7 +1983,7 @@ function initScript() {
                 if (!t) return;
                 if (isPaginationMode) {
                     var page = Math.floor(t.offsetLeft / pageWidth);
-                    showPage(page);
+                    showPage(page, true);
                 } else {
                     window.scrollTo({top: t.offsetTop-100, behavior:'smooth'});
                 }

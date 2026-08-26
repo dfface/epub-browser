@@ -464,6 +464,58 @@ test('drops expired and permanent failures so a queue head cannot block later ti
   tracker.destroy();
 });
 
+test('a heartbeat that expires after an offline failure is discarded before fresh time flushes', async () => {
+  let clock = 0;
+  const sent = [];
+  const tracker = Sessions.createTracker({
+    now: () => clock,
+    idleMs: 400000,
+    send: item => {
+      sent.push(item);
+      if (sent.length === 1) return Promise.reject(new Error('offline'));
+    },
+  });
+  tracker.setChapter(1, 'One');
+  tracker.recordInteraction();
+  clock = 15000;
+  await tracker.flush();
+  clock = 315001;
+  tracker.recordInteraction();
+  clock = 330001;
+  await tracker.flush();
+  assert.deepEqual(sent, [
+    { chapter_index: 1, active_seconds: 15, client_sequence: 1 },
+    { chapter_index: 1, active_seconds: 20, client_sequence: 2 },
+  ]);
+  tracker.destroy();
+});
+
+test('an expired in-flight heartbeat cannot block a fresh heartbeat forever', async () => {
+  let clock = 0;
+  const sent = [];
+  const tracker = Sessions.createTracker({
+    now: () => clock,
+    idleMs: 400000,
+    send: item => {
+      sent.push(item);
+      return sent.length === 1 ? new Promise(() => {}) : undefined;
+    },
+  });
+  tracker.setChapter(1, 'One');
+  tracker.recordInteraction();
+  clock = 15000;
+  tracker.flush();
+  clock = 315001;
+  tracker.recordInteraction();
+  clock = 330001;
+  await tracker.flush();
+  assert.deepEqual(sent, [
+    { chapter_index: 1, active_seconds: 15, client_sequence: 1 },
+    { chapter_index: 1, active_seconds: 20, client_sequence: 2 },
+  ]);
+  tracker.destroy();
+});
+
 test('browser tracker sends localized retry feedback through the shared notification UI', async () => {
   const content = {
     getAttribute(name) {

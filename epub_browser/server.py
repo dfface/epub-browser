@@ -2913,8 +2913,12 @@ window.location.assign(payload.redirect||'/');
         """Return cache-derived labels only after the caller has book access."""
         renderer = ServerPageRenderer(base_directory, book_id)
         metadata = renderer._read_json(renderer.content_dir / 'metadata.json')
+        if not isinstance(metadata, dict):
+            raise ServerPageError('Book content cache is invalid')
         chapters = metadata.get('chapters')
-        if not isinstance(chapters, list) or chapter_index >= len(chapters):
+        if not isinstance(chapters, list):
+            raise ServerPageError('Book content cache is invalid')
+        if chapter_index >= len(chapters):
             raise ValueError('chapter index is outside the book')
         renderer.render_chapter(chapter_index)
         chapter = renderer._read_json(
@@ -3000,11 +3004,6 @@ window.location.assign(payload.redirect||'/');
             book_title, chapter_label = authorized_chapter_snapshot(
                 book_id, chapter_index
             )
-        except ValueError:
-            return response(
-                error_payload('invalid_reading_session', 'Invalid reading session'),
-                400,
-            )
         except ServerPageError:
             return response(
                 error_payload(
@@ -3012,6 +3011,11 @@ window.location.assign(payload.redirect||'/');
                     'Reading source is unavailable',
                 ),
                 503,
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_reading_session', 'Invalid reading session'),
+                400,
             )
         session = store.record_reading_heartbeat(
             user_id=principal.user_id,

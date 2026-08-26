@@ -1464,6 +1464,31 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('navigateReaderChapter(next, { history: true });', next_handler)
         self.assertNotIn('location.href=next', next_handler)
 
+    def test_pagination_click_paths_notify_the_active_reading_tracker(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        tracker = Path('epub_browser/assets/reading-sessions.js').read_text(encoding='utf-8')
+
+        show_page_start = script.index('function showPage(idx, fromReaderNavigation) {')
+        show_page_end = script.index('\n    function updateNavButtons()', show_page_start)
+        show_page = script[show_page_start:show_page_end]
+        signal_start = script.index('function announceReadingSessionPageTurn() {')
+        signal_end = script.index('\n    function showPage(', signal_start)
+        self.assertIn("new CustomEvent('epub:reader-page-turn')", script[signal_start:signal_end])
+        self.assertIn('if (fromReaderNavigation && pageChanged) announceReadingSessionPageTurn();', show_page)
+        self.assertIn("addListener(eventTarget, 'epub:reader-page-turn', recordInteraction);", tracker)
+
+        prev_start = script.index("prevPageBtn.addEventListener('click', function() {")
+        prev_end = script.index('\n    });', prev_start)
+        next_start = script.index("nextPageBtn.addEventListener('click', function() {")
+        next_end = script.index('\n    });', next_start)
+        page_edge_start = script.index('function handleClickPage(e) {')
+        page_edge_end = script.index('\n    function initClickPageState()', page_edge_start)
+        self.assertIn('showPage(currentPage-1, true);', script[prev_start:prev_end])
+        self.assertIn('showPage(currentPage+1, true);', script[next_start:next_end])
+        page_edge = script[page_edge_start:page_edge_end]
+        self.assertIn('prevPageBtn.click();', page_edge)
+        self.assertIn('nextPageBtn.click();', page_edge)
+
     def test_pagination_chapter_toc_jumps_to_an_exact_page_boundary(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
 
@@ -1475,7 +1500,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         pagination_jump = toc[pagination_start:pagination_end]
 
         self.assertIn('var page = Math.floor(t.offsetLeft / pageWidth);', pagination_jump)
-        self.assertIn('showPage(page);', pagination_jump)
+        self.assertIn('showPage(page, true);', pagination_jump)
         self.assertNotIn('scrollIntoView', pagination_jump)
 
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
