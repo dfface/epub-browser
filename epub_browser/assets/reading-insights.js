@@ -28,6 +28,18 @@
       ? target.EpubBrowserURL.publicPath(path) : path;
   }
 
+  function bookPath(target, bookId) {
+    var path = '/book/' + encodeURIComponent(bookId) + '/index.html';
+    return target.EpubBrowserURL && typeof target.EpubBrowserURL.publicPath === 'function'
+      ? target.EpubBrowserURL.publicPath(path) : path;
+  }
+
+  function chapterPath(target, bookId, chapterIndex) {
+    var path = '/book/' + encodeURIComponent(bookId) + '/chapter_' + encodeURIComponent(chapterIndex) + '.html';
+    return target.EpubBrowserURL && typeof target.EpubBrowserURL.publicPath === 'function'
+      ? target.EpubBrowserURL.publicPath(path) : path;
+  }
+
   function createClient(target) {
     var documentTarget = target.document;
     var state = {
@@ -306,7 +318,7 @@
       var total = append(totalCard, 'strong', '', '—');
       var bookCard = append(summary, 'article', 'reading-insights-summary-card');
       append(bookCard, 'p', '', translate(target, 'readingInsights.topBook', 'Top book'));
-      var topBook = append(bookCard, 'strong', '', '—');
+      var topBook = append(bookCard, 'a', 'reading-insights-summary-link', '—');
       var analytics = append(targetRoot, 'section', 'reading-insights-analytics');
       var analyticsTitle = append(analytics, 'h2', '', translate(target, 'readingInsights.activity', 'Reading activity'));
       analyticsTitle.id = 'readingInsightsActivityTitle';
@@ -384,8 +396,13 @@
         item.setAttribute('aria-label', [time, book, chapter, duration].join(' '));
         append(item, 'time', 'reading-insights-session-time', time);
         var details = append(item, 'span', 'reading-insights-session-details');
-        append(details, 'strong', 'reading-insights-session-book', book);
-        append(details, 'span', 'reading-insights-session-chapter', chapter);
+        var bookLink = append(details, 'a', 'reading-insights-session-book', book);
+        if (session.book_id) bookLink.setAttribute('href', bookPath(target, session.book_id));
+        else bookLink.removeAttribute('href');
+        var chapterLink = append(details, 'a', 'reading-insights-session-chapter', chapter);
+        if (session.book_id && Number.isInteger(session.chapter_index) && session.chapter_index >= 0) {
+          chapterLink.setAttribute('href', chapterPath(target, session.book_id, session.chapter_index));
+        } else chapterLink.removeAttribute('href');
         append(item, 'span', 'reading-insights-session-duration is-' + durationTone(session.active_seconds), duration);
       });
     }
@@ -516,8 +533,14 @@
           ? today : (days.length ? days[days.length - 1].date : state.anchor);
       }
       state.view.total.textContent = formatDuration(insights.total_active_seconds);
-      state.view.topBook.textContent = insights.top_book
+      var topBookText = insights.top_book
         ? insights.top_book.title + ' · ' + formatDuration(insights.top_book.active_seconds) : '—';
+      state.view.topBook.textContent = topBookText;
+      if (insights.top_book && insights.top_book.book_id) {
+        state.view.topBook.setAttribute('href', bookPath(target, insights.top_book.book_id));
+      } else {
+        state.view.topBook.removeAttribute('href');
+      }
       if (state.period === 'day') state.activityMetric = 'duration';
       renderActivity();
       var isOverview = state.period === 'overview';

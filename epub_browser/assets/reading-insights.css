@@ -121,9 +121,13 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 }
 
 .reading-insights-live {
-    min-height: 1.5em;
-    margin: 16px 0 0;
-    color: var(--text-secondary);
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 .reading-insights-range {
@@ -186,6 +190,21 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
     font-size: 1.2rem;
     font-variant-numeric: tabular-nums;
 }
+
+.reading-insights-summary-link {
+    display: block;
+    overflow-wrap: anywhere;
+    margin-top: 6px;
+    color: var(--text);
+    font-size: 1.2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+}
+.reading-insights-summary-link[href]:hover { color: var(--button-bg); text-decoration: underline; text-underline-offset: .16em; }
+.reading-insights-summary-link:focus-visible,
+.reading-insights-session-book:focus-visible,
+.reading-insights-session-chapter:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; border-radius: 3px; }
 
 .reading-insights-analytics { margin: 0 0 28px; }
 .reading-insights-analytics > h2 { font-size: 1.24rem; letter-spacing: -.02em; }
@@ -332,8 +351,10 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-session-details { display: grid; min-width: 0; gap: 2px; }
 .reading-insights-session-book,
 .reading-insights-session-chapter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reading-insights-session-book { color: var(--text); font-size: .92rem; }
-.reading-insights-session-chapter { color: var(--text-secondary); font-size: .8rem; }
+.reading-insights-session-book { color: var(--text); font-size: .92rem; font-weight: 700; text-decoration: none; }
+.reading-insights-session-chapter { color: var(--text-secondary); font-size: .8rem; text-decoration: none; }
+.reading-insights-session-book[href]:hover,
+.reading-insights-session-chapter[href]:hover { color: var(--button-bg); text-decoration: underline; text-underline-offset: .14em; }
 .reading-insights-session-duration { border-radius: 999px; padding: 3px 7px; color: var(--text-secondary); background: var(--card-bg); font-size: .8rem; font-weight: 750; white-space: nowrap; }
 .reading-insights-session-duration.is-glance { border: 1px solid var(--border); }
 .reading-insights-session-duration.is-light { color: var(--text); background: color-mix(in srgb, var(--button-bg) 18%, var(--card-bg)); }

@@ -9,6 +9,7 @@ function element(tagName) {
     appendChild(node) { this.children.push(node); node.parentNode = this; return node; },
     replaceChildren(...nodes) { this.children = []; nodes.forEach(node => this.appendChild(node)); },
     setAttribute(name, value) { this.attributes[name] = String(value); },
+    removeAttribute(name) { delete this.attributes[name]; },
     getAttribute(name) { return this.attributes[name] || null; },
     addEventListener(type, fn) { (listeners[type] || (listeners[type] = [])).push(fn); },
     click() { (listeners.click || []).forEach(fn => fn()); },
@@ -55,14 +56,16 @@ function clientFor(payload, translations) {
 test('selecting a day fetches and safely renders chronological sessions', async () => {
   const page = clientFor({
     total_active_seconds: 1860,
-    top_book: { title: 'Book', active_seconds: 1860 },
+    top_book: { book_id: 'book-id', title: 'Book', active_seconds: 1860 },
     days: [{ date: '2026-08-15', active_seconds: 1860 }],
-    sessions: [{ started_at: '2026-08-15T08:18:00+00:00', book_title: 'Book', chapter_label: 'Chapter 6', active_seconds: 1860 }],
+    sessions: [{ started_at: '2026-08-15T08:18:00+00:00', book_id: 'book-id', chapter_index: 5, book_title: 'Book', chapter_label: 'Chapter 6', active_seconds: 1860 }],
   });
   await page.mount();
   await page.selectDay('2026-08-15');
   assert.equal(page.sessionRows[0].getAttribute('aria-label'), '08:18 Book Chapter 6 31 min');
   assert.match(page.sessionRows[0].children.at(-1).className, /is-focused/);
+  assert.equal(page.sessionRows[0].children[1].children[0].getAttribute('href'), '/book/book-id/index.html');
+  assert.equal(page.sessionRows[0].children[1].children[1].getAttribute('href'), '/book/book-id/chapter_5.html');
 });
 
 test('duration fallback uses the active locale unit copy when DurationFormat is unavailable', async () => {
