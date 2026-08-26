@@ -275,6 +275,7 @@ function initScript() {
         deferBookFeature('toggleShelfBtn', 'bookshelf', function() {
             initBookShelfButton(book_hash);
         }, 'bookshelf.loading');
+        hydrateBookShelfMembership(book_hash);
         deferBookFeature('bookAnnotationsBtn', 'annotations', null, 'annotations.loading');
     }
 
@@ -468,6 +469,48 @@ function setClearReadingProgressAvailability(available) {
     }
     if (menu) menu.hidden = true;
     if (control) control.classList.toggle('has-reading-progress', available);
+}
+
+function hydrateBookShelfMembership(bookHash) {
+    if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
+
+    var button = document.getElementById('toggleShelfBtn');
+    var label = document.getElementById('toggleShelfBtnText');
+    var icon = button && button.querySelector('i');
+    if (!button || !label || button.dataset.bookShelfMembershipLoading) return;
+    button.dataset.bookShelfMembershipLoading = 'true';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.classList.add('is-loading');
+    label.textContent = bookT('bookshelf.loading');
+    if (icon) icon.className = 'fas fa-spinner fa-spin';
+
+    var prefix = window.EpubBrowserBasePath || '/';
+    if (prefix.charAt(prefix.length - 1) !== '/') prefix += '/';
+    window.EpubBrowserAuth.fetch(prefix + 'api/bookshelf/' + encodeURIComponent(bookHash) + '/membership')
+        .then(function(response) {
+            if (!response.ok) throw new Error('bookshelf_membership_unavailable');
+            return response.json();
+        })
+        .then(function(payload) {
+            if (!payload || typeof payload.in_shelf !== 'boolean') throw new Error('invalid_bookshelf_membership');
+            var key = payload.in_shelf ? 'book.removeFromShelf' : 'book.addToShelf';
+            label.textContent = bookT(key);
+            button.setAttribute('aria-label', label.textContent);
+            button.classList.toggle('in-shelf', payload.in_shelf);
+        })
+        .catch(function() {
+            label.textContent = bookT('book.addToShelf');
+            button.setAttribute('aria-label', label.textContent);
+            button.classList.remove('in-shelf');
+        })
+        .finally(function() {
+            if (icon) icon.className = 'fas fa-bookmark';
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+            button.classList.remove('is-loading');
+            delete button.dataset.bookShelfMembershipLoading;
+        });
 }
 
 function initBookShelfButton(bookHash) {

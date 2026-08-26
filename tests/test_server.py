@@ -3669,6 +3669,38 @@ class ServerCacheTests(unittest.TestCase):
         loaded = self.client.get("/api/bookshelf")
         self.assertEqual(loaded.json(), created.json())
 
+    def test_server_bookshelf_membership_reads_root_and_nested_groups(self):
+        self.client.put(
+            "/api/bookshelf",
+            json={
+                "version": 0,
+                "data": {
+                    "items": ["root-book"],
+                    "groups": {
+                        "folder": {
+                            "items": ["nested-book"],
+                            "groups": {},
+                            "order": ["nested-book"],
+                        },
+                    },
+                    "order": ["root-book"],
+                },
+            },
+        )
+
+        self.assertEqual(
+            self.client.get("/api/bookshelf/root-book/membership").json(),
+            {"in_shelf": True},
+        )
+        self.assertEqual(
+            self.client.get("/api/bookshelf/nested-book/membership").json(),
+            {"in_shelf": True},
+        )
+        self.assertEqual(
+            self.client.get("/api/bookshelf/missing-book/membership").json(),
+            {"in_shelf": False},
+        )
+
     def test_server_bookshelf_ignores_spoofed_username_and_uses_principal(self):
         created = self.client.put(
             "/api/bookshelf",

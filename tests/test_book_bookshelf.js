@@ -160,6 +160,58 @@ test('Server reader defers its shelf button until the Server store has loaded', 
   assert.deepEqual(localWrites, []);
 });
 
+test('Server book detail resolves its shelf label through the lightweight membership API', async () => {
+  const requests = [];
+  const button = {
+    dataset: {},
+    disabled: false,
+    attributes: {},
+    classList: {
+      add() {},
+      remove() {},
+      toggle(name, enabled) { button.toggles[name] = enabled; },
+    },
+    toggles: {},
+    querySelector() { return { className: 'fas fa-bookmark' }; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
+  };
+  const text = { textContent: '' };
+  const window = {
+    EpubBrowserMode: 'server',
+    EpubBrowserBasePath: '/reader/',
+    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserAuth: {
+      fetch(url) {
+        requests.push(url);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ in_shelf: true }) });
+      },
+    },
+  };
+  const context = {
+    window,
+    navigator: { userAgent: '' },
+    localStorage: { getItem() { return null; }, setItem() {} },
+    document: {
+      getElementById(id) {
+        if (id === 'toggleShelfBtn') return button;
+        if (id === 'toggleShelfBtnText') return text;
+        return null;
+      },
+    },
+    Promise,
+  };
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
+
+  context.hydrateBookShelfMembership('book-id');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(requests, ['/reader/api/bookshelf/book-id/membership']);
+  assert.equal(text.textContent, 'book.removeFromShelf');
+  assert.equal(button.toggles['in-shelf'], true);
+  assert.equal(button.disabled, false);
+});
+
 test('Server progress labels never invent a shared account identity', () => {
   const client = loadBookClient();
   client.context.window.EpubReadingProgress = { getUsername() { return ''; } };

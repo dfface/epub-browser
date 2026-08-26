@@ -2818,6 +2818,24 @@ window.location.assign(payload.redirect||'/');
         version, serialized = row
         return version, json.loads(serialized)
 
+    def bookshelf_contains(book_hash, shelf):
+        if not isinstance(shelf, dict):
+            return False
+        if book_hash in shelf.get("items", []):
+            return True
+        return any(
+            bookshelf_contains(book_hash, group)
+            for group in (shelf.get("groups") or {}).values()
+        )
+
+    async def bookshelf_membership(request):
+        principal = require_principal(request)
+        try:
+            _version, shelf = bookshelf_document(principal.user_id)
+            return response({"in_shelf": bookshelf_contains(request.path_params["book_hash"], shelf)})
+        except Exception:
+            return response(error_payload('server_error', 'Internal server error'), 500)
+
     async def bookshelf(request):
         principal = require_principal(request)
         user_id = principal.user_id
@@ -3109,6 +3127,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/ready', ready),
         Route('/api/version', version_status),
         Route('/api/library-events', library_events),
+        Route('/api/bookshelf/{book_hash}/membership', bookshelf_membership, methods=['GET']),
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
