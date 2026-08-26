@@ -87,11 +87,13 @@ def render_library_shell(
     server_auth_script = ""
     ai_reading_stylesheet = ""
     ai_reading_navigation = ""
+    reading_insights_navigation = ""
     ai_reading_script = ""
     server_client_start = f"""
             if (window.initScriptLibrary) window.initScriptLibrary();
             {server_progress_start}"""
     if deployment_mode == "server":
+        reading_insights_navigation = '''<a class="app-nav-link" href="/reading-insights" data-i18n="readingInsights.navigation">Reading insights</a>'''
         ai_reading_navigation = '''<button type="button" class="app-nav-link" data-ai-reading-hub aria-haspopup="dialog"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="ai.library">AI readings</span></button>'''
         ai_feature_assets = {
             "aiReadingHubCss": assets.url_for("ai-reading-hub.css"),
@@ -253,6 +255,7 @@ if (isKindle) {
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+            {reading_insights_navigation}
             {ai_reading_navigation}
             {install_control}
         </div>
@@ -421,6 +424,7 @@ if (isKindle) {
     library_html = library_html.replace("{server_client_start}", server_client_start)
     library_html = library_html.replace("{ai_reading_stylesheet}", ai_reading_stylesheet)
     library_html = library_html.replace("{ai_reading_navigation}", ai_reading_navigation)
+    library_html = library_html.replace("{reading_insights_navigation}", reading_insights_navigation)
     library_html = library_html.replace("{ai_reading_script}", ai_reading_script)
     library_html = library_html.replace("{SERVER_LOCALE_SCRIPT}", SERVER_LOCALE_SCRIPT)
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)

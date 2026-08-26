@@ -3811,17 +3811,22 @@ class ReadingInsightsAPITests(unittest.TestCase):
         )
         assets = public / "assets"
         assets.mkdir(exist_ok=True)
-        (assets / "asset-manifest.json").write_text(
-            json.dumps({
-                name: "/assets/immutable/" + name
-                for name in (
+        manifest = {
+            name: "/assets/immutable/" + name
+            for name in (
                     "ai-canvas.css", "ai-canvas.js", "ai-reading-hub.css",
                     "ai-reading-hub.js", "ai-chat.css", "ai-chat.js",
                     "ai-rich-text.css", "ai-rich-text.js",
                     "vendor/katex/katex.min.css", "vendor/katex/katex.min.js",
                     "vendor/mermaid/mermaid.min.js",
                 )
-            }),
+        }
+        manifest.update({
+            "reading-insights.css": "/assets/immutable/reading-insights.0123456789ab.css",
+            "reading-insights.js": "/assets/immutable/reading-insights.0123456789ab.js",
+        })
+        (assets / "asset-manifest.json").write_text(
+            json.dumps(manifest),
             encoding="utf-8",
         )
         (content / "metadata.json").write_text(
@@ -3991,6 +3996,21 @@ class ReadingInsightsAPITests(unittest.TestCase):
             401,
         )
         self.assertEqual(anonymous.get("/api/reading-insights").status_code, 401)
+
+    def test_reading_insights_document_requires_login_and_uses_current_asset_manifest(self):
+        anonymous = TestClient(self.app)
+        self.addCleanup(anonymous.close)
+        self.assertEqual(anonymous.get('/reading-insights').status_code, 401)
+
+        page = self.client.get('/reading-insights')
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('no-cache', page.headers['cache-control'])
+        self.assertIn('data-reading-insights', page.text)
+        self.assertIn('readingInsights.navigation', page.text)
+        self.assertRegex(
+            page.text,
+            r'/assets/immutable/reading-insights\.[0-9a-f]{12}\.js',
+        )
 
     def test_review_and_heartbeat_mutations_wait_for_server_readiness(self):
         not_ready_app = create_app(

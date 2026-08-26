@@ -30,6 +30,8 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
     'book-reviews.css',
     'book-reviews.js',
     'reading-sessions.js',
+    'reading-insights.css',
+    'reading-insights.js',
     # Legacy AI-reading renderer kept for backwards-compatible source trees.
     'ai-reading.css',
     'ai-reading.js',

@@ -1,0 +1,194 @@
+.reading-insights-page {
+    width: min(calc(100% - 40px), 1000px);
+    margin: 0 auto;
+    padding: 32px 0 56px;
+    color: var(--text);
+}
+
+.reading-insights-heading {
+    max-width: 680px;
+    margin-bottom: 24px;
+}
+
+.reading-insights-kicker {
+    margin: 0 0 4px;
+    color: var(--button-bg);
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.reading-insights-heading h1,
+.reading-insights-heading p,
+.reading-insights-summary-card p,
+.reading-insights-days h2,
+.reading-insights-sessions h2 {
+    margin: 0;
+}
+
+.reading-insights-heading h1 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    letter-spacing: -.035em;
+    line-height: 1.15;
+}
+
+.reading-insights-heading > p:last-child {
+    margin-top: 10px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.reading-insights-periods,
+.reading-insights-day-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.reading-insights-periods button,
+.reading-insights-day-button {
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 8px 14px;
+    color: var(--text);
+    background: var(--card-bg);
+    font: inherit;
+    font-weight: 650;
+    line-height: 1.2;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.reading-insights-periods button[aria-pressed="true"],
+.reading-insights-day-button[aria-pressed="true"] {
+    border-color: #3148b7;
+    color: #fff;
+    background: #3148b7;
+}
+
+.reading-insights-periods button:hover,
+.reading-insights-day-button:hover {
+    border-color: var(--button-bg);
+    background: var(--hover);
+}
+
+.reading-insights-periods button[aria-pressed="true"]:hover,
+.reading-insights-day-button[aria-pressed="true"]:hover {
+    background: #263b9c;
+}
+
+.reading-insights-periods button:focus-visible,
+.reading-insights-day-button:focus-visible {
+    outline: 3px solid #1d3ab1;
+    outline-offset: 3px;
+}
+
+.reading-insights-periods button:disabled,
+.reading-insights-day-button:disabled {
+    cursor: progress;
+    opacity: .6;
+}
+
+.reading-insights-live {
+    min-height: 1.5em;
+    margin: 16px 0 0;
+    color: var(--text-secondary);
+}
+
+.reading-insights-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin: 24px 0 32px;
+}
+
+.reading-insights-summary-card,
+.reading-insights-days,
+.reading-insights-sessions {
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius-xl, 12px);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.reading-insights-summary-card {
+    min-width: 0;
+    padding: 20px;
+}
+
+.reading-insights-summary-card p {
+    color: var(--text-secondary);
+    font-size: .9rem;
+}
+
+.reading-insights-summary-card strong {
+    display: block;
+    overflow-wrap: anywhere;
+    margin-top: 6px;
+    font-size: 1.2rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.reading-insights-days,
+.reading-insights-sessions {
+    padding: 20px;
+}
+
+.reading-insights-sessions { margin-top: 20px; }
+.reading-insights-day-list { margin-top: 14px; }
+
+.reading-insights-session-list {
+    display: grid;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.reading-insights-session,
+.reading-insights-empty {
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 11px 12px;
+    border-left: 3px solid var(--button-bg);
+    background: var(--hover);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.reading-insights-empty {
+    border-left-color: var(--border);
+    color: var(--text-secondary);
+}
+
+.dark-mode .reading-insights-periods button[aria-pressed="true"],
+.dark-mode .reading-insights-day-button[aria-pressed="true"] {
+    border-color: #b5c2ff;
+    color: #13235d;
+    background: #b5c2ff;
+}
+
+@media (max-width: 768px) {
+    .reading-insights-page {
+        width: min(calc(100% - 32px), 1000px);
+        padding-top: 24px;
+    }
+}
+
+@media (max-width: 520px) {
+    .reading-insights-summary { grid-template-columns: 1fr; }
+    .reading-insights-days,
+    .reading-insights-sessions,
+    .reading-insights-summary-card { padding: 16px; }
+    .reading-insights-periods button { flex: 1 1 0; }
+    .reading-insights-day-button { flex: 1 1 100%; text-align: left; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .reading-insights-periods button,
+    .reading-insights-day-button { transition: color 180ms ease-out, background-color 180ms ease-out, border-color 180ms ease-out; }
+}

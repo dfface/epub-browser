@@ -58,6 +58,7 @@ from .processor import (
     server_book_public_path_allowed,
 )
 from .server_library import library_metadata
+from .server_chrome import render_reading_insights_document
 from .server_pages import ServerPageError, ServerPageRenderer
 from .site import render_library_shell
 from .urls import SiteURLs
@@ -377,7 +378,7 @@ def unauthenticated_response(request):
             status_code=403,
             headers={'Cache-Control': 'no-store'},
         )
-    if path == '/sync' or path.startswith('/api/'):
+    if path == '/sync' or path.startswith('/api/') or path == '/reading-insights':
         return JSONResponse(
             error_payload('authentication_required', 'Authentication required'),
             status_code=401,
@@ -2404,6 +2405,27 @@ window.location.assign(payload.redirect||'/');
         response.headers['Cache-Control'] = 'no-cache'
         return apply_reader_security_headers(response, index_path)
 
+    async def reading_insights_page(request):
+        require_principal(request)
+        try:
+            manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            if not isinstance(manifest, dict) or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in manifest.items()
+            ):
+                raise ValueError('Invalid asset manifest')
+            markup = render_reading_insights_document(
+                PublishedAssets(manifest), SiteURLs()
+            )
+        except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            return response(
+                error_payload('reading_insights_unavailable', 'Reading insights are unavailable'),
+                503,
+            )
+        target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
+        return apply_reader_security_headers(target, markup=markup)
+
     async def service_worker_tombstone(request):
         return Response(
             SERVICE_WORKER_TOMBSTONE,
@@ -3046,6 +3068,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/ai/jobs/{job_id:path}/retry', admin_ai_job_retry, methods=['POST']),
         Route('/', library_index),
         Route('/index.html', library_index),
+        Route('/reading-insights', reading_insights_page, methods=['GET']),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
         Route('/api/health', health),
         Route('/api/ready', ready),

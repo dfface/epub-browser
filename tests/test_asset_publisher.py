@@ -167,6 +167,8 @@ class AssetPublisherTests(unittest.TestCase):
         self.assertIn('book-reviews.css', SERVER_ONLY_ASSET_PATHS)
         self.assertIn('book-reviews.js', SERVER_ONLY_ASSET_PATHS)
         self.assertIn('reading-sessions.js', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('reading-insights.css', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('reading-insights.js', SERVER_ONLY_ASSET_PATHS)
         with tempfile.TemporaryDirectory() as output:
             published = AssetPublisher(
                 Path("epub_browser/assets"),

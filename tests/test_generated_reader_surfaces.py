@@ -49,6 +49,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertNotIn('auth.js', ssg_html)
         self.assertNotRegex(ssg_html, r'/assets/immutable/auth\.[0-9a-f]{12}\.js')
+        self.assertNotIn('readingInsights.navigation', ssg_html)
+        self.assertNotIn('reading-insights', ssg_html)
         self.assertLess(server_html.index('/immutable/auth.'), server_html.rindex('/immutable/library.'))
         self.assertNotIn('id=loginForm', server_html)
         self.assertRegex(
