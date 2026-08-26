@@ -4148,10 +4148,21 @@ class ReadingInsightsAPITests(unittest.TestCase):
         )
         self.assertEqual(insights.status_code, 200)
         self.assertEqual(insights.json()["insights"]["period"], "week")
+        self.assertEqual(len(insights.json()["insights"]["activity"]["days"]), 84)
+        self.assertTrue(any(
+            day["book_count"] == 1
+            for day in insights.json()["insights"]["activity"]["days"]
+        ))
         self.assertEqual(self.bob_client.get("/api/book-reviews/book").json(), {"review": None})
         self.assertEqual(self.bob_client.get(
             "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
         ).json()["insights"]["sessions"], [])
+        self.assertTrue(all(
+            day["book_count"] == 0
+            for day in self.bob_client.get(
+                "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
+            ).json()["insights"]["activity"]["days"]
+        ))
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
         self.assertEqual(anonymous.get("/api/book-reviews/book").status_code, 401)

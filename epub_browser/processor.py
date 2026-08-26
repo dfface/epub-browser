@@ -1705,8 +1705,11 @@ class EPUBProcessor:
 </header>
 <div class="container">
     <div class="book-info-card" data-id="book-info-card">
-            <div class="book-info-cover">
-                <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
+            <div class="book-info-cover-wrap">
+                <div class="book-info-cover">
+                    <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
+                </div>
+                {book_reading_time}
             </div>
             <div class="book-info-content">
                 <h2 class="book-info-title" lang="{book_language}">{book_title_text}</h2>
@@ -1745,7 +1748,6 @@ class EPUBProcessor:
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                     {book_review_trigger}
                 </div>
-                {book_reading_time}
             </div>
     </div>
     {book_review_display}

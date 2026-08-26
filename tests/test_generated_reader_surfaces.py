@@ -1887,10 +1887,12 @@ assert.deepEqual(
         self.assertNotIn('data-book-reading-time', html)
         self.assertIn('data-book-reading-time', server_html)
         self.assertIn('data-book-reading-time-label', server_html)
+        self.assertLess(server_html.index('class="book-info-cover"'), server_html.index('data-book-reading-time'))
         self.assertIn("'/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary'", script)
         self.assertIn("bookT('book.readingTime'", script)
         self.assertIn("renderBookReadingTime(readingTime.dataset.activeSeconds)", script)
         self.assertIn('.book-reading-time', styles)
+        self.assertIn('.book-info-cover-wrap', styles)
         self.assertIn('font-variant-numeric: tabular-nums;', styles)
 
     def test_book_toc_marks_server_synced_reading_progress_with_the_reader_identity(self):

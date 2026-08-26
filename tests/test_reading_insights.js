@@ -61,7 +61,8 @@ test('selecting a day fetches and safely renders chronological sessions', async 
   });
   await page.mount();
   await page.selectDay('2026-08-15');
-  assert.equal(page.sessionRows[0].textContent, '08:18 Book Chapter 6 31 min');
+  assert.equal(page.sessionRows[0].getAttribute('aria-label'), '08:18 Book Chapter 6 31 min');
+  assert.match(page.sessionRows[0].children.at(-1).className, /is-focused/);
 });
 
 test('duration fallback uses the active locale unit copy when DurationFormat is unavailable', async () => {
@@ -77,7 +78,32 @@ test('duration fallback uses the active locale unit copy when DurationFormat is 
     'readingInsights.duration.hour': '小时',
   });
   await page.mount();
-  assert.equal(page.sessionRows[0].textContent, '08:18 书 第一章 1 小时 1 分钟');
+  assert.equal(page.sessionRows[0].getAttribute('aria-label'), '08:18 书 第一章 1 小时 1 分钟');
+  assert.match(page.sessionRows[0].children.at(-1).className, /is-deep/);
+});
+
+test('renders a theme-token-ready activity calendar and switches its daily trend metric', async () => {
+  const page = clientFor({
+    total_active_seconds: 3661,
+    days: [{ date: '2026-08-15', active_seconds: 3661 }],
+    activity: {
+      days: [
+        { date: '2026-08-10', active_seconds: 1, book_count: 1 },
+        { date: '2026-08-11', active_seconds: 60, book_count: 1 },
+        { date: '2026-08-12', active_seconds: 3600, book_count: 2 },
+      ],
+    },
+    sessions: [],
+  });
+  await page.mount();
+
+  assert.match(page.activityCells[0].className, /is-level-1/);
+  assert.match(page.activityCells[1].className, /is-level-2/);
+  assert.match(page.activityCells[2].className, /is-level-4/);
+  assert.equal(page.activityCells[2].getAttribute('aria-label'), 'Sat, Aug 15, 2026: 1 hr. Books read: 2');
+  page.metricButtons[1].click();
+  assert.equal(page.metricButtons[0].getAttribute('aria-pressed'), 'false');
+  assert.equal(page.metricButtons[1].getAttribute('aria-pressed'), 'true');
 });
 
 test('opens on the current day and activating a period updates its pressed state before requesting the new range', async () => {
@@ -123,7 +149,7 @@ test('week and month use compact visual day labels while preserving full dates f
   const page = clientFor({ total_active_seconds: 0, days: [{ date: '2026-08-15', active_seconds: 0 }], sessions: [] });
   await page.mount();
   await page.setPeriod('week', '2026-08-15');
-  const dayList = page.root.children[4].children[1];
+  const dayList = page.root.children[5].children[1];
   const button = dayList.children[0];
   assert.equal(button.children[0].textContent, 'Sat');
   assert.equal(button.children[1].textContent, '8/15');
@@ -143,11 +169,11 @@ test('week and month prefer today over the range end when today is visible', asy
 
   await page.mount();
   await page.setPeriod('week', todayIso);
-  let dayList = page.root.children[4].children[1];
+  let dayList = page.root.children[5].children[1];
   assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
   assert.equal(dayList.children[1].getAttribute('aria-pressed'), 'false');
 
   await page.setPeriod('month', todayIso);
-  dayList = page.root.children[4].children[1];
+  dayList = page.root.children[5].children[1];
   assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
 });

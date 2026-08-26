@@ -31,6 +31,7 @@ DB_SCHEMA_VERSION = 14
 # the same chapter.  The persistence layer keeps those heartbeats distinct for
 # auditability; the personal timeline joins this short telemetry seam instead.
 READING_INSIGHTS_CONTINUITY_SECONDS = 30
+READING_INSIGHTS_ACTIVITY_DAYS = 84
 
 _PUBLIC_AI_READING_JOB_ERROR_CODES = frozenset({
     "ai_disabled",
@@ -5214,6 +5215,64 @@ class StateStore:
             datetime.combine(ends_on, datetime.min.time(), zone).timestamp(),
         )
 
+    def _reading_activity_days(
+        self,
+        rows: Sequence[sqlite3.Row],
+        *,
+        range_start: float,
+        range_end: float,
+        zone: ZoneInfo,
+    ) -> list[dict]:
+        """Return a compact, de-duplicated daily activity history for insights."""
+        first_day = datetime.fromtimestamp(range_start, zone).date()
+        last_day = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        day_intervals = {}
+        day_book_intervals = {}
+        for row in rows:
+            started_at = max(row["started_at"], range_start)
+            ended_at = min(row["ended_at"], range_end)
+            if ended_at <= started_at:
+                continue
+            active_seconds = self._distribute_active_seconds(
+                row["active_seconds"],
+                (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
+            )[1]
+            local_start_date = datetime.fromtimestamp(started_at, zone).date()
+            local_end_date = datetime.fromtimestamp(ended_at - 0.000001, zone).date()
+            boundaries = []
+            current_day = local_start_date
+            while current_day <= local_end_date:
+                next_day = current_day + timedelta(days=1)
+                boundaries.append((
+                    current_day,
+                    max(started_at, datetime.combine(current_day, datetime.min.time(), zone).timestamp()),
+                    min(ended_at, datetime.combine(next_day, datetime.min.time(), zone).timestamp()),
+                ))
+                current_day = next_day
+            distributed = self._distribute_active_seconds(
+                active_seconds,
+                tuple(day_end - day_start for _, day_start, day_end in boundaries),
+            )
+            for (day, day_start, day_end), seconds in zip(boundaries, distributed):
+                interval = {"started_at": day_start, "ended_at": day_end, "active_seconds": seconds}
+                day_intervals.setdefault(day, []).append(interval)
+                day_book_intervals.setdefault(day, {}).setdefault(row["book_id"], []).append(interval)
+
+        activity = []
+        current_day = first_day
+        while current_day <= last_day:
+            book_intervals = day_book_intervals.get(current_day, {})
+            activity.append({
+                "date": current_day.isoformat(),
+                "active_seconds": self._merged_active_seconds(day_intervals.get(current_day, ())),
+                "book_count": sum(
+                    self._merged_active_seconds(intervals) > 0
+                    for intervals in book_intervals.values()
+                ),
+            })
+            current_day += timedelta(days=1)
+        return activity
+
     def record_reading_heartbeat(
         self,
         *,
@@ -5301,13 +5360,16 @@ class StateStore:
         except (TypeError, ValueError, ZoneInfoNotFoundError) as exc:
             raise ValueError("unknown timezone") from exc
         range_start, range_end = self._insight_bounds(period, anchor_date, zone)
+        activity_end_date = datetime.fromtimestamp(range_end - 0.000001, zone).date()
+        activity_start_date = activity_end_date - timedelta(days=READING_INSIGHTS_ACTIVITY_DAYS - 1)
+        activity_start = datetime.combine(activity_start_date, datetime.min.time(), zone).timestamp()
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
                 "SELECT * FROM reading_sessions WHERE user_id = ? "
                 "AND started_at < ? AND ended_at > ? "
                 "ORDER BY started_at DESC, id DESC",
-                (user_id, range_end, range_start),
+                (user_id, range_end, activity_start),
             ).fetchall()
 
         clipped_sessions = []
@@ -5318,6 +5380,8 @@ class StateStore:
         for row in rows:
             started_at = max(row["started_at"], range_start)
             ended_at = min(row["ended_at"], range_end)
+            if ended_at <= started_at:
+                continue
             in_range_active_seconds = self._distribute_active_seconds(
                 row["active_seconds"],
                 (started_at - row["started_at"], ended_at - started_at, row["ended_at"] - ended_at),
@@ -5403,6 +5467,16 @@ class StateStore:
             "total_active_seconds": self._merged_active_seconds(clipped_sessions),
             "top_book": top_book,
             "days": days,
+            "activity": {
+                "start_date": activity_start_date.isoformat(),
+                "end_date": activity_end_date.isoformat(),
+                "days": self._reading_activity_days(
+                    rows,
+                    range_start=activity_start,
+                    range_end=range_end,
+                    zone=zone,
+                ),
+            },
             "sessions": [{
                 "id": session["id"],
                 "started_at": self._utc_timestamp(session["started_at"]),

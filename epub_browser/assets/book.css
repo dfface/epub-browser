@@ -182,8 +182,9 @@ body {
 .book-reading-time {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
-    margin: 12px 0 0;
+    margin: 0;
     color: var(--text-secondary);
     font-size: .9rem;
     font-variant-numeric: tabular-nums;
@@ -595,11 +596,20 @@ body {
 }
 
 .book-info-cover {
-    flex: 0 0 150px;
+    flex: 0 0 auto;
+    width: 150px;
     height: 200px;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.book-info-cover-wrap {
+    flex: 0 0 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
 }
 
 .book-info-cover img {
@@ -920,9 +930,10 @@ body {
         text-align: center;
     }
     
-    .book-info-card:has(.book-info-desc) .book-info-cover,
-    .book-info-card:has([data-book-reviews]) .book-info-cover {
+    .book-info-card:has(.book-info-desc) .book-info-cover-wrap,
+    .book-info-card:has([data-book-reviews]) .book-info-cover-wrap {
         flex: 0 0 auto;
+        align-self: center;
         margin-bottom: 20px;
     }
     
