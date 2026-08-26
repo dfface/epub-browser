@@ -104,6 +104,11 @@
     border-radius: 6px;
 }
 
+.book-review-star-option:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
 .book-review-form textarea {
     width: 100%;
     max-width: 100%;

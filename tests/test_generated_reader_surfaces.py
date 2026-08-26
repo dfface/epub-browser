@@ -3039,6 +3039,12 @@ assert.deepEqual(
         self.assertIn('.dark-mode .book-reviews', review_styles)
         self.assertIn('box-sizing: border-box;', review_styles)
         self.assertIn('max-width: 100%;', review_styles)
+        disabled_star_rule = review_styles[
+            review_styles.index('.book-review-star-option:has(input:disabled)'):
+            review_styles.index('}', review_styles.index('.book-review-star-option:has(input:disabled)'))
+        ]
+        self.assertIn('cursor: not-allowed;', disabled_star_rule)
+        self.assertIn('opacity: 0.45;', disabled_star_rule)
         self.assertIn('.book-info-card:has([data-book-reviews])', book_styles)
 
     def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):
