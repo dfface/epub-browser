@@ -40,15 +40,22 @@ class DictionaryFormatTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.mdx"
             writer = MDictWriter(
-                {"run": "<b>to move</b>"}, title="Sample", description="",
+                {"run": '<link rel="stylesheet" href="entry.css"><b>to move</b><img src="file://images/run.png">'}, title="Sample", description="",
                 encoding="utf8", compression_type=2, version="2.0",
             )
             with path.open("wb") as handle:
                 writer.write(handle)
             result = parse_local_dictionary(path)
         self.assertEqual(result.format, "mdict")
-        self.assertEqual(result.entries[0].definition_text, "<b>to move</b>")
+        self.assertEqual(
+            result.entries[0].definition_text,
+            '<link rel="stylesheet" href="entry.css"><b>to move</b><img src="file://images/run.png">',
+        )
         self.assertEqual(result.entries[0].definition_format, "mdict")
+        self.assertEqual(
+            result.entries[0].media_references,
+            (("stylesheet", "entry.css"), ("image", "images/run.png")),
+        )
 
     def test_keeps_stardict_html_fields_as_html(self):
         with tempfile.TemporaryDirectory() as directory:

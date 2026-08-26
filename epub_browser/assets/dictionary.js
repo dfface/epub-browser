@@ -37,19 +37,59 @@
     return item;
   }
 
-  function definitionElement(entry) {
+  function dictionaryResourceUrl(bookId, dictionaryId, mediaId) {
+    return '/api/books/' + encodeURIComponent(bookId) + '/dictionaries/'
+      + encodeURIComponent(dictionaryId || '') + '/resources/' + encodeURIComponent(mediaId);
+  }
+
+  function canonicalMdictResourceReference(value, allowRelative) {
+    if (typeof value !== 'string') return null;
+    try { value = decodeURIComponent(value).trim(); } catch (error) { return null; }
+    if (/^file:\/\//i.test(value)) value = value.slice(7);
+    else if (!allowRelative || value.indexOf('://') >= 0 || /^[/#]/.test(value)) return null;
+    value = value.replace(/\\/g, '/').replace(/^\/+/, '');
+    var parts = [];
+    value.split('/').forEach(function(part) {
+      if (!part || part === '.') return;
+      if (part === '..') { parts.pop(); return; }
+      parts.push(part);
+    });
+    return parts.length ? parts.join('/').toLowerCase() : null;
+  }
+
+  function resolveMdictResources(source, entry, bookId) {
+    var resources = {};
+    (entry.media || []).forEach(function(media) {
+      var reference = canonicalMdictResourceReference(
+        String(media && media.reference || ''), media && media.kind === 'stylesheet'
+      );
+      if (reference && media.id) resources[reference] = dictionaryResourceUrl(bookId, entry.dictionary_id, media.id);
+    });
+    return source.replace(/\b(src|href)\s*=\s*(["'])(.*?)\2/gi, function(attribute, name, quote, value) {
+      var replacement = resources[canonicalMdictResourceReference(value, name.toLowerCase() === 'href')];
+      return replacement ? name + '=' + quote + replacement + quote : attribute;
+    });
+  }
+
+  function definitionElement(entry, bookId) {
     var definition = element('iframe', 'dictionary-entry-document');
     var source = String(entry.definition || '');
     var format = String(entry.definition_format || '');
     var isPlainText = /^stardict:[ml]+$/.test(format)
       || (format === 'mdict' && !/<[A-Za-z!/][^>]*>/.test(source));
-    definition.sandbox = '';
+    if (format === 'mdict') source = resolveMdictResources(source, entry, bookId);
+    definition.sandbox = 'allow-same-origin';
     definition.referrerPolicy = 'no-referrer';
     definition.setAttribute('title', entry.headword || '');
     definition.srcdoc = '<!doctype html><meta http-equiv="Content-Security-Policy" '
-      + 'content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; media-src data:">'
+      + 'content="default-src \'none\'; base-uri \'none\'; connect-src \'none\'; form-action \'none\'; '
+      + 'frame-src \'none\'; object-src \'none\'; script-src \'none\'; style-src \'self\' \'unsafe-inline\'; '
+      + 'img-src \'self\' data:; media-src \'self\' data:">'
       + '<style>body{margin:0;color:inherit;font:14px/1.62 system-ui,sans-serif;overflow-wrap:anywhere}'
-      + 'pre{margin:0;white-space:pre-wrap;font:inherit}img{max-width:100%;height:auto}</style>'
+      + 'pre{margin:0;white-space:pre-wrap;font:inherit}img{max-width:100%;height:auto}'
+      + 'table{max-width:100%;border-collapse:collapse}td{vertical-align:top}.hycd_3rd a{color:inherit;text-decoration:none}'
+      + '.hycd_3rd_cixing,.hycd_3rd_pinyin{display:flex;gap:.45em;margin:.25em 0}.hycd_3rd_cixing_part,.hycd_3rd_pinyin_part{display:inline-block}'
+      + '.hycd_3rd_part{margin-top:.4em}.hycd_3rd .citouci{font-weight:700}.hycd_3rd .hycd_3rd_en{color:#52606d}</style>'
       + (isPlainText ? '<pre>' + source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>' : source);
     return definition;
   }
@@ -80,27 +120,6 @@
     return choices[0].id;
   }
 
-  function appendMedia(item, entry, bookId) {
-    (entry.media || []).forEach(function(media) {
-      if (!media || !media.id || (media.kind !== 'image' && media.kind !== 'audio')) return;
-      var source = '/api/books/' + encodeURIComponent(bookId) + '/dictionaries/'
-        + encodeURIComponent(entry.dictionary_id || '') + '/resources/' + encodeURIComponent(media.id);
-      if (media.kind === 'image') {
-        var image = element('img', 'dictionary-entry-image');
-        image.src = source;
-        image.loading = 'lazy';
-        image.alt = entry.headword || '';
-        item.appendChild(image);
-      } else {
-        var audio = element('audio', 'dictionary-entry-audio');
-        audio.src = source;
-        audio.controls = true;
-        audio.preload = 'metadata';
-        item.appendChild(audio);
-      }
-    });
-  }
-
   function renderDictionaryResult(content, data, bookId) {
     var result = element('div', 'dictionary-results');
     if (!data.found) {
@@ -109,9 +128,8 @@
       (data.entries || []).forEach(function(entry) {
         var item = element('article', 'dictionary-entry');
         item.appendChild(element('strong', '', entry.headword));
-        item.appendChild(definitionElement(entry));
         entry.dictionary_id = data.dictionary && data.dictionary.id;
-        appendMedia(item, entry, bookId);
+        item.appendChild(definitionElement(entry, bookId));
         result.appendChild(item);
       });
     }

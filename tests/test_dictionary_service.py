@@ -122,7 +122,7 @@ class DictionaryServiceTests(unittest.TestCase):
             MDictWriter(
                 {
                     "run": (
-                        "<p>to move</p><img src=\"file://\\\\images\\\\run.png\">"
+                        "<link rel=\"stylesheet\" href=\"entry.css\"><p>to move</p><img src=\"file://\\\\images\\\\run.png\">"
                         "<audio src=\"file://\\\\audio\\\\run.mp3\"></audio>"
                     )
                 }, title="Media", description="", encoding="utf8", compression_type=2, version="2.0",
@@ -130,6 +130,7 @@ class DictionaryServiceTests(unittest.TestCase):
             mdd = io.BytesIO()
             MDictWriter(
                 {
+                    "entry.css": b".entry { color: #123456; }",
                     "\\\\images\\\\run.png": b"\x89PNG\r\n\x1a\nimage-data",
                     "\\\\audio\\\\run.mp3": b"ID3audio-data",
                 }, title="Media", description="", compression_type=2, version="2.0", is_mdd=True,
@@ -142,12 +143,15 @@ class DictionaryServiceTests(unittest.TestCase):
             entry = service.lookup(record.id, "run").entries[0]
             self.assertEqual(
                 entry["definition"],
-                '<p>to move</p><img src="file://\\\\images\\\\run.png"><audio src="file://\\\\audio\\\\run.mp3"></audio>',
+                '<link rel="stylesheet" href="entry.css"><p>to move</p><img src="file://\\\\images\\\\run.png"><audio src="file://\\\\audio\\\\run.mp3"></audio>',
             )
             self.assertEqual(entry["definition_format"], "mdict")
-            self.assertEqual([item["kind"] for item in entry["media"]], ["image", "audio"])
-            image = service.get_media(record.id, entry["media"][0]["id"])
-            audio = service.get_media(record.id, entry["media"][1]["id"])
+            self.assertEqual([item["kind"] for item in entry["media"]], ["stylesheet", "image", "audio"])
+            self.assertEqual([item["reference"] for item in entry["media"]], ["entry.css", "images/run.png", "audio/run.mp3"])
+            stylesheet = service.get_media(record.id, entry["media"][0]["id"])
+            image = service.get_media(record.id, entry["media"][1]["id"])
+            audio = service.get_media(record.id, entry["media"][2]["id"])
+            self.assertEqual(stylesheet["content_type"], "text/css; charset=utf-8")
             self.assertEqual(image["content_type"], "image/png")
             self.assertEqual(image["content"], b"\x89PNG\r\n\x1a\nimage-data")
             self.assertEqual(audio["content_type"], "audio/mpeg")

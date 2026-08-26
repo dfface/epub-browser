@@ -54,14 +54,18 @@ def normalize_lookup(value: str) -> str:
     return value.casefold()
 
 
-def _canonical_mdict_resource_path(value: str) -> str | None:
-    """Return the safe, case-insensitive MDD key for a file:// resource."""
+def _canonical_mdict_resource_path(value: str, *, allow_relative: bool = False) -> str | None:
+    """Return the safe, case-insensitive MDD key for a local resource."""
     if not isinstance(value, str):
         return None
     value = unquote(value).strip()
-    if not value.casefold().startswith("file://"):
+    if value.casefold().startswith("file://"):
+        value = value[7:]
+    elif not allow_relative:
         return None
-    value = value[7:].replace("\\", "/").lstrip("/")
+    elif "://" in value or value.startswith(("/", "#")):
+        return None
+    value = value.replace("\\", "/").lstrip("/")
     value = posixpath.normpath(value)
     if not value or value in {".", ".."} or value.startswith("../") or "\x00" in value:
         return None
@@ -74,11 +78,17 @@ class _MdictMediaExtractor(html.parser.HTMLParser):
         self.references: list[tuple[str, str]] = []
 
     def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
         kind = {"img": "image", "audio": "audio"}.get(tag.casefold())
+        source = attributes.get("src")
+        if tag.casefold() == "link" and "stylesheet" in attributes.get("rel", "").casefold().split():
+            kind = "stylesheet"
+            source = attributes.get("href")
+            path = _canonical_mdict_resource_path(source, allow_relative=True)
+        else:
+            path = _canonical_mdict_resource_path(source)
         if not kind:
             return
-        source = dict(attrs).get("src")
-        path = _canonical_mdict_resource_path(source)
         if path and (kind, path) not in self.references:
             self.references.append((kind, path))
 

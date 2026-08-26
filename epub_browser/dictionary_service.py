@@ -54,7 +54,7 @@ class DictionaryService:
                     ).fetchone()
             except sqlite3.Error:
                 row = None
-            if row and row[0] == "2":
+            if row and row[0] == "3":
                 continue
             self.store.delete_dictionary(record.id)
             path.unlink(missing_ok=True)
@@ -99,7 +99,7 @@ class DictionaryService:
                 )
                 connection.executemany(
                     "INSERT INTO meta(key, value) VALUES (?, ?)",
-                    (("format", dictionary.format), ("content_sha256", digest), ("definition_rendering_revision", "2")),
+                    (("format", dictionary.format), ("content_sha256", digest), ("definition_rendering_revision", "3")),
                 )
                 for entry in dictionary.entries:
                     cursor = connection.execute(
@@ -296,6 +296,12 @@ class DictionaryService:
                 return "audio/wav"
             if content.startswith(b"OggS"):
                 return "audio/ogg"
+        if kind == "stylesheet":
+            try:
+                content.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
+            return "text/css; charset=utf-8"
         return None
 
     def attach_mdict_resources(self, dictionary_id: str, upload_bytes: bytes, filename: str) -> None:
@@ -367,7 +373,10 @@ class DictionaryService:
                     )
                 for entry_id, media in entry_media.items():
                     attached = [
-                        {"kind": item["kind"], "id": replacements[item["reference"]][0]}
+                        {
+                            "kind": item["kind"], "reference": item["reference"],
+                            "id": replacements[item["reference"]][0],
+                        }
                         for item in media
                         if isinstance(item, dict) and item.get("reference") in replacements
                     ]
@@ -434,7 +443,8 @@ class DictionaryService:
         entries = tuple({
             "headword": row["headword"], "definition": row["definition_text"],
             "definition_format": row["definition_format"],
-            "media": [item for item in json.loads(row["media_json"]) if isinstance(item, dict) and item.get("id")],
+            "media": [item for item in json.loads(row["media_json"])
+                      if isinstance(item, dict) and item.get("id") and item.get("reference")],
         } for row in rows)
         return DictionaryLookup(bool(entries), dictionary, query, entries)
 
