@@ -26,7 +26,8 @@ body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
 .book-review-display-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .book-review-display h2,
 .book-review-header h2 { margin: 0; font-size: 1.15rem; line-height: 1.35; }
-.book-review-display-rating { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--book-review-star); font-size: 1.18rem; letter-spacing: .08em; }
+.book-review-display-rating,
+.book-review-display-rating > [aria-hidden="true"] { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; color: var(--book-review-star) !important; font-size: 1.18rem; letter-spacing: .08em; }
 .book-review-display-score { color: var(--text-secondary); font-size: .85rem; font-weight: 650; letter-spacing: 0; }
 .book-review-display-private,
 .book-review-hint,
@@ -82,6 +83,18 @@ body.book-review-open { position: fixed; width: 100%; overflow: hidden; }
     .book-review-display { padding: 18px 16px; }
     .book-review-display-header { align-items: flex-start; flex-direction: column; gap: 6px; }
     .book-review-star-option { width: 44px; min-height: 44px; }
+}
+@media (max-width: 768px) {
+    /* On touch screens these three connected cards share one inset and one gap. */
+    .book-info-card:has(~ .book-review-display:not([hidden])),
+    .book-review-display:not([hidden]),
+    .book-review-display:not([hidden]) ~ .toc-container {
+        margin-inline: 16px !important;
+        border-radius: var(--border-radius-lg, 12px) !important;
+    }
+
+    .book-info-card:has(~ .book-review-display:not([hidden])) { margin-bottom: 16px !important; }
+    .book-review-display:not([hidden]) { margin-top: 0 !important; margin-bottom: 16px !important; }
 }
 @media (prefers-reduced-motion: reduce) { .book-review-dialog { animation: none; } }
 @media (prefers-reduced-motion: no-preference) { .book-review-star-option,.book-review-expand,.book-review-close,.book-review-actions .css-btn,.book-review-delete { transition: color 180ms ease-out, background-color 180ms ease-out, border-color 180ms ease-out; } }
