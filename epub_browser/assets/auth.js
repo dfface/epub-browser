@@ -2443,6 +2443,12 @@
       var dictionaryForm = element('adminDictionaryForm');
       var dictionarySubmit = element('adminDictionarySubmit');
       var dictionaryAutoName = '';
+      var dictionaryProgress = element('adminDictionaryProgress');
+      var dictionaryProgressText = element('adminDictionaryProgressText');
+      function setDictionaryProgress(key) {
+        if (dictionaryProgressText) dictionaryProgressText.textContent = key ? t(key) : '';
+        if (dictionaryProgress) dictionaryProgress.hidden = !key;
+      }
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
       var aiJobsStatus = element('adminAiJobsStatus');
@@ -2546,6 +2552,7 @@
         var mediaFile = format === 'mdict' && dictionaryForm.elements.mdd.files[0];
         if (!dictionaryFile) return;
         showDictionaryMessage('', '');
+        setDictionaryProgress(mediaFile ? 'admin.dictionaryProgressMdxWithMdd' : 'admin.dictionaryProgressMdx');
         runButtonOperation(dictionarySubmit, 'admin.installingDictionary', function() {
           function upload(file, target) {
             return file.arrayBuffer().then(function(contents) {
@@ -2565,6 +2572,7 @@
           }).then(function(payload) {
             if (!mediaFile) return payload;
             var dictionary = payload && payload.dictionary;
+            setDictionaryProgress('admin.dictionaryProgressMdd');
             return upload(mediaFile, '/api/admin/dictionaries/' + encodeURIComponent(dictionary.id) + '/resources').then(function(response) {
               if (response.ok) return payload;
               return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {method: 'DELETE'})
@@ -2575,12 +2583,15 @@
           }).then(function() {
             dictionaryForm.reset();
             setDictionaryFormat('mdict');
+            updateDictionaryFileLabels();
             dictionaryAutoName = '';
             clearAdminDirty();
+            setDictionaryProgress('');
             showDictionaryMessage('admin.dictionaryInstalled', 'success');
             showStatus('admin.dictionaryInstalled', 'success');
             return loadAdminData();
           }).catch(function(error) {
+            setDictionaryProgress('');
             if (error && /dictionary_(?:media_)?upload_failed/.test(error.message)) return;
             showDictionaryMessage('admin.error.network', 'error');
             showStatus('admin.error.network', 'error');
@@ -2589,8 +2600,20 @@
       });
       if (dictionaryForm) {
         var dictionaryFormatInputs = dictionaryForm.querySelectorAll('input[name="dictionary_format"]');
-        var dictionaryFileInputs = [dictionaryForm.elements.mdx, dictionaryForm.elements.archive];
+        var dictionaryFileInputs = [dictionaryForm.elements.mdx, dictionaryForm.elements.mdd, dictionaryForm.elements.archive];
         var dictionaryNameInput = dictionaryForm.elements.display_name;
+        function updateDictionaryFileLabel(input) {
+          if (!input) return;
+          var output = dictionaryForm.querySelector('[data-dictionary-file-name="' + input.name + '"]');
+          var control = input.closest ? input.closest('.dictionary-file-control') : null;
+          var file = input.files && input.files[0];
+          var label = file && file.name ? file.name : t('admin.noDictionaryFile');
+          if (output) output.textContent = label;
+          if (control) control.classList.toggle('has-file', Boolean(file));
+        }
+        function updateDictionaryFileLabels() {
+          dictionaryFileInputs.forEach(updateDictionaryFileLabel);
+        }
         function setDictionaryFormat(format) {
           Array.prototype.forEach.call(dictionaryFormatInputs, function(input) {
             var selected = input.value === format;
@@ -2611,6 +2634,8 @@
         });
         dictionaryFileInputs.forEach(function(dictionaryFileInput) {
           dictionaryFileInput.addEventListener('change', function() {
+            updateDictionaryFileLabel(dictionaryFileInput);
+            if (dictionaryFileInput.name === 'mdd') return;
             var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
             var fileName = file && file.name ? file.name.replace(/\.(?:mdx|zip|tar(?:\.(?:gz|bz2))?|tgz|tbz2)$/i, '').trim() : '';
             if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;
@@ -2622,6 +2647,7 @@
           if (dictionaryNameInput.value !== dictionaryAutoName) dictionaryAutoName = '';
         });
         setDictionaryFormat('mdict');
+        updateDictionaryFileLabels();
       }
       if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {
         event.preventDefault();

@@ -651,6 +651,97 @@ body.auth-page {
     gap: 14px;
 }
 
+.dictionary-file-control {
+    position: relative;
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    padding: 6px 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: var(--account-card);
+}
+
+.dictionary-file-control:focus-within {
+    border-color: var(--account-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--account-primary) 22%, transparent);
+}
+
+.dictionary-file-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.dictionary-file-button {
+    flex: 0 0 auto;
+    padding: 7px 11px;
+    border: 1px solid var(--account-border);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--account-primary) 8%, var(--account-card));
+    color: var(--account-text);
+    font-size: .86rem;
+    font-weight: 700;
+}
+
+.dictionary-file-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--account-muted);
+    font-size: .9rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dictionary-file-control.has-file .dictionary-file-name {
+    color: var(--account-text);
+}
+
+.dictionary-install-progress {
+    display: flex;
+    width: min(100%, 480px);
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .86rem;
+    font-weight: 600;
+}
+
+.dictionary-install-progress-bar {
+    position: relative;
+    width: 64px;
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-primary) 16%, var(--account-card));
+}
+
+.dictionary-install-progress-bar > span {
+    position: absolute;
+    inset: 0 auto 0 -52%;
+    width: 52%;
+    border-radius: inherit;
+    background: var(--account-primary);
+    animation: dictionary-install-progress 1.15s ease-in-out infinite;
+}
+
+@keyframes dictionary-install-progress {
+    from { transform: translateX(0); }
+    to { transform: translateX(300%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dictionary-install-progress-bar > span { animation: none; inset-inline-start: 24%; }
+}
+
 .dictionary-install-form small {
     color: var(--account-muted);
     font-size: .78rem;
@@ -751,6 +842,61 @@ body.auth-page {
     color: var(--account-text);
     font-size: 1.08rem;
     line-height: 1.25;
+}
+
+.admin-system-limits {
+    display: grid;
+    gap: 8px;
+    margin-top: 20px;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--account-border) 80%, var(--account-primary));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--account-primary) 3%, var(--account-card));
+}
+
+.admin-system-limits h5,
+.admin-system-limits h6,
+.admin-system-limits p {
+    margin: 0;
+}
+
+.admin-system-limits h5 {
+    color: var(--account-text);
+    font-size: .92rem;
+}
+
+.admin-system-limits > p {
+    color: var(--account-muted);
+    font-size: .78rem;
+    line-height: 1.5;
+}
+
+.admin-system-limits-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.admin-system-limits article {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+    background: var(--account-card);
+}
+
+.admin-system-limits h6 {
+    color: var(--account-text);
+    font-size: .8rem;
+}
+
+.admin-system-limits article p {
+    color: var(--account-muted);
+    font-size: .76rem;
+    line-height: 1.5;
 }
 
 .account-users-section {
@@ -2095,6 +2241,10 @@ body.auth-page {
     }
 
     .admin-overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-system-limits-grid {
         grid-template-columns: 1fr;
     }
 

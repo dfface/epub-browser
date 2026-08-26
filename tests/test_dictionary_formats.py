@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from epub_browser.dictionary_formats import parse_local_dictionary
+from epub_browser.dictionary_formats import parse_local_dictionary, read_mdict_resources
 
 
 class DictionaryFormatTests(unittest.TestCase):
@@ -59,6 +59,24 @@ class DictionaryFormatTests(unittest.TestCase):
                 ).write(handle)
             result = parse_local_dictionary(path)
         self.assertEqual([entry.headword for entry in result.entries], ["usable"])
+
+    def test_reads_mdd_resources_without_an_arbitrary_asset_count_limit(self):
+        try:
+            from mdict_utils.base.writemdict import MDictWriter
+        except ImportError:
+            self.skipTest("mdict-utils is installed with the server extra")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.mdd"
+            assets = {
+                "\\\\images\\\\%03d.png" % number: b"\x89PNG\r\n\x1a\nasset"
+                for number in range(513)
+            }
+            with path.open("wb") as handle:
+                MDictWriter(assets, title="Sample", description="", compression_type=2, version="2.0", is_mdd=True).write(handle)
+            resources = read_mdict_resources(
+                path, {"images/%03d.png" % number for number in range(513)},
+            )
+        self.assertEqual(len(resources), 513)
 
 
 if __name__ == "__main__":

@@ -22,8 +22,11 @@ from typing import Iterable
 MAX_ENTRIES = 500_000
 MAX_HEADWORD_LENGTH = 256
 MAX_DEFINITION_BYTES = 16 * 1024
-MAX_MDICT_MEDIA_ITEMS = 128
-MAX_MDICT_MEDIA_BYTES = 128 * 1024 * 1024
+# Keep decompression within the same 512 MiB envelope enforced for every
+# uploaded dictionary file by the server.  There is deliberately no resource
+# count limit: a normal illustrated dictionary may legitimately reference many
+# small files.
+MAX_MDICT_MEDIA_BYTES = 512 * 1024 * 1024
 
 
 class DictionaryFormatError(ValueError):
@@ -342,7 +345,7 @@ def read_mdict_resources(mdd_path: Path, references: set[str]) -> dict[str, byte
             if not isinstance(value, bytes) or len(value) > MAX_MDICT_MEDIA_BYTES:
                 raise DictionaryFormatError("mdict_resource_too_large")
             total += len(value)
-            if len(found) >= MAX_MDICT_MEDIA_ITEMS or total > MAX_MDICT_MEDIA_BYTES:
+            if total > MAX_MDICT_MEDIA_BYTES:
                 raise DictionaryFormatError("mdict_resource_too_large")
             found[path] = value
     except DictionaryFormatError:

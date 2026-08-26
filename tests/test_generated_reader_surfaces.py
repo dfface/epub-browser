@@ -90,6 +90,21 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         ):
             self.assertNotIn(control_id, ssg_html)
 
+    def test_dictionary_import_uses_custom_file_controls_and_a_live_progress_surface(self):
+        server_html = self._server_html()
+
+        self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdx)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
+        self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdd)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
+        self.assertRegex(server_html, r'\bdata-dictionary-file-name=(?:["\'])?mdx(?:["\' >])')
+        self.assertRegex(server_html, r'\bdata-dictionary-file-name=(?:["\'])?mdd(?:["\' >])')
+        self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminDictionaryProgress)(?=[^>]*aria-live=(?:["\'])?polite)')
+        self.assertRegex(server_html, r'<section\b[^>]*id=(?:["\'])?adminSystemLimits')
+        for key in (
+            'admin.systemLimits', 'admin.systemLimits.dictionary',
+            'admin.systemLimits.ai', 'admin.systemLimits.bulk',
+        ):
+            self.assertIn('data-i18n=' + key, server_html)
+
     def test_server_admin_ai_jobs_surface_is_semantic_and_localized(self):
         server_html = self._server_html()
         ssg_html = self._library_html()
