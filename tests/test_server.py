@@ -3770,3 +3770,249 @@ class ServerCacheTests(unittest.TestCase):
 
         self.assertTrue(os.path.isfile(legacy_path))
         self.assertTrue(os.path.isfile(os.path.join(legacy_directory.name, "epub-browser.db")))
+
+
+class ReadingInsightsAPITests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        self._write_server_content_cache(public, "book", "Book", "Opening chapter")
+        self._write_server_content_cache(public, "restricted", "Restricted", "Private chapter")
+
+        self.store = StateStore(public / "epub-browser.db")
+        self.alice = self.store.initialize(
+            BootstrapCredentials("alice", "alice-secret")
+        )
+        self.bob = self.store.create_user("bob", hash_password("bob-secret"))
+        for book_id, title in (("book", "Book"), ("restricted", "Restricted")):
+            self.store.resolve_book(
+                public / f"{book_id}.epub",
+                None,
+                f"{book_id}-fingerprint",
+                {"title": title},
+                preferred_book_id=book_id,
+            )
+        self.store.set_book_visibility("restricted", "restricted")
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+        )
+        self.client = self._login("alice", "alice-secret")
+        self.bob_client = self._login("bob", "bob-secret")
+
+    def _write_server_content_cache(self, public, book_id, title, chapter_title):
+        content = public / "book" / book_id / "content"
+        content.mkdir(parents=True)
+        (content.parent / SERVER_OUTPUT_REVISION_FILE).write_text(
+            SERVER_OUTPUT_REVISION + "\n", encoding="utf-8"
+        )
+        assets = public / "assets"
+        assets.mkdir(exist_ok=True)
+        (assets / "asset-manifest.json").write_text(
+            json.dumps({
+                name: "/assets/immutable/" + name
+                for name in (
+                    "ai-canvas.css", "ai-canvas.js", "ai-reading-hub.css",
+                    "ai-reading-hub.js", "ai-chat.css", "ai-chat.js",
+                    "ai-rich-text.css", "ai-rich-text.js",
+                    "vendor/katex/katex.min.css", "vendor/katex/katex.min.js",
+                    "vendor/mermaid/mermaid.min.js",
+                )
+            }),
+            encoding="utf-8",
+        )
+        (content / "metadata.json").write_text(
+            json.dumps({
+                "title": title,
+                "authors": [],
+                "tags": [],
+                "chapters": [{"title": chapter_title, "path": "chapter.xhtml"}],
+                "toc": [],
+            }),
+            encoding="utf-8",
+        )
+        (content / "chapter_0.json").write_text(
+            json.dumps({
+                "index": 0,
+                "title": chapter_title,
+                "content": "<p>Cached chapter.</p>",
+                "style_links": "",
+            }),
+            encoding="utf-8",
+        )
+
+    def _login(self, username, password):
+        client = TestClient(self.app)
+        self.addCleanup(client.close)
+        self.assertEqual(_json_login(self, client, username, password).status_code, 200)
+        session = client.get("/api/session")
+        client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
+        return client
+
+    def test_book_review_api_is_private_and_requires_book_access(self):
+        saved = self.client.put(
+            "/api/book-reviews/book",
+            json={"rating": 5, "review_text": "Excellent"},
+        )
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["review"]["rating"], 5)
+        self.assertEqual(
+            self.client.get("/api/book-reviews/book").json()["review"]["review_text"],
+            "Excellent",
+        )
+        self.assertEqual(self.client.delete("/api/book-reviews/book").status_code, 204)
+        self.assertEqual(self.client.get("/api/book-reviews/book").json(), {"review": None})
+        self.assertEqual(self.bob_client.get("/api/book-reviews/restricted").status_code, 403)
+
+    def test_reading_heartbeat_requires_csrf_is_idempotent_and_uses_cached_titles(self):
+        payload = {
+            "client_id": "tab-a",
+            "client_sequence": 1,
+            "chapter_index": 0,
+            "active_seconds": 15,
+        }
+        without_csrf = TestClient(self.app)
+        self.addCleanup(without_csrf.close)
+        without_csrf.cookies.set(
+            "epub_browser_session", self.client.cookies.get("epub_browser_session")
+        )
+        self.assertEqual(
+            without_csrf.post("/api/reading-sessions/book/heartbeat", json=payload).status_code,
+            403,
+        )
+
+        first = self.client.post("/api/reading-sessions/book/heartbeat", json=payload)
+        again = self.client.post("/api/reading-sessions/book/heartbeat", json=payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json()["session"]["book_title"], "Book")
+        self.assertEqual(first.json()["session"]["chapter_label"], "Opening chapter")
+        self.assertEqual(again.json()["session"]["active_seconds"], 15)
+
+    def test_review_and_session_routes_do_not_expose_restricted_books(self):
+        requests = (
+            self.bob_client.get("/api/book-reviews/restricted"),
+            self.bob_client.put(
+                "/api/book-reviews/restricted",
+                json={"rating": 5, "review_text": "Hidden"},
+            ),
+            self.bob_client.delete("/api/book-reviews/restricted"),
+            self.bob_client.post(
+                "/api/reading-sessions/restricted/heartbeat", json={}
+            ),
+        )
+        for denied in requests:
+            with self.subTest(response=denied):
+                self.assertEqual(denied.status_code, 403)
+                self.assertEqual(denied.json()["code"], "forbidden")
+
+    def test_review_heartbeat_and_insights_validate_public_input(self):
+        invalid_reviews = (
+            {"rating": 0, "review_text": "Nope"},
+            {"rating": True, "review_text": "Nope"},
+            {"rating": 5, "review_text": 3},
+        )
+        for payload in invalid_reviews:
+            with self.subTest(payload=payload):
+                result = self.client.put("/api/book-reviews/book", json=payload)
+                self.assertEqual(result.status_code, 400)
+                self.assertEqual(result.json()["code"], "invalid_book_review")
+        self.assertEqual(
+            self.client.put(
+                "/api/book-reviews/book",
+                content=b"{",
+                headers={"Content-Type": "application/json"},
+            ).json()["code"],
+            "invalid_json",
+        )
+        self.assertEqual(
+            self.client.put(
+                "/api/book-reviews/book",
+                content=b"rating=5",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            ).json()["code"],
+            "unsupported_media_type",
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/reading-sessions/book/heartbeat",
+                json={"client_id": "tab", "client_sequence": 0, "chapter_index": 0, "active_seconds": 21},
+            ).json()["code"],
+            "invalid_reading_session",
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/reading-sessions/book/heartbeat",
+                content=b"{}",
+                headers={"Content-Type": "text/plain"},
+            ).json()["code"],
+            "unsupported_media_type",
+        )
+        for query in (
+            "period=year&anchor=2026-08-15&timezone=UTC",
+            "period=week&anchor=nope&timezone=UTC",
+            "period=week&anchor=2026-08-15&timezone=Bad/Zone",
+        ):
+            with self.subTest(query=query):
+                self.assertEqual(
+                    self.client.get("/api/reading-insights?" + query).status_code,
+                    400,
+                )
+
+    def test_reading_insights_are_authenticated_and_owner_scoped(self):
+        payload = {
+            "client_id": "alice-tab",
+            "client_sequence": 1,
+            "chapter_index": 0,
+            "active_seconds": 15,
+        }
+        self.assertEqual(
+            self.client.post("/api/reading-sessions/book/heartbeat", json=payload).status_code,
+            200,
+        )
+        insights = self.client.get(
+            "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
+        )
+        self.assertEqual(insights.status_code, 200)
+        self.assertEqual(insights.json()["insights"]["period"], "week")
+        self.assertEqual(self.bob_client.get("/api/book-reviews/book").json(), {"review": None})
+        self.assertEqual(self.bob_client.get(
+            "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
+        ).json()["insights"]["sessions"], [])
+        anonymous = TestClient(self.app)
+        self.addCleanup(anonymous.close)
+        self.assertEqual(anonymous.get("/api/book-reviews/book").status_code, 401)
+        self.assertEqual(
+            anonymous.post("/api/reading-sessions/book/heartbeat", json=payload).status_code,
+            401,
+        )
+        self.assertEqual(anonymous.get("/api/reading-insights").status_code, 401)
+
+    def test_review_and_heartbeat_mutations_wait_for_server_readiness(self):
+        not_ready_app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            status=RuntimeStatus(),
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+        )
+        not_ready = TestClient(not_ready_app)
+        self.addCleanup(not_ready.close)
+        self.assertEqual(_json_login(self, not_ready, "alice", "alice-secret").status_code, 200)
+        not_ready.headers["X-CSRF-Token"] = not_ready.get("/api/session").json()["csrf_token"]
+
+        review = not_ready.put(
+            "/api/book-reviews/book", json={"rating": 5, "review_text": "Later"}
+        )
+        heartbeat = not_ready.post(
+            "/api/reading-sessions/book/heartbeat",
+            json={"client_id": "tab", "client_sequence": 0, "chapter_index": 0, "active_seconds": 1},
+        )
+
+        self.assertEqual(review.status_code, 503)
+        self.assertEqual(review.json()["code"], "not_ready")
+        self.assertEqual(heartbeat.status_code, 503)
+        self.assertEqual(heartbeat.json()["code"], "not_ready")
