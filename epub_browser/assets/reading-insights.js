@@ -329,7 +329,7 @@
       [0, 1, 2, 3, 4].forEach(function(level) { append(legendScale, 'i', 'is-level-' + level); });
       append(legend, 'span', '', translate(target, 'readingInsights.activityMore', 'More'));
       var trendCard = append(analyticsGrid, 'article', 'reading-insights-analytics-card reading-insights-trend-card');
-      append(trendCard, 'h3', '', translate(target, 'readingInsights.trend', 'Daily trend'));
+      append(trendCard, 'h3', '', translate(target, 'readingInsights.trend', 'Trend chart'));
       var trendRange = append(trendCard, 'p', 'reading-insights-analytics-description');
       var metricButtons = ['duration', 'books'].map(function(metric) {
         var key = metric === 'duration' ? 'readingInsights.trend.duration' : 'readingInsights.trend.books';
