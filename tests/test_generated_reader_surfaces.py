@@ -3055,7 +3055,10 @@ assert.deepEqual(
         review_script = Path('epub_browser/assets/book-reviews.js').read_text(encoding='utf-8')
         review_styles = Path('epub_browser/assets/book-reviews.css').read_text(encoding='utf-8')
         self.assertRegex(server_index, r'<section[^>]*data-book-id=[^>]*data-book-reviews')
-        self.assertIn('data-book-review-display', server_index)
+        self.assertRegex(
+            server_index,
+            r'<section(?=[^>]*\bdata-id=(?:["\'])?book-review-display)(?=[^>]*\bdata-book-review-display)[^>]*>',
+        )
         self.assertRegex(server_index, r'data-i18n=(?:["\'])?bookReviews\.write')
         self.assertIn("translate('bookReviews.ratingRequired')", review_script)
         self.assertIn("ratingField.setAttribute('aria-describedby'", review_script)
@@ -3064,7 +3067,7 @@ assert.deepEqual(
         self.assertIn('--book-review-danger-foreground', review_styles)
         self.assertIn('--book-review-star: #9a6700', review_styles)
         self.assertIn('.book-info-card:has(~ .book-review-display:not([hidden]))', review_styles)
-        self.assertIn('placeDisplayAfterBookInfo', review_script)
+        self.assertNotIn('placeDisplayAfterBookInfo', review_script)
         self.assertIn('.book-review-display-rating > [aria-hidden="true"]', review_styles)
         self.assertIn('@media (max-width: 768px)', review_styles)
         self.assertNotIn('book-review-status[data-state="success"]', review_styles)

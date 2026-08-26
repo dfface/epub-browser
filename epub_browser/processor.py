@@ -1510,7 +1510,7 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         book_review_display = (
-            f'<section class="book-review-display" data-book-review-display '
+            f'<section class="book-review-display" data-id="book-review-display" data-book-review-display '
             f'data-book-id="{book_id_attribute}" hidden></section>'
             if self.deployment_mode == "server" else ""
         )

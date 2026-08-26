@@ -226,3 +226,42 @@ test('book sorting leaves book metadata content available for text selection', a
   assert.match(sortableOptions.filter, /\.book-info-content/);
   assert.equal(sortableOptions.preventOnFilter, false);
 });
+
+test('book card order restores the review card and upgrades legacy drag state', () => {
+  const cards = [
+    { dataset: { id: 'book-info-card' } },
+    { dataset: { id: 'book-review-display' } },
+    { dataset: {} },
+    { dataset: { id: 'toc-container' } },
+  ];
+  const container = {
+    children: cards,
+    appendChild(card) {
+      const index = cards.indexOf(card);
+      if (index >= 0) cards.splice(index, 1);
+      cards.push(card);
+    },
+  };
+  let persisted = '';
+  const localStorage = {
+    getItem() { return JSON.stringify(['toc-container', null, 'book-info-card']); },
+    setItem(key, value) { persisted = value; },
+    removeItem() {},
+  };
+  const context = {
+    window: {},
+    document: { querySelector(selector) { return selector === '.container' ? container : null; } },
+    navigator: { userAgent: '' },
+    localStorage,
+  };
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
+
+  context.restoreOrder('book-container-sortable-order', 'container');
+
+  assert.deepEqual(cards.filter((card) => card.dataset.id).map((card) => card.dataset.id), [
+    'toc-container',
+    'book-info-card',
+    'book-review-display',
+  ]);
+  assert.equal(persisted, JSON.stringify(['toc-container', 'book-info-card', 'book-review-display']));
+});
