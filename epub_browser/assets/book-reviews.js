@@ -24,7 +24,7 @@
 
   function createClient() {
     var documentTarget = root.document, view = {}, bookId = '', savedRating = '', savedText = '';
-    var displayRoot = null, modal = null, dialog = null, trigger = null, keydownBound = false, scrollY = 0;
+    var displayRoot = null, modal = null, dialog = null, trigger = null, keydownBound = false, scrollY = 0, unsubscribeLocale = null;
     function hasSavedReview() { return Boolean(savedRating); }
     function icon(name) { var node = documentTarget.createElement('i'); node.className = 'fas ' + name; node.setAttribute('aria-hidden', 'true'); return node; }
     function setStatus(message, isError) {
@@ -104,8 +104,21 @@
       var saveButton = documentTarget.createElement('button'); saveButton.type = 'submit'; saveButton.className = 'css-btn primary'; saveButton.textContent = translate('bookReviews.save'); actions.appendChild(deleteButton); actions.appendChild(saveButton);
       var status = documentTarget.createElement('p'); status.className = 'book-review-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true');
       form.appendChild(ratingField); form.appendChild(reviewLabel); form.appendChild(reviewText); form.appendChild(hint); form.appendChild(actions); target.appendChild(header); target.appendChild(form); target.appendChild(status);
-      view = { root: target, rating: rating, ratingOptions: ratingOptions, reviewText: reviewText, saveButton: saveButton, deleteButton: deleteButton, status: status, ratingField: ratingField, ratingError: ratingError, closeButton: closeButton };
+      view = { root: target, heading: heading, rating: rating, ratingOptions: ratingOptions, ratingLegend: legend, reviewLabel: reviewLabel, reviewText: reviewText, hint: hint, saveButton: saveButton, deleteButton: deleteButton, status: status, ratingField: ratingField, ratingError: ratingError, closeButton: closeButton };
       form.addEventListener('submit', function(event) { event.preventDefault(); save(currentRating(), reviewText.value); }); deleteButton.addEventListener('click', deleteReview);
+    }
+    function refreshLocale() {
+      renderDisplay();
+      if (!view.root) return;
+      if (view.heading) view.heading.textContent = translate('bookReviews.write');
+      if (view.closeButton) view.closeButton.setAttribute('aria-label', translate('dialog.cancel'));
+      if (view.ratingLegend) view.ratingLegend.textContent = translate('bookReviews.rating');
+      (view.ratingOptions || []).forEach(function(option) { option.setAttribute('aria-label', translate('bookReviews.ratingValue').replace('{rating}', option.value)); });
+      if (view.reviewLabel) view.reviewLabel.textContent = translate('bookReviews.review');
+      if (view.hint) view.hint.textContent = translate('bookReviews.reviewHint');
+      if (view.deleteButton) view.deleteButton.textContent = translate('bookReviews.delete');
+      if (view.saveButton) view.saveButton.textContent = translate('bookReviews.save');
+      if (view.ratingError && !view.ratingError.hidden) view.ratingError.textContent = translate('bookReviews.ratingRequired');
     }
     function restoreSaved() { applyRating(savedRating); if (view.reviewText) view.reviewText.value = savedText; }
     function applyReview(review) { savedRating = review && Number.isInteger(review.rating) ? String(review.rating) : ''; savedText = review && typeof review.review_text === 'string' ? review.review_text : ''; restoreSaved(); renderDisplay(); if (view.deleteButton) view.deleteButton.hidden = !hasSavedReview(); }
@@ -164,6 +177,8 @@
       trigger = documentTarget && documentTarget.querySelector('[data-book-review-toggle]'); modal = documentTarget && documentTarget.querySelector('[data-book-review-modal]'); dialog = documentTarget && documentTarget.querySelector('[data-book-review-modal] .book-review-dialog');
       if (trigger) trigger.addEventListener('click', openPanel); if (modal) modal.addEventListener('click', function(event) { if (event.target === modal) closePanel(); }); if (view.closeButton) view.closeButton.addEventListener('click', closePanel);
       if (!keydownBound && documentTarget && documentTarget.addEventListener) { keydownBound = true; documentTarget.addEventListener('keydown', onKeydown); }
+      if (unsubscribeLocale) unsubscribeLocale();
+      if (root.EpubBrowserI18n && root.EpubBrowserI18n.onLocaleChange) unsubscribeLocale = root.EpubBrowserI18n.onLocaleChange(refreshLocale);
       return load();
     }
     return { mount: mount, save: save, deleteReview: deleteReview, get rating() { return view.rating; }, get ratingOptions() { return view.ratingOptions || []; }, get reviewText() { return view.reviewText; }, get ratingError() { return view.ratingError; }, get ratingField() { return view.ratingField; }, get deleteButton() { return view.deleteButton; } };

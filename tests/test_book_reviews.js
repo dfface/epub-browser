@@ -28,12 +28,16 @@ function makeElement(tagName) {
 function loadReviewClient(initial, failSave) {
   const root = makeElement('section');
   const requests = [];
+  const localeListeners = [];
   const browser = {
     document: {
       createElement: makeElement,
       querySelector(selector) { return selector === '[data-book-reviews]' ? root : null; },
     },
-    EpubBrowserI18n: { t(key) { return key; } },
+    EpubBrowserI18n: {
+      t(key) { return key; },
+      onLocaleChange(listener) { localeListeners.push(listener); return () => localeListeners.splice(localeListeners.indexOf(listener), 1); },
+    },
     EpubBrowserAuth: {
       fetch(url, options) {
         requests.push({ url, method: options.method, body: options.body && JSON.parse(options.body) });
@@ -46,6 +50,7 @@ function loadReviewClient(initial, failSave) {
   };
   const client = Reviews.create(browser);
   client.requests = requests;
+  client.localeListeners = localeListeners;
   return client;
 }
 
@@ -132,4 +137,16 @@ test('delete remains unavailable until a review record has been loaded', async (
   const client = loadReviewClient({ review: null });
   await client.mount('book-id');
   assert.equal(client.deleteButton.hidden, true);
+});
+
+test('review display and editor copy refresh when the active locale changes', async () => {
+  const client = loadReviewClient({ review: { rating: 4, review_text: 'Useful' } });
+  const display = makeElement('section');
+  await client.mount('book-id', display);
+
+  client.localeListeners[0]();
+
+  assert.equal(display.children[0].children[0].textContent, 'bookReviews.title');
+  assert.equal(client.deleteButton.textContent, 'bookReviews.delete');
+  assert.equal(client.ratingOptions[3].getAttribute('aria-label'), 'bookReviews.ratingValue');
 });
