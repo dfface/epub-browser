@@ -53,7 +53,7 @@ test('review editor loads, saves, and deletes only the current book review', asy
   const client = loadReviewClient({ review: { rating: 4, review_text: 'Useful' } });
   await client.mount('book-id');
   assert.equal(client.rating.value, '4');
-  assert.equal(client.ratingOptions[3].checked, true);
+  assert.equal(client.ratingOptions[3].getAttribute('aria-checked'), 'true');
   await client.save(5, 'Excellent');
   assert.deepEqual(client.requests.at(-1).body, { rating: 5, review_text: 'Excellent' });
   assert.equal(client.requests.at(-1).url, '/api/book-reviews/book-id');
@@ -74,7 +74,7 @@ test('a missing rating preserves typed review text and announces the field-speci
   const client = loadReviewClient({ review: { rating: 4, review_text: 'Useful' } });
   await client.mount('book-id');
   client.rating.value = '';
-  client.ratingOptions.forEach(option => { option.checked = false; });
+  client.ratingOptions.forEach(option => { option.setAttribute('aria-checked', 'false'); });
   client.reviewText.value = 'Keep this draft';
 
   await client.save('', client.reviewText.value);
@@ -115,4 +115,21 @@ test('a review write disables every visible rating choice until the request fini
   await writing;
   assert.equal(client.rating.disabled, false);
   assert.ok(client.ratingOptions.every(option => !option.disabled));
+});
+
+test('rating stars are native buttons and update the selected value on click', async () => {
+  const client = loadReviewClient({ review: null });
+  await client.mount('book-id');
+
+  assert.ok(client.ratingOptions.every(option => option.tagName === 'button'));
+  client.ratingOptions[2].dispatch('click');
+  assert.equal(client.rating.value, '3');
+  assert.equal(client.ratingOptions[2].getAttribute('aria-checked'), 'true');
+  assert.equal(client.ratingOptions[0].className.includes('is-filled'), true);
+});
+
+test('delete remains unavailable until a review record has been loaded', async () => {
+  const client = loadReviewClient({ review: null });
+  await client.mount('book-id');
+  assert.equal(client.deleteButton.hidden, true);
 });

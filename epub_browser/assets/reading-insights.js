@@ -183,7 +183,7 @@
       targetRoot.setAttribute('aria-labelledby', 'readingInsightsTitle');
       if (state.modal) {
         state.modal.querySelector('.reading-insights-header-label span').textContent = translate(target, 'readingInsights.navigation', 'Reading insights');
-        state.closeButton.setAttribute('aria-label', translate(target, 'common.close', 'Close'));
+        state.closeButton.setAttribute('aria-label', translate(target, 'readingInsights.close', 'Close'));
       }
 
       var heading = append(targetRoot, 'section', 'reading-insights-heading');
@@ -384,7 +384,7 @@
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
       modal.setAttribute('aria-labelledby', 'readingInsightsTitle');
-      modal.innerHTML = '<div class="reading-insights-backdrop" data-reading-insights-close></div><section class="reading-insights-dialog"><header class="reading-insights-modal-header"><span class="reading-insights-header-label"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></span><button type="button" class="reading-insights-icon-button" data-reading-insights-close-button aria-label="Close reading insights"><i class="fas fa-times" aria-hidden="true"></i></button></header><main class="reading-insights-container" data-reading-insights tabindex="-1"></main></section>';
+      modal.innerHTML = '<div class="reading-insights-backdrop" data-reading-insights-close></div><section class="reading-insights-dialog"><header class="reading-insights-modal-header"><span class="reading-insights-header-label"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></span><button type="button" class="reading-insights-icon-button" data-reading-insights-close-button><i class="fas fa-times" aria-hidden="true"></i></button></header><main class="reading-insights-container" data-reading-insights tabindex="-1"></main></section>';
       documentTarget.body.appendChild(modal);
       state.modal = modal;
       state.container = modal.querySelector('.reading-insights-container');

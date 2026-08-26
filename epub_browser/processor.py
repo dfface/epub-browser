@@ -1509,11 +1509,16 @@ class EPUBProcessor:
             f'</section></div>'
             if self.deployment_mode == "server" else ""
         )
+        book_review_display = (
+            f'<section class="book-review-display" data-book-review-display '
+            f'data-book-id="{book_id_attribute}" hidden></section>'
+            if self.deployment_mode == "server" else ""
+        )
         book_review_trigger = (
             '<button type="button" class="css-btn secondary" data-book-review-toggle '
             'aria-controls="book-review-dialog" aria-expanded="false">'
-            '<i class="fas fa-star" aria-hidden="true"></i>'
-            '<span data-i18n="bookReviews.title">My review</span></button>'
+            '<i class="fas fa-pen" aria-hidden="true"></i>'
+            '<span data-i18n="bookReviews.write">Write review</span></button>'
             if self.deployment_mode == "server" else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
@@ -1683,9 +1688,10 @@ class EPUBProcessor:
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
                     {book_review_trigger}
                 </div>
-                {book_review_panel}
             </div>
     </div>
+    {book_review_display}
+    {book_review_panel}
     <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
         <div class="toc-header">
             <h2 data-i18n="book.tableOfContents">Table of contents</h2>
@@ -1818,7 +1824,11 @@ class EPUBProcessor:
             if (window.initScriptBook) window.initScriptBook();
             var reviewRoot = document.querySelector('[data-book-reviews]');
             if (reviewRoot && window.EpubBookReviews) {
-                window.EpubBookReviews.mount(reviewRoot, reviewRoot.getAttribute('data-book-id'));
+                window.EpubBookReviews.mount(
+                    reviewRoot,
+                    reviewRoot.getAttribute('data-book-id'),
+                    document.querySelector('[data-book-review-display]')
+                );
             }
         });
 }

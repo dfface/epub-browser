@@ -3054,9 +3054,9 @@ assert.deepEqual(
         server_index = self._server_book_html()
         review_script = Path('epub_browser/assets/book-reviews.js').read_text(encoding='utf-8')
         review_styles = Path('epub_browser/assets/book-reviews.css').read_text(encoding='utf-8')
-        book_styles = Path('epub_browser/assets/book.css').read_text(encoding='utf-8')
-
         self.assertRegex(server_index, r'<section[^>]*data-book-id=[^>]*data-book-reviews')
+        self.assertIn('data-book-review-display', server_index)
+        self.assertRegex(server_index, r'data-i18n=(?:["\'])?bookReviews\.write')
         self.assertIn("translate('bookReviews.ratingRequired')", review_script)
         self.assertIn("ratingField.setAttribute('aria-describedby'", review_script)
         self.assertIn("ratingError.setAttribute('role', 'alert')", review_script)
@@ -3066,16 +3066,10 @@ assert.deepEqual(
         self.assertIn('.dark-mode .book-reviews', review_styles)
         self.assertIn('box-sizing: border-box;', review_styles)
         self.assertIn('max-width: 100%;', review_styles)
-        disabled_star_rule = review_styles[
-            review_styles.index('.book-review-star-option:has(input:disabled)'):
-            review_styles.index('}', review_styles.index('.book-review-star-option:has(input:disabled)'))
-        ]
-        self.assertIn('color: var(--book-review-disabled-foreground);', disabled_star_rule)
-        self.assertIn('cursor: not-allowed;', disabled_star_rule)
-        self.assertIn('opacity: 1;', disabled_star_rule)
-        self.assertIn('--book-review-disabled-foreground: #7a746a;', review_styles)
-        self.assertIn('--book-review-disabled-foreground: #918b80;', review_styles)
-        self.assertIn('.book-info-card:has([data-book-reviews])', book_styles)
+        self.assertIn("option.type = 'button'", review_script)
+        self.assertIn("setAttribute('aria-checked'", review_script)
+        self.assertIn('book-review-display-copy.is-collapsed', review_styles)
+        self.assertIn('book-review-display', review_styles)
 
     def test_server_chapter_contains_reading_session_context_but_ssg_does_not(self):
         server_chapter = self._server_chapter_html()
