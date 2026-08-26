@@ -444,11 +444,11 @@ class StateStore:
                 api_key TEXT NOT NULL DEFAULT '',
                 model TEXT NOT NULL DEFAULT '',
                 timeout_seconds INTEGER NOT NULL DEFAULT 60
-                    CHECK(timeout_seconds BETWEEN 5 AND 3600),
+                    CHECK(timeout_seconds > 0),
                 model_context_window INTEGER NOT NULL DEFAULT 32768
-                    CHECK(model_context_window BETWEEN 2048 AND 100000000),
+                    CHECK(model_context_window > 0),
                 max_concurrency INTEGER NOT NULL DEFAULT 2
-                    CHECK(max_concurrency BETWEEN 1 AND 4),
+                    CHECK(max_concurrency > 0),
                 daily_limit INTEGER NOT NULL DEFAULT 20
                     CHECK(daily_limit >= 0),
                 config_revision INTEGER NOT NULL DEFAULT 0,
@@ -462,7 +462,7 @@ class StateStore:
         )
         added_context_window = self._add_column_if_missing(
             connection, "ai_settings", "model_context_window",
-            "INTEGER NOT NULL DEFAULT 32768 CHECK(model_context_window BETWEEN 2048 AND 100000000)",
+            "INTEGER NOT NULL DEFAULT 32768 CHECK(model_context_window > 0)",
         )
         if added_context_window:
             columns = {row["name"] for row in connection.execute("PRAGMA table_info(ai_settings)")}
@@ -1746,9 +1746,9 @@ class StateStore:
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'ai_settings'"
         ).fetchone()["sql"]
         if (
-            "BETWEEN 5 AND 3600" in definition
-            and "model_context_window INTEGER NOT NULL" in definition
-            and "BETWEEN 2048 AND 100000000" in definition
+            "CHECK(timeout_seconds > 0)" in definition
+            and "CHECK(model_context_window > 0)" in definition
+            and "CHECK(max_concurrency > 0)" in definition
             and "chat_context_tokens" not in definition
         ):
             return
@@ -1763,11 +1763,11 @@ class StateStore:
                 api_key TEXT NOT NULL DEFAULT '',
                 model TEXT NOT NULL DEFAULT '',
                 timeout_seconds INTEGER NOT NULL DEFAULT 60
-                    CHECK(timeout_seconds BETWEEN 5 AND 3600),
+                    CHECK(timeout_seconds > 0),
                 model_context_window INTEGER NOT NULL DEFAULT 32768
-                    CHECK(model_context_window BETWEEN 2048 AND 100000000),
+                    CHECK(model_context_window > 0),
                 max_concurrency INTEGER NOT NULL DEFAULT 2
-                    CHECK(max_concurrency BETWEEN 1 AND 4),
+                    CHECK(max_concurrency > 0),
                 daily_limit INTEGER NOT NULL DEFAULT 20
                     CHECK(daily_limit >= 0),
                 config_revision INTEGER NOT NULL DEFAULT 0,
@@ -2987,11 +2987,11 @@ class StateStore:
             raise ValueError("AI settings must be strings")
         if not isinstance(model, str):
             raise ValueError("AI model must be text")
-        if not 5 <= int(timeout_seconds) <= 3600:
+        if int(timeout_seconds) <= 0:
             raise ValueError("AI timeout is out of range")
-        if not 2048 <= int(model_context_window) <= 100000000:
+        if int(model_context_window) <= 0:
             raise ValueError("AI model context window is out of range")
-        if not 1 <= int(max_concurrency) <= 4:
+        if int(max_concurrency) <= 0:
             raise ValueError("AI concurrency is out of range")
         if int(daily_limit) < 0:
             raise ValueError("AI daily limit is out of range")
@@ -3114,8 +3114,8 @@ class StateStore:
         if not isinstance(name, str):
             raise ValueError("AI tag must be text")
         display = unicodedata.normalize("NFKC", name).strip()
-        if not display or len(display) > 80:
-            raise ValueError("AI tag must contain 1 to 80 characters")
+        if not display:
+            raise ValueError("AI tag must not be empty")
         return display.casefold(), display
 
     def create_ai_tag(self, name: str) -> dict:

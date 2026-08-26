@@ -19,16 +19,6 @@ from pathlib import Path
 from typing import Iterable
 
 
-MAX_ENTRIES = 500_000
-MAX_HEADWORD_LENGTH = 256
-MAX_DEFINITION_BYTES = 16 * 1024
-# Keep decompression within the same 512 MiB envelope enforced for every
-# uploaded dictionary file by the server.  There is deliberately no resource
-# count limit: a normal illustrated dictionary may legitimately reference many
-# small files.
-MAX_MDICT_MEDIA_BYTES = 512 * 1024 * 1024
-
-
 class DictionaryFormatError(ValueError):
     """A stable, safe reason why a local dictionary cannot be installed."""
 
@@ -58,7 +48,7 @@ def normalize_lookup(value: str) -> str:
         raise DictionaryFormatError("invalid_dictionary_text")
     value = unicodedata.normalize("NFC", value)
     value = " ".join(value.split())
-    if not value or len(value) > MAX_HEADWORD_LENGTH:
+    if not value:
         raise DictionaryFormatError("invalid_dictionary_text")
     return value.casefold()
 
@@ -105,8 +95,6 @@ def clean_definition(value: str, *, allow_empty: bool = False) -> str:
     text = unicodedata.normalize("NFC", parser.text())
     if not text and not allow_empty:
         raise DictionaryFormatError("empty_dictionary_definition")
-    if len(text.encode("utf-8")) > MAX_DEFINITION_BYTES:
-        text = text.encode("utf-8")[:MAX_DEFINITION_BYTES].decode("utf-8", "ignore").rstrip()
     return text
 
 
@@ -215,8 +203,6 @@ def parse_stardict(ifo_path: Path) -> ImportedDictionary:
             entries.append(DictionaryEntry(headword.strip(), normalized, (), clean_definition(definition)))
         except UnicodeDecodeError:
             raise DictionaryFormatError("invalid_stardict")
-        if len(entries) > MAX_ENTRIES:
-            raise DictionaryFormatError("dictionary_too_large")
     aliases_by_index: dict[int, list[str]] = {}
     synonym_path = base.with_suffix(".syn")
     if synonym_path.is_file():
@@ -316,8 +302,6 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
                 headword.strip(), normalize_lookup(headword), (),
                 definition_text, media_references,
             ))
-            if len(entries) > MAX_ENTRIES:
-                raise DictionaryFormatError("dictionary_too_large")
     except DictionaryFormatError:
         raise
     except (OSError, UnicodeDecodeError, ValueError, AssertionError, EOFError) as error:
@@ -328,25 +312,21 @@ def parse_mdict(mdx_path: Path) -> ImportedDictionary:
 
 
 def read_mdict_resources(mdd_path: Path, references: set[str]) -> dict[str, bytes]:
-    """Read only referenced, bounded MDD resources; source HTML is never kept."""
+    """Read only MDD resources referenced by dictionary entries."""
     if mdd_path.suffix.casefold() != ".mdd":
         raise DictionaryFormatError("invalid_mdict_resource")
     if not references:
         return {}
     readmdict = _mdict_reader_runtime()
     found: dict[str, bytes] = {}
-    total = 0
     try:
         reader = readmdict.MDD(str(mdd_path), None)
         for key, value in reader.items():
             path = _canonical_mdict_resource_path("file://" + _decode_mdict_text(key, reader._encoding))
             if path not in references or path in found:
                 continue
-            if not isinstance(value, bytes) or len(value) > MAX_MDICT_MEDIA_BYTES:
-                raise DictionaryFormatError("mdict_resource_too_large")
-            total += len(value)
-            if total > MAX_MDICT_MEDIA_BYTES:
-                raise DictionaryFormatError("mdict_resource_too_large")
+            if not isinstance(value, bytes):
+                raise DictionaryFormatError("invalid_mdict_resource")
             found[path] = value
     except DictionaryFormatError:
         raise

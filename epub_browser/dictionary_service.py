@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import shutil
 import sqlite3
@@ -18,7 +17,6 @@ from .dictionary_formats import (
     read_mdict_resources,
 )
 from .state import DictionaryRecord, StateStore
-
 
 class DictionaryServiceError(ValueError):
     def __init__(self, code: str):
@@ -166,8 +164,33 @@ class DictionaryService:
         attribution: str = "",
         _use_upload_name_as_default: bool = True,
     ) -> DictionaryRecord:
-        """Install a direct MDX upload or a safe ZIP StarDict/MDX package."""
-        if not isinstance(upload_bytes, bytes) or not upload_bytes or len(upload_bytes) > 512 * 1024 * 1024:
+        """Install a dictionary received by an in-memory caller, such as a test."""
+        if not isinstance(upload_bytes, bytes) or not upload_bytes:
+            raise DictionaryServiceError("invalid_dictionary_archive")
+        upload = self.dictionary_directory / (".upload-" + str(uuid.uuid4()))
+        try:
+            upload.write_bytes(upload_bytes)
+            return self.install_upload_file(
+                upload, filename, created_by_user_id=created_by_user_id,
+                display_name=display_name, attribution=attribution,
+                _use_upload_name_as_default=_use_upload_name_as_default,
+            )
+        finally:
+            upload.unlink(missing_ok=True)
+
+    def install_upload_file(
+        self,
+        upload_path: Path,
+        filename: str,
+        *,
+        created_by_user_id: str,
+        display_name: str | None = None,
+        attribution: str = "",
+        _use_upload_name_as_default: bool = True,
+    ) -> DictionaryRecord:
+        """Install a direct MDX or a StarDict archive already streamed to disk."""
+        upload_path = Path(upload_path)
+        if not upload_path.is_file() or upload_path.stat().st_size <= 0:
             raise DictionaryServiceError("invalid_dictionary_archive")
         upload_name = Path(filename).name if isinstance(filename, str) else ""
         upload_name_folded = upload_name.casefold()
@@ -183,15 +206,15 @@ class DictionaryService:
         try:
             if is_mdx:
                 source = staging / "dictionary.mdx"
-                source.write_bytes(upload_bytes)
+                shutil.copyfile(upload_path, source)
             elif is_zip:
                 try:
-                    archive = zipfile.ZipFile(io.BytesIO(upload_bytes))
+                    archive = zipfile.ZipFile(upload_path)
                 except zipfile.BadZipFile as error:
                     raise DictionaryServiceError("invalid_dictionary_archive") from error
                 with archive:
                     members = [member for member in archive.infolist() if not member.is_dir()]
-                    if not members or len(members) > 16 or sum(member.file_size for member in members) > 1024 * 1024 * 1024:
+                    if not members:
                         raise DictionaryServiceError("invalid_dictionary_archive")
                     for member in members:
                         relative = Path(member.filename)
@@ -204,12 +227,12 @@ class DictionaryService:
                             shutil.copyfileobj(source_stream, output, 1024 * 1024)
             else:
                 try:
-                    archive = tarfile.open(fileobj=io.BytesIO(upload_bytes), mode="r:*")
+                    archive = tarfile.open(upload_path, mode="r:*")
                 except (tarfile.TarError, OSError, EOFError) as error:
                     raise DictionaryServiceError("invalid_dictionary_archive") from error
                 with archive:
                     members = [member for member in archive.getmembers() if member.isfile()]
-                    if not members or len(members) > 16 or sum(member.size for member in members) > 1024 * 1024 * 1024:
+                    if not members:
                         raise DictionaryServiceError("invalid_dictionary_archive")
                     for member in members:
                         relative = Path(member.name)
@@ -255,8 +278,20 @@ class DictionaryService:
         return None
 
     def attach_mdict_resources(self, dictionary_id: str, upload_bytes: bytes, filename: str) -> None:
-        """Attach supported MDD media to a previously installed MDict atomically."""
-        if not isinstance(upload_bytes, bytes) or not upload_bytes or len(upload_bytes) > 512 * 1024 * 1024:
+        """Attach MDD media received by an in-memory caller, such as a test."""
+        if not isinstance(upload_bytes, bytes) or not upload_bytes:
+            raise DictionaryServiceError("invalid_mdict_resource")
+        upload = self.dictionary_directory / (".resource-upload-" + str(uuid.uuid4()) + ".mdd")
+        try:
+            upload.write_bytes(upload_bytes)
+            self.attach_mdict_resources_file(dictionary_id, upload, filename)
+        finally:
+            upload.unlink(missing_ok=True)
+
+    def attach_mdict_resources_file(self, dictionary_id: str, upload_path: Path, filename: str) -> None:
+        """Attach supported MDD media that has already been streamed to disk."""
+        upload_path = Path(upload_path)
+        if not upload_path.is_file() or upload_path.stat().st_size <= 0:
             raise DictionaryServiceError("invalid_mdict_resource")
         if Path(filename).suffix.casefold() != ".mdd":
             raise DictionaryServiceError("invalid_mdict_resource")
@@ -283,14 +318,10 @@ class DictionaryService:
         }
         if not references:
             raise DictionaryServiceError("mdict_resources_not_found")
-        staging = self.dictionary_directory / (".resource-" + str(uuid.uuid4()) + ".mdd")
         try:
-            staging.write_bytes(upload_bytes)
-            resources = read_mdict_resources(staging, references)
+            resources = read_mdict_resources(upload_path, references)
         except DictionaryFormatError as error:
             raise DictionaryServiceError(error.code) from error
-        finally:
-            staging.unlink(missing_ok=True)
 
         replacements: dict[str, tuple[str, str]] = {}
         for entry in entry_media.values():

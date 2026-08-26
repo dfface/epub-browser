@@ -61,9 +61,9 @@ class OpenAICompatibleClient:
     def __init__(self, config: ProviderConfig, opener: Callable = urlopen):
         if not config.api_key or not config.model:
             raise ValueError("AI Provider key and model are required")
-        if not 5 <= config.timeout_seconds <= 3600:
+        if config.timeout_seconds <= 0:
             raise ValueError("AI Provider timeout is out of range")
-        if not 1 <= config.max_concurrency <= 4:
+        if config.max_concurrency <= 0:
             raise ValueError("AI Provider concurrency is out of range")
         self._config = config
         self._opener = opener

@@ -699,21 +699,23 @@ def create_app(
             return None, 'invalid_json'
         return data, None
 
-    async def bounded_unique_json_object(request, maximum_size=64 * 1024):
+    async def bounded_unique_json_object(request, maximum_size=None):
         content_type = request.headers.get('content-type', '').split(';', 1)[0]
         if content_type.strip().casefold() != 'application/json':
             return None
         content_length = request.headers.get('content-length')
         if content_length:
             try:
-                if int(content_length) < 0 or int(content_length) > maximum_size:
+                if int(content_length) < 0 or (
+                    maximum_size is not None and int(content_length) > maximum_size
+                ):
                     return None
             except ValueError:
                 return None
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
-            if len(body) > maximum_size:
+            if maximum_size is not None and len(body) > maximum_size:
                 return None
 
         class DuplicateKeyError(ValueError):
@@ -1532,14 +1534,12 @@ window.location.assign(payload.redirect||'/');
             operation not in {'restrict', 'grant'}
             or not isinstance(book_ids, list)
             or not book_ids
-            or len(book_ids) > 500
             or any(not isinstance(book_id, str) or not book_id for book_id in book_ids)
             or len(set(book_ids)) != len(book_ids)
             or (operation == 'restrict' and user_ids is not None)
             or (operation == 'grant' and (
                 not isinstance(user_ids, list)
                 or not user_ids
-                or len(user_ids) > 100
                 or any(not isinstance(user_id, str) or not user_id for user_id in user_ids)
                 or len(set(user_ids)) != len(user_ids)
             ))
@@ -2161,22 +2161,20 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload("not_ready", "Server is not ready"), 503)
         filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
         display_name = unquote(request.headers.get("x-epub-browser-dictionary-name", ""))
-        content_length = request.headers.get("content-length")
+        upload = dictionary_service.dictionary_directory / (".upload-" + secrets.token_urlsafe(24))
         try:
-            if content_length and int(content_length) > 512 * 1024 * 1024:
-                return response(error_payload("body_too_large", "Dictionary archive is too large"), 413)
-            body = bytearray()
-            async for chunk in request.stream():
-                body.extend(chunk)
-                if len(body) > 512 * 1024 * 1024:
-                    return response(error_payload("body_too_large", "Dictionary archive is too large"), 413)
-            record = dictionary_service.install_upload(
-                bytes(body), filename, created_by_user_id=principal.user_id,
+            with upload.open("xb") as output:
+                async for chunk in request.stream():
+                    output.write(chunk)
+            record = dictionary_service.install_upload_file(
+                upload, filename, created_by_user_id=principal.user_id,
                 display_name=display_name,
             )
-        except (DictionaryServiceError, ValueError) as error:
+        except (DictionaryServiceError, OSError, ValueError) as error:
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_dictionary_archive"
             return response(error_payload(code, "Dictionary installation failed"), 400)
+        finally:
+            upload.unlink(missing_ok=True)
         return response({"dictionary": dictionary_record_data(record)}, 201)
 
     async def admin_dictionary(request):
@@ -2202,21 +2200,19 @@ window.location.assign(payload.redirect||'/');
         if not runtime_status.is_ready():
             return response(error_payload("not_ready", "Server is not ready"), 503)
         filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
-        content_length = request.headers.get("content-length")
+        upload = dictionary_service.dictionary_directory / (".resource-upload-" + secrets.token_urlsafe(24) + ".mdd")
         try:
-            if content_length and int(content_length) > 512 * 1024 * 1024:
-                return response(error_payload("body_too_large", "Dictionary resource is too large"), 413)
-            body = bytearray()
-            async for chunk in request.stream():
-                body.extend(chunk)
-                if len(body) > 512 * 1024 * 1024:
-                    return response(error_payload("body_too_large", "Dictionary resource is too large"), 413)
-            dictionary_service.attach_mdict_resources(
-                request.path_params["dictionary_id"], bytes(body), filename,
+            with upload.open("xb") as output:
+                async for chunk in request.stream():
+                    output.write(chunk)
+            dictionary_service.attach_mdict_resources_file(
+                request.path_params["dictionary_id"], upload, filename,
             )
-        except (DictionaryServiceError, ValueError) as error:
+        except (DictionaryServiceError, OSError, ValueError) as error:
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_mdict_resource"
             return response(error_payload(code, "Dictionary resource installation failed"), 400)
+        finally:
+            upload.unlink(missing_ok=True)
         return Response(status_code=204, headers={"Cache-Control": "no-cache"})
 
     async def ai_reading_request(request):

@@ -65,6 +65,27 @@ class DictionaryServiceTests(unittest.TestCase):
             self.assertEqual(record.display_name, "Zip")
             self.assertEqual(list((root / "data" / "dictionaries").glob(".import-*")), [])
 
+    def test_installs_stardict_archive_with_more_than_the_former_16_file_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = StateStore(root / "data" / "epub-browser.db")
+            admin = store.initialize(BootstrapCredentials("admin", "correct horse battery staple"))
+            definition = b"to move quickly"
+            index = b"run\0" + struct.pack(">II", 0, len(definition))
+            payload = io.BytesIO()
+            with zipfile.ZipFile(payload, "w") as archive:
+                archive.writestr("sample.ifo", "StarDict's dict ifo file\nversion=2.4.2\nbookname=Many files\nwordcount=1\nidxfilesize=" + str(len(index)) + "\nsametypesequence=m\n")
+                archive.writestr("sample.idx", index)
+                archive.writestr("sample.dict", definition)
+                for number in range(14):
+                    archive.writestr("extra-%02d.txt" % number, "metadata")
+
+            service = DictionaryService(store, root)
+            record = service.install_upload(payload.getvalue(), "many-files.zip", created_by_user_id=admin.user_id)
+
+            self.assertEqual(record.display_name, "many-files")
+            self.assertEqual(service.lookup(record.id, "run").entries[0]["definition"], "to move quickly")
+
     def test_installs_an_mdx_upload_directly(self):
         try:
             from mdict_utils.base.writemdict import MDictWriter

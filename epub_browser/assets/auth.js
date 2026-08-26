@@ -251,12 +251,9 @@
         invalid_mdict_resource: true,
         mdict_resources_not_found: true,
         unsupported_mdict_resource: true,
-        mdict_resource_too_large: true,
         mdict_reader_unavailable: true,
         invalid_stardict: true,
         dictionary_has_no_entries: true,
-        dictionary_too_large: true,
-        body_too_large: true,
         invalid_dictionary_update: true,
         network: true
       } : {

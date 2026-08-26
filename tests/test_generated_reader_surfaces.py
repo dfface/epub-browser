@@ -99,11 +99,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(server_html, r'\bdata-dictionary-file-name=(?:["\'])?mdd(?:["\' >])')
         self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminDictionaryProgress)(?=[^>]*aria-live=(?:["\'])?polite)')
         self.assertRegex(server_html, r'<section\b[^>]*id=(?:["\'])?adminSystemLimits')
-        for key in (
-            'admin.systemLimits', 'admin.systemLimits.dictionary',
-            'admin.systemLimits.ai', 'admin.systemLimits.bulk',
-        ):
-            self.assertIn('data-i18n=' + key, server_html)
+        self.assertIn('data-i18n=admin.systemLimits', server_html)
+        self.assertIn('data-i18n=admin.systemLimitsDescription', server_html)
+        self.assertIn('no built-in capacity, count, or concurrency limit', server_html)
+        self.assertNotIn('512 MB', server_html)
+        self.assertNotIn('500,000 entries', server_html)
+        self.assertNotIn('16 KB', server_html)
+        self.assertNotIn('1–4 requests', server_html)
 
     def test_server_admin_ai_jobs_surface_is_semantic_and_localized(self):
         server_html = self._server_html()

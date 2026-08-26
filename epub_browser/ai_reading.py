@@ -190,11 +190,13 @@ class _ModelTokenBudget:
 
     @classmethod
     def from_context_window(cls, value: int) -> "_ModelTokenBudget":
-        context_window = max(2048, min(int(value), 100000000))
+        context_window = int(value)
+        if context_window <= 0:
+            raise ValueError("AI model context window must be positive")
         return cls(
             context_window=context_window,
-            output_tokens=min(16384, max(512, context_window // 5)),
-            safety_tokens=min(4096, max(128, context_window // 20)),
+            output_tokens=max(1, context_window // 5),
+            safety_tokens=context_window // 20,
         )
 
     def input_tokens(self) -> int:

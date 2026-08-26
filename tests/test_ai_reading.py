@@ -2232,9 +2232,10 @@ class ModelContextBudgetTests(unittest.TestCase):
 
     def test_context_window_controls_output_and_safety_reserves(self):
         cases = (
-            (2048, (512, 128)),
+            (2048, (409, 102)),
             (32768, (6553, 1638)),
-            (1050000, (16384, 4096)),
+            (1050000, (210000, 52500)),
+            (1, (1, 0)),
         )
 
         for context_window, expected in cases:
@@ -2243,7 +2244,7 @@ class ModelContextBudgetTests(unittest.TestCase):
                 self.assertEqual(
                     (budget.output_tokens, budget.safety_tokens), expected
                 )
-                self.assertLess(
+                self.assertLessEqual(
                     budget.output_tokens + budget.safety_tokens,
                     budget.context_window,
                 )

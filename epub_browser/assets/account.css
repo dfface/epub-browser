@@ -855,7 +855,6 @@ body.auth-page {
 }
 
 .admin-system-limits h5,
-.admin-system-limits h6,
 .admin-system-limits p {
     margin: 0;
 }
@@ -868,34 +867,6 @@ body.auth-page {
 .admin-system-limits > p {
     color: var(--account-muted);
     font-size: .78rem;
-    line-height: 1.5;
-}
-
-.admin-system-limits-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.admin-system-limits article {
-    display: grid;
-    align-content: start;
-    gap: 6px;
-    min-width: 0;
-    padding: 12px;
-    border: 1px solid var(--account-border);
-    border-radius: 8px;
-    background: var(--account-card);
-}
-
-.admin-system-limits h6 {
-    color: var(--account-text);
-    font-size: .8rem;
-}
-
-.admin-system-limits article p {
-    color: var(--account-muted);
-    font-size: .76rem;
     line-height: 1.5;
 }
 
@@ -2241,10 +2212,6 @@ body.auth-page {
     }
 
     .admin-overview-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-system-limits-grid {
         grid-template-columns: 1fr;
     }
 

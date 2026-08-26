@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from epub_browser.dictionary_formats import parse_local_dictionary, read_mdict_resources
+from epub_browser.dictionary_formats import clean_definition, parse_local_dictionary, read_mdict_resources
 
 
 class DictionaryFormatTests(unittest.TestCase):
@@ -59,6 +59,10 @@ class DictionaryFormatTests(unittest.TestCase):
                 ).write(handle)
             result = parse_local_dictionary(path)
         self.assertEqual([entry.headword for entry in result.entries], ["usable"])
+
+    def test_keeps_a_definition_larger_than_the_former_16_kib_import_limit(self):
+        definition = "释义" * 10_000
+        self.assertEqual(clean_definition(definition), definition)
 
     def test_reads_mdd_resources_without_an_arbitrary_asset_count_limit(self):
         try:
