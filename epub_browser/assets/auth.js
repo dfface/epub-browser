@@ -293,7 +293,7 @@
     function showDictionaryMessage(key, type) {
       var message = element('adminDictionaryMessage');
       var live = element('adminDictionaryLive');
-      var text = t(key);
+      var text = key ? t(key) : '';
       if (live) live.textContent = text;
       if (!message) return;
       message.textContent = text;
@@ -2662,7 +2662,7 @@
               renderDictionaries();
             }
             return null;
-          }).catch(function(error) {
+          }, function(error) {
             if (error && /dictionary_(?:media_)?upload_failed/.test(error.message)) return;
             showDictionaryMessage('admin.error.network', 'error');
             showStatus('admin.error.network', 'error');

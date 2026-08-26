@@ -105,6 +105,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('function confirmDictionaryAction', auth_js)
         self.assertIn('root.EpubDialog.confirm', auth_js)
         self.assertNotIn("confirmAdminAction('admin.confirmDeleteDictionary'", auth_js)
+        self.assertNotIn("}).catch(function(error) {\n            if (error && /dictionary_(?:media_)?upload_failed/", auth_js)
+        self.assertIn("var text = key ? t(key) : '';", auth_js)
         self.assertRegex(server_html, r'<section\b[^>]*id=(?:["\'])?adminSystemLimits')
         self.assertIn('data-i18n=admin.systemLimits', server_html)
         self.assertIn('data-i18n=admin.systemLimitsDescription', server_html)
