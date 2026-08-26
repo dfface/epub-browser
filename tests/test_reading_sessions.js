@@ -391,7 +391,6 @@ test('browser transport starts only for an authenticated server reader and adds 
   });
   assert.equal(Sessions.start({ root: Object.assign({}, root, { EpubBrowserMode: 'ssg' }) }), null);
   const tracker = Sessions.start({ root, eventTarget, now: () => clock, schedule() {} });
-  tracker.recordInteraction();
   clock = 15000;
   await tracker.flush(true);
   assert.equal(calls[0].url, '/api/reading-sessions/book%20id/heartbeat');
@@ -400,6 +399,29 @@ test('browser transport starts only for an authenticated server reader and adds 
   assert.equal(body.chapter_index, 6);
   assert.equal(body.active_seconds, 15);
   assert.match(body.client_id, /^reading-/);
+  tracker.destroy();
+});
+
+test('opening an authenticated reader starts an active reading interval before the first scroll', async () => {
+  const content = {
+    getAttribute(name) {
+      return { 'data-book-hash': 'book', 'data-chapter-index': '1', 'data-chapter-title': 'Two' }[name] || null;
+    },
+  };
+  const target = createEventTarget();
+  let clock = 0;
+  const calls = [];
+  const root = Object.assign(target, {
+    EpubBrowserMode: 'server',
+    EpubBrowserAuth: { fetch(_url, options) { calls.push(options); return Promise.resolve({ ok: true }); } },
+    sessionStorage: createStorage(),
+    document: { getElementById: () => content, hasFocus: () => true },
+  });
+  const tracker = Sessions.start({ root, eventTarget: target, now: () => clock, schedule() {} });
+  clock = 15000;
+  await tracker.flush();
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.parse(calls[0].body).active_seconds, 15);
   tracker.destroy();
 });
 

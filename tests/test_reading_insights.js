@@ -27,7 +27,9 @@ function clientFor(payload, translations) {
           resolvedOptions() { return { timeZone: 'UTC' }; },
           format(value) {
             if (options.hour) return '08:18';
+            if (options.weekday && !options.day) return 'Sat';
             if (options.weekday) return 'Sat, Aug 15, 2026';
+            if (options.day && options.month && !options.year) return '8/15';
             return new Date(value).toISOString().slice(0, 10);
           },
           formatRange(start, end) {
@@ -78,18 +80,20 @@ test('duration fallback uses the active locale unit copy when DurationFormat is 
   assert.equal(page.sessionRows[0].textContent, '08:18 书 第一章 1 小时 1 分钟');
 });
 
-test('activating a period updates its pressed state before requesting the new range', async () => {
+test('opens on the current day and activating a period updates its pressed state before requesting the new range', async () => {
   const page = clientFor({ total_active_seconds: 0, days: [], sessions: [] });
   await page.mount();
   const day = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'day');
   const week = page.periodButtons.find(button => button.getAttribute('data-reading-insights-period') === 'week');
 
-  day.click();
-
   assert.equal(day.getAttribute('aria-pressed'), 'true');
-  assert.equal(week.getAttribute('aria-pressed'), 'false');
+  assert.match(page.requests[0], /period=day/);
+  week.click();
+
+  assert.equal(day.getAttribute('aria-pressed'), 'false');
+  assert.equal(week.getAttribute('aria-pressed'), 'true');
   await Promise.resolve();
-  assert.match(page.requests.at(-1), /period=day/);
+  assert.match(page.requests.at(-1), /period=week/);
 });
 
 test('previous and next range controls preserve period and shift the API anchor', async () => {
@@ -115,9 +119,13 @@ test('range label reflects the same day, week, and month bounds as the API', asy
   assert.equal(page.rangeLabel.textContent, '2026-02-01–2026-02-28');
 });
 
-test('day labels use the locale formatter rather than exposing raw ISO dates', async () => {
+test('week and month use compact visual day labels while preserving full dates for assistive technology', async () => {
   const page = clientFor({ total_active_seconds: 0, days: [{ date: '2026-08-15', active_seconds: 0 }], sessions: [] });
   await page.mount();
-  const dayList = page.root.children[5].children[1];
-  assert.equal(dayList.children[0].textContent, 'Sat, Aug 15, 2026 0 sec');
+  await page.setPeriod('week', '2026-08-15');
+  const dayList = page.root.children[4].children[1];
+  const button = dayList.children[0];
+  assert.equal(button.children[0].textContent, 'Sat');
+  assert.equal(button.children[1].textContent, '8/15');
+  assert.equal(button.getAttribute('aria-label'), 'Sat, Aug 15, 2026: 0 sec');
 });

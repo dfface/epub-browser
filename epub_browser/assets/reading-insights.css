@@ -11,15 +11,15 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-icon-button:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
 
 .reading-insights-page {
-    width: min(calc(100% - 40px), 1000px);
+    width: min(calc(100% - 40px), 920px);
     margin: 0 auto;
-    padding: 32px 0 72px;
+    padding: 28px 0 64px;
     color: var(--text);
 }
 
 .reading-insights-heading {
-    max-width: 680px;
-    margin-bottom: 24px;
+    max-width: 620px;
+    margin-bottom: 20px;
 }
 
 .reading-insights-kicker {
@@ -40,7 +40,7 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 }
 
 .reading-insights-heading h1 {
-    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-size: clamp(1.65rem, 3vw, 2.1rem);
     letter-spacing: -.035em;
     line-height: 1.15;
 }
@@ -51,12 +51,20 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
     line-height: 1.6;
 }
 
+.reading-insights-controls,
 .reading-insights-periods,
 .reading-insights-day-list,
 .reading-insights-range {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.reading-insights-controls {
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 2px;
 }
 
 .reading-insights-periods button,
@@ -116,13 +124,13 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 
 .reading-insights-range {
     align-items: center;
-    justify-content: space-between;
-    margin-top: 12px;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
 }
 
 .reading-insights-range-label {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: 148px;
     margin: 0;
     color: var(--text-secondary);
     font-size: .92rem;
@@ -130,11 +138,21 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
     text-align: center;
 }
 
+.reading-insights-range-button {
+    width: 44px;
+    padding: 0 !important;
+}
+
+.reading-insights-today {
+    padding-inline: 11px !important;
+    color: var(--button-bg) !important;
+}
+
 .reading-insights-summary {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
-    margin: 24px 0 32px;
+    margin: 22px 0 28px;
 }
 
 .reading-insights-summary-card,
@@ -170,7 +188,18 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 }
 
 .reading-insights-sessions { margin-top: 20px; }
-.reading-insights-day-list { margin-top: 14px; }
+.reading-insights-day-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); margin-top: 14px; }
+
+.reading-insights-day-button {
+    display: grid;
+    min-height: 78px;
+    padding: 10px !important;
+    text-align: left;
+}
+
+.reading-insights-day-name { color: var(--text); font-size: .9rem; }
+.reading-insights-day-date { color: var(--text-secondary); font-size: .78rem; }
+.reading-insights-day-duration { overflow: hidden; color: var(--text); font-size: .88rem; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 
 .reading-insights-session-list {
     display: grid;
@@ -208,9 +237,10 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 @media (max-width: 768px) {
     .reading-insights-modal-header { padding: 0 10px; }
     .reading-insights-page {
-        width: min(calc(100% - 32px), 1000px);
+        width: min(calc(100% - 32px), 920px);
         padding-top: 24px;
     }
+    .reading-insights-controls { align-items: flex-start; flex-direction: column; gap: 12px; }
 }
 
 @media (max-width: 520px) {
@@ -218,10 +248,11 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
     .reading-insights-days,
     .reading-insights-sessions,
     .reading-insights-summary-card { padding: 16px; }
+    .reading-insights-periods { width: 100%; }
     .reading-insights-periods button { flex: 1 1 0; }
     .reading-insights-range { gap: 6px; }
-    .reading-insights-range button { padding-inline: 10px; }
-    .reading-insights-day-button { flex: 1 1 100%; text-align: left; }
+    .reading-insights-range-label { min-width: 0; flex: 1 1 auto; }
+    .reading-insights-day-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: no-preference) {

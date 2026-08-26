@@ -568,6 +568,9 @@
       }
     });
     tracker.setChapter(chapterIndex, options.chapterLabel || content.getAttribute('data-chapter-title') || '');
+    // Opening a focused, visible reader is itself reading activity.  Waiting for a
+    // scroll or keypress here under-counts people who simply start reading a page.
+    tracker.recordInteraction();
     return tracker;
   }
 

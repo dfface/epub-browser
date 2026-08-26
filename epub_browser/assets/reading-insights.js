@@ -31,7 +31,7 @@
   function createClient(target) {
     var documentTarget = target.document;
     var state = {
-      period: 'week',
+      period: 'day',
       anchor: localIsoDate(),
       timezone: 'UTC',
       insights: null,
@@ -91,6 +91,32 @@
       }
     }
 
+    function formatDayShort(value) {
+      try {
+        return new intl().DateTimeFormat(locale(), {
+          weekday: 'short', timeZone: 'UTC'
+        }).format(new Date(value + 'T12:00:00Z'));
+      } catch (error) {
+        return value;
+      }
+    }
+
+    function formatDayNumber(value) {
+      try {
+        return new intl().DateTimeFormat(locale(), {
+          day: 'numeric', month: 'numeric', timeZone: 'UTC'
+        }).format(new Date(value + 'T12:00:00Z'));
+      } catch (error) {
+        return value;
+      }
+    }
+
+    function selectedDayLabel(value) {
+      return value === localIsoDate()
+        ? translate(target, 'readingInsights.today', 'Today')
+        : formatDay(value);
+    }
+
     function sessionDate(value) {
       var date = new Date(value);
       try {
@@ -119,6 +145,7 @@
       (state.view.dayButtons || []).forEach(function(button) { button.disabled = busy; });
       if (state.view.previousRange) state.view.previousRange.disabled = busy;
       if (state.view.nextRange) state.view.nextRange.disabled = busy;
+      if (state.view.todayRange) state.view.todayRange.disabled = busy;
     }
 
     function setLive(message) {
@@ -174,6 +201,8 @@
       }
       if (state.view.previousRange) state.view.previousRange.setAttribute('aria-label', translate(target, 'readingInsights.previousRange', 'Previous range'));
       if (state.view.nextRange) state.view.nextRange.setAttribute('aria-label', translate(target, 'readingInsights.nextRange', 'Next range'));
+      if (state.view.nextRange) state.view.nextRange.disabled = shiftAnchor(state.anchor, state.period, 1) > localIsoDate();
+      if (state.view.todayRange) state.view.todayRange.hidden = state.anchor === localIsoDate();
     }
 
     function build(targetRoot) {
@@ -192,7 +221,8 @@
       title.id = 'readingInsightsTitle';
       append(heading, 'p', '', translate(target, 'readingInsights.intro', 'See when you actively read and where your time went.'));
 
-      var periods = append(targetRoot, 'section', 'reading-insights-periods');
+      var controls = append(targetRoot, 'section', 'reading-insights-controls');
+      var periods = append(controls, 'div', 'reading-insights-periods');
       periods.setAttribute('aria-label', translate(target, 'readingInsights.periodLabel', 'Reading period'));
       var periodButtons = ['day', 'week', 'month'].map(function(period) {
         var button = append(periods, 'button', '', periodLabel(period));
@@ -202,17 +232,22 @@
         button.addEventListener('click', function() { setPeriod(period); });
         return button;
       });
-      var range = append(targetRoot, 'nav', 'reading-insights-range');
+      var range = append(controls, 'nav', 'reading-insights-range');
       range.setAttribute('aria-label', translate(target, 'readingInsights.rangeLabel', 'Reading range'));
-      var previousRange = append(range, 'button', '', translate(target, 'readingInsights.previousRange', 'Previous range'));
+      var previousRange = append(range, 'button', 'reading-insights-range-button');
       previousRange.type = 'button';
       previousRange.setAttribute('data-reading-insights-previous', '');
+      previousRange.innerHTML = '<i class="fas fa-chevron-left" aria-hidden="true"></i>';
       previousRange.addEventListener('click', function() { previousRangeForPeriod(); });
       var rangeLabel = append(range, 'p', 'reading-insights-range-label');
       rangeLabel.setAttribute('aria-live', 'polite'); rangeLabel.setAttribute('aria-atomic', 'true');
-      var nextRange = append(range, 'button', '', translate(target, 'readingInsights.nextRange', 'Next range'));
+      var todayRange = append(range, 'button', 'reading-insights-today', translate(target, 'readingInsights.today', 'Today'));
+      todayRange.type = 'button';
+      todayRange.addEventListener('click', function() { setPeriod(state.period, localIsoDate()); });
+      var nextRange = append(range, 'button', 'reading-insights-range-button');
       nextRange.type = 'button';
       nextRange.setAttribute('data-reading-insights-next', '');
+      nextRange.innerHTML = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
       nextRange.addEventListener('click', function() { nextRangeForPeriod(); });
       var live = append(targetRoot, 'p', 'reading-insights-live', translate(target, 'readingInsights.loading', 'Loading reading insights…'));
       live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
@@ -234,7 +269,7 @@
       selectedDay.id = 'readingInsightsSelectedDay';
       sessions.setAttribute('aria-labelledby', selectedDay.id);
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, dayList: dayList, selectedDay: selectedDay, sessionList: sessionList, dayButtons: [] };
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, days: days, dayList: dayList, selectedDay: selectedDay, sessionList: sessionList, dayButtons: [] };
       updatePeriodControls();
       updateRangeControls();
     }
@@ -267,6 +302,7 @@
       state.view.total.textContent = formatDuration(insights.total_active_seconds);
       state.view.topBook.textContent = insights.top_book
         ? insights.top_book.title + ' · ' + formatDuration(insights.top_book.active_seconds) : '—';
+      state.view.days.hidden = state.period === 'day';
       state.view.dayList.replaceChildren();
       state.view.dayButtons = days.map(function(day) {
         var button = append(state.view.dayList, 'button', 'reading-insights-day-button');
@@ -274,12 +310,14 @@
         button.setAttribute('aria-pressed', day.date === state.selectedDay ? 'true' : 'false');
         var dayLabel = formatDay(day.date);
         button.setAttribute('aria-label', dayLabel + ': ' + formatDuration(day.active_seconds));
-        button.textContent = dayLabel + ' ' + formatDuration(day.active_seconds);
+        append(button, 'span', 'reading-insights-day-name', formatDayShort(day.date));
+        append(button, 'span', 'reading-insights-day-date', formatDayNumber(day.date));
+        append(button, 'strong', 'reading-insights-day-duration', formatDuration(day.active_seconds));
         button.addEventListener('click', function() { selectDay(day.date); });
         return button;
       });
       state.view.selectedDay.textContent = state.selectedDay
-        ? formatDay(state.selectedDay)
+        ? selectedDayLabel(state.selectedDay)
         : translate(target, 'readingInsights.selectedDay', 'Selected day');
       renderSessions();
       setLive(days.length ? translate(target, 'readingInsights.loaded', 'Reading insights updated.') : translate(target, 'readingInsights.empty', 'No active reading recorded yet.'));
@@ -306,7 +344,7 @@
           setLive(translate(target, 'readingInsights.error', 'Unable to load reading insights. Please try again.'));
           return null;
         })
-        .finally(function() { setBusy(false); });
+        .finally(function() { setBusy(false); updateRangeControls(); });
     }
 
     function selectDay(day) {
@@ -399,6 +437,11 @@
       var modal = ensure();
       if (!modal) return Promise.resolve(null);
       if (modal.hidden) {
+        // Insights always opens at today's timeline.  Week/month are intentional
+        // comparisons inside the dialog, not sticky state from a previous visit.
+        state.period = 'day';
+        state.anchor = localIsoDate();
+        state.selectedDay = '';
         state.opener = opener || documentTarget.activeElement;
         state.scrollY = target.scrollY || 0;
         documentTarget.body.classList.add('reading-insights-open');
