@@ -340,7 +340,7 @@
       selectedDay.id = 'readingInsightsSelectedDay';
       sessions.setAttribute('aria-labelledby', selectedDay.id);
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYLabel: trendYLabel, trendYMax: trendYMax, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, total: total, topBook: topBook, analytics: analytics, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYLabel: trendYLabel, trendYMax: trendYMax, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
       updatePeriodControls();
       updateRangeControls();
     }
@@ -496,6 +496,7 @@
       state.view.topBook.textContent = insights.top_book
         ? insights.top_book.title + ' · ' + formatDuration(insights.top_book.active_seconds) : '—';
       renderActivity();
+      state.view.analytics.hidden = state.period !== 'overview';
       state.view.days.hidden = state.period === 'day' || state.period === 'overview';
       state.view.sessions.hidden = state.period === 'overview';
       state.view.dayList.replaceChildren();

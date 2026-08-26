@@ -152,8 +152,12 @@ test('overview range covers a complete natural year and hides range-specific dri
   await page.mount();
   await page.setPeriod('overview', '2026-08-15');
   assert.equal(page.rangeLabel.textContent, '2026-01-01–2026-12-31');
+  assert.equal(page.root.children[4].hidden, false);
   assert.equal(page.root.children[5].hidden, true);
   assert.equal(page.root.children[6].hidden, true);
+
+  await page.setPeriod('month', '2026-08-15');
+  assert.equal(page.root.children[4].hidden, true);
 });
 
 test('week and month use compact visual day labels while preserving full dates for assistive technology', async () => {
