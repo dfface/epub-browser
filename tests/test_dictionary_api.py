@@ -96,6 +96,18 @@ class DictionaryApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["dictionary"]["display_name"], "现代汉语词典")
 
+    def test_admin_can_disable_and_delete_a_dictionary(self):
+        disabled = self.client.put(
+            "/api/admin/dictionaries/" + self.dictionary.id, json={"enabled": False},
+        )
+        self.assertEqual(disabled.status_code, 200)
+        self.assertFalse(disabled.json()["dictionary"]["enabled"])
+        self.assertEqual(self.client.get("/api/books/book/dictionaries").json()["dictionaries"], [])
+
+        deleted = self.client.delete("/api/admin/dictionaries/" + self.dictionary.id)
+        self.assertEqual(deleted.status_code, 204)
+        self.assertEqual(self.client.get("/api/admin/dictionaries").json()["dictionaries"], [])
+
     @mock.patch("epub_browser.server.WikimediaEncyclopedia.lookup")
     def test_encyclopedia_is_separate_from_local_dictionary(self, lookup):
         lookup.return_value = EncyclopediaSummary(True, "Run", "motion", "An act of running", "https://en.wikipedia.org/wiki/Run")

@@ -1497,6 +1497,55 @@ body.auth-page {
     background: var(--account-card);
 }
 
+.dictionary-record-summary {
+    display: grid;
+    flex: 1 1 220px;
+    gap: 3px;
+    min-width: 0;
+}
+
+.dictionary-record-name {
+    overflow: hidden;
+    color: var(--account-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dictionary-record-metadata {
+    color: var(--account-muted);
+    font-size: .78rem;
+}
+
+.dictionary-record-state {
+    flex: 0 0 auto;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.dictionary-record-state.is-enabled {
+    background: color-mix(in srgb, var(--account-success) 12%, var(--account-card));
+    color: var(--account-success);
+}
+
+.dictionary-record-state.is-disabled {
+    background: color-mix(in srgb, var(--account-danger) 8%, var(--account-card));
+    color: var(--account-danger);
+}
+
+.dictionary-record-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dictionary-record-actions .account-inline-action,
+.dictionary-record-actions .account-danger-action {
+    min-height: 44px;
+}
+
 #adminUserList {
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
     gap: 14px;
@@ -1882,6 +1931,14 @@ body.auth-page {
 }
 
 @media (max-width: 720px) {
+    .dictionary-record-actions {
+        flex: 1 0 100%;
+    }
+
+    .dictionary-record-actions > button {
+        flex: 1 1 0;
+    }
+
     .admin-ai-jobs-controls {
         grid-template-columns: 1fr 1fr;
     }

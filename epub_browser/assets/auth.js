@@ -252,6 +252,7 @@
         dictionary_has_no_entries: true,
         dictionary_too_large: true,
         body_too_large: true,
+        invalid_dictionary_update: true,
         network: true
       } : {
         authentication_required: true,
@@ -886,6 +887,47 @@
       });
     }
 
+    function updateDictionary(dictionary, enabled) {
+      return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled: enabled})
+      }).then(function(response) {
+        if (!response.ok) return showDictionaryResponseError(response);
+        showDictionaryMessage('admin.dictionaryUpdated', 'success');
+        showStatus('admin.dictionaryUpdated', 'success');
+        return loadDictionaries();
+      }).catch(function() {
+        showDictionaryMessage('admin.error.network', 'error');
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
+    function deleteDictionary(dictionary) {
+      return authenticatedFetch('/api/admin/dictionaries/' + encodeURIComponent(dictionary.id), {
+        method: 'DELETE'
+      }).then(function(response) {
+        if (!response.ok) return showDictionaryResponseError(response);
+        showDictionaryMessage('admin.dictionaryDeleted', 'success');
+        showStatus('admin.dictionaryDeleted', 'success');
+        return loadDictionaries();
+      }).catch(function() {
+        showDictionaryMessage('admin.error.network', 'error');
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
+    function loadDictionaries() {
+      return authenticatedFetch('/api/admin/dictionaries').then(function(dictionaryResponse) {
+        if (!dictionaryResponse.ok) return showDictionaryResponseError(dictionaryResponse);
+        return readJson(dictionaryResponse).then(function(payload) {
+          dictionaries = payload.dictionaries || [];
+          renderDictionaries();
+        });
+      }).catch(function() {
+        showDictionaryMessage('admin.error.network', 'error');
+      });
+    }
+
     function renderDictionaries() {
       var list = element('adminDictionaryList');
       if (!list) return;
@@ -896,8 +938,39 @@
       }
       dictionaries.forEach(function(dictionary) {
         var item = root.document.createElement('li');
+        var summary = root.document.createElement('div');
+        var name = root.document.createElement('strong');
+        var metadata = createTextElement(
+          'span', 'dictionary-record-metadata', 'admin.dictionaryEntries',
+          {count: dictionary.entry_count}
+        );
+        var state = root.document.createElement('span');
+        var actions = root.document.createElement('div');
         item.className = 'account-list-item';
-        item.textContent = dictionary.display_name + ' · ' + dictionary.entry_count;
+        summary.className = 'dictionary-record-summary';
+        name.className = 'dictionary-record-name';
+        state.className = 'dictionary-record-state ' + (dictionary.enabled ? 'is-enabled' : 'is-disabled');
+        actions.className = 'dictionary-record-actions';
+        name.textContent = dictionary.display_name;
+        state.textContent = enabledLabel(dictionary.enabled);
+        summary.appendChild(name);
+        summary.appendChild(metadata);
+        item.appendChild(summary);
+        item.appendChild(state);
+        actions.appendChild(actionButton(
+          dictionary.enabled ? 'admin.disableDictionary' : 'admin.enableDictionary',
+          function() {
+            if (dictionary.enabled && !confirmAdminAction('admin.confirmDisableDictionary', {
+              name: dictionary.display_name
+            })) return;
+            return updateDictionary(dictionary, !dictionary.enabled);
+          }, dictionary.enabled ? 'danger' : undefined
+        ));
+        actions.appendChild(actionButton('admin.deleteDictionary', function() {
+          if (!confirmAdminAction('admin.confirmDeleteDictionary', {name: dictionary.display_name})) return;
+          return deleteDictionary(dictionary);
+        }, 'danger'));
+        item.appendChild(actions);
         list.appendChild(item);
       });
     }
@@ -2275,15 +2348,7 @@
           renderAiUserAccess();
           renderAiTags();
           renderAdminOverview();
-          if (element('adminDictionaryList')) {
-            authenticatedFetch('/api/admin/dictionaries').then(function(dictionaryResponse) {
-              if (!dictionaryResponse.ok) return;
-              return readJson(dictionaryResponse).then(function(payload) {
-                dictionaries = payload.dictionaries || [];
-                renderDictionaries();
-              });
-            });
-          }
+          if (element('adminDictionaryList')) return loadDictionaries();
         });
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
