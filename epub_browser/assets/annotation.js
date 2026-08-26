@@ -1318,12 +1318,15 @@
             document.body.appendChild(dialog);
             self.positionFloatingDialog(dialog, self.getSourceAnchorRect(source));
             this.activeDialog = dialog;
+            this.bindDialogOutsideClick(dialog, function() { self.cancelPendingDraft(); });
+        },
+
+        bindDialogOutsideClick: function(dialog, dismiss) {
+            var self = this;
             setTimeout(function() {
                 if (self.activeDialog !== dialog) return;
-                self.outsideClickHandler = function(e) {
-                    if (dialog && !dialog.contains(e.target)) {
-                        self.cancelPendingDraft();
-                    }
+                self.outsideClickHandler = function(event) {
+                    if (!dialog.contains(event.target)) dismiss();
                 };
                 document.addEventListener('click', self.outsideClickHandler);
             }, 10);
@@ -1424,6 +1427,7 @@
             document.body.appendChild(dialog);
             this.positionFloatingDialog(dialog, this.getSourceAnchorRect(source));
             this.activeDialog = dialog;
+            this.bindDialogOutsideClick(dialog, function() { self.cancelPendingDraft(); });
             input.focus();
             close.addEventListener('click', function() { self.cancelPendingDraft(); });
             cancel.addEventListener('click', function() { self.cancelPendingDraft(); });
@@ -1498,6 +1502,7 @@
 
                 document.body.appendChild(dialog);
                 self.activeDialog = dialog;
+                self.bindDialogOutsideClick(dialog, function() { self.closeDialog(); });
 
                 var noteInput = dialog.querySelector('textarea');
                 var textEl = dialog.querySelector('.annotation-dialog-text');

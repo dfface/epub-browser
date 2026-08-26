@@ -1732,6 +1732,21 @@ assert.deepEqual(
         self.assertIn("CONFIG.getColors().slice(0, 5)", script)
         self.assertIn("footer.className = 'annotation-dialog-footer';", script)
 
+    def test_reader_overlays_close_outside_and_dictionary_picker_stays_compact(self):
+        annotation = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+        dictionary = Path("epub_browser/assets/dictionary.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/dictionary.css").read_text(encoding="utf-8")
+
+        self.assertIn('bindDialogOutsideClick: function(dialog, dismiss)', annotation)
+        self.assertIn('this.bindDialogOutsideClick(dialog, function() { self.cancelPendingDraft(); });', annotation)
+        self.assertIn('self.bindDialogOutsideClick(dialog, function() { self.closeDialog(); });', annotation)
+        self.assertIn('function closeWhenClickedOutside(dialog)', dictionary)
+        self.assertIn('closeWhenClickedOutside(dialog);', dictionary)
+        self.assertIn('if (choices.length > 1)', dictionary)
+        self.assertIn("select.setAttribute('aria-label', t('choose'));", dictionary)
+        self.assertIn('display: inline-flex', css)
+        self.assertIn('max-width: 220px', css)
+
     def test_annotation_storage_exposes_reading_independent_read_apis(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
 

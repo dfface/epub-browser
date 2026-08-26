@@ -3,6 +3,7 @@
   'use strict';
   var activeController = null;
   var activeDialog = null;
+  var outsideClickHandler = null;
 
   function t(key) {
     var i18n = root.EpubBrowserI18n;
@@ -12,8 +13,20 @@
   function close() {
     if (activeController) activeController.abort();
     activeController = null;
+    if (outsideClickHandler) root.document.removeEventListener('click', outsideClickHandler);
+    outsideClickHandler = null;
     if (activeDialog) activeDialog.remove();
     activeDialog = null;
+  }
+
+  function closeWhenClickedOutside(dialog) {
+    root.setTimeout(function() {
+      if (activeDialog !== dialog) return;
+      outsideClickHandler = function(event) {
+        if (!dialog.contains(event.target)) close();
+      };
+      root.document.addEventListener('click', outsideClickHandler);
+    }, 0);
   }
 
   function element(tag, className, text) {
@@ -60,9 +73,6 @@
     if (!data.found) {
       result.textContent = t('notFound');
     } else {
-      if (data.dictionary && data.dictionary.display_name) {
-        result.appendChild(element('p', 'dictionary-source', data.dictionary.display_name));
-      }
       (data.entries || []).forEach(function(entry) {
         var item = element('article', 'dictionary-entry');
         item.appendChild(element('strong', '', entry.headword));
@@ -108,6 +118,7 @@
     dialog._epubAnchor = anchor;
     positionDialog(dialog, anchor);
     activeDialog = dialog;
+    closeWhenClickedOutside(dialog);
     button.focus();
 
     var article = root.document.getElementById('eb-content');
@@ -124,23 +135,28 @@
         var choices = data.dictionaries || [];
         content.textContent = '';
         if (!choices.length) { content.textContent = t('notConfigured'); positionDialog(dialog, dialog._epubAnchor); return; }
-        var label = element('label', 'dictionary-picker');
-        label.appendChild(element('span', '', t('choose')));
-        var select = element('select', 'dictionary-picker-select');
-        choices.forEach(function(choice) {
-          var option = element('option', '', choice.display_name);
-          option.value = choice.id;
-          select.appendChild(option);
-        });
-        label.appendChild(select);
-        content.appendChild(label);
-        positionDialog(dialog, dialog._epubAnchor);
+        var dictionaryId = choices[0].id;
+        var select = null;
+        if (choices.length > 1) {
+          var picker = element('div', 'dictionary-picker');
+          picker.appendChild(element('span', '', t('choose')));
+          select = element('select', 'dictionary-picker-select');
+          select.setAttribute('aria-label', t('choose'));
+          choices.forEach(function(choice) {
+            var option = element('option', '', choice.display_name);
+            option.value = choice.id;
+            select.appendChild(option);
+          });
+          picker.appendChild(select);
+          content.appendChild(picker);
+          positionDialog(dialog, dialog._epubAnchor);
+        }
         function lookup() {
           if (activeController) activeController.abort();
           activeController = new AbortController();
           root.EpubBrowserAuth.fetch('/api/books/' + encodeURIComponent(bookId) + '/dictionary/lookup', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({text: text, dictionary_id: select.value}), signal: activeController.signal
+            body: JSON.stringify({text: text, dictionary_id: select ? select.value : dictionaryId}), signal: activeController.signal
           }).then(readJson).then(function(result) {
             if (activeDialog === dialog) renderDictionaryResult(content, result);
           }).catch(function(error) {
@@ -149,7 +165,7 @@
             }
           });
         }
-        select.addEventListener('change', lookup);
+        if (select) select.addEventListener('change', lookup);
         lookup();
       }).catch(function(error) {
         if (error.name !== 'AbortError' && activeDialog === dialog) {

@@ -3,8 +3,8 @@
 .dictionary-dialog-close { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text); font-size: 1.5rem; cursor: pointer; }
 .dictionary-dialog-close:focus-visible, .dictionary-source-link:focus-visible, .dictionary-picker-select:focus-visible { outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent); outline-offset: 2px; }
 .dictionary-dialog-content { padding: 14px; font-size: 14px; line-height: 1.62; white-space: pre-wrap; }
-.dictionary-picker { display: grid; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: 14px; }
-.dictionary-picker-select { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
+.dictionary-picker { display: inline-flex; max-width: 100%; align-items: center; gap: 8px; margin: -2px 0 10px; color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
+.dictionary-picker-select { min-width: 0; max-width: 220px; min-height: 36px; padding: 5px 28px 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font: inherit; }
 .dictionary-entry { overflow-wrap: anywhere; }
 .dictionary-entry strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 15px; }
 .dictionary-entry p { margin: 0; }
