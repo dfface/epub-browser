@@ -5198,7 +5198,7 @@ class StateStore:
             self._require_active_book(connection, book_id)
             previous = connection.execute(
                 "SELECT * FROM reading_sessions WHERE user_id = ? AND client_id = ? "
-                "ORDER BY ended_at DESC, id DESC LIMIT 1",
+                "ORDER BY last_client_sequence DESC, id DESC LIMIT 1",
                 (user_id, client_id),
             ).fetchone()
             if previous is not None and client_sequence <= previous["last_client_sequence"]:

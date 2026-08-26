@@ -94,6 +94,46 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(duplicate["active_seconds"], 15)
         self.assertNotEqual(first["id"], changed["id"])
 
+    def test_heartbeat_retry_is_idempotent_when_receipts_arrive_out_of_order(self):
+        self._reading_book()
+        values = {
+            "user_id": self.owner.user_id,
+            "book_id": "book-1",
+            "client_id": "tab-a",
+            "chapter_index": 2,
+            "active_seconds": 15,
+            "book_title": "Book",
+            "chapter_label": "Chapter 3",
+        }
+        self.store.record_reading_heartbeat(
+            **(values | {
+                "client_sequence": 1,
+                "received_at": _utc("2026-08-15T00:00:20Z"),
+            })
+        )
+        second = self.store.record_reading_heartbeat(
+            **(values | {
+                "client_sequence": 2,
+                "received_at": _utc("2026-08-15T00:00:10Z"),
+            })
+        )
+        retry = self.store.record_reading_heartbeat(
+            **(values | {
+                "client_sequence": 2,
+                "received_at": _utc("2026-08-15T00:00:10Z"),
+            })
+        )
+
+        with self.store._connection() as connection:
+            rows = connection.execute(
+                "SELECT id, active_seconds FROM reading_sessions "
+                "WHERE user_id = ? AND client_id = ? ORDER BY last_client_sequence",
+                (self.owner.user_id, "tab-a"),
+            ).fetchall()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(retry["id"], second["id"])
+        self.assertEqual(rows[1]["active_seconds"], 15)
+
     def test_insights_use_callers_timezone_and_merge_overlapping_device_sessions(self):
         self._reading_book()
         with self.store._connection() as connection:
