@@ -893,9 +893,13 @@
             });
             hl.on(Highlighter.event.CLICK, function(data) {
                 var annotationId = (data && data.id) || self.getAnnotationIdFromNode(data && data.target);
-                if (annotationId) {
-                    self.showDetailDialog(annotationId);
+                if (!annotationId) return;
+                var draft = self.pendingDraft;
+                if (draft && draft.id === annotationId && draft.source) {
+                    self.showCreateDialogFromSource(draft.source);
+                    return;
                 }
+                self.showDetailDialog(annotationId);
             });
         },
 

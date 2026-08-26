@@ -77,7 +77,14 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
     requestAnimationFrame: callback => callback(),
   };
 
-  vm.runInNewContext(fs.readFileSync('epub_browser/assets/annotation.js', 'utf8'), context);
+  let source = fs.readFileSync('epub_browser/assets/annotation.js', 'utf8');
+  if (options.exposeHighlightInteraction) {
+    source = source.replace(
+      /\}\)\(window\);\s*$/,
+      'window.__testHighlightInteraction = HighlightInteraction;\n})(window);',
+    );
+  }
+  vm.runInNewContext(source, context);
   window.authenticatedRequests = authenticatedRequests;
   window.indexedDbState = indexedDbState;
   return window;
@@ -112,6 +119,31 @@ test('server annotations use shared Cookie and CSRF authentication without a use
   assert.equal(received.options.credentials, 'same-origin');
   assert.equal(received.options.headers['X-CSRF-Token'], 'csrf');
   assert.equal(received.options.headers['X-Username'], undefined);
+});
+
+test('clicking a draft highlight reopens its selection actions instead of reading annotation detail', () => {
+  const Highlighter = { event: { CREATE: 'create', CLICK: 'click' } };
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', undefined,
+    { Highlighter, exposeHighlightInteraction: true },
+  );
+  const interaction = window.__testHighlightInteraction;
+  const listeners = {};
+  const source = { id: 'draft-highlight', text: 'Selected text' };
+  let reopenedSource = null;
+  let detailId = null;
+
+  interaction.pendingDraft = { id: source.id, source };
+  interaction.showCreateDialogFromSource = value => { reopenedSource = value; };
+  interaction.showDetailDialog = value => { detailId = value; };
+  interaction.bindHighlighterEvents({
+    on(event, handler) { listeners[event] = handler; },
+  });
+
+  listeners.click({ id: source.id });
+
+  assert.equal(reopenedSource, source);
+  assert.equal(detailId, null);
 });
 
 test('annotation storage follows deployment mode instead of a saved browser choice', async () => {
