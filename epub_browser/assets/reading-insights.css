@@ -201,6 +201,9 @@ body.reading-insights-open { position: fixed; width: 100%; overflow: hidden; }
 .reading-insights-day-name { color: var(--text); font-size: .9rem; }
 .reading-insights-day-date { color: var(--text-secondary); font-size: .78rem; }
 .reading-insights-day-duration { overflow: hidden; color: var(--text); font-size: .88rem; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.reading-insights-day-button[aria-pressed="true"] .reading-insights-day-name,
+.reading-insights-day-button[aria-pressed="true"] .reading-insights-day-date,
+.reading-insights-day-button[aria-pressed="true"] .reading-insights-day-duration { color: var(--button-text); }
 
 .reading-insights-session-list {
     display: grid;

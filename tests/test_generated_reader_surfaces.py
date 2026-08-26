@@ -3162,6 +3162,7 @@ assert.deepEqual(
         self.assertIn('reading-insights-modal', insights_styles)
         self.assertIn('background: var(--button-bg);', insights_styles)
         self.assertIn('color: var(--button-text);', insights_styles)
+        self.assertIn('.reading-insights-day-button[aria-pressed="true"] .reading-insights-day-name', insights_styles)
         self.assertNotIn('#3148b7', insights_styles)
         self.assertNotIn('.dark-mode .reading-insights-periods button[aria-pressed="true"]', insights_styles)
 
