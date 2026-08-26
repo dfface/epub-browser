@@ -2548,11 +2548,11 @@ window.location.assign(payload.redirect||'/');
     async def version_status(request):
         release = await asyncio.to_thread(release_lookup.fetch)
         if release is None:
-            return response(
-                error_payload('version_unavailable', 'Version information unavailable'),
-                503,
-                cache_control='no-store',
-            )
+            # Version checks are explicitly optional. A blocked/offline release
+            # lookup must not surface as a failed application resource in the
+            # browser console; the client already treats an empty response as
+            # "no update information available".
+            return Response(status_code=204, headers={'Cache-Control': 'no-store'})
         return response(release, cache_control='no-cache')
 
     async def ready(request):

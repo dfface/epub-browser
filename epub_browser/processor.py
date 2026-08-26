@@ -1469,6 +1469,11 @@ class EPUBProcessor:
             '<span data-i18n="ai.library">AI readings</span></button>'
             if self.deployment_mode == "server" else ""
         )
+        reading_insights_navigation = (
+            '<a class="app-nav-link" href="/reading-insights" '
+            'data-i18n="readingInsights.navigation">Reading insights</a>'
+            if self.deployment_mode == "server" else ""
+        )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
             if self.deployment_mode == "server" else ""
@@ -1490,7 +1495,13 @@ class EPUBProcessor:
             if self.deployment_mode == "server" else ""
         )
         book_review_panel = (
-            f'<section data-book-reviews data-book-id="{book_id_attribute}"></section>'
+            f'<div class="book-review-entry">'
+            f'<button type="button" class="css-btn secondary" data-book-review-toggle '
+            f'aria-controls="book-review-panel" aria-expanded="false">'
+            f'<i class="fas fa-star" aria-hidden="true"></i>'
+            f'<span data-i18n="bookReviews.title">My review</span></button>'
+            f'<section id="book-review-panel" data-book-reviews data-book-id="{book_id_attribute}" hidden></section>'
+            f'</div>'
             if self.deployment_mode == "server" else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
@@ -1608,6 +1619,7 @@ class EPUBProcessor:
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
+            {reading_insights_navigation}
             {ai_reading_navigation}
         </div>
         <div class="app-nav-actions">
@@ -2421,6 +2433,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             '<span data-i18n="ai.library">AI readings</span></button>'
             if self.deployment_mode == "server" else ""
         )
+        reading_insights_navigation = (
+            '<a class="app-nav-link" href="/reading-insights" '
+            'data-i18n="readingInsights.navigation">Reading insights</a>'
+            if self.deployment_mode == "server" else ""
+        )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
             if self.deployment_mode == "server" else ""
@@ -2445,7 +2462,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server" else ""
         )
         reading_session_script = (
-            '<script src="/assets/reading-sessions.js" defer></script>'
+            '<script src="' + self.asset_manifest.url_for("reading-sessions.js") + '" defer></script>'
             if self.deployment_mode == "server" else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
@@ -2625,6 +2642,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <div class="app-nav-links">
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+                {reading_insights_navigation}
                 {ai_reading_navigation}
             </div>
             <div class="app-nav-actions">

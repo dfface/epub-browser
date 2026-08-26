@@ -118,6 +118,10 @@
       var heading = documentTarget.createElement('h2');
       heading.id = id + '-title';
       heading.textContent = translate('bookReviews.title');
+      var closeButton = documentTarget.createElement('button');
+      closeButton.type = 'button';
+      closeButton.className = 'book-review-close';
+      closeButton.textContent = translate('dialog.cancel');
       var summary = documentTarget.createElement('p');
       summary.className = 'book-review-summary';
       summary.hidden = true;
@@ -206,12 +210,17 @@
       form.appendChild(reviewText);
       form.appendChild(hint);
       form.appendChild(actions);
-      target.appendChild(heading);
+      var header = documentTarget.createElement('div');
+      header.className = 'book-review-header';
+      header.appendChild(heading);
+      header.appendChild(closeButton);
+      target.appendChild(header);
       target.appendChild(summary);
       target.appendChild(form);
       target.appendChild(status);
       view = { root: target, rating: rating, ratingOptions: ratingOptions, reviewText: reviewText, saveButton: saveButton,
-        deleteButton: deleteButton, status: status, summary: summary, ratingField: ratingField, ratingError: ratingError };
+        deleteButton: deleteButton, status: status, summary: summary, ratingField: ratingField, ratingError: ratingError,
+        closeButton: closeButton };
 
       form.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -283,6 +292,25 @@
       if (!target || !suppliedBookId) return Promise.resolve(null);
       bookId = String(suppliedBookId);
       render(target);
+      var toggle = documentTarget && documentTarget.querySelector('[data-book-review-toggle]');
+      function closePanel() {
+        target.hidden = true;
+        target.setAttribute('aria-hidden', 'true');
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', 'false');
+          if (typeof toggle.focus === 'function') toggle.focus();
+        }
+      }
+      if (toggle) {
+        toggle.addEventListener('click', function() {
+          var opening = target.hidden;
+          target.hidden = !opening;
+          target.setAttribute('aria-hidden', opening ? 'false' : 'true');
+          toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+          if (opening && view.ratingOptions && view.ratingOptions[0]) view.ratingOptions[0].focus();
+        });
+      }
+      if (view.closeButton) view.closeButton.addEventListener('click', closePanel);
       return load();
     }
 

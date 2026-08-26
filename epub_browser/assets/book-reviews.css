@@ -18,6 +18,37 @@
     line-height: 1.4;
 }
 
+.book-review-entry {
+    margin-top: 24px;
+}
+
+.book-reviews {
+    margin-top: 12px;
+}
+
+.book-review-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.book-review-close {
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text-secondary);
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+}
+
+.book-review-close:focus-visible {
+    outline: 3px solid var(--form-input-focus);
+    outline-offset: 2px;
+}
+
 .book-review-summary,
 .book-review-hint,
 .book-review-status {

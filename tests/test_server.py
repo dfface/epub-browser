@@ -3822,6 +3822,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
                 )
         }
         manifest.update({
+            "reading-sessions.js": "/assets/immutable/reading-sessions.0123456789ab.js",
             "reading-insights.css": "/assets/immutable/reading-insights.0123456789ab.css",
             "reading-insights.js": "/assets/immutable/reading-insights.0123456789ab.js",
         })
