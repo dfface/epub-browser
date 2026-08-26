@@ -27,12 +27,17 @@ function makeElement(tagName) {
 
 function loadReviewClient(initial, failSave) {
   const root = makeElement('section');
+  const dialog = makeElement('section');
   const requests = [];
   const localeListeners = [];
   const browser = {
     document: {
       createElement: makeElement,
-      querySelector(selector) { return selector === '[data-book-reviews]' ? root : null; },
+      querySelector(selector) {
+        if (selector === '[data-book-reviews]') return root;
+        if (selector === '[data-book-review-modal] .book-review-dialog') return dialog;
+        return null;
+      },
     },
     EpubBrowserI18n: {
       t(key) { return key; },
@@ -51,6 +56,7 @@ function loadReviewClient(initial, failSave) {
   const client = Reviews.create(browser);
   client.requests = requests;
   client.localeListeners = localeListeners;
+  client.dialog = dialog;
   return client;
 }
 
@@ -149,4 +155,5 @@ test('review display and editor copy refresh when the active locale changes', as
   assert.equal(display.children[0].children[0].textContent, 'bookReviews.title');
   assert.equal(client.deleteButton.textContent, 'bookReviews.delete');
   assert.equal(client.ratingOptions[3].getAttribute('aria-label'), 'bookReviews.ratingValue');
+  assert.equal(client.dialog.getAttribute('aria-label'), 'bookReviews.write');
 });

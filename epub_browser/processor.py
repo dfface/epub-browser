@@ -1504,7 +1504,7 @@ class EPUBProcessor:
         book_review_panel = (
             f'<div class="book-review-modal" data-book-review-modal hidden>'
             f'<section class="book-review-dialog" id="book-review-dialog" role="dialog" '
-            f'aria-modal="true" aria-labelledby="book-review-dialog-title" tabindex="-1">'
+            f'aria-modal="true" aria-label="Write review" data-i18n-aria-label="bookReviews.write" tabindex="-1">'
             f'<section data-book-reviews data-book-id="{book_id_attribute}"></section>'
             f'</section></div>'
             if self.deployment_mode == "server" else ""

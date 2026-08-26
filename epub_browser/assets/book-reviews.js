@@ -79,11 +79,10 @@
       if (root.requestAnimationFrame) root.requestAnimationFrame(function() { if (copy.scrollHeight && copy.clientHeight) expand.hidden = copy.scrollHeight <= copy.clientHeight; });
     }
     function render(target) {
-      var id = 'book-review-' + (++instanceCount); target.replaceChildren(); target.className = (target.className ? target.className + ' ' : '') + 'book-reviews'; target.setAttribute('aria-labelledby', 'book-review-dialog-title');
+      var id = 'book-review-' + (++instanceCount); target.replaceChildren(); target.className = (target.className ? target.className + ' ' : '') + 'book-reviews';
       var header = documentTarget.createElement('div'); header.className = 'book-review-header';
-      var heading = documentTarget.createElement('h2'); heading.id = 'book-review-dialog-title'; heading.textContent = translate('bookReviews.write');
       var closeButton = documentTarget.createElement('button'); closeButton.type = 'button'; closeButton.className = 'book-review-close'; closeButton.setAttribute('aria-label', translate('dialog.cancel')); closeButton.appendChild(icon('fa-times'));
-      header.appendChild(heading); header.appendChild(closeButton);
+      header.appendChild(closeButton);
       var form = documentTarget.createElement('form'); form.className = 'book-review-form'; form.setAttribute('novalidate', '');
       var ratingField = documentTarget.createElement('fieldset'); ratingField.className = 'book-review-rating'; ratingField.setAttribute('aria-describedby', id + '-rating-error');
       var legend = documentTarget.createElement('legend'); legend.className = 'book-review-visually-hidden'; legend.textContent = translate('bookReviews.rating');
@@ -104,13 +103,13 @@
       var saveButton = documentTarget.createElement('button'); saveButton.type = 'submit'; saveButton.className = 'css-btn primary'; saveButton.textContent = translate('bookReviews.save'); actions.appendChild(deleteButton); actions.appendChild(saveButton);
       var status = documentTarget.createElement('p'); status.className = 'book-review-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); status.setAttribute('aria-atomic', 'true');
       form.appendChild(ratingField); form.appendChild(reviewLabel); form.appendChild(reviewText); form.appendChild(hint); form.appendChild(actions); target.appendChild(header); target.appendChild(form); target.appendChild(status);
-      view = { root: target, heading: heading, rating: rating, ratingOptions: ratingOptions, ratingLegend: legend, reviewLabel: reviewLabel, reviewText: reviewText, hint: hint, saveButton: saveButton, deleteButton: deleteButton, status: status, ratingField: ratingField, ratingError: ratingError, closeButton: closeButton };
+      view = { root: target, rating: rating, ratingOptions: ratingOptions, ratingLegend: legend, reviewLabel: reviewLabel, reviewText: reviewText, hint: hint, saveButton: saveButton, deleteButton: deleteButton, status: status, ratingField: ratingField, ratingError: ratingError, closeButton: closeButton };
       form.addEventListener('submit', function(event) { event.preventDefault(); save(currentRating(), reviewText.value); }); deleteButton.addEventListener('click', deleteReview);
     }
     function refreshLocale() {
       renderDisplay();
       if (!view.root) return;
-      if (view.heading) view.heading.textContent = translate('bookReviews.write');
+      if (dialog) dialog.setAttribute('aria-label', translate('bookReviews.write'));
       if (view.closeButton) view.closeButton.setAttribute('aria-label', translate('dialog.cancel'));
       if (view.ratingLegend) view.ratingLegend.textContent = translate('bookReviews.rating');
       (view.ratingOptions || []).forEach(function(option) { option.setAttribute('aria-label', translate('bookReviews.ratingValue').replace('{rating}', option.value)); });
@@ -175,6 +174,7 @@
       bookId = String(suppliedBookId); displayRoot = suppliedDisplayRoot || (documentTarget && documentTarget.querySelector('[data-book-review-display]')); render(target);
       var serverReview = initialReview(); if (serverReview) applyReview(serverReview);
       trigger = documentTarget && documentTarget.querySelector('[data-book-review-toggle]'); modal = documentTarget && documentTarget.querySelector('[data-book-review-modal]'); dialog = documentTarget && documentTarget.querySelector('[data-book-review-modal] .book-review-dialog');
+      if (dialog) dialog.setAttribute('aria-label', translate('bookReviews.write'));
       if (trigger) trigger.addEventListener('click', openPanel); if (modal) modal.addEventListener('click', function(event) { if (event.target === modal) closePanel(); }); if (view.closeButton) view.closeButton.addEventListener('click', closePanel);
       if (!keydownBound && documentTarget && documentTarget.addEventListener) { keydownBound = true; documentTarget.addEventListener('keydown', onKeydown); }
       if (unsubscribeLocale) unsubscribeLocale();
