@@ -2360,6 +2360,7 @@
       var aiTagSubmit = element('adminAiTagSubmit');
       var dictionaryForm = element('adminDictionaryForm');
       var dictionarySubmit = element('adminDictionarySubmit');
+      var dictionaryAutoName = '';
       var clearAiRevision = element('adminAiClearRevision');
       var clearAiAll = element('adminAiClearAll');
       var aiJobsStatus = element('adminAiJobsStatus');
@@ -2465,13 +2466,14 @@
               method: 'POST',
               headers: {
                 'Content-Type': archive.type || 'application/octet-stream',
-                'X-EPUB-Browser-Dictionary-Filename': archive.name,
-                'X-EPUB-Browser-Dictionary-Name': dictionaryForm.elements.display_name.value
+                'X-EPUB-Browser-Dictionary-Filename': encodeURIComponent(archive.name),
+                'X-EPUB-Browser-Dictionary-Name': encodeURIComponent(dictionaryForm.elements.display_name.value.trim())
               }, body: contents
             });
           }).then(function(response) {
             if (!response.ok) return showDictionaryResponseError(response);
             dictionaryForm.reset();
+            dictionaryAutoName = '';
             clearAdminDirty();
             showDictionaryMessage('admin.dictionaryInstalled', 'success');
             showStatus('admin.dictionaryInstalled', 'success');
@@ -2482,6 +2484,20 @@
           });
         });
       });
+      if (dictionaryForm) {
+        var dictionaryFileInput = dictionaryForm.elements.archive;
+        var dictionaryNameInput = dictionaryForm.elements.display_name;
+        dictionaryFileInput.addEventListener('change', function() {
+          var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
+          var fileName = file && file.name ? file.name.replace(/\.(mdx|zip)$/i, '').trim() : '';
+          if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;
+          dictionaryNameInput.value = fileName;
+          dictionaryAutoName = fileName;
+        });
+        dictionaryNameInput.addEventListener('input', function() {
+          if (dictionaryNameInput.value !== dictionaryAutoName) dictionaryAutoName = '';
+        });
+      }
       if (aiSettingsForm) aiSettingsForm.addEventListener('submit', function(event) {
         event.preventDefault();
         var fields = aiSettingsForm.elements;

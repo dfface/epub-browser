@@ -1,7 +1,10 @@
+import io
 import struct
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
+from urllib.parse import quote
 from unittest import mock
 
 from starlette.testclient import TestClient
@@ -67,6 +70,31 @@ class DictionaryApiTests(unittest.TestCase):
         self.assertEqual(response.json()["dictionaries"], [{
             "id": self.dictionary.id, "display_name": "Local", "entry_count": 1,
         }])
+
+    def test_admin_upload_decodes_a_unicode_filename_as_the_default_name(self):
+        definition = b"a different definition"
+        index = b"word\0" + struct.pack(">II", 0, len(definition))
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w") as archive:
+            archive.writestr(
+                "inner.ifo",
+                "StarDict's dict ifo file\nversion=2.4.2\nbookname=Inner\nwordcount=1\n"
+                "idxfilesize=" + str(len(index)) + "\nsametypesequence=m\n",
+            )
+            archive.writestr("inner.idx", index)
+            archive.writestr("inner.dict", definition)
+
+        response = self.client.post(
+            "/api/admin/dictionaries", content=payload.getvalue(),
+            headers={
+                "content-type": "application/zip",
+                "x-epub-browser-dictionary-filename": quote("现代汉语词典.zip"),
+                "x-epub-browser-dictionary-name": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["dictionary"]["display_name"], "现代汉语词典")
 
     @mock.patch("epub_browser.server.WikimediaEncyclopedia.lookup")
     def test_encyclopedia_is_separate_from_local_dictionary(self, lookup):

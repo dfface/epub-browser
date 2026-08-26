@@ -139,6 +139,7 @@ class DictionaryService:
         return self.install_upload(
             archive_bytes, "dictionary.zip", created_by_user_id=created_by_user_id,
             display_name=display_name, attribution=attribution,
+            _use_upload_name_as_default=False,
         )
 
     def install_upload(
@@ -149,6 +150,7 @@ class DictionaryService:
         created_by_user_id: str,
         display_name: str | None = None,
         attribution: str = "",
+        _use_upload_name_as_default: bool = True,
     ) -> DictionaryRecord:
         """Install a direct MDX upload or a safe ZIP StarDict/MDX package."""
         if not isinstance(upload_bytes, bytes) or not upload_bytes or len(upload_bytes) > 512 * 1024 * 1024:
@@ -185,8 +187,11 @@ class DictionaryService:
                 if len(candidates) != 1:
                     raise DictionaryServiceError("invalid_dictionary_archive")
                 source = candidates[0]
+            requested_name = display_name.strip() if isinstance(display_name, str) else ""
+            fallback_name = Path(upload_name).stem if _use_upload_name_as_default and upload_name else None
             return self.install(source, created_by_user_id=created_by_user_id,
-                                display_name=display_name, attribution=attribution)
+                                display_name=requested_name or fallback_name,
+                                attribution=attribution)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
 

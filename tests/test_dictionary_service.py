@@ -46,6 +46,7 @@ class DictionaryServiceTests(unittest.TestCase):
             service = DictionaryService(store, root)
             record = service.install_upload(payload.getvalue(), "sample.mdx", created_by_user_id=admin.user_id)
 
+            self.assertEqual(record.display_name, "sample")
             self.assertEqual(service.lookup(record.id, "词典").entries[0]["definition"], "本地释义")
 
     def test_installs_stardict_into_isolated_sqlite_and_looks_up_aliases(self):

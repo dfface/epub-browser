@@ -593,6 +593,22 @@ body.auth-page {
     justify-self: start;
 }
 
+.dictionary-install-form {
+    max-width: 720px;
+    gap: 14px;
+}
+
+.dictionary-install-form small {
+    color: var(--account-muted);
+    font-size: .78rem;
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.dictionary-install-form .auth-alert {
+    margin: 0;
+}
+
 .account-details {
     padding: 0;
     overflow: hidden;

@@ -2143,8 +2143,8 @@ window.location.assign(payload.redirect||'/');
             return response({"dictionaries": [dictionary_record_data(item) for item in dictionary_service.store.list_dictionaries()]})
         if not runtime_status.is_ready():
             return response(error_payload("not_ready", "Server is not ready"), 503)
-        filename = request.headers.get("x-epub-browser-dictionary-filename", "")
-        display_name = request.headers.get("x-epub-browser-dictionary-name")
+        filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
+        display_name = unquote(request.headers.get("x-epub-browser-dictionary-name", ""))
         content_length = request.headers.get("content-length")
         try:
             if content_length and int(content_length) > 512 * 1024 * 1024:
