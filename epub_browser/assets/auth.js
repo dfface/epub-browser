@@ -1308,7 +1308,12 @@
         details.className = 'account-pat-details';
         name.textContent = record.name;
         scopes.className = 'account-pat-scope-summary';
-        scopes.textContent = (record.scopes || []).map(patScopeLabel).join(' · ');
+        (record.scopes || []).forEach(function(scope) {
+          var chip = root.document.createElement('span');
+          chip.className = 'account-pat-scope-chip';
+          chip.textContent = patScopeLabel(scope);
+          scopes.appendChild(chip);
+        });
         dates.className = 'account-pat-dates';
         dates.textContent = record.expires_at
           ? t('account.pats.expires', { date: formatDate(record.expires_at) })
@@ -1368,6 +1373,21 @@
       }
     }
 
+    function webhookEventLabel(eventType) {
+      var keys = {
+        'review.created': 'admin.webhooks.event.reviewCreated',
+        'review.updated': 'admin.webhooks.event.reviewUpdated',
+        'review.deleted': 'admin.webhooks.event.reviewDeleted',
+        'book.created': 'admin.webhooks.event.bookCreated',
+        'book.updated': 'admin.webhooks.event.bookUpdated',
+        'book.removed': 'admin.webhooks.event.bookRemoved',
+        'book.conversion.succeeded': 'admin.webhooks.event.conversionSucceeded',
+        'book.conversion.failed': 'admin.webhooks.event.conversionFailed',
+        'webhook.test': 'admin.webhooks.event.test'
+      };
+      return keys[eventType] ? t(keys[eventType]) : eventType;
+    }
+
     function renderWebhooks(endpoints, deliveries) {
       var list = element('adminWebhookList');
       var history = element('adminWebhookDeliveries');
@@ -1376,10 +1396,11 @@
         (endpoints || []).forEach(function(endpoint) {
           var item = root.document.createElement('li');
           var summary = root.document.createElement('div');
+          var summaryHeader = root.document.createElement('div');
           var actions = root.document.createElement('div');
           var name = root.document.createElement('strong');
-          var url = root.document.createElement('span');
-          var events = root.document.createElement('span');
+          var url = root.document.createElement('code');
+          var events = root.document.createElement('div');
           var stateKey = endpoint.enabled ? 'admin.webhooks.status.enabled' : 'admin.webhooks.status.paused';
           var state = createTextElement('span', '', stateKey);
           item.className = 'account-list-item admin-webhook-item';
@@ -1388,12 +1409,19 @@
           url.className = 'admin-webhook-url';
           url.textContent = endpoint.url;
           events.className = 'admin-webhook-events-copy';
-          events.textContent = (endpoint.event_types || []).join(' · ');
           state.className = 'account-status-badge ' + (endpoint.enabled ? 'is-success' : 'is-muted');
-          summary.appendChild(name);
+          summaryHeader.className = 'admin-webhook-summary-header';
+          summaryHeader.appendChild(name);
+          summaryHeader.appendChild(state);
+          summary.appendChild(summaryHeader);
           summary.appendChild(url);
+          (endpoint.event_types || []).forEach(function(eventType) {
+            var chip = root.document.createElement('span');
+            chip.className = 'admin-webhook-event-chip';
+            chip.textContent = webhookEventLabel(eventType);
+            events.appendChild(chip);
+          });
           summary.appendChild(events);
-          summary.appendChild(state);
           actions.className = 'account-list-actions';
           actions.appendChild(actionButton('admin.webhooks.edit', function() {
             var form = element('adminWebhookForm');

@@ -15,10 +15,10 @@ SERVER_LOCALE_CONTROL = '''<div class="library-language app-nav-locale">
     <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="en" data-i18n="locale.name.en">English</option><option value="zh-CN" data-i18n="locale.name.zh-CN">简体中文</option><option value="zh-TW" data-i18n="locale.name.zh-TW">繁體中文</option><option value="ko" data-i18n="locale.name.ko">한국어</option><option value="ja" data-i18n="locale.name.ja">日本語</option></select>
 </div>'''
 
-SERVER_ACCOUNT_CONTROL = '''<button type="button" class="library-meta-action app-nav-action" id="adminMenu" aria-haspopup="dialog" aria-controls="adminPanel" hidden>
+SERVER_ACCOUNT_CONTROL = '''<button type="button" class="library-meta-action app-nav-action" id="adminMenu" aria-haspopup="dialog" aria-controls="adminPanel" aria-label="Administration" data-i18n-aria-label="admin.menu" hidden>
         <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>
     </button>
-    <button type="button" class="library-meta-action app-nav-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel">
+    <button type="button" class="library-meta-action app-nav-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Account" data-i18n-aria-label="account.menu">
         <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue" data-i18n="account.menu">Account</span>
     </button>'''
 SERVER_ACCOUNT_PANEL = '''
@@ -57,33 +57,33 @@ SERVER_ACCOUNT_PANEL = '''
 </section>
 </div>
 <section class="account-card account-card-wide account-pat-card" aria-labelledby="accountPatTitle">
-    <h3 id="accountPatTitle" data-i18n="account.pats.title">Personal access tokens</h3>
-    <p class="account-help" data-i18n="account.pats.description">Use scoped tokens with the external API.</p>
+    <div class="account-section-heading">
+        <div><h3 id="accountPatTitle" data-i18n="account.pats.title">Personal access tokens</h3><p class="account-help" data-i18n="account.pats.description">Use scoped tokens with the external API.</p></div>
+        <a class="account-docs-link" href="/api-docs" target="_blank" rel="noopener"><i class="fas fa-code" aria-hidden="true"></i><span data-i18n="account.pats.docs">Open API docs</span></a>
+    </div>
     <form class="account-form account-pat-form" id="patCreateForm">
-        <label><span data-i18n="account.pats.name">Token name</span><input type="text" name="name" maxlength="80" autocomplete="off" required></label>
-        <label><span data-i18n="account.currentPassword">Current password</span><input type="password" name="current_password" autocomplete="current-password" required></label>
+        <div class="account-pat-form-grid">
+            <label><span data-i18n="account.pats.name">Token name</span><input type="text" name="name" maxlength="80" autocomplete="off" required></label>
+            <label><span data-i18n="account.currentPassword">Current password</span><input type="password" name="current_password" autocomplete="current-password" required></label>
+            <label><span data-i18n="account.pats.expiration">Expiration</span><select name="expires_in_days" aria-describedby="patExpirationHelp"><option value="30" data-i18n="account.pats.days30">30 days</option><option value="90" selected data-i18n="account.pats.days90">90 days</option><option value="180" data-i18n="account.pats.days180">180 days</option><option value="365" data-i18n="account.pats.days365">365 days</option><option value="never" data-i18n="account.pats.never">Never expires</option></select></label>
+        </div>
         <fieldset class="account-pat-scopes">
             <legend data-i18n="account.pats.scopes">Permissions</legend>
-            <label><input type="checkbox" name="scopes" value="library:read"> <span data-i18n="account.pats.scope.libraryRead">Read library and chapters</span></label>
-            <label><input type="checkbox" name="scopes" value="bookshelf:read"> <span data-i18n="account.pats.scope.bookshelfRead">Read bookshelf</span></label>
-            <label><input type="checkbox" name="scopes" value="bookshelf:write"> <span data-i18n="account.pats.scope.bookshelfWrite">Update bookshelf</span></label>
-            <label><input type="checkbox" name="scopes" value="progress:read"> <span data-i18n="account.pats.scope.progressRead">Read progress</span></label>
-            <label><input type="checkbox" name="scopes" value="progress:write"> <span data-i18n="account.pats.scope.progressWrite">Update progress</span></label>
-            <label><input type="checkbox" name="scopes" value="annotations:read"> <span data-i18n="account.pats.scope.annotationsRead">Read annotations</span></label>
-            <label><input type="checkbox" name="scopes" value="annotations:write"> <span data-i18n="account.pats.scope.annotationsWrite">Update annotations</span></label>
-            <label><input type="checkbox" name="scopes" value="reviews:read"> <span data-i18n="account.pats.scope.reviewsRead">Read reviews</span></label>
-            <label><input type="checkbox" name="scopes" value="reviews:write"> <span data-i18n="account.pats.scope.reviewsWrite">Update reviews</span></label>
-            <label id="patAdminScopeLabel" hidden><input type="checkbox" name="scopes" value="admin:data:read"> <span data-i18n="account.pats.scope.adminDataRead">Read all users' non-secret data</span></label>
+            <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.library">Library</strong><label><input type="checkbox" name="scopes" value="library:read"> <span data-i18n="account.pats.scope.libraryRead">Read library and chapters</span></label></div>
+            <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.bookshelf">Bookshelf</strong><label><input type="checkbox" name="scopes" value="bookshelf:read"> <span data-i18n="account.pats.scope.bookshelfRead">Read bookshelf</span></label><label><input type="checkbox" name="scopes" value="bookshelf:write"> <span data-i18n="account.pats.scope.bookshelfWrite">Update bookshelf</span></label></div>
+            <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.progress">Progress</strong><label><input type="checkbox" name="scopes" value="progress:read"> <span data-i18n="account.pats.scope.progressRead">Read progress</span></label><label><input type="checkbox" name="scopes" value="progress:write"> <span data-i18n="account.pats.scope.progressWrite">Update progress</span></label></div>
+            <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.annotations">Annotations</strong><label><input type="checkbox" name="scopes" value="annotations:read"> <span data-i18n="account.pats.scope.annotationsRead">Read annotations</span></label><label><input type="checkbox" name="scopes" value="annotations:write"> <span data-i18n="account.pats.scope.annotationsWrite">Update annotations</span></label></div>
+            <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.reviews">Reviews</strong><label><input type="checkbox" name="scopes" value="reviews:read"> <span data-i18n="account.pats.scope.reviewsRead">Read reviews</span></label><label><input type="checkbox" name="scopes" value="reviews:write"> <span data-i18n="account.pats.scope.reviewsWrite">Update reviews</span></label></div>
+            <div class="account-pat-scope-group" id="patAdminScopeLabel" hidden><strong data-i18n="account.pats.group.administration">Administration</strong><label><input type="checkbox" name="scopes" value="admin:data:read"> <span data-i18n="account.pats.scope.adminDataRead">Read all users' non-secret data</span></label></div>
         </fieldset>
-        <label><span data-i18n="account.pats.expiration">Expiration</span><select name="expires_in_days"><option value="30" data-i18n="account.pats.days30">30 days</option><option value="90" selected data-i18n="account.pats.days90">90 days</option><option value="180" data-i18n="account.pats.days180">180 days</option><option value="365" data-i18n="account.pats.days365">365 days</option><option value="never" data-i18n="account.pats.never">Never expires</option></select></label>
-        <p class="account-pat-warning" data-i18n="account.pats.neverExpiresWarning">Never-expiring tokens remain valid until you revoke them.</p>
-        <button type="submit" id="patCreateSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="account.pats.create">Create token</button>
+        <div class="account-pat-form-footer"><p class="account-pat-warning" id="patExpirationHelp" data-i18n="account.pats.neverExpiresWarning">Never-expiring tokens remain valid until you revoke them.</p><button type="submit" id="patCreateSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="account.pats.create">Create token</button></div>
     </form>
     <div class="account-pat-secret" id="patSecretRegion" role="status" aria-live="polite" hidden>
         <p data-i18n="account.pats.created">Copy this token now. It will not be shown again.</p>
         <code id="patCreatedSecret"></code>
         <button type="button" id="patCopySecret" class="bookshelf-action-btn" data-i18n="account.pats.copy">Copy token</button>
     </div>
+    <div class="account-records-heading"><h4 data-i18n="account.pats.issued">Issued tokens</h4></div>
     <ul class="account-list account-pat-list" id="patList"></ul>
     <p id="patLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
 </section>
@@ -227,27 +227,19 @@ SERVER_ACCOUNT_PANEL = '''
     <section class="account-admin-section account-card-wide admin-webhooks-section" id="adminWebhooksSection" role="tabpanel" aria-labelledby="adminSectionWebhooksTab" data-admin-panel="webhooks" hidden>
         <h4 data-i18n="admin.webhooks.title">WebHooks</h4>
         <p class="account-section-copy" data-i18n="admin.webhooks.description">Send signed event notifications to administrator-managed HTTP endpoints.</p>
-        <form class="account-form admin-webhook-form" id="adminWebhookForm">
+        <div class="admin-webhook-workspace"><form class="account-form admin-webhook-form" id="adminWebhookForm">
             <label><span data-i18n="admin.webhooks.name">Name</span><input name="name" maxlength="80" required></label>
             <label><span data-i18n="admin.webhooks.url">Endpoint URL</span><input name="url" type="url" placeholder="https://example.com/webhook" data-i18n-placeholder="admin.webhooks.urlPlaceholder" autocomplete="off" required></label>
             <fieldset class="admin-webhook-events"><legend data-i18n="admin.webhooks.events">Events</legend>
-                <label><input type="checkbox" name="event_types" value="review.created"><span data-i18n="admin.webhooks.event.reviewCreated">Review created</span></label>
-                <label><input type="checkbox" name="event_types" value="review.updated"><span data-i18n="admin.webhooks.event.reviewUpdated">Review updated</span></label>
-                <label><input type="checkbox" name="event_types" value="review.deleted"><span data-i18n="admin.webhooks.event.reviewDeleted">Review deleted</span></label>
-                <label><input type="checkbox" name="event_types" value="book.created"><span data-i18n="admin.webhooks.event.bookCreated">Book created</span></label>
-                <label><input type="checkbox" name="event_types" value="book.updated"><span data-i18n="admin.webhooks.event.bookUpdated">Book updated</span></label>
-                <label><input type="checkbox" name="event_types" value="book.removed"><span data-i18n="admin.webhooks.event.bookRemoved">Book removed</span></label>
-                <label><input type="checkbox" name="event_types" value="book.conversion.succeeded"><span data-i18n="admin.webhooks.event.conversionSucceeded">Conversion succeeded</span></label>
-                <label><input type="checkbox" name="event_types" value="book.conversion.failed"><span data-i18n="admin.webhooks.event.conversionFailed">Conversion failed</span></label>
+                <div class="admin-webhook-event-group" role="group" aria-labelledby="adminWebhookReviewEvents"><strong id="adminWebhookReviewEvents" data-i18n="admin.webhooks.reviewEvents">Review activity</strong><div class="admin-webhook-event-options"><label><input type="checkbox" name="event_types" value="review.created"><span data-i18n="admin.webhooks.event.reviewCreated">Review created</span></label><label><input type="checkbox" name="event_types" value="review.updated"><span data-i18n="admin.webhooks.event.reviewUpdated">Review updated</span></label><label><input type="checkbox" name="event_types" value="review.deleted"><span data-i18n="admin.webhooks.event.reviewDeleted">Review deleted</span></label></div></div>
+                <div class="admin-webhook-event-group" role="group" aria-labelledby="adminWebhookBookEvents"><strong id="adminWebhookBookEvents" data-i18n="admin.webhooks.bookEvents">Book lifecycle</strong><div class="admin-webhook-event-options"><label><input type="checkbox" name="event_types" value="book.created"><span data-i18n="admin.webhooks.event.bookCreated">Book created</span></label><label><input type="checkbox" name="event_types" value="book.updated"><span data-i18n="admin.webhooks.event.bookUpdated">Book updated</span></label><label><input type="checkbox" name="event_types" value="book.removed"><span data-i18n="admin.webhooks.event.bookRemoved">Book removed</span></label><label><input type="checkbox" name="event_types" value="book.conversion.succeeded"><span data-i18n="admin.webhooks.event.conversionSucceeded">Conversion succeeded</span></label><label><input type="checkbox" name="event_types" value="book.conversion.failed"><span data-i18n="admin.webhooks.event.conversionFailed">Conversion failed</span></label></div></div>
             </fieldset>
             <label class="admin-webhook-enabled"><input type="checkbox" name="enabled" checked><span data-i18n="admin.webhooks.enabled">Enabled</span></label>
-            <button type="submit" id="adminWebhookSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.webhooks.create">Add endpoint</button>
-            <button type="button" id="adminWebhookCancelEdit" class="bookshelf-action-btn" data-i18n="admin.webhooks.cancelEdit" hidden>Cancel editing</button>
+            <div class="admin-webhook-form-actions"><button type="submit" id="adminWebhookSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.webhooks.create">Add endpoint</button><button type="button" id="adminWebhookCancelEdit" class="bookshelf-action-btn" data-i18n="admin.webhooks.cancelEdit" hidden>Cancel editing</button></div>
         </form>
+        <section class="admin-webhook-registry" aria-labelledby="adminWebhookConfiguredTitle"><h5 id="adminWebhookConfiguredTitle" data-i18n="admin.webhooks.configured">Configured endpoints</h5><ul class="account-list admin-webhook-list" id="adminWebhookList"></ul></section></div>
         <div class="account-pat-secret" id="adminWebhookSecretRegion" role="status" aria-live="polite" hidden><p data-i18n="admin.webhooks.secretOnce">Copy the signing secret now. It will not be shown again.</p><code id="adminWebhookSecret"></code><button type="button" id="adminWebhookCopySecret" class="bookshelf-action-btn" data-i18n="admin.webhooks.copySecret">Copy secret</button></div>
-        <ul class="account-list admin-webhook-list" id="adminWebhookList"></ul>
-        <h5 data-i18n="admin.webhooks.deliveries">Recent deliveries</h5>
-        <ul class="account-list admin-webhook-deliveries" id="adminWebhookDeliveries"></ul>
+        <section class="admin-webhook-history" aria-labelledby="adminWebhookDeliveriesTitle"><h5 id="adminWebhookDeliveriesTitle" data-i18n="admin.webhooks.deliveries">Recent deliveries</h5><ul class="account-list admin-webhook-deliveries" id="adminWebhookDeliveries"></ul></section>
         <p id="adminWebhookLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
     </section>
     <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
