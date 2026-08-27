@@ -3249,8 +3249,9 @@ class StateStore:
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT id FROM webhook_deliveries WHERE status IN ('pending','retrying') "
-                "AND next_attempt_at<=? AND (lease_expires_at IS NULL OR lease_expires_at<=?) "
+                "SELECT id FROM webhook_deliveries WHERE "
+                "((status IN ('pending','retrying') AND next_attempt_at<=?) "
+                "OR (status='leased' AND lease_expires_at<=?)) "
                 "ORDER BY next_attempt_at,created_at,id LIMIT 1", (timestamp, timestamp)
             ).fetchone()
             if row is None:
@@ -3291,6 +3292,21 @@ class StateStore:
                 (status, attempt, retry_at if retry_at is not None else timestamp, status_code, str(error or "")[:1000] or None, timestamp, delivery_id),
             )
         return True
+
+    def cleanup_webhook_history(self, *, now=None, retention_days=30):
+        timestamp = self._timestamp(now)
+        cutoff = timestamp - max(int(retention_days), 1) * 86400
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "DELETE FROM webhook_deliveries WHERE status IN ('succeeded','failed') AND updated_at<?",
+                (cutoff,),
+            )
+            connection.execute(
+                "DELETE FROM webhook_events WHERE created_at<? AND NOT EXISTS "
+                "(SELECT 1 FROM webhook_deliveries WHERE webhook_deliveries.event_id=webhook_events.id)",
+                (cutoff,),
+            )
+        return cursor.rowcount
 
     def redeliver_webhook_event(self, event_id, endpoint_id, *, now=None):
         timestamp = self._timestamp(now)

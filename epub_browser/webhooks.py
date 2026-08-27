@@ -109,6 +109,7 @@ class WebhookService:
 
     async def start_worker(self):
         if self._task is None:
+            self.store.cleanup_webhook_history(now=self.clock(), retention_days=30)
             self._stop = asyncio.Event()
             self._task = asyncio.create_task(self._run())
 

@@ -67,6 +67,29 @@ class WebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(headers["X-EPUB-Signature"].startswith("v1="))
         self.assertEqual(set(WEBHOOK_EVENT_TYPES) >= {"review.created", "webhook.test"}, True)
 
+    async def test_expired_delivery_lease_is_reclaimed_after_worker_restart(self):
+        endpoint = self.store.create_webhook_endpoint(
+            "Receiver", "https://example.test/hook", {"webhook.test"}
+        )
+        self.store.enqueue_webhook_test(endpoint["webhook"]["id"], now=100)
+        first = self.store.claim_webhook_delivery("worker-a", now=100, lease_seconds=30)
+        self.assertIsNotNone(first)
+        self.assertIsNone(
+            self.store.claim_webhook_delivery("worker-b", now=120, lease_seconds=30)
+        )
+        reclaimed = self.store.claim_webhook_delivery(
+            "worker-b", now=131, lease_seconds=30
+        )
+        self.assertEqual(reclaimed["id"], first["id"])
+
+    async def test_cleanup_preserves_pending_deliveries(self):
+        endpoint = self.store.create_webhook_endpoint(
+            "Receiver", "https://example.test/hook", {"webhook.test"}
+        )
+        self.store.enqueue_webhook_test(endpoint["webhook"]["id"], now=100)
+        self.assertEqual(self.store.cleanup_webhook_history(now=10_000_000, retention_days=30), 0)
+        self.assertEqual(len(self.store.list_webhook_deliveries()), 1)
+
 
 class WebhookAdminAPITests(unittest.TestCase):
     def setUp(self):
