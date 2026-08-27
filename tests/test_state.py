@@ -359,6 +359,31 @@ class StateStoreTests(unittest.TestCase):
             <= tables
         )
 
+    def test_v16_personal_access_tokens_store_only_digest_and_authenticate(self):
+        issued = self.store.create_personal_access_token(
+            self.owner.user_id,
+            "Automation",
+            {"library:read"},
+            expires_at=None,
+        )
+
+        authenticated = self.store.authenticate_personal_access_token(
+            issued.raw_token,
+            now=1_000.0,
+        )
+
+        self.assertEqual(authenticated.token.token_id, issued.token.token_id)
+        self.assertEqual(authenticated.principal, self.owner)
+        self.assertEqual(authenticated.effective_scopes, frozenset({"library:read"}))
+        with sqlite3.connect(self.database) as connection:
+            row = connection.execute(
+                "SELECT token_digest, scopes_json FROM personal_access_tokens "
+                "WHERE id = ?",
+                (issued.token.token_id,),
+            ).fetchone()
+        self.assertNotIn(issued.raw_token, row)
+        self.assertEqual(json.loads(row[1]), ["library:read"])
+
     def test_disabling_dictionary_clears_its_language_default(self):
         dictionary = self.store.create_dictionary(
             dictionary_id="dictionary-en",

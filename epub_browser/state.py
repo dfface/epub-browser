@@ -23,9 +23,18 @@ from .auth import (
 )
 from .identity import new_server_book_id
 from .locales import SUPPORTED_LOCALE_SET
+from .pat import (
+    AuthenticatedPAT,
+    IssuedPersonalAccessToken,
+    PersonalAccessToken,
+    generate_pat,
+    normalize_scopes,
+    pat_digest,
+    pat_public_id,
+)
 
 
-DB_SCHEMA_VERSION = 15
+DB_SCHEMA_VERSION = 16
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -299,6 +308,12 @@ class StateStore:
                 self._create_v14_indexes(connection)
                 self._create_v15_dictionary_schema(connection)
                 self._create_v15_dictionary_indexes(connection)
+                self._require_foreign_key_integrity(connection)
+            if version < 16:
+                self._migrate_schema_v16(connection, max(version, 15))
+            else:
+                self._create_v16_pat_schema(connection)
+                self._create_v16_pat_indexes(connection)
                 self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
@@ -1434,6 +1449,44 @@ class StateStore:
         self._create_v15_dictionary_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 15")
+
+    @staticmethod
+    def _create_v16_pat_schema(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS personal_access_tokens (
+                id TEXT PRIMARY KEY,
+                public_id TEXT NOT NULL UNIQUE,
+                token_digest TEXT NOT NULL UNIQUE,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 80),
+                scopes_json TEXT NOT NULL,
+                expires_at REAL,
+                last_used_at REAL,
+                revoked_at REAL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
+
+    @staticmethod
+    def _create_v16_pat_indexes(connection) -> None:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_personal_access_tokens_user_created "
+            "ON personal_access_tokens(user_id, created_at DESC, id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_personal_access_tokens_active "
+            "ON personal_access_tokens(user_id, expires_at, revoked_at)"
+        )
+
+    def _migrate_schema_v16(self, connection, source_version) -> None:
+        if source_version >= 16:
+            return
+        self._create_v16_pat_schema(connection)
+        self._create_v16_pat_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 16")
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -2796,6 +2849,186 @@ class StateStore:
                 (timestamp, session_id, user_id),
             )
         return cursor.rowcount == 1
+
+    @staticmethod
+    def _personal_access_token_record(row) -> PersonalAccessToken:
+        scopes = normalize_scopes(json.loads(row["scopes_json"]))
+        return PersonalAccessToken(
+            token_id=row["id"],
+            public_id=row["public_id"],
+            user_id=row["user_id"],
+            name=row["name"],
+            scopes=scopes,
+            expires_at=row["expires_at"],
+            last_used_at=row["last_used_at"],
+            revoked_at=row["revoked_at"],
+            created_at=row["created_at"],
+        )
+
+    def create_personal_access_token(
+        self,
+        user_id: str,
+        name: str,
+        scopes,
+        *,
+        expires_at=None,
+        now=None,
+    ) -> IssuedPersonalAccessToken:
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80:
+            raise ValueError("PAT name must contain 1 to 80 characters")
+        normalized_scopes = normalize_scopes(scopes)
+        created_at = self._timestamp(now)
+        expiry = None if expires_at is None else self._timestamp(expires_at)
+        if expiry is not None and expiry <= created_at:
+            raise ValueError("PAT expiration must be in the future")
+        raw_token, public_id, digest = generate_pat()
+        token_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            connection.execute(
+                """
+                INSERT INTO personal_access_tokens (
+                    id, public_id, token_digest, user_id, name, scopes_json,
+                    expires_at, last_used_at, revoked_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+                """,
+                (
+                    token_id,
+                    public_id,
+                    digest,
+                    user_id,
+                    name.strip(),
+                    json.dumps(normalized_scopes, separators=(",", ":")),
+                    expiry,
+                    created_at,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM personal_access_tokens WHERE id = ?",
+                (token_id,),
+            ).fetchone()
+        return IssuedPersonalAccessToken(
+            token=self._personal_access_token_record(row),
+            raw_token=raw_token,
+        )
+
+    def list_personal_access_tokens(
+        self,
+        user_id: str,
+        *,
+        include_revoked: bool = False,
+    ) -> tuple:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            condition = "" if include_revoked else " AND revoked_at IS NULL"
+            rows = connection.execute(
+                "SELECT * FROM personal_access_tokens WHERE user_id = ?"
+                + condition
+                + " ORDER BY created_at DESC, id",
+                (user_id,),
+            ).fetchall()
+        return tuple(self._personal_access_token_record(row) for row in rows)
+
+    def authenticate_personal_access_token(
+        self,
+        raw_token: str,
+        *,
+        now=None,
+        touch_interval_seconds: float = 300,
+    ) -> Optional[AuthenticatedPAT]:
+        public_id = pat_public_id(raw_token)
+        if public_id is None:
+            return None
+        digest = pat_digest(raw_token)
+        used_at = self._timestamp(now)
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT personal_access_tokens.*, users.username, users.role,
+                       users.enabled
+                FROM personal_access_tokens
+                JOIN users ON users.id = personal_access_tokens.user_id
+                WHERE personal_access_tokens.public_id = ?
+                """,
+                (public_id,),
+            ).fetchone()
+            if (
+                row is None
+                or not hmac.compare_digest(row["token_digest"], digest)
+                or row["revoked_at"] is not None
+                or not bool(row["enabled"])
+                or (
+                    row["expires_at"] is not None
+                    and float(row["expires_at"]) <= used_at
+                )
+            ):
+                return None
+            if (
+                row["last_used_at"] is None
+                or float(row["last_used_at"]) <= used_at - touch_interval_seconds
+            ):
+                connection.execute(
+                    "UPDATE personal_access_tokens SET last_used_at = ? WHERE id = ?",
+                    (used_at, row["id"]),
+                )
+            token = self._personal_access_token_record(row)
+        scopes = set(token.scopes)
+        if row["role"] != "admin":
+            scopes.discard("admin:data:read")
+        return AuthenticatedPAT(
+            principal=Principal(row["user_id"], row["username"], row["role"]),
+            token=token,
+            effective_scopes=frozenset(scopes),
+        )
+
+    def revoke_personal_access_token(
+        self,
+        user_id: str,
+        token_id: str,
+        *,
+        revoked_at=None,
+    ) -> bool:
+        timestamp = self._timestamp(revoked_at)
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            cursor = connection.execute(
+                """
+                UPDATE personal_access_tokens SET revoked_at = ?
+                WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+                """,
+                (timestamp, token_id, user_id),
+            )
+        return cursor.rowcount == 1
+
+    def revoke_all_personal_access_tokens(
+        self,
+        user_id: str,
+        *,
+        revoked_at=None,
+    ) -> int:
+        timestamp = self._timestamp(revoked_at)
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            cursor = connection.execute(
+                """
+                UPDATE personal_access_tokens SET revoked_at = ?
+                WHERE user_id = ? AND revoked_at IS NULL
+                """,
+                (timestamp, user_id),
+            )
+        return cursor.rowcount
+
+    def raw_personal_access_token_rows(self) -> tuple:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM personal_access_tokens"
+            ).fetchall()
+        return tuple(
+            str(value)
+            for row in rows
+            for value in row
+            if value is not None
+        )
 
     def raw_session_rows(self) -> tuple[str, ...]:
         """Expose persisted scalar values for security inspection tests."""
