@@ -171,6 +171,74 @@
         }
         return Utils.formatDateTime(value);
     }
+
+    var COLLAPSED_COLOR_COUNT = 7;
+
+    function compactAnnotationColors(colors, selectedColor) {
+        var visible = colors.slice(0, COLLAPSED_COLOR_COUNT);
+        if (
+            colors.indexOf(selectedColor) !== -1 &&
+            visible.indexOf(selectedColor) === -1 &&
+            visible.length
+        ) {
+            visible[visible.length - 1] = selectedColor;
+        }
+        return visible;
+    }
+
+    function createExpandableColorPicker(container, selectedColor, onSelect) {
+        var allColors = CONFIG.getColors();
+        var currentColor = selectedColor;
+        var expanded = false;
+
+        var render = function() {
+            container.innerHTML = '';
+            var visibleColors = expanded
+                ? allColors
+                : compactAnnotationColors(allColors, currentColor);
+
+            visibleColors.forEach(function(color) {
+                var choice = document.createElement('button');
+                choice.type = 'button';
+                choice.className = 'color-option' + (color === currentColor ? ' selected' : '');
+                choice.style.backgroundColor = color;
+                choice.setAttribute('data-color', color);
+                choice.setAttribute('aria-label', tr('color') + ' ' + color);
+                choice.setAttribute('aria-pressed', (color === currentColor).toString());
+                choice.addEventListener('click', function() {
+                    currentColor = color;
+                    container.querySelectorAll('.color-option').forEach(function(option) {
+                        option.classList.toggle('selected', option === choice);
+                        option.setAttribute('aria-pressed', (option === choice).toString());
+                    });
+                    if (onSelect) onSelect(color);
+                });
+                container.appendChild(choice);
+            });
+
+            if (allColors.length > COLLAPSED_COLOR_COUNT) {
+                var hiddenCount = allColors.length - visibleColors.length;
+                var toggle = document.createElement('button');
+                var toggleLabel = expanded
+                    ? tr('showFewerColors')
+                    : tr('showMoreColors', { count: hiddenCount });
+                toggle.type = 'button';
+                toggle.className = 'color-options-toggle';
+                toggle.textContent = expanded ? '−' : '+' + hiddenCount;
+                toggle.title = toggleLabel;
+                toggle.setAttribute('aria-label', toggleLabel);
+                toggle.setAttribute('aria-expanded', expanded.toString());
+                toggle.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    expanded = !expanded;
+                    render();
+                });
+                container.appendChild(toggle);
+            }
+        };
+
+        render();
+    }
     
     // ========== Utility Functions ==========
     var Utils = {
@@ -1408,19 +1476,8 @@
             var colors = document.createElement('div');
             colors.className = 'color-options';
             var selectedColor = Settings.defaultColor;
-            CONFIG.getColors().slice(0, 5).forEach(function(color) {
-                var choice = document.createElement('button');
-                choice.type = 'button';
-                choice.className = 'color-option' + (color === selectedColor ? ' selected' : '');
-                choice.style.backgroundColor = color;
-                choice.setAttribute('aria-label', tr('color') + ' ' + color);
-                choice.addEventListener('click', function() {
-                    selectedColor = color;
-                    colors.querySelectorAll('.color-option').forEach(function(option) {
-                        option.classList.toggle('selected', option === choice);
-                    });
-                });
-                colors.appendChild(choice);
+            createExpandableColorPicker(colors, selectedColor, function(color) {
+                selectedColor = color;
             });
             colorPicker.appendChild(colorLabel);
             colorPicker.appendChild(colors);
@@ -1501,19 +1558,7 @@
                 }
 
                 var colorOptions = dialog.querySelector('.color-options');
-                CONFIG.getColors().slice(0, 7).forEach(function(color) {
-                    var btn = document.createElement('button');
-                    btn.className = 'color-option' + (color === annotation.color ? ' selected' : '');
-                    btn.style.backgroundColor = color;
-                    btn.setAttribute('data-color', color);
-                    btn.addEventListener('click', function() {
-                        colorOptions.querySelectorAll('.color-option').forEach(function(option) {
-                            option.classList.remove('selected');
-                        });
-                        this.classList.add('selected');
-                    });
-                    colorOptions.appendChild(btn);
-                });
+                createExpandableColorPicker(colorOptions, annotation.color);
 
                 document.body.appendChild(dialog);
                 dialog._epubAnchor = self.getAnnotationAnchorRect(annotation);

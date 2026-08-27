@@ -114,8 +114,9 @@
     font-family: var(--font-family, system-ui, -apple-system, sans-serif);
 }
 
-/* Reader detail uses the same anchored surface language as dictionary lookup.
+/* Reader note and detail dialogs share one anchored surface language.
    Settings dialogs retain the broader modal treatment above. */
+.annotation-note-dialog,
 .annotation-detail-dialog {
     z-index: 10002;
     width: min(420px, calc(100vw - 24px));
@@ -128,12 +129,14 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.annotation-note-dialog .annotation-dialog-header,
 .annotation-detail-dialog .annotation-dialog-header {
     min-height: 48px;
     padding: 8px 14px;
     font-size: 14px;
 }
 
+.annotation-note-dialog .annotation-dialog-close,
 .annotation-detail-dialog .annotation-dialog-close {
     min-width: 44px;
     min-height: 44px;
@@ -141,12 +144,14 @@
     font-size: 1.5rem;
 }
 
+.annotation-note-dialog .annotation-dialog-body,
 .annotation-detail-dialog .annotation-dialog-body {
     padding: 14px;
     font-size: 14px;
     line-height: 1.62;
 }
 
+.annotation-note-dialog .annotation-dialog-footer,
 .annotation-detail-dialog .annotation-dialog-footer {
     padding: 10px 14px;
 }
@@ -351,6 +356,7 @@
 .color-options,
 .color-picker-default {
     display: flex;
+    align-items: center;
     gap: 6px;
     flex-wrap: wrap;
 }
@@ -372,6 +378,30 @@
 .color-option.selected {
     border-color: var(--text);
     box-shadow: 0 0 0 2px var(--button-bg);
+}
+
+.color-options-toggle {
+    min-width: 26px;
+    height: 26px;
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--text-secondary);
+    font: 700 11px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    cursor: pointer;
+}
+
+.color-options-toggle:hover {
+    border-color: var(--button-bg);
+    color: var(--button-bg);
+    background: var(--hover-bg);
+}
+
+.color-option:focus-visible,
+.color-options-toggle:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 45%, transparent);
+    outline-offset: 2px;
 }
 
 .annotation-note-input {
@@ -913,6 +943,18 @@
     .annotation-btn {
         width: 100%;
     }
+
+    .annotation-note-dialog .annotation-dialog-footer,
+    .annotation-detail-dialog .annotation-dialog-footer {
+        flex-direction: row;
+    }
+
+    .annotation-note-dialog .annotation-btn,
+    .annotation-detail-dialog .annotation-btn {
+        width: auto;
+        min-width: 88px;
+        min-height: 44px;
+    }
     
     .export-buttons {
         flex-direction: column;
@@ -920,6 +962,11 @@
     
     .color-option {
         width: 24px;
+        height: 24px;
+    }
+
+    .color-options-toggle {
+        min-width: 24px;
         height: 24px;
     }
     

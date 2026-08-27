@@ -75,19 +75,102 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
     indexedDB,
     Highlighter: options.Highlighter,
     requestAnimationFrame: callback => callback(),
+    setTimeout: callback => callback(),
   };
 
   let source = fs.readFileSync('epub_browser/assets/annotation.js', 'utf8');
   if (options.exposeHighlightInteraction) {
     source = source.replace(
       /\}\)\(window\);\s*$/,
-      'window.__testHighlightInteraction = HighlightInteraction;\n})(window);',
+      'window.__testHighlightInteraction = HighlightInteraction;\n' +
+      'window.__testAnnotationSettings = Settings;\n' +
+      'window.__testAnnotationConfig = CONFIG;\n' +
+      '})(window);',
     );
   }
   vm.runInNewContext(source, context);
   window.authenticatedRequests = authenticatedRequests;
   window.indexedDbState = indexedDbState;
   return window;
+}
+
+function createAnnotationDialogDocument() {
+  let document;
+  function createElement(tagName) {
+    const element = {
+      tagName,
+      children: [],
+      className: '',
+      attributes: {},
+      listeners: {},
+      style: {},
+      appendChild(child) { this.children.push(child); return child; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      getAttribute(name) { return this.attributes[name]; },
+      addEventListener(type, listener) { this.listeners[type] = listener; },
+      click() {
+        const event = {
+          target: this,
+          propagationStopped: false,
+          stopPropagation() { this.propagationStopped = true; },
+        };
+        this.listeners.click.call(this, event);
+        if (!event.propagationStopped && document.listeners.click) {
+          document.listeners.click(event);
+        }
+      },
+      querySelectorAll(selector) {
+        const className = selector.startsWith('.') ? selector.slice(1) : '';
+        const matches = [];
+        function visit(parent) {
+          parent.children.forEach(child => {
+            if (child.className.split(/\s+/).includes(className)) matches.push(child);
+            visit(child);
+          });
+        }
+        visit(this);
+        return matches;
+      },
+      focus() {},
+      remove() {},
+      contains(target) {
+        if (this === target) return true;
+        return this.children.some(child => child.contains(target));
+      },
+    };
+    element.classList = {
+      toggle(className, force) {
+        const classes = new Set(element.className.split(/\s+/).filter(Boolean));
+        const enabled = force === undefined ? !classes.has(className) : force;
+        if (enabled) classes.add(className); else classes.delete(className);
+        element.className = Array.from(classes).join(' ');
+      },
+      add(className) { this.toggle(className, true); },
+      remove(className) { this.toggle(className, false); },
+    };
+    let innerHTML = '';
+    Object.defineProperty(element, 'innerHTML', {
+      get() { return innerHTML; },
+      set(value) {
+        innerHTML = value;
+        if (value === '') element.children = [];
+      },
+    });
+    return element;
+  }
+
+  document = {
+    cookie: '',
+    listeners: {},
+    body: createElement('body'),
+    createElement,
+    querySelectorAll() { return []; },
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    removeEventListener(type, listener) {
+      if (this.listeners[type] === listener) delete this.listeners[type];
+    },
+  };
+  return document;
 }
 
 function loadBackendStorage(response, mode = 'server') {
@@ -144,6 +227,60 @@ test('clicking a draft highlight reopens its selection actions instead of readin
 
   assert.equal(reopenedSource, source);
   assert.equal(detailId, null);
+});
+
+test('note dialog keeps colors compact and lets readers expand every configured color', () => {
+  const document = createAnnotationDialogDocument();
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) },
+    'server',
+    document,
+    { exposeHighlightInteraction: true },
+  );
+  window.innerWidth = 1024;
+  window.innerHeight = 768;
+  window.__testAnnotationSettings.customColors = ['#123456', '#ABCDEF'];
+
+  const expectedColors = Array.from(window.__testAnnotationConfig.getColors());
+  window.__testHighlightInteraction.showNoteDialog({ text: 'Selected text' });
+
+  const dialog = document.body.children[0];
+  const body = dialog.children[1];
+  const colorPicker = body.children[1];
+  const colorOptions = colorPicker.children[1];
+  assert.equal(colorOptions.querySelectorAll('.color-option').length, 7);
+  assert.equal(
+    colorOptions.querySelectorAll('.color-option').filter(option => option.getAttribute('aria-pressed') === 'true').length,
+    1,
+  );
+
+  let toggle = colorOptions.querySelectorAll('.color-options-toggle')[0];
+  assert.ok(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(toggle.textContent, '+3');
+  toggle.click();
+
+  assert.equal(window.__testHighlightInteraction.activeDialog, dialog);
+  assert.equal(colorOptions.querySelectorAll('.color-option').length, expectedColors.length);
+  toggle = colorOptions.querySelectorAll('.color-options-toggle')[0];
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(toggle.textContent, '−');
+  assert.deepEqual(
+    colorOptions.querySelectorAll('.color-option').map(option => option.style.backgroundColor),
+    expectedColors,
+  );
+
+  const customChoice = colorOptions.querySelectorAll('.color-option').at(-1);
+  customChoice.click();
+  assert.equal(customChoice.getAttribute('aria-pressed'), 'true');
+  toggle = colorOptions.querySelectorAll('.color-options-toggle')[0];
+  toggle.click();
+  assert.equal(window.__testHighlightInteraction.activeDialog, dialog);
+  assert.equal(colorOptions.querySelectorAll('.color-option').length, 7);
+  assert.equal(
+    colorOptions.querySelectorAll('.color-option').some(option => option.style.backgroundColor === '#ABCDEF'),
+    true,
+  );
 });
 
 test('annotation storage follows deployment mode instead of a saved browser choice', async () => {

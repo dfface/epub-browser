@@ -6,6 +6,7 @@ const vm = require('node:vm');
 function createHarness() {
   const appended = [];
   const document = {
+    querySelectorAll() { return []; },
     createElement(tagName) {
       const listeners = {};
       return {

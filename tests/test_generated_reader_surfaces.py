@@ -1786,12 +1786,24 @@ assert.deepEqual(
 
     def test_new_annotation_actions_keep_highlight_immediate_and_note_familiar(self):
         script = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation.css").read_text(encoding="utf-8")
 
         self.assertIn("self.createAnnotationFromSource(source, Settings.defaultColor, '');", script)
         self.assertNotIn('showColorPicker', script)
         self.assertIn("dialog.className = 'annotation-dialog annotation-note-dialog';", script)
-        self.assertIn("CONFIG.getColors().slice(0, 5)", script)
+        self.assertNotIn("CONFIG.getColors().slice", script)
+        self.assertEqual(script.count('createExpandableColorPicker('), 3)
         self.assertIn("footer.className = 'annotation-dialog-footer';", script)
+        shared_surface = css[css.index('.annotation-note-dialog,'):css.index('/* Compact annotation dialog */')]
+        self.assertIn('.annotation-detail-dialog {', shared_surface)
+        self.assertIn('width: min(420px, calc(100vw - 24px));', shared_surface)
+        self.assertIn('.annotation-note-dialog .annotation-dialog-header,', shared_surface)
+        self.assertIn('.annotation-note-dialog .annotation-dialog-body,', shared_surface)
+        self.assertIn('.annotation-note-dialog .annotation-dialog-footer,', shared_surface)
+        mobile_styles = css[css.index('@media (max-width: 768px)'):]
+        self.assertIn('.annotation-note-dialog .annotation-dialog-footer,', mobile_styles)
+        self.assertIn('flex-direction: row;', mobile_styles)
+        self.assertIn('.annotation-note-dialog .annotation-btn,', mobile_styles)
 
     def test_reader_overlays_close_outside_and_dictionary_picker_stays_compact(self):
         annotation = Path("epub_browser/assets/annotation.js").read_text(encoding="utf-8")
@@ -2723,6 +2735,15 @@ assert.deepEqual(
         self.assertNotIn("document.querySelector('.tag-cloud'),", library_script)
         self.assertIn('new Sortable(bookshelfBody, {', bookshelf_script)
         self.assertIn('new Sortable(groupBody, {', bookshelf_script)
+
+    def test_library_covers_keep_a_book_like_ratio_on_small_screens(self):
+        css = Path('epub_browser/assets/library.css').read_text(encoding='utf-8')
+        cover_start = css.index('.book-cover {')
+        cover_rule = css[cover_start:css.index('}', cover_start)]
+
+        self.assertIn('aspect-ratio: 4 / 5;', cover_rule)
+        self.assertIn('height: auto;', cover_rule)
+        self.assertNotRegex(css, r'\.book-cover\s*\{[^}]*height:\s*\d+px')
 
     def test_server_book_ai_assets_stay_off_critical_path(self):
         book_html = self._server_book_html()
