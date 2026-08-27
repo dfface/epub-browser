@@ -8,8 +8,10 @@ from epub_browser.asset_publisher import (
     AssetPublisher,
     SERVER_ONLY_ASSET_PATHS,
     SERVER_ONLY_ASSET_PREFIXES,
+    WEB_MANIFEST_LOCALIZATIONS,
 )
 from epub_browser.asset_publisher import rewrite_asset_urls
+from epub_browser.locales import SUPPORTED_LOCALES
 from epub_browser.urls import SiteURLs
 
 
@@ -94,11 +96,7 @@ class AssetPublisherTests(unittest.TestCase):
             self.assertNotIn("/assets/app.js", worker)
             for manifest_path in (
                 "/assets/manifest.json",
-                "/assets/manifest.en.json",
-                "/assets/manifest.zh-CN.json",
-                "/assets/manifest.zh-TW.json",
-                "/assets/manifest.ko.json",
-                "/assets/manifest.ja.json",
+                *(f"/assets/manifest.{locale}.json" for locale in SUPPORTED_LOCALES),
             ):
                 self.assertIn(json.dumps(manifest_path), worker)
 
@@ -122,6 +120,11 @@ class AssetPublisherTests(unittest.TestCase):
             self.assertEqual(korean["description"], "개인용 EPUB 리더 및 정적 사이트 생성기")
             self.assertEqual(japanese["lang"], "ja")
             self.assertEqual(japanese["description"], "個人用 EPUB リーダー兼静的サイトジェネレーター")
+            for locale in SUPPORTED_LOCALES:
+                localized = json.loads(Path(output, "assets", f"manifest.{locale}.json").read_text(encoding="utf-8"))
+                self.assertEqual(localized["lang"], locale)
+                if locale in WEB_MANIFEST_LOCALIZATIONS:
+                    self.assertTrue(localized["description"])
             self.assertRegex(english["icons"][0]["src"], r"^/assets/immutable/icon-192\.[0-9a-f]{12}\.png$")
 
     def test_real_worker_only_uses_cache_first_for_content_addressed_assets(self):

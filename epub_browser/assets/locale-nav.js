@@ -9,7 +9,7 @@
 })(typeof self !== 'undefined' ? self : this, function() {
   'use strict';
 
-  var SUPPORTED_LOCALES = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'];
+  var SUPPORTED_LOCALES = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
 
   function createLocaleNavigation(root) {
     var documentObject = root && root.document;
@@ -42,7 +42,8 @@
 
     function positionLocaleMenu() {
       var rect = localeToggle.getBoundingClientRect();
-      localeMenu.style.top = (rect.bottom + 8) + 'px';
+      var menuHeight = Math.min(localeMenu.scrollHeight, root.innerHeight * .72);
+      localeMenu.style.top = Math.max(8, Math.min(rect.bottom + 8, root.innerHeight - menuHeight - 8)) + 'px';
       localeMenu.style.right = (root.innerWidth - rect.right) + 'px';
     }
 

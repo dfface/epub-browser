@@ -2,11 +2,12 @@
   'use strict';
   if (!root || root.EpubBrowserMode !== 'server') return;
   var document = root.document;
-  var overlay, panel, thread, composer, input, send, previousFocus;
+  var overlay, panel, conversation, questionNav, thread, composer, input, send, previousFocus;
   var context = null, eventSources = {};
+  var activeQuestionFrame = 0;
   function t(key, params) { var i = root.EpubBrowserI18n; return i && i.t ? i.t(key, params) : key; }
   function localised(key, en, _zh, params) { var value = t(key, params); return value === key ? en : value; }
-  function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].indexOf(value) >= 0 ? value : 'en'; }
+  function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'].indexOf(value) >= 0 ? value : 'en'; }
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function fetchApi(url, options) { return root.EpubBrowserAuth.fetch(url, options).then(function(response) { return response.json().catch(function() { return {}; }).then(function(payload) { if (!response.ok) { var error = new Error(payload.code || 'ai_generation_failed'); error.code = payload.code || 'ai_generation_failed'; throw error; } return payload; }); }); }
   function chapterContext(button) {
@@ -76,6 +77,58 @@
     return Number(turn.chapter_index) === Number(context.chapterIndex) ? '' : chapterLabel(turn);
   }
   function findTurn(id) { return thread && thread.querySelector('[data-ai-chat-id="' + id + '"]'); }
+  function questionJumpLabel(number, question) {
+    var value = t('ai.chatQuestionJump', { number: number, question: question });
+    return value === 'ai.chatQuestionJump' ? 'Question ' + number + ': ' + question : value;
+  }
+  function updateActiveQuestion() {
+    activeQuestionFrame = 0;
+    if (!thread || !questionNav || questionNav.hidden) return;
+    var turns = Array.prototype.slice.call(thread.querySelectorAll('.ai-chat-turn'));
+    if (!turns.length) return;
+    var threadTop = thread.getBoundingClientRect().top, active = turns[0];
+    turns.forEach(function(turn) {
+      if (turn.getBoundingClientRect().top <= threadTop + 28) active = turn;
+    });
+    var activeId = active.getAttribute('data-ai-chat-id');
+    var activeMarker = null;
+    Array.prototype.slice.call(questionNav.querySelectorAll('.ai-chat-question-marker')).forEach(function(marker) {
+      var current = marker.getAttribute('data-ai-chat-target') === activeId;
+      marker.classList.toggle('is-active', current);
+      if (current) { marker.setAttribute('aria-current', 'true'); activeMarker = marker; } else marker.removeAttribute('aria-current');
+    });
+    if (activeMarker) {
+      var navRect = questionNav.getBoundingClientRect(), markerRect = activeMarker.getBoundingClientRect();
+      if (markerRect.top < navRect.top) questionNav.scrollTop -= navRect.top - markerRect.top;
+      else if (markerRect.bottom > navRect.bottom) questionNav.scrollTop += markerRect.bottom - navRect.bottom;
+    }
+  }
+  function scheduleActiveQuestion() {
+    if (activeQuestionFrame) return;
+    activeQuestionFrame = root.requestAnimationFrame(updateActiveQuestion);
+  }
+  function syncQuestionNavigator() {
+    if (!questionNav || !thread) return;
+    var turns = Array.prototype.slice.call(thread.querySelectorAll('.ai-chat-turn'));
+    questionNav.textContent = '';
+    questionNav.hidden = turns.length < 2;
+    conversation.classList.toggle('ai-chat-conversation-has-nav', turns.length >= 2);
+    turns.forEach(function(turn, index) {
+      var id = turn.getAttribute('data-ai-chat-id'), questionNode = turn.querySelector('.ai-chat-message-user p');
+      var question = questionNode ? questionNode.textContent.trim() : '';
+      var marker = el('button', 'ai-chat-question-marker'); marker.type = 'button';
+      marker.setAttribute('data-ai-chat-target', id); marker.setAttribute('aria-label', questionJumpLabel(index + 1, question)); marker.title = question;
+      marker.appendChild(el('span', 'ai-chat-question-tick'));
+      marker.addEventListener('click', function() {
+        var target = findTurn(id); if (!target) return;
+        var top = thread.scrollTop + target.getBoundingClientRect().top - thread.getBoundingClientRect().top;
+        var reduced = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        thread.scrollTo({ top: top, behavior: reduced ? 'auto' : 'smooth' });
+      });
+      questionNav.appendChild(marker);
+    });
+    scheduleActiveQuestion();
+  }
   function renderTurn(turn) {
     if (!turn || !turn.id || !thread) return;
     var empty = thread.querySelector('[data-ai-chat-empty]'); if (empty && empty.parentNode) empty.parentNode.removeChild(empty);
@@ -85,7 +138,7 @@
     var answer = el('section', 'ai-chat-message ai-chat-message-assistant'); answer.appendChild(el('span', 'ai-chat-message-label', t('ai.assistant')));
     if (turn.status === 'complete') { var markdown = el('div', 'ai-chat-markdown'); renderMarkdown(markdown, turn.answer || ''); answer.appendChild(markdown); }
     else answer.appendChild(el('p', 'ai-chat-pending', statusText(turn)));
-    node.appendChild(answer); var existing = findTurn(turn.id), shouldScroll = !existing || threadIsNearBottom(); if (existing) thread.replaceChild(node, existing); else thread.appendChild(node); if (shouldScroll) scrollThread();
+    node.appendChild(answer); var existing = findTurn(turn.id), shouldScroll = !existing || threadIsNearBottom(); if (existing) thread.replaceChild(node, existing); else thread.appendChild(node); syncQuestionNavigator(); if (shouldScroll) scrollThread();
   }
   function error(message) { var note = thread.querySelector('[data-ai-chat-error]'); if (!note) { note = el('p', 'ai-chat-error'); note.setAttribute('data-ai-chat-error', ''); note.setAttribute('role', 'alert'); thread.prepend(note); } note.textContent = message; }
   function renderEmptyState() {
@@ -100,7 +153,7 @@
     empty.appendChild(suggestions); thread.appendChild(empty);
   }
   function loadTurns() {
-    thread.textContent = ''; thread.appendChild(el('p', 'ai-chat-loading', t('ai.chatLoading')));
+    thread.textContent = ''; questionNav.textContent = ''; questionNav.hidden = true; conversation.classList.remove('ai-chat-conversation-has-nav'); thread.appendChild(el('p', 'ai-chat-loading', t('ai.chatLoading')));
     return fetchApi('/api/ai/books/' + encodeURIComponent(context.bookId) + '/chat').then(function(payload) {
       thread.textContent = ''; var turns = payload.turns || [];
       if (!turns.length) renderEmptyState();
@@ -133,7 +186,7 @@
     if (overlay) return; overlay = el('div', 'ai-chat-overlay'); overlay.hidden = true; panel = el('aside', 'ai-chat-panel'); panel.setAttribute('role', 'complementary'); panel.setAttribute('aria-label', t('ai.chatDrawerTitle'));
     var header = el('header', 'ai-chat-header'), titles = el('div', 'ai-chat-heading'); titles.appendChild(el('h2', '', t('ai.chatDrawerTitle'))); var meta = el('div', 'ai-chat-meta'), privacy = el('span', 'ai-chat-private-badge', t('ai.chatDrawerEyebrow')); privacy.title = t('ai.chatDrawerDescription'); privacy.setAttribute('aria-label', t('ai.chatDrawerDescription')); var scope = el('span', 'ai-chat-scope'); scope.setAttribute('data-ai-chat-scope', ''); meta.appendChild(privacy); meta.appendChild(scope); titles.appendChild(meta); header.appendChild(titles);
     var actions = el('div', 'ai-chat-header-actions'), full = el('button', 'ai-chat-icon-button'); full.type = 'button'; full.setAttribute('data-ai-chat-fullscreen', ''); full.setAttribute('aria-label', t('ai.fullscreen')); full.appendChild(el('i', 'fas fa-expand')); full.addEventListener('click', function() { setFullscreen(!document.body.classList.contains('ai-chat-fullscreen')); }); var closer = el('button', 'ai-chat-icon-button'); closer.type = 'button'; closer.setAttribute('data-ai-chat-close', ''); closer.setAttribute('aria-label', t('ai.close')); closer.appendChild(el('i', 'fas fa-times')); closer.addEventListener('click', close); actions.appendChild(full); actions.appendChild(closer); header.appendChild(actions); panel.appendChild(header);
-    var body = el('div', 'ai-chat-body'); thread = el('div', 'ai-chat-thread'); thread.setAttribute('aria-live', 'polite'); body.appendChild(thread); panel.appendChild(body);
+    var body = el('div', 'ai-chat-body'); conversation = el('div', 'ai-chat-conversation'); questionNav = el('nav', 'ai-chat-question-nav'); questionNav.hidden = true; questionNav.setAttribute('aria-label', t('ai.chatQuestionNavigation')); thread = el('div', 'ai-chat-thread'); thread.setAttribute('aria-live', 'polite'); thread.addEventListener('scroll', scheduleActiveQuestion, { passive: true }); conversation.appendChild(questionNav); conversation.appendChild(thread); body.appendChild(conversation); panel.appendChild(body);
     composer = el('form', 'ai-chat-composer'); var composerMain = el('div', 'ai-chat-compose-main'); input = el('textarea'); input.maxLength = 2000; input.rows = 1; input.placeholder = t('ai.followupPlaceholder'); input.setAttribute('aria-label', t('ai.followupPlaceholder')); composerMain.appendChild(input); send = el('button', 'ai-chat-send', t('ai.ask')); send.type = 'submit'; composer.appendChild(composerMain); composer.appendChild(send); input.addEventListener('keydown', function(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); composer.requestSubmit(); } }); composer.addEventListener('submit', function(event) { event.preventDefault(); var question = input.value.trim(); if (question && context) submitQuestion(question, 'shared_layer'); }); panel.appendChild(composer); overlay.appendChild(panel); document.body.appendChild(overlay); document.addEventListener('keydown', function(event) { if (event.key === 'Escape' && !overlay.hidden) close(); });
   }
   function availability() { return fetchApi('/api/ai/status').then(function(status) { if (!status.enabled) throw Object.assign(new Error('ai_disabled'), { code: 'ai_disabled' }); if (!status.authorized) throw Object.assign(new Error('ai_not_authorized'), { code: 'ai_not_authorized' }); }); }

@@ -30,6 +30,7 @@ from epub_browser.ai_reading import (
     validate_reading_request,
 )
 from epub_browser.auth import BootstrapCredentials
+from epub_browser.locales import PROMPT_LANGUAGE_NAMES
 from epub_browser.prompt_templates import (
     chapter_core_template,
     chapter_grounding_template,
@@ -410,13 +411,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(_FakeClient.calls), 2)
 
     def test_all_supported_locales_keep_distinct_prompt_language_instructions(self):
-        expected = {
-            'en': 'English',
-            'zh-CN': 'Chinese (Simplified)',
-            'zh-TW': 'Chinese (Traditional)',
-            'ko': 'Korean',
-            'ja': 'Japanese',
-        }
+        expected = PROMPT_LANGUAGE_NAMES
         template = template_for('chapter', 'chapter')
         for locale, language_name in expected.items():
             with self.subTest(locale=locale):
@@ -434,7 +429,7 @@ class AIReadingServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(AIReadingError):
             validate_reading_request(ReadingRequest(
                 scope='chapter', book_id=self.book.book_id,
-                chapter_index=0, language='fr',
+                chapter_index=0, language='nl',
             ))
 
     async def test_admin_retry_recomputes_current_job_state(self):

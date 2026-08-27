@@ -48,13 +48,13 @@ from .ai_reading import (
     _public_ai_result,
     validate_reading_request,
 )
-from .asset_publisher import PublishedAssets, rewrite_asset_urls
+from .asset_publisher import WEB_MANIFEST_SOURCES, PublishedAssets, rewrite_asset_urls
 from .dictionary_service import DictionaryService, DictionaryServiceError
 from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
-from .locales import SUPPORTED_LOCALE_SET, normalize_locale
+from .locales import LOCALE_NATIVE_NAMES, SUPPORTED_LOCALE_SET, normalize_locale
 from .processor import (
     SERVER_OUTPUT_REVISION,
     SERVER_OUTPUT_REVISION_FILE,
@@ -105,14 +105,9 @@ PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/theme.css',
     '/assets/version-check.js',
 })
-PUBLIC_WEB_MANIFESTS = frozenset({
-    '/assets/manifest.json',
-    '/assets/manifest.en.json',
-    '/assets/manifest.zh-CN.json',
-    '/assets/manifest.zh-TW.json',
-    '/assets/manifest.ko.json',
-    '/assets/manifest.ja.json',
-})
+PUBLIC_WEB_MANIFESTS = frozenset(
+    f'/assets/{name}' for name in WEB_MANIFEST_SOURCES
+)
 SETUP_COPY = {
     'en': {
         'page_title': 'Set up · EPUB Browser',
@@ -234,14 +229,6 @@ LOGIN_COPY = {
         'login_throttled': 'ログイン試行回数が多すぎます。{minutes} 分後にもう一度お試しください。',
         'language': '言語',
     },
-}
-
-LOCALE_NATIVE_NAMES = {
-    'en': 'English',
-    'zh-CN': '简体中文',
-    'zh-TW': '繁體中文',
-    'ko': '한국어',
-    'ja': '日本語',
 }
 
 def locale_options(locale):
@@ -989,7 +976,7 @@ def create_app(
     ):
         locale = normalize_login_locale(locale)
         nonce = secrets.token_urlsafe(32)
-        copy = SETUP_COPY[locale]
+        copy = SETUP_COPY.get(locale, SETUP_COPY['en'])
         error_key = {
             'invalid': 'account.error.invalidSetup',
             'password_mismatch': 'account.error.passwordMismatch',
@@ -1167,7 +1154,7 @@ if(localeField)localeField.value=localeSelect.value;
         safe_next = html.escape(_safe_relative_path(next_path), quote=True)
         locale = normalize_login_locale(locale)
         nonce = secrets.token_urlsafe(32)
-        copy = LOGIN_COPY[locale]
+        copy = LOGIN_COPY.get(locale, LOGIN_COPY['en'])
         error_markup = (
             '<p class="auth-alert" id="loginError" role="alert" data-i18n="account.error.invalid_credentials">'
             + copy['invalid_credentials']
@@ -1300,7 +1287,7 @@ window.location.assign(payload.redirect||'/');
                 minutes = max(1, math.ceil(retry_after_seconds / 60))
                 payload = error_payload(
                     'login_throttled',
-                    LOGIN_COPY[locale]['login_throttled'].format(minutes=minutes),
+                    LOGIN_COPY.get(locale, LOGIN_COPY['en'])['login_throttled'].format(minutes=minutes),
                 )
                 payload['retry_after_seconds'] = retry_after_seconds
                 throttled = response(payload, 429, cache_control='no-store')

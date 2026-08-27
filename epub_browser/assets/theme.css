@@ -290,6 +290,9 @@
 
 .locale-menu {
     min-width: 156px;
+    max-height: min(72vh, 620px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 /* Theme Logo - SVG color adaptation */

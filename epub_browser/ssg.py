@@ -17,6 +17,7 @@ from .asset_publisher import (
     PublishedAssets,
     SERVER_ONLY_ASSET_PATHS,
     SERVER_ONLY_ASSET_PREFIXES,
+    WEB_MANIFEST_SOURCES,
 )
 from .book_identity import inspect_book_identity, resolve_book_identity
 from .cli import SSGConfig
@@ -292,14 +293,8 @@ class SSGPublisher:
             "index.html",
             "book-metadata.json",
             "assets/asset-manifest.json",
-            "assets/manifest.json",
-            "assets/manifest.en.json",
-            "assets/manifest.zh-CN.json",
-            "assets/manifest.zh-TW.json",
-            "assets/manifest.ko.json",
-            "assets/manifest.ja.json",
             "sw.js",
-        )
+        ) + tuple(f"assets/{name}" for name in WEB_MANIFEST_SOURCES)
         for relative in required_root_files:
             if not (staging / relative).is_file():
                 raise SSGBuildError(f"Incomplete SSG snapshot: missing {relative}")

@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from .asset_publisher import PublishedAssets
+from .locales import LOCALE_NATIVE_NAMES
 from .urls import SiteURLs
 from .version import render_footer
 
@@ -10,10 +11,18 @@ SERVER_ACCOUNT_STYLESHEET = '<link rel="stylesheet" href="/assets/account.css">'
 SERVER_AUTH_SCRIPT = '<script src="/assets/auth.js" defer></script>'
 SERVER_LOCALE_SCRIPT = '<script src="/assets/locale-nav.js" defer></script>'
 
+_SERVER_LOCALE_OPTIONS = ''.join(
+    '<option value="{code}" data-i18n="locale.name.{code}">{name}</option>'.format(
+        code=code,
+        name=name,
+    )
+    for code, name in LOCALE_NATIVE_NAMES.items()
+)
+
 SERVER_LOCALE_CONTROL = '''<div class="library-language app-nav-locale">
     <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" id="localeCurrentLabel" data-i18n="locale.name.en">English</span></button>
-    <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="en" data-i18n="locale.name.en">English</option><option value="zh-CN" data-i18n="locale.name.zh-CN">简体中文</option><option value="zh-TW" data-i18n="locale.name.zh-TW">繁體中文</option><option value="ko" data-i18n="locale.name.ko">한국어</option><option value="ja" data-i18n="locale.name.ja">日本語</option></select>
-</div>'''
+    <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true">{}</select>
+</div>'''.format(_SERVER_LOCALE_OPTIONS)
 
 SERVER_ACCOUNT_CONTROL = '''<button type="button" class="library-meta-action app-nav-action" id="adminMenu" aria-haspopup="dialog" aria-controls="adminPanel" aria-label="Administration" data-i18n-aria-label="admin.menu" hidden>
         <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>

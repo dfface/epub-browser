@@ -25,6 +25,7 @@ from epub_browser.epub_identity import (
 )
 from epub_browser.identity import source_sha256
 from epub_browser.library_progress import LibraryProgressBroker
+from epub_browser.locales import SUPPORTED_LOCALES
 from epub_browser.migration import MigrationManager
 from epub_browser.processor import (
     EPUBProcessor,
@@ -753,7 +754,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 'adminMenu', 'adminPanel', 'adminClose',
             ):
                 self.assertRegex(markup, rf'\bid=(?:["\'])?{control_id}(?:["\' >])')
-            for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+            for locale in SUPPORTED_LOCALES:
                 self.assertRegex(markup, rf'\bvalue=(?:["\'])?{re.escape(locale)}(?:["\' >])')
             self.assertRegex(markup, r'<button\b(?=[^>]*id=(?:["\'])?adminMenu)(?=[^>]*hidden)')
             self.assertRegex(markup, r'/assets/immutable/account\.[0-9a-f]{12}\.css')

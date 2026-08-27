@@ -10,6 +10,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
+from epub_browser.locales import SUPPORTED_LOCALES
 from epub_browser.state import DB_SCHEMA_VERSION, StateStore
 
 
@@ -2915,9 +2916,8 @@ class StateStoreTests(unittest.TestCase):
                 'ai_reading_results', 'ai_reading_followups',
                 'ai_book_chat_turns', 'ai_book_chat_summaries',
             ):
-                self.assertIn("'zh-TW'", after['schema'][table])
-                self.assertIn("'ko'", after['schema'][table])
-                self.assertIn("'ja'", after['schema'][table])
+                for locale in SUPPORTED_LOCALES:
+                    self.assertIn("'" + locale + "'", after['schema'][table])
             self.assertEqual(
                 connection.execute("SELECT * FROM ai_reading_results").fetchone(),
                 (
@@ -3010,7 +3010,10 @@ class StateStoreTests(unittest.TestCase):
             )
             self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
 
-        for index, locale in enumerate(('zh-TW', 'ko', 'ja'), 1):
+        for index, locale in enumerate(
+            (locale for locale in SUPPORTED_LOCALES if locale not in {'en', 'zh-CN'}),
+            1,
+        ):
             created = migrated.store_ai_reading_result(
                 cache_key='locale-result-' + locale, book_id=book.book_id,
                 chapter_index=index, scope='chapter', mode='chapter', profile='auto',

@@ -8,7 +8,7 @@
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function locale() {
     var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang;
-    return ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].indexOf(value) >= 0 ? value : 'en';
+    return ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'].indexOf(value) >= 0 ? value : 'en';
   }
   function generationStatus(job, context) {
     var stageKey = job.generation_stage && {

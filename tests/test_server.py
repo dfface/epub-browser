@@ -25,6 +25,7 @@ from epub_browser.auth import (
 )
 from epub_browser.ai_reading import AIReadingError, AIReadingService
 from epub_browser.library_progress import LibraryProgressBroker
+from epub_browser.locales import SUPPORTED_LOCALES
 from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import CachedStaticFiles, create_app, migrate_legacy_database
@@ -2892,7 +2893,7 @@ class BookAuthorizationTests(unittest.TestCase):
             new_callable=mock.AsyncMock,
             return_value=result,
         ) as submit:
-            for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+            for locale in SUPPORTED_LOCALES:
                 with self.subTest(route='reading', locale=locale):
                     response = self.member_client.post(
                         '/api/ai/reading',
@@ -2914,7 +2915,7 @@ class BookAuthorizationTests(unittest.TestCase):
             '/api/ai/reading',
             json={
                 'scope': 'chapter', 'book_id': 'open-id', 'chapter_index': 0,
-                'mode': 'chapter', 'language': 'fr', 'force': False,
+                'mode': 'chapter', 'language': 'nl', 'force': False,
             },
         )
         self.assertEqual(rejected.status_code, 400)
@@ -2936,7 +2937,7 @@ class BookAuthorizationTests(unittest.TestCase):
             new_callable=mock.AsyncMock,
             return_value={'id': 'chat'},
         ) as ask_book:
-            for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+            for locale in SUPPORTED_LOCALES:
                 with self.subTest(route='followup', locale=locale):
                     response = self.member_client.post(
                         '/api/ai/followups',
@@ -2960,10 +2961,10 @@ class BookAuthorizationTests(unittest.TestCase):
 
         for path, payload in (
             ('/api/ai/followups', {
-                'result_id': result['id'], 'question': 'Question?', 'language': 'fr',
+                'result_id': result['id'], 'question': 'Question?', 'language': 'nl',
             }),
             ('/api/ai/books/open-id/chat', {
-                'chapter_index': 0, 'question': 'Question?', 'language': 'fr',
+                'chapter_index': 0, 'question': 'Question?', 'language': 'nl',
                 'context_mode': 'chapter_source',
             }),
         ):

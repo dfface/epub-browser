@@ -3187,6 +3187,16 @@ assert.deepEqual(
         self.assertIn('.ai-chat-send { min-width: 74px; height: 48px;', stylesheet)
         self.assertIn('.ai-chat-suggestions { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr);', stylesheet)
         self.assertIn('.ai-chat-suggestion { width: 100%; min-height: 38px;', stylesheet)
+        self.assertIn('function syncQuestionNavigator()', script)
+        self.assertIn("questionNav = el('nav', 'ai-chat-question-nav')", script)
+        self.assertIn("conversation.classList.toggle('ai-chat-conversation-has-nav', turns.length >= 2)", script)
+        self.assertIn("thread.addEventListener('scroll', scheduleActiveQuestion, { passive: true })", script)
+        self.assertIn('.ai-chat-conversation.ai-chat-conversation-has-nav { grid-template-columns: 20px minmax(0, 1fr);', stylesheet)
+        self.assertIn('.ai-chat-conversation { min-height: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); direction: ltr;', stylesheet)
+        self.assertIn('[dir="rtl"] .ai-chat-thread { direction: rtl; }', stylesheet)
+        self.assertIn('.ai-chat-question-nav::-webkit-scrollbar, .ai-chat-thread::-webkit-scrollbar', stylesheet)
+        self.assertIn('scrollbar-width: none;', stylesheet)
+        self.assertNotIn('scrollbar-gutter: stable;', stylesheet)
 
     def test_chapter_optional_scripts_do_not_block_html_parsing(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -628,9 +628,9 @@
         : t('admin.ai.jobs.unknownValue')];
       var chapter = safeNonNegativeInteger(job.chapter_index, null);
       if (knownScope && job.scope === 'chapter' && chapter !== null) details.push('#' + chapter);
-      details.push(hasOwn(languageKeys, job.language)
-        ? t(languageKeys[job.language])
-        : t('admin.ai.jobs.unknownValue'));
+      var languageKey = languageKeys[job.language] || 'locale.name.' + String(job.language || '');
+      var languageLabel = t(languageKey);
+      details.push(languageLabel !== languageKey ? languageLabel : t('admin.ai.jobs.unknownValue'));
       return details.join(' · ');
     }
 

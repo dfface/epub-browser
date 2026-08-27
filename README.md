@@ -404,7 +404,9 @@ Legacy-only `--keep-files` retains a temporary Server directory. Persistent Serv
 - Responsive Library, book detail, and chapter-reading interfaces
 - Scrolling, page turning, continuous reading, adjustable content width, fonts, custom CSS, themes, and pure reading mode
 - Highlights, notes, annotation browsing, nested bookshelf groups, tags, and JSON Import/Export
-- English and Simplified Chinese interfaces
+- Interface locale support for English, Simplified Chinese, Traditional Chinese,
+  Korean, Japanese, Spanish, German, French, Russian, Italian, Brazilian
+  Portuguese, Arabic, Indonesian, Hindi, Vietnamese, Thai, and Malay
 - E-reader-friendly behavior for Kindle/Silk browsers; browser-heavy features may be reduced
 
 | Data | SSG | Server |

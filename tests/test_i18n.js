@@ -26,7 +26,10 @@ test('normalizes all supported browser locale families and falls back unsupporte
   assert.equal(createRuntime(fakeRoot('ko-KR'), dictionaries).init(), 'ko');
   assert.equal(createRuntime(fakeRoot('ja-JP'), dictionaries).init(), 'ja');
   assert.equal(createRuntime(fakeRoot('en-GB'), dictionaries).init(), 'en');
-  assert.equal(createRuntime(fakeRoot('fr-FR'), dictionaries).init(), 'en');
+  assert.equal(createRuntime(fakeRoot('fr-FR'), dictionaries).init(), 'fr');
+  assert.equal(createRuntime(fakeRoot('pt-PT'), dictionaries).init(), 'pt-BR');
+  assert.equal(createRuntime(fakeRoot('ar-SA'), dictionaries).init(), 'ar');
+  assert.equal(createRuntime(fakeRoot('nl-NL'), dictionaries).init(), 'en');
 });
 
 test('builds browser URLs from the generated base path', () => {
@@ -49,8 +52,25 @@ test('persists an explicit locale and interpolates text parameters', () => {
   assert.equal(i18n.t('common.version', { version: '1.11.1' }), '版本 1.11.1');
 });
 
-test('all five dictionaries have identical non-empty shapes and interpolation tokens', () => {
-  const locales = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'];
+test('applies RTL only for Arabic and restores LTR for other locales', () => {
+  const root = fakeRoot('en');
+  root.EpubBrowserDisableManifest = true;
+  root.document = {
+    documentElement: {},
+    addEventListener() {},
+    querySelectorAll() { return []; }
+  };
+  const i18n = createRuntime(root, dictionaries);
+  i18n.setLocale('ar-SA');
+  assert.equal(root.document.documentElement.lang, 'ar');
+  assert.equal(root.document.documentElement.dir, 'rtl');
+  i18n.setLocale('de-DE');
+  assert.equal(root.document.documentElement.lang, 'de');
+  assert.equal(root.document.documentElement.dir, 'ltr');
+});
+
+test('all supported dictionaries have identical non-empty shapes and interpolation tokens', () => {
+  const locales = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
   const placeholders = value => [...String(value).matchAll(/\{([A-Za-z0-9_]+)\}/g)].map(match => match[1]).sort();
   const shape = value => value && typeof value === 'object' ? Object.keys(value).sort() : typeof value;
   locales.slice(1).forEach(locale => {
@@ -170,12 +190,14 @@ test('localizes private review and reading-insight copy in all five supported lo
 
 test('provides native locale names and translated AI language labels', () => {
   const nativeNames = {
-    en: 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ko: '한국어', ja: '日本語'
+    en: 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ko: '한국어', ja: '日本語',
+    es: 'Español', de: 'Deutsch', fr: 'Français', ru: 'Русский', it: 'Italiano',
+    'pt-BR': 'Português (Brasil)', ar: 'العربية', id: 'Bahasa Indonesia', hi: 'हिन्दी',
+    vi: 'Tiếng Việt', th: 'ไทย', ms: 'Bahasa Melayu'
   };
   Object.keys(dictionaries).forEach(locale => {
     Object.entries(nativeNames).forEach(([code, name]) => {
       assert.equal(dictionaries[locale][`locale.name.${code}`], name);
-      assert.ok(dictionaries[locale][`admin.ai.jobs.language.${code}`]);
     });
   });
   assert.equal(dictionaries['zh-TW']['ai.title'], 'AI 閱讀');

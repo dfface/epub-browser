@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .locales import SUPPORTED_LOCALES
 from .urls import SiteURLs
 
 
@@ -19,6 +20,26 @@ WEB_MANIFEST_SOURCES = {
     'manifest.zh-TW.json': 'manifest.zh-TW.json',
     'manifest.ko.json': 'manifest.ko.json',
     'manifest.ja.json': 'manifest.ja.json',
+    **{
+        f'manifest.{locale}.json': 'manifest.json'
+        for locale in SUPPORTED_LOCALES
+        if locale not in {'en', 'zh-CN', 'zh-TW', 'ko', 'ja'}
+    },
+}
+
+WEB_MANIFEST_LOCALIZATIONS = {
+    'es': ('Un lector EPUB personal y generador de sitios estáticos', 'Vista de escritorio de EPUB Browser', 'Vista móvil de EPUB Browser'),
+    'de': ('Ein persönlicher EPUB-Reader und Generator für statische Websites', 'EPUB Browser auf dem Desktop', 'EPUB Browser auf Mobilgeräten'),
+    'fr': ('Un lecteur EPUB personnel et générateur de site statique', 'Vue bureau d’EPUB Browser', 'Vue mobile d’EPUB Browser'),
+    'ru': ('Персональная EPUB-читалка и генератор статических сайтов', 'EPUB Browser на компьютере', 'EPUB Browser на мобильном устройстве'),
+    'it': ('Un lettore EPUB personale e generatore di siti statici', 'EPUB Browser su desktop', 'EPUB Browser su dispositivo mobile'),
+    'pt-BR': ('Um leitor EPUB pessoal e gerador de sites estáticos', 'EPUB Browser no computador', 'EPUB Browser no celular'),
+    'ar': ('قارئ EPUB شخصي ومنشئ مواقع ثابتة', 'EPUB Browser على سطح المكتب', 'EPUB Browser على الهاتف'),
+    'id': ('Pembaca EPUB pribadi dan pembuat situs statis', 'Tampilan desktop EPUB Browser', 'Tampilan seluler EPUB Browser'),
+    'hi': ('एक निजी EPUB रीडर और स्थिर साइट जनरेटर', 'EPUB Browser डेस्कटॉप दृश्य', 'EPUB Browser मोबाइल दृश्य'),
+    'vi': ('Trình đọc EPUB cá nhân và trình tạo trang tĩnh', 'EPUB Browser trên máy tính', 'EPUB Browser trên thiết bị di động'),
+    'th': ('โปรแกรมอ่าน EPUB ส่วนตัวและเครื่องมือสร้างเว็บไซต์แบบคงที่', 'EPUB Browser บนเดสก์ท็อป', 'EPUB Browser บนอุปกรณ์เคลื่อนที่'),
+    'ms': ('Pembaca EPUB peribadi dan penjana laman statik', 'Paparan desktop EPUB Browser', 'Paparan mudah alih EPUB Browser'),
 }
 
 # These files implement authenticated Server-mode experiences. Keeping them out
@@ -125,14 +146,7 @@ class AssetPublisher:
 
     def _is_excluded(self, logical_path: str) -> bool:
         return (
-            logical_path in {
-                'sw.js',
-                'manifest.json',
-                'manifest.zh-CN.json',
-                'manifest.zh-TW.json',
-                'manifest.ko.json',
-                'manifest.ja.json',
-            } | self.excluded_paths
+            logical_path in {'sw.js', *WEB_MANIFEST_SOURCES.values()} | self.excluded_paths
             or any(logical_path.startswith(prefix) for prefix in self.excluded_prefixes)
         )
 
@@ -172,10 +186,15 @@ class AssetPublisher:
     def _write_web_manifests(self, published: PublishedAssets) -> None:
         for output_name, source_name in WEB_MANIFEST_SOURCES.items():
             source = self.source_dir / source_name
-            manifest = self._rewrite_asset_urls(
-                json.loads(source.read_text(encoding='utf-8')),
-                published,
-            )
+            manifest = json.loads(source.read_text(encoding='utf-8'))
+            locale = output_name.removeprefix('manifest.').removesuffix('.json')
+            if locale in WEB_MANIFEST_LOCALIZATIONS:
+                description, wide_label, narrow_label = WEB_MANIFEST_LOCALIZATIONS[locale]
+                manifest['description'] = description
+                manifest['lang'] = locale
+                for screenshot in manifest.get('screenshots', ()):
+                    screenshot['label'] = wide_label if screenshot.get('form_factor') == 'wide' else narrow_label
+            manifest = self._rewrite_asset_urls(manifest, published)
             target = self.output_dir / 'assets' / output_name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

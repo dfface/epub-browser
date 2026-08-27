@@ -5,7 +5,7 @@
   var state = { modal: null, container: null, close: null, back: null, opener: null, scrollY: 0, books: [], bookId: '', contextualBookId: '', language: '', version: 0, chapterIndicators: {}, chapterIndicatorRequests: {} };
   function t(key, params) { var i = root.EpubBrowserI18n; return i && i.t ? i.t(key, params) : key; }
   function path(value) { return root.EpubBrowserURL ? root.EpubBrowserURL.publicPath(value) : value; }
-  var supportedLanguages = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'];
+  var supportedLanguages = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
   function locale() { var value = root.EpubBrowserI18n && root.EpubBrowserI18n.getLocale ? root.EpubBrowserI18n.getLocale() : document.documentElement.lang; return supportedLanguages.indexOf(value) >= 0 ? value : 'en'; }
   function el(tag, className, text) { var node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }

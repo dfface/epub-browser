@@ -5708,13 +5708,180 @@
     Object.keys(apiDocsLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = apiDocsLocaleAdditions[code][key]; });
   });
 
+  var chatNavigationLocaleAdditions = {
+    en: { 'ai.chatQuestionNavigation': 'Questions in this conversation', 'ai.chatQuestionJump': 'Question {number}: {question}' },
+    'zh-CN': { 'ai.chatQuestionNavigation': '本次对话中的问题', 'ai.chatQuestionJump': '问题 {number}：{question}' },
+    'zh-TW': { 'ai.chatQuestionNavigation': '本次對話中的問題', 'ai.chatQuestionJump': '問題 {number}：{question}' },
+    ko: { 'ai.chatQuestionNavigation': '이 대화의 질문', 'ai.chatQuestionJump': '질문 {number}: {question}' },
+    ja: { 'ai.chatQuestionNavigation': 'この会話の質問', 'ai.chatQuestionJump': '質問 {number}: {question}' }
+  };
+  Object.keys(chatNavigationLocaleAdditions).forEach(function(code) {
+    Object.keys(chatNavigationLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = chatNavigationLocaleAdditions[code][key]; });
+  });
+
+  // New locale packs start from the complete English dictionary so every
+  // surface has a safe fallback, then replace the reader's primary navigation
+  // and conversation vocabulary with native copy. This keeps key/placeholder
+  // parity exact while locale packs continue to grow independently.
+  var extendedLocaleTranslations = {
+    es: {
+      'common.language': 'Idioma', 'theme.light': 'Claro', 'theme.dark': 'Oscuro', 'theme.sepia': 'Sepia', 'theme.forest': 'Bosque', 'theme.ocean': 'Océano', 'theme.peach': 'Melocotón', 'theme.lavender': 'Lavanda',
+      'reader.library': 'Biblioteca', 'reader.theme': 'Tema', 'reader.book': 'Libro', 'reader.home': 'Inicio', 'reader.top': 'Arriba', 'reader.settings': 'Ajustes', 'reader.shelf': 'Estantería', 'reader.annotations': 'Anotaciones', 'reader.tableOfContents': 'Índice', 'reader.previous': 'Capítulo anterior', 'reader.next': 'Capítulo siguiente',
+      'account.menu': 'Cuenta', 'account.title': 'Ajustes de la cuenta', 'account.logout': 'Cerrar sesión', 'admin.menu': 'Administración', 'admin.title': 'Administración',
+      'ai.you': 'Tú', 'ai.chatDrawerTitle': 'Pregunta a la IA', 'ai.chatDrawerEyebrow': 'CONVERSACIÓN PRIVADA', 'ai.chatReadyPrompt': 'Pide una explicación, un contraargumento o una conexión con otra parte del libro.', 'ai.chatSuggestions': 'Puedes preguntar', 'ai.followupPlaceholder': 'Haz una pregunta de seguimiento', 'ai.ask': 'Preguntar', 'ai.assistant': 'Asistente de IA', 'ai.close': 'Cerrar',
+      'ai.chatSuggestionExplain': '¿Puedes explicar la idea principal de este contenido?', 'ai.chatSuggestionChallenge': '¿Puedes cuestionar una de las ideas presentadas aquí?', 'ai.chatSuggestionConnect': '¿Cómo se relaciona esto con el resto del libro?', 'ai.chatSuggestionSummarize': '¿Puedes resumir este contenido en unas pocas frases?', 'ai.chatSuggestionNotice': '¿A qué debería prestar más atención aquí?',
+      'ai.chatQuestionNavigation': 'Preguntas de esta conversación', 'ai.chatQuestionJump': 'Pregunta {number}: {question}'
+    },
+    de: {
+      'common.language': 'Sprache', 'theme.light': 'Hell', 'theme.dark': 'Dunkel', 'theme.sepia': 'Sepia', 'theme.forest': 'Wald', 'theme.ocean': 'Ozean', 'theme.peach': 'Pfirsich', 'theme.lavender': 'Lavendel',
+      'reader.library': 'Bibliothek', 'reader.theme': 'Design', 'reader.book': 'Buch', 'reader.home': 'Start', 'reader.top': 'Nach oben', 'reader.settings': 'Einstellungen', 'reader.shelf': 'Bücherregal', 'reader.annotations': 'Anmerkungen', 'reader.tableOfContents': 'Inhaltsverzeichnis', 'reader.previous': 'Vorheriges Kapitel', 'reader.next': 'Nächstes Kapitel',
+      'account.menu': 'Konto', 'account.title': 'Kontoeinstellungen', 'account.logout': 'Abmelden', 'admin.menu': 'Verwaltung', 'admin.title': 'Verwaltung',
+      'ai.you': 'Du', 'ai.chatDrawerTitle': 'KI fragen', 'ai.chatDrawerEyebrow': 'PRIVATES GESPRÄCH', 'ai.chatReadyPrompt': 'Bitte um eine Erklärung, ein Gegenargument oder eine Verbindung zu einem anderen Teil des Buches.', 'ai.chatSuggestions': 'Frage zum Beispiel', 'ai.followupPlaceholder': 'Eine Folgefrage stellen', 'ai.ask': 'Fragen', 'ai.assistant': 'KI-Assistent', 'ai.close': 'Schließen',
+      'ai.chatSuggestionExplain': 'Kannst du die Kernaussage dieses Abschnitts erklären?', 'ai.chatSuggestionChallenge': 'Kannst du eine der hier genannten Ideen kritisch hinterfragen?', 'ai.chatSuggestionConnect': 'Wie hängt das mit dem Rest des Buches zusammen?', 'ai.chatSuggestionSummarize': 'Kannst du diesen Abschnitt in wenigen Sätzen zusammenfassen?', 'ai.chatSuggestionNotice': 'Worauf sollte ich hier besonders achten?',
+      'ai.chatQuestionNavigation': 'Fragen in diesem Gespräch', 'ai.chatQuestionJump': 'Frage {number}: {question}'
+    },
+    fr: {
+      'common.language': 'Langue', 'theme.light': 'Clair', 'theme.dark': 'Sombre', 'theme.sepia': 'Sépia', 'theme.forest': 'Forêt', 'theme.ocean': 'Océan', 'theme.peach': 'Pêche', 'theme.lavender': 'Lavande',
+      'reader.library': 'Bibliothèque', 'reader.theme': 'Thème', 'reader.book': 'Livre', 'reader.home': 'Accueil', 'reader.top': 'Haut', 'reader.settings': 'Réglages', 'reader.shelf': 'Étagère', 'reader.annotations': 'Annotations', 'reader.tableOfContents': 'Table des matières', 'reader.previous': 'Chapitre précédent', 'reader.next': 'Chapitre suivant',
+      'account.menu': 'Compte', 'account.title': 'Réglages du compte', 'account.logout': 'Se déconnecter', 'admin.menu': 'Administration', 'admin.title': 'Administration',
+      'ai.you': 'Vous', 'ai.chatDrawerTitle': "Demander à l’IA", 'ai.chatDrawerEyebrow': 'CONVERSATION PRIVÉE', 'ai.chatReadyPrompt': 'Demandez une explication, un contre-argument ou un lien avec une autre partie du livre.', 'ai.chatSuggestions': 'Essayez de demander', 'ai.followupPlaceholder': 'Poser une question complémentaire', 'ai.ask': 'Demander', 'ai.assistant': 'Assistant IA', 'ai.close': 'Fermer',
+      'ai.chatSuggestionExplain': 'Pouvez-vous expliquer l’idée principale de ce passage ?', 'ai.chatSuggestionChallenge': 'Pouvez-vous remettre en question l’une des idées présentées ici ?', 'ai.chatSuggestionConnect': 'Quel est le lien avec le reste du livre ?', 'ai.chatSuggestionSummarize': 'Pouvez-vous résumer ce passage en quelques phrases ?', 'ai.chatSuggestionNotice': 'À quoi devrais-je prêter le plus attention ici ?',
+      'ai.chatQuestionNavigation': 'Questions de cette conversation', 'ai.chatQuestionJump': 'Question {number} : {question}'
+    },
+    ru: {
+      'common.language': 'Язык', 'theme.light': 'Светлая', 'theme.dark': 'Тёмная', 'theme.sepia': 'Сепия', 'theme.forest': 'Лес', 'theme.ocean': 'Океан', 'theme.peach': 'Персик', 'theme.lavender': 'Лаванда',
+      'reader.library': 'Библиотека', 'reader.theme': 'Тема', 'reader.book': 'Книга', 'reader.home': 'Главная', 'reader.top': 'Наверх', 'reader.settings': 'Настройки', 'reader.shelf': 'Книжная полка', 'reader.annotations': 'Заметки', 'reader.tableOfContents': 'Оглавление', 'reader.previous': 'Предыдущая глава', 'reader.next': 'Следующая глава',
+      'account.menu': 'Аккаунт', 'account.title': 'Настройки аккаунта', 'account.logout': 'Выйти', 'admin.menu': 'Администрирование', 'admin.title': 'Администрирование',
+      'ai.you': 'Вы', 'ai.chatDrawerTitle': 'Спросить ИИ', 'ai.chatDrawerEyebrow': 'ЛИЧНЫЙ ДИАЛОГ', 'ai.chatReadyPrompt': 'Попросите объяснение, контраргумент или связь с другой частью книги.', 'ai.chatSuggestions': 'Примеры вопросов', 'ai.followupPlaceholder': 'Задайте уточняющий вопрос', 'ai.ask': 'Спросить', 'ai.assistant': 'ИИ-ассистент', 'ai.close': 'Закрыть',
+      'ai.chatSuggestionExplain': 'Можете объяснить главную мысль этого фрагмента?', 'ai.chatSuggestionChallenge': 'Можете оспорить одну из изложенных здесь идей?', 'ai.chatSuggestionConnect': 'Как это связано с остальной частью книги?', 'ai.chatSuggestionSummarize': 'Можете кратко изложить этот фрагмент в нескольких предложениях?', 'ai.chatSuggestionNotice': 'На что здесь стоит обратить особое внимание?',
+      'ai.chatQuestionNavigation': 'Вопросы в этом диалоге', 'ai.chatQuestionJump': 'Вопрос {number}: {question}'
+    },
+    it: {
+      'common.language': 'Lingua', 'theme.light': 'Chiaro', 'theme.dark': 'Scuro', 'theme.sepia': 'Seppia', 'theme.forest': 'Foresta', 'theme.ocean': 'Oceano', 'theme.peach': 'Pesca', 'theme.lavender': 'Lavanda',
+      'reader.library': 'Biblioteca', 'reader.theme': 'Tema', 'reader.book': 'Libro', 'reader.home': 'Home', 'reader.top': 'In alto', 'reader.settings': 'Impostazioni', 'reader.shelf': 'Scaffale', 'reader.annotations': 'Annotazioni', 'reader.tableOfContents': 'Indice', 'reader.previous': 'Capitolo precedente', 'reader.next': 'Capitolo successivo',
+      'account.menu': 'Account', 'account.title': 'Impostazioni account', 'account.logout': 'Esci', 'admin.menu': 'Amministrazione', 'admin.title': 'Amministrazione',
+      'ai.you': 'Tu', 'ai.chatDrawerTitle': "Chiedi all’IA", 'ai.chatDrawerEyebrow': 'CONVERSAZIONE PRIVATA', 'ai.chatReadyPrompt': 'Chiedi una spiegazione, un’obiezione o un collegamento con un’altra parte del libro.', 'ai.chatSuggestions': 'Prova a chiedere', 'ai.followupPlaceholder': 'Fai una domanda di approfondimento', 'ai.ask': 'Chiedi', 'ai.assistant': 'Assistente IA', 'ai.close': 'Chiudi',
+      'ai.chatSuggestionExplain': 'Puoi spiegare l’idea principale di questo contenuto?', 'ai.chatSuggestionChallenge': 'Puoi mettere in discussione una delle idee presentate qui?', 'ai.chatSuggestionConnect': 'In che modo questo si collega al resto del libro?', 'ai.chatSuggestionSummarize': 'Puoi riassumere questo contenuto in poche frasi?', 'ai.chatSuggestionNotice': 'A cosa dovrei prestare maggiore attenzione qui?',
+      'ai.chatQuestionNavigation': 'Domande in questa conversazione', 'ai.chatQuestionJump': 'Domanda {number}: {question}'
+    },
+    'pt-BR': {
+      'common.language': 'Idioma', 'theme.light': 'Claro', 'theme.dark': 'Escuro', 'theme.sepia': 'Sépia', 'theme.forest': 'Floresta', 'theme.ocean': 'Oceano', 'theme.peach': 'Pêssego', 'theme.lavender': 'Lavanda',
+      'reader.library': 'Biblioteca', 'reader.theme': 'Tema', 'reader.book': 'Livro', 'reader.home': 'Início', 'reader.top': 'Topo', 'reader.settings': 'Configurações', 'reader.shelf': 'Estante', 'reader.annotations': 'Anotações', 'reader.tableOfContents': 'Sumário', 'reader.previous': 'Capítulo anterior', 'reader.next': 'Próximo capítulo',
+      'account.menu': 'Conta', 'account.title': 'Configurações da conta', 'account.logout': 'Sair', 'admin.menu': 'Administração', 'admin.title': 'Administração',
+      'ai.you': 'Você', 'ai.chatDrawerTitle': 'Pergunte à IA', 'ai.chatDrawerEyebrow': 'CONVERSA PRIVADA', 'ai.chatReadyPrompt': 'Peça uma explicação, um contraponto ou uma conexão com outra parte do livro.', 'ai.chatSuggestions': 'Experimente perguntar', 'ai.followupPlaceholder': 'Faça uma pergunta complementar', 'ai.ask': 'Perguntar', 'ai.assistant': 'Assistente de IA', 'ai.close': 'Fechar',
+      'ai.chatSuggestionExplain': 'Você pode explicar a ideia central deste conteúdo?', 'ai.chatSuggestionChallenge': 'Você pode questionar uma das ideias apresentadas aqui?', 'ai.chatSuggestionConnect': 'Como isso se relaciona com o restante do livro?', 'ai.chatSuggestionSummarize': 'Você pode resumir este conteúdo em algumas frases?', 'ai.chatSuggestionNotice': 'A que devo prestar mais atenção aqui?',
+      'ai.chatQuestionNavigation': 'Perguntas desta conversa', 'ai.chatQuestionJump': 'Pergunta {number}: {question}'
+    },
+    ar: {
+      'common.language': 'اللغة', 'theme.light': 'فاتح', 'theme.dark': 'داكن', 'theme.sepia': 'بني', 'theme.forest': 'غابة', 'theme.ocean': 'محيط', 'theme.peach': 'خوخي', 'theme.lavender': 'لافندر',
+      'reader.library': 'المكتبة', 'reader.theme': 'المظهر', 'reader.book': 'الكتاب', 'reader.home': 'الرئيسية', 'reader.top': 'إلى الأعلى', 'reader.settings': 'الإعدادات', 'reader.shelf': 'رف الكتب', 'reader.annotations': 'التعليقات', 'reader.tableOfContents': 'جدول المحتويات', 'reader.previous': 'الفصل السابق', 'reader.next': 'الفصل التالي',
+      'account.menu': 'الحساب', 'account.title': 'إعدادات الحساب', 'account.logout': 'تسجيل الخروج', 'admin.menu': 'الإدارة', 'admin.title': 'الإدارة',
+      'ai.you': 'أنت', 'ai.chatDrawerTitle': 'اسأل الذكاء الاصطناعي', 'ai.chatDrawerEyebrow': 'محادثة خاصة', 'ai.chatReadyPrompt': 'اطلب شرحًا أو حجة مضادة أو صلة بجزء آخر من الكتاب.', 'ai.chatSuggestions': 'جرّب أن تسأل', 'ai.followupPlaceholder': 'اطرح سؤال متابعة', 'ai.ask': 'اسأل', 'ai.assistant': 'مساعد الذكاء الاصطناعي', 'ai.close': 'إغلاق',
+      'ai.chatSuggestionExplain': 'هل يمكنك شرح الفكرة الأساسية في هذا المحتوى؟', 'ai.chatSuggestionChallenge': 'هل يمكنك مناقشة إحدى الأفكار المطروحة هنا نقديًا؟', 'ai.chatSuggestionConnect': 'كيف يرتبط هذا ببقية الكتاب؟', 'ai.chatSuggestionSummarize': 'هل يمكنك تلخيص هذا المحتوى في بضع جمل؟', 'ai.chatSuggestionNotice': 'ما الذي ينبغي أن أوليه أكبر قدر من الاهتمام هنا؟',
+      'ai.chatQuestionNavigation': 'أسئلة هذه المحادثة', 'ai.chatQuestionJump': 'السؤال {number}: {question}'
+    },
+    id: {
+      'common.language': 'Bahasa', 'theme.light': 'Terang', 'theme.dark': 'Gelap', 'theme.sepia': 'Sepia', 'theme.forest': 'Hutan', 'theme.ocean': 'Samudra', 'theme.peach': 'Persik', 'theme.lavender': 'Lavender',
+      'reader.library': 'Perpustakaan', 'reader.theme': 'Tema', 'reader.book': 'Buku', 'reader.home': 'Beranda', 'reader.top': 'Ke atas', 'reader.settings': 'Pengaturan', 'reader.shelf': 'Rak buku', 'reader.annotations': 'Anotasi', 'reader.tableOfContents': 'Daftar isi', 'reader.previous': 'Bab sebelumnya', 'reader.next': 'Bab berikutnya',
+      'account.menu': 'Akun', 'account.title': 'Pengaturan akun', 'account.logout': 'Keluar', 'admin.menu': 'Administrasi', 'admin.title': 'Administrasi',
+      'ai.you': 'Anda', 'ai.chatDrawerTitle': 'Tanya AI', 'ai.chatDrawerEyebrow': 'PERCAKAPAN PRIBADI', 'ai.chatReadyPrompt': 'Mintalah penjelasan, argumen tandingan, atau kaitan dengan bagian lain dari buku.', 'ai.chatSuggestions': 'Coba tanyakan', 'ai.followupPlaceholder': 'Ajukan pertanyaan lanjutan', 'ai.ask': 'Tanya', 'ai.assistant': 'Asisten AI', 'ai.close': 'Tutup',
+      'ai.chatSuggestionExplain': 'Bisakah Anda menjelaskan gagasan utama dalam bagian ini?', 'ai.chatSuggestionChallenge': 'Bisakah Anda mengkritisi salah satu gagasan yang disampaikan di sini?', 'ai.chatSuggestionConnect': 'Bagaimana kaitannya dengan bagian lain dari buku?', 'ai.chatSuggestionSummarize': 'Bisakah Anda merangkum bagian ini dalam beberapa kalimat?', 'ai.chatSuggestionNotice': 'Apa yang paling perlu saya perhatikan di sini?',
+      'ai.chatQuestionNavigation': 'Pertanyaan dalam percakapan ini', 'ai.chatQuestionJump': 'Pertanyaan {number}: {question}'
+    },
+    hi: {
+      'common.language': 'भाषा', 'theme.light': 'हल्का', 'theme.dark': 'गहरा', 'theme.sepia': 'सेपिया', 'theme.forest': 'वन', 'theme.ocean': 'महासागर', 'theme.peach': 'पीच', 'theme.lavender': 'लैवेंडर',
+      'reader.library': 'पुस्तकालय', 'reader.theme': 'थीम', 'reader.book': 'पुस्तक', 'reader.home': 'होम', 'reader.top': 'ऊपर', 'reader.settings': 'सेटिंग्स', 'reader.shelf': 'बुकशेल्फ़', 'reader.annotations': 'टिप्पणियाँ', 'reader.tableOfContents': 'विषय-सूची', 'reader.previous': 'पिछला अध्याय', 'reader.next': 'अगला अध्याय',
+      'account.menu': 'खाता', 'account.title': 'खाता सेटिंग्स', 'account.logout': 'साइन आउट', 'admin.menu': 'प्रशासन', 'admin.title': 'प्रशासन',
+      'ai.you': 'आप', 'ai.chatDrawerTitle': 'AI से पूछें', 'ai.chatDrawerEyebrow': 'निजी बातचीत', 'ai.chatReadyPrompt': 'स्पष्टीकरण, प्रतिवाद या पुस्तक के किसी अन्य भाग से संबंध के बारे में पूछें।', 'ai.chatSuggestions': 'आप यह पूछ सकते हैं', 'ai.followupPlaceholder': 'आगे का प्रश्न पूछें', 'ai.ask': 'पूछें', 'ai.assistant': 'AI सहायक', 'ai.close': 'बंद करें',
+      'ai.chatSuggestionExplain': 'क्या आप इस अंश के मुख्य विचार को समझा सकते हैं?', 'ai.chatSuggestionChallenge': 'क्या आप यहाँ प्रस्तुत किसी एक विचार पर सवाल उठा सकते हैं?', 'ai.chatSuggestionConnect': 'यह पुस्तक के बाकी हिस्से से कैसे जुड़ता है?', 'ai.chatSuggestionSummarize': 'क्या आप इस अंश को कुछ वाक्यों में संक्षेपित कर सकते हैं?', 'ai.chatSuggestionNotice': 'मुझे यहाँ किस बात पर सबसे अधिक ध्यान देना चाहिए?',
+      'ai.chatQuestionNavigation': 'इस बातचीत के प्रश्न', 'ai.chatQuestionJump': 'प्रश्न {number}: {question}'
+    },
+    vi: {
+      'common.language': 'Ngôn ngữ', 'theme.light': 'Sáng', 'theme.dark': 'Tối', 'theme.sepia': 'Nâu đỏ', 'theme.forest': 'Rừng', 'theme.ocean': 'Đại dương', 'theme.peach': 'Đào', 'theme.lavender': 'Oải hương',
+      'reader.library': 'Thư viện', 'reader.theme': 'Giao diện', 'reader.book': 'Sách', 'reader.home': 'Trang chủ', 'reader.top': 'Lên đầu', 'reader.settings': 'Cài đặt', 'reader.shelf': 'Kệ sách', 'reader.annotations': 'Ghi chú', 'reader.tableOfContents': 'Mục lục', 'reader.previous': 'Chương trước', 'reader.next': 'Chương sau',
+      'account.menu': 'Tài khoản', 'account.title': 'Cài đặt tài khoản', 'account.logout': 'Đăng xuất', 'admin.menu': 'Quản trị', 'admin.title': 'Quản trị',
+      'ai.you': 'Bạn', 'ai.chatDrawerTitle': 'Hỏi AI', 'ai.chatDrawerEyebrow': 'CUỘC TRÒ CHUYỆN RIÊNG TƯ', 'ai.chatReadyPrompt': 'Hãy yêu cầu giải thích, phản biện hoặc liên hệ với phần khác của cuốn sách.', 'ai.chatSuggestions': 'Thử hỏi', 'ai.followupPlaceholder': 'Đặt câu hỏi tiếp theo', 'ai.ask': 'Hỏi', 'ai.assistant': 'Trợ lý AI', 'ai.close': 'Đóng',
+      'ai.chatSuggestionExplain': 'Bạn có thể giải thích ý chính của phần này không?', 'ai.chatSuggestionChallenge': 'Bạn có thể phản biện một trong những ý tưởng được nêu ở đây không?', 'ai.chatSuggestionConnect': 'Điều này liên quan thế nào đến phần còn lại của cuốn sách?', 'ai.chatSuggestionSummarize': 'Bạn có thể tóm tắt phần này trong vài câu không?', 'ai.chatSuggestionNotice': 'Tôi nên chú ý nhất đến điều gì ở đây?',
+      'ai.chatQuestionNavigation': 'Các câu hỏi trong cuộc trò chuyện này', 'ai.chatQuestionJump': 'Câu hỏi {number}: {question}'
+    },
+    th: {
+      'common.language': 'ภาษา', 'theme.light': 'สว่าง', 'theme.dark': 'มืด', 'theme.sepia': 'ซีเปีย', 'theme.forest': 'ป่า', 'theme.ocean': 'มหาสมุทร', 'theme.peach': 'พีช', 'theme.lavender': 'ลาเวนเดอร์',
+      'reader.library': 'ห้องสมุด', 'reader.theme': 'ธีม', 'reader.book': 'หนังสือ', 'reader.home': 'หน้าแรก', 'reader.top': 'ด้านบน', 'reader.settings': 'การตั้งค่า', 'reader.shelf': 'ชั้นหนังสือ', 'reader.annotations': 'คำอธิบายประกอบ', 'reader.tableOfContents': 'สารบัญ', 'reader.previous': 'บทก่อนหน้า', 'reader.next': 'บทถัดไป',
+      'account.menu': 'บัญชี', 'account.title': 'การตั้งค่าบัญชี', 'account.logout': 'ออกจากระบบ', 'admin.menu': 'การดูแลระบบ', 'admin.title': 'การดูแลระบบ',
+      'ai.you': 'คุณ', 'ai.chatDrawerTitle': 'ถาม AI', 'ai.chatDrawerEyebrow': 'การสนทนาส่วนตัว', 'ai.chatReadyPrompt': 'ขอคำอธิบาย ข้อโต้แย้ง หรือความเชื่อมโยงกับส่วนอื่นของหนังสือ', 'ai.chatSuggestions': 'ลองถาม', 'ai.followupPlaceholder': 'ถามคำถามต่อ', 'ai.ask': 'ถาม', 'ai.assistant': 'ผู้ช่วย AI', 'ai.close': 'ปิด',
+      'ai.chatSuggestionExplain': 'ช่วยอธิบายแนวคิดหลักของเนื้อหาส่วนนี้ได้ไหม?', 'ai.chatSuggestionChallenge': 'ช่วยตั้งข้อโต้แย้งต่อหนึ่งในแนวคิดที่กล่าวถึงที่นี่ได้ไหม?', 'ai.chatSuggestionConnect': 'เรื่องนี้เชื่อมโยงกับส่วนอื่นของหนังสืออย่างไร?', 'ai.chatSuggestionSummarize': 'ช่วยสรุปเนื้อหาส่วนนี้เป็นประโยคสั้น ๆ ได้ไหม?', 'ai.chatSuggestionNotice': 'ฉันควรให้ความสำคัญกับเรื่องใดมากที่สุด?',
+      'ai.chatQuestionNavigation': 'คำถามในการสนทนานี้', 'ai.chatQuestionJump': 'คำถาม {number}: {question}'
+    },
+    ms: {
+      'common.language': 'Bahasa', 'theme.light': 'Cerah', 'theme.dark': 'Gelap', 'theme.sepia': 'Sepia', 'theme.forest': 'Hutan', 'theme.ocean': 'Lautan', 'theme.peach': 'Pic', 'theme.lavender': 'Lavender',
+      'reader.library': 'Perpustakaan', 'reader.theme': 'Tema', 'reader.book': 'Buku', 'reader.home': 'Laman utama', 'reader.top': 'Ke atas', 'reader.settings': 'Tetapan', 'reader.shelf': 'Rak buku', 'reader.annotations': 'Anotasi', 'reader.tableOfContents': 'Isi kandungan', 'reader.previous': 'Bab sebelumnya', 'reader.next': 'Bab seterusnya',
+      'account.menu': 'Akaun', 'account.title': 'Tetapan akaun', 'account.logout': 'Log keluar', 'admin.menu': 'Pentadbiran', 'admin.title': 'Pentadbiran',
+      'ai.you': 'Anda', 'ai.chatDrawerTitle': 'Tanya AI', 'ai.chatDrawerEyebrow': 'PERBUALAN PERIBADI', 'ai.chatReadyPrompt': 'Minta penjelasan, hujah balas atau kaitan dengan bahagian lain dalam buku.', 'ai.chatSuggestions': 'Cuba tanya', 'ai.followupPlaceholder': 'Tanya soalan susulan', 'ai.ask': 'Tanya', 'ai.assistant': 'Pembantu AI', 'ai.close': 'Tutup',
+      'ai.chatSuggestionExplain': 'Bolehkah anda menerangkan idea utama dalam bahagian ini?', 'ai.chatSuggestionChallenge': 'Bolehkah anda mencabar salah satu idea yang dikemukakan di sini?', 'ai.chatSuggestionConnect': 'Bagaimanakah perkara ini berkaitan dengan bahagian lain dalam buku?', 'ai.chatSuggestionSummarize': 'Bolehkah anda meringkaskan bahagian ini dalam beberapa ayat?', 'ai.chatSuggestionNotice': 'Apakah perkara yang paling perlu saya beri perhatian di sini?',
+      'ai.chatQuestionNavigation': 'Soalan dalam perbualan ini', 'ai.chatQuestionJump': 'Soalan {number}: {question}'
+    }
+  };
+  var localeNativeNames = { en: 'English', 'zh-CN': '简体中文', 'zh-TW': '繁體中文', ko: '한국어', ja: '日本語', es: 'Español', de: 'Deutsch', fr: 'Français', ru: 'Русский', it: 'Italiano', 'pt-BR': 'Português (Brasil)', ar: 'العربية', id: 'Bahasa Indonesia', hi: 'हिन्दी', vi: 'Tiếng Việt', th: 'ไทย', ms: 'Bahasa Melayu' };
+  Object.keys(extendedLocaleTranslations).forEach(function(code) {
+    dictionaries[code] = Object.assign({}, dictionaries.en, extendedLocaleTranslations[code]);
+  });
+  var extendedAuthTranslations = {
+    es: {
+      'account.signIn': 'Iniciar sesión', 'account.loginPageTitle': 'Iniciar sesión · EPUB Browser', 'account.loginDescription': 'Inicia sesión para acceder a tu biblioteca personal.', 'account.setupPageTitle': 'Crear administrador · EPUB Browser', 'account.setupTitle': 'Crea tu cuenta de administrador', 'account.setupDescription': 'La primera vez que accedas a la interfaz web, se te pedirá que crees una cuenta de superusuario.', 'account.username': 'Nombre de usuario', 'account.password': 'Contraseña', 'account.confirmPassword': 'Confirmar contraseña', 'account.createSuperuser': 'Crear superusuario', 'account.error.invalid_credentials': 'El nombre de usuario o la contraseña no son correctos.', 'account.error.invalidSetup': 'Introduce un nombre de usuario, una contraseña y su confirmación.', 'account.error.passwordMismatch': 'Las contraseñas no coinciden.', 'account.error.username_unavailable': 'Ese nombre de usuario no está disponible.'
+    },
+    de: {
+      'account.signIn': 'Anmelden', 'account.loginPageTitle': 'Anmelden · EPUB Browser', 'account.loginDescription': 'Melde dich an, um deine persönliche Bibliothek zu öffnen.', 'account.setupPageTitle': 'Administrator erstellen · EPUB Browser', 'account.setupTitle': 'Administratorkonto erstellen', 'account.setupDescription': 'Beim ersten Aufruf der Weboberfläche wirst du aufgefordert, ein Superuser-Konto zu erstellen.', 'account.username': 'Benutzername', 'account.password': 'Passwort', 'account.confirmPassword': 'Passwort bestätigen', 'account.createSuperuser': 'Superuser erstellen', 'account.error.invalid_credentials': 'Benutzername oder Passwort ist falsch.', 'account.error.invalidSetup': 'Gib Benutzername, Passwort und Passwortbestätigung ein.', 'account.error.passwordMismatch': 'Die Passwörter stimmen nicht überein.', 'account.error.username_unavailable': 'Dieser Benutzername ist nicht verfügbar.'
+    },
+    fr: {
+      'account.signIn': 'Se connecter', 'account.loginPageTitle': 'Se connecter · EPUB Browser', 'account.loginDescription': 'Connectez-vous pour accéder à votre bibliothèque personnelle.', 'account.setupPageTitle': 'Créer un administrateur · EPUB Browser', 'account.setupTitle': 'Créez votre compte administrateur', 'account.setupDescription': 'Lors de votre premier accès à l’interface web, vous devrez créer un compte superutilisateur.', 'account.username': 'Nom d’utilisateur', 'account.password': 'Mot de passe', 'account.confirmPassword': 'Confirmer le mot de passe', 'account.createSuperuser': 'Créer le superutilisateur', 'account.error.invalid_credentials': 'Le nom d’utilisateur ou le mot de passe est incorrect.', 'account.error.invalidSetup': 'Saisissez un nom d’utilisateur, un mot de passe et sa confirmation.', 'account.error.passwordMismatch': 'Les mots de passe ne correspondent pas.', 'account.error.username_unavailable': 'Ce nom d’utilisateur n’est pas disponible.'
+    },
+    ru: {
+      'account.signIn': 'Войти', 'account.loginPageTitle': 'Вход · EPUB Browser', 'account.loginDescription': 'Войдите, чтобы открыть свою личную библиотеку.', 'account.setupPageTitle': 'Создание администратора · EPUB Browser', 'account.setupTitle': 'Создайте учётную запись администратора', 'account.setupDescription': 'При первом открытии веб-интерфейса вам будет предложено создать учётную запись суперпользователя.', 'account.username': 'Имя пользователя', 'account.password': 'Пароль', 'account.confirmPassword': 'Подтвердите пароль', 'account.createSuperuser': 'Создать суперпользователя', 'account.error.invalid_credentials': 'Неверное имя пользователя или пароль.', 'account.error.invalidSetup': 'Введите имя пользователя, пароль и подтверждение пароля.', 'account.error.passwordMismatch': 'Пароли не совпадают.', 'account.error.username_unavailable': 'Это имя пользователя недоступно.'
+    },
+    it: {
+      'account.signIn': 'Accedi', 'account.loginPageTitle': 'Accedi · EPUB Browser', 'account.loginDescription': 'Accedi per continuare nella tua biblioteca personale.', 'account.setupPageTitle': 'Crea amministratore · EPUB Browser', 'account.setupTitle': 'Crea il tuo account amministratore', 'account.setupDescription': 'Al primo accesso all’interfaccia web ti verrà chiesto di creare un account superutente.', 'account.username': 'Nome utente', 'account.password': 'Password', 'account.confirmPassword': 'Conferma password', 'account.createSuperuser': 'Crea superutente', 'account.error.invalid_credentials': 'Il nome utente o la password non sono corretti.', 'account.error.invalidSetup': 'Inserisci nome utente, password e conferma della password.', 'account.error.passwordMismatch': 'Le password non corrispondono.', 'account.error.username_unavailable': 'Questo nome utente non è disponibile.'
+    },
+    'pt-BR': {
+      'account.signIn': 'Entrar', 'account.loginPageTitle': 'Entrar · EPUB Browser', 'account.loginDescription': 'Entre para acessar sua biblioteca pessoal.', 'account.setupPageTitle': 'Criar administrador · EPUB Browser', 'account.setupTitle': 'Crie sua conta de administrador', 'account.setupDescription': 'No primeiro acesso à interface web, você deverá criar uma conta de superusuário.', 'account.username': 'Nome de usuário', 'account.password': 'Senha', 'account.confirmPassword': 'Confirmar senha', 'account.createSuperuser': 'Criar superusuário', 'account.error.invalid_credentials': 'O nome de usuário ou a senha está incorreto.', 'account.error.invalidSetup': 'Informe o nome de usuário, a senha e a confirmação da senha.', 'account.error.passwordMismatch': 'As senhas não coincidem.', 'account.error.username_unavailable': 'Esse nome de usuário não está disponível.'
+    },
+    ar: {
+      'account.signIn': 'تسجيل الدخول', 'account.loginPageTitle': 'تسجيل الدخول · EPUB Browser', 'account.loginDescription': 'سجّل الدخول للوصول إلى مكتبتك الشخصية.', 'account.setupPageTitle': 'إنشاء مسؤول · EPUB Browser', 'account.setupTitle': 'أنشئ حساب المسؤول', 'account.setupDescription': 'عند فتح واجهة الويب لأول مرة، سيُطلب منك إنشاء حساب مستخدم متميز.', 'account.username': 'اسم المستخدم', 'account.password': 'كلمة المرور', 'account.confirmPassword': 'تأكيد كلمة المرور', 'account.createSuperuser': 'إنشاء مستخدم متميز', 'account.error.invalid_credentials': 'اسم المستخدم أو كلمة المرور غير صحيحة.', 'account.error.invalidSetup': 'أدخل اسم المستخدم وكلمة المرور وتأكيدها.', 'account.error.passwordMismatch': 'كلمتا المرور غير متطابقتين.', 'account.error.username_unavailable': 'اسم المستخدم هذا غير متاح.'
+    },
+    id: {
+      'account.signIn': 'Masuk', 'account.loginPageTitle': 'Masuk · EPUB Browser', 'account.loginDescription': 'Masuk untuk membuka perpustakaan pribadi Anda.', 'account.setupPageTitle': 'Buat administrator · EPUB Browser', 'account.setupTitle': 'Buat akun administrator Anda', 'account.setupDescription': 'Saat pertama kali membuka antarmuka web, Anda akan diminta membuat akun superuser.', 'account.username': 'Nama pengguna', 'account.password': 'Kata sandi', 'account.confirmPassword': 'Konfirmasi kata sandi', 'account.createSuperuser': 'Buat superuser', 'account.error.invalid_credentials': 'Nama pengguna atau kata sandi salah.', 'account.error.invalidSetup': 'Masukkan nama pengguna, kata sandi, dan konfirmasi kata sandi.', 'account.error.passwordMismatch': 'Kata sandi tidak cocok.', 'account.error.username_unavailable': 'Nama pengguna tersebut tidak tersedia.'
+    },
+    hi: {
+      'account.signIn': 'साइन इन करें', 'account.loginPageTitle': 'साइन इन · EPUB Browser', 'account.loginDescription': 'अपनी निजी लाइब्रेरी खोलने के लिए साइन इन करें।', 'account.setupPageTitle': 'व्यवस्थापक बनाएँ · EPUB Browser', 'account.setupTitle': 'अपना व्यवस्थापक खाता बनाएँ', 'account.setupDescription': 'वेब इंटरफ़ेस पहली बार खोलने पर आपसे सुपरयूज़र खाता बनाने के लिए कहा जाएगा।', 'account.username': 'उपयोगकर्ता नाम', 'account.password': 'पासवर्ड', 'account.confirmPassword': 'पासवर्ड की पुष्टि करें', 'account.createSuperuser': 'सुपरयूज़र बनाएँ', 'account.error.invalid_credentials': 'उपयोगकर्ता नाम या पासवर्ड गलत है।', 'account.error.invalidSetup': 'उपयोगकर्ता नाम, पासवर्ड और पासवर्ड की पुष्टि दर्ज करें।', 'account.error.passwordMismatch': 'पासवर्ड मेल नहीं खाते।', 'account.error.username_unavailable': 'यह उपयोगकर्ता नाम उपलब्ध नहीं है।'
+    },
+    vi: {
+      'account.signIn': 'Đăng nhập', 'account.loginPageTitle': 'Đăng nhập · EPUB Browser', 'account.loginDescription': 'Đăng nhập để mở thư viện cá nhân của bạn.', 'account.setupPageTitle': 'Tạo quản trị viên · EPUB Browser', 'account.setupTitle': 'Tạo tài khoản quản trị viên', 'account.setupDescription': 'Khi truy cập giao diện web lần đầu, bạn sẽ được yêu cầu tạo tài khoản siêu người dùng.', 'account.username': 'Tên người dùng', 'account.password': 'Mật khẩu', 'account.confirmPassword': 'Xác nhận mật khẩu', 'account.createSuperuser': 'Tạo siêu người dùng', 'account.error.invalid_credentials': 'Tên người dùng hoặc mật khẩu không đúng.', 'account.error.invalidSetup': 'Nhập tên người dùng, mật khẩu và xác nhận mật khẩu.', 'account.error.passwordMismatch': 'Mật khẩu không khớp.', 'account.error.username_unavailable': 'Tên người dùng này không khả dụng.'
+    },
+    th: {
+      'account.signIn': 'ลงชื่อเข้าใช้', 'account.loginPageTitle': 'ลงชื่อเข้าใช้ · EPUB Browser', 'account.loginDescription': 'ลงชื่อเข้าใช้เพื่อเปิดห้องสมุดส่วนตัวของคุณ', 'account.setupPageTitle': 'สร้างผู้ดูแลระบบ · EPUB Browser', 'account.setupTitle': 'สร้างบัญชีผู้ดูแลระบบ', 'account.setupDescription': 'เมื่อเปิดเว็บอินเทอร์เฟซเป็นครั้งแรก ระบบจะขอให้คุณสร้างบัญชีผู้ใช้ระดับสูง', 'account.username': 'ชื่อผู้ใช้', 'account.password': 'รหัสผ่าน', 'account.confirmPassword': 'ยืนยันรหัสผ่าน', 'account.createSuperuser': 'สร้างผู้ใช้ระดับสูง', 'account.error.invalid_credentials': 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'account.error.invalidSetup': 'กรอกชื่อผู้ใช้ รหัสผ่าน และการยืนยันรหัสผ่าน', 'account.error.passwordMismatch': 'รหัสผ่านไม่ตรงกัน', 'account.error.username_unavailable': 'ชื่อผู้ใช้นี้ไม่พร้อมใช้งาน'
+    },
+    ms: {
+      'account.signIn': 'Log masuk', 'account.loginPageTitle': 'Log masuk · EPUB Browser', 'account.loginDescription': 'Log masuk untuk membuka perpustakaan peribadi anda.', 'account.setupPageTitle': 'Cipta pentadbir · EPUB Browser', 'account.setupTitle': 'Cipta akaun pentadbir anda', 'account.setupDescription': 'Apabila anda membuka antara muka web buat kali pertama, anda akan diminta mencipta akaun pengguna super.', 'account.username': 'Nama pengguna', 'account.password': 'Kata laluan', 'account.confirmPassword': 'Sahkan kata laluan', 'account.createSuperuser': 'Cipta pengguna super', 'account.error.invalid_credentials': 'Nama pengguna atau kata laluan tidak betul.', 'account.error.invalidSetup': 'Masukkan nama pengguna, kata laluan dan pengesahan kata laluan.', 'account.error.passwordMismatch': 'Kata laluan tidak sepadan.', 'account.error.username_unavailable': 'Nama pengguna itu tidak tersedia.'
+    }
+  };
+  Object.keys(extendedAuthTranslations).forEach(function(code) {
+    Object.assign(dictionaries[code], extendedAuthTranslations[code]);
+    dictionaries[code]['ai.askChapter'] = dictionaries[code]['ai.chatDrawerTitle'];
+    dictionaries[code]['ai.askBook'] = dictionaries[code]['ai.chatDrawerTitle'];
+  });
+  Object.keys(dictionaries).forEach(function(code) {
+    Object.keys(localeNativeNames).forEach(function(localeCode) { dictionaries[code]['locale.name.' + localeCode] = localeNativeNames[localeCode]; });
+  });
+
   function normalizeLocale(value) {
     value = String(value || '').replace('_', '-').toLowerCase();
     if (value === 'zh' || value.indexOf('zh-cn') === 0 || value.indexOf('zh-sg') === 0) return 'zh-CN';
     if (value.indexOf('zh-tw') === 0 || value.indexOf('zh-hk') === 0 || value.indexOf('zh-mo') === 0) return 'zh-TW';
     if (value === 'ko' || value.indexOf('ko-') === 0) return 'ko';
     if (value === 'ja' || value.indexOf('ja-') === 0) return 'ja';
-    return value === 'en' || value.indexOf('en-') === 0 ? 'en' : '';
+    if (value === 'en' || value.indexOf('en-') === 0) return 'en';
+    if (value === 'pt' || value.indexOf('pt-') === 0) return 'pt-BR';
+    var base = value.split('-')[0];
+    return ['es', 'de', 'fr', 'ru', 'it', 'ar', 'id', 'hi', 'vi', 'th', 'ms'].indexOf(base) >= 0 ? base : '';
   }
 
   function readCookie(root) {
@@ -5894,7 +6061,7 @@
 
     function applyLocaleToDocument() {
       var documentRoot = root.document && root.document.documentElement;
-      if (documentRoot) documentRoot.lang = locale;
+      if (documentRoot) { documentRoot.lang = locale; documentRoot.dir = locale === 'ar' ? 'rtl' : 'ltr'; }
       updateManifestLink();
     }
 

@@ -23,7 +23,7 @@ from .auth import (
     validate_password_hash,
 )
 from .identity import new_server_book_id
-from .locales import SUPPORTED_LOCALE_SET
+from .locales import SUPPORTED_LOCALES, SUPPORTED_LOCALE_SET
 from .pat import (
     AuthenticatedPAT,
     IssuedPersonalAccessToken,
@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 16
+DB_SCHEMA_VERSION = 17
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -317,6 +317,8 @@ class StateStore:
                 self._create_v16_pat_indexes(connection)
                 self._create_v16_webhook_schema(connection)
                 self._require_foreign_key_integrity(connection)
+            if version < 17:
+                self._migrate_schema_v17(connection, max(version, 16))
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -1104,11 +1106,16 @@ class StateStore:
         connection.execute("PRAGMA user_version = 12")
 
     @staticmethod
-    def _create_v13_ai_language_targets(connection) -> None:
-        languages = "'en', 'zh-CN', 'zh-TW', 'ko', 'ja'"
+    def _create_ai_language_targets(
+        connection,
+        migration_version: int,
+        supported_locales,
+    ) -> None:
+        languages = ", ".join("'" + locale.replace("'", "''") + "'" for locale in supported_locales)
+        suffix = f"__v{migration_version}_target"
         connection.execute(
             f"""
-            CREATE TABLE ai_reading_results__v13_target (
+            CREATE TABLE ai_reading_results{suffix} (
                 id TEXT PRIMARY KEY,
                 cache_key TEXT NOT NULL,
                 book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
@@ -1132,8 +1139,8 @@ class StateStore:
             """
         )
         connection.execute(
-            """
-            CREATE TABLE ai_reading_jobs__v13_target (
+            f"""
+            CREATE TABLE ai_reading_jobs{suffix} (
                 id TEXT PRIMARY KEY,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 book_id TEXT REFERENCES books(book_id) ON DELETE CASCADE,
@@ -1146,14 +1153,14 @@ class StateStore:
                     'queued', 'running', 'complete', 'failed', 'interrupted'
                 )),
                 error_code TEXT,
-                result_id TEXT REFERENCES ai_reading_results__v13_target(id) ON DELETE SET NULL,
+                result_id TEXT REFERENCES ai_reading_results{suffix}(id) ON DELETE SET NULL,
                 progress_current INTEGER NOT NULL DEFAULT 0,
                 progress_total INTEGER NOT NULL DEFAULT 1,
                 quota_reserved INTEGER NOT NULL DEFAULT 0 CHECK(quota_reserved IN (0, 1)),
                 generation_stage TEXT,
                 attempt_number INTEGER NOT NULL DEFAULT 1 CHECK(attempt_number >= 1),
-                retried_from_job_id TEXT REFERENCES ai_reading_jobs__v13_target(id) ON DELETE SET NULL,
-                retry_root_job_id TEXT REFERENCES ai_reading_jobs__v13_target(id) ON DELETE SET NULL,
+                retried_from_job_id TEXT REFERENCES ai_reading_jobs{suffix}(id) ON DELETE SET NULL,
+                retry_root_job_id TEXT REFERENCES ai_reading_jobs{suffix}(id) ON DELETE SET NULL,
                 retried_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1170,10 +1177,10 @@ class StateStore:
             """
         )
         connection.execute(
-            """
-            CREATE TABLE ai_reading_current_results__v13_target (
+            f"""
+            CREATE TABLE ai_reading_current_results{suffix} (
                 cache_key TEXT PRIMARY KEY,
-                result_id TEXT NOT NULL REFERENCES ai_reading_results__v13_target(id)
+                result_id TEXT NOT NULL REFERENCES ai_reading_results{suffix}(id)
                     ON DELETE CASCADE,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -1181,9 +1188,9 @@ class StateStore:
         )
         connection.execute(
             f"""
-            CREATE TABLE ai_reading_followups__v13_target (
+            CREATE TABLE ai_reading_followups{suffix} (
                 id TEXT PRIMARY KEY,
-                result_id TEXT NOT NULL REFERENCES ai_reading_results__v13_target(id)
+                result_id TEXT NOT NULL REFERENCES ai_reading_results{suffix}(id)
                     ON DELETE CASCADE,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 question TEXT NOT NULL,
@@ -1200,11 +1207,11 @@ class StateStore:
         )
         connection.execute(
             f"""
-            CREATE TABLE ai_book_chat_turns__v13_target (
+            CREATE TABLE ai_book_chat_turns{suffix} (
                 id TEXT PRIMARY KEY,
                 book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
                 chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
-                result_id TEXT REFERENCES ai_reading_results__v13_target(id) ON DELETE SET NULL,
+                result_id TEXT REFERENCES ai_reading_results{suffix}(id) ON DELETE SET NULL,
                 context_mode TEXT NOT NULL CHECK(context_mode IN (
                     'shared_layer', 'chapter_source'
                 )),
@@ -1224,7 +1231,7 @@ class StateStore:
         )
         connection.execute(
             f"""
-            CREATE TABLE ai_book_chat_summaries__v13_target (
+            CREATE TABLE ai_book_chat_summaries{suffix} (
                 book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
                 owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 language TEXT NOT NULL CHECK(language IN ({languages})),
@@ -1238,7 +1245,7 @@ class StateStore:
         )
 
     @staticmethod
-    def _v13_copy_table(connection, source: str, target: str) -> None:
+    def _v13_copy_table(connection, source: str, target: str, schema_version: int = 13) -> None:
         source_columns = tuple(
             row[1] for row in connection.execute(
                 f'PRAGMA table_info("{source}")'
@@ -1254,7 +1261,7 @@ class StateStore:
             or set(source_columns) != set(target_columns)
         ):
             raise sqlite3.IntegrityError(
-                f"schema v13 column mismatch: {source} -> {target}"
+                f"schema v{schema_version} column mismatch: {source} -> {target}"
             )
         quoted_columns = ", ".join(f'"{column}"' for column in source_columns)
         connection.execute(
@@ -1284,7 +1291,9 @@ class StateStore:
             raise sqlite3.IntegrityError(
                 f"schema v13 reserved migration table exists: {leftover[0]}"
             )
-        self._create_v13_ai_language_targets(connection)
+        self._create_ai_language_targets(
+            connection, 13, ('en', 'zh-CN', 'zh-TW', 'ko', 'ja')
+        )
         pairs = (
             ("ai_reading_results", "ai_reading_results__v13_target"),
             ("ai_reading_jobs", "ai_reading_jobs__v13_target"),
@@ -1490,6 +1499,65 @@ class StateStore:
         self._create_v16_webhook_schema(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 16")
+
+    def _migrate_schema_v17(self, connection, source_version) -> None:
+        if source_version >= 17:
+            return
+        targets = tuple(
+            table + "__v17_target"
+            for table in (
+                "ai_reading_results",
+                "ai_reading_jobs",
+                "ai_reading_current_results",
+                "ai_reading_followups",
+                "ai_book_chat_turns",
+                "ai_book_chat_summaries",
+            )
+        )
+        placeholder = ",".join("?" for _ in targets)
+        leftover = connection.execute(
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name IN ({placeholder}) "
+            "ORDER BY name LIMIT 1",
+            targets,
+        ).fetchone()
+        if leftover is not None:
+            raise sqlite3.IntegrityError(
+                f"schema v17 reserved migration table exists: {leftover[0]}"
+            )
+        self._create_ai_language_targets(connection, 17, SUPPORTED_LOCALES)
+        for source, target in zip(
+            (
+                "ai_reading_results",
+                "ai_reading_jobs",
+                "ai_reading_current_results",
+                "ai_reading_followups",
+                "ai_book_chat_turns",
+                "ai_book_chat_summaries",
+            ),
+            targets,
+        ):
+            self._v13_copy_table(connection, source, target, schema_version=17)
+        for table in (
+            "ai_reading_current_results",
+            "ai_reading_followups",
+            "ai_book_chat_turns",
+            "ai_reading_jobs",
+            "ai_book_chat_summaries",
+            "ai_reading_results",
+        ):
+            connection.execute(f'DROP TABLE "{table}"')
+        for target, final in zip(targets, (
+            "ai_reading_results",
+            "ai_reading_jobs",
+            "ai_reading_current_results",
+            "ai_reading_followups",
+            "ai_book_chat_turns",
+            "ai_book_chat_summaries",
+        )):
+            connection.execute(f'ALTER TABLE "{target}" RENAME TO "{final}"')
+        self._create_v11_indexes(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 17")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:

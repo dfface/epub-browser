@@ -198,12 +198,12 @@ test('locale popup opens on the selected roving item and arrows wrap', () => {
   assert.equal(localeToggle.getAttribute('aria-controls'), 'localeMenu');
   assert.equal(localeToggle.getAttribute('aria-expanded'), 'true');
   assert.equal(documentObject.activeElement, items[0]);
-  assert.deepEqual(items.map(item => item.tabIndex), [0, -1, -1, -1, -1]);
+  assert.deepEqual(items.map(item => item.tabIndex), [0].concat(Array(16).fill(-1)));
 
   assert.equal(dispatchKey(documentObject.activeElement, 'ArrowUp'), true);
   items = localeMenu.querySelectorAll('[role="menuitemradio"]');
-  assert.equal(documentObject.activeElement, items[4]);
-  assert.deepEqual(items.map(item => item.tabIndex), [-1, -1, -1, -1, 0]);
+  assert.equal(documentObject.activeElement, items[16]);
+  assert.deepEqual(items.map(item => item.tabIndex), Array(16).fill(-1).concat([0]));
 
   dispatchKey(documentObject.activeElement, 'ArrowDown');
   assert.equal(documentObject.activeElement, items[0]);
@@ -215,7 +215,7 @@ test('locale popup selects with keyboard and Escape restores the trigger', () =>
   localeToggle.click();
   dispatchKey(documentObject.activeElement, 'ArrowUp');
   assert.equal(dispatchKey(documentObject.activeElement, ' '), true);
-  assert.equal(getLocale(), 'ja');
+  assert.equal(getLocale(), 'ms');
   assert.equal(localeToggle.getAttribute('aria-expanded'), 'false');
   assert.equal(documentObject.activeElement, localeToggle);
 

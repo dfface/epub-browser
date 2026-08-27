@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from epub_browser.library import EPUBLibrary
+from epub_browser.locales import SUPPORTED_LOCALES
 
 
 class StaticAssetDeliveryTests(unittest.TestCase):
@@ -21,11 +22,8 @@ class StaticAssetDeliveryTests(unittest.TestCase):
             self.assertNotIn('?v=', html)
             self.assertTrue((root / 'sw.js').is_file())
             self.assertTrue((root / 'assets' / 'manifest.json').is_file())
-            self.assertTrue((root / 'assets' / 'manifest.en.json').is_file())
-            self.assertTrue((root / 'assets' / 'manifest.zh-CN.json').is_file())
-            self.assertTrue((root / 'assets' / 'manifest.zh-TW.json').is_file())
-            self.assertTrue((root / 'assets' / 'manifest.ko.json').is_file())
-            self.assertTrue((root / 'assets' / 'manifest.ja.json').is_file())
+            for locale in SUPPORTED_LOCALES:
+                self.assertTrue((root / 'assets' / f'manifest.{locale}.json').is_file())
             self.assertTrue((root / 'assets' / 'asset-manifest.json').is_file())
             for public_url in asset_urls:
                 self.assertTrue((root / public_url.lstrip('/')).is_file(), public_url)
@@ -36,6 +34,6 @@ class StaticAssetDeliveryTests(unittest.TestCase):
                 self.assertRegex(icon['src'], r'^/assets/immutable/icon-[0-9]+\.[0-9a-f]{12}\.png$')
             chinese_manifest = json.loads((root / 'assets' / 'manifest.zh-CN.json').read_text(encoding='utf-8'))
             self.assertEqual(chinese_manifest['lang'], 'zh-CN')
-            for locale in ('zh-TW', 'ko', 'ja'):
+            for locale in SUPPORTED_LOCALES:
                 localized = json.loads((root / 'assets' / f'manifest.{locale}.json').read_text(encoding='utf-8'))
                 self.assertEqual(localized['lang'], locale)
