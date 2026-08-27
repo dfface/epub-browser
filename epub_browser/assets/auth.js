@@ -339,6 +339,51 @@
       }));
     }
 
+    function confirmWebhookDeletion(name) {
+      if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') return Promise.resolve(false);
+      return Promise.resolve(root.EpubDialog.confirm({
+        title: t('admin.webhooks.delete'),
+        message: t('admin.webhooks.deleteConfirm', { name: name }),
+        confirmText: t('admin.webhooks.delete'),
+        destructive: true
+      }));
+    }
+
+    function confirmPatRevocation(name) {
+      if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') return Promise.resolve(false);
+      return Promise.resolve(root.EpubDialog.confirm({
+        title: t('account.pats.revoke'),
+        message: t('account.pats.revokeConfirm', { name: name }),
+        confirmText: t('account.pats.revoke'),
+        destructive: true
+      }));
+    }
+
+    function copySensitiveText(value) {
+      if (!value) return Promise.reject(new Error('empty_copy_value'));
+      if (root.navigator && root.navigator.clipboard && typeof root.navigator.clipboard.writeText === 'function') {
+        return root.navigator.clipboard.writeText(value);
+      }
+      return new Promise(function(resolve, reject) {
+        var field;
+        try {
+          field = root.document.createElement('textarea');
+          field.value = value;
+          field.setAttribute('readonly', '');
+          field.style.position = 'fixed';
+          field.style.opacity = '0';
+          root.document.body.appendChild(field);
+          field.select();
+          if (!root.document.execCommand || !root.document.execCommand('copy')) throw new Error('copy_failed');
+          field.remove();
+          resolve();
+        } catch (error) {
+          if (field && field.remove) field.remove();
+          reject(error);
+        }
+      });
+    }
+
     function confirmAdminBookBulkOperation(operation, params) {
       var actionKey = operation === 'restrict'
         ? 'admin.books.bulk.restrict'
@@ -870,14 +915,14 @@
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) !== -1
+      return ['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
         ? section : '';
     }
 
     function adminPanelIsAvailable(panel) { return Boolean(panel); }
 
     function setActiveAdminSection(section) {
-      if (['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) === -1) return;
+      if (['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
@@ -1159,6 +1204,8 @@
       var adminMenu = element('adminMenu');
       if (adminPanel) adminPanel.hidden = sessionState.user.role !== 'admin';
       if (adminMenu) adminMenu.hidden = sessionState.user.role !== 'admin';
+      var patAdminScopeLabel = element('patAdminScopeLabel');
+      if (patAdminScopeLabel) patAdminScopeLabel.hidden = sessionState.user.role !== 'admin';
     }
 
     function describeSessionDevice(userAgent) {
@@ -1229,6 +1276,223 @@
         if (!response.ok) return showResponseError(response, 'account');
         return readJson(response).then(function(payload) { renderSessions(payload.sessions); });
       }).catch(function() { showStatus('account.error.network', 'error'); });
+    }
+
+    function patScopeLabel(scope) {
+      var keys = {
+        'library:read': 'account.pats.scope.libraryRead',
+        'bookshelf:read': 'account.pats.scope.bookshelfRead',
+        'bookshelf:write': 'account.pats.scope.bookshelfWrite',
+        'progress:read': 'account.pats.scope.progressRead',
+        'progress:write': 'account.pats.scope.progressWrite',
+        'annotations:read': 'account.pats.scope.annotationsRead',
+        'annotations:write': 'account.pats.scope.annotationsWrite',
+        'reviews:read': 'account.pats.scope.reviewsRead',
+        'reviews:write': 'account.pats.scope.reviewsWrite',
+        'admin:data:read': 'account.pats.scope.adminDataRead'
+      };
+      return t(keys[scope] || 'account.pats.unknownScope', { scope: scope });
+    }
+
+    function renderPersonalAccessTokens(records) {
+      var list = element('patList');
+      if (!list) return;
+      list.textContent = '';
+      (records || []).forEach(function(record) {
+        var item = root.document.createElement('li');
+        var details = root.document.createElement('div');
+        var name = root.document.createElement('strong');
+        var scopes = root.document.createElement('span');
+        var dates = root.document.createElement('span');
+        item.className = 'account-list-item account-pat-item';
+        details.className = 'account-pat-details';
+        name.textContent = record.name;
+        scopes.className = 'account-pat-scope-summary';
+        (record.scopes || []).forEach(function(scope) {
+          var chip = root.document.createElement('span');
+          chip.className = 'account-pat-scope-chip';
+          chip.textContent = patScopeLabel(scope);
+          scopes.appendChild(chip);
+        });
+        dates.className = 'account-pat-dates';
+        dates.textContent = record.expires_at
+          ? t('account.pats.expires', { date: formatDate(record.expires_at) })
+          : t('account.pats.never');
+        if (record.last_used_at) {
+          dates.textContent += ' · ' + t('account.pats.lastUsed', {
+            date: formatDate(record.last_used_at)
+          });
+        }
+        details.appendChild(name);
+        details.appendChild(scopes);
+        details.appendChild(dates);
+        item.appendChild(details);
+        item.appendChild(actionButton('account.pats.revoke', function() {
+          return confirmPatRevocation(record.name).then(function(confirmed) {
+            if (!confirmed) return;
+            return authenticatedFetch('/api/account/pats/' + encodeURIComponent(record.id), {
+              method: 'DELETE'
+            }).then(function(response) {
+              if (!response.ok) return showResponseError(response, 'account');
+              showStatus('account.pats.revoked', 'success');
+              return loadPersonalAccessTokens();
+            }).catch(function() { showStatus('account.error.network', 'error'); });
+          });
+        }, 'danger'));
+        list.appendChild(item);
+      });
+      if (!(records || []).length) {
+        list.appendChild(createTextElement('li', 'account-empty', 'account.pats.empty'));
+      }
+    }
+
+    function loadPersonalAccessTokens() {
+      return authenticatedFetch('/api/account/pats').then(function(response) {
+        if (!response.ok) return showResponseError(response, 'account');
+        return readJson(response).then(function(payload) {
+          renderPersonalAccessTokens(payload.personal_access_tokens || []);
+        });
+      }).catch(function() { showStatus('account.error.network', 'error'); });
+    }
+
+    function clearPersonalAccessTokenSecret() {
+      var secret = element('patCreatedSecret');
+      var region = element('patSecretRegion');
+      if (secret) secret.textContent = '';
+      if (region) region.hidden = true;
+    }
+
+    function showWebhookSecret(value) {
+      var secret = element('adminWebhookSecret');
+      var region = element('adminWebhookSecretRegion');
+      if (secret) secret.textContent = value || '';
+      if (region) region.hidden = !value;
+      if (value) {
+        var copy = element('adminWebhookCopySecret');
+        if (copy && copy.focus) copy.focus();
+      }
+    }
+
+    function webhookEventLabel(eventType) {
+      var keys = {
+        'review.created': 'admin.webhooks.event.reviewCreated',
+        'review.updated': 'admin.webhooks.event.reviewUpdated',
+        'review.deleted': 'admin.webhooks.event.reviewDeleted',
+        'book.created': 'admin.webhooks.event.bookCreated',
+        'book.updated': 'admin.webhooks.event.bookUpdated',
+        'book.removed': 'admin.webhooks.event.bookRemoved',
+        'book.conversion.succeeded': 'admin.webhooks.event.conversionSucceeded',
+        'book.conversion.failed': 'admin.webhooks.event.conversionFailed',
+        'webhook.test': 'admin.webhooks.event.test'
+      };
+      return keys[eventType] ? t(keys[eventType]) : eventType;
+    }
+
+    function renderWebhooks(endpoints, deliveries) {
+      var list = element('adminWebhookList');
+      var history = element('adminWebhookDeliveries');
+      if (list) {
+        list.textContent = '';
+        (endpoints || []).forEach(function(endpoint) {
+          var item = root.document.createElement('li');
+          var summary = root.document.createElement('div');
+          var summaryHeader = root.document.createElement('div');
+          var actions = root.document.createElement('div');
+          var name = root.document.createElement('strong');
+          var url = root.document.createElement('code');
+          var events = root.document.createElement('div');
+          var stateKey = endpoint.enabled ? 'admin.webhooks.status.enabled' : 'admin.webhooks.status.paused';
+          var state = createTextElement('span', '', stateKey);
+          item.className = 'account-list-item admin-webhook-item';
+          summary.className = 'admin-webhook-summary';
+          name.textContent = endpoint.name;
+          url.className = 'admin-webhook-url';
+          url.textContent = endpoint.url;
+          events.className = 'admin-webhook-events-copy';
+          state.className = 'account-status-badge ' + (endpoint.enabled ? 'is-success' : 'is-muted');
+          summaryHeader.className = 'admin-webhook-summary-header';
+          summaryHeader.appendChild(name);
+          summaryHeader.appendChild(state);
+          summary.appendChild(summaryHeader);
+          summary.appendChild(url);
+          (endpoint.event_types || []).forEach(function(eventType) {
+            var chip = root.document.createElement('span');
+            chip.className = 'admin-webhook-event-chip';
+            chip.textContent = webhookEventLabel(eventType);
+            events.appendChild(chip);
+          });
+          summary.appendChild(events);
+          actions.className = 'account-list-actions';
+          actions.appendChild(actionButton('admin.webhooks.edit', function() {
+            var form = element('adminWebhookForm');
+            if (!form || !form.elements) return;
+            form.elements.name.value = endpoint.name;
+            form.elements.url.value = endpoint.url;
+            form.elements.enabled.checked = endpoint.enabled;
+            Array.prototype.forEach.call(form.querySelectorAll('input[name="event_types"]'), function(input) {
+              input.checked = (endpoint.event_types || []).indexOf(input.value) !== -1;
+            });
+            form.setAttribute('data-editing-id', endpoint.id);
+            var submit = element('adminWebhookSubmit');
+            if (submit) {
+              submit.setAttribute('data-i18n', 'admin.webhooks.update');
+              if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(submit.parentNode);
+            }
+            var cancel = element('adminWebhookCancelEdit');
+            if (cancel) cancel.hidden = false;
+            if (form.elements.name.focus) form.elements.name.focus();
+          }));
+          actions.appendChild(actionButton(endpoint.enabled ? 'admin.webhooks.pause' : 'admin.webhooks.resume', function() {
+            return authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id), {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: endpoint.name, url: endpoint.url, event_types: endpoint.event_types, enabled: !endpoint.enabled })
+            }).then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+          }));
+          actions.appendChild(actionButton('admin.webhooks.test', function() {
+            authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id) + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+          }));
+          actions.appendChild(actionButton('admin.webhooks.rotate', function() {
+            authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id) + '/rotate-secret', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return readJson(response); })
+              .then(function(payload) { if (payload) showWebhookSecret(payload.secret); });
+          }));
+          actions.appendChild(actionButton('admin.webhooks.delete', function() {
+            return confirmWebhookDeletion(endpoint.name).then(function(confirmed) {
+              if (!confirmed) return;
+              return authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id), { method: 'DELETE' })
+                .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+            });
+          }, 'danger'));
+          item.appendChild(summary);
+          item.appendChild(actions);
+          list.appendChild(item);
+        });
+        if (!(endpoints || []).length) list.appendChild(createTextElement('li', 'account-empty', 'admin.webhooks.empty'));
+      }
+      if (history) {
+        history.textContent = '';
+        (deliveries || []).forEach(function(delivery) {
+          var item = root.document.createElement('li');
+          item.className = 'account-list-item admin-webhook-delivery';
+          item.textContent = delivery.endpoint_name + ' · ' + delivery.event_type + ' · ' + delivery.status + ' · ' + delivery.attempt_count;
+          history.appendChild(item);
+        });
+        if (!(deliveries || []).length) history.appendChild(createTextElement('li', 'account-empty', 'admin.webhooks.noDeliveries'));
+      }
+    }
+
+    function loadWebhooks() {
+      return Promise.all([
+        authenticatedFetch('/api/admin/webhooks'),
+        authenticatedFetch('/api/admin/webhooks/deliveries')
+      ]).then(function(responses) {
+        if (!responses[0].ok) return showResponseError(responses[0], 'admin');
+        if (!responses[1].ok) return showResponseError(responses[1], 'admin');
+        return Promise.all([readJson(responses[0]), readJson(responses[1])]).then(function(payloads) {
+          renderWebhooks(payloads[0].items || [], payloads[1].items || []);
+        });
+      });
     }
 
     function updateUser(username, payload) {
@@ -2490,7 +2754,7 @@
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
       setSurfaceLoading('accountPanel', 'accountPanelLoading', true);
-      loadSessions().then(function() {
+      Promise.all([loadSessions(), loadPersonalAccessTokens()]).then(function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
       }, function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
@@ -2503,6 +2767,7 @@
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');
       setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
+      clearPersonalAccessTokenSecret();
     }
 
     function openAdminPanel() {
@@ -2520,6 +2785,7 @@
         setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
       });
       loadAdminAiJobs();
+      loadWebhooks();
       startAdminAiJobPolling();
     }
 
@@ -2532,6 +2798,7 @@
       panel.setAttribute('aria-hidden', 'true');
       setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
       stopAdminAiJobPolling();
+      showWebhookSecret('');
     }
 
     function bindUi() {
@@ -2541,6 +2808,13 @@
       var adminClose = element('adminClose');
       var logoutButton = element('accountLogout');
       var passwordForm = element('accountPasswordForm');
+      var patCreateForm = element('patCreateForm');
+      var patCreateSubmit = element('patCreateSubmit');
+      var patCopySecret = element('patCopySecret');
+      var webhookForm = element('adminWebhookForm');
+      var webhookSubmit = element('adminWebhookSubmit');
+      var webhookCopySecret = element('adminWebhookCopySecret');
+      var webhookCancelEdit = element('adminWebhookCancelEdit');
       var createUserForm = element('adminUserForm');
       var createUserSubmit = element('adminUserSubmit');
       var aiSettingsForm = element('adminAiSettingsForm');
@@ -2570,7 +2844,7 @@
       var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
-      [createUserForm, aiSettingsForm, aiTagForm, dictionaryForm].forEach(function(form) {
+      [createUserForm, aiSettingsForm, aiTagForm, dictionaryForm, webhookForm].forEach(function(form) {
         if (!form) return;
         form.addEventListener('input', markAdminDirty);
         form.addEventListener('change', markAdminDirty);
@@ -2624,6 +2898,110 @@
           showStatus('account.passwordChanged', 'success');
           redirectToLogin();
         }).catch(function() { showStatus('account.error.network', 'error'); });
+      });
+      if (patCreateForm) {
+        patCreateForm.addEventListener('change', function(event) {
+          var required = {
+            'bookshelf:write': 'bookshelf:read',
+            'progress:write': 'progress:read',
+            'annotations:write': 'annotations:read',
+            'reviews:write': 'reviews:read'
+          };
+          var readScope = event.target && required[event.target.value];
+          if (!readScope || !event.target.checked || !patCreateForm.querySelector) return;
+          var read = patCreateForm.querySelector('input[name="scopes"][value="' + readScope + '"]');
+          if (read) read.checked = true;
+        });
+        patCreateForm.addEventListener('submit', function(event) {
+          event.preventDefault();
+          clearPersonalAccessTokenSecret();
+          runButtonOperation(patCreateSubmit, 'account.pats.creating', function() {
+            var selected = patCreateForm.querySelectorAll
+              ? Array.prototype.map.call(
+                  patCreateForm.querySelectorAll('input[name="scopes"]:checked'),
+                  function(input) { return input.value; }
+                ) : [];
+            var expiration = formValue(patCreateForm, 'expires_in_days');
+            return authenticatedFetch('/api/account/pats', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: formValue(patCreateForm, 'name'),
+                current_password: formValue(patCreateForm, 'current_password'),
+                scopes: selected,
+                expires_in_days: expiration === 'never' ? null : Number(expiration)
+              })
+            }).then(function(response) {
+              clearPasswordFields(patCreateForm);
+              if (!response.ok) return showResponseError(response, 'account');
+              return readJson(response).then(function(payload) {
+                var secret = element('patCreatedSecret');
+                var region = element('patSecretRegion');
+                if (secret) secret.textContent = payload.token || '';
+                if (region) region.hidden = false;
+                if (patCreateForm.reset) patCreateForm.reset();
+                showStatus('account.pats.created', 'success');
+                return loadPersonalAccessTokens();
+              });
+            }).catch(function() { showStatus('account.error.network', 'error'); });
+          });
+        });
+      }
+      if (patCopySecret) patCopySecret.addEventListener('click', function() {
+        var secret = element('patCreatedSecret');
+        var value = secret && secret.textContent;
+        copySensitiveText(value).then(function() {
+          var live = element('patLive');
+          if (live) live.textContent = t('account.pats.copied');
+        }).catch(function() { showStatus('account.pats.copyFailed', 'error'); });
+      });
+      if (webhookCopySecret) webhookCopySecret.addEventListener('click', function() {
+        var secret = element('adminWebhookSecret');
+        copySensitiveText(secret && secret.textContent).then(function() {
+          var live = element('adminWebhookLive');
+          if (live) {
+            live.setAttribute('data-i18n', 'admin.webhooks.copied');
+            if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(live.parentNode);
+          }
+        }).catch(function() { showStatus('admin.webhooks.copyFailed', 'error'); });
+      });
+      if (webhookCancelEdit) webhookCancelEdit.addEventListener('click', function() {
+        webhookForm.reset();
+        webhookForm.removeAttribute('data-editing-id');
+        webhookForm.elements.enabled.checked = true;
+        webhookCancelEdit.hidden = true;
+        if (webhookSubmit) {
+          webhookSubmit.setAttribute('data-i18n', 'admin.webhooks.create');
+          if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(webhookSubmit.parentNode);
+        }
+        if (webhookForm.elements.name.focus) webhookForm.elements.name.focus();
+      });
+      if (webhookForm) webhookForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        showWebhookSecret('');
+        runButtonOperation(webhookSubmit, 'admin.webhooks.creating', function() {
+          var events = Array.prototype.map.call(webhookForm.querySelectorAll('input[name="event_types"]:checked'), function(input) { return input.value; });
+          var editingId = webhookForm.getAttribute('data-editing-id');
+          return authenticatedFetch(editingId ? '/api/admin/webhooks/' + encodeURIComponent(editingId) : '/api/admin/webhooks', {
+            method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: formValue(webhookForm, 'name'), url: formValue(webhookForm, 'url'), event_types: events, enabled: webhookForm.elements.enabled.checked })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            return readJson(response).then(function(payload) {
+              showWebhookSecret(payload.secret);
+              webhookForm.reset();
+              webhookForm.removeAttribute('data-editing-id');
+              webhookForm.elements.enabled.checked = true;
+              if (webhookCancelEdit) webhookCancelEdit.hidden = true;
+              if (webhookSubmit) {
+                webhookSubmit.setAttribute('data-i18n', 'admin.webhooks.create');
+                if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(webhookSubmit.parentNode);
+              }
+              clearAdminDirty();
+              return loadWebhooks();
+            });
+          });
+        });
       });
       if (createUserForm) createUserForm.addEventListener('submit', function(event) {
         event.preventDefault();

@@ -407,6 +407,14 @@ Server 不提供“本地/云端”存储选择器：已登录阅读数据固定
 
 SSG 会发布静态 Service Worker。Server 会禁用并清退整个源范围的 Service Worker，避免一个账户收到另一个账户缓存过的受保护内容。
 
+## Server API 与 WebHook
+
+Server 账户可在“账户设置”中创建带作用域的个人访问令牌（PAT）。外部客户端通过 `Authorization: Bearer <PAT>` 访问版本化的 `/api/v1/*`；浏览器 Cookie 不能认证这些路由。接口覆盖可见书籍与章节正文、令牌所有者的书架、进度、标注和书评；带 `admin:data:read` 的管理员 PAT 还可只读访问所有用户的非敏感数据。
+
+OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本地接口参考。例如：`curl -H 'Authorization: Bearer …' https://reader.example/api/v1/books`。章节接口默认返回已清洗 HTML，添加 `?format=text` 可返回纯文本。
+
+管理员可在“后台管理”中维护 WebHook。签名密钥只在创建或轮换时显示；投递会持久化、签名并对非 2xx 结果重试。书评事件只含用户 ID、书籍 ID、动作和时间，不包含评分或书评正文。
+
 ## 数据安全与迁移
 
 升级持久化 Server 前，请备份源 EPUB 和 `<server-dir>/data`。替换容器时必须继续挂载同一个持久化状态目录。

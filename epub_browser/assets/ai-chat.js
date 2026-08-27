@@ -23,7 +23,8 @@
   }
   function chapterScope(value) {
     if (!value || value.bookContext) return t('ai.chatWholeBook');
-    return value.chapterTitle ? t('ai.chapterScope', { chapter: value.chapterIndex, title: value.chapterTitle }) : t('ai.chapterScopeUntitled', { chapter: value.chapterIndex });
+    var title = String(value.chapterTitle || '').trim();
+    return title ? t('ai.chapterScope', { chapter: value.chapterIndex, title: title }) : t('ai.chapterScopeUntitled', { chapter: value.chapterIndex });
   }
   function drawerScope(value) {
     if (!value || value.bookContext) return t('ai.chatBookScope');
@@ -63,26 +64,46 @@
     });
     if (code) flushCode(); flushParagraph();
   }
+  function threadIsNearBottom() { return !thread || thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80; }
   function scrollThread() { if (thread) root.requestAnimationFrame(function() { thread.scrollTop = thread.scrollHeight; }); }
   function statusText(turn) { if (turn.status === 'queued') return t('ai.queued', { current: 0, total: 1 }); if (turn.status === 'running') return t('ai.generating', { current: 0, total: 1 }); return t('ai.error.' + (turn.error_code || 'unknown')); }
   function chapterLabel(turn) { if (turn && Number(turn.book_context)) return t('ai.chatWholeBook'); return localised('ai.chatChapter', 'Chapter ' + Number(turn.chapter_index), '第 ' + Number(turn.chapter_index) + ' 章', { number: Number(turn.chapter_index) }); }
+  function turnScopeLabel(turn) {
+    var turnUsesBook = Boolean(turn && Number(turn.book_context));
+    if (!context) return chapterLabel(turn);
+    if (context.bookContext) return turnUsesBook ? '' : chapterLabel(turn);
+    if (turnUsesBook) return t('ai.chatWholeBook');
+    return Number(turn.chapter_index) === Number(context.chapterIndex) ? '' : chapterLabel(turn);
+  }
   function findTurn(id) { return thread && thread.querySelector('[data-ai-chat-id="' + id + '"]'); }
   function renderTurn(turn) {
     if (!turn || !turn.id || !thread) return;
+    var empty = thread.querySelector('[data-ai-chat-empty]'); if (empty && empty.parentNode) empty.parentNode.removeChild(empty);
     var node = el('article', 'ai-chat-turn'); node.setAttribute('data-ai-chat-id', turn.id);
     var question = el('section', 'ai-chat-message ai-chat-message-user');
-    var label = el('span', 'ai-chat-message-label', t('ai.you')); label.appendChild(el('span', 'ai-chat-chapter-pill', chapterLabel(turn))); question.appendChild(label); question.appendChild(el('p', '', turn.question || '')); node.appendChild(question);
+    var label = el('span', 'ai-chat-message-label', t('ai.you')), turnScope = turnScopeLabel(turn); if (turnScope) label.appendChild(el('span', 'ai-chat-chapter-pill', turnScope)); question.appendChild(label); question.appendChild(el('p', '', turn.question || '')); node.appendChild(question);
     var answer = el('section', 'ai-chat-message ai-chat-message-assistant'); answer.appendChild(el('span', 'ai-chat-message-label', t('ai.assistant')));
     if (turn.status === 'complete') { var markdown = el('div', 'ai-chat-markdown'); renderMarkdown(markdown, turn.answer || ''); answer.appendChild(markdown); }
     else answer.appendChild(el('p', 'ai-chat-pending', statusText(turn)));
-    node.appendChild(answer); var existing = findTurn(turn.id); if (existing) thread.replaceChild(node, existing); else thread.appendChild(node); scrollThread();
+    node.appendChild(answer); var existing = findTurn(turn.id), shouldScroll = !existing || threadIsNearBottom(); if (existing) thread.replaceChild(node, existing); else thread.appendChild(node); if (shouldScroll) scrollThread();
   }
   function error(message) { var note = thread.querySelector('[data-ai-chat-error]'); if (!note) { note = el('p', 'ai-chat-error'); note.setAttribute('data-ai-chat-error', ''); note.setAttribute('role', 'alert'); thread.prepend(note); } note.textContent = message; }
+  function renderEmptyState() {
+    var empty = el('section', 'ai-chat-empty'); empty.setAttribute('data-ai-chat-empty', '');
+    empty.appendChild(el('p', '', t('ai.chatReadyPrompt')));
+    var suggestions = el('div', 'ai-chat-suggestions'); suggestions.appendChild(el('span', 'ai-chat-suggestions-title', t('ai.chatSuggestions')));
+    ['ai.chatSuggestionExplain', 'ai.chatSuggestionChallenge', 'ai.chatSuggestionConnect', 'ai.chatSuggestionSummarize', 'ai.chatSuggestionNotice'].forEach(function(key) {
+      var suggestion = el('button', 'ai-chat-suggestion', t(key)); suggestion.type = 'button';
+      suggestion.addEventListener('click', function() { input.value = suggestion.textContent; input.focus(); });
+      suggestions.appendChild(suggestion);
+    });
+    empty.appendChild(suggestions); thread.appendChild(empty);
+  }
   function loadTurns() {
     thread.textContent = ''; thread.appendChild(el('p', 'ai-chat-loading', t('ai.chatLoading')));
     return fetchApi('/api/ai/books/' + encodeURIComponent(context.bookId) + '/chat').then(function(payload) {
       thread.textContent = ''; var turns = payload.turns || [];
-      if (!turns.length) { var empty = el('section', 'ai-chat-empty'); empty.appendChild(el('h3', '', context && context.bookContext ? t('ai.chatBookTitle') : localised('ai.chatBookTitle', 'Ask about this book', '问问这本书'))); empty.appendChild(el('p', '', context && context.bookContext ? t('ai.bookChatDescription') : localised('ai.chatBookPrompt', 'Ask about the current chapter or connect it to the rest of the book.', '可以就当前章节提问，也可以联系全书来问。'))); thread.appendChild(empty); }
+      if (!turns.length) renderEmptyState();
       turns.forEach(function(turn) { renderTurn(turn); if (turn.status === 'queued' || turn.status === 'running') streamTurn(turn.id); }); scrollThread();
     }).catch(function() { thread.textContent = ''; error(t('ai.chatError')); });
   }
@@ -110,13 +131,13 @@
   function close() { if (!overlay || overlay.hidden) return; overlay.hidden = true; document.body.classList.remove('ai-chat-open'); setFullscreen(false); if (previousFocus && previousFocus.focus) previousFocus.focus(); }
   function ensure() {
     if (overlay) return; overlay = el('div', 'ai-chat-overlay'); overlay.hidden = true; panel = el('aside', 'ai-chat-panel'); panel.setAttribute('role', 'complementary'); panel.setAttribute('aria-label', t('ai.chatDrawerTitle'));
-    var header = el('header', 'ai-chat-header'), titles = el('div', 'ai-chat-heading'); titles.appendChild(el('span', 'ai-chat-eyebrow', t('ai.chatDrawerEyebrow'))); titles.appendChild(el('h2', '', t('ai.chatDrawerTitle'))); header.appendChild(titles);
+    var header = el('header', 'ai-chat-header'), titles = el('div', 'ai-chat-heading'); titles.appendChild(el('h2', '', t('ai.chatDrawerTitle'))); var meta = el('div', 'ai-chat-meta'), privacy = el('span', 'ai-chat-private-badge', t('ai.chatDrawerEyebrow')); privacy.title = t('ai.chatDrawerDescription'); privacy.setAttribute('aria-label', t('ai.chatDrawerDescription')); var scope = el('span', 'ai-chat-scope'); scope.setAttribute('data-ai-chat-scope', ''); meta.appendChild(privacy); meta.appendChild(scope); titles.appendChild(meta); header.appendChild(titles);
     var actions = el('div', 'ai-chat-header-actions'), full = el('button', 'ai-chat-icon-button'); full.type = 'button'; full.setAttribute('data-ai-chat-fullscreen', ''); full.setAttribute('aria-label', t('ai.fullscreen')); full.appendChild(el('i', 'fas fa-expand')); full.addEventListener('click', function() { setFullscreen(!document.body.classList.contains('ai-chat-fullscreen')); }); var closer = el('button', 'ai-chat-icon-button'); closer.type = 'button'; closer.setAttribute('data-ai-chat-close', ''); closer.setAttribute('aria-label', t('ai.close')); closer.appendChild(el('i', 'fas fa-times')); closer.addEventListener('click', close); actions.appendChild(full); actions.appendChild(closer); header.appendChild(actions); panel.appendChild(header);
-    var body = el('div', 'ai-chat-body'); body.appendChild(el('p', 'ai-chat-description', t('ai.chatDrawerDescription'))); thread = el('div', 'ai-chat-thread'); thread.setAttribute('aria-live', 'polite'); body.appendChild(thread); panel.appendChild(body);
-    composer = el('form', 'ai-chat-composer'); var composerMain = el('div', 'ai-chat-compose-main'); var scope = el('p', 'ai-chat-scope'); scope.setAttribute('data-ai-chat-scope', ''); composerMain.appendChild(scope); input = el('textarea'); input.maxLength = 2000; input.rows = 2; input.placeholder = t('ai.followupPlaceholder'); input.setAttribute('aria-label', t('ai.followupPlaceholder')); composerMain.appendChild(input); send = el('button', 'ai-chat-send', t('ai.ask')); send.type = 'submit'; composer.appendChild(composerMain); composer.appendChild(send); input.addEventListener('keydown', function(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); composer.requestSubmit(); } }); composer.addEventListener('submit', function(event) { event.preventDefault(); var question = input.value.trim(); if (question && context) submitQuestion(question, 'shared_layer'); }); panel.appendChild(composer); overlay.appendChild(panel); document.body.appendChild(overlay); document.addEventListener('keydown', function(event) { if (event.key === 'Escape' && !overlay.hidden) close(); });
+    var body = el('div', 'ai-chat-body'); thread = el('div', 'ai-chat-thread'); thread.setAttribute('aria-live', 'polite'); body.appendChild(thread); panel.appendChild(body);
+    composer = el('form', 'ai-chat-composer'); var composerMain = el('div', 'ai-chat-compose-main'); input = el('textarea'); input.maxLength = 2000; input.rows = 1; input.placeholder = t('ai.followupPlaceholder'); input.setAttribute('aria-label', t('ai.followupPlaceholder')); composerMain.appendChild(input); send = el('button', 'ai-chat-send', t('ai.ask')); send.type = 'submit'; composer.appendChild(composerMain); composer.appendChild(send); input.addEventListener('keydown', function(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); composer.requestSubmit(); } }); composer.addEventListener('submit', function(event) { event.preventDefault(); var question = input.value.trim(); if (question && context) submitQuestion(question, 'shared_layer'); }); panel.appendChild(composer); overlay.appendChild(panel); document.body.appendChild(overlay); document.addEventListener('keydown', function(event) { if (event.key === 'Escape' && !overlay.hidden) close(); });
   }
   function availability() { return fetchApi('/api/ai/status').then(function(status) { if (!status.enabled) throw Object.assign(new Error('ai_disabled'), { code: 'ai_disabled' }); if (!status.authorized) throw Object.assign(new Error('ai_not_authorized'), { code: 'ai_not_authorized' }); }); }
-  function open(nextContext, button) { availability().then(function() { if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiChatCss'); context = nextContext; if (!context.bookContext && !Number.isInteger(context.chapterIndex)) throw Object.assign(new Error('invalid_chapter_index'), { code: 'invalid_chapter_index' }); ensure(); previousFocus = button; var scope = panel.querySelector('[data-ai-chat-scope]'); if (scope) { scope.textContent = drawerScope(context); scope.title = scope.textContent; } overlay.hidden = false; document.body.classList.add('ai-chat-open'); panel.querySelector('[data-ai-chat-close]').focus(); loadTurns(); }).catch(function(err) { if (root.EpubBrowserNotification && root.EpubBrowserNotification.show) root.EpubBrowserNotification.show(t('ai.error.' + (err.code || 'unknown')), 'error'); }); }
+  function open(nextContext, button) { availability().then(function() { if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiChatCss'); context = nextContext; if (!context.bookContext && !Number.isInteger(context.chapterIndex)) throw Object.assign(new Error('invalid_chapter_index'), { code: 'invalid_chapter_index' }); ensure(); previousFocus = button; var scope = panel.querySelector('[data-ai-chat-scope]'), scopeLabel = drawerScope(context); if (scope) { scope.textContent = chapterScope(context); scope.title = scopeLabel; scope.setAttribute('aria-label', scopeLabel); } overlay.hidden = false; document.body.classList.add('ai-chat-open'); panel.querySelector('[data-ai-chat-close]').focus(); loadTurns(); }).catch(function(err) { if (root.EpubBrowserNotification && root.EpubBrowserNotification.show) root.EpubBrowserNotification.show(t('ai.error.' + (err.code || 'unknown')), 'error'); }); }
   function init() { var buttons = document.querySelectorAll('[data-ai-followup-drawer]'), bookButtons = document.querySelectorAll('[data-ai-book-chat]'); if ((!buttons.length && !bookButtons.length) || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) return; buttons.forEach(function(button) { function currentContext() { return chapterContext(button); } if (document.body.classList.contains('pagination-mode')) { button.disabled = true; button.setAttribute('aria-disabled', 'true'); button.title = t('ai.unavailableInPagination'); return; } updateTriggerScope(button, currentContext()); button.addEventListener('mouseenter', function() { updateTriggerScope(button, currentContext()); }); button.addEventListener('focus', function() { updateTriggerScope(button, currentContext()); }); button.addEventListener('click', function() { open(currentContext(), button); }); }); bookButtons.forEach(function(button) { var bookContext = { bookId: button.getAttribute('data-book-id'), chapterIndex: null, bookContext: true }; updateTriggerScope(button, bookContext); button.addEventListener('click', function() { open(bookContext, button); }); }); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })(window);

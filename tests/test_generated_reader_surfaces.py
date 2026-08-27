@@ -25,6 +25,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "accountPanel",
             "accountPasswordForm",
             "sessionList",
+            "patCreateForm",
+            "patList",
+            "patCreatedSecret",
+            "patLive",
+            "adminWebhooksSection",
+            "adminWebhookForm",
+            "adminWebhookSecretRegion",
+            "adminWebhookList",
+            "adminWebhookDeliveries",
             "adminMenu",
             "adminPanel",
             "adminClose",
@@ -59,6 +68,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertRegex(server_html, r'class=(?:["\'])?account-layout(?:["\' >])')
         self.assertRegex(server_html, r'class=(?:["\'])?account-grid(?:["\' >])')
+        self.assertRegex(server_html, r'data-i18n=(?:["\'])?account\.pats\.title(?:["\' >])')
+        self.assertRegex(server_html, r'data-i18n=(?:["\'])?account\.pats\.neverExpiresWarning(?:["\' >])')
+        self.assertLess(
+            server_html.index('id=adminSectionBooksTab'),
+            server_html.index('id=adminSectionWebhooksTab'),
+        )
 
     def test_server_admin_books_surface_is_semantic_and_localized(self):
         server_html = self._server_html()
@@ -2114,6 +2129,7 @@ assert.deepEqual(
 
         chapter_html = self._chapter_html()
         self.assertNotIn('id="mobileAIReadingBtn"', chapter_html)
+        self.assertNotIn('id="mobileAIChatBtn"', chapter_html)
         self.assertNotIn('data-ai-learning-canvas', chapter_html)
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor("book.epub", directory, deployment_mode="server")
@@ -2127,6 +2143,12 @@ assert.deepEqual(
         self.assertIn('data-ai-learning-canvas', mobile_ai_button)
         self.assertIn('aria-pressed="false"', mobile_ai_button)
         self.assertNotIn('data-ai-reading-hub', mobile_ai_button)
+        self.assertIn('id="mobileAIChatBtn"', server_chapter_html)
+        mobile_chat_start = server_chapter_html.index('id="mobileAIChatBtn"')
+        mobile_chat_end = server_chapter_html.index('</button>', mobile_chat_start)
+        mobile_chat_button = server_chapter_html[mobile_chat_start:mobile_chat_end]
+        self.assertIn('data-ai-followup-drawer', mobile_chat_button)
+        self.assertIn('data-i18n-aria-label="ai.askChapter"', mobile_chat_button)
         self.assertNotIn('id="mobileThemeBtn"', chapter_html)
 
     def test_theme_picker_stays_anchored_to_the_top_right_action_on_mobile(self):
@@ -2816,16 +2838,30 @@ assert.deepEqual(
         script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
         css = Path("epub_browser/assets/annotation-hub.css").read_text(encoding="utf-8")
 
-        self.assertIn("element('button', 'annotation-card-delete'", script)
+        self.assertIn("element('button', 'annotation-card-action annotation-card-delete'", script)
         self.assertIn("deleteButton.setAttribute('aria-label', tr('deleteAnnotation'))", script)
         self.assertIn("root.EpubDialog.confirm({", script)
         self.assertIn("destructive: true", script)
         self.assertIn("root.AnnotationStorage.delete(annotation.id)", script)
         self.assertIn("notify('deleted', 'success')", script)
-        self.assertIn('.annotation-card-delete:focus-visible', css)
-        self.assertIn('.annotation-card-row:hover .annotation-card-delete', css)
+        self.assertIn('.annotation-card-action:focus-visible', css)
+        self.assertIn('.annotation-card-row:hover .annotation-card-actions', css)
         self.assertIn('@media (hover: none), (pointer: coarse)', css)
         self.assertIn('@media (max-width: 600px)', css)
+
+    def test_annotation_hub_copies_each_entry_and_exports_standard_markdown(self):
+        script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
+        css = Path("epub_browser/assets/annotation-hub.css").read_text(encoding="utf-8")
+
+        self.assertIn('function buildAnnotationShare(annotation, context)', script)
+        self.assertIn("element('button', 'annotation-card-action annotation-card-copy'", script)
+        self.assertIn("copyShareText(buildAnnotationShare(annotation, context))", script)
+        self.assertIn("notify('annotationCopied', 'success')", script)
+        self.assertIn("'# ' + markdownLine(book.title", script)
+        self.assertIn("'## ' + markdownLine(group.title)", script)
+        self.assertIn("type: 'text/markdown;charset=utf-8'", script)
+        self.assertIn("+ '-annotations.md'", script)
+        self.assertIn('.annotation-card-copy:hover', css)
 
     def test_chapter_groups_width_and_custom_css_under_appearance_only(self):
         html = self._chapter_html()
@@ -3114,6 +3150,43 @@ assert.deepEqual(
         self.assertIn('"aiReadingHub":', chapter)
         self.assertIn('/assets/immutable/ai-feature-loader.', chapter)
         self.assertIn('function ensureRenderer(language)', Path('epub_browser/assets/ai-rich-text.js').read_text(encoding='utf-8'))
+
+    def test_ai_chat_uses_one_context_badge_across_book_and_chapter_pages(self):
+        script = Path('epub_browser/assets/ai-chat.js').read_text(encoding='utf-8')
+        stylesheet = Path('epub_browser/assets/ai-chat.css').read_text(encoding='utf-8')
+
+        self.assertIn("buttons = document.querySelectorAll('[data-ai-followup-drawer]')", script)
+        self.assertIn("bookButtons = document.querySelectorAll('[data-ai-book-chat]')", script)
+        self.assertIn('function turnScopeLabel(turn)', script)
+        self.assertIn("if (context.bookContext) return turnUsesBook ? '' : chapterLabel(turn);", script)
+        self.assertIn("Number(turn.chapter_index) === Number(context.chapterIndex) ? ''", script)
+        self.assertIn('scope.textContent = chapterScope(context)', script)
+        self.assertIn("empty.setAttribute('data-ai-chat-empty', '')", script)
+        self.assertIn("thread.querySelector('[data-ai-chat-empty]')", script)
+        self.assertIn("return title ? t('ai.chapterScope'", script)
+        self.assertNotIn('hasMeaningfulTitle', script)
+        self.assertIn('function renderEmptyState()', script)
+        self.assertIn("'ai.chatSuggestionExplain'", script)
+        self.assertIn("'ai.chatSuggestionChallenge'", script)
+        self.assertIn("'ai.chatSuggestionConnect'", script)
+        self.assertIn("'ai.chatSuggestionSummarize'", script)
+        self.assertIn("'ai.chatSuggestionNotice'", script)
+        self.assertIn('input.value = suggestion.textContent', script)
+        self.assertNotIn("empty.appendChild(el('h3'", script)
+        self.assertIn('input.rows = 1', script)
+        self.assertNotIn("composerMain.appendChild(scope)", script)
+        self.assertNotIn("body.appendChild(el('p', 'ai-chat-description'", script)
+        self.assertIn('.ai-chat-private-badge, .ai-chat-scope', stylesheet)
+        self.assertIn('.ai-chat-message-assistant { margin-right: 0;', stylesheet)
+        self.assertIn('body.ai-chat-open:not(.ai-chat-fullscreen) .app-nav', stylesheet)
+        self.assertIn('@media (min-width: 1280px)', stylesheet)
+        self.assertIn('.ai-chat-header { min-height: 68px;', stylesheet)
+        self.assertIn('body.ai-chat-fullscreen .ai-chat-panel { width: 100vw; height: 100dvh;', stylesheet)
+        self.assertIn('.ai-chat-icon-button { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 10px;', stylesheet)
+        self.assertIn('.ai-chat-composer textarea { display: block; width: 100%; height: 48px;', stylesheet)
+        self.assertIn('.ai-chat-send { min-width: 74px; height: 48px;', stylesheet)
+        self.assertIn('.ai-chat-suggestions { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr);', stylesheet)
+        self.assertIn('.ai-chat-suggestion { width: 100%; min-height: 38px;', stylesheet)
 
     def test_chapter_optional_scripts_do_not_block_html_parsing(self):
         with tempfile.TemporaryDirectory() as directory:

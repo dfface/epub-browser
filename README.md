@@ -426,6 +426,14 @@ The footer may make an optional request to the GitHub Releases API to discover a
 
 SSG publishes a static Service Worker. Server deliberately disables and retires the origin-wide Service Worker so one account cannot receive another account's cached protected content.
 
+## Server API and WebHooks
+
+Server accounts can create scoped personal access tokens in Account settings. External clients use `Authorization: Bearer <PAT>` with the versioned `/api/v1/*` API; browser cookies do not authenticate these routes. The API covers visible books and chapter content, the token owner's bookshelf, progress, annotations and reviews, plus read-only cross-user data for administrator PATs with `admin:data:read`.
+
+The OpenAPI 3.1 document is available at `/openapi.json`; signed-in users can browse the local reference at `/api-docs`. For example: `curl -H 'Authorization: Bearer …' https://reader.example/api/v1/books`. Chapter detail returns sanitized HTML by default and plain text with `?format=text`.
+
+Administrators manage WebHook endpoints in Administration. Secrets are shown only on creation or rotation. Deliveries are signed, durable, retried for non-2xx responses, and book-review events contain IDs and action timestamps but never rating or review text.
+
 ## Data safety and migration
 
 Before upgrading persistent Server installations, back up the source EPUBs and `<server-dir>/data`. Keep the same persistent state volume during container replacement.

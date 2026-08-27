@@ -1044,7 +1044,7 @@ test('account settings and administration open as separate surfaces', async () =
 
   assert.equal(accountPanel.active, true);
   assert.equal(adminPanel.active, false);
-  assert.deepEqual(calls, ['/api/account/sessions']);
+  assert.deepEqual(calls, ['/api/account/sessions', '/api/account/pats']);
 
   adminMenu.listeners.click();
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -1052,11 +1052,14 @@ test('account settings and administration open as separate surfaces', async () =
   assert.equal(adminPanel.active, true);
   assert.deepEqual(calls, [
     '/api/account/sessions',
+    '/api/account/pats',
     '/api/admin/users',
     '/api/admin/books/index',
     '/api/admin/ai/settings',
     '/api/admin/ai/tags',
     '/api/admin/ai/jobs?page=1&page_size=20',
+    '/api/admin/webhooks',
+    '/api/admin/webhooks/deliveries',
   ]);
 });
 
@@ -1122,6 +1125,38 @@ test('account and administration surfaces announce loading while their initial d
   await tick();
   assert.equal(adminPanelLoading.hidden, true);
   assert.equal(adminPanel.getAttribute('aria-busy'), 'false');
+});
+
+test('account loads PATs and clears the one-time secret when closed', async () => {
+  const calls = [];
+  const accountMenu = fakeElement('button');
+  const accountClose = fakeElement('button');
+  const accountPanel = fakeElement('section');
+  const patCreatedSecret = fakeElement('code');
+  patCreatedSecret.textContent = 'epub_pat_public_secret';
+  const root = rootWithFetch((url) => {
+    calls.push(url);
+    if (url === '/api/account/sessions') return Promise.resolve(response(200, {sessions: []}));
+    if (url === '/api/account/pats') return Promise.resolve(response(200, {personal_access_tokens: []}));
+    return Promise.resolve(response(404, {}));
+  });
+  root.document = {
+    getElementById(id) {
+      return ({accountMenu, accountClose, accountPanel, patCreatedSecret})[id] || null;
+    },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({user: {id: 'u', username: 'reader', role: 'member'}, csrf_token: 'token'});
+
+  await auth.init();
+  accountMenu.click();
+  await tick();
+  accountClose.click();
+
+  assert.deepEqual(calls, ['/api/account/sessions', '/api/account/pats']);
+  assert.equal(patCreatedSecret.textContent, '');
 });
 
 test('administration section navigation keeps one workspace visible and marks its tab current', async () => {

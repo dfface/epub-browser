@@ -4474,9 +4474,14 @@
       'admin.loading': 'Loading administration…',
       'admin.discardChanges': 'Discard changes',
       'annotations.shareActions': 'Share annotations',
-      'annotations.copyShare': 'Copy to clipboard',
-      'annotations.exportShare': 'Export text',
+      'annotations.copyShare': 'Copy Markdown',
+      'annotations.exportShare': 'Export Markdown',
+      'annotations.annotationActions': 'Annotation actions',
+      'annotations.copyAnnotation': 'Copy this annotation',
+      'annotations.annotationCopied': 'Annotation copied as Markdown.',
+      'annotations.annotationCopyFailed': 'Unable to copy this annotation.',
       'annotations.shareAuthors': 'Authors',
+      'annotations.shareCount': 'Annotations',
       'annotations.shareNote': 'Note',
       'annotations.shareCopied': 'Annotation summary copied locally.',
       'annotations.shareCopyFailed': 'Unable to copy the annotation summary.',
@@ -4518,7 +4523,12 @@
       'dictionary.source': 'Open source',
       'ai.annotation.vocabulary': 'Rare characters & vocabulary',
       'ai.teachKicker': 'FEYNMAN LEARNING',
-      'ai.teachTitle': 'Teach it back in your own words'
+      'ai.teachTitle': 'Teach it back in your own words',
+      'ai.chatSuggestionExplain': 'Can you explain the core idea in this scope?',
+      'ai.chatSuggestionChallenge': 'Can you challenge one of the ideas here?',
+      'ai.chatSuggestionConnect': 'How does this connect to the rest of the book?',
+      'ai.chatSuggestionSummarize': 'Can you summarize this scope in a few sentences?',
+      'ai.chatSuggestionNotice': 'What should I pay the most attention to here?'
       ,'admin.dictionaries': 'Dictionaries'
       ,'admin.dictionariesDescription': 'Install a local MDict or StarDict dictionary. Set the default for a reader’s first lookup; readers can switch dictionaries at any time.'
       ,'admin.systemLimits': 'Administrator operations'
@@ -4653,9 +4663,14 @@
       'admin.loading': '正在加载管理后台…',
       'admin.discardChanges': '放弃修改',
       'annotations.shareActions': '分享标注',
-      'annotations.copyShare': '复制到剪贴板',
-      'annotations.exportShare': '导出文本',
+      'annotations.copyShare': '复制 Markdown',
+      'annotations.exportShare': '导出 Markdown',
+      'annotations.annotationActions': '标注操作',
+      'annotations.copyAnnotation': '复制此标注',
+      'annotations.annotationCopied': '标注已复制为 Markdown。',
+      'annotations.annotationCopyFailed': '无法复制此标注。',
       'annotations.shareAuthors': '作者',
+      'annotations.shareCount': '标注数量',
       'annotations.shareNote': '笔记',
       'annotations.shareCopied': '标注摘要已仅在本地复制。',
       'annotations.shareCopyFailed': '无法复制标注摘要。',
@@ -4697,7 +4712,12 @@
       'dictionary.source': '打开来源',
       'ai.annotation.vocabulary': '生僻字词讲解',
       'ai.teachKicker': '费曼学习法',
-      'ai.teachTitle': '用自己的话讲明白'
+      'ai.teachTitle': '用自己的话讲明白',
+      'ai.chatSuggestionExplain': '请解释一下当前内容最核心的观点。',
+      'ai.chatSuggestionChallenge': '你能对其中一个观点提出反驳吗？',
+      'ai.chatSuggestionConnect': '这部分内容和全书其他章节有什么联系？',
+      'ai.chatSuggestionSummarize': '请用几句话总结当前内容。',
+      'ai.chatSuggestionNotice': '阅读这部分时，我最应该留意什么？'
       ,'admin.dictionaries': '词典'
       ,'admin.dictionariesDescription': '安装本地 MDict 或 StarDict 词典。设置读者首次查词使用的默认词典；读者之后可随时切换。'
       ,'admin.systemLimits': '管理员操作'
@@ -4832,9 +4852,14 @@
       'admin.loading': '正在載入管理後台…',
       'admin.discardChanges': '放棄修改',
       'annotations.shareActions': '分享註釋',
-      'annotations.copyShare': '複製到剪貼簿',
-      'annotations.exportShare': '匯出文字',
+      'annotations.copyShare': '複製 Markdown',
+      'annotations.exportShare': '匯出 Markdown',
+      'annotations.annotationActions': '註釋操作',
+      'annotations.copyAnnotation': '複製此註釋',
+      'annotations.annotationCopied': '註釋已複製為 Markdown。',
+      'annotations.annotationCopyFailed': '無法複製此註釋。',
       'annotations.shareAuthors': '作者',
+      'annotations.shareCount': '註釋數量',
       'annotations.shareNote': '筆記',
       'annotations.shareCopied': '註釋摘要已僅在本機複製。',
       'annotations.shareCopyFailed': '無法複製註釋摘要。',
@@ -4876,7 +4901,12 @@
       'dictionary.source': '開啟來源',
       'ai.annotation.vocabulary': '生僻字詞解說',
       'ai.teachKicker': '費曼學習法',
-      'ai.teachTitle': '用自己的話講明白'
+      'ai.teachTitle': '用自己的話講明白',
+      'ai.chatSuggestionExplain': '請解釋一下目前內容最核心的觀點。',
+      'ai.chatSuggestionChallenge': '你能針對其中一個觀點提出反駁嗎？',
+      'ai.chatSuggestionConnect': '這部分內容和全書其他章節有什麼連結？',
+      'ai.chatSuggestionSummarize': '請用幾句話總結目前內容。',
+      'ai.chatSuggestionNotice': '閱讀這部分時，我最應該留意什麼？'
       ,'admin.dictionaries': '詞典'
       ,'admin.dictionariesDescription': '安裝本機 MDict 或 StarDict 詞典。設定讀者首次查詞使用的預設詞典；讀者之後可隨時切換。'
       ,'admin.systemLimits': '管理員操作'
@@ -5011,9 +5041,14 @@
       'admin.loading': '관리 화면을 불러오는 중…',
       'admin.discardChanges': '변경 사항 버리기',
       'annotations.shareActions': '주석 공유',
-      'annotations.copyShare': '클립보드에 복사',
-      'annotations.exportShare': '텍스트 내보내기',
+      'annotations.copyShare': 'Markdown 복사',
+      'annotations.exportShare': 'Markdown 내보내기',
+      'annotations.annotationActions': '주석 작업',
+      'annotations.copyAnnotation': '이 주석 복사',
+      'annotations.annotationCopied': '주석을 Markdown으로 복사했습니다.',
+      'annotations.annotationCopyFailed': '이 주석을 복사할 수 없습니다.',
       'annotations.shareAuthors': '저자',
+      'annotations.shareCount': '주석 수',
       'annotations.shareNote': '메모',
       'annotations.shareCopied': '주석 요약을 로컬에 복사했습니다.',
       'annotations.shareCopyFailed': '주석 요약을 복사할 수 없습니다.',
@@ -5055,7 +5090,12 @@
       'dictionary.source': '원문 열기',
       'ai.annotation.vocabulary': '낯선 글자·어휘 풀이',
       'ai.teachKicker': '파인만 학습법',
-      'ai.teachTitle': '내 말로 다시 설명하기'
+      'ai.teachTitle': '내 말로 다시 설명하기',
+      'ai.chatSuggestionExplain': '현재 내용의 핵심 생각을 설명해 줄 수 있나요?',
+      'ai.chatSuggestionChallenge': '여기 나온 생각 하나에 반론을 제시해 줄 수 있나요?',
+      'ai.chatSuggestionConnect': '이 내용은 책의 다른 부분과 어떻게 연결되나요?',
+      'ai.chatSuggestionSummarize': '현재 내용을 몇 문장으로 요약해 줄 수 있나요?',
+      'ai.chatSuggestionNotice': '이 부분을 읽을 때 무엇을 가장 눈여겨봐야 하나요?'
       ,'admin.dictionaries': '사전'
       ,'admin.dictionariesDescription': '로컬 MDict 또는 StarDict 사전을 설치합니다. 독자의 첫 조회에 사용할 기본 사전을 설정하며, 독자는 언제든 사전을 바꿀 수 있습니다.'
       ,'admin.systemLimits': '관리자 작업'
@@ -5190,9 +5230,14 @@
       'admin.loading': '管理画面を読み込み中…',
       'admin.discardChanges': '変更を破棄',
       'annotations.shareActions': '注釈を共有',
-      'annotations.copyShare': 'クリップボードにコピー',
-      'annotations.exportShare': 'テキストをエクスポート',
+      'annotations.copyShare': 'Markdown をコピー',
+      'annotations.exportShare': 'Markdown をエクスポート',
+      'annotations.annotationActions': '注釈の操作',
+      'annotations.copyAnnotation': 'この注釈をコピー',
+      'annotations.annotationCopied': '注釈を Markdown としてコピーしました。',
+      'annotations.annotationCopyFailed': 'この注釈をコピーできませんでした。',
       'annotations.shareAuthors': '著者',
+      'annotations.shareCount': '注釈数',
       'annotations.shareNote': 'メモ',
       'annotations.shareCopied': '注釈の概要をローカルにコピーしました。',
       'annotations.shareCopyFailed': '注釈の概要をコピーできません。',
@@ -5234,7 +5279,12 @@
       'dictionary.source': '出典を開く',
       'ai.annotation.vocabulary': '難しい字句の解説',
       'ai.teachKicker': 'ファインマン学習法',
-      'ai.teachTitle': '自分の言葉で説明する'
+      'ai.teachTitle': '自分の言葉で説明する',
+      'ai.chatSuggestionExplain': 'この範囲の中心的な考えを説明してもらえますか？',
+      'ai.chatSuggestionChallenge': 'ここにある考えの一つに反論できますか？',
+      'ai.chatSuggestionConnect': 'この内容は本のほかの部分とどうつながりますか？',
+      'ai.chatSuggestionSummarize': 'この範囲を数文で要約してもらえますか？',
+      'ai.chatSuggestionNotice': 'ここを読むとき、何に最も注目すべきですか？'
       ,'admin.dictionaries': '辞書'
       ,'admin.dictionariesDescription': 'ローカルの MDict または StarDict 辞書をインストールします。読者の初回検索に使う既定の辞書を設定でき、読者はいつでも切り替えられます。'
       ,'admin.systemLimits': '管理者操作'
@@ -5367,6 +5417,295 @@
   };
   Object.keys(localeAdditions).forEach(function(code) {
     Object.keys(localeAdditions[code]).forEach(function(key) { dictionaries[code][key] = localeAdditions[code][key]; });
+  });
+  var patLocaleAdditions = {
+    en: {
+      'account.pats.title': 'Personal access tokens',
+      'account.pats.description': 'Create scoped tokens for the external API. Treat every token like a password.',
+      'account.pats.docs': 'Open API docs',
+      'account.pats.issued': 'Issued tokens',
+      'account.pats.group.library': 'Library', 'account.pats.group.bookshelf': 'Bookshelf', 'account.pats.group.progress': 'Progress',
+      'account.pats.group.annotations': 'Annotations', 'account.pats.group.reviews': 'Reviews', 'account.pats.group.administration': 'Administration',
+      'account.pats.name': 'Token name',
+      'account.pats.scopes': 'Permissions',
+      'account.pats.expiration': 'Expiration',
+      'account.pats.days30': '30 days',
+      'account.pats.days90': '90 days',
+      'account.pats.days180': '180 days',
+      'account.pats.days365': '365 days',
+      'account.pats.never': 'Never expires',
+      'account.pats.neverExpiresWarning': 'Never-expiring tokens remain valid until you revoke them.',
+      'account.pats.create': 'Create token',
+      'account.pats.creating': 'Creating…',
+      'account.pats.created': 'Copy this token now. It will not be shown again.',
+      'account.pats.copy': 'Copy token',
+      'account.pats.copied': 'Token copied.',
+      'account.pats.copyFailed': 'Unable to copy the token.',
+      'account.pats.revoke': 'Revoke',
+      'account.pats.revokeConfirm': 'Revoke “{name}”? Integrations using it will stop immediately.',
+      'account.pats.revoked': 'Token revoked.',
+      'account.pats.empty': 'No personal access tokens.',
+      'account.pats.lastUsed': 'Last used {date}',
+      'account.pats.expires': 'Expires {date}',
+      'account.pats.unknownScope': 'Permission: {scope}',
+      'account.pats.scope.libraryRead': 'Read library and chapters',
+      'account.pats.scope.bookshelfRead': 'Read bookshelf',
+      'account.pats.scope.bookshelfWrite': 'Update bookshelf',
+      'account.pats.scope.progressRead': 'Read progress',
+      'account.pats.scope.progressWrite': 'Update progress',
+      'account.pats.scope.annotationsRead': 'Read annotations',
+      'account.pats.scope.annotationsWrite': 'Update annotations',
+      'account.pats.scope.reviewsRead': 'Read reviews',
+      'account.pats.scope.reviewsWrite': 'Update reviews',
+      'account.pats.scope.adminDataRead': 'Read all users’ non-secret data',
+      'account.pats.error.invalid_personal_access_token': 'Check the token name, permissions, and expiration.',
+      'account.error.invalid_personal_access_token': 'Check the token name, permissions, and expiration.'
+    },
+    'zh-CN': {
+      'account.pats.title': '个人访问令牌',
+      'account.pats.description': '创建用于开放接口的分权令牌。请像保护密码一样保护令牌。',
+      'account.pats.docs': '查看 API 文档',
+      'account.pats.issued': '已签发令牌',
+      'account.pats.group.library': '书库', 'account.pats.group.bookshelf': '书架', 'account.pats.group.progress': '阅读进度',
+      'account.pats.group.annotations': '标注', 'account.pats.group.reviews': '书评', 'account.pats.group.administration': '管理员数据',
+      'account.pats.name': '令牌名称',
+      'account.pats.scopes': '权限范围',
+      'account.pats.expiration': '有效期',
+      'account.pats.days30': '30 天', 'account.pats.days90': '90 天', 'account.pats.days180': '180 天', 'account.pats.days365': '365 天',
+      'account.pats.never': '永不过期',
+      'account.pats.neverExpiresWarning': '永不过期的令牌会一直有效，直到你主动撤销。',
+      'account.pats.create': '创建令牌', 'account.pats.creating': '正在创建…',
+      'account.pats.created': '请立即复制此令牌，之后将不再显示。',
+      'account.pats.copy': '复制令牌', 'account.pats.copied': '令牌已复制。', 'account.pats.copyFailed': '无法复制令牌。',
+      'account.pats.revoke': '撤销', 'account.pats.revokeConfirm': '撤销“{name}”？使用它的集成会立即停止。', 'account.pats.revoked': '令牌已撤销。',
+      'account.pats.empty': '尚未创建个人访问令牌。', 'account.pats.lastUsed': '最近使用 {date}', 'account.pats.expires': '到期于 {date}',
+      'account.pats.unknownScope': '权限：{scope}',
+      'account.pats.scope.libraryRead': '读取书库与章节', 'account.pats.scope.bookshelfRead': '读取书架', 'account.pats.scope.bookshelfWrite': '更新书架',
+      'account.pats.scope.progressRead': '读取进度', 'account.pats.scope.progressWrite': '更新进度',
+      'account.pats.scope.annotationsRead': '读取标注', 'account.pats.scope.annotationsWrite': '更新标注',
+      'account.pats.scope.reviewsRead': '读取书评', 'account.pats.scope.reviewsWrite': '更新书评',
+      'account.pats.scope.adminDataRead': '读取所有用户的非机密数据',
+      'account.pats.error.invalid_personal_access_token': '请检查令牌名称、权限范围和有效期。',
+      'account.error.invalid_personal_access_token': '请检查令牌名称、权限范围和有效期。'
+    },
+    'zh-TW': {
+      'account.pats.title': '個人存取權杖', 'account.pats.description': '建立用於開放介面的分權權杖。請像保護密碼一樣保護權杖。',
+      'account.pats.docs': '查看 API 文件', 'account.pats.issued': '已簽發權杖',
+      'account.pats.group.library': '書庫', 'account.pats.group.bookshelf': '書架', 'account.pats.group.progress': '閱讀進度', 'account.pats.group.annotations': '註釋', 'account.pats.group.reviews': '書評', 'account.pats.group.administration': '管理員資料',
+      'account.pats.name': '權杖名稱', 'account.pats.scopes': '權限範圍', 'account.pats.expiration': '有效期限',
+      'account.pats.days30': '30 天', 'account.pats.days90': '90 天', 'account.pats.days180': '180 天', 'account.pats.days365': '365 天',
+      'account.pats.never': '永不過期', 'account.pats.neverExpiresWarning': '永不過期的權杖會一直有效，直到你主動撤銷。',
+      'account.pats.create': '建立權杖', 'account.pats.creating': '正在建立…', 'account.pats.created': '請立即複製此權杖，之後將不再顯示。',
+      'account.pats.copy': '複製權杖', 'account.pats.copied': '權杖已複製。', 'account.pats.copyFailed': '無法複製權杖。',
+      'account.pats.revoke': '撤銷', 'account.pats.revokeConfirm': '撤銷「{name}」？使用它的整合會立即停止。', 'account.pats.revoked': '權杖已撤銷。',
+      'account.pats.empty': '尚未建立個人存取權杖。', 'account.pats.lastUsed': '最近使用 {date}', 'account.pats.expires': '到期日 {date}', 'account.pats.unknownScope': '權限：{scope}',
+      'account.pats.scope.libraryRead': '讀取書庫與章節', 'account.pats.scope.bookshelfRead': '讀取書架', 'account.pats.scope.bookshelfWrite': '更新書架',
+      'account.pats.scope.progressRead': '讀取進度', 'account.pats.scope.progressWrite': '更新進度', 'account.pats.scope.annotationsRead': '讀取註釋', 'account.pats.scope.annotationsWrite': '更新註釋',
+      'account.pats.scope.reviewsRead': '讀取書評', 'account.pats.scope.reviewsWrite': '更新書評', 'account.pats.scope.adminDataRead': '讀取所有使用者的非機密資料',
+      'account.pats.error.invalid_personal_access_token': '請檢查權杖名稱、權限範圍和有效期限。', 'account.error.invalid_personal_access_token': '請檢查權杖名稱、權限範圍和有效期限。'
+    },
+    ko: {
+      'account.pats.title': '개인 액세스 토큰', 'account.pats.description': '외부 API에 사용할 범위 지정 토큰을 만듭니다. 비밀번호처럼 안전하게 보관하세요.',
+      'account.pats.docs': 'API 문서 열기', 'account.pats.issued': '발급된 토큰',
+      'account.pats.group.library': '라이브러리', 'account.pats.group.bookshelf': '책장', 'account.pats.group.progress': '진행률', 'account.pats.group.annotations': '주석', 'account.pats.group.reviews': '리뷰', 'account.pats.group.administration': '관리자 데이터',
+      'account.pats.name': '토큰 이름', 'account.pats.scopes': '권한', 'account.pats.expiration': '만료',
+      'account.pats.days30': '30일', 'account.pats.days90': '90일', 'account.pats.days180': '180일', 'account.pats.days365': '365일',
+      'account.pats.never': '만료 없음', 'account.pats.neverExpiresWarning': '만료되지 않는 토큰은 취소할 때까지 유효합니다.',
+      'account.pats.create': '토큰 만들기', 'account.pats.creating': '만드는 중…', 'account.pats.created': '지금 토큰을 복사하세요. 다시 표시되지 않습니다.',
+      'account.pats.copy': '토큰 복사', 'account.pats.copied': '토큰을 복사했습니다.', 'account.pats.copyFailed': '토큰을 복사할 수 없습니다.',
+      'account.pats.revoke': '취소', 'account.pats.revokeConfirm': '“{name}” 토큰을 취소할까요? 연결된 통합이 즉시 중지됩니다.', 'account.pats.revoked': '토큰을 취소했습니다.',
+      'account.pats.empty': '개인 액세스 토큰이 없습니다.', 'account.pats.lastUsed': '최근 사용 {date}', 'account.pats.expires': '만료 {date}', 'account.pats.unknownScope': '권한: {scope}',
+      'account.pats.scope.libraryRead': '라이브러리와 장 읽기', 'account.pats.scope.bookshelfRead': '책장 읽기', 'account.pats.scope.bookshelfWrite': '책장 업데이트',
+      'account.pats.scope.progressRead': '진행률 읽기', 'account.pats.scope.progressWrite': '진행률 업데이트', 'account.pats.scope.annotationsRead': '주석 읽기', 'account.pats.scope.annotationsWrite': '주석 업데이트',
+      'account.pats.scope.reviewsRead': '리뷰 읽기', 'account.pats.scope.reviewsWrite': '리뷰 업데이트', 'account.pats.scope.adminDataRead': '모든 사용자의 비밀이 아닌 데이터 읽기',
+      'account.pats.error.invalid_personal_access_token': '토큰 이름, 권한, 만료를 확인하세요.', 'account.error.invalid_personal_access_token': '토큰 이름, 권한, 만료를 확인하세요.'
+    },
+    ja: {
+      'account.pats.title': '個人アクセストークン', 'account.pats.description': '外部 API 用の権限を限定したトークンを作成します。パスワードと同様に保護してください。',
+      'account.pats.docs': 'API ドキュメントを開く', 'account.pats.issued': '発行済みトークン',
+      'account.pats.group.library': 'ライブラリ', 'account.pats.group.bookshelf': '本棚', 'account.pats.group.progress': '進捗', 'account.pats.group.annotations': '注釈', 'account.pats.group.reviews': 'レビュー', 'account.pats.group.administration': '管理者データ',
+      'account.pats.name': 'トークン名', 'account.pats.scopes': '権限', 'account.pats.expiration': '有効期限',
+      'account.pats.days30': '30 日', 'account.pats.days90': '90 日', 'account.pats.days180': '180 日', 'account.pats.days365': '365 日',
+      'account.pats.never': '無期限', 'account.pats.neverExpiresWarning': '無期限のトークンは取り消すまで有効です。',
+      'account.pats.create': 'トークンを作成', 'account.pats.creating': '作成中…', 'account.pats.created': '今すぐトークンをコピーしてください。再表示されません。',
+      'account.pats.copy': 'トークンをコピー', 'account.pats.copied': 'トークンをコピーしました。', 'account.pats.copyFailed': 'トークンをコピーできません。',
+      'account.pats.revoke': '取り消す', 'account.pats.revokeConfirm': '「{name}」を取り消しますか？使用中の連携は直ちに停止します。', 'account.pats.revoked': 'トークンを取り消しました。',
+      'account.pats.empty': '個人アクセストークンはありません。', 'account.pats.lastUsed': '最終使用 {date}', 'account.pats.expires': '有効期限 {date}', 'account.pats.unknownScope': '権限: {scope}',
+      'account.pats.scope.libraryRead': 'ライブラリと章を読む', 'account.pats.scope.bookshelfRead': '本棚を読む', 'account.pats.scope.bookshelfWrite': '本棚を更新',
+      'account.pats.scope.progressRead': '進捗を読む', 'account.pats.scope.progressWrite': '進捗を更新', 'account.pats.scope.annotationsRead': '注釈を読む', 'account.pats.scope.annotationsWrite': '注釈を更新',
+      'account.pats.scope.reviewsRead': 'レビューを読む', 'account.pats.scope.reviewsWrite': 'レビューを更新', 'account.pats.scope.adminDataRead': '全ユーザーの機密ではないデータを読む',
+      'account.pats.error.invalid_personal_access_token': 'トークン名、権限、有効期限を確認してください。', 'account.error.invalid_personal_access_token': 'トークン名、権限、有効期限を確認してください。'
+    }
+  };
+  Object.keys(patLocaleAdditions).forEach(function(code) {
+    Object.keys(patLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = patLocaleAdditions[code][key]; });
+  });
+
+  var webhookLocaleAdditions = {
+    en: {
+      'admin.webhooks.title': 'WebHooks', 'admin.webhooks.description': 'Send signed event notifications to administrator-managed HTTP endpoints.',
+      'admin.webhooks.configured': 'Configured endpoints', 'admin.webhooks.reviewEvents': 'Review activity', 'admin.webhooks.bookEvents': 'Book lifecycle',
+      'admin.webhooks.name': 'Name', 'admin.webhooks.url': 'Endpoint URL', 'admin.webhooks.events': 'Events', 'admin.webhooks.enabled': 'Enabled',
+      'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': 'Review created', 'admin.webhooks.event.reviewUpdated': 'Review updated', 'admin.webhooks.event.reviewDeleted': 'Review deleted', 'admin.webhooks.event.bookCreated': 'Book created', 'admin.webhooks.event.bookUpdated': 'Book updated', 'admin.webhooks.event.bookRemoved': 'Book removed', 'admin.webhooks.event.conversionSucceeded': 'Conversion succeeded', 'admin.webhooks.event.conversionFailed': 'Conversion failed', 'admin.webhooks.event.test': 'Test delivery',
+      'admin.webhooks.create': 'Add endpoint', 'admin.webhooks.creating': 'Adding…', 'admin.webhooks.secretOnce': 'Copy the signing secret now. It will not be shown again.',
+      'admin.webhooks.deliveries': 'Recent deliveries', 'admin.webhooks.test': 'Send test', 'admin.webhooks.rotate': 'Rotate secret', 'admin.webhooks.delete': 'Delete',
+      'admin.webhooks.copySecret': 'Copy secret', 'admin.webhooks.update': 'Save endpoint', 'admin.webhooks.edit': 'Edit', 'admin.webhooks.pause': 'Pause', 'admin.webhooks.resume': 'Resume', 'admin.webhooks.status.enabled': 'Enabled', 'admin.webhooks.status.paused': 'Paused', 'admin.webhooks.copied': 'Secret copied.', 'admin.webhooks.copyFailed': 'Could not copy the secret.',
+      'admin.webhooks.deleteConfirm': 'Delete WebHook “{name}”?', 'admin.webhooks.empty': 'No WebHook endpoints yet.', 'admin.webhooks.noDeliveries': 'No deliveries yet.', 'admin.webhooks.cancelEdit': 'Cancel editing'
+    },
+    'zh-CN': {
+      'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '向管理员配置的 HTTP 端点发送带签名的事件通知。',
+      'admin.webhooks.configured': '已配置端点', 'admin.webhooks.reviewEvents': '书评动态', 'admin.webhooks.bookEvents': '书籍生命周期',
+      'admin.webhooks.name': '名称', 'admin.webhooks.url': '端点 URL', 'admin.webhooks.events': '事件', 'admin.webhooks.enabled': '启用',
+      'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': '书评已创建', 'admin.webhooks.event.reviewUpdated': '书评已更新', 'admin.webhooks.event.reviewDeleted': '书评已删除', 'admin.webhooks.event.bookCreated': '书籍已创建', 'admin.webhooks.event.bookUpdated': '书籍已更新', 'admin.webhooks.event.bookRemoved': '书籍已移除', 'admin.webhooks.event.conversionSucceeded': '转换成功', 'admin.webhooks.event.conversionFailed': '转换失败', 'admin.webhooks.event.test': '测试投递',
+      'admin.webhooks.create': '添加端点', 'admin.webhooks.creating': '正在添加…', 'admin.webhooks.secretOnce': '请立即复制签名密钥，之后不会再次显示。',
+      'admin.webhooks.deliveries': '最近投递', 'admin.webhooks.test': '发送测试', 'admin.webhooks.rotate': '轮换密钥', 'admin.webhooks.delete': '删除',
+      'admin.webhooks.copySecret': '复制密钥', 'admin.webhooks.update': '保存端点', 'admin.webhooks.edit': '编辑', 'admin.webhooks.pause': '暂停', 'admin.webhooks.resume': '恢复', 'admin.webhooks.status.enabled': '已启用', 'admin.webhooks.status.paused': '已暂停', 'admin.webhooks.copied': '密钥已复制。', 'admin.webhooks.copyFailed': '无法复制密钥。',
+      'admin.webhooks.deleteConfirm': '删除 WebHook“{name}”？', 'admin.webhooks.empty': '尚未添加 WebHook 端点。', 'admin.webhooks.noDeliveries': '暂无投递记录。', 'admin.webhooks.cancelEdit': '取消编辑'
+    },
+    'zh-TW': {
+      'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '向管理員設定的 HTTP 端點傳送已簽署的事件通知。',
+      'admin.webhooks.configured': '已設定端點', 'admin.webhooks.reviewEvents': '書評動態', 'admin.webhooks.bookEvents': '書籍生命週期',
+      'admin.webhooks.name': '名稱', 'admin.webhooks.url': '端點 URL', 'admin.webhooks.events': '事件', 'admin.webhooks.enabled': '啟用',
+      'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': '書評已建立', 'admin.webhooks.event.reviewUpdated': '書評已更新', 'admin.webhooks.event.reviewDeleted': '書評已刪除', 'admin.webhooks.event.bookCreated': '書籍已建立', 'admin.webhooks.event.bookUpdated': '書籍已更新', 'admin.webhooks.event.bookRemoved': '書籍已移除', 'admin.webhooks.event.conversionSucceeded': '轉換成功', 'admin.webhooks.event.conversionFailed': '轉換失敗', 'admin.webhooks.event.test': '測試投遞',
+      'admin.webhooks.create': '新增端點', 'admin.webhooks.creating': '正在新增…', 'admin.webhooks.secretOnce': '請立即複製簽署密鑰，之後不會再次顯示。',
+      'admin.webhooks.deliveries': '最近投遞', 'admin.webhooks.test': '傳送測試', 'admin.webhooks.rotate': '輪替密鑰', 'admin.webhooks.delete': '刪除',
+      'admin.webhooks.copySecret': '複製密鑰', 'admin.webhooks.update': '儲存端點', 'admin.webhooks.edit': '編輯', 'admin.webhooks.pause': '暫停', 'admin.webhooks.resume': '恢復', 'admin.webhooks.status.enabled': '已啟用', 'admin.webhooks.status.paused': '已暫停', 'admin.webhooks.copied': '密鑰已複製。', 'admin.webhooks.copyFailed': '無法複製密鑰。',
+      'admin.webhooks.deleteConfirm': '刪除 WebHook「{name}」？', 'admin.webhooks.empty': '尚未新增 WebHook 端點。', 'admin.webhooks.noDeliveries': '尚無投遞記錄。', 'admin.webhooks.cancelEdit': '取消編輯'
+    },
+    ko: {
+      'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '관리자가 설정한 HTTP 엔드포인트로 서명된 이벤트 알림을 보냅니다.',
+      'admin.webhooks.configured': '설정된 엔드포인트', 'admin.webhooks.reviewEvents': '리뷰 활동', 'admin.webhooks.bookEvents': '도서 수명 주기',
+      'admin.webhooks.name': '이름', 'admin.webhooks.url': '엔드포인트 URL', 'admin.webhooks.events': '이벤트', 'admin.webhooks.enabled': '사용',
+      'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': '서평 생성됨', 'admin.webhooks.event.reviewUpdated': '서평 수정됨', 'admin.webhooks.event.reviewDeleted': '서평 삭제됨', 'admin.webhooks.event.bookCreated': '도서 생성됨', 'admin.webhooks.event.bookUpdated': '도서 수정됨', 'admin.webhooks.event.bookRemoved': '도서 제거됨', 'admin.webhooks.event.conversionSucceeded': '변환 성공', 'admin.webhooks.event.conversionFailed': '변환 실패', 'admin.webhooks.event.test': '테스트 전송',
+      'admin.webhooks.create': '엔드포인트 추가', 'admin.webhooks.creating': '추가 중…', 'admin.webhooks.secretOnce': '서명 비밀 키를 지금 복사하세요. 다시 표시되지 않습니다.',
+      'admin.webhooks.deliveries': '최근 전송', 'admin.webhooks.test': '테스트 보내기', 'admin.webhooks.rotate': '비밀 키 교체', 'admin.webhooks.delete': '삭제',
+      'admin.webhooks.copySecret': '비밀 키 복사', 'admin.webhooks.update': '엔드포인트 저장', 'admin.webhooks.edit': '편집', 'admin.webhooks.pause': '일시 중지', 'admin.webhooks.resume': '재개', 'admin.webhooks.status.enabled': '사용', 'admin.webhooks.status.paused': '일시 중지됨', 'admin.webhooks.copied': '비밀 키를 복사했습니다.', 'admin.webhooks.copyFailed': '비밀 키를 복사할 수 없습니다.',
+      'admin.webhooks.deleteConfirm': 'WebHook “{name}”을 삭제할까요?', 'admin.webhooks.empty': 'WebHook 엔드포인트가 없습니다.', 'admin.webhooks.noDeliveries': '전송 기록이 없습니다.', 'admin.webhooks.cancelEdit': '편집 취소'
+    },
+    ja: {
+      'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '管理者が設定した HTTP エンドポイントへ署名付きイベント通知を送信します。',
+      'admin.webhooks.configured': '設定済みエンドポイント', 'admin.webhooks.reviewEvents': 'レビューの動き', 'admin.webhooks.bookEvents': '書籍のライフサイクル',
+      'admin.webhooks.name': '名前', 'admin.webhooks.url': 'エンドポイント URL', 'admin.webhooks.events': 'イベント', 'admin.webhooks.enabled': '有効',
+      'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': 'レビューを作成', 'admin.webhooks.event.reviewUpdated': 'レビューを更新', 'admin.webhooks.event.reviewDeleted': 'レビューを削除', 'admin.webhooks.event.bookCreated': '書籍を作成', 'admin.webhooks.event.bookUpdated': '書籍を更新', 'admin.webhooks.event.bookRemoved': '書籍を削除', 'admin.webhooks.event.conversionSucceeded': '変換成功', 'admin.webhooks.event.conversionFailed': '変換失敗', 'admin.webhooks.event.test': 'テスト配信',
+      'admin.webhooks.create': 'エンドポイントを追加', 'admin.webhooks.creating': '追加中…', 'admin.webhooks.secretOnce': '署名シークレットを今すぐコピーしてください。再表示されません。',
+      'admin.webhooks.deliveries': '最近の配信', 'admin.webhooks.test': 'テスト送信', 'admin.webhooks.rotate': 'シークレットをローテーション', 'admin.webhooks.delete': '削除',
+      'admin.webhooks.copySecret': 'シークレットをコピー', 'admin.webhooks.update': 'エンドポイントを保存', 'admin.webhooks.edit': '編集', 'admin.webhooks.pause': '一時停止', 'admin.webhooks.resume': '再開', 'admin.webhooks.status.enabled': '有効', 'admin.webhooks.status.paused': '一時停止中', 'admin.webhooks.copied': 'シークレットをコピーしました。', 'admin.webhooks.copyFailed': 'シークレットをコピーできませんでした。',
+      'admin.webhooks.deleteConfirm': 'WebHook「{name}」を削除しますか？', 'admin.webhooks.empty': 'WebHook エンドポイントはありません。', 'admin.webhooks.noDeliveries': '配信履歴はありません。', 'admin.webhooks.cancelEdit': '編集をキャンセル'
+    }
+  };
+  Object.keys(webhookLocaleAdditions).forEach(function(code) {
+    Object.keys(webhookLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = webhookLocaleAdditions[code][key]; });
+  });
+
+  var apiDocsLocaleAdditions = {
+    en: {
+      'apiDocs.pageTitle': 'API reference · EPUB Browser', 'apiDocs.skip': 'Skip to endpoints', 'apiDocs.back': 'Back to library',
+      'apiDocs.authBadge': 'Bearer PAT authentication', 'apiDocs.title': 'Build with your EPUB library',
+      'apiDocs.intro': 'Read books and chapters, sync personal reading data, or inspect account data with an administrator token.',
+      'apiDocs.download': 'Download OpenAPI JSON', 'apiDocs.browse': 'Browse endpoints', 'apiDocs.details': 'API details',
+      'apiDocs.basePath': 'Base path', 'apiDocs.format': 'Format', 'apiDocs.operations': 'Operations', 'apiDocs.getStarted': 'Get started',
+      'apiDocs.quickstart': 'Authenticate your first request', 'apiDocs.step1Title': 'Create a token',
+      'apiDocs.step1Body': 'Open Account settings, create a PAT, and choose only the scopes your integration needs.',
+      'apiDocs.step2Title': 'Add the Bearer header', 'apiDocs.step2Body': 'Send the token in the Authorization header. This documentation page never reads or stores it.',
+      'apiDocs.step3Title': 'Call a versioned endpoint', 'apiDocs.step3Body': 'All public endpoints live under /api/v1 and return JSON unless documented otherwise.',
+      'apiDocs.example': 'Example request', 'apiDocs.copy': 'Copy', 'apiDocs.copied': 'Example copied.', 'apiDocs.copyFailed': 'Could not copy the example.',
+      'apiDocs.envHint': 'Keep the token in an environment variable instead of placing it in source code.',
+      'apiDocs.reference': 'Reference', 'apiDocs.explorer': 'Endpoint explorer', 'apiDocs.explorerBody': 'Search by method, path, permission scope, or description.',
+      'apiDocs.searchLabel': 'Search endpoints', 'apiDocs.searchPlaceholder': 'Search path, scope, or description', 'apiDocs.searchHint': 'Press / to focus search.',
+      'apiDocs.results': '{count} endpoints shown', 'apiDocs.machineReadable': 'Machine-readable schema', 'apiDocs.onThisPage': 'On this page',
+      'apiDocs.endpointGroup': 'Endpoint group', 'apiDocs.endpointCount': '{count} endpoints',
+      'apiDocs.group.library': 'Library', 'apiDocs.group.bookshelf': 'Bookshelf', 'apiDocs.group.progress': 'Reading progress',
+      'apiDocs.group.annotations': 'Annotations', 'apiDocs.group.reviews': 'Reviews', 'apiDocs.group.admin': 'Administrator data',
+      'apiDocs.emptyTitle': 'No matching endpoints', 'apiDocs.emptyBody': 'Try a method such as GET, a scope such as reviews:read, or part of a path.',
+      'apiDocs.backToTop': 'Back to top'
+    },
+    'zh-CN': {
+      'apiDocs.pageTitle': 'API 参考 · EPUB Browser', 'apiDocs.skip': '跳到接口目录', 'apiDocs.back': '返回书库',
+      'apiDocs.authBadge': 'Bearer PAT 认证', 'apiDocs.title': '用你的 EPUB 书库构建应用',
+      'apiDocs.intro': '读取书籍与章节、同步个人阅读数据，或使用管理员令牌查看账户数据。',
+      'apiDocs.download': '下载 OpenAPI JSON', 'apiDocs.browse': '浏览接口', 'apiDocs.details': 'API 信息',
+      'apiDocs.basePath': '基础路径', 'apiDocs.format': '数据格式', 'apiDocs.operations': '接口数量', 'apiDocs.getStarted': '快速开始',
+      'apiDocs.quickstart': '完成第一次认证请求', 'apiDocs.step1Title': '创建令牌',
+      'apiDocs.step1Body': '前往账户设置创建 PAT，并且只选择集成实际需要的权限。',
+      'apiDocs.step2Title': '添加 Bearer 请求头', 'apiDocs.step2Body': '在 Authorization 请求头中发送令牌。这个文档页面不会读取或保存令牌。',
+      'apiDocs.step3Title': '调用版本化接口', 'apiDocs.step3Body': '所有开放接口都位于 /api/v1 下；除非另有说明，否则均返回 JSON。',
+      'apiDocs.example': '请求示例', 'apiDocs.copy': '复制', 'apiDocs.copied': '示例已复制。', 'apiDocs.copyFailed': '无法复制示例。',
+      'apiDocs.envHint': '请把令牌放在环境变量中，不要直接写进源代码。',
+      'apiDocs.reference': '接口参考', 'apiDocs.explorer': '接口浏览器', 'apiDocs.explorerBody': '可以按方法、路径、权限范围或说明搜索。',
+      'apiDocs.searchLabel': '搜索接口', 'apiDocs.searchPlaceholder': '搜索路径、权限或说明', 'apiDocs.searchHint': '按 / 可快速聚焦搜索框。',
+      'apiDocs.results': '显示 {count} 个接口', 'apiDocs.machineReadable': '机器可读规范', 'apiDocs.onThisPage': '本页导航',
+      'apiDocs.endpointGroup': '接口分组', 'apiDocs.endpointCount': '{count} 个接口',
+      'apiDocs.group.library': '书库', 'apiDocs.group.bookshelf': '书架', 'apiDocs.group.progress': '阅读进度',
+      'apiDocs.group.annotations': '标注', 'apiDocs.group.reviews': '书评', 'apiDocs.group.admin': '管理员数据',
+      'apiDocs.emptyTitle': '没有匹配的接口', 'apiDocs.emptyBody': '可以尝试 GET 等方法、reviews:read 等权限，或路径中的一部分。',
+      'apiDocs.backToTop': '返回顶部'
+    },
+    'zh-TW': {
+      'apiDocs.pageTitle': 'API 參考 · EPUB Browser', 'apiDocs.skip': '跳到介面目錄', 'apiDocs.back': '返回書庫',
+      'apiDocs.authBadge': 'Bearer PAT 驗證', 'apiDocs.title': '用你的 EPUB 書庫建構應用程式',
+      'apiDocs.intro': '讀取書籍與章節、同步個人閱讀資料，或使用管理員權杖查看帳戶資料。',
+      'apiDocs.download': '下載 OpenAPI JSON', 'apiDocs.browse': '瀏覽介面', 'apiDocs.details': 'API 資訊',
+      'apiDocs.basePath': '基礎路徑', 'apiDocs.format': '資料格式', 'apiDocs.operations': '介面數量', 'apiDocs.getStarted': '快速開始',
+      'apiDocs.quickstart': '完成第一次驗證請求', 'apiDocs.step1Title': '建立權杖',
+      'apiDocs.step1Body': '前往帳戶設定建立 PAT，並且只選擇整合實際需要的權限。',
+      'apiDocs.step2Title': '加入 Bearer 標頭', 'apiDocs.step2Body': '在 Authorization 標頭中傳送權杖。這個文件頁面不會讀取或儲存權杖。',
+      'apiDocs.step3Title': '呼叫版本化介面', 'apiDocs.step3Body': '所有開放介面都位於 /api/v1 下；除非另有說明，否則均回傳 JSON。',
+      'apiDocs.example': '請求範例', 'apiDocs.copy': '複製', 'apiDocs.copied': '範例已複製。', 'apiDocs.copyFailed': '無法複製範例。',
+      'apiDocs.envHint': '請把權杖放在環境變數中，不要直接寫入原始碼。',
+      'apiDocs.reference': '介面參考', 'apiDocs.explorer': '介面瀏覽器', 'apiDocs.explorerBody': '可以依方法、路徑、權限範圍或說明搜尋。',
+      'apiDocs.searchLabel': '搜尋介面', 'apiDocs.searchPlaceholder': '搜尋路徑、權限或說明', 'apiDocs.searchHint': '按 / 可快速聚焦搜尋框。',
+      'apiDocs.results': '顯示 {count} 個介面', 'apiDocs.machineReadable': '機器可讀規範', 'apiDocs.onThisPage': '本頁導覽',
+      'apiDocs.endpointGroup': '介面分組', 'apiDocs.endpointCount': '{count} 個介面',
+      'apiDocs.group.library': '書庫', 'apiDocs.group.bookshelf': '書架', 'apiDocs.group.progress': '閱讀進度',
+      'apiDocs.group.annotations': '註釋', 'apiDocs.group.reviews': '書評', 'apiDocs.group.admin': '管理員資料',
+      'apiDocs.emptyTitle': '沒有符合的介面', 'apiDocs.emptyBody': '可以嘗試 GET 等方法、reviews:read 等權限，或路徑中的一部分。',
+      'apiDocs.backToTop': '返回頂端'
+    },
+    ko: {
+      'apiDocs.pageTitle': 'API 참조 · EPUB Browser', 'apiDocs.skip': '엔드포인트로 이동', 'apiDocs.back': '라이브러리로 돌아가기',
+      'apiDocs.authBadge': 'Bearer PAT 인증', 'apiDocs.title': 'EPUB 라이브러리로 앱 만들기',
+      'apiDocs.intro': '책과 장을 읽고 개인 독서 데이터를 동기화하거나 관리자 토큰으로 계정 데이터를 확인하세요.',
+      'apiDocs.download': 'OpenAPI JSON 다운로드', 'apiDocs.browse': '엔드포인트 보기', 'apiDocs.details': 'API 정보',
+      'apiDocs.basePath': '기본 경로', 'apiDocs.format': '형식', 'apiDocs.operations': '작업 수', 'apiDocs.getStarted': '시작하기',
+      'apiDocs.quickstart': '첫 인증 요청 보내기', 'apiDocs.step1Title': '토큰 만들기',
+      'apiDocs.step1Body': '계정 설정에서 PAT를 만들고 통합에 필요한 권한만 선택하세요.',
+      'apiDocs.step2Title': 'Bearer 헤더 추가', 'apiDocs.step2Body': 'Authorization 헤더로 토큰을 보내세요. 이 문서 페이지는 토큰을 읽거나 저장하지 않습니다.',
+      'apiDocs.step3Title': '버전이 지정된 엔드포인트 호출', 'apiDocs.step3Body': '모든 공개 엔드포인트는 /api/v1 아래에 있으며 별도 설명이 없으면 JSON을 반환합니다.',
+      'apiDocs.example': '요청 예시', 'apiDocs.copy': '복사', 'apiDocs.copied': '예시를 복사했습니다.', 'apiDocs.copyFailed': '예시를 복사할 수 없습니다.',
+      'apiDocs.envHint': '토큰을 소스 코드에 넣지 말고 환경 변수에 보관하세요.',
+      'apiDocs.reference': '참조', 'apiDocs.explorer': '엔드포인트 탐색기', 'apiDocs.explorerBody': '메서드, 경로, 권한 범위 또는 설명으로 검색하세요.',
+      'apiDocs.searchLabel': '엔드포인트 검색', 'apiDocs.searchPlaceholder': '경로, 권한 또는 설명 검색', 'apiDocs.searchHint': '/ 키를 눌러 검색창으로 이동합니다.',
+      'apiDocs.results': '엔드포인트 {count}개 표시', 'apiDocs.machineReadable': '기계 판독 스키마', 'apiDocs.onThisPage': '이 페이지',
+      'apiDocs.endpointGroup': '엔드포인트 그룹', 'apiDocs.endpointCount': '엔드포인트 {count}개',
+      'apiDocs.group.library': '라이브러리', 'apiDocs.group.bookshelf': '책장', 'apiDocs.group.progress': '읽기 진행률',
+      'apiDocs.group.annotations': '주석', 'apiDocs.group.reviews': '리뷰', 'apiDocs.group.admin': '관리자 데이터',
+      'apiDocs.emptyTitle': '일치하는 엔드포인트 없음', 'apiDocs.emptyBody': 'GET 같은 메서드, reviews:read 같은 권한 또는 경로 일부를 검색해 보세요.',
+      'apiDocs.backToTop': '맨 위로'
+    },
+    ja: {
+      'apiDocs.pageTitle': 'API リファレンス · EPUB Browser', 'apiDocs.skip': 'エンドポイントへ移動', 'apiDocs.back': 'ライブラリへ戻る',
+      'apiDocs.authBadge': 'Bearer PAT 認証', 'apiDocs.title': 'EPUB ライブラリを使って構築',
+      'apiDocs.intro': '書籍や章の取得、個人の読書データの同期、管理者トークンによるアカウントデータの確認ができます。',
+      'apiDocs.download': 'OpenAPI JSON をダウンロード', 'apiDocs.browse': 'エンドポイントを見る', 'apiDocs.details': 'API 情報',
+      'apiDocs.basePath': 'ベースパス', 'apiDocs.format': '形式', 'apiDocs.operations': '操作数', 'apiDocs.getStarted': 'はじめに',
+      'apiDocs.quickstart': '最初の認証リクエスト', 'apiDocs.step1Title': 'トークンを作成',
+      'apiDocs.step1Body': 'アカウント設定で PAT を作成し、連携に必要な権限だけを選択します。',
+      'apiDocs.step2Title': 'Bearer ヘッダーを追加', 'apiDocs.step2Body': 'Authorization ヘッダーでトークンを送信します。このドキュメントページはトークンを読み取ったり保存したりしません。',
+      'apiDocs.step3Title': 'バージョン付きエンドポイントを呼び出す', 'apiDocs.step3Body': '公開エンドポイントはすべて /api/v1 配下にあり、特記がなければ JSON を返します。',
+      'apiDocs.example': 'リクエスト例', 'apiDocs.copy': 'コピー', 'apiDocs.copied': '例をコピーしました。', 'apiDocs.copyFailed': '例をコピーできませんでした。',
+      'apiDocs.envHint': 'トークンはソースコードに書かず、環境変数に保管してください。',
+      'apiDocs.reference': 'リファレンス', 'apiDocs.explorer': 'エンドポイント一覧', 'apiDocs.explorerBody': 'メソッド、パス、権限スコープ、説明で検索できます。',
+      'apiDocs.searchLabel': 'エンドポイントを検索', 'apiDocs.searchPlaceholder': 'パス、権限、説明を検索', 'apiDocs.searchHint': '/ キーで検索欄に移動します。',
+      'apiDocs.results': '{count} 件のエンドポイントを表示', 'apiDocs.machineReadable': '機械可読スキーマ', 'apiDocs.onThisPage': 'このページ',
+      'apiDocs.endpointGroup': 'エンドポイントグループ', 'apiDocs.endpointCount': '{count} 件',
+      'apiDocs.group.library': 'ライブラリ', 'apiDocs.group.bookshelf': '本棚', 'apiDocs.group.progress': '読書進捗',
+      'apiDocs.group.annotations': '注釈', 'apiDocs.group.reviews': 'レビュー', 'apiDocs.group.admin': '管理者データ',
+      'apiDocs.emptyTitle': '一致するエンドポイントはありません', 'apiDocs.emptyBody': 'GET などのメソッド、reviews:read などの権限、またはパスの一部を試してください。',
+      'apiDocs.backToTop': 'ページ上部へ'
+    }
+  };
+  Object.keys(apiDocsLocaleAdditions).forEach(function(code) {
+    Object.keys(apiDocsLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = apiDocsLocaleAdditions[code][key]; });
   });
 
   function normalizeLocale(value) {

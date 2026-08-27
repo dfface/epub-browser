@@ -48,7 +48,7 @@ from .ai_reading import (
     _public_ai_result,
     validate_reading_request,
 )
-from .asset_publisher import PublishedAssets
+from .asset_publisher import PublishedAssets, rewrite_asset_urls
 from .dictionary_service import DictionaryService, DictionaryServiceError
 from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
@@ -60,11 +60,20 @@ from .processor import (
     SERVER_OUTPUT_REVISION_FILE,
     server_book_public_path_allowed,
 )
+from .public_api import (
+    PUBLIC_API_CONTEXT_KEY,
+    PublicAPIContext,
+    openapi_document,
+    public_api_operations,
+    public_api_routes,
+)
 from .server_library import library_metadata
+from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
 from .site import render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
+from .webhooks import WEBHOOK_EVENT_TYPES, WebhookService
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -88,6 +97,8 @@ PUBLIC_AUTH_ENDPOINTS = frozenset({
 })
 PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/account.css',
+    '/assets/api-docs.css',
+    '/assets/api-docs.js',
     '/assets/auth.js',
     '/assets/i18n.js',
     '/assets/theme-bootstrap.js',
@@ -579,6 +590,7 @@ def create_app(
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     release_lookup = release_lookup or ReleaseLookup()
     ai_reading = AIReadingService(store, base_directory)
+    webhook_service = WebhookService(store)
     dictionary_service = DictionaryService(store, base_directory)
     encyclopedia = WikimediaEncyclopedia()
     heartbeat_attempts = {}
@@ -592,6 +604,16 @@ def create_app(
             status_code=status,
             headers={'Cache-Control': cache_control},
         )
+
+    def current_published_assets():
+        manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        if not isinstance(manifest, dict) or not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in manifest.items()
+        ):
+            raise ValueError('Invalid asset manifest')
+        return PublishedAssets(manifest)
 
     def heartbeat_rate_limited(user_id, client_id):
         """Permit the normal 15-second cadence and a few transient retries."""
@@ -1420,6 +1442,94 @@ window.location.assign(payload.redirect||'/');
             delete_session_cookie(revoked)
         return revoked
 
+    def personal_access_token_data(record):
+        def iso_timestamp(value):
+            if value is None:
+                return None
+            return datetime.fromtimestamp(
+                float(value), timezone.utc
+            ).isoformat().replace('+00:00', 'Z')
+
+        return {
+            'id': record.token_id,
+            'name': record.name,
+            'scopes': list(record.scopes),
+            'created_at': iso_timestamp(record.created_at),
+            'expires_at': iso_timestamp(record.expires_at),
+            'last_used_at': iso_timestamp(record.last_used_at),
+        }
+
+    async def own_personal_access_tokens(request):
+        principal = require_principal(request)
+        if request.method == 'GET':
+            return response({
+                'personal_access_tokens': [
+                    personal_access_token_data(record)
+                    for record in store.list_personal_access_tokens(
+                        principal.user_id
+                    )
+                ]
+            })
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        name = data.get('name')
+        current_password = data.get('current_password')
+        scopes = data.get('scopes')
+        expires_in_days = data.get('expires_in_days')
+        if (
+            not isinstance(name, str)
+            or not isinstance(current_password, str)
+            or not isinstance(scopes, list)
+            or expires_in_days not in (None, 30, 90, 180, 365)
+        ):
+            return response(
+                error_payload('invalid_personal_access_token', 'Invalid personal access token'),
+                400,
+            )
+        authenticated = auth_service.authenticate_password(
+            principal.username,
+            current_password,
+            client_key(request),
+        )
+        if authenticated is None or authenticated.user_id != principal.user_id:
+            return response(
+                error_payload('invalid_credentials', 'Invalid username or password'),
+                401,
+            )
+        if 'admin:data:read' in scopes and principal.role != 'admin':
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        expires_at = (
+            None
+            if expires_in_days is None
+            else time.time() + expires_in_days * 24 * 60 * 60
+        )
+        try:
+            issued = store.create_personal_access_token(
+                principal.user_id,
+                name,
+                scopes,
+                expires_at=expires_at,
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_personal_access_token', 'Invalid personal access token'),
+                400,
+            )
+        return response({
+            'personal_access_token': personal_access_token_data(issued.token),
+            'token': issued.raw_token,
+        }, 201, cache_control='no-store')
+
+    async def revoke_own_personal_access_token(request):
+        principal = require_principal(request)
+        if not store.revoke_personal_access_token(
+            principal.user_id,
+            request.path_params['token_id'],
+        ):
+            return response(error_payload('not_found', 'Personal access token not found'), 404)
+        return Response(status_code=204)
+
     async def admin_users(request):
         require_admin(request)
         if request.method == 'GET':
@@ -1519,6 +1629,7 @@ window.location.assign(payload.redirect||'/');
         updated = store.set_password_hash_and_revoke_sessions(
             user.user_id,
             hash_password(password),
+            revoke_personal_access_tokens=True,
         )
         return response({'user': user_data(updated)})
 
@@ -2642,15 +2753,8 @@ window.location.assign(payload.redirect||'/');
         # Keep the static fallback for partially initialized/legacy installs
         # where no manifest has been published yet.
         try:
-            manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
-            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-            if not isinstance(manifest, dict) or not all(
-                isinstance(key, str) and isinstance(value, str)
-                for key, value in manifest.items()
-            ):
-                raise ValueError('Invalid asset manifest')
             markup = render_library_shell(
-                (), PublishedAssets(manifest), SiteURLs(), deployment_mode='server'
+                (), current_published_assets(), SiteURLs(), deployment_mode='server'
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
@@ -2664,6 +2768,19 @@ window.location.assign(payload.redirect||'/');
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
         return apply_reader_security_headers(response, index_path)
+
+    async def openapi_schema(request):
+        return response(openapi_document(), cache_control='public, max-age=300')
+
+    async def api_docs(request):
+        require_principal(request)
+        markup = render_api_docs(public_api_operations())
+        try:
+            markup = rewrite_asset_urls(markup, current_published_assets())
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            pass
+        target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        return apply_reader_security_headers(target, markup=markup)
 
     async def reading_insights_page(request):
         """Keep legacy links safe now that insights lives in the shared modal hub."""
@@ -3348,6 +3465,81 @@ window.location.assign(payload.redirect||'/');
             )
         return response({'insights': insights})
 
+    def valid_webhook_configuration(data):
+        if not isinstance(data, dict):
+            return None
+        name = data.get('name')
+        url = data.get('url')
+        event_types = data.get('event_types')
+        enabled = data.get('enabled', True)
+        parsed = urlsplit(url) if isinstance(url, str) else None
+        if (
+            not isinstance(name, str) or not 1 <= len(name.strip()) <= 80
+            or parsed is None or parsed.scheme not in {'http', 'https'} or not parsed.netloc
+            or not isinstance(event_types, list) or not event_types
+            or any(not isinstance(item, str) for item in event_types)
+            or not set(event_types) <= WEBHOOK_EVENT_TYPES
+            or not isinstance(enabled, bool)
+        ):
+            return None
+        return name.strip(), url, tuple(sorted(set(event_types))), enabled
+
+    async def admin_webhooks(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response({'items': store.list_webhook_endpoints()}, cache_control='private, no-store')
+        data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
+        configuration = valid_webhook_configuration(data) if not error else None
+        if configuration is None:
+            return response(error_payload('invalid_webhook', 'Invalid WebHook configuration'), 400, 'private, no-store')
+        created = store.create_webhook_endpoint(*configuration[:3], enabled=configuration[3])
+        return response(created, 201, 'private, no-store')
+
+    async def admin_webhook(request):
+        require_admin(request)
+        endpoint_id = request.path_params['webhook_id']
+        if request.method == 'GET':
+            endpoint = store.get_webhook_endpoint(endpoint_id)
+            return response({'webhook': endpoint}, cache_control='private, no-store') if endpoint else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+        if request.method == 'DELETE':
+            return Response(status_code=204) if store.delete_webhook_endpoint(endpoint_id) else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+        data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
+        configuration = valid_webhook_configuration(data) if not error else None
+        if configuration is None:
+            return response(error_payload('invalid_webhook', 'Invalid WebHook configuration'), 400, 'private, no-store')
+        endpoint = store.update_webhook_endpoint(endpoint_id, name=configuration[0], url=configuration[1], event_types=configuration[2], enabled=configuration[3])
+        return response({'webhook': endpoint}, cache_control='private, no-store') if endpoint else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+
+    async def admin_webhook_test(request):
+        require_admin(request)
+        try:
+            queued = store.enqueue_webhook_test(request.path_params['webhook_id'])
+        except KeyError:
+            return response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+        return response(queued, 202, 'private, no-store')
+
+    async def admin_webhook_rotate(request):
+        require_admin(request)
+        secret = store.rotate_webhook_secret(request.path_params['webhook_id'])
+        return response({'secret': secret}, cache_control='private, no-store') if secret else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+
+    async def admin_webhook_deliveries(request):
+        require_admin(request)
+        return response({'items': store.list_webhook_deliveries()}, cache_control='private, no-store')
+
+    async def admin_webhook_redeliver(request):
+        require_admin(request)
+        data, error = await bounded_public_json_object(request, maximum_size=2048)
+        endpoint_id = data.get('endpoint_id') if not error else None
+        if not isinstance(endpoint_id, str):
+            return response(error_payload('invalid_webhook_redelivery', 'Invalid WebHook redelivery'), 400, 'private, no-store')
+        try:
+            delivery_id = store.redeliver_webhook_event(request.path_params['event_id'], endpoint_id)
+        except sqlite3.IntegrityError:
+            return response(error_payload('webhook_event_not_found', 'WebHook event not found'), 404, 'private, no-store')
+        return response({'delivery_id': delivery_id}, 202, 'private, no-store')
+
+    public_api_context = PublicAPIContext(store=store, public_dir=Path(base_directory))
     routes = [
         Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
@@ -3358,6 +3550,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/account/password', change_password, methods=['PUT']),
         Route('/api/account/sessions', list_own_sessions, methods=['GET']),
         Route('/api/account/sessions/{session_id}', revoke_own_session, methods=['DELETE']),
+        Route('/api/account/pats', own_personal_access_tokens, methods=['GET', 'POST']),
+        Route('/api/account/pats/{token_id}', revoke_own_personal_access_token, methods=['DELETE']),
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
@@ -3380,11 +3574,20 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/dictionaries/{dictionary_id}/resources', admin_dictionary_resources, methods=['POST']),
         Route('/api/admin/dictionaries/{dictionary_id}/default', admin_dictionary_default, methods=['PUT']),
         Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
+        Route('/api/admin/webhooks', admin_webhooks, methods=['GET', 'POST']),
+        Route('/api/admin/webhooks/deliveries', admin_webhook_deliveries, methods=['GET']),
+        Route('/api/admin/webhooks/events/{event_id}/redeliver', admin_webhook_redeliver, methods=['POST']),
+        Route('/api/admin/webhooks/{webhook_id}/test', admin_webhook_test, methods=['POST']),
+        Route('/api/admin/webhooks/{webhook_id}/rotate-secret', admin_webhook_rotate, methods=['POST']),
+        Route('/api/admin/webhooks/{webhook_id}', admin_webhook, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
+        *public_api_routes(public_api_context),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/reading-insights', reading_insights_page, methods=['GET']),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
+        Route('/openapi.json', openapi_schema, methods=['GET']),
+        Route('/api-docs', api_docs, methods=['GET']),
         Route('/api/health', health),
         Route('/api/ready', ready),
         Route('/api/version', version_status),
@@ -3420,10 +3623,12 @@ window.location.assign(payload.redirect||'/');
     async def ai_worker_lifespan(application):
         """Keep the AI worker lifecycle aligned with the ASGI application."""
         await ai_reading.start_worker()
+        await webhook_service.start_worker()
         ai_reading.wake_worker()
         try:
             yield
         finally:
+            await webhook_service.stop_worker()
             await ai_reading.stop_worker()
 
     app = Starlette(
@@ -3434,6 +3639,7 @@ window.location.assign(payload.redirect||'/');
         },
         lifespan=ai_worker_lifespan,
     )
+    setattr(app.state, PUBLIC_API_CONTEXT_KEY, public_api_context)
 
     async def auth_middleware(request, call_next):
         path = request.url.path
@@ -3448,6 +3654,12 @@ window.location.assign(payload.redirect||'/');
             return setup_required_response(request)
         if path == '/sw.js':
             return await call_next(request)
+        if path == '/openapi.json':
+            return await call_next(request)
+        if path.startswith('/api/v1/'):
+            authorized = await call_next(request)
+            authorized.headers['Cache-Control'] = 'private, no-store'
+            return authorized
         raw_session = request.cookies.get(SESSION_COOKIE)
         session_principal = auth_service.principal_from_session(raw_session)
         principal = session_principal

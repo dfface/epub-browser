@@ -884,6 +884,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.addCleanup(subscription.close)
         manager = self._manager(progress_broker=broker)
         first = manager.reconcile().active_books[0]
+        succeeded = self.store.list_webhook_events(
+            event_type="book.conversion.succeeded"
+        )
+        self.assertEqual(succeeded[0]["data"], {"book_id": first.book_id})
         chapter_path = (
             self.server_dir
             / "cache"
@@ -928,6 +932,12 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(snapshot.phase, "degraded")
         self.assertEqual(snapshot.failures[0].filename, self.source.name)
         self.assertNotIn(self.temporary.name, str(snapshot.failures))
+        failed = self.store.list_webhook_events(
+            event_type="book.conversion.failed"
+        )[0]
+        self.assertEqual(failed["data"]["source_name"], self.source.name)
+        self.assertEqual(failed["data"]["error_code"], "conversion_failed")
+        self.assertNotIn(str(self.source.parent), json.dumps(failed))
 
         manager.converter_factory = EPUBProcessor
         retried = manager.reconcile()

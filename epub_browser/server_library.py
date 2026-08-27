@@ -435,6 +435,14 @@ class ServerLibraryManager:
                         )
                     )
                     self._mark_missing_if_deleted(source, existing)
+                    self.state_store.enqueue_webhook_event(
+                        "book.conversion.failed",
+                        {
+                            "book_id": resolved_book_id,
+                            "source_name": source.name,
+                            "error_code": "conversion_failed",
+                        },
+                    )
                     self.progress_broker.record_failure(source, error)
                     continue
 
@@ -460,6 +468,10 @@ class ServerLibraryManager:
                         )
                     if error is None:
                         converted_records.append(converted)
+                        self.state_store.enqueue_webhook_event(
+                            "book.conversion.succeeded",
+                            {"book_id": converted.book_id},
+                        )
                     elif not isinstance(error, _ConversionCancelled):
                         kept = self._cache_valid(plan.record)
                         if not kept:
@@ -479,6 +491,14 @@ class ServerLibraryManager:
                                 str(error),
                                 kept,
                             )
+                        )
+                        self.state_store.enqueue_webhook_event(
+                            "book.conversion.failed",
+                            {
+                                "book_id": plan.record.book_id,
+                                "source_name": plan.source.name,
+                                "error_code": "conversion_failed",
+                            },
                         )
                         self.reporter.detail(
                             f"Failed to convert {plan.source}: {error}"

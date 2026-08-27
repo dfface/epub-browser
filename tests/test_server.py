@@ -2334,6 +2334,95 @@ class AdminAccountTests(unittest.TestCase):
         )
         self.assertEqual(self.member_client.get("/api/session").status_code, 200)
 
+    def test_account_creates_lists_and_revokes_a_scoped_pat(self):
+        created = self.member_client.post(
+            "/api/account/pats",
+            json={
+                "name": "Reader sync",
+                "current_password": "member-secret",
+                "scopes": ["library:read", "reviews:read"],
+                "expires_in_days": None,
+            },
+        )
+
+        self.assertEqual(created.status_code, 201)
+        raw_token = created.json()["token"]
+        token_id = created.json()["personal_access_token"]["id"]
+        self.assertTrue(raw_token.startswith("epub_pat_"))
+        listed = self.member_client.get("/api/account/pats")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.json()["personal_access_tokens"][0]["name"], "Reader sync")
+        self.assertNotIn(raw_token, listed.text)
+
+        revoked = self.member_client.delete("/api/account/pats/" + token_id)
+
+        self.assertEqual(revoked.status_code, 204)
+        self.assertIsNone(self.store.authenticate_personal_access_token(raw_token))
+
+    def test_pat_creation_reauthenticates_and_admin_scope_requires_admin(self):
+        wrong_password = self.member_client.post(
+            "/api/account/pats",
+            json={
+                "name": "Denied",
+                "current_password": "wrong",
+                "scopes": ["library:read"],
+                "expires_in_days": 90,
+            },
+        )
+        admin_scope = self.member_client.post(
+            "/api/account/pats",
+            json={
+                "name": "Denied",
+                "current_password": "member-secret",
+                "scopes": ["admin:data:read"],
+                "expires_in_days": 90,
+            },
+        )
+
+        self.assertEqual(wrong_password.status_code, 401)
+        self.assertEqual(admin_scope.status_code, 403)
+
+        malformed_expiration = self.member_client.post(
+            "/api/account/pats",
+            json={
+                "name": "Denied",
+                "current_password": "member-secret",
+                "scopes": ["library:read"],
+                "expires_in_days": [],
+            },
+        )
+        self.assertEqual(malformed_expiration.status_code, 400)
+
+    def test_self_password_change_keeps_pat_but_admin_reset_revokes_it(self):
+        created = self.member_client.post(
+            "/api/account/pats",
+            json={
+                "name": "Automation",
+                "current_password": "member-secret",
+                "scopes": ["library:read"],
+                "expires_in_days": 30,
+            },
+        )
+        raw_token = created.json()["token"]
+
+        changed = self.member_client.put(
+            "/api/account/password",
+            json={
+                "current_password": "member-secret",
+                "new_password": "member-new-secret",
+            },
+        )
+        self.assertEqual(changed.status_code, 200)
+        self.assertIsNotNone(self.store.authenticate_personal_access_token(raw_token))
+
+        reset = self.admin_client.put(
+            "/api/admin/users/member/password",
+            json={"password": "member-reset-secret"},
+        )
+
+        self.assertEqual(reset.status_code, 200)
+        self.assertIsNone(self.store.authenticate_personal_access_token(raw_token))
+
 
 class SessionOwnershipTests(unittest.TestCase):
     def setUp(self):
