@@ -5,13 +5,15 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.routing import Route
 
 from .pat import AuthenticatedPAT, PAT_SCOPES
+from .server_pages import ServerPageError, ServerPageRenderer
 
 
 PUBLIC_API_CONTEXT_KEY = "epub_browser.public_api_context"
@@ -104,6 +106,129 @@ async def _list_books(request, authenticated: AuthenticatedPAT):
     )
 
 
+def _authorized_book(request, authenticated, book_id):
+    context = _context(request)
+    if not context.store.can_read_book(
+        authenticated.principal.user_id,
+        authenticated.principal.role,
+        book_id,
+    ):
+        return None
+    return context.store.book_by_id(book_id)
+
+
+async def _book_detail(request, authenticated: AuthenticatedPAT):
+    book = _authorized_book(
+        request, authenticated, request.path_params["book_id"]
+    )
+    if book is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    return JSONResponse(
+        {"book": _book_payload(book)},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+def _chapter_list(renderer):
+    metadata = renderer._read_json(renderer.content_dir / "metadata.json")
+    chapters = metadata.get("chapters")
+    if not isinstance(chapters, list):
+        raise ServerPageError("Book content cache is invalid")
+    result = []
+    for index, chapter in enumerate(chapters):
+        if not isinstance(chapter, dict) or not isinstance(chapter.get("title"), str):
+            raise ServerPageError("Book content cache is invalid")
+        result.append({"index": index, "title": chapter["title"]})
+    return result
+
+
+async def _book_chapters(request, authenticated: AuthenticatedPAT):
+    book_id = request.path_params["book_id"]
+    if _authorized_book(request, authenticated, book_id) is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    try:
+        items = _chapter_list(ServerPageRenderer(_context(request).public_dir, book_id))
+    except ServerPageError:
+        return public_api_error(
+            "book_content_unavailable", "Book content is unavailable", 503
+        )
+    return JSONResponse(
+        {"items": items, "next_cursor": None},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+class _PlainTextExtractor(HTMLParser):
+    _BLOCKS = frozenset({"p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br"})
+    _IGNORED = frozenset({"script", "style"})
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.ignored_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        del attrs
+        if tag in self._IGNORED:
+            self.ignored_depth += 1
+        elif not self.ignored_depth and tag in self._BLOCKS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self._IGNORED and self.ignored_depth:
+            self.ignored_depth -= 1
+        elif not self.ignored_depth and tag in self._BLOCKS:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if not self.ignored_depth:
+            self.parts.append(data)
+
+    def text(self):
+        value = re.sub(r"[ \t\r\f\v]+", " ", "".join(self.parts))
+        return re.sub(r"\n\s*\n+", "\n", value).strip()
+
+
+async def _chapter_detail(request, authenticated: AuthenticatedPAT):
+    book_id = request.path_params["book_id"]
+    if _authorized_book(request, authenticated, book_id) is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    values = request.query_params.getlist("format")
+    output_format = values[0] if len(values) == 1 else "html" if not values else None
+    if output_format not in {"html", "text"}:
+        return public_api_error("invalid_format", "Format must be html or text", 400)
+    try:
+        chapter_index = int(request.path_params["chapter_index"])
+        if chapter_index < 0 or str(chapter_index) != request.path_params["chapter_index"]:
+            raise ValueError
+    except (TypeError, ValueError):
+        return public_api_error("chapter_not_found", "Chapter not found", 404)
+    try:
+        renderer = ServerPageRenderer(_context(request).public_dir, book_id)
+        if chapter_index >= len(_chapter_list(renderer)):
+            return public_api_error("chapter_not_found", "Chapter not found", 404)
+        chapter = renderer.chapter_content(chapter_index)
+    except ServerPageError:
+        return public_api_error(
+            "book_content_unavailable", "Book content is unavailable", 503
+        )
+    if output_format == "text":
+        extractor = _PlainTextExtractor()
+        extractor.feed(chapter["content"])
+        extractor.close()
+        return PlainTextResponse(
+            extractor.text(), headers={"Cache-Control": "private, no-store"}
+        )
+    return JSONResponse(
+        {
+            "index": chapter["index"],
+            "title": chapter["title"],
+            "content_html": chapter["content"],
+        },
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
 def public_api_operations():
     return (
         PublicAPIOperation(
@@ -113,6 +238,30 @@ def public_api_operations():
             summary="List books visible to the token owner",
             operation_id="listBooks",
             handler=_list_books,
+        ),
+        PublicAPIOperation(
+            path="/api/v1/books/{book_id}",
+            methods=("GET",),
+            required_scope="library:read",
+            summary="Get one visible book",
+            operation_id="getBook",
+            handler=_book_detail,
+        ),
+        PublicAPIOperation(
+            path="/api/v1/books/{book_id}/chapters",
+            methods=("GET",),
+            required_scope="library:read",
+            summary="List a visible book's chapters",
+            operation_id="listBookChapters",
+            handler=_book_chapters,
+        ),
+        PublicAPIOperation(
+            path="/api/v1/books/{book_id}/chapters/{chapter_index}",
+            methods=("GET",),
+            required_scope="library:read",
+            summary="Read sanitized chapter content",
+            operation_id="getBookChapter",
+            handler=_chapter_detail,
         ),
     )
 

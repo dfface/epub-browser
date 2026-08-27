@@ -29,7 +29,10 @@ PAT_WRITE_REQUIRES = {
     "reviews:write": "reviews:read",
 }
 
-_PAT_PATTERN = re.compile(r"^epub_pat_([A-Za-z0-9_-]{16,64})_([A-Za-z0-9_-]{32,128})$")
+# token_urlsafe(16) and token_urlsafe(32) produce 22 and 43 unpadded
+# base64url characters respectively. Exact lengths make the separator
+# unambiguous even when either random component itself contains underscores.
+_PAT_PATTERN = re.compile(r"^epub_pat_([A-Za-z0-9_-]{22})_([A-Za-z0-9_-]{43})$")
 
 
 @dataclass(frozen=True)

@@ -6,6 +6,7 @@ from epub_browser.pat import (
     generate_pat,
     normalize_scopes,
     pat_digest,
+    pat_public_id,
 )
 
 
@@ -34,6 +35,15 @@ class PersonalAccessTokenPrimitiveTests(unittest.TestCase):
             normalize_scopes([])
         with self.assertRaisesRegex(ValueError, "Unsupported"):
             normalize_scopes(["system:write"])
+
+    def test_public_id_parser_is_not_confused_by_secret_underscores(self):
+        public_id = "a" * 21 + "_"
+        secret = "secret_" + "b" * 36
+        raw_token = "epub_pat_{}_{}".format(public_id, secret)
+
+        self.assertEqual(len(public_id), 22)
+        self.assertEqual(len(secret), 43)
+        self.assertEqual(pat_public_id(raw_token), public_id)
 
 
 if __name__ == "__main__":

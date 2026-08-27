@@ -36,6 +36,16 @@ class ServerPageRenderer:
         )
 
     def render_chapter(self, chapter_index: int) -> str:
+        payload = self.chapter_content(chapter_index)
+        title = payload["title"]
+        content = payload["content"]
+        style_links = payload["style_links"]
+        return self._processor().create_chapter_template(
+            content, style_links, chapter_index, title
+        )
+
+    def chapter_content(self, chapter_index: int) -> dict:
+        """Return one validated cache payload without exposing its disk path."""
         payload = self._read_json(self.content_dir / f"chapter_{chapter_index}.json")
         if payload.get("index") != chapter_index:
             raise ServerPageError("Chapter cache does not match its requested index")
@@ -44,9 +54,12 @@ class ServerPageRenderer:
         style_links = payload.get("style_links")
         if not all(isinstance(value, str) for value in (title, content, style_links)):
             raise ServerPageError("Chapter cache is invalid")
-        return self._processor().create_chapter_template(
-            content, style_links, chapter_index, title
-        )
+        return {
+            "index": chapter_index,
+            "title": title,
+            "content": content,
+            "style_links": style_links,
+        }
 
     def toc_bytes(self) -> bytes:
         path = self.content_dir / "toc.json"

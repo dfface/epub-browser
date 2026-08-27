@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,6 +32,29 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             {"title": "Visible Book", "author": "Author"},
             preferred_book_id="book",
         )
+        content = self.public / "book" / "book" / "content"
+        content.mkdir(parents=True)
+        (content / "metadata.json").write_text(
+            json.dumps({
+                "title": "Visible Book",
+                "author": "Author",
+                "chapters": [{"title": "Opening", "path": "chapter_0.html"}],
+            }),
+            encoding="utf-8",
+        )
+        (content / "toc.json").write_text(
+            json.dumps([{"title": "Opening", "href": "chapter_0.html"}]),
+            encoding="utf-8",
+        )
+        (content / "chapter_0.json").write_text(
+            json.dumps({
+                "index": 0,
+                "title": "Opening",
+                "content": "<h1>Opening</h1><p>Hello <strong>reader</strong>.</p>",
+                "style_links": "",
+            }),
+            encoding="utf-8",
+        )
         self.auth_service = AuthService(self.store, AuthConfig.from_values([]))
         self.app = create_app(
             self.public,
@@ -45,6 +69,9 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             "API test",
             scopes,
             expires_at=None,
+        )
+        self.assertIsNotNone(
+            self.store.authenticate_personal_access_token(issued.raw_token)
         )
         return {"Authorization": "Bearer " + issued.raw_token}
 
@@ -93,6 +120,46 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             self.assertEqual(
                 declared["security"], [{"PATBearer": [operation.required_scope]}]
             )
+
+    def test_book_detail_toc_and_chapter_content_are_available(self):
+        headers = self.bearer("library:read")
+        detail = self.client.get("/api/v1/books/book", headers=headers)
+        chapters = self.client.get(
+            "/api/v1/books/book/chapters", headers=headers
+        )
+        chapter = self.client.get(
+            "/api/v1/books/book/chapters/0", headers=headers
+        )
+
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["book"]["title"], "Visible Book")
+        self.assertEqual(chapters.status_code, 200)
+        self.assertEqual(chapters.json()["items"][0]["index"], 0)
+        self.assertEqual(chapter.status_code, 200)
+        self.assertIn("<strong>reader</strong>", chapter.json()["content_html"])
+
+    def test_chapter_supports_plain_text_and_rejects_unknown_formats(self):
+        headers = self.bearer("library:read")
+        text = self.client.get(
+            "/api/v1/books/book/chapters/0?format=text", headers=headers
+        )
+        invalid = self.client.get(
+            "/api/v1/books/book/chapters/0?format=epub", headers=headers
+        )
+
+        self.assertEqual(text.status_code, 200, text.text)
+        self.assertEqual(text.headers["content-type"].split(";", 1)[0], "text/plain")
+        self.assertEqual(text.text, "Opening\nHello reader.")
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["code"], "invalid_format")
+
+    def test_missing_book_is_404_before_content_cache_is_read(self):
+        response = self.client.get(
+            "/api/v1/books/not-visible/chapters/0",
+            headers=self.bearer("library:read"),
+        )
+        self.assertEqual(response.status_code, 404, response.text)
+        self.assertEqual(response.json()["code"], "book_not_found")
 
 
 if __name__ == "__main__":
