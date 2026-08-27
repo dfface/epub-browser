@@ -114,8 +114,8 @@ SERVER_ACCOUNT_PANEL = '''
         <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions" data-i18n="admin.ai.permissions">AI permissions</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiJobsTab" role="tab" aria-selected="false" aria-controls="adminAiJobsSection" data-admin-section="ai-jobs" data-i18n="admin.ai.jobs.title">AI jobs</button>
         <button type="button" class="admin-section-tab" id="adminSectionTagsTab" role="tab" aria-selected="false" aria-controls="adminTagsSection" data-admin-section="tags" data-i18n="admin.tags">Tag management</button>
-        <button type="button" class="admin-section-tab" id="adminSectionWebhooksTab" role="tab" aria-selected="false" aria-controls="adminWebhooksSection" data-admin-section="webhooks" data-i18n="admin.webhooks.title">WebHooks</button>
         <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books" data-i18n="admin.books">Book management</button>
+        <button type="button" class="admin-section-tab" id="adminSectionWebhooksTab" role="tab" aria-selected="false" aria-controls="adminWebhooksSection" data-admin-section="webhooks" data-i18n="admin.webhooks.title">WebHooks</button>
     </nav>
     <div class="account-admin-grid">
     <section class="account-admin-section account-card-wide admin-overview-section" id="adminOverviewSection" role="tabpanel" aria-labelledby="adminSectionOverviewTab" data-admin-panel="overview">

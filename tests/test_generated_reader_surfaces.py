@@ -70,6 +70,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(server_html, r'class=(?:["\'])?account-grid(?:["\' >])')
         self.assertRegex(server_html, r'data-i18n=(?:["\'])?account\.pats\.title(?:["\' >])')
         self.assertRegex(server_html, r'data-i18n=(?:["\'])?account\.pats\.neverExpiresWarning(?:["\' >])')
+        self.assertLess(
+            server_html.index('id=adminSectionBooksTab'),
+            server_html.index('id=adminSectionWebhooksTab'),
+        )
 
     def test_server_admin_books_surface_is_semantic_and_localized(self):
         server_html = self._server_html()

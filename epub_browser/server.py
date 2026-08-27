@@ -68,6 +68,7 @@ from .public_api import (
     public_api_routes,
 )
 from .server_library import library_metadata
+from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
 from .site import render_library_shell
 from .urls import SiteURLs
@@ -96,6 +97,8 @@ PUBLIC_AUTH_ENDPOINTS = frozenset({
 })
 PUBLIC_LOGIN_ASSETS = frozenset({
     '/assets/account.css',
+    '/assets/api-docs.css',
+    '/assets/api-docs.js',
     '/assets/auth.js',
     '/assets/i18n.js',
     '/assets/theme-bootstrap.js',
@@ -2768,17 +2771,9 @@ window.location.assign(payload.redirect||'/');
 
     async def api_docs(request):
         require_principal(request)
-        rows = ''.join(
-            '<li><code>{method} {path}</code><strong>{scope}</strong><span>{summary}</span></li>'.format(
-                method=html.escape(operation.methods[0]),
-                path=html.escape(operation.path),
-                scope=html.escape(operation.required_scope),
-                summary=html.escape(operation.summary),
-            )
-            for operation in public_api_operations()
-        )
-        markup = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EPUB Browser API</title><style>body{font:16px system-ui,sans-serif;max-width:70rem;margin:auto;padding:2rem;color:#183132;background:#f7faf9}a{color:#075d63}li{display:grid;grid-template-columns:minmax(18rem,1fr) minmax(10rem,.4fr) 1fr;gap:1rem;padding:1rem;margin:.5rem 0;background:white;border:1px solid #cad8d5;border-radius:.75rem}code{overflow-wrap:anywhere}strong{color:#075d63}@media(max-width:700px){li{grid-template-columns:1fr}} </style><main><p><a href="/">← EPUB Browser</a></p><h1>OpenAPI reference</h1><p>Use <code>Authorization: Bearer &lt;PAT&gt;</code>. Tokens are managed in Account settings and are never stored by this page.</p><p><a href="/openapi.json">Download OpenAPI 3.1 JSON</a></p><ul>''' + rows + '</ul></main></html>'
-        return HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        markup = render_api_docs(public_api_operations())
+        target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        return apply_reader_security_headers(target, markup=markup)
 
     async def reading_insights_page(request):
         """Keep legacy links safe now that insights lives in the shared modal hub."""

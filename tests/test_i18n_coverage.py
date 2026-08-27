@@ -12,6 +12,7 @@ FIRST_PARTY = [
         Path('epub_browser/assets', name)
         for name in (
             'auth.js',
+            'api-docs.js',
             'library.js',
             'library-progress.js',
             'bookshelf.js',

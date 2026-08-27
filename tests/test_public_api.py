@@ -126,6 +126,28 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertEqual(served.json()["openapi"], "3.1.0")
         self.assertEqual(self.client.get("/api-docs").status_code, 403)
 
+    def test_api_docs_are_grouped_searchable_and_session_protected(self):
+        self.assertEqual(self.client.get("/api-docs").status_code, 403)
+        self.assertEqual(
+            _json_login(self, self.client, "alice", "secret").status_code,
+            200,
+        )
+
+        page = self.client.get("/api-docs")
+
+        self.assertEqual(page.status_code, 200, page.text)
+        self.assertEqual(
+            page.text.count("data-api-endpoint data-api-search="),
+            len(public_api_operations()),
+        )
+        self.assertIn('id="apiEndpointSearch"', page.text)
+        self.assertIn('id="api-group-library"', page.text)
+        self.assertIn('id="api-group-admin"', page.text)
+        self.assertIn('href="/assets/api-docs.css"', page.text)
+        self.assertIn('src="/assets/api-docs.js"', page.text)
+        self.assertIn("default-src 'self'", page.headers["content-security-policy"])
+        self.assertEqual(page.headers["cache-control"], "private, no-store")
+
     def test_book_detail_toc_and_chapter_content_are_available(self):
         headers = self.bearer("library:read")
         detail = self.client.get("/api/v1/books/book", headers=headers)

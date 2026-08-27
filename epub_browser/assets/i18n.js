@@ -5537,6 +5537,117 @@
     Object.keys(webhookLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = webhookLocaleAdditions[code][key]; });
   });
 
+  var apiDocsLocaleAdditions = {
+    en: {
+      'apiDocs.pageTitle': 'API reference · EPUB Browser', 'apiDocs.skip': 'Skip to endpoints', 'apiDocs.back': 'Back to library',
+      'apiDocs.authBadge': 'Bearer PAT authentication', 'apiDocs.title': 'Build with your EPUB library',
+      'apiDocs.intro': 'Read books and chapters, sync personal reading data, or inspect account data with an administrator token.',
+      'apiDocs.download': 'Download OpenAPI JSON', 'apiDocs.browse': 'Browse endpoints', 'apiDocs.details': 'API details',
+      'apiDocs.basePath': 'Base path', 'apiDocs.format': 'Format', 'apiDocs.operations': 'Operations', 'apiDocs.getStarted': 'Get started',
+      'apiDocs.quickstart': 'Authenticate your first request', 'apiDocs.step1Title': 'Create a token',
+      'apiDocs.step1Body': 'Open Account settings, create a PAT, and choose only the scopes your integration needs.',
+      'apiDocs.step2Title': 'Add the Bearer header', 'apiDocs.step2Body': 'Send the token in the Authorization header. This documentation page never reads or stores it.',
+      'apiDocs.step3Title': 'Call a versioned endpoint', 'apiDocs.step3Body': 'All public endpoints live under /api/v1 and return JSON unless documented otherwise.',
+      'apiDocs.example': 'Example request', 'apiDocs.copy': 'Copy', 'apiDocs.copied': 'Example copied.', 'apiDocs.copyFailed': 'Could not copy the example.',
+      'apiDocs.envHint': 'Keep the token in an environment variable instead of placing it in source code.',
+      'apiDocs.reference': 'Reference', 'apiDocs.explorer': 'Endpoint explorer', 'apiDocs.explorerBody': 'Search by method, path, permission scope, or description.',
+      'apiDocs.searchLabel': 'Search endpoints', 'apiDocs.searchPlaceholder': 'Search path, scope, or description', 'apiDocs.searchHint': 'Press / to focus search.',
+      'apiDocs.results': '{count} endpoints shown', 'apiDocs.machineReadable': 'Machine-readable schema', 'apiDocs.onThisPage': 'On this page',
+      'apiDocs.endpointGroup': 'Endpoint group', 'apiDocs.endpointCount': '{count} endpoints',
+      'apiDocs.group.library': 'Library', 'apiDocs.group.bookshelf': 'Bookshelf', 'apiDocs.group.progress': 'Reading progress',
+      'apiDocs.group.annotations': 'Annotations', 'apiDocs.group.reviews': 'Reviews', 'apiDocs.group.admin': 'Administrator data',
+      'apiDocs.emptyTitle': 'No matching endpoints', 'apiDocs.emptyBody': 'Try a method such as GET, a scope such as reviews:read, or part of a path.',
+      'apiDocs.backToTop': 'Back to top'
+    },
+    'zh-CN': {
+      'apiDocs.pageTitle': 'API 参考 · EPUB Browser', 'apiDocs.skip': '跳到接口目录', 'apiDocs.back': '返回书库',
+      'apiDocs.authBadge': 'Bearer PAT 认证', 'apiDocs.title': '用你的 EPUB 书库构建应用',
+      'apiDocs.intro': '读取书籍与章节、同步个人阅读数据，或使用管理员令牌查看账户数据。',
+      'apiDocs.download': '下载 OpenAPI JSON', 'apiDocs.browse': '浏览接口', 'apiDocs.details': 'API 信息',
+      'apiDocs.basePath': '基础路径', 'apiDocs.format': '数据格式', 'apiDocs.operations': '接口数量', 'apiDocs.getStarted': '快速开始',
+      'apiDocs.quickstart': '完成第一次认证请求', 'apiDocs.step1Title': '创建令牌',
+      'apiDocs.step1Body': '前往账户设置创建 PAT，并且只选择集成实际需要的权限。',
+      'apiDocs.step2Title': '添加 Bearer 请求头', 'apiDocs.step2Body': '在 Authorization 请求头中发送令牌。这个文档页面不会读取或保存令牌。',
+      'apiDocs.step3Title': '调用版本化接口', 'apiDocs.step3Body': '所有开放接口都位于 /api/v1 下；除非另有说明，否则均返回 JSON。',
+      'apiDocs.example': '请求示例', 'apiDocs.copy': '复制', 'apiDocs.copied': '示例已复制。', 'apiDocs.copyFailed': '无法复制示例。',
+      'apiDocs.envHint': '请把令牌放在环境变量中，不要直接写进源代码。',
+      'apiDocs.reference': '接口参考', 'apiDocs.explorer': '接口浏览器', 'apiDocs.explorerBody': '可以按方法、路径、权限范围或说明搜索。',
+      'apiDocs.searchLabel': '搜索接口', 'apiDocs.searchPlaceholder': '搜索路径、权限或说明', 'apiDocs.searchHint': '按 / 可快速聚焦搜索框。',
+      'apiDocs.results': '显示 {count} 个接口', 'apiDocs.machineReadable': '机器可读规范', 'apiDocs.onThisPage': '本页导航',
+      'apiDocs.endpointGroup': '接口分组', 'apiDocs.endpointCount': '{count} 个接口',
+      'apiDocs.group.library': '书库', 'apiDocs.group.bookshelf': '书架', 'apiDocs.group.progress': '阅读进度',
+      'apiDocs.group.annotations': '标注', 'apiDocs.group.reviews': '书评', 'apiDocs.group.admin': '管理员数据',
+      'apiDocs.emptyTitle': '没有匹配的接口', 'apiDocs.emptyBody': '可以尝试 GET 等方法、reviews:read 等权限，或路径中的一部分。',
+      'apiDocs.backToTop': '返回顶部'
+    },
+    'zh-TW': {
+      'apiDocs.pageTitle': 'API 參考 · EPUB Browser', 'apiDocs.skip': '跳到介面目錄', 'apiDocs.back': '返回書庫',
+      'apiDocs.authBadge': 'Bearer PAT 驗證', 'apiDocs.title': '用你的 EPUB 書庫建構應用程式',
+      'apiDocs.intro': '讀取書籍與章節、同步個人閱讀資料，或使用管理員權杖查看帳戶資料。',
+      'apiDocs.download': '下載 OpenAPI JSON', 'apiDocs.browse': '瀏覽介面', 'apiDocs.details': 'API 資訊',
+      'apiDocs.basePath': '基礎路徑', 'apiDocs.format': '資料格式', 'apiDocs.operations': '介面數量', 'apiDocs.getStarted': '快速開始',
+      'apiDocs.quickstart': '完成第一次驗證請求', 'apiDocs.step1Title': '建立權杖',
+      'apiDocs.step1Body': '前往帳戶設定建立 PAT，並且只選擇整合實際需要的權限。',
+      'apiDocs.step2Title': '加入 Bearer 標頭', 'apiDocs.step2Body': '在 Authorization 標頭中傳送權杖。這個文件頁面不會讀取或儲存權杖。',
+      'apiDocs.step3Title': '呼叫版本化介面', 'apiDocs.step3Body': '所有開放介面都位於 /api/v1 下；除非另有說明，否則均回傳 JSON。',
+      'apiDocs.example': '請求範例', 'apiDocs.copy': '複製', 'apiDocs.copied': '範例已複製。', 'apiDocs.copyFailed': '無法複製範例。',
+      'apiDocs.envHint': '請把權杖放在環境變數中，不要直接寫入原始碼。',
+      'apiDocs.reference': '介面參考', 'apiDocs.explorer': '介面瀏覽器', 'apiDocs.explorerBody': '可以依方法、路徑、權限範圍或說明搜尋。',
+      'apiDocs.searchLabel': '搜尋介面', 'apiDocs.searchPlaceholder': '搜尋路徑、權限或說明', 'apiDocs.searchHint': '按 / 可快速聚焦搜尋框。',
+      'apiDocs.results': '顯示 {count} 個介面', 'apiDocs.machineReadable': '機器可讀規範', 'apiDocs.onThisPage': '本頁導覽',
+      'apiDocs.endpointGroup': '介面分組', 'apiDocs.endpointCount': '{count} 個介面',
+      'apiDocs.group.library': '書庫', 'apiDocs.group.bookshelf': '書架', 'apiDocs.group.progress': '閱讀進度',
+      'apiDocs.group.annotations': '註釋', 'apiDocs.group.reviews': '書評', 'apiDocs.group.admin': '管理員資料',
+      'apiDocs.emptyTitle': '沒有符合的介面', 'apiDocs.emptyBody': '可以嘗試 GET 等方法、reviews:read 等權限，或路徑中的一部分。',
+      'apiDocs.backToTop': '返回頂端'
+    },
+    ko: {
+      'apiDocs.pageTitle': 'API 참조 · EPUB Browser', 'apiDocs.skip': '엔드포인트로 이동', 'apiDocs.back': '라이브러리로 돌아가기',
+      'apiDocs.authBadge': 'Bearer PAT 인증', 'apiDocs.title': 'EPUB 라이브러리로 앱 만들기',
+      'apiDocs.intro': '책과 장을 읽고 개인 독서 데이터를 동기화하거나 관리자 토큰으로 계정 데이터를 확인하세요.',
+      'apiDocs.download': 'OpenAPI JSON 다운로드', 'apiDocs.browse': '엔드포인트 보기', 'apiDocs.details': 'API 정보',
+      'apiDocs.basePath': '기본 경로', 'apiDocs.format': '형식', 'apiDocs.operations': '작업 수', 'apiDocs.getStarted': '시작하기',
+      'apiDocs.quickstart': '첫 인증 요청 보내기', 'apiDocs.step1Title': '토큰 만들기',
+      'apiDocs.step1Body': '계정 설정에서 PAT를 만들고 통합에 필요한 권한만 선택하세요.',
+      'apiDocs.step2Title': 'Bearer 헤더 추가', 'apiDocs.step2Body': 'Authorization 헤더로 토큰을 보내세요. 이 문서 페이지는 토큰을 읽거나 저장하지 않습니다.',
+      'apiDocs.step3Title': '버전이 지정된 엔드포인트 호출', 'apiDocs.step3Body': '모든 공개 엔드포인트는 /api/v1 아래에 있으며 별도 설명이 없으면 JSON을 반환합니다.',
+      'apiDocs.example': '요청 예시', 'apiDocs.copy': '복사', 'apiDocs.copied': '예시를 복사했습니다.', 'apiDocs.copyFailed': '예시를 복사할 수 없습니다.',
+      'apiDocs.envHint': '토큰을 소스 코드에 넣지 말고 환경 변수에 보관하세요.',
+      'apiDocs.reference': '참조', 'apiDocs.explorer': '엔드포인트 탐색기', 'apiDocs.explorerBody': '메서드, 경로, 권한 범위 또는 설명으로 검색하세요.',
+      'apiDocs.searchLabel': '엔드포인트 검색', 'apiDocs.searchPlaceholder': '경로, 권한 또는 설명 검색', 'apiDocs.searchHint': '/ 키를 눌러 검색창으로 이동합니다.',
+      'apiDocs.results': '엔드포인트 {count}개 표시', 'apiDocs.machineReadable': '기계 판독 스키마', 'apiDocs.onThisPage': '이 페이지',
+      'apiDocs.endpointGroup': '엔드포인트 그룹', 'apiDocs.endpointCount': '엔드포인트 {count}개',
+      'apiDocs.group.library': '라이브러리', 'apiDocs.group.bookshelf': '책장', 'apiDocs.group.progress': '읽기 진행률',
+      'apiDocs.group.annotations': '주석', 'apiDocs.group.reviews': '리뷰', 'apiDocs.group.admin': '관리자 데이터',
+      'apiDocs.emptyTitle': '일치하는 엔드포인트 없음', 'apiDocs.emptyBody': 'GET 같은 메서드, reviews:read 같은 권한 또는 경로 일부를 검색해 보세요.',
+      'apiDocs.backToTop': '맨 위로'
+    },
+    ja: {
+      'apiDocs.pageTitle': 'API リファレンス · EPUB Browser', 'apiDocs.skip': 'エンドポイントへ移動', 'apiDocs.back': 'ライブラリへ戻る',
+      'apiDocs.authBadge': 'Bearer PAT 認証', 'apiDocs.title': 'EPUB ライブラリを使って構築',
+      'apiDocs.intro': '書籍や章の取得、個人の読書データの同期、管理者トークンによるアカウントデータの確認ができます。',
+      'apiDocs.download': 'OpenAPI JSON をダウンロード', 'apiDocs.browse': 'エンドポイントを見る', 'apiDocs.details': 'API 情報',
+      'apiDocs.basePath': 'ベースパス', 'apiDocs.format': '形式', 'apiDocs.operations': '操作数', 'apiDocs.getStarted': 'はじめに',
+      'apiDocs.quickstart': '最初の認証リクエスト', 'apiDocs.step1Title': 'トークンを作成',
+      'apiDocs.step1Body': 'アカウント設定で PAT を作成し、連携に必要な権限だけを選択します。',
+      'apiDocs.step2Title': 'Bearer ヘッダーを追加', 'apiDocs.step2Body': 'Authorization ヘッダーでトークンを送信します。このドキュメントページはトークンを読み取ったり保存したりしません。',
+      'apiDocs.step3Title': 'バージョン付きエンドポイントを呼び出す', 'apiDocs.step3Body': '公開エンドポイントはすべて /api/v1 配下にあり、特記がなければ JSON を返します。',
+      'apiDocs.example': 'リクエスト例', 'apiDocs.copy': 'コピー', 'apiDocs.copied': '例をコピーしました。', 'apiDocs.copyFailed': '例をコピーできませんでした。',
+      'apiDocs.envHint': 'トークンはソースコードに書かず、環境変数に保管してください。',
+      'apiDocs.reference': 'リファレンス', 'apiDocs.explorer': 'エンドポイント一覧', 'apiDocs.explorerBody': 'メソッド、パス、権限スコープ、説明で検索できます。',
+      'apiDocs.searchLabel': 'エンドポイントを検索', 'apiDocs.searchPlaceholder': 'パス、権限、説明を検索', 'apiDocs.searchHint': '/ キーで検索欄に移動します。',
+      'apiDocs.results': '{count} 件のエンドポイントを表示', 'apiDocs.machineReadable': '機械可読スキーマ', 'apiDocs.onThisPage': 'このページ',
+      'apiDocs.endpointGroup': 'エンドポイントグループ', 'apiDocs.endpointCount': '{count} 件',
+      'apiDocs.group.library': 'ライブラリ', 'apiDocs.group.bookshelf': '本棚', 'apiDocs.group.progress': '読書進捗',
+      'apiDocs.group.annotations': '注釈', 'apiDocs.group.reviews': 'レビュー', 'apiDocs.group.admin': '管理者データ',
+      'apiDocs.emptyTitle': '一致するエンドポイントはありません', 'apiDocs.emptyBody': 'GET などのメソッド、reviews:read などの権限、またはパスの一部を試してください。',
+      'apiDocs.backToTop': 'ページ上部へ'
+    }
+  };
+  Object.keys(apiDocsLocaleAdditions).forEach(function(code) {
+    Object.keys(apiDocsLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = apiDocsLocaleAdditions[code][key]; });
+  });
+
   function normalizeLocale(value) {
     value = String(value || '').replace('_', '-').toLowerCase();
     if (value === 'zh' || value.indexOf('zh-cn') === 0 || value.indexOf('zh-sg') === 0) return 'zh-CN';

@@ -163,6 +163,8 @@ class AssetPublisherTests(unittest.TestCase):
 
     def test_excluded_assets_are_not_written_or_listed(self):
         self.assertIn('account.css', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('api-docs.css', SERVER_ONLY_ASSET_PATHS)
+        self.assertIn('api-docs.js', SERVER_ONLY_ASSET_PATHS)
         self.assertIn('auth.js', SERVER_ONLY_ASSET_PATHS)
         self.assertIn('book-reviews.css', SERVER_ONLY_ASSET_PATHS)
         self.assertIn('book-reviews.js', SERVER_ONLY_ASSET_PATHS)

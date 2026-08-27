@@ -26,6 +26,8 @@ WEB_MANIFEST_SOURCES = {
 # crossing the SSG boundary.
 SERVER_ONLY_ASSET_PATHS = frozenset({
     'account.css',
+    'api-docs.css',
+    'api-docs.js',
     'auth.js',
     'dictionary.css',
     'dictionary.js',
