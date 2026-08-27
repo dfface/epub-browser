@@ -56,6 +56,37 @@ SERVER_ACCOUNT_PANEL = '''
     <ul class="account-list" id="sessionList"></ul>
 </section>
 </div>
+<section class="account-card account-card-wide account-pat-card" aria-labelledby="accountPatTitle">
+    <h3 id="accountPatTitle" data-i18n="account.pats.title">Personal access tokens</h3>
+    <p class="account-help" data-i18n="account.pats.description">Use scoped tokens with the external API.</p>
+    <form class="account-form account-pat-form" id="patCreateForm">
+        <label><span data-i18n="account.pats.name">Token name</span><input type="text" name="name" maxlength="80" autocomplete="off" required></label>
+        <label><span data-i18n="account.currentPassword">Current password</span><input type="password" name="current_password" autocomplete="current-password" required></label>
+        <fieldset class="account-pat-scopes">
+            <legend data-i18n="account.pats.scopes">Permissions</legend>
+            <label><input type="checkbox" name="scopes" value="library:read"> <span data-i18n="account.pats.scope.libraryRead">Read library and chapters</span></label>
+            <label><input type="checkbox" name="scopes" value="bookshelf:read"> <span data-i18n="account.pats.scope.bookshelfRead">Read bookshelf</span></label>
+            <label><input type="checkbox" name="scopes" value="bookshelf:write"> <span data-i18n="account.pats.scope.bookshelfWrite">Update bookshelf</span></label>
+            <label><input type="checkbox" name="scopes" value="progress:read"> <span data-i18n="account.pats.scope.progressRead">Read progress</span></label>
+            <label><input type="checkbox" name="scopes" value="progress:write"> <span data-i18n="account.pats.scope.progressWrite">Update progress</span></label>
+            <label><input type="checkbox" name="scopes" value="annotations:read"> <span data-i18n="account.pats.scope.annotationsRead">Read annotations</span></label>
+            <label><input type="checkbox" name="scopes" value="annotations:write"> <span data-i18n="account.pats.scope.annotationsWrite">Update annotations</span></label>
+            <label><input type="checkbox" name="scopes" value="reviews:read"> <span data-i18n="account.pats.scope.reviewsRead">Read reviews</span></label>
+            <label><input type="checkbox" name="scopes" value="reviews:write"> <span data-i18n="account.pats.scope.reviewsWrite">Update reviews</span></label>
+            <label id="patAdminScopeLabel" hidden><input type="checkbox" name="scopes" value="admin:data:read"> <span data-i18n="account.pats.scope.adminDataRead">Read all users' non-secret data</span></label>
+        </fieldset>
+        <label><span data-i18n="account.pats.expiration">Expiration</span><select name="expires_in_days"><option value="30" data-i18n="account.pats.days30">30 days</option><option value="90" selected data-i18n="account.pats.days90">90 days</option><option value="180" data-i18n="account.pats.days180">180 days</option><option value="365" data-i18n="account.pats.days365">365 days</option><option value="never" data-i18n="account.pats.never">Never expires</option></select></label>
+        <p class="account-pat-warning" data-i18n="account.pats.neverExpiresWarning">Never-expiring tokens remain valid until you revoke them.</p>
+        <button type="submit" id="patCreateSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="account.pats.create">Create token</button>
+    </form>
+    <div class="account-pat-secret" id="patSecretRegion" role="status" aria-live="polite" hidden>
+        <p data-i18n="account.pats.created">Copy this token now. It will not be shown again.</p>
+        <code id="patCreatedSecret"></code>
+        <button type="button" id="patCopySecret" class="bookshelf-action-btn" data-i18n="account.pats.copy">Copy token</button>
+    </div>
+    <ul class="account-list account-pat-list" id="patList"></ul>
+    <p id="patLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
+</section>
 </div></div>
     </div>
 </div>

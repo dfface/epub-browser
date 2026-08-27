@@ -778,6 +778,94 @@ body.auth-page {
     background: color-mix(in srgb, var(--account-card) 88%, var(--account-bg));
 }
 
+.account-pat-card {
+    margin-top: 1rem;
+}
+
+.account-pat-form {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.account-pat-scopes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.55rem 1rem;
+    margin: 0;
+    padding: 0.9rem;
+    border: 1px solid var(--border-color, #d7dce3);
+    border-radius: 0.75rem;
+}
+
+.account-pat-scopes legend {
+    padding: 0 0.35rem;
+    font-weight: 700;
+}
+
+.account-pat-scopes label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+}
+
+.account-pat-scopes input {
+    inline-size: 1.2rem;
+    block-size: 1.2rem;
+    margin-top: 0.1rem;
+}
+
+.account-pat-warning {
+    margin: 0;
+    color: var(--text-secondary, #596273);
+}
+
+.account-pat-secret {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 2px solid var(--accent-color, #2563eb);
+    border-radius: 0.75rem;
+    background: var(--surface-secondary, rgba(37, 99, 235, 0.08));
+}
+
+.account-pat-secret[hidden] {
+    display: none;
+}
+
+.account-pat-secret code {
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.account-pat-item,
+.account-pat-details {
+    min-width: 0;
+}
+
+.account-pat-details {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.account-pat-scope-summary,
+.account-pat-dates {
+    color: var(--text-secondary, #596273);
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+    .account-pat-scopes {
+        grid-template-columns: 1fr;
+    }
+
+    .account-pat-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
 .admin-overview-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

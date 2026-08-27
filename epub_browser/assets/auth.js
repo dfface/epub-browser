@@ -1159,6 +1159,8 @@
       var adminMenu = element('adminMenu');
       if (adminPanel) adminPanel.hidden = sessionState.user.role !== 'admin';
       if (adminMenu) adminMenu.hidden = sessionState.user.role !== 'admin';
+      var patAdminScopeLabel = element('patAdminScopeLabel');
+      if (patAdminScopeLabel) patAdminScopeLabel.hidden = sessionState.user.role !== 'admin';
     }
 
     function describeSessionDevice(userAgent) {
@@ -1229,6 +1231,85 @@
         if (!response.ok) return showResponseError(response, 'account');
         return readJson(response).then(function(payload) { renderSessions(payload.sessions); });
       }).catch(function() { showStatus('account.error.network', 'error'); });
+    }
+
+    function patScopeLabel(scope) {
+      var keys = {
+        'library:read': 'account.pats.scope.libraryRead',
+        'bookshelf:read': 'account.pats.scope.bookshelfRead',
+        'bookshelf:write': 'account.pats.scope.bookshelfWrite',
+        'progress:read': 'account.pats.scope.progressRead',
+        'progress:write': 'account.pats.scope.progressWrite',
+        'annotations:read': 'account.pats.scope.annotationsRead',
+        'annotations:write': 'account.pats.scope.annotationsWrite',
+        'reviews:read': 'account.pats.scope.reviewsRead',
+        'reviews:write': 'account.pats.scope.reviewsWrite',
+        'admin:data:read': 'account.pats.scope.adminDataRead'
+      };
+      return t(keys[scope] || 'account.pats.unknownScope', { scope: scope });
+    }
+
+    function renderPersonalAccessTokens(records) {
+      var list = element('patList');
+      if (!list) return;
+      list.textContent = '';
+      (records || []).forEach(function(record) {
+        var item = root.document.createElement('li');
+        var details = root.document.createElement('div');
+        var name = root.document.createElement('strong');
+        var scopes = root.document.createElement('span');
+        var dates = root.document.createElement('span');
+        item.className = 'account-list-item account-pat-item';
+        details.className = 'account-pat-details';
+        name.textContent = record.name;
+        scopes.className = 'account-pat-scope-summary';
+        scopes.textContent = (record.scopes || []).map(patScopeLabel).join(' · ');
+        dates.className = 'account-pat-dates';
+        dates.textContent = record.expires_at
+          ? t('account.pats.expires', { date: formatDate(record.expires_at) })
+          : t('account.pats.never');
+        if (record.last_used_at) {
+          dates.textContent += ' · ' + t('account.pats.lastUsed', {
+            date: formatDate(record.last_used_at)
+          });
+        }
+        details.appendChild(name);
+        details.appendChild(scopes);
+        details.appendChild(dates);
+        item.appendChild(details);
+        item.appendChild(actionButton('account.pats.revoke', function() {
+          var confirmed = typeof root.confirm !== 'function'
+            || root.confirm(t('account.pats.revokeConfirm', { name: record.name }));
+          if (!confirmed) return;
+          authenticatedFetch('/api/account/pats/' + encodeURIComponent(record.id), {
+            method: 'DELETE'
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'account');
+            showStatus('account.pats.revoked', 'success');
+            return loadPersonalAccessTokens();
+          }).catch(function() { showStatus('account.error.network', 'error'); });
+        }, 'danger'));
+        list.appendChild(item);
+      });
+      if (!(records || []).length) {
+        list.appendChild(createTextElement('li', 'account-empty', 'account.pats.empty'));
+      }
+    }
+
+    function loadPersonalAccessTokens() {
+      return authenticatedFetch('/api/account/pats').then(function(response) {
+        if (!response.ok) return showResponseError(response, 'account');
+        return readJson(response).then(function(payload) {
+          renderPersonalAccessTokens(payload.personal_access_tokens || []);
+        });
+      }).catch(function() { showStatus('account.error.network', 'error'); });
+    }
+
+    function clearPersonalAccessTokenSecret() {
+      var secret = element('patCreatedSecret');
+      var region = element('patSecretRegion');
+      if (secret) secret.textContent = '';
+      if (region) region.hidden = true;
     }
 
     function updateUser(username, payload) {
@@ -2490,7 +2571,7 @@
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
       setSurfaceLoading('accountPanel', 'accountPanelLoading', true);
-      loadSessions().then(function() {
+      Promise.all([loadSessions(), loadPersonalAccessTokens()]).then(function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
       }, function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
@@ -2503,6 +2584,7 @@
       panel.classList.remove('active');
       panel.setAttribute('aria-hidden', 'true');
       setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
+      clearPersonalAccessTokenSecret();
     }
 
     function openAdminPanel() {
@@ -2541,6 +2623,9 @@
       var adminClose = element('adminClose');
       var logoutButton = element('accountLogout');
       var passwordForm = element('accountPasswordForm');
+      var patCreateForm = element('patCreateForm');
+      var patCreateSubmit = element('patCreateSubmit');
+      var patCopySecret = element('patCopySecret');
       var createUserForm = element('adminUserForm');
       var createUserSubmit = element('adminUserSubmit');
       var aiSettingsForm = element('adminAiSettingsForm');
@@ -2624,6 +2709,63 @@
           showStatus('account.passwordChanged', 'success');
           redirectToLogin();
         }).catch(function() { showStatus('account.error.network', 'error'); });
+      });
+      if (patCreateForm) {
+        patCreateForm.addEventListener('change', function(event) {
+          var required = {
+            'bookshelf:write': 'bookshelf:read',
+            'progress:write': 'progress:read',
+            'annotations:write': 'annotations:read',
+            'reviews:write': 'reviews:read'
+          };
+          var readScope = event.target && required[event.target.value];
+          if (!readScope || !event.target.checked || !patCreateForm.querySelector) return;
+          var read = patCreateForm.querySelector('input[name="scopes"][value="' + readScope + '"]');
+          if (read) read.checked = true;
+        });
+        patCreateForm.addEventListener('submit', function(event) {
+          event.preventDefault();
+          clearPersonalAccessTokenSecret();
+          runButtonOperation(patCreateSubmit, 'account.pats.creating', function() {
+            var selected = patCreateForm.querySelectorAll
+              ? Array.prototype.map.call(
+                  patCreateForm.querySelectorAll('input[name="scopes"]:checked'),
+                  function(input) { return input.value; }
+                ) : [];
+            var expiration = formValue(patCreateForm, 'expires_in_days');
+            return authenticatedFetch('/api/account/pats', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: formValue(patCreateForm, 'name'),
+                current_password: formValue(patCreateForm, 'current_password'),
+                scopes: selected,
+                expires_in_days: expiration === 'never' ? null : Number(expiration)
+              })
+            }).then(function(response) {
+              clearPasswordFields(patCreateForm);
+              if (!response.ok) return showResponseError(response, 'account');
+              return readJson(response).then(function(payload) {
+                var secret = element('patCreatedSecret');
+                var region = element('patSecretRegion');
+                if (secret) secret.textContent = payload.token || '';
+                if (region) region.hidden = false;
+                if (patCreateForm.reset) patCreateForm.reset();
+                showStatus('account.pats.created', 'success');
+                return loadPersonalAccessTokens();
+              });
+            }).catch(function() { showStatus('account.error.network', 'error'); });
+          });
+        });
+      }
+      if (patCopySecret) patCopySecret.addEventListener('click', function() {
+        var secret = element('patCreatedSecret');
+        var value = secret && secret.textContent;
+        if (!value || !root.navigator || !root.navigator.clipboard) return;
+        root.navigator.clipboard.writeText(value).then(function() {
+          var live = element('patLive');
+          if (live) live.textContent = t('account.pats.copied');
+        }).catch(function() { showStatus('account.pats.copyFailed', 'error'); });
       });
       if (createUserForm) createUserForm.addEventListener('submit', function(event) {
         event.preventDefault();

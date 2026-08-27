@@ -5358,6 +5358,114 @@
   Object.keys(localeAdditions).forEach(function(code) {
     Object.keys(localeAdditions[code]).forEach(function(key) { dictionaries[code][key] = localeAdditions[code][key]; });
   });
+  var patLocaleAdditions = {
+    en: {
+      'account.pats.title': 'Personal access tokens',
+      'account.pats.description': 'Create scoped tokens for the external API. Treat every token like a password.',
+      'account.pats.name': 'Token name',
+      'account.pats.scopes': 'Permissions',
+      'account.pats.expiration': 'Expiration',
+      'account.pats.days30': '30 days',
+      'account.pats.days90': '90 days',
+      'account.pats.days180': '180 days',
+      'account.pats.days365': '365 days',
+      'account.pats.never': 'Never expires',
+      'account.pats.neverExpiresWarning': 'Never-expiring tokens remain valid until you revoke them.',
+      'account.pats.create': 'Create token',
+      'account.pats.creating': 'Creating…',
+      'account.pats.created': 'Copy this token now. It will not be shown again.',
+      'account.pats.copy': 'Copy token',
+      'account.pats.copied': 'Token copied.',
+      'account.pats.copyFailed': 'Unable to copy the token.',
+      'account.pats.revoke': 'Revoke',
+      'account.pats.revokeConfirm': 'Revoke “{name}”? Integrations using it will stop immediately.',
+      'account.pats.revoked': 'Token revoked.',
+      'account.pats.empty': 'No personal access tokens.',
+      'account.pats.lastUsed': 'Last used {date}',
+      'account.pats.expires': 'Expires {date}',
+      'account.pats.unknownScope': 'Permission: {scope}',
+      'account.pats.scope.libraryRead': 'Read library and chapters',
+      'account.pats.scope.bookshelfRead': 'Read bookshelf',
+      'account.pats.scope.bookshelfWrite': 'Update bookshelf',
+      'account.pats.scope.progressRead': 'Read progress',
+      'account.pats.scope.progressWrite': 'Update progress',
+      'account.pats.scope.annotationsRead': 'Read annotations',
+      'account.pats.scope.annotationsWrite': 'Update annotations',
+      'account.pats.scope.reviewsRead': 'Read reviews',
+      'account.pats.scope.reviewsWrite': 'Update reviews',
+      'account.pats.scope.adminDataRead': 'Read all users’ non-secret data',
+      'account.pats.error.invalid_personal_access_token': 'Check the token name, permissions, and expiration.',
+      'account.error.invalid_personal_access_token': 'Check the token name, permissions, and expiration.'
+    },
+    'zh-CN': {
+      'account.pats.title': '个人访问令牌',
+      'account.pats.description': '创建用于开放接口的分权令牌。请像保护密码一样保护令牌。',
+      'account.pats.name': '令牌名称',
+      'account.pats.scopes': '权限范围',
+      'account.pats.expiration': '有效期',
+      'account.pats.days30': '30 天', 'account.pats.days90': '90 天', 'account.pats.days180': '180 天', 'account.pats.days365': '365 天',
+      'account.pats.never': '永不过期',
+      'account.pats.neverExpiresWarning': '永不过期的令牌会一直有效，直到你主动撤销。',
+      'account.pats.create': '创建令牌', 'account.pats.creating': '正在创建…',
+      'account.pats.created': '请立即复制此令牌，之后将不再显示。',
+      'account.pats.copy': '复制令牌', 'account.pats.copied': '令牌已复制。', 'account.pats.copyFailed': '无法复制令牌。',
+      'account.pats.revoke': '撤销', 'account.pats.revokeConfirm': '撤销“{name}”？使用它的集成会立即停止。', 'account.pats.revoked': '令牌已撤销。',
+      'account.pats.empty': '尚未创建个人访问令牌。', 'account.pats.lastUsed': '最近使用 {date}', 'account.pats.expires': '到期于 {date}',
+      'account.pats.unknownScope': '权限：{scope}',
+      'account.pats.scope.libraryRead': '读取书库与章节', 'account.pats.scope.bookshelfRead': '读取书架', 'account.pats.scope.bookshelfWrite': '更新书架',
+      'account.pats.scope.progressRead': '读取进度', 'account.pats.scope.progressWrite': '更新进度',
+      'account.pats.scope.annotationsRead': '读取标注', 'account.pats.scope.annotationsWrite': '更新标注',
+      'account.pats.scope.reviewsRead': '读取书评', 'account.pats.scope.reviewsWrite': '更新书评',
+      'account.pats.scope.adminDataRead': '读取所有用户的非机密数据',
+      'account.pats.error.invalid_personal_access_token': '请检查令牌名称、权限范围和有效期。',
+      'account.error.invalid_personal_access_token': '请检查令牌名称、权限范围和有效期。'
+    },
+    'zh-TW': {
+      'account.pats.title': '個人存取權杖', 'account.pats.description': '建立用於開放介面的分權權杖。請像保護密碼一樣保護權杖。',
+      'account.pats.name': '權杖名稱', 'account.pats.scopes': '權限範圍', 'account.pats.expiration': '有效期限',
+      'account.pats.days30': '30 天', 'account.pats.days90': '90 天', 'account.pats.days180': '180 天', 'account.pats.days365': '365 天',
+      'account.pats.never': '永不過期', 'account.pats.neverExpiresWarning': '永不過期的權杖會一直有效，直到你主動撤銷。',
+      'account.pats.create': '建立權杖', 'account.pats.creating': '正在建立…', 'account.pats.created': '請立即複製此權杖，之後將不再顯示。',
+      'account.pats.copy': '複製權杖', 'account.pats.copied': '權杖已複製。', 'account.pats.copyFailed': '無法複製權杖。',
+      'account.pats.revoke': '撤銷', 'account.pats.revokeConfirm': '撤銷「{name}」？使用它的整合會立即停止。', 'account.pats.revoked': '權杖已撤銷。',
+      'account.pats.empty': '尚未建立個人存取權杖。', 'account.pats.lastUsed': '最近使用 {date}', 'account.pats.expires': '到期日 {date}', 'account.pats.unknownScope': '權限：{scope}',
+      'account.pats.scope.libraryRead': '讀取書庫與章節', 'account.pats.scope.bookshelfRead': '讀取書架', 'account.pats.scope.bookshelfWrite': '更新書架',
+      'account.pats.scope.progressRead': '讀取進度', 'account.pats.scope.progressWrite': '更新進度', 'account.pats.scope.annotationsRead': '讀取註釋', 'account.pats.scope.annotationsWrite': '更新註釋',
+      'account.pats.scope.reviewsRead': '讀取書評', 'account.pats.scope.reviewsWrite': '更新書評', 'account.pats.scope.adminDataRead': '讀取所有使用者的非機密資料',
+      'account.pats.error.invalid_personal_access_token': '請檢查權杖名稱、權限範圍和有效期限。', 'account.error.invalid_personal_access_token': '請檢查權杖名稱、權限範圍和有效期限。'
+    },
+    ko: {
+      'account.pats.title': '개인 액세스 토큰', 'account.pats.description': '외부 API에 사용할 범위 지정 토큰을 만듭니다. 비밀번호처럼 안전하게 보관하세요.',
+      'account.pats.name': '토큰 이름', 'account.pats.scopes': '권한', 'account.pats.expiration': '만료',
+      'account.pats.days30': '30일', 'account.pats.days90': '90일', 'account.pats.days180': '180일', 'account.pats.days365': '365일',
+      'account.pats.never': '만료 없음', 'account.pats.neverExpiresWarning': '만료되지 않는 토큰은 취소할 때까지 유효합니다.',
+      'account.pats.create': '토큰 만들기', 'account.pats.creating': '만드는 중…', 'account.pats.created': '지금 토큰을 복사하세요. 다시 표시되지 않습니다.',
+      'account.pats.copy': '토큰 복사', 'account.pats.copied': '토큰을 복사했습니다.', 'account.pats.copyFailed': '토큰을 복사할 수 없습니다.',
+      'account.pats.revoke': '취소', 'account.pats.revokeConfirm': '“{name}” 토큰을 취소할까요? 연결된 통합이 즉시 중지됩니다.', 'account.pats.revoked': '토큰을 취소했습니다.',
+      'account.pats.empty': '개인 액세스 토큰이 없습니다.', 'account.pats.lastUsed': '최근 사용 {date}', 'account.pats.expires': '만료 {date}', 'account.pats.unknownScope': '권한: {scope}',
+      'account.pats.scope.libraryRead': '라이브러리와 장 읽기', 'account.pats.scope.bookshelfRead': '책장 읽기', 'account.pats.scope.bookshelfWrite': '책장 업데이트',
+      'account.pats.scope.progressRead': '진행률 읽기', 'account.pats.scope.progressWrite': '진행률 업데이트', 'account.pats.scope.annotationsRead': '주석 읽기', 'account.pats.scope.annotationsWrite': '주석 업데이트',
+      'account.pats.scope.reviewsRead': '리뷰 읽기', 'account.pats.scope.reviewsWrite': '리뷰 업데이트', 'account.pats.scope.adminDataRead': '모든 사용자의 비밀이 아닌 데이터 읽기',
+      'account.pats.error.invalid_personal_access_token': '토큰 이름, 권한, 만료를 확인하세요.', 'account.error.invalid_personal_access_token': '토큰 이름, 권한, 만료를 확인하세요.'
+    },
+    ja: {
+      'account.pats.title': '個人アクセストークン', 'account.pats.description': '外部 API 用の権限を限定したトークンを作成します。パスワードと同様に保護してください。',
+      'account.pats.name': 'トークン名', 'account.pats.scopes': '権限', 'account.pats.expiration': '有効期限',
+      'account.pats.days30': '30 日', 'account.pats.days90': '90 日', 'account.pats.days180': '180 日', 'account.pats.days365': '365 日',
+      'account.pats.never': '無期限', 'account.pats.neverExpiresWarning': '無期限のトークンは取り消すまで有効です。',
+      'account.pats.create': 'トークンを作成', 'account.pats.creating': '作成中…', 'account.pats.created': '今すぐトークンをコピーしてください。再表示されません。',
+      'account.pats.copy': 'トークンをコピー', 'account.pats.copied': 'トークンをコピーしました。', 'account.pats.copyFailed': 'トークンをコピーできません。',
+      'account.pats.revoke': '取り消す', 'account.pats.revokeConfirm': '「{name}」を取り消しますか？使用中の連携は直ちに停止します。', 'account.pats.revoked': 'トークンを取り消しました。',
+      'account.pats.empty': '個人アクセストークンはありません。', 'account.pats.lastUsed': '最終使用 {date}', 'account.pats.expires': '有効期限 {date}', 'account.pats.unknownScope': '権限: {scope}',
+      'account.pats.scope.libraryRead': 'ライブラリと章を読む', 'account.pats.scope.bookshelfRead': '本棚を読む', 'account.pats.scope.bookshelfWrite': '本棚を更新',
+      'account.pats.scope.progressRead': '進捗を読む', 'account.pats.scope.progressWrite': '進捗を更新', 'account.pats.scope.annotationsRead': '注釈を読む', 'account.pats.scope.annotationsWrite': '注釈を更新',
+      'account.pats.scope.reviewsRead': 'レビューを読む', 'account.pats.scope.reviewsWrite': 'レビューを更新', 'account.pats.scope.adminDataRead': '全ユーザーの機密ではないデータを読む',
+      'account.pats.error.invalid_personal_access_token': 'トークン名、権限、有効期限を確認してください。', 'account.error.invalid_personal_access_token': 'トークン名、権限、有効期限を確認してください。'
+    }
+  };
+  Object.keys(patLocaleAdditions).forEach(function(code) {
+    Object.keys(patLocaleAdditions[code]).forEach(function(key) { dictionaries[code][key] = patLocaleAdditions[code][key]; });
+  });
 
   function normalizeLocale(value) {
     value = String(value || '').replace('_', '-').toLowerCase();
