@@ -114,6 +114,7 @@ SERVER_ACCOUNT_PANEL = '''
         <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions" data-i18n="admin.ai.permissions">AI permissions</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiJobsTab" role="tab" aria-selected="false" aria-controls="adminAiJobsSection" data-admin-section="ai-jobs" data-i18n="admin.ai.jobs.title">AI jobs</button>
         <button type="button" class="admin-section-tab" id="adminSectionTagsTab" role="tab" aria-selected="false" aria-controls="adminTagsSection" data-admin-section="tags" data-i18n="admin.tags">Tag management</button>
+        <button type="button" class="admin-section-tab" id="adminSectionWebhooksTab" role="tab" aria-selected="false" aria-controls="adminWebhooksSection" data-admin-section="webhooks" data-i18n="admin.webhooks.title">WebHooks</button>
         <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books" data-i18n="admin.books">Book management</button>
     </nav>
     <div class="account-admin-grid">
@@ -222,6 +223,31 @@ SERVER_ACCOUNT_PANEL = '''
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminAiTagSubmit" data-i18n="admin.ai.addTag">Add tag</button>
         </form>
         <ul class="account-list" id="adminAiTagList"></ul>
+    </section>
+    <section class="account-admin-section account-card-wide admin-webhooks-section" id="adminWebhooksSection" role="tabpanel" aria-labelledby="adminSectionWebhooksTab" data-admin-panel="webhooks" hidden>
+        <h4 data-i18n="admin.webhooks.title">WebHooks</h4>
+        <p class="account-section-copy" data-i18n="admin.webhooks.description">Send signed event notifications to administrator-managed HTTP endpoints.</p>
+        <form class="account-form admin-webhook-form" id="adminWebhookForm">
+            <label><span data-i18n="admin.webhooks.name">Name</span><input name="name" maxlength="80" required></label>
+            <label><span data-i18n="admin.webhooks.url">Endpoint URL</span><input name="url" type="url" placeholder="https://example.com/webhook" data-i18n-placeholder="admin.webhooks.urlPlaceholder" autocomplete="off" required></label>
+            <fieldset class="admin-webhook-events"><legend data-i18n="admin.webhooks.events">Events</legend>
+                <label><input type="checkbox" name="event_types" value="review.created"><span data-i18n="admin.webhooks.event.reviewCreated">Review created</span></label>
+                <label><input type="checkbox" name="event_types" value="review.updated"><span data-i18n="admin.webhooks.event.reviewUpdated">Review updated</span></label>
+                <label><input type="checkbox" name="event_types" value="review.deleted"><span data-i18n="admin.webhooks.event.reviewDeleted">Review deleted</span></label>
+                <label><input type="checkbox" name="event_types" value="book.created"><span data-i18n="admin.webhooks.event.bookCreated">Book created</span></label>
+                <label><input type="checkbox" name="event_types" value="book.updated"><span data-i18n="admin.webhooks.event.bookUpdated">Book updated</span></label>
+                <label><input type="checkbox" name="event_types" value="book.removed"><span data-i18n="admin.webhooks.event.bookRemoved">Book removed</span></label>
+                <label><input type="checkbox" name="event_types" value="book.conversion.succeeded"><span data-i18n="admin.webhooks.event.conversionSucceeded">Conversion succeeded</span></label>
+                <label><input type="checkbox" name="event_types" value="book.conversion.failed"><span data-i18n="admin.webhooks.event.conversionFailed">Conversion failed</span></label>
+            </fieldset>
+            <label class="admin-webhook-enabled"><input type="checkbox" name="enabled" checked><span data-i18n="admin.webhooks.enabled">Enabled</span></label>
+            <button type="submit" id="adminWebhookSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.webhooks.create">Add endpoint</button>
+        </form>
+        <div class="account-pat-secret" id="adminWebhookSecretRegion" role="status" aria-live="polite" hidden><p data-i18n="admin.webhooks.secretOnce">Copy the signing secret now. It will not be shown again.</p><code id="adminWebhookSecret"></code></div>
+        <ul class="account-list admin-webhook-list" id="adminWebhookList"></ul>
+        <h5 data-i18n="admin.webhooks.deliveries">Recent deliveries</h5>
+        <ul class="account-list admin-webhook-deliveries" id="adminWebhookDeliveries"></ul>
+        <p id="adminWebhookLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
     </section>
     <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
         <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>

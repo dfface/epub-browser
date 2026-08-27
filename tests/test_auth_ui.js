@@ -1058,6 +1058,8 @@ test('account settings and administration open as separate surfaces', async () =
     '/api/admin/ai/settings',
     '/api/admin/ai/tags',
     '/api/admin/ai/jobs?page=1&page_size=20',
+    '/api/admin/webhooks',
+    '/api/admin/webhooks/deliveries',
   ]);
 });
 

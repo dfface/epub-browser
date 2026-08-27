@@ -3,6 +3,7 @@ import hmac
 import json
 import math
 import re
+import secrets
 import sqlite3
 import time
 import unicodedata
@@ -314,6 +315,7 @@ class StateStore:
             else:
                 self._create_v16_pat_schema(connection)
                 self._create_v16_pat_indexes(connection)
+                self._create_v16_webhook_schema(connection)
                 self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
@@ -1485,8 +1487,61 @@ class StateStore:
             return
         self._create_v16_pat_schema(connection)
         self._create_v16_pat_indexes(connection)
+        self._create_v16_webhook_schema(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 16")
+
+    @staticmethod
+    def _create_v16_webhook_schema(connection) -> None:
+        statements = (
+            """
+            CREATE TABLE IF NOT EXISTS webhook_endpoints (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL,
+                secret TEXT NOT NULL, event_types_json TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1, deleted_at REAL,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                id TEXT PRIMARY KEY, event_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL, created_at REAL NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS webhook_deliveries (
+                id TEXT PRIMARY KEY,
+                event_id TEXT NOT NULL REFERENCES webhook_events(id) ON DELETE CASCADE,
+                endpoint_id TEXT NOT NULL REFERENCES webhook_endpoints(id),
+                status TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0,
+                next_attempt_at REAL NOT NULL, lease_owner TEXT, lease_expires_at REAL,
+                last_status_code INTEGER, last_error TEXT,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS webhook_attempts (
+                id TEXT PRIMARY KEY,
+                delivery_id TEXT NOT NULL REFERENCES webhook_deliveries(id) ON DELETE CASCADE,
+                attempt_number INTEGER NOT NULL, status_code INTEGER,
+                error TEXT, attempted_at REAL NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due
+            ON webhook_deliveries(status, next_attempt_at, lease_expires_at, created_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_webhook_events_created
+            ON webhook_events(created_at DESC, id DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_webhook_attempts_delivery
+            ON webhook_attempts(delivery_id, attempt_number)
+            """,
+        )
+        for statement in statements:
+            connection.execute(statement)
 
     @staticmethod
     def _reject_v11_source_tables(connection) -> None:
@@ -3035,6 +3090,218 @@ class StateStore:
                 (timestamp, user_id),
             )
         return cursor.rowcount
+
+    def create_webhook_endpoint(self, name, url, event_types, *, enabled=True, now=None):
+        timestamp = self._timestamp(now)
+        endpoint_id = uuid.uuid4().hex
+        secret = secrets.token_urlsafe(32)
+        events = tuple(sorted(set(event_types)))
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO webhook_endpoints "
+                "(id,name,url,secret,event_types_json,enabled,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (endpoint_id, name, url, secret, json.dumps(events), 1 if enabled else 0, timestamp, timestamp),
+            )
+        return {"webhook": self.get_webhook_endpoint(endpoint_id), "secret": secret}
+
+    @staticmethod
+    def _webhook_endpoint_data(row, *, include_secret=False):
+        if row is None:
+            return None
+        result = {
+            "id": row["id"], "name": row["name"], "url": row["url"],
+            "event_types": json.loads(row["event_types_json"]),
+            "enabled": bool(row["enabled"]), "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+        if include_secret:
+            result["secret"] = row["secret"]
+        return result
+
+    def get_webhook_endpoint(self, endpoint_id, *, include_secret=False):
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM webhook_endpoints WHERE id=? AND deleted_at IS NULL",
+                (endpoint_id,),
+            ).fetchone()
+        return self._webhook_endpoint_data(row, include_secret=include_secret)
+
+    def list_webhook_endpoints(self):
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM webhook_endpoints WHERE deleted_at IS NULL ORDER BY created_at DESC, id"
+            ).fetchall()
+        return tuple(self._webhook_endpoint_data(row) for row in rows)
+
+    def update_webhook_endpoint(self, endpoint_id, *, name, url, event_types, enabled, now=None):
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "UPDATE webhook_endpoints SET name=?,url=?,event_types_json=?,enabled=?,updated_at=? "
+                "WHERE id=? AND deleted_at IS NULL",
+                (name, url, json.dumps(tuple(sorted(set(event_types)))), 1 if enabled else 0, timestamp, endpoint_id),
+            )
+        return self.get_webhook_endpoint(endpoint_id) if cursor.rowcount else None
+
+    def delete_webhook_endpoint(self, endpoint_id, *, now=None):
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "UPDATE webhook_endpoints SET enabled=0,secret='',deleted_at=?,updated_at=? "
+                "WHERE id=? AND deleted_at IS NULL", (timestamp, timestamp, endpoint_id)
+            )
+        return cursor.rowcount == 1
+
+    def rotate_webhook_secret(self, endpoint_id, *, now=None):
+        timestamp = self._timestamp(now)
+        secret = secrets.token_urlsafe(32)
+        with self._connection() as connection:
+            cursor = connection.execute(
+                "UPDATE webhook_endpoints SET secret=?,updated_at=? WHERE id=? AND deleted_at IS NULL",
+                (secret, timestamp, endpoint_id),
+            )
+        return secret if cursor.rowcount else None
+
+    def _enqueue_webhook_event_connection(self, connection, event_type, data, timestamp):
+        event_id = uuid.uuid4().hex
+        payload = {
+            "id": event_id,
+            "type": event_type,
+            "created_at": self._utc_timestamp(timestamp),
+            "data": data,
+        }
+        connection.execute(
+            "INSERT INTO webhook_events(id,event_type,payload_json,created_at) VALUES(?,?,?,?)",
+            (event_id, event_type, json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")), timestamp),
+        )
+        endpoints = connection.execute(
+            "SELECT id,event_types_json FROM webhook_endpoints WHERE enabled=1 AND deleted_at IS NULL"
+        ).fetchall()
+        for endpoint in endpoints:
+            if event_type not in json.loads(endpoint["event_types_json"]):
+                continue
+            connection.execute(
+                "INSERT INTO webhook_deliveries "
+                "(id,event_id,endpoint_id,status,next_attempt_at,created_at,updated_at) "
+                "VALUES(?,?,?,'pending',?,?,?)",
+                (uuid.uuid4().hex, event_id, endpoint["id"], timestamp, timestamp, timestamp),
+            )
+        return payload
+
+    def enqueue_webhook_event(self, event_type, data, *, now=None):
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            return self._enqueue_webhook_event_connection(connection, event_type, data, timestamp)
+
+    def enqueue_webhook_test(self, endpoint_id, *, now=None):
+        timestamp = self._timestamp(now)
+        event_id = uuid.uuid4().hex
+        payload = {
+            "id": event_id, "type": "webhook.test",
+            "created_at": self._utc_timestamp(timestamp),
+            "data": {"endpoint_id": endpoint_id},
+        }
+        with self._connection() as connection:
+            endpoint = connection.execute(
+                "SELECT 1 FROM webhook_endpoints WHERE id=? AND deleted_at IS NULL",
+                (endpoint_id,),
+            ).fetchone()
+            if endpoint is None:
+                raise KeyError(endpoint_id)
+            connection.execute(
+                "INSERT INTO webhook_events(id,event_type,payload_json,created_at) VALUES(?,?,?,?)",
+                (event_id, "webhook.test", json.dumps(payload, sort_keys=True, separators=(",", ":")), timestamp),
+            )
+            delivery_id = uuid.uuid4().hex
+            connection.execute(
+                "INSERT INTO webhook_deliveries(id,event_id,endpoint_id,status,next_attempt_at,created_at,updated_at) "
+                "VALUES(?,?,?,'pending',?,?,?)",
+                (delivery_id, event_id, endpoint_id, timestamp, timestamp, timestamp),
+            )
+        return {"event": payload, "delivery_id": delivery_id}
+
+    def list_webhook_events(self, *, event_type=None, limit=100):
+        statement = "SELECT * FROM webhook_events"
+        values = []
+        if event_type:
+            statement += " WHERE event_type=?"
+            values.append(event_type)
+        statement += " ORDER BY created_at DESC,id DESC LIMIT ?"
+        values.append(min(max(int(limit), 1), 100))
+        with self._connection() as connection:
+            rows = connection.execute(statement, values).fetchall()
+        return tuple(json.loads(row["payload_json"]) for row in rows)
+
+    def list_webhook_deliveries(self, *, limit=100):
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT deliveries.*,events.event_type,endpoints.name AS endpoint_name "
+                "FROM webhook_deliveries deliveries JOIN webhook_events events ON events.id=deliveries.event_id "
+                "JOIN webhook_endpoints endpoints ON endpoints.id=deliveries.endpoint_id "
+                "ORDER BY deliveries.created_at DESC,deliveries.id DESC LIMIT ?",
+                (min(max(int(limit), 1), 100),),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
+    def claim_webhook_delivery(self, worker_id, *, now=None, lease_seconds=60):
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT id FROM webhook_deliveries WHERE status IN ('pending','retrying') "
+                "AND next_attempt_at<=? AND (lease_expires_at IS NULL OR lease_expires_at<=?) "
+                "ORDER BY next_attempt_at,created_at,id LIMIT 1", (timestamp, timestamp)
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                "UPDATE webhook_deliveries SET status='leased',lease_owner=?,lease_expires_at=?,updated_at=? WHERE id=?",
+                (worker_id, timestamp + lease_seconds, timestamp, row["id"]),
+            )
+            claimed = connection.execute(
+                "SELECT deliveries.*,events.payload_json,events.event_type,endpoints.url,endpoints.secret "
+                "FROM webhook_deliveries deliveries JOIN webhook_events events ON events.id=deliveries.event_id "
+                "JOIN webhook_endpoints endpoints ON endpoints.id=deliveries.endpoint_id WHERE deliveries.id=?",
+                (row["id"],),
+            ).fetchone()
+        result = dict(claimed)
+        result["payload"] = json.loads(result.pop("payload_json"))
+        return result
+
+    def finish_webhook_delivery(self, delivery_id, worker_id, *, status_code=None, error=None, retry_at=None, now=None):
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT attempt_count FROM webhook_deliveries WHERE id=? AND lease_owner=?",
+                (delivery_id, worker_id),
+            ).fetchone()
+            if row is None:
+                return False
+            attempt = row["attempt_count"] + 1
+            success = status_code is not None and 200 <= status_code < 300
+            terminal = success or attempt >= 8
+            status = "succeeded" if success else "failed" if terminal else "retrying"
+            connection.execute(
+                "INSERT INTO webhook_attempts(id,delivery_id,attempt_number,status_code,error,attempted_at) VALUES(?,?,?,?,?,?)",
+                (uuid.uuid4().hex, delivery_id, attempt, status_code, str(error or "")[:1000] or None, timestamp),
+            )
+            connection.execute(
+                "UPDATE webhook_deliveries SET status=?,attempt_count=?,next_attempt_at=?,lease_owner=NULL,lease_expires_at=NULL,last_status_code=?,last_error=?,updated_at=? WHERE id=?",
+                (status, attempt, retry_at if retry_at is not None else timestamp, status_code, str(error or "")[:1000] or None, timestamp, delivery_id),
+            )
+        return True
+
+    def redeliver_webhook_event(self, event_id, endpoint_id, *, now=None):
+        timestamp = self._timestamp(now)
+        delivery_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO webhook_deliveries(id,event_id,endpoint_id,status,next_attempt_at,created_at,updated_at) "
+                "VALUES(?,?,?,'pending',?,?,?)",
+                (delivery_id, event_id, endpoint_id, timestamp, timestamp, timestamp),
+            )
+        return delivery_id
 
     def raw_personal_access_token_rows(self) -> tuple:
         with self._connection() as connection:
@@ -5170,6 +5437,9 @@ class StateStore:
                     metadata_json,
                 ),
             )
+            self._enqueue_webhook_event_connection(
+                connection, "book.created", {"book_id": book_id}, self._timestamp()
+            )
             return self._get_book(connection, book_id)
 
     @staticmethod
@@ -5235,15 +5505,22 @@ class StateStore:
             )
             if cursor.rowcount != 1:
                 raise KeyError(f"Unknown book ID: {book_id}")
+            self._enqueue_webhook_event_connection(
+                connection, "book.updated", {"book_id": book_id}, self._timestamp()
+            )
             return self._get_book(connection, book_id)
 
     def mark_missing(self, book_id: str) -> None:
         with self._connection() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 "UPDATE books SET active = 0, updated_at = CURRENT_TIMESTAMP "
-                "WHERE book_id = ?",
+                "WHERE book_id = ? AND active = 1",
                 (book_id,),
             )
+            if cursor.rowcount:
+                self._enqueue_webhook_event_connection(
+                    connection, "book.removed", {"book_id": book_id}, self._timestamp()
+                )
 
     def active_books(self) -> tuple[BookRecord, ...]:
         with self._connection() as connection:
@@ -5777,6 +6054,10 @@ class StateStore:
         with self._connection() as connection:
             self._require_user(connection, user_id)
             self._require_active_book(connection, book_id)
+            existed = connection.execute(
+                "SELECT 1 FROM book_reviews WHERE user_id=? AND book_id=?",
+                (user_id, book_id),
+            ).fetchone() is not None
             connection.execute(
                 "INSERT INTO book_reviews (user_id, book_id, rating, review_text) "
                 "VALUES (?, ?, ?, ?) "
@@ -5793,15 +6074,28 @@ class StateStore:
                 """,
                 (user_id, book_id),
             ).fetchone()
+            self._enqueue_webhook_event_connection(
+                connection,
+                "review.updated" if existed else "review.created",
+                {"user_id": user_id, "book_id": book_id},
+                self._timestamp(),
+            )
         return dict(row)
 
     def delete_book_review(self, book_id: str, user_id: str) -> None:
         with self._connection() as connection:
             self._require_user(connection, user_id)
-            connection.execute(
+            cursor = connection.execute(
                 "DELETE FROM book_reviews WHERE user_id = ? AND book_id = ?",
                 (user_id, book_id),
             )
+            if cursor.rowcount:
+                self._enqueue_webhook_event_connection(
+                    connection,
+                    "review.deleted",
+                    {"user_id": user_id, "book_id": book_id},
+                    self._timestamp(),
+                )
 
     def list_book_reviews(self, user_id: str) -> tuple:
         with self._connection() as connection:

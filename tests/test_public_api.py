@@ -121,6 +121,11 @@ class PublicAPIBoundaryTests(unittest.TestCase):
                 declared["security"], [{"PATBearer": [operation.required_scope]}]
             )
 
+        served = self.client.get("/openapi.json")
+        self.assertEqual(served.status_code, 200)
+        self.assertEqual(served.json()["openapi"], "3.1.0")
+        self.assertEqual(self.client.get("/api-docs").status_code, 403)
+
     def test_book_detail_toc_and_chapter_content_are_available(self):
         headers = self.bearer("library:read")
         detail = self.client.get("/api/v1/books/book", headers=headers)

@@ -870,14 +870,14 @@
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) !== -1
+      return ['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
         ? section : '';
     }
 
     function adminPanelIsAvailable(panel) { return Boolean(panel); }
 
     function setActiveAdminSection(section) {
-      if (['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'books'].indexOf(section) === -1) return;
+      if (['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
@@ -1310,6 +1310,81 @@
       var region = element('patSecretRegion');
       if (secret) secret.textContent = '';
       if (region) region.hidden = true;
+    }
+
+    function showWebhookSecret(value) {
+      var secret = element('adminWebhookSecret');
+      var region = element('adminWebhookSecretRegion');
+      if (secret) secret.textContent = value || '';
+      if (region) region.hidden = !value;
+    }
+
+    function renderWebhooks(endpoints, deliveries) {
+      var list = element('adminWebhookList');
+      var history = element('adminWebhookDeliveries');
+      if (list) {
+        list.textContent = '';
+        (endpoints || []).forEach(function(endpoint) {
+          var item = root.document.createElement('li');
+          var summary = root.document.createElement('div');
+          var actions = root.document.createElement('div');
+          var name = root.document.createElement('strong');
+          var url = root.document.createElement('span');
+          var events = root.document.createElement('span');
+          item.className = 'account-list-item admin-webhook-item';
+          summary.className = 'admin-webhook-summary';
+          name.textContent = endpoint.name;
+          url.className = 'admin-webhook-url';
+          url.textContent = endpoint.url;
+          events.className = 'admin-webhook-events-copy';
+          events.textContent = (endpoint.event_types || []).join(' · ');
+          summary.appendChild(name);
+          summary.appendChild(url);
+          summary.appendChild(events);
+          actions.className = 'account-list-actions';
+          actions.appendChild(actionButton('admin.webhooks.test', function() {
+            authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id) + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+          }));
+          actions.appendChild(actionButton('admin.webhooks.rotate', function() {
+            authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id) + '/rotate-secret', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return readJson(response); })
+              .then(function(payload) { if (payload) showWebhookSecret(payload.secret); });
+          }));
+          actions.appendChild(actionButton('admin.webhooks.delete', function() {
+            if (typeof root.confirm === 'function' && !root.confirm(t('admin.webhooks.deleteConfirm', { name: endpoint.name }))) return;
+            authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id), { method: 'DELETE' })
+              .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+          }, 'danger'));
+          item.appendChild(summary);
+          item.appendChild(actions);
+          list.appendChild(item);
+        });
+        if (!(endpoints || []).length) list.appendChild(createTextElement('li', 'account-empty', 'admin.webhooks.empty'));
+      }
+      if (history) {
+        history.textContent = '';
+        (deliveries || []).forEach(function(delivery) {
+          var item = root.document.createElement('li');
+          item.className = 'account-list-item admin-webhook-delivery';
+          item.textContent = delivery.endpoint_name + ' · ' + delivery.event_type + ' · ' + delivery.status + ' · ' + delivery.attempt_count;
+          history.appendChild(item);
+        });
+        if (!(deliveries || []).length) history.appendChild(createTextElement('li', 'account-empty', 'admin.webhooks.noDeliveries'));
+      }
+    }
+
+    function loadWebhooks() {
+      return Promise.all([
+        authenticatedFetch('/api/admin/webhooks'),
+        authenticatedFetch('/api/admin/webhooks/deliveries')
+      ]).then(function(responses) {
+        if (!responses[0].ok) return showResponseError(responses[0], 'admin');
+        if (!responses[1].ok) return showResponseError(responses[1], 'admin');
+        return Promise.all([readJson(responses[0]), readJson(responses[1])]).then(function(payloads) {
+          renderWebhooks(payloads[0].items || [], payloads[1].items || []);
+        });
+      });
     }
 
     function updateUser(username, payload) {
@@ -2602,6 +2677,7 @@
         setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
       });
       loadAdminAiJobs();
+      loadWebhooks();
       startAdminAiJobPolling();
     }
 
@@ -2626,6 +2702,8 @@
       var patCreateForm = element('patCreateForm');
       var patCreateSubmit = element('patCreateSubmit');
       var patCopySecret = element('patCopySecret');
+      var webhookForm = element('adminWebhookForm');
+      var webhookSubmit = element('adminWebhookSubmit');
       var createUserForm = element('adminUserForm');
       var createUserSubmit = element('adminUserSubmit');
       var aiSettingsForm = element('adminAiSettingsForm');
@@ -2655,7 +2733,7 @@
       var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
-      [createUserForm, aiSettingsForm, aiTagForm, dictionaryForm].forEach(function(form) {
+      [createUserForm, aiSettingsForm, aiTagForm, dictionaryForm, webhookForm].forEach(function(form) {
         if (!form) return;
         form.addEventListener('input', markAdminDirty);
         form.addEventListener('change', markAdminDirty);
@@ -2766,6 +2844,26 @@
           var live = element('patLive');
           if (live) live.textContent = t('account.pats.copied');
         }).catch(function() { showStatus('account.pats.copyFailed', 'error'); });
+      });
+      if (webhookForm) webhookForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        showWebhookSecret('');
+        runButtonOperation(webhookSubmit, 'admin.webhooks.creating', function() {
+          var events = Array.prototype.map.call(webhookForm.querySelectorAll('input[name="event_types"]:checked'), function(input) { return input.value; });
+          return authenticatedFetch('/api/admin/webhooks', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: formValue(webhookForm, 'name'), url: formValue(webhookForm, 'url'), event_types: events, enabled: webhookForm.elements.enabled.checked })
+          }).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'admin');
+            return readJson(response).then(function(payload) {
+              showWebhookSecret(payload.secret);
+              webhookForm.reset();
+              webhookForm.elements.enabled.checked = true;
+              clearAdminDirty();
+              return loadWebhooks();
+            });
+          });
+        });
       });
       if (createUserForm) createUserForm.addEventListener('submit', function(event) {
         event.preventDefault();

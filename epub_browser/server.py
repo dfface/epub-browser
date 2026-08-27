@@ -60,12 +60,19 @@ from .processor import (
     SERVER_OUTPUT_REVISION_FILE,
     server_book_public_path_allowed,
 )
-from .public_api import PUBLIC_API_CONTEXT_KEY, PublicAPIContext, public_api_routes
+from .public_api import (
+    PUBLIC_API_CONTEXT_KEY,
+    PublicAPIContext,
+    openapi_document,
+    public_api_operations,
+    public_api_routes,
+)
 from .server_library import library_metadata
 from .server_pages import ServerPageError, ServerPageRenderer
 from .site import render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
+from .webhooks import WEBHOOK_EVENT_TYPES, WebhookService
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -580,6 +587,7 @@ def create_app(
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     release_lookup = release_lookup or ReleaseLookup()
     ai_reading = AIReadingService(store, base_directory)
+    webhook_service = WebhookService(store)
     dictionary_service = DictionaryService(store, base_directory)
     encyclopedia = WikimediaEncyclopedia()
     heartbeat_attempts = {}
@@ -2755,6 +2763,23 @@ window.location.assign(payload.redirect||'/');
         response.headers['Cache-Control'] = 'no-cache'
         return apply_reader_security_headers(response, index_path)
 
+    async def openapi_schema(request):
+        return response(openapi_document(), cache_control='public, max-age=300')
+
+    async def api_docs(request):
+        require_principal(request)
+        rows = ''.join(
+            '<li><code>{method} {path}</code><strong>{scope}</strong><span>{summary}</span></li>'.format(
+                method=html.escape(operation.methods[0]),
+                path=html.escape(operation.path),
+                scope=html.escape(operation.required_scope),
+                summary=html.escape(operation.summary),
+            )
+            for operation in public_api_operations()
+        )
+        markup = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EPUB Browser API</title><style>body{font:16px system-ui,sans-serif;max-width:70rem;margin:auto;padding:2rem;color:#183132;background:#f7faf9}a{color:#075d63}li{display:grid;grid-template-columns:minmax(18rem,1fr) minmax(10rem,.4fr) 1fr;gap:1rem;padding:1rem;margin:.5rem 0;background:white;border:1px solid #cad8d5;border-radius:.75rem}code{overflow-wrap:anywhere}strong{color:#075d63}@media(max-width:700px){li{grid-template-columns:1fr}} </style><main><p><a href="/">← EPUB Browser</a></p><h1>OpenAPI reference</h1><p>Use <code>Authorization: Bearer &lt;PAT&gt;</code>. Tokens are managed in Account settings and are never stored by this page.</p><p><a href="/openapi.json">Download OpenAPI 3.1 JSON</a></p><ul>''' + rows + '</ul></main></html>'
+        return HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+
     async def reading_insights_page(request):
         """Keep legacy links safe now that insights lives in the shared modal hub."""
         require_principal(request)
@@ -3438,6 +3463,80 @@ window.location.assign(payload.redirect||'/');
             )
         return response({'insights': insights})
 
+    def valid_webhook_configuration(data):
+        if not isinstance(data, dict):
+            return None
+        name = data.get('name')
+        url = data.get('url')
+        event_types = data.get('event_types')
+        enabled = data.get('enabled', True)
+        parsed = urlsplit(url) if isinstance(url, str) else None
+        if (
+            not isinstance(name, str) or not 1 <= len(name.strip()) <= 80
+            or parsed is None or parsed.scheme not in {'http', 'https'} or not parsed.netloc
+            or not isinstance(event_types, list) or not event_types
+            or any(not isinstance(item, str) for item in event_types)
+            or not set(event_types) <= WEBHOOK_EVENT_TYPES
+            or not isinstance(enabled, bool)
+        ):
+            return None
+        return name.strip(), url, tuple(sorted(set(event_types))), enabled
+
+    async def admin_webhooks(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response({'items': store.list_webhook_endpoints()}, cache_control='private, no-store')
+        data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
+        configuration = valid_webhook_configuration(data) if not error else None
+        if configuration is None:
+            return response(error_payload('invalid_webhook', 'Invalid WebHook configuration'), 400, 'private, no-store')
+        created = store.create_webhook_endpoint(*configuration[:3], enabled=configuration[3])
+        return response(created, 201, 'private, no-store')
+
+    async def admin_webhook(request):
+        require_admin(request)
+        endpoint_id = request.path_params['webhook_id']
+        if request.method == 'GET':
+            endpoint = store.get_webhook_endpoint(endpoint_id)
+            return response({'webhook': endpoint}, cache_control='private, no-store') if endpoint else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+        if request.method == 'DELETE':
+            return Response(status_code=204) if store.delete_webhook_endpoint(endpoint_id) else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+        data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
+        configuration = valid_webhook_configuration(data) if not error else None
+        if configuration is None:
+            return response(error_payload('invalid_webhook', 'Invalid WebHook configuration'), 400, 'private, no-store')
+        endpoint = store.update_webhook_endpoint(endpoint_id, name=configuration[0], url=configuration[1], event_types=configuration[2], enabled=configuration[3])
+        return response({'webhook': endpoint}, cache_control='private, no-store') if endpoint else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+
+    async def admin_webhook_test(request):
+        require_admin(request)
+        try:
+            queued = store.enqueue_webhook_test(request.path_params['webhook_id'])
+        except KeyError:
+            return response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+        return response(queued, 202, 'private, no-store')
+
+    async def admin_webhook_rotate(request):
+        require_admin(request)
+        secret = store.rotate_webhook_secret(request.path_params['webhook_id'])
+        return response({'secret': secret}, cache_control='private, no-store') if secret else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+
+    async def admin_webhook_deliveries(request):
+        require_admin(request)
+        return response({'items': store.list_webhook_deliveries()}, cache_control='private, no-store')
+
+    async def admin_webhook_redeliver(request):
+        require_admin(request)
+        data, error = await bounded_public_json_object(request, maximum_size=2048)
+        endpoint_id = data.get('endpoint_id') if not error else None
+        if not isinstance(endpoint_id, str):
+            return response(error_payload('invalid_webhook_redelivery', 'Invalid WebHook redelivery'), 400, 'private, no-store')
+        try:
+            delivery_id = store.redeliver_webhook_event(request.path_params['event_id'], endpoint_id)
+        except sqlite3.IntegrityError:
+            return response(error_payload('webhook_event_not_found', 'WebHook event not found'), 404, 'private, no-store')
+        return response({'delivery_id': delivery_id}, 202, 'private, no-store')
+
     public_api_context = PublicAPIContext(store=store, public_dir=Path(base_directory))
     routes = [
         Route('/setup', setup, methods=['GET', 'POST']),
@@ -3473,12 +3572,20 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/dictionaries/{dictionary_id}/resources', admin_dictionary_resources, methods=['POST']),
         Route('/api/admin/dictionaries/{dictionary_id}/default', admin_dictionary_default, methods=['PUT']),
         Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
+        Route('/api/admin/webhooks', admin_webhooks, methods=['GET', 'POST']),
+        Route('/api/admin/webhooks/deliveries', admin_webhook_deliveries, methods=['GET']),
+        Route('/api/admin/webhooks/events/{event_id}/redeliver', admin_webhook_redeliver, methods=['POST']),
+        Route('/api/admin/webhooks/{webhook_id}/test', admin_webhook_test, methods=['POST']),
+        Route('/api/admin/webhooks/{webhook_id}/rotate-secret', admin_webhook_rotate, methods=['POST']),
+        Route('/api/admin/webhooks/{webhook_id}', admin_webhook, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
         *public_api_routes(public_api_context),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/reading-insights', reading_insights_page, methods=['GET']),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
+        Route('/openapi.json', openapi_schema, methods=['GET']),
+        Route('/api-docs', api_docs, methods=['GET']),
         Route('/api/health', health),
         Route('/api/ready', ready),
         Route('/api/version', version_status),
@@ -3514,10 +3621,12 @@ window.location.assign(payload.redirect||'/');
     async def ai_worker_lifespan(application):
         """Keep the AI worker lifecycle aligned with the ASGI application."""
         await ai_reading.start_worker()
+        await webhook_service.start_worker()
         ai_reading.wake_worker()
         try:
             yield
         finally:
+            await webhook_service.stop_worker()
             await ai_reading.stop_worker()
 
     app = Starlette(
@@ -3542,6 +3651,8 @@ window.location.assign(payload.redirect||'/');
                 return await call_next(request)
             return setup_required_response(request)
         if path == '/sw.js':
+            return await call_next(request)
+        if path == '/openapi.json':
             return await call_next(request)
         if path.startswith('/api/v1/'):
             authorized = await call_next(request)
