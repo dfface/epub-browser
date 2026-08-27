@@ -4474,9 +4474,14 @@
       'admin.loading': 'Loading administration…',
       'admin.discardChanges': 'Discard changes',
       'annotations.shareActions': 'Share annotations',
-      'annotations.copyShare': 'Copy to clipboard',
-      'annotations.exportShare': 'Export text',
+      'annotations.copyShare': 'Copy Markdown',
+      'annotations.exportShare': 'Export Markdown',
+      'annotations.annotationActions': 'Annotation actions',
+      'annotations.copyAnnotation': 'Copy this annotation',
+      'annotations.annotationCopied': 'Annotation copied as Markdown.',
+      'annotations.annotationCopyFailed': 'Unable to copy this annotation.',
       'annotations.shareAuthors': 'Authors',
+      'annotations.shareCount': 'Annotations',
       'annotations.shareNote': 'Note',
       'annotations.shareCopied': 'Annotation summary copied locally.',
       'annotations.shareCopyFailed': 'Unable to copy the annotation summary.',
@@ -4516,7 +4521,12 @@
       'dictionary.source': 'Open source',
       'ai.annotation.vocabulary': 'Rare characters & vocabulary',
       'ai.teachKicker': 'FEYNMAN LEARNING',
-      'ai.teachTitle': 'Teach it back in your own words'
+      'ai.teachTitle': 'Teach it back in your own words',
+      'ai.chatSuggestionExplain': 'Can you explain the core idea in this scope?',
+      'ai.chatSuggestionChallenge': 'Can you challenge one of the ideas here?',
+      'ai.chatSuggestionConnect': 'How does this connect to the rest of the book?',
+      'ai.chatSuggestionSummarize': 'Can you summarize this scope in a few sentences?',
+      'ai.chatSuggestionNotice': 'What should I pay the most attention to here?'
       ,'admin.dictionaries': 'Dictionaries'
       ,'admin.dictionariesDescription': 'Install a local MDict or StarDict dictionary. Set the default for a reader’s first lookup; readers can switch dictionaries at any time.'
       ,'admin.systemLimits': 'Administrator operations'
@@ -4651,9 +4661,14 @@
       'admin.loading': '正在加载管理后台…',
       'admin.discardChanges': '放弃修改',
       'annotations.shareActions': '分享标注',
-      'annotations.copyShare': '复制到剪贴板',
-      'annotations.exportShare': '导出文本',
+      'annotations.copyShare': '复制 Markdown',
+      'annotations.exportShare': '导出 Markdown',
+      'annotations.annotationActions': '标注操作',
+      'annotations.copyAnnotation': '复制此标注',
+      'annotations.annotationCopied': '标注已复制为 Markdown。',
+      'annotations.annotationCopyFailed': '无法复制此标注。',
       'annotations.shareAuthors': '作者',
+      'annotations.shareCount': '标注数量',
       'annotations.shareNote': '笔记',
       'annotations.shareCopied': '标注摘要已仅在本地复制。',
       'annotations.shareCopyFailed': '无法复制标注摘要。',
@@ -4693,7 +4708,12 @@
       'dictionary.source': '打开来源',
       'ai.annotation.vocabulary': '生僻字词讲解',
       'ai.teachKicker': '费曼学习法',
-      'ai.teachTitle': '用自己的话讲明白'
+      'ai.teachTitle': '用自己的话讲明白',
+      'ai.chatSuggestionExplain': '请解释一下当前内容最核心的观点。',
+      'ai.chatSuggestionChallenge': '你能对其中一个观点提出反驳吗？',
+      'ai.chatSuggestionConnect': '这部分内容和全书其他章节有什么联系？',
+      'ai.chatSuggestionSummarize': '请用几句话总结当前内容。',
+      'ai.chatSuggestionNotice': '阅读这部分时，我最应该留意什么？'
       ,'admin.dictionaries': '词典'
       ,'admin.dictionariesDescription': '安装本地 MDict 或 StarDict 词典。设置读者首次查词使用的默认词典；读者之后可随时切换。'
       ,'admin.systemLimits': '管理员操作'
@@ -4828,9 +4848,14 @@
       'admin.loading': '正在載入管理後台…',
       'admin.discardChanges': '放棄修改',
       'annotations.shareActions': '分享註釋',
-      'annotations.copyShare': '複製到剪貼簿',
-      'annotations.exportShare': '匯出文字',
+      'annotations.copyShare': '複製 Markdown',
+      'annotations.exportShare': '匯出 Markdown',
+      'annotations.annotationActions': '註釋操作',
+      'annotations.copyAnnotation': '複製此註釋',
+      'annotations.annotationCopied': '註釋已複製為 Markdown。',
+      'annotations.annotationCopyFailed': '無法複製此註釋。',
       'annotations.shareAuthors': '作者',
+      'annotations.shareCount': '註釋數量',
       'annotations.shareNote': '筆記',
       'annotations.shareCopied': '註釋摘要已僅在本機複製。',
       'annotations.shareCopyFailed': '無法複製註釋摘要。',
@@ -4870,7 +4895,12 @@
       'dictionary.source': '開啟來源',
       'ai.annotation.vocabulary': '生僻字詞解說',
       'ai.teachKicker': '費曼學習法',
-      'ai.teachTitle': '用自己的話講明白'
+      'ai.teachTitle': '用自己的話講明白',
+      'ai.chatSuggestionExplain': '請解釋一下目前內容最核心的觀點。',
+      'ai.chatSuggestionChallenge': '你能針對其中一個觀點提出反駁嗎？',
+      'ai.chatSuggestionConnect': '這部分內容和全書其他章節有什麼連結？',
+      'ai.chatSuggestionSummarize': '請用幾句話總結目前內容。',
+      'ai.chatSuggestionNotice': '閱讀這部分時，我最應該留意什麼？'
       ,'admin.dictionaries': '詞典'
       ,'admin.dictionariesDescription': '安裝本機 MDict 或 StarDict 詞典。設定讀者首次查詞使用的預設詞典；讀者之後可隨時切換。'
       ,'admin.systemLimits': '管理員操作'
@@ -5005,9 +5035,14 @@
       'admin.loading': '관리 화면을 불러오는 중…',
       'admin.discardChanges': '변경 사항 버리기',
       'annotations.shareActions': '주석 공유',
-      'annotations.copyShare': '클립보드에 복사',
-      'annotations.exportShare': '텍스트 내보내기',
+      'annotations.copyShare': 'Markdown 복사',
+      'annotations.exportShare': 'Markdown 내보내기',
+      'annotations.annotationActions': '주석 작업',
+      'annotations.copyAnnotation': '이 주석 복사',
+      'annotations.annotationCopied': '주석을 Markdown으로 복사했습니다.',
+      'annotations.annotationCopyFailed': '이 주석을 복사할 수 없습니다.',
       'annotations.shareAuthors': '저자',
+      'annotations.shareCount': '주석 수',
       'annotations.shareNote': '메모',
       'annotations.shareCopied': '주석 요약을 로컬에 복사했습니다.',
       'annotations.shareCopyFailed': '주석 요약을 복사할 수 없습니다.',
@@ -5047,7 +5082,12 @@
       'dictionary.source': '원문 열기',
       'ai.annotation.vocabulary': '낯선 글자·어휘 풀이',
       'ai.teachKicker': '파인만 학습법',
-      'ai.teachTitle': '내 말로 다시 설명하기'
+      'ai.teachTitle': '내 말로 다시 설명하기',
+      'ai.chatSuggestionExplain': '현재 내용의 핵심 생각을 설명해 줄 수 있나요?',
+      'ai.chatSuggestionChallenge': '여기 나온 생각 하나에 반론을 제시해 줄 수 있나요?',
+      'ai.chatSuggestionConnect': '이 내용은 책의 다른 부분과 어떻게 연결되나요?',
+      'ai.chatSuggestionSummarize': '현재 내용을 몇 문장으로 요약해 줄 수 있나요?',
+      'ai.chatSuggestionNotice': '이 부분을 읽을 때 무엇을 가장 눈여겨봐야 하나요?'
       ,'admin.dictionaries': '사전'
       ,'admin.dictionariesDescription': '로컬 MDict 또는 StarDict 사전을 설치합니다. 독자의 첫 조회에 사용할 기본 사전을 설정하며, 독자는 언제든 사전을 바꿀 수 있습니다.'
       ,'admin.systemLimits': '관리자 작업'
@@ -5182,9 +5222,14 @@
       'admin.loading': '管理画面を読み込み中…',
       'admin.discardChanges': '変更を破棄',
       'annotations.shareActions': '注釈を共有',
-      'annotations.copyShare': 'クリップボードにコピー',
-      'annotations.exportShare': 'テキストをエクスポート',
+      'annotations.copyShare': 'Markdown をコピー',
+      'annotations.exportShare': 'Markdown をエクスポート',
+      'annotations.annotationActions': '注釈の操作',
+      'annotations.copyAnnotation': 'この注釈をコピー',
+      'annotations.annotationCopied': '注釈を Markdown としてコピーしました。',
+      'annotations.annotationCopyFailed': 'この注釈をコピーできませんでした。',
       'annotations.shareAuthors': '著者',
+      'annotations.shareCount': '注釈数',
       'annotations.shareNote': 'メモ',
       'annotations.shareCopied': '注釈の概要をローカルにコピーしました。',
       'annotations.shareCopyFailed': '注釈の概要をコピーできません。',
@@ -5224,7 +5269,12 @@
       'dictionary.source': '出典を開く',
       'ai.annotation.vocabulary': '難しい字句の解説',
       'ai.teachKicker': 'ファインマン学習法',
-      'ai.teachTitle': '自分の言葉で説明する'
+      'ai.teachTitle': '自分の言葉で説明する',
+      'ai.chatSuggestionExplain': 'この範囲の中心的な考えを説明してもらえますか？',
+      'ai.chatSuggestionChallenge': 'ここにある考えの一つに反論できますか？',
+      'ai.chatSuggestionConnect': 'この内容は本のほかの部分とどうつながりますか？',
+      'ai.chatSuggestionSummarize': 'この範囲を数文で要約してもらえますか？',
+      'ai.chatSuggestionNotice': 'ここを読むとき、何に最も注目すべきですか？'
       ,'admin.dictionaries': '辞書'
       ,'admin.dictionariesDescription': 'ローカルの MDict または StarDict 辞書をインストールします。読者の初回検索に使う既定の辞書を設定でき、読者はいつでも切り替えられます。'
       ,'admin.systemLimits': '管理者操作'

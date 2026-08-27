@@ -137,21 +137,43 @@
     }
     function labelCount(count) { return tr('annotationCount', { count: count }); }
 
+    function markdownLine(value) {
+        return String(value || '').replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function markdownQuote(value) {
+        return String(value || '').replace(/\r\n?/g, '\n').split('\n').map(function(line) {
+            return line ? '> ' + line : '>';
+        }).join('\n');
+    }
+
+    function buildAnnotationShare(annotation, context) {
+        annotation = annotation || {};
+        context = context || {};
+        var lines = [markdownQuote(annotation.text || '')];
+        if (annotation.note && annotation.note.trim()) {
+            lines.push('', '**' + tr('shareNote') + ':** ' + annotation.note.trim());
+        }
+        var source = [markdownLine(context.bookTitle), markdownLine(context.chapterTitle)].filter(function(value) { return value; });
+        if (source.length) lines.push('', '— ' + source.join(' · '));
+        return lines.join('\n');
+    }
+
     function buildShareSummary(book, annotations, toc) {
         book = book || {};
         annotations = annotations || [];
         var authors = Array.isArray(book.authors) ? book.authors.filter(function(author) { return author; }) : [];
-        var lines = [book.title || tr('bookFallback')];
-        if (authors.length) lines.push(tr('shareAuthors') + ': ' + authors.join(tr('authorSeparator')));
-        lines.push(labelCount(annotations.length));
+        var lines = ['# ' + markdownLine(book.title || tr('bookFallback')), ''];
+        if (authors.length) lines.push('- **' + tr('shareAuthors') + ':** ' + authors.join(tr('authorSeparator')));
+        lines.push('- **' + tr('shareCount') + ':** ' + annotations.length);
         groupByChapter(annotations, toc).forEach(function(group) {
-            lines.push('', group.title);
-            group.annotations.forEach(function(annotation) {
-                lines.push('“' + (annotation.text || '') + '”');
-                if (annotation.note && annotation.note.trim()) lines.push(tr('shareNote') + ': ' + annotation.note);
+            lines.push('', '## ' + markdownLine(group.title), '');
+            group.annotations.forEach(function(annotation, index) {
+                if (index) lines.push('', '---', '');
+                lines.push(buildAnnotationShare(annotation));
             });
         });
-        return lines.join('\n');
+        return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
     }
 
     function copyWithSelection(text) {
@@ -193,7 +215,7 @@
     function shareFilename(title, fallback) {
         var stem = String(title || '').normalize ? String(title || '').normalize('NFKC') : String(title || '');
         stem = stem.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').replace(/^\.+|\.+$/g, '').trim();
-        return (stem || fallback || 'annotations').slice(0, 100) + '-annotations.txt';
+        return (stem || fallback || 'annotations').slice(0, 100) + '-annotations.md';
     }
 
     function downloadShareText(text, filename) {
@@ -203,7 +225,7 @@
                 typeof objectUrl.revokeObjectURL !== 'function' || !root.document || !document.body) {
             throw new Error('Unable to export share summary');
         }
-        var url = objectUrl.createObjectURL(new BlobConstructor([text], { type: 'text/plain;charset=utf-8' }));
+        var url = objectUrl.createObjectURL(new BlobConstructor([text], { type: 'text/markdown;charset=utf-8' }));
         var link;
         try {
             link = document.createElement('a');
@@ -417,13 +439,13 @@
             var section = element('section', 'annotation-chapter-group');
             section.appendChild(element('h2', '', group.title));
             group.annotations.forEach(function(annotation) {
-                section.appendChild(annotationCard(annotation));
+                section.appendChild(annotationCard(annotation, { bookTitle: book.title, chapterTitle: group.title }));
             });
             container.appendChild(section);
         });
     }
 
-    function annotationCard(annotation) {
+    function annotationCard(annotation, context) {
         var row = element('article', 'annotation-card-row');
         var card = element('a', 'annotation-card');
         card.href = annotationHref(annotation); card.addEventListener('click', close);
@@ -446,7 +468,34 @@
         content.appendChild(element('p', 'annotation-card-meta', formatTimestamp(annotationTime(annotation))));
         card.appendChild(content); row.appendChild(card);
 
-        var deleteButton = element('button', 'annotation-card-delete');
+        var actionGroup = element('div', 'annotation-card-actions');
+        actionGroup.setAttribute('role', 'group');
+        actionGroup.setAttribute('aria-label', tr('annotationActions'));
+
+        var copyButton = element('button', 'annotation-card-action annotation-card-copy');
+        copyButton.type = 'button';
+        copyButton.setAttribute('aria-label', tr('copyAnnotation'));
+        copyButton.setAttribute('title', tr('copyAnnotation'));
+        var copyIcon = element('i', 'fas fa-copy');
+        copyIcon.setAttribute('aria-hidden', 'true');
+        copyButton.appendChild(copyIcon);
+        copyButton.addEventListener('click', function(event) {
+            event.preventDefault(); event.stopPropagation();
+            if (copyButton.disabled) return;
+            copyButton.disabled = true;
+            copyButton.setAttribute('aria-busy', 'true');
+            copyShareText(buildAnnotationShare(annotation, context)).then(function() {
+                notify('annotationCopied', 'success');
+            }).catch(function() {
+                notify('annotationCopyFailed', 'error');
+            }).then(function() {
+                copyButton.disabled = false;
+                copyButton.removeAttribute('aria-busy');
+            });
+        });
+        actionGroup.appendChild(copyButton);
+
+        var deleteButton = element('button', 'annotation-card-action annotation-card-delete');
         deleteButton.type = 'button';
         deleteButton.setAttribute('aria-label', tr('deleteAnnotation'));
         deleteButton.setAttribute('title', tr('deleteAnnotation'));
@@ -468,7 +517,8 @@
                 }
             });
         });
-        row.appendChild(deleteButton);
+        actionGroup.appendChild(deleteButton);
+        row.appendChild(actionGroup);
         return row;
     }
 
@@ -551,5 +601,5 @@
         else bind();
     }
 
-    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, annotationThumbnailHref: annotationThumbnailHref, formatTimestamp: formatTimestamp, buildShareSummary: buildShareSummary, copyShareText: copyShareText, downloadShareText: downloadShareText, shareFilename: shareFilename, createShareActions: createShareActions, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
+    return { aggregateBooks: aggregateBooks, groupByChapter: groupByChapter, annotationHref: annotationHref, annotationThumbnailHref: annotationThumbnailHref, formatTimestamp: formatTimestamp, buildAnnotationShare: buildAnnotationShare, buildShareSummary: buildShareSummary, copyShareText: copyShareText, downloadShareText: downloadShareText, shareFilename: shareFilename, createShareActions: createShareActions, annotationCard: annotationCard, deleteAnnotation: deleteAnnotation, open: open, close: close, bind: bind };
 });

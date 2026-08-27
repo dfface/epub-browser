@@ -106,13 +106,14 @@ test('uses the chapter_index field published by toc.json for numbered chapter ti
   });
 });
 
-test('builds a deterministic local-only share summary in the displayed chapter order', () => {
+test('builds a deterministic Markdown share summary in the displayed chapter order', () => {
   withI18n({
     t: (key, params = {}) => ({
       'annotations.chapterNumber': `Chapter ${params.number}`,
       'annotations.annotationCount': `${params.count} annotations`,
       'annotations.authorSeparator': ' & ',
       'annotations.shareAuthors': 'Authors',
+      'annotations.shareCount': 'Annotations',
       'annotations.shareNote': 'Note',
     }[key] || key),
   }, () => {
@@ -120,16 +121,21 @@ test('builds a deterministic local-only share summary in the displayed chapter o
       { id: 'later', chapter_index: 2, created_at: '2026-08-12T00:00:00Z', text: 'Second highlight' },
       { id: 'first', chapter_index: 0, created_at: '2026-08-10T00:00:00Z', text: 'First highlight', note: 'Keep this note exactly.' },
     ], [{ chapter_index: 0, title: 'Opening' }, { chapter_index: 2, title: 'Ending' }]), [
-      'The Book',
-      'Authors: Ada & Ben',
-      '2 annotations',
+      '# The Book',
       '',
-      'Chapter 0 · Opening',
-      '“First highlight”',
-      'Note: Keep this note exactly.',
+      '- **Authors:** Ada & Ben',
+      '- **Annotations:** 2',
       '',
-      'Chapter 2 · Ending',
-      '“Second highlight”',
+      '## Chapter 0 · Opening',
+      '',
+      '> First highlight',
+      '',
+      '**Note:** Keep this note exactly.',
+      '',
+      '## Chapter 2 · Ending',
+      '',
+      '> Second highlight',
+      '',
     ].join('\n'));
   });
 });
@@ -141,12 +147,29 @@ test('omits absent authors and empty notes from a share summary', () => {
       'annotations.annotationCount': `${params.count} annotation`,
       'annotations.authorSeparator': ' & ',
       'annotations.shareAuthors': 'Authors',
+      'annotations.shareCount': 'Annotations',
       'annotations.shareNote': 'Note',
     }[key] || key),
   }, () => {
     assert.equal(Hub.buildShareSummary({ title: 'Untitled' }, [
       { chapter_index: 1, text: 'Exact source text', note: '   ' },
-    ], []), 'Untitled\n1 annotation\n\nChapter 1\n“Exact source text”');
+    ], []), '# Untitled\n\n- **Annotations:** 1\n\n## Chapter 1\n\n> Exact source text\n');
+  });
+});
+
+test('builds a standalone Markdown block with note and source context', () => {
+  withI18n({ t: key => key === 'annotations.shareNote' ? 'Note' : key }, () => {
+    assert.equal(Hub.buildAnnotationShare({
+      text: 'First line\nSecond line',
+      note: 'A private thought.',
+    }, { bookTitle: 'The Book', chapterTitle: 'Chapter 2 · Ending' }), [
+      '> First line',
+      '> Second line',
+      '',
+      '**Note:** A private thought.',
+      '',
+      '— The Book · Chapter 2 · Ending',
+    ].join('\n'));
   });
 });
 
@@ -155,8 +178,8 @@ test('only creates labelled share actions for a non-empty per-book view', async 
     document: fakeDocument(),
     EpubBrowserI18n: { t: key => ({
       'annotations.shareActions': 'Share annotations',
-      'annotations.copyShare': 'Copy to clipboard',
-      'annotations.exportShare': 'Export text',
+      'annotations.copyShare': 'Copy Markdown',
+      'annotations.exportShare': 'Export Markdown',
     }[key] || key) },
   }, async () => {
     assert.equal(Hub.createShareActions(null, [{ text: 'A' }], []), null);
@@ -167,8 +190,8 @@ test('only creates labelled share actions for a non-empty per-book view', async 
     assert.equal(actions.attributes.role, 'group');
     assert.equal(actions.attributes['aria-label'], 'Share annotations');
     assert.deepEqual(actions.children.map(button => [button.className, button.attributes['aria-label'], button.attributes['data-annotation-share-action']]), [
-      ['annotation-share-action', 'Copy to clipboard', 'copy'],
-      ['annotation-share-action', 'Export text', 'export'],
+      ['annotation-share-action', 'Copy Markdown', 'copy'],
+      ['annotation-share-action', 'Export Markdown', 'export'],
     ]);
   });
 });
@@ -346,12 +369,12 @@ test('downloads UTF-8 text with a safe deterministic filename and revokes its ob
     URL: { createObjectURL(blob) { created.push(blob); return 'blob:share'; }, revokeObjectURL(url) { revoked.push(url); } },
     document: { body, createElement: () => ({ click() { clicked = true; }, remove() {} }) },
   }, async () => {
-    assert.equal(Hub.shareFilename('  A / B: C?  ', 'Annotations'), 'A B C-annotations.txt');
-    assert.equal(Hub.shareFilename('...', 'Annotations'), 'Annotations-annotations.txt');
-    Hub.downloadShareText('Hello', 'A B C-annotations.txt');
+    assert.equal(Hub.shareFilename('  A / B: C?  ', 'Annotations'), 'A B C-annotations.md');
+    assert.equal(Hub.shareFilename('...', 'Annotations'), 'Annotations-annotations.md');
+    Hub.downloadShareText('Hello', 'A B C-annotations.md');
   });
   assert.equal(await created[0].text(), 'Hello');
-  assert.equal(created[0].type, 'text/plain;charset=utf-8');
+  assert.equal(created[0].type, 'text/markdown;charset=utf-8');
   assert.equal(clicked, true);
   assert.deepEqual(body.children, []);
   assert.deepEqual(revoked, ['blob:share']);
@@ -384,10 +407,14 @@ test('resolves an image note thumbnail relative to its chapter page', () => {
   assert.equal(Hub.annotationThumbnailHref({}), '');
 });
 
-test('renders an icon-only delete action outside the annotation card content', async () => {
+test('renders icon-only copy and delete actions outside the annotation card content', async () => {
   await withHubGlobals({
     document: fakeDocument(),
-    EpubBrowserI18n: { t: (key) => key === 'annotations.deleteAnnotation' ? 'Delete annotation' : key },
+    EpubBrowserI18n: { t: (key) => ({
+      'annotations.annotationActions': 'Annotation actions',
+      'annotations.copyAnnotation': 'Copy this annotation',
+      'annotations.deleteAnnotation': 'Delete annotation',
+    }[key] || key) },
   }, async () => {
     const row = Hub.annotationCard({
       id: 'annotation-1',
@@ -399,17 +426,48 @@ test('renders an icon-only delete action outside the annotation card content', a
 
     assert.equal(row.tagName, 'ARTICLE');
     assert.equal(row.className, 'annotation-card-row');
-    assert.deepEqual(row.children.map(child => child.className), ['annotation-card', 'annotation-card-delete']);
+    assert.deepEqual(row.children.map(child => child.className), ['annotation-card', 'annotation-card-actions']);
 
     const card = row.children[0];
-    const deleteButton = row.children[1];
+    const actions = row.children[1];
+    const copyButton = actions.children[0];
+    const deleteButton = actions.children[1];
     assert.equal(card.tagName, 'A');
+    assert.equal(actions.attributes.role, 'group');
+    assert.equal(actions.attributes['aria-label'], 'Annotation actions');
+    assert.equal(copyButton.tagName, 'BUTTON');
+    assert.equal(copyButton.attributes['aria-label'], 'Copy this annotation');
+    assert.deepEqual(copyButton.children.map(child => child.className), ['fas fa-copy']);
     assert.equal(deleteButton.tagName, 'BUTTON');
     assert.equal(deleteButton.textContent, '');
     assert.equal(deleteButton.attributes['aria-label'], 'Delete annotation');
     assert.equal(deleteButton.attributes.title, 'Delete annotation');
     assert.deepEqual(deleteButton.children.map(child => child.className), ['fas fa-trash-alt']);
   });
+});
+
+test('copies one annotation as Markdown and announces success', async () => {
+  const copied = [];
+  const notifications = [];
+  await withHubGlobals({
+    document: fakeDocument(),
+    navigator: { clipboard: { writeText: async text => copied.push(text) } },
+    EpubBrowserI18n: { t: key => ({
+      'annotations.annotationActions': 'Annotation actions',
+      'annotations.copyAnnotation': 'Copy this annotation',
+      'annotations.shareNote': 'Note',
+      'annotations.annotationCopied': 'Annotation copied as Markdown.',
+    }[key] || key) },
+    EpubBrowserNotification: { show: (message, type) => notifications.push([message, type]) },
+  }, async () => {
+    const row = Hub.annotationCard({ text: 'Highlighted text', note: 'Remember this.' }, {
+      bookTitle: 'Book', chapterTitle: 'Chapter 1',
+    });
+    row.children[1].children[0].listeners.click({ preventDefault() {}, stopPropagation() {} });
+    await new Promise(resolve => setImmediate(resolve));
+  });
+  assert.deepEqual(copied, ['> Highlighted text\n\n**Note:** Remember this.\n\n— Book · Chapter 1']);
+  assert.deepEqual(notifications, [['Annotation copied as Markdown.', 'success']]);
 });
 
 test('renders a compact thumbnail for an image note', async () => {

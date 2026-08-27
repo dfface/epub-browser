@@ -2537,6 +2537,16 @@ document.addEventListener('DOMContentLoaded', function() {{
             '<span data-i18n="ai.chapterRead">AI reading</span></button>'
             if self.deployment_mode == "server" else ""
         )
+        mobile_ai_followup_button = (
+            '<button class="control-btn" id="mobileAIChatBtn" type="button" '
+            'data-ai-followup-drawer '
+            f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}" '
+            'aria-label="Ask AI" title="Ask AI" '
+            'data-i18n-aria-label="ai.askChapter" data-i18n-title="ai.askChapter">'
+            '<i class="fas fa-comments" aria-hidden="true"></i>'
+            '<span data-i18n="ai.askChapter">Ask AI</span></button>'
+            if self.deployment_mode == "server" else ""
+        )
         ai_chapter_scripts = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
             if self.deployment_mode == "server" else ""
@@ -2986,6 +2996,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <span data-i18n="reader.thisChapterContents">This chapter</span>
         </button>
         {mobile_ai_reading_button}
+        {mobile_ai_followup_button}
         {prev_link_mobile}
         <a href="/" aria-label="Home" title="Home" data-i18n-aria-label="reader.home" data-i18n-title="reader.home">
             <div class="control-btn" aria-label="Home" data-i18n-aria-label="reader.home">
