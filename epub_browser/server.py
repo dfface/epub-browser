@@ -48,7 +48,7 @@ from .ai_reading import (
     _public_ai_result,
     validate_reading_request,
 )
-from .asset_publisher import PublishedAssets
+from .asset_publisher import PublishedAssets, rewrite_asset_urls
 from .dictionary_service import DictionaryService, DictionaryServiceError
 from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
@@ -604,6 +604,16 @@ def create_app(
             status_code=status,
             headers={'Cache-Control': cache_control},
         )
+
+    def current_published_assets():
+        manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        if not isinstance(manifest, dict) or not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in manifest.items()
+        ):
+            raise ValueError('Invalid asset manifest')
+        return PublishedAssets(manifest)
 
     def heartbeat_rate_limited(user_id, client_id):
         """Permit the normal 15-second cadence and a few transient retries."""
@@ -2743,15 +2753,8 @@ window.location.assign(payload.redirect||'/');
         # Keep the static fallback for partially initialized/legacy installs
         # where no manifest has been published yet.
         try:
-            manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
-            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-            if not isinstance(manifest, dict) or not all(
-                isinstance(key, str) and isinstance(value, str)
-                for key, value in manifest.items()
-            ):
-                raise ValueError('Invalid asset manifest')
             markup = render_library_shell(
-                (), PublishedAssets(manifest), SiteURLs(), deployment_mode='server'
+                (), current_published_assets(), SiteURLs(), deployment_mode='server'
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
@@ -2772,6 +2775,10 @@ window.location.assign(payload.redirect||'/');
     async def api_docs(request):
         require_principal(request)
         markup = render_api_docs(public_api_operations())
+        try:
+            markup = rewrite_asset_urls(markup, current_published_assets())
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            pass
         target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
         return apply_reader_security_headers(target, markup=markup)
 

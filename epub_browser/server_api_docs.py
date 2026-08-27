@@ -88,7 +88,7 @@ def render_api_docs(operations):
 <body class="api-docs-page" id="apiDocsTop">
 <a class="api-skip-link" href="#apiEndpointExplorer" data-i18n="apiDocs.skip">Skip to endpoints</a>
 <header class="api-topbar">
-    <a class="api-brand" href="/" aria-label="EPUB Browser"><span class="api-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a3 3 0 0 1 3 3v14a3 3 0 0 0-3-3H6.5A2.5 2.5 0 0 0 4 19.5v-14Z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H14v17a3 3 0 0 1 3-3h.5a2.5 2.5 0 0 1 2.5 2.5v-14Z"/></svg></span><span>EPUB Browser</span><span class="api-brand-divider" aria-hidden="true">/</span><strong>API</strong></a>
+    <a class="api-brand" href="/" aria-label="EPUB Browser"><img class="api-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt="" aria-hidden="true"><span>EPUB Browser</span><span class="api-brand-divider" aria-hidden="true">/</span><strong>API</strong></a>
     <a class="api-back-link" href="/" aria-label="Back to library" data-i18n-aria-label="apiDocs.back"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg><span data-i18n="apiDocs.back">Back to library</span></a>
 </header>
 <main class="api-shell">

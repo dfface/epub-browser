@@ -111,18 +111,11 @@ body.api-docs-page {
 }
 
 .api-brand-mark {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    border-radius: 9px;
-    background: color-mix(in srgb, var(--api-primary) 11%, var(--api-surface));
-    color: var(--api-primary);
-}
-
-.api-brand-mark svg {
-    width: 19px;
-    height: 19px;
+    display: block;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
 }
 
 .api-brand-divider {

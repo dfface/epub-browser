@@ -145,8 +145,26 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertIn('id="api-group-admin"', page.text)
         self.assertIn('href="/assets/api-docs.css"', page.text)
         self.assertIn('src="/assets/api-docs.js"', page.text)
+        self.assertIn('src="/assets/logo-mark-color.png"', page.text)
         self.assertIn("default-src 'self'", page.headers["content-security-policy"])
         self.assertEqual(page.headers["cache-control"], "private, no-store")
+
+    def test_api_docs_use_the_library_brand_asset_from_the_current_release(self):
+        logo_url = "/assets/immutable/logo-mark-color.release.png"
+        (self.public / "assets" / "asset-manifest.json").write_text(
+            json.dumps({"logo-mark-color.png": logo_url}),
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            _json_login(self, self.client, "alice", "secret").status_code,
+            200,
+        )
+
+        page = self.client.get("/api-docs")
+
+        self.assertEqual(page.status_code, 200, page.text)
+        self.assertIn(f'src="{logo_url}"', page.text)
+        self.assertNotIn('src="/assets/logo-mark-color.png"', page.text)
 
     def test_book_detail_toc_and_chapter_content_are_available(self):
         headers = self.bearer("library:read")
