@@ -9,6 +9,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from dataclasses import dataclass
+from typing import Optional
 
 
 WEBHOOK_EVENT_TYPES = frozenset({
@@ -57,6 +59,12 @@ class WebhookTransport:
             return int(error.code)
 
 
+@dataclass
+class _WorkerState:
+    stop: asyncio.Event
+    task: Optional[asyncio.Task] = None
+
+
 class WebhookService:
     def __init__(self, store, *, transport=None, clock=time.time, jitter=_random_jitter):
         self.store = store
@@ -64,8 +72,7 @@ class WebhookService:
         self.clock = clock
         self.jitter = jitter
         self.worker_id = uuid.uuid4().hex
-        self._task = None
-        self._stop = None
+        self._worker_states = {}
 
     async def run_once(self):
         now = self.clock()
@@ -99,23 +106,29 @@ class WebhookService:
         )
         return True
 
-    async def _run(self):
-        while self._stop is not None and not self._stop.is_set():
+    async def _run(self, state):
+        while not state.stop.is_set():
             if not await self.run_once():
                 try:
-                    await asyncio.wait_for(self._stop.wait(), timeout=1)
+                    await asyncio.wait_for(state.stop.wait(), timeout=1)
                 except asyncio.TimeoutError:
                     pass
 
     async def start_worker(self):
-        if self._task is None:
-            self.store.cleanup_webhook_history(now=self.clock(), retention_days=30)
-            self._stop = asyncio.Event()
-            self._task = asyncio.create_task(self._run())
+        current_loop = asyncio.get_running_loop()
+        state = self._worker_states.get(current_loop)
+        if state is not None and state.task is not None and not state.task.done():
+            return
+        self.store.cleanup_webhook_history(now=self.clock(), retention_days=30)
+        state = _WorkerState(stop=asyncio.Event())
+        self._worker_states[current_loop] = state
+        state.task = asyncio.create_task(self._run(state))
 
     async def stop_worker(self):
-        if self._task is not None:
-            self._stop.set()
-            await self._task
-            self._task = None
-            self._stop = None
+        current_loop = asyncio.get_running_loop()
+        state = self._worker_states.pop(current_loop, None)
+        if state is None:
+            return
+        state.stop.set()
+        if state.task is not None:
+            await state.task
