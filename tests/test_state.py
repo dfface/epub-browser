@@ -384,6 +384,22 @@ class StateStoreTests(unittest.TestCase):
         self.assertNotIn(issued.raw_token, row)
         self.assertEqual(json.loads(row[1]), ["library:read"])
 
+    def test_disabling_account_revokes_its_personal_access_tokens(self):
+        member = self.store.create_user("pat-member", hash_password("secret"))
+        issued = self.store.create_personal_access_token(
+            member.user_id, "Automation", {"library:read"}, expires_at=None
+        )
+
+        self.store.update_user(member.user_id, enabled=False)
+
+        self.assertIsNone(
+            self.store.authenticate_personal_access_token(issued.raw_token)
+        )
+        tokens = self.store.list_personal_access_tokens(
+            member.user_id, include_revoked=True
+        )
+        self.assertIsNotNone(tokens[0].revoked_at)
+
     def test_disabling_dictionary_clears_its_language_default(self):
         dictionary = self.store.create_dictionary(
             dictionary_id="dictionary-en",

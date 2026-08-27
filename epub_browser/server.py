@@ -1420,6 +1420,94 @@ window.location.assign(payload.redirect||'/');
             delete_session_cookie(revoked)
         return revoked
 
+    def personal_access_token_data(record):
+        def iso_timestamp(value):
+            if value is None:
+                return None
+            return datetime.fromtimestamp(
+                float(value), timezone.utc
+            ).isoformat().replace('+00:00', 'Z')
+
+        return {
+            'id': record.token_id,
+            'name': record.name,
+            'scopes': list(record.scopes),
+            'created_at': iso_timestamp(record.created_at),
+            'expires_at': iso_timestamp(record.expires_at),
+            'last_used_at': iso_timestamp(record.last_used_at),
+        }
+
+    async def own_personal_access_tokens(request):
+        principal = require_principal(request)
+        if request.method == 'GET':
+            return response({
+                'personal_access_tokens': [
+                    personal_access_token_data(record)
+                    for record in store.list_personal_access_tokens(
+                        principal.user_id
+                    )
+                ]
+            })
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        name = data.get('name')
+        current_password = data.get('current_password')
+        scopes = data.get('scopes')
+        expires_in_days = data.get('expires_in_days')
+        if (
+            not isinstance(name, str)
+            or not isinstance(current_password, str)
+            or not isinstance(scopes, list)
+            or expires_in_days not in (None, 30, 90, 180, 365)
+        ):
+            return response(
+                error_payload('invalid_personal_access_token', 'Invalid personal access token'),
+                400,
+            )
+        authenticated = auth_service.authenticate_password(
+            principal.username,
+            current_password,
+            client_key(request),
+        )
+        if authenticated is None or authenticated.user_id != principal.user_id:
+            return response(
+                error_payload('invalid_credentials', 'Invalid username or password'),
+                401,
+            )
+        if 'admin:data:read' in scopes and principal.role != 'admin':
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        expires_at = (
+            None
+            if expires_in_days is None
+            else time.time() + expires_in_days * 24 * 60 * 60
+        )
+        try:
+            issued = store.create_personal_access_token(
+                principal.user_id,
+                name,
+                scopes,
+                expires_at=expires_at,
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_personal_access_token', 'Invalid personal access token'),
+                400,
+            )
+        return response({
+            'personal_access_token': personal_access_token_data(issued.token),
+            'token': issued.raw_token,
+        }, 201, cache_control='no-store')
+
+    async def revoke_own_personal_access_token(request):
+        principal = require_principal(request)
+        if not store.revoke_personal_access_token(
+            principal.user_id,
+            request.path_params['token_id'],
+        ):
+            return response(error_payload('not_found', 'Personal access token not found'), 404)
+        return Response(status_code=204)
+
     async def admin_users(request):
         require_admin(request)
         if request.method == 'GET':
@@ -1519,6 +1607,7 @@ window.location.assign(payload.redirect||'/');
         updated = store.set_password_hash_and_revoke_sessions(
             user.user_id,
             hash_password(password),
+            revoke_personal_access_tokens=True,
         )
         return response({'user': user_data(updated)})
 
@@ -3358,6 +3447,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/account/password', change_password, methods=['PUT']),
         Route('/api/account/sessions', list_own_sessions, methods=['GET']),
         Route('/api/account/sessions/{session_id}', revoke_own_session, methods=['DELETE']),
+        Route('/api/account/pats', own_personal_access_tokens, methods=['GET', 'POST']),
+        Route('/api/account/pats/{token_id}', revoke_own_personal_access_token, methods=['DELETE']),
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT']),

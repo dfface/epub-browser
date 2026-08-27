@@ -2505,12 +2505,22 @@ class StateStore:
                     """,
                     (timestamp, user_id),
                 )
+            if enabled is False:
+                connection.execute(
+                    """
+                    UPDATE personal_access_tokens SET revoked_at = ?
+                    WHERE user_id = ? AND revoked_at IS NULL
+                    """,
+                    (timestamp, user_id),
+                )
             return self._get_user(connection, user_id)
 
     def set_password_hash_and_revoke_sessions(
         self,
         user_id: str,
         password_hash: str,
+        *,
+        revoke_personal_access_tokens: bool = False,
     ) -> UserRecord:
         timestamp = str(self._timestamp())
         with self._connection() as connection:
@@ -2531,6 +2541,14 @@ class StateStore:
                 """,
                 (timestamp, user_id),
             )
+            if revoke_personal_access_tokens:
+                connection.execute(
+                    """
+                    UPDATE personal_access_tokens SET revoked_at = ?
+                    WHERE user_id = ? AND revoked_at IS NULL
+                    """,
+                    (timestamp, user_id),
+                )
             return self._get_user(connection, user_id)
 
     def list_users(self) -> tuple[UserRecord, ...]:
