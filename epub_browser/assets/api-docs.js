@@ -79,7 +79,7 @@
       var query = normalizeQuery(search && search.value);
       var visible = 0;
       endpoints.forEach(function(endpoint) {
-        var matches = matchesEndpoint(endpoint.getAttribute('data-api-search'), query);
+        var matches = matchesEndpoint(endpoint.textContent || endpoint.getAttribute('data-api-search'), query);
         endpoint.hidden = !matches;
         if (matches) visible += 1;
       });

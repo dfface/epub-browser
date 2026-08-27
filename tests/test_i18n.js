@@ -93,6 +93,45 @@ test('all supported dictionaries have identical non-empty shapes and interpolati
   });
 });
 
+test('new locale packs have no unexpected English fallback copy', () => {
+  const locales = ['es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
+  const sharedInvariantKeys = new Set([
+    'common.brand',
+    'reader.pageRange',
+    'admin.userSummary',
+    'annotations.hexPlaceholder',
+    'annotations.authorSeparator',
+    'annotations.bylineSeparator',
+    'footer.poweredBySuffix',
+    'admin.dictionaryFormatMdictName',
+    'admin.dictionaryFormatStardictName',
+    'admin.webhooks.title',
+    'admin.webhooks.urlPlaceholder',
+  ]);
+  const nativeIdenticalKeys = {
+    es: ['theme.sepia', 'admin.books.profile.general', 'admin.ai.profile.general', 'admin.ai.jobs.header.error', 'ai.spoilers', 'book.totalChapters', 'annotations.color', 'readingInsights.duration.minute', 'apiDocs.endpointCount'],
+    de: ['common.version', 'theme.sepia', 'settings.optional', 'account.role.admin', 'admin.ai.jobs.statusFilter', 'admin.ai.jobs.header.status', 'account.pats.group.administration', 'admin.webhooks.name', 'apiDocs.format'],
+    fr: ['common.version', 'reader.annotations', 'library.annotations', 'admin.menu', 'admin.title', 'admin.books.profile.fiction', 'admin.books.header.action', 'admin.books.pageButton', 'admin.ai.profile.fiction', 'admin.ai.jobs.header.action', 'admin.ai.jobs.pageButton', 'ai.spoilers', 'ai.annotation.concept', 'ai.annotation.question', 'ai.libraryConfigVersion', 'ai.libraryVersionCount', 'ai.conversation', 'book.annotations', 'annotations.tab', 'annotations.hubTitle', 'annotations.annotationCount', 'annotations.shareCount', 'annotations.shareNote', 'annotations.shareFileFallback', 'annotations.noteAction', 'readingInsights.duration.minute', 'account.pats.group.annotations', 'account.pats.group.administration', 'account.pats.expiration', 'apiDocs.format', 'apiDocs.group.annotations'],
+    ru: [],
+    it: ['reader.home', 'account.menu', 'account.password', 'book.home', 'dictionary.source', 'readingInsights.duration.minute'],
+    'pt-BR': ['admin.ai.jobs.statusFilter', 'admin.ai.jobs.header.status', 'ai.spoilers', 'book.totalChapters', 'readingInsights.duration.minute', 'apiDocs.endpointCount'],
+    ar: [],
+    id: ['theme.sepia', 'theme.lavender', 'account.role.admin', 'admin.ai.model', 'admin.ai.jobs.statusFilter', 'admin.ai.jobs.header.status', 'book.totalChapters', 'apiDocs.format'],
+    hi: [],
+    vi: [],
+    th: [],
+    ms: ['theme.sepia', 'theme.lavender', 'admin.ai.model', 'admin.ai.jobs.statusFilter', 'admin.ai.jobs.header.status', 'bookshelf.import', 'readingInsights.duration.minute', 'apiDocs.format'],
+  };
+  locales.forEach(locale => {
+    const allowed = new Set(nativeIdenticalKeys[locale]);
+    Object.keys(dictionaries.en).forEach(key => {
+      const identical = JSON.stringify(dictionaries[locale][key]) === JSON.stringify(dictionaries.en[key]);
+      const intentional = key.startsWith('locale.name.') || sharedInvariantKeys.has(key) || allowed.has(key);
+      assert.equal(identical && !intentional, false, `${locale}:${key} unexpectedly falls back to English`);
+    });
+  });
+});
+
 test('translates the local annotation sharing actions in all five supported locales', () => {
   ['en', 'zh-CN', 'zh-TW', 'ko', 'ja'].forEach(locale => {
     [
@@ -203,6 +242,49 @@ test('provides native locale names and translated AI language labels', () => {
   assert.equal(dictionaries['zh-TW']['ai.title'], 'AI 閱讀');
   assert.equal(dictionaries.ko['account.signIn'], '로그인');
   assert.equal(dictionaries.ja['library.title'], 'ライブラリ');
+});
+
+test('new locale packs translate the Library and Book primary surfaces', () => {
+  const locales = ['es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
+  const keys = [
+    'library.navigation', 'library.bookCount', 'library.tagCount', 'library.shelf',
+    'library.searchPlaceholder', 'library.noTag', 'readingInsights.navigation',
+    'ai.library', 'book.navigation', 'book.shelf', 'book.startReading',
+    'book.addToShelf', 'book.tableOfContents', 'footer.poweredBy'
+  ];
+  locales.forEach(locale => {
+    keys.forEach(key => {
+      assert.notDeepEqual(dictionaries[locale][key], dictionaries.en[key], `${locale}:${key}`);
+    });
+  });
+  assert.equal(dictionaries.es['library.shelf'], 'Estantería');
+  assert.equal(dictionaries.es['readingInsights.navigation'], 'Estadísticas de lectura');
+  assert.equal(dictionaries.ar['library.navigation'], 'التنقل الرئيسي');
+});
+
+test('new locale packs translate every Library, Book, Chapter, and API Docs message', () => {
+  const locales = ['es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
+  const namespaces = /^(library|book|reader|settings|apiDocs)\./;
+  const intentionalInvariants = {
+    es: ['reader.pageRange', 'book.totalChapters', 'apiDocs.endpointCount'],
+    de: ['reader.pageRange', 'settings.optional', 'apiDocs.format'],
+    fr: ['reader.annotations', 'reader.pageRange', 'library.annotations', 'book.annotations', 'apiDocs.format', 'apiDocs.group.annotations'],
+    ru: ['reader.pageRange'],
+    it: ['reader.home', 'reader.pageRange', 'book.home'],
+    'pt-BR': ['reader.pageRange', 'book.totalChapters', 'apiDocs.endpointCount'],
+    ar: ['reader.pageRange'],
+    id: ['reader.pageRange', 'book.totalChapters', 'apiDocs.format'],
+    hi: ['reader.pageRange'],
+    vi: ['reader.pageRange'],
+    th: ['reader.pageRange'],
+    ms: ['reader.pageRange', 'apiDocs.format'],
+  };
+  locales.forEach(locale => {
+    const unchanged = Object.keys(dictionaries.en).filter(key => (
+      namespaces.test(key) && dictionaries[locale][key] === dictionaries.en[key]
+    ));
+    assert.deepEqual(unchanged, intentionalInvariants[locale], `${locale} untranslated page copy`);
+  });
 });
 
 test('localizes every navigation behavior choice and its helper copy', () => {

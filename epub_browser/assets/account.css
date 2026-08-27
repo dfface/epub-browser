@@ -106,13 +106,11 @@ body.auth-page {
 }
 
 .auth-brand-mark {
-    display: grid;
-    width: 38px;
-    height: 38px;
-    place-items: center;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--account-primary) 10%, var(--account-card));
-    font-size: 1.25rem;
+    display: block;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    object-fit: contain;
 }
 
 .auth-language {

@@ -346,6 +346,12 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertIn('href="/assets/account.css"', english.text)
         self.assertIn('href="/assets/theme.css"', english.text)
         self.assertIn('src="/assets/theme-bootstrap.js"', english.text)
+        self.assertIn(
+            '<img class="auth-brand-mark" src="/assets/logo-mark-color.png" '
+            'width="32" height="32" alt="" aria-hidden="true">',
+            english.text,
+        )
+        self.assertNotIn('📖', english.text)
         self.assertIn('src="/assets/version-check.js"', english.text)
         self.assertIn('data-id="eb-footer"', english.text)
         self.assertIn('data-i18n="footer.product"', english.text)
@@ -369,6 +375,9 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertIn('text/css', account_styles.headers['content-type'])
         self.assertIn('.auth-card', account_styles.text)
         self.assertIn('.account-layout', account_styles.text)
+        logo = self.client.get('/assets/logo-mark-color.png')
+        self.assertEqual(logo.status_code, 200)
+        self.assertEqual(logo.headers['content-type'], 'image/png')
 
         for path in ("/", "/index.html", "/login", "/reader.html"):
             with self.subTest(path=path):
@@ -716,6 +725,29 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(ready.json()["state"], "ready")
         self.assertEqual(ready.headers["cache-control"], "no-cache")
 
+    def test_declared_public_endpoints_and_assets_need_no_session(self):
+        for path in (
+            '/login',
+            '/openapi.json',
+            '/api-docs',
+            '/api/health',
+            '/api/ready',
+            '/api/version',
+            '/sw.js',
+            '/assets/account.css',
+            '/assets/api-docs.css',
+            '/assets/api-docs.js',
+            '/assets/auth.js',
+            '/assets/i18n.js',
+            '/assets/logo-mark-color.png',
+            '/assets/theme-bootstrap.js',
+            '/assets/theme.css',
+            '/assets/version-check.js',
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertNotIn(response.status_code, {401, 403})
+
     def test_password_login_sets_session_and_requires_csrf_to_write(self):
         response = _json_login(
             self,
@@ -873,6 +905,12 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('href="/assets/account.css"', english.text)
         self.assertIn('href="/assets/theme.css"', english.text)
         self.assertIn('src="/assets/theme-bootstrap.js"', english.text)
+        self.assertIn(
+            '<img class="auth-brand-mark" src="/assets/logo-mark-color.png" '
+            'width="32" height="32" alt="" aria-hidden="true">',
+            english.text,
+        )
+        self.assertNotIn('📖', english.text)
         self.assertIn('src="/assets/version-check.js"', english.text)
         self.assertIn('data-id="eb-footer"', english.text)
         self.assertIn('data-current-version=', english.text)
@@ -1010,7 +1048,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(failed.status_code, 500)
         self.assertEqual(
             failed.headers.get("cache-control"),
-            "private, no-cache",
+            "no-store",
         )
         self.assertEqual(
             failed.json(),
@@ -3388,8 +3426,11 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(cached.headers["cache-control"], "private, no-cache")
 
     def test_mutable_assets_and_worker_revalidate(self):
+        cover = self.client.get("/assets/cover.webp")
+        self.assertEqual(cover.status_code, 200)
+        self.assertEqual(cover.headers["cache-control"], "private, no-cache")
+
         for path in (
-            "/assets/cover.webp",
             "/assets/manifest.json",
             "/assets/manifest.en.json",
             "/assets/manifest.zh-CN.json",
@@ -3400,7 +3441,7 @@ class ServerCacheTests(unittest.TestCase):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.headers["cache-control"], "private, no-cache")
+                self.assertEqual(response.headers["cache-control"], "no-cache")
 
     def test_server_serves_a_public_no_cache_service_worker_tombstone(self):
         with TestClient(self.app, follow_redirects=False) as anonymous:

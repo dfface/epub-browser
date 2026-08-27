@@ -5,6 +5,7 @@ import html
 import ipaddress
 import json
 import math
+import mimetypes
 import os
 import posixpath
 import re
@@ -88,19 +89,31 @@ ADMIN_AI_JOB_STATUSES = frozenset({
 })
 ADMIN_AI_JOB_MAX_PAGE = 1_000_000
 ADMIN_AI_JOB_MAX_PAGE_SIZE = 100
-PUBLIC_AUTH_ENDPOINTS = frozenset({
+PUBLIC_UNAUTHENTICATED_ENDPOINTS = frozenset({
     '/setup',
     '/login',
     '/logout',
     '/sw.js',
+    '/openapi.json',
+    '/api-docs',
+    '/api/health',
+    '/api/ready',
     '/api/version',
 })
-PUBLIC_LOGIN_ASSETS = frozenset({
+PUBLIC_SESSION_AWARE_ENDPOINTS = frozenset({'/setup', '/login', '/logout'})
+PUBLIC_STATELESS_ENDPOINTS = (
+    PUBLIC_UNAUTHENTICATED_ENDPOINTS - PUBLIC_SESSION_AWARE_ENDPOINTS
+)
+PUBLIC_PRE_SETUP_ENDPOINTS = (
+    PUBLIC_STATELESS_ENDPOINTS - frozenset({'/api/health', '/api/ready'})
+) | frozenset({'/setup'})
+PUBLIC_UNAUTHENTICATED_ASSETS = frozenset({
     '/assets/account.css',
     '/assets/api-docs.css',
     '/assets/api-docs.js',
     '/assets/auth.js',
     '/assets/i18n.js',
+    '/assets/logo-mark-color.png',
     '/assets/theme-bootstrap.js',
     '/assets/theme.css',
     '/assets/version-check.js',
@@ -299,10 +312,10 @@ def error_payload(code, message):
     return {'code': code, 'message': message}
 
 
-def route_is_public_auth_endpoint(path):
+def route_is_public_unauthenticated(path):
     return (
-        path in PUBLIC_AUTH_ENDPOINTS
-        or path in PUBLIC_LOGIN_ASSETS
+        path in PUBLIC_UNAUTHENTICATED_ENDPOINTS
+        or path in PUBLIC_UNAUTHENTICATED_ASSETS
         or path in PUBLIC_WEB_MANIFESTS
     )
 
@@ -946,6 +959,14 @@ def create_app(
             cache_control='no-store',
         )
 
+    def auth_brand_markup():
+        return (
+            '<div class="auth-brand">'
+            '<img class="auth-brand-mark" src="/assets/logo-mark-color.png" '
+            'width="32" height="32" '
+            'alt="" aria-hidden="true"><span>EPUB Browser</span></div>'
+        )
+
     def public_json_error(error):
         if error == 'unsupported_media_type':
             return response(
@@ -992,6 +1013,7 @@ def create_app(
         )
         language_options = locale_options(locale)
         footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
+        brand_markup = auth_brand_markup()
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -1004,7 +1026,7 @@ def create_app(
 <script src="/assets/version-check.js" defer></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
 </head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card setup-card">
-<header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
+<header class="auth-card-header">{brand_markup}
 <label class="auth-language setup-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
 <select id="setupLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
 {language_options}
@@ -1166,6 +1188,7 @@ if(localeField)localeField.value=localeSelect.value;
         )
         language_options = locale_options(locale)
         footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
+        brand_markup = auth_brand_markup()
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -1179,7 +1202,7 @@ if(localeField)localeField.value=localeSelect.value;
 <script src="/assets/version-check.js" defer></script>
 <script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
 </head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
-<header class="auth-card-header"><div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">📖</span><span>EPUB Browser</span></div>
+<header class="auth-card-header">{brand_markup}
 <label class="auth-language login-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
 <select id="loginLocaleSelect" aria-label="{copy['language']}" data-i18n-aria-label="common.language">
 {language_options}
@@ -2760,13 +2783,12 @@ window.location.assign(payload.redirect||'/');
         return response(openapi_document(), cache_control='public, max-age=300')
 
     async def api_docs(request):
-        require_principal(request)
         markup = render_api_docs(public_api_operations())
         try:
             markup = rewrite_asset_urls(markup, current_published_assets())
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             pass
-        target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        target = HTMLResponse(markup, headers={'Cache-Control': 'public, max-age=300'})
         return apply_reader_security_headers(target, markup=markup)
 
     async def reading_insights_page(request):
@@ -2790,10 +2812,10 @@ window.location.assign(payload.redirect||'/');
             path = normalize_public_path(request.path_params['path'])
         except ValueError:
             return response(error_payload('not_found', 'Not Found'), 404)
-        if '/' + path in PUBLIC_LOGIN_ASSETS:
+        if '/' + path in PUBLIC_UNAUTHENTICATED_ASSETS:
             return FileResponse(
                 os.path.join(os.path.dirname(__file__), path),
-                media_type='text/css' if path.endswith('.css') else 'text/javascript',
+                media_type=mimetypes.guess_type(path)[0] or 'application/octet-stream',
                 headers={'Cache-Control': 'no-cache'},
             )
         if '/' + path in PUBLIC_WEB_MANIFESTS:
@@ -3632,16 +3654,17 @@ window.location.assign(payload.redirect||'/');
         path = request.url.path
         if not store.has_administrator():
             if (
-                path in {'/setup', '/sw.js'}
-                or path in PUBLIC_LOGIN_ASSETS
+                path in PUBLIC_PRE_SETUP_ENDPOINTS
+                or path in PUBLIC_UNAUTHENTICATED_ASSETS
                 or path in PUBLIC_WEB_MANIFESTS
-                or path == '/api/version'
             ):
                 return await call_next(request)
             return setup_required_response(request)
-        if path == '/sw.js':
-            return await call_next(request)
-        if path == '/openapi.json':
+        if (
+            path in PUBLIC_STATELESS_ENDPOINTS
+            or path in PUBLIC_UNAUTHENTICATED_ASSETS
+            or path in PUBLIC_WEB_MANIFESTS
+        ):
             return await call_next(request)
         if path.startswith('/api/v1/'):
             authorized = await call_next(request)
@@ -3652,9 +3675,8 @@ window.location.assign(payload.redirect||'/');
         principal = session_principal
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
-        is_public_auth = route_is_public_auth_endpoint(path)
         if principal is None:
-            if is_public_auth or path in {'/api/health', '/api/ready'}:
+            if route_is_public_unauthenticated(path):
                 return await call_next(request)
             return unauthenticated_response(request)
         if request.method not in SAFE_METHODS:

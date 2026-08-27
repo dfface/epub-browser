@@ -124,15 +124,9 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         served = self.client.get("/openapi.json")
         self.assertEqual(served.status_code, 200)
         self.assertEqual(served.json()["openapi"], "3.1.0")
-        self.assertEqual(self.client.get("/api-docs").status_code, 403)
+        self.assertEqual(self.client.get("/api-docs").status_code, 200)
 
-    def test_api_docs_are_grouped_searchable_and_session_protected(self):
-        self.assertEqual(self.client.get("/api-docs").status_code, 403)
-        self.assertEqual(
-            _json_login(self, self.client, "alice", "secret").status_code,
-            200,
-        )
-
+    def test_api_docs_are_grouped_searchable_and_public(self):
         page = self.client.get("/api-docs")
 
         self.assertEqual(page.status_code, 200, page.text)
@@ -141,13 +135,16 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             len(public_api_operations()),
         )
         self.assertIn('id="apiEndpointSearch"', page.text)
+        self.assertIn('data-i18n="apiDocs.operation.listBooks"', page.text)
+        self.assertIn('data-i18n="apiDocs.exampleListBooks"', page.text)
+        self.assertIn('<code dir="ltr">/api/v1</code>', page.text)
         self.assertIn('id="api-group-library"', page.text)
         self.assertIn('id="api-group-admin"', page.text)
         self.assertIn('href="/assets/api-docs.css"', page.text)
         self.assertIn('src="/assets/api-docs.js"', page.text)
         self.assertIn('src="/assets/logo-mark-color.png"', page.text)
         self.assertIn("default-src 'self'", page.headers["content-security-policy"])
-        self.assertEqual(page.headers["cache-control"], "private, no-store")
+        self.assertEqual(page.headers["cache-control"], "public, max-age=300")
 
     def test_api_docs_use_the_library_brand_asset_from_the_current_release(self):
         logo_url = "/assets/immutable/logo-mark-color.release.png"

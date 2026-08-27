@@ -456,7 +456,7 @@ class I18nCoverageTests(unittest.TestCase):
             'ai.annotation.vocabulary',
             'reader.locateCurrentChapter',
         ):
-            self.assertEqual(source.count("'" + key + "'"), 5, key)
+            self.assertEqual(source.count("'" + key + "'"), 17, key)
 
     def test_generation_stage_and_task_limit_copy_exists_in_both_locales(self):
         required = {

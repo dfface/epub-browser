@@ -27,15 +27,17 @@ def _i18n_params(**params):
 def _operation_markup(operation):
     method = operation.methods[0]
     searchable = " ".join((method, operation.path, operation.required_scope, operation.summary))
+    summary_key = "apiDocs.operation.{0}".format(operation.operation_id)
     return '''<li class="api-endpoint" data-api-endpoint data-api-search="{searchable}">
-    <div class="api-endpoint-route"><span class="api-method api-method-{method_class}">{method}</span><code>{path}</code></div>
-    <div class="api-endpoint-detail"><span class="api-scope">{scope}</span><p>{summary}</p></div>
+    <div class="api-endpoint-route"><span class="api-method api-method-{method_class}" dir="ltr">{method}</span><code dir="ltr">{path}</code></div>
+    <div class="api-endpoint-detail"><span class="api-scope" dir="ltr">{scope}</span><p data-i18n="{summary_key}">{summary}</p></div>
 </li>'''.format(
         searchable=html.escape(searchable.lower(), quote=True),
         method_class=html.escape(method.lower(), quote=True),
         method=html.escape(method),
         path=html.escape(operation.path),
         scope=html.escape(operation.required_scope),
+        summary_key=html.escape(summary_key, quote=True),
         summary=html.escape(operation.summary),
     )
 
@@ -94,11 +96,11 @@ def render_api_docs(operations):
 <main class="api-shell">
     <section class="api-hero" aria-labelledby="apiDocsTitle">
         <div class="api-hero-copy"><p class="api-eyebrow"><span>OpenAPI 3.1</span><span data-i18n="apiDocs.authBadge">Bearer PAT authentication</span></p><h1 id="apiDocsTitle" data-i18n="apiDocs.title">Build with your EPUB library</h1><p data-i18n="apiDocs.intro">Read books and chapters, sync personal reading data, or inspect account data with an administrator token.</p><div class="api-hero-actions"><a class="api-primary-action" href="/openapi.json" download><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg><span data-i18n="apiDocs.download">Download OpenAPI JSON</span></a><a class="api-secondary-action" href="#apiEndpointExplorer" data-i18n="apiDocs.browse">Browse endpoints</a></div></div>
-        <aside class="api-hero-facts" aria-label="API details" data-i18n-aria-label="apiDocs.details"><div><span data-i18n="apiDocs.basePath">Base path</span><code>/api/v1</code></div><div><span data-i18n="apiDocs.format">Format</span><strong>JSON</strong></div><div><span data-i18n="apiDocs.operations">Operations</span><strong>{count}</strong></div></aside>
+        <aside class="api-hero-facts" aria-label="API details" data-i18n-aria-label="apiDocs.details"><div><span data-i18n="apiDocs.basePath">Base path</span><code dir="ltr">/api/v1</code></div><div><span data-i18n="apiDocs.format">Format</span><strong>JSON</strong></div><div><span data-i18n="apiDocs.operations">Operations</span><strong>{count}</strong></div></aside>
     </section>
     <section class="api-quickstart" aria-labelledby="apiQuickstartTitle">
         <div class="api-steps"><p class="api-section-kicker" data-i18n="apiDocs.getStarted">Get started</p><h2 id="apiQuickstartTitle" data-i18n="apiDocs.quickstart">Authenticate your first request</h2><ol><li><span>1</span><div><strong data-i18n="apiDocs.step1Title">Create a token</strong><p data-i18n="apiDocs.step1Body">Open Account settings, create a PAT, and choose only the scopes your integration needs.</p></div></li><li><span>2</span><div><strong data-i18n="apiDocs.step2Title">Add the Bearer header</strong><p data-i18n="apiDocs.step2Body">Send the token in the Authorization header. This documentation page never reads or stores it.</p></div></li><li><span>3</span><div><strong data-i18n="apiDocs.step3Title">Call a versioned endpoint</strong><p data-i18n="apiDocs.step3Body">All public endpoints live under /api/v1 and return JSON unless documented otherwise.</p></div></li></ol></div>
-        <div class="api-code-card"><div class="api-code-header"><div><p data-i18n="apiDocs.example">Example request</p><strong>List books</strong></div><button type="button" id="apiCopyExample" data-i18n="apiDocs.copy">Copy</button></div><pre><code id="apiExampleCode">curl --request GET \\
+        <div class="api-code-card"><div class="api-code-header"><div><p data-i18n="apiDocs.example">Example request</p><strong data-i18n="apiDocs.exampleListBooks">List books</strong></div><button type="button" id="apiCopyExample" data-i18n="apiDocs.copy">Copy</button></div><pre dir="ltr"><code id="apiExampleCode">curl --request GET \\
   --header "Authorization: Bearer $EPUB_BROWSER_PAT" \\
   "$EPUB_BROWSER_URL/api/v1/books"</code></pre><p class="api-code-note" data-i18n="apiDocs.envHint">Keep the token in an environment variable instead of placing it in source code.</p><p class="api-copy-status" id="apiCopyStatus" role="status" aria-live="polite"></p></div>
     </section>
