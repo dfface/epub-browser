@@ -339,6 +339,51 @@
       }));
     }
 
+    function confirmWebhookDeletion(name) {
+      if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') return Promise.resolve(false);
+      return Promise.resolve(root.EpubDialog.confirm({
+        title: t('admin.webhooks.delete'),
+        message: t('admin.webhooks.deleteConfirm', { name: name }),
+        confirmText: t('admin.webhooks.delete'),
+        destructive: true
+      }));
+    }
+
+    function confirmPatRevocation(name) {
+      if (!root.EpubDialog || typeof root.EpubDialog.confirm !== 'function') return Promise.resolve(false);
+      return Promise.resolve(root.EpubDialog.confirm({
+        title: t('account.pats.revoke'),
+        message: t('account.pats.revokeConfirm', { name: name }),
+        confirmText: t('account.pats.revoke'),
+        destructive: true
+      }));
+    }
+
+    function copySensitiveText(value) {
+      if (!value) return Promise.reject(new Error('empty_copy_value'));
+      if (root.navigator && root.navigator.clipboard && typeof root.navigator.clipboard.writeText === 'function') {
+        return root.navigator.clipboard.writeText(value);
+      }
+      return new Promise(function(resolve, reject) {
+        var field;
+        try {
+          field = root.document.createElement('textarea');
+          field.value = value;
+          field.setAttribute('readonly', '');
+          field.style.position = 'fixed';
+          field.style.opacity = '0';
+          root.document.body.appendChild(field);
+          field.select();
+          if (!root.document.execCommand || !root.document.execCommand('copy')) throw new Error('copy_failed');
+          field.remove();
+          resolve();
+        } catch (error) {
+          if (field && field.remove) field.remove();
+          reject(error);
+        }
+      });
+    }
+
     function confirmAdminBookBulkOperation(operation, params) {
       var actionKey = operation === 'restrict'
         ? 'admin.books.bulk.restrict'
@@ -1278,16 +1323,16 @@
         details.appendChild(dates);
         item.appendChild(details);
         item.appendChild(actionButton('account.pats.revoke', function() {
-          var confirmed = typeof root.confirm !== 'function'
-            || root.confirm(t('account.pats.revokeConfirm', { name: record.name }));
-          if (!confirmed) return;
-          authenticatedFetch('/api/account/pats/' + encodeURIComponent(record.id), {
-            method: 'DELETE'
-          }).then(function(response) {
-            if (!response.ok) return showResponseError(response, 'account');
-            showStatus('account.pats.revoked', 'success');
-            return loadPersonalAccessTokens();
-          }).catch(function() { showStatus('account.error.network', 'error'); });
+          return confirmPatRevocation(record.name).then(function(confirmed) {
+            if (!confirmed) return;
+            return authenticatedFetch('/api/account/pats/' + encodeURIComponent(record.id), {
+              method: 'DELETE'
+            }).then(function(response) {
+              if (!response.ok) return showResponseError(response, 'account');
+              showStatus('account.pats.revoked', 'success');
+              return loadPersonalAccessTokens();
+            }).catch(function() { showStatus('account.error.network', 'error'); });
+          });
         }, 'danger'));
         list.appendChild(item);
       });
@@ -1317,6 +1362,10 @@
       var region = element('adminWebhookSecretRegion');
       if (secret) secret.textContent = value || '';
       if (region) region.hidden = !value;
+      if (value) {
+        var copy = element('adminWebhookCopySecret');
+        if (copy && copy.focus) copy.focus();
+      }
     }
 
     function renderWebhooks(endpoints, deliveries) {
@@ -1331,6 +1380,8 @@
           var name = root.document.createElement('strong');
           var url = root.document.createElement('span');
           var events = root.document.createElement('span');
+          var stateKey = endpoint.enabled ? 'admin.webhooks.status.enabled' : 'admin.webhooks.status.paused';
+          var state = createTextElement('span', '', stateKey);
           item.className = 'account-list-item admin-webhook-item';
           summary.className = 'admin-webhook-summary';
           name.textContent = endpoint.name;
@@ -1338,10 +1389,37 @@
           url.textContent = endpoint.url;
           events.className = 'admin-webhook-events-copy';
           events.textContent = (endpoint.event_types || []).join(' · ');
+          state.className = 'account-status-badge ' + (endpoint.enabled ? 'is-success' : 'is-muted');
           summary.appendChild(name);
           summary.appendChild(url);
           summary.appendChild(events);
+          summary.appendChild(state);
           actions.className = 'account-list-actions';
+          actions.appendChild(actionButton('admin.webhooks.edit', function() {
+            var form = element('adminWebhookForm');
+            if (!form || !form.elements) return;
+            form.elements.name.value = endpoint.name;
+            form.elements.url.value = endpoint.url;
+            form.elements.enabled.checked = endpoint.enabled;
+            Array.prototype.forEach.call(form.querySelectorAll('input[name="event_types"]'), function(input) {
+              input.checked = (endpoint.event_types || []).indexOf(input.value) !== -1;
+            });
+            form.setAttribute('data-editing-id', endpoint.id);
+            var submit = element('adminWebhookSubmit');
+            if (submit) {
+              submit.setAttribute('data-i18n', 'admin.webhooks.update');
+              if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(submit.parentNode);
+            }
+            var cancel = element('adminWebhookCancelEdit');
+            if (cancel) cancel.hidden = false;
+            if (form.elements.name.focus) form.elements.name.focus();
+          }));
+          actions.appendChild(actionButton(endpoint.enabled ? 'admin.webhooks.pause' : 'admin.webhooks.resume', function() {
+            return authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id), {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: endpoint.name, url: endpoint.url, event_types: endpoint.event_types, enabled: !endpoint.enabled })
+            }).then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+          }));
           actions.appendChild(actionButton('admin.webhooks.test', function() {
             authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id) + '/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
               .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
@@ -1352,9 +1430,11 @@
               .then(function(payload) { if (payload) showWebhookSecret(payload.secret); });
           }));
           actions.appendChild(actionButton('admin.webhooks.delete', function() {
-            if (typeof root.confirm === 'function' && !root.confirm(t('admin.webhooks.deleteConfirm', { name: endpoint.name }))) return;
-            authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id), { method: 'DELETE' })
-              .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+            return confirmWebhookDeletion(endpoint.name).then(function(confirmed) {
+              if (!confirmed) return;
+              return authenticatedFetch('/api/admin/webhooks/' + encodeURIComponent(endpoint.id), { method: 'DELETE' })
+                .then(function(response) { if (!response.ok) return showResponseError(response, 'admin'); return loadWebhooks(); });
+            });
           }, 'danger'));
           item.appendChild(summary);
           item.appendChild(actions);
@@ -2690,6 +2770,7 @@
       panel.setAttribute('aria-hidden', 'true');
       setSurfaceLoading('adminPanel', 'adminPanelLoading', false);
       stopAdminAiJobPolling();
+      showWebhookSecret('');
     }
 
     function bindUi() {
@@ -2704,6 +2785,8 @@
       var patCopySecret = element('patCopySecret');
       var webhookForm = element('adminWebhookForm');
       var webhookSubmit = element('adminWebhookSubmit');
+      var webhookCopySecret = element('adminWebhookCopySecret');
+      var webhookCancelEdit = element('adminWebhookCancelEdit');
       var createUserForm = element('adminUserForm');
       var createUserSubmit = element('adminUserSubmit');
       var aiSettingsForm = element('adminAiSettingsForm');
@@ -2839,26 +2922,53 @@
       if (patCopySecret) patCopySecret.addEventListener('click', function() {
         var secret = element('patCreatedSecret');
         var value = secret && secret.textContent;
-        if (!value || !root.navigator || !root.navigator.clipboard) return;
-        root.navigator.clipboard.writeText(value).then(function() {
+        copySensitiveText(value).then(function() {
           var live = element('patLive');
           if (live) live.textContent = t('account.pats.copied');
         }).catch(function() { showStatus('account.pats.copyFailed', 'error'); });
+      });
+      if (webhookCopySecret) webhookCopySecret.addEventListener('click', function() {
+        var secret = element('adminWebhookSecret');
+        copySensitiveText(secret && secret.textContent).then(function() {
+          var live = element('adminWebhookLive');
+          if (live) {
+            live.setAttribute('data-i18n', 'admin.webhooks.copied');
+            if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(live.parentNode);
+          }
+        }).catch(function() { showStatus('admin.webhooks.copyFailed', 'error'); });
+      });
+      if (webhookCancelEdit) webhookCancelEdit.addEventListener('click', function() {
+        webhookForm.reset();
+        webhookForm.removeAttribute('data-editing-id');
+        webhookForm.elements.enabled.checked = true;
+        webhookCancelEdit.hidden = true;
+        if (webhookSubmit) {
+          webhookSubmit.setAttribute('data-i18n', 'admin.webhooks.create');
+          if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(webhookSubmit.parentNode);
+        }
+        if (webhookForm.elements.name.focus) webhookForm.elements.name.focus();
       });
       if (webhookForm) webhookForm.addEventListener('submit', function(event) {
         event.preventDefault();
         showWebhookSecret('');
         runButtonOperation(webhookSubmit, 'admin.webhooks.creating', function() {
           var events = Array.prototype.map.call(webhookForm.querySelectorAll('input[name="event_types"]:checked'), function(input) { return input.value; });
-          return authenticatedFetch('/api/admin/webhooks', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+          var editingId = webhookForm.getAttribute('data-editing-id');
+          return authenticatedFetch(editingId ? '/api/admin/webhooks/' + encodeURIComponent(editingId) : '/api/admin/webhooks', {
+            method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: formValue(webhookForm, 'name'), url: formValue(webhookForm, 'url'), event_types: events, enabled: webhookForm.elements.enabled.checked })
           }).then(function(response) {
             if (!response.ok) return showResponseError(response, 'admin');
             return readJson(response).then(function(payload) {
               showWebhookSecret(payload.secret);
               webhookForm.reset();
+              webhookForm.removeAttribute('data-editing-id');
               webhookForm.elements.enabled.checked = true;
+              if (webhookCancelEdit) webhookCancelEdit.hidden = true;
+              if (webhookSubmit) {
+                webhookSubmit.setAttribute('data-i18n', 'admin.webhooks.create');
+                if (root.EpubBrowserI18n) root.EpubBrowserI18n.translateDocument(webhookSubmit.parentNode);
+              }
               clearAdminDirty();
               return loadWebhooks();
             });

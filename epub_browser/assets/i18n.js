@@ -5474,7 +5474,8 @@
       'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': 'Review created', 'admin.webhooks.event.reviewUpdated': 'Review updated', 'admin.webhooks.event.reviewDeleted': 'Review deleted', 'admin.webhooks.event.bookCreated': 'Book created', 'admin.webhooks.event.bookUpdated': 'Book updated', 'admin.webhooks.event.bookRemoved': 'Book removed', 'admin.webhooks.event.conversionSucceeded': 'Conversion succeeded', 'admin.webhooks.event.conversionFailed': 'Conversion failed',
       'admin.webhooks.create': 'Add endpoint', 'admin.webhooks.creating': 'Adding…', 'admin.webhooks.secretOnce': 'Copy the signing secret now. It will not be shown again.',
       'admin.webhooks.deliveries': 'Recent deliveries', 'admin.webhooks.test': 'Send test', 'admin.webhooks.rotate': 'Rotate secret', 'admin.webhooks.delete': 'Delete',
-      'admin.webhooks.deleteConfirm': 'Delete WebHook “{name}”?', 'admin.webhooks.empty': 'No WebHook endpoints yet.', 'admin.webhooks.noDeliveries': 'No deliveries yet.'
+      'admin.webhooks.copySecret': 'Copy secret', 'admin.webhooks.update': 'Save endpoint', 'admin.webhooks.edit': 'Edit', 'admin.webhooks.pause': 'Pause', 'admin.webhooks.resume': 'Resume', 'admin.webhooks.status.enabled': 'Enabled', 'admin.webhooks.status.paused': 'Paused', 'admin.webhooks.copied': 'Secret copied.', 'admin.webhooks.copyFailed': 'Could not copy the secret.',
+      'admin.webhooks.deleteConfirm': 'Delete WebHook “{name}”?', 'admin.webhooks.empty': 'No WebHook endpoints yet.', 'admin.webhooks.noDeliveries': 'No deliveries yet.', 'admin.webhooks.cancelEdit': 'Cancel editing'
     },
     'zh-CN': {
       'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '向管理员配置的 HTTP 端点发送带签名的事件通知。',
@@ -5482,7 +5483,8 @@
       'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': '书评已创建', 'admin.webhooks.event.reviewUpdated': '书评已更新', 'admin.webhooks.event.reviewDeleted': '书评已删除', 'admin.webhooks.event.bookCreated': '书籍已创建', 'admin.webhooks.event.bookUpdated': '书籍已更新', 'admin.webhooks.event.bookRemoved': '书籍已移除', 'admin.webhooks.event.conversionSucceeded': '转换成功', 'admin.webhooks.event.conversionFailed': '转换失败',
       'admin.webhooks.create': '添加端点', 'admin.webhooks.creating': '正在添加…', 'admin.webhooks.secretOnce': '请立即复制签名密钥，之后不会再次显示。',
       'admin.webhooks.deliveries': '最近投递', 'admin.webhooks.test': '发送测试', 'admin.webhooks.rotate': '轮换密钥', 'admin.webhooks.delete': '删除',
-      'admin.webhooks.deleteConfirm': '删除 WebHook“{name}”？', 'admin.webhooks.empty': '尚未添加 WebHook 端点。', 'admin.webhooks.noDeliveries': '暂无投递记录。'
+      'admin.webhooks.copySecret': '复制密钥', 'admin.webhooks.update': '保存端点', 'admin.webhooks.edit': '编辑', 'admin.webhooks.pause': '暂停', 'admin.webhooks.resume': '恢复', 'admin.webhooks.status.enabled': '已启用', 'admin.webhooks.status.paused': '已暂停', 'admin.webhooks.copied': '密钥已复制。', 'admin.webhooks.copyFailed': '无法复制密钥。',
+      'admin.webhooks.deleteConfirm': '删除 WebHook“{name}”？', 'admin.webhooks.empty': '尚未添加 WebHook 端点。', 'admin.webhooks.noDeliveries': '暂无投递记录。', 'admin.webhooks.cancelEdit': '取消编辑'
     },
     'zh-TW': {
       'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '向管理員設定的 HTTP 端點傳送已簽署的事件通知。',
@@ -5490,7 +5492,8 @@
       'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': '書評已建立', 'admin.webhooks.event.reviewUpdated': '書評已更新', 'admin.webhooks.event.reviewDeleted': '書評已刪除', 'admin.webhooks.event.bookCreated': '書籍已建立', 'admin.webhooks.event.bookUpdated': '書籍已更新', 'admin.webhooks.event.bookRemoved': '書籍已移除', 'admin.webhooks.event.conversionSucceeded': '轉換成功', 'admin.webhooks.event.conversionFailed': '轉換失敗',
       'admin.webhooks.create': '新增端點', 'admin.webhooks.creating': '正在新增…', 'admin.webhooks.secretOnce': '請立即複製簽署密鑰，之後不會再次顯示。',
       'admin.webhooks.deliveries': '最近投遞', 'admin.webhooks.test': '傳送測試', 'admin.webhooks.rotate': '輪替密鑰', 'admin.webhooks.delete': '刪除',
-      'admin.webhooks.deleteConfirm': '刪除 WebHook「{name}」？', 'admin.webhooks.empty': '尚未新增 WebHook 端點。', 'admin.webhooks.noDeliveries': '尚無投遞記錄。'
+      'admin.webhooks.copySecret': '複製密鑰', 'admin.webhooks.update': '儲存端點', 'admin.webhooks.edit': '編輯', 'admin.webhooks.pause': '暫停', 'admin.webhooks.resume': '恢復', 'admin.webhooks.status.enabled': '已啟用', 'admin.webhooks.status.paused': '已暫停', 'admin.webhooks.copied': '密鑰已複製。', 'admin.webhooks.copyFailed': '無法複製密鑰。',
+      'admin.webhooks.deleteConfirm': '刪除 WebHook「{name}」？', 'admin.webhooks.empty': '尚未新增 WebHook 端點。', 'admin.webhooks.noDeliveries': '尚無投遞記錄。', 'admin.webhooks.cancelEdit': '取消編輯'
     },
     ko: {
       'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '관리자가 설정한 HTTP 엔드포인트로 서명된 이벤트 알림을 보냅니다.',
@@ -5498,7 +5501,8 @@
       'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': '서평 생성됨', 'admin.webhooks.event.reviewUpdated': '서평 수정됨', 'admin.webhooks.event.reviewDeleted': '서평 삭제됨', 'admin.webhooks.event.bookCreated': '도서 생성됨', 'admin.webhooks.event.bookUpdated': '도서 수정됨', 'admin.webhooks.event.bookRemoved': '도서 제거됨', 'admin.webhooks.event.conversionSucceeded': '변환 성공', 'admin.webhooks.event.conversionFailed': '변환 실패',
       'admin.webhooks.create': '엔드포인트 추가', 'admin.webhooks.creating': '추가 중…', 'admin.webhooks.secretOnce': '서명 비밀 키를 지금 복사하세요. 다시 표시되지 않습니다.',
       'admin.webhooks.deliveries': '최근 전송', 'admin.webhooks.test': '테스트 보내기', 'admin.webhooks.rotate': '비밀 키 교체', 'admin.webhooks.delete': '삭제',
-      'admin.webhooks.deleteConfirm': 'WebHook “{name}”을 삭제할까요?', 'admin.webhooks.empty': 'WebHook 엔드포인트가 없습니다.', 'admin.webhooks.noDeliveries': '전송 기록이 없습니다.'
+      'admin.webhooks.copySecret': '비밀 키 복사', 'admin.webhooks.update': '엔드포인트 저장', 'admin.webhooks.edit': '편집', 'admin.webhooks.pause': '일시 중지', 'admin.webhooks.resume': '재개', 'admin.webhooks.status.enabled': '사용', 'admin.webhooks.status.paused': '일시 중지됨', 'admin.webhooks.copied': '비밀 키를 복사했습니다.', 'admin.webhooks.copyFailed': '비밀 키를 복사할 수 없습니다.',
+      'admin.webhooks.deleteConfirm': 'WebHook “{name}”을 삭제할까요?', 'admin.webhooks.empty': 'WebHook 엔드포인트가 없습니다.', 'admin.webhooks.noDeliveries': '전송 기록이 없습니다.', 'admin.webhooks.cancelEdit': '편집 취소'
     },
     ja: {
       'admin.webhooks.title': 'WebHook', 'admin.webhooks.description': '管理者が設定した HTTP エンドポイントへ署名付きイベント通知を送信します。',
@@ -5506,7 +5510,8 @@
       'admin.webhooks.urlPlaceholder': 'https://example.com/webhook', 'admin.webhooks.event.reviewCreated': 'レビューを作成', 'admin.webhooks.event.reviewUpdated': 'レビューを更新', 'admin.webhooks.event.reviewDeleted': 'レビューを削除', 'admin.webhooks.event.bookCreated': '書籍を作成', 'admin.webhooks.event.bookUpdated': '書籍を更新', 'admin.webhooks.event.bookRemoved': '書籍を削除', 'admin.webhooks.event.conversionSucceeded': '変換成功', 'admin.webhooks.event.conversionFailed': '変換失敗',
       'admin.webhooks.create': 'エンドポイントを追加', 'admin.webhooks.creating': '追加中…', 'admin.webhooks.secretOnce': '署名シークレットを今すぐコピーしてください。再表示されません。',
       'admin.webhooks.deliveries': '最近の配信', 'admin.webhooks.test': 'テスト送信', 'admin.webhooks.rotate': 'シークレットをローテーション', 'admin.webhooks.delete': '削除',
-      'admin.webhooks.deleteConfirm': 'WebHook「{name}」を削除しますか？', 'admin.webhooks.empty': 'WebHook エンドポイントはありません。', 'admin.webhooks.noDeliveries': '配信履歴はありません。'
+      'admin.webhooks.copySecret': 'シークレットをコピー', 'admin.webhooks.update': 'エンドポイントを保存', 'admin.webhooks.edit': '編集', 'admin.webhooks.pause': '一時停止', 'admin.webhooks.resume': '再開', 'admin.webhooks.status.enabled': '有効', 'admin.webhooks.status.paused': '一時停止中', 'admin.webhooks.copied': 'シークレットをコピーしました。', 'admin.webhooks.copyFailed': 'シークレットをコピーできませんでした。',
+      'admin.webhooks.deleteConfirm': 'WebHook「{name}」を削除しますか？', 'admin.webhooks.empty': 'WebHook エンドポイントはありません。', 'admin.webhooks.noDeliveries': '配信履歴はありません。', 'admin.webhooks.cancelEdit': '編集をキャンセル'
     }
   };
   Object.keys(webhookLocaleAdditions).forEach(function(code) {

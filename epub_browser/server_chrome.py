@@ -242,8 +242,9 @@ SERVER_ACCOUNT_PANEL = '''
             </fieldset>
             <label class="admin-webhook-enabled"><input type="checkbox" name="enabled" checked><span data-i18n="admin.webhooks.enabled">Enabled</span></label>
             <button type="submit" id="adminWebhookSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.webhooks.create">Add endpoint</button>
+            <button type="button" id="adminWebhookCancelEdit" class="bookshelf-action-btn" data-i18n="admin.webhooks.cancelEdit" hidden>Cancel editing</button>
         </form>
-        <div class="account-pat-secret" id="adminWebhookSecretRegion" role="status" aria-live="polite" hidden><p data-i18n="admin.webhooks.secretOnce">Copy the signing secret now. It will not be shown again.</p><code id="adminWebhookSecret"></code></div>
+        <div class="account-pat-secret" id="adminWebhookSecretRegion" role="status" aria-live="polite" hidden><p data-i18n="admin.webhooks.secretOnce">Copy the signing secret now. It will not be shown again.</p><code id="adminWebhookSecret"></code><button type="button" id="adminWebhookCopySecret" class="bookshelf-action-btn" data-i18n="admin.webhooks.copySecret">Copy secret</button></div>
         <ul class="account-list admin-webhook-list" id="adminWebhookList"></ul>
         <h5 data-i18n="admin.webhooks.deliveries">Recent deliveries</h5>
         <ul class="account-list admin-webhook-deliveries" id="adminWebhookDeliveries"></ul>
