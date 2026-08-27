@@ -161,6 +161,75 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404, response.text)
         self.assertEqual(response.json()["code"], "book_not_found")
 
+    def test_personal_bookshelf_and_progress_require_independent_scopes(self):
+        shelf_read = self.bearer("bookshelf:read")
+        self.assertEqual(
+            self.client.get("/api/v1/me/bookshelf", headers=shelf_read).status_code,
+            200,
+        )
+        denied = self.client.put(
+            "/api/v1/me/bookshelf",
+            headers=shelf_read,
+            json={"version": 0, "data": {"items": ["book"], "groups": {}, "order": []}},
+        )
+        self.assertEqual(denied.status_code, 403)
+
+        shelf_write = self.bearer("bookshelf:read", "bookshelf:write")
+        updated = self.client.put(
+            "/api/v1/me/bookshelf",
+            headers=shelf_write,
+            json={"version": 0, "data": {"items": ["book"], "groups": {}, "order": []}},
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(updated.json()["version"], 1)
+
+        progress = self.client.put(
+            "/api/v1/me/progress/book",
+            headers=self.bearer("progress:read", "progress:write"),
+            json={"chapter_index": 0},
+        )
+        self.assertEqual(progress.status_code, 200, progress.text)
+        listing = self.client.get(
+            "/api/v1/me/progress", headers=self.bearer("progress:read")
+        )
+        self.assertEqual(listing.json()["items"][0]["book_id"], "book")
+
+    def test_annotation_owner_comes_only_from_authenticated_pat(self):
+        payload = {
+            "id": "external-note",
+            "user_id": "someone-else",
+            "book_hash": "book",
+            "chapter_index": 0,
+            "text": "Selected text",
+            "note": "My note",
+            "color": "#ffff00",
+            "created_at": "2026-08-27T00:00:00Z",
+            "updated_at": "2026-08-27T00:00:00Z",
+        }
+        response = self.client.post(
+            "/api/v1/me/annotations",
+            headers=self.bearer("annotations:read", "annotations:write"),
+            json=payload,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        stored = self.store.get_annotation(
+            "external-note", user_id=self.principal.user_id
+        )
+        self.assertEqual(stored["note"], "My note")
+        self.assertEqual(response.json()["annotation"]["user_id"], self.principal.user_id)
+
+    def test_review_round_trip_includes_user_book_review(self):
+        headers = self.bearer("reviews:read", "reviews:write")
+        updated = self.client.put(
+            "/api/v1/me/reviews/book",
+            headers=headers,
+            json={"rating": 5, "review_text": "A careful private review."},
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
+        listing = self.client.get("/api/v1/me/reviews", headers=headers)
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(listing.json()["items"][0]["review_text"], "A careful private review.")
+
 
 if __name__ == "__main__":
     unittest.main()

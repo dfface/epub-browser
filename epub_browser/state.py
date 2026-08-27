@@ -5773,6 +5773,19 @@ class StateStore:
                 (user_id, book_id),
             )
 
+    def list_book_reviews(self, user_id: str) -> tuple:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT user_id, book_id, rating, review_text, created_at, updated_at
+                FROM book_reviews WHERE user_id = ?
+                ORDER BY updated_at DESC, book_id
+                """,
+                (user_id,),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
     def book_review_ratings(self, user_id: str, book_ids: Sequence[str]) -> dict[str, int]:
         """Return one owner's ratings in one query; review text never leaves this projection."""
         if not book_ids:
@@ -6322,6 +6335,19 @@ class StateStore:
                 "DELETE FROM reading_progress WHERE user_id = ? AND book_hash = ?",
                 (user_id, book_hash),
             )
+
+    def list_reading_progress(self, user_id: str) -> tuple:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT user_id, book_hash AS book_id, chapter_index, updated_at
+                FROM reading_progress WHERE user_id = ?
+                ORDER BY updated_at DESC, book_hash
+                """,
+                (user_id,),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
 
     @staticmethod
     def _metadata_json(metadata) -> str:

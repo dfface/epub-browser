@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
@@ -229,6 +230,245 @@ async def _chapter_detail(request, authenticated: AuthenticatedPAT):
     )
 
 
+async def _json_object(request):
+    try:
+        value = await request.json()
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _bookshelf_document(store, user_id):
+    row = store.get_bookshelf(user_id)
+    if row is None:
+        return 0, {"items": [], "groups": {}, "order": []}
+    version, serialized = row
+    try:
+        data = json.loads(serialized) if isinstance(serialized, str) else serialized
+    except json.JSONDecodeError:
+        raise ValueError("Invalid bookshelf document")
+    if not isinstance(data, dict):
+        raise ValueError("Invalid bookshelf document")
+    return version, data
+
+
+async def _get_bookshelf(request, authenticated):
+    version, data = _bookshelf_document(
+        _context(request).store, authenticated.principal.user_id
+    )
+    return JSONResponse(
+        {"version": version, "data": data},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+async def _put_bookshelf(request, authenticated):
+    data = await _json_object(request)
+    version = data.get("version") if data else None
+    document = data.get("data") if data else None
+    if isinstance(version, bool) or not isinstance(version, int) or version < 0 or not isinstance(document, dict):
+        return public_api_error("invalid_bookshelf", "Invalid bookshelf document", 400)
+    store = _context(request).store
+    current_version, current_data = _bookshelf_document(
+        store, authenticated.principal.user_id
+    )
+    if version != current_version:
+        response = public_api_error(
+            "bookshelf_conflict", "Bookshelf changed on the server", 409
+        )
+        response.body = json.dumps({
+            "code": "bookshelf_conflict",
+            "message": "Bookshelf changed on the server",
+            "version": current_version,
+            "data": current_data,
+        }, separators=(",", ":")).encode("utf-8")
+        response.headers["content-length"] = str(len(response.body))
+        return response
+    next_version = version + 1
+    if version == 0:
+        store.create_bookshelf(authenticated.principal.user_id, next_version, document)
+    else:
+        store.update_bookshelf(authenticated.principal.user_id, next_version, document)
+    return JSONResponse(
+        {"version": next_version, "data": document},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+def _visible_items(store, authenticated, items, book_key="book_id"):
+    return [
+        item for item in items
+        if store.can_read_book(
+            authenticated.principal.user_id,
+            authenticated.principal.role,
+            item.get(book_key),
+        )
+    ]
+
+
+async def _list_progress(request, authenticated):
+    store = _context(request).store
+    items = _visible_items(
+        store,
+        authenticated,
+        store.list_reading_progress(authenticated.principal.user_id),
+    )
+    return JSONResponse(
+        {"items": items, "next_cursor": None},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+async def _progress_item(request, authenticated):
+    store = _context(request).store
+    book_id = request.path_params["book_id"]
+    if _authorized_book(request, authenticated, book_id) is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    user_id = authenticated.principal.user_id
+    if request.method == "GET":
+        chapter_index = store.get_reading_progress(user_id, book_id)
+        if chapter_index is None:
+            return public_api_error("progress_not_found", "Reading progress not found", 404)
+        return JSONResponse(
+            {"book_id": book_id, "chapter_index": chapter_index},
+            headers={"Cache-Control": "private, no-store"},
+        )
+    if request.method == "DELETE":
+        store.delete_reading_progress(user_id, book_id)
+        return Response(status_code=204, headers={"Cache-Control": "private, no-store"})
+    data = await _json_object(request)
+    chapter_index = data.get("chapter_index") if data else None
+    if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
+        return public_api_error("invalid_chapter_index", "Invalid chapter index", 400)
+    try:
+        chapters = _chapter_list(ServerPageRenderer(_context(request).public_dir, book_id))
+    except ServerPageError:
+        return public_api_error("book_content_unavailable", "Book content is unavailable", 503)
+    if chapter_index >= len(chapters):
+        return public_api_error("invalid_chapter_index", "Invalid chapter index", 400)
+    store.set_reading_progress(user_id, book_id, chapter_index)
+    return JSONResponse(
+        {"book_id": book_id, "chapter_index": chapter_index},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+async def _list_annotations(request, authenticated):
+    store = _context(request).store
+    items = _visible_items(
+        store,
+        authenticated,
+        store.list_annotations(user_id=authenticated.principal.user_id),
+        book_key="book_hash",
+    )
+    return JSONResponse(
+        {"items": items, "next_cursor": None},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+def _valid_annotation(data):
+    return (
+        isinstance(data, dict)
+        and isinstance(data.get("book_hash"), str)
+        and data.get("book_hash")
+        and not isinstance(data.get("chapter_index"), bool)
+        and isinstance(data.get("chapter_index"), int)
+        and data.get("chapter_index") >= 0
+        and isinstance(data.get("text"), str)
+        and 1 <= len(data.get("text")) <= 100_000
+        and isinstance(data.get("note", ""), str)
+        and len(data.get("note", "")) <= 100_000
+        and isinstance(data.get("color"), str)
+        and 1 <= len(data.get("color")) <= 64
+    )
+
+
+async def _create_annotation(request, authenticated):
+    data = await _json_object(request)
+    if not _valid_annotation(data):
+        return public_api_error("invalid_annotation", "Invalid annotation", 400)
+    book_id = data["book_hash"]
+    if _authorized_book(request, authenticated, book_id) is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    annotation = {
+        "id": data.get("id") if isinstance(data.get("id"), str) and 1 <= len(data["id"]) <= 128 else uuid.uuid4().hex,
+        "book_hash": book_id,
+        "chapter_index": data["chapter_index"],
+        "text": data["text"],
+        "note": data.get("note", ""),
+        "startMeta": data.get("startMeta"),
+        "endMeta": data.get("endMeta"),
+        "color": data["color"],
+        "created_at": data.get("created_at") or "",
+        "updated_at": data.get("updated_at") or "",
+    }
+    store = _context(request).store
+    try:
+        store.upsert_annotation(annotation, authenticated.principal.user_id)
+    except Exception:
+        return public_api_error("annotation_conflict", "Annotation already exists", 409)
+    stored = store.get_annotation(annotation["id"], authenticated.principal.user_id)
+    return JSONResponse(
+        {"annotation": stored},
+        status_code=201,
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+async def _annotation_item(request, authenticated):
+    store = _context(request).store
+    user_id = authenticated.principal.user_id
+    annotation_id = request.path_params["annotation_id"]
+    stored = store.get_annotation(annotation_id, user_id)
+    if stored is None or _authorized_book(request, authenticated, stored["book_hash"]) is None:
+        return public_api_error("annotation_not_found", "Annotation not found", 404)
+    if request.method == "GET":
+        return JSONResponse({"annotation": stored}, headers={"Cache-Control": "private, no-store"})
+    if request.method == "DELETE":
+        store.delete_annotation(annotation_id, user_id)
+        return Response(status_code=204, headers={"Cache-Control": "private, no-store"})
+    data = await _json_object(request)
+    allowed = {key: data[key] for key in ("note", "color", "chapter_index", "startMeta", "endMeta") if data and key in data}
+    if not allowed or ("chapter_index" in allowed and (isinstance(allowed["chapter_index"], bool) or not isinstance(allowed["chapter_index"], int) or allowed["chapter_index"] < 0)):
+        return public_api_error("invalid_annotation", "Invalid annotation", 400)
+    updated = store.update_annotation(annotation_id, allowed, user_id)
+    return JSONResponse({"annotation": updated}, headers={"Cache-Control": "private, no-store"})
+
+
+async def _list_reviews(request, authenticated):
+    store = _context(request).store
+    items = _visible_items(
+        store,
+        authenticated,
+        store.list_book_reviews(authenticated.principal.user_id),
+    )
+    return JSONResponse({"items": items, "next_cursor": None}, headers={"Cache-Control": "private, no-store"})
+
+
+async def _review_item(request, authenticated):
+    store = _context(request).store
+    book_id = request.path_params["book_id"]
+    if _authorized_book(request, authenticated, book_id) is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    user_id = authenticated.principal.user_id
+    if request.method == "GET":
+        review = store.get_book_review(book_id, user_id)
+        if review is None:
+            return public_api_error("review_not_found", "Review not found", 404)
+        return JSONResponse({"review": review}, headers={"Cache-Control": "private, no-store"})
+    if request.method == "DELETE":
+        store.delete_book_review(book_id, user_id)
+        return Response(status_code=204, headers={"Cache-Control": "private, no-store"})
+    data = await _json_object(request)
+    rating = data.get("rating") if data else None
+    review_text = data.get("review_text") if data else None
+    if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5 or not isinstance(review_text, str) or len(review_text.strip()) > 10_000:
+        return public_api_error("invalid_review", "Invalid review", 400)
+    review = store.upsert_book_review(book_id, user_id, rating, review_text)
+    return JSONResponse({"review": review}, headers={"Cache-Control": "private, no-store"})
+
+
 def public_api_operations():
     return (
         PublicAPIOperation(
@@ -263,6 +503,21 @@ def public_api_operations():
             operation_id="getBookChapter",
             handler=_chapter_detail,
         ),
+        PublicAPIOperation("/api/v1/me/bookshelf", ("GET",), "bookshelf:read", "Get the token owner's bookshelf", "getMyBookshelf", _get_bookshelf),
+        PublicAPIOperation("/api/v1/me/bookshelf", ("PUT",), "bookshelf:write", "Replace the token owner's bookshelf", "putMyBookshelf", _put_bookshelf),
+        PublicAPIOperation("/api/v1/me/progress", ("GET",), "progress:read", "List the token owner's reading progress", "listMyProgress", _list_progress),
+        PublicAPIOperation("/api/v1/me/progress/{book_id}", ("GET",), "progress:read", "Get reading progress for one book", "getMyProgress", _progress_item),
+        PublicAPIOperation("/api/v1/me/progress/{book_id}", ("PUT",), "progress:write", "Update reading progress for one book", "putMyProgress", _progress_item),
+        PublicAPIOperation("/api/v1/me/progress/{book_id}", ("DELETE",), "progress:write", "Delete reading progress for one book", "deleteMyProgress", _progress_item),
+        PublicAPIOperation("/api/v1/me/annotations", ("GET",), "annotations:read", "List the token owner's annotations", "listMyAnnotations", _list_annotations),
+        PublicAPIOperation("/api/v1/me/annotations", ("POST",), "annotations:write", "Create an annotation", "createMyAnnotation", _create_annotation),
+        PublicAPIOperation("/api/v1/me/annotations/{annotation_id}", ("GET",), "annotations:read", "Get an annotation", "getMyAnnotation", _annotation_item),
+        PublicAPIOperation("/api/v1/me/annotations/{annotation_id}", ("PUT",), "annotations:write", "Update an annotation", "putMyAnnotation", _annotation_item),
+        PublicAPIOperation("/api/v1/me/annotations/{annotation_id}", ("DELETE",), "annotations:write", "Delete an annotation", "deleteMyAnnotation", _annotation_item),
+        PublicAPIOperation("/api/v1/me/reviews", ("GET",), "reviews:read", "List the token owner's reviews", "listMyReviews", _list_reviews),
+        PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("GET",), "reviews:read", "Get a review", "getMyReview", _review_item),
+        PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("PUT",), "reviews:write", "Create or replace a review", "putMyReview", _review_item),
+        PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("DELETE",), "reviews:write", "Delete a review", "deleteMyReview", _review_item),
     )
 
 
