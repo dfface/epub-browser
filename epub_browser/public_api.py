@@ -6,12 +6,13 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 from starlette.responses import JSONResponse, PlainTextResponse, Response
-from starlette.routing import Route
+from starlette.routing import Match, Route
 
 from .pat import AuthenticatedPAT, PAT_SCOPES
 from .server_pages import ServerPageError, ServerPageRenderer
@@ -469,6 +470,118 @@ async def _review_item(request, authenticated):
     return JSONResponse({"review": review}, headers={"Cache-Control": "private, no-store"})
 
 
+def _admin_user(store, user_id):
+    try:
+        return store.get_user(user_id)
+    except KeyError:
+        return None
+
+
+def _user_payload(user):
+    return {
+        "id": user.user_id,
+        "username": user.username,
+        "role": user.role,
+        "enabled": user.enabled,
+        "created_at": user.created_at,
+        "updated_at": user.updated_at,
+    }
+
+
+async def _admin_users(request, authenticated):
+    del authenticated
+    items = [_user_payload(user) for user in _context(request).store.list_users()]
+    return JSONResponse({"items": items, "next_cursor": None}, headers={"Cache-Control": "private, no-store"})
+
+
+def _admin_items_response(items):
+    return JSONResponse(
+        {"items": list(items), "next_cursor": None},
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+async def _admin_bookshelf(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    version, data = _bookshelf_document(store, user_id)
+    return JSONResponse({"version": version, "data": data}, headers={"Cache-Control": "private, no-store"})
+
+
+async def _admin_progress(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    return _admin_items_response(store.list_reading_progress(user_id))
+
+
+async def _admin_annotations(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    return _admin_items_response(store.list_annotations(user_id=user_id))
+
+
+async def _admin_reviews(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    return _admin_items_response(store.list_book_reviews(user_id))
+
+
+async def _admin_reading_sessions(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    return _admin_items_response(store.list_reading_sessions_for_user(user_id))
+
+
+async def _admin_reading_insights(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    period = request.query_params.get("period", "overview")
+    anchor_value = request.query_params.get("anchor", date.today().isoformat())
+    timezone_name = request.query_params.get("timezone", "UTC")
+    try:
+        anchor = date.fromisoformat(anchor_value)
+        insights = store.reading_insights(user_id, period, anchor, timezone_name)
+    except (TypeError, ValueError, OverflowError):
+        return public_api_error("invalid_reading_insights", "Invalid reading insights query", 400)
+    return JSONResponse({"insights": insights}, headers={"Cache-Control": "private, no-store"})
+
+
+async def _admin_ai_conversations(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    return _admin_items_response(store.list_ai_book_chat_turns_for_user(user_id))
+
+
+async def _admin_ai_results(request, authenticated):
+    del authenticated
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+    if _admin_user(store, user_id) is None:
+        return public_api_error("user_not_found", "User not found", 404)
+    return _admin_items_response(store.list_ai_reading_results_for_user(user_id))
+
+
 def public_api_operations():
     return (
         PublicAPIOperation(
@@ -518,6 +631,15 @@ def public_api_operations():
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("GET",), "reviews:read", "Get a review", "getMyReview", _review_item),
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("PUT",), "reviews:write", "Create or replace a review", "putMyReview", _review_item),
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("DELETE",), "reviews:write", "Delete a review", "deleteMyReview", _review_item),
+        PublicAPIOperation("/api/v1/admin/users", ("GET",), "admin:data:read", "List public account metadata", "listAdminUsers", _admin_users),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/bookshelf", ("GET",), "admin:data:read", "Read a user's bookshelf", "getAdminUserBookshelf", _admin_bookshelf),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/progress", ("GET",), "admin:data:read", "Read a user's progress", "listAdminUserProgress", _admin_progress),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/annotations", ("GET",), "admin:data:read", "Read a user's annotations", "listAdminUserAnnotations", _admin_annotations),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/reviews", ("GET",), "admin:data:read", "Read a user's reviews", "listAdminUserReviews", _admin_reviews),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/reading-sessions", ("GET",), "admin:data:read", "Read a user's reading sessions", "listAdminUserReadingSessions", _admin_reading_sessions),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/reading-insights", ("GET",), "admin:data:read", "Read a user's reading insights", "getAdminUserReadingInsights", _admin_reading_insights),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/ai-conversations", ("GET",), "admin:data:read", "Read a user's AI conversations", "listAdminUserAIConversations", _admin_ai_conversations),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/ai-results", ("GET",), "admin:data:read", "Read a user's AI results", "listAdminUserAIResults", _admin_ai_results),
     )
 
 
@@ -534,10 +656,29 @@ def _endpoint(operation: PublicAPIOperation):
 
 def public_api_routes(context: Optional[PublicAPIContext] = None):
     del context  # Context is attached to app.state so handlers stay reusable.
-    return [
+    routes = [
         Route(operation.path, _endpoint(operation), methods=operation.methods)
         for operation in public_api_operations()
     ]
+    routes.append(Route(
+        "/api/v1/{path:path}",
+        _public_api_fallback,
+        methods=("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"),
+    ))
+    return routes
+
+
+async def _public_api_fallback(request):
+    all_methods = ("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+    for operation in public_api_operations():
+        probe = Route(operation.path, _endpoint(operation), methods=all_methods)
+        match, _scope = probe.matches(request.scope)
+        if match is Match.FULL:
+            return public_api_error(
+                "method_not_allowed", "Method not allowed", 405,
+                headers={"Allow": ", ".join(operation.methods)},
+            )
+    return public_api_error("not_found", "API resource not found", 404)
 
 
 def openapi_document():

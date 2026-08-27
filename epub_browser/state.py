@@ -4941,6 +4941,36 @@ class StateStore:
             ).fetchall()
         return tuple(dict(row) for row in rows)
 
+    def list_ai_book_chat_turns_for_user(self, owner_user_id: str) -> tuple:
+        with self._connection() as connection:
+            self._require_user(connection, owner_user_id)
+            rows = connection.execute(
+                """
+                SELECT id, book_id, chapter_index, result_id, context_mode, book_context,
+                       owner_user_id, question, language, answer, status, error_code,
+                       created_at, updated_at
+                FROM ai_book_chat_turns WHERE owner_user_id = ?
+                ORDER BY created_at DESC, id DESC
+                """,
+                (owner_user_id,),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
+    def list_ai_reading_results_for_user(self, owner_user_id: str) -> tuple:
+        with self._connection() as connection:
+            self._require_user(connection, owner_user_id)
+            rows = connection.execute(
+                """
+                SELECT DISTINCT results.*
+                FROM ai_reading_results AS results
+                JOIN ai_reading_jobs AS jobs ON jobs.result_id = results.id
+                WHERE jobs.owner_user_id = ?
+                ORDER BY results.created_at DESC, results.id DESC
+                """,
+                (owner_user_id,),
+            ).fetchall()
+        return tuple(self._ai_result_record(row) for row in rows)
+
     def get_ai_book_chat_summary(
         self, book_id: str, owner_user_id: str, language: str,
     ) -> Optional[dict]:
@@ -5815,6 +5845,18 @@ class StateStore:
             "client_id": row["client_id"],
             "last_client_sequence": row["last_client_sequence"],
         }
+
+    def list_reading_sessions_for_user(self, user_id: str) -> tuple:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT * FROM reading_sessions WHERE user_id = ?
+                ORDER BY started_at DESC, id DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        return tuple(self._reading_session_data(row) for row in rows)
 
     @staticmethod
     def _utc_timestamp(value: float) -> str:

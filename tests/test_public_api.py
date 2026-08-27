@@ -5,7 +5,7 @@ from pathlib import Path
 
 from starlette.testclient import TestClient
 
-from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials
+from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials, hash_password
 from epub_browser.pat import PAT_SCOPES
 from epub_browser.public_api import openapi_document, public_api_operations
 from epub_browser.server import create_app
@@ -229,6 +229,63 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         listing = self.client.get("/api/v1/me/reviews", headers=headers)
         self.assertEqual(listing.status_code, 200)
         self.assertEqual(listing.json()["items"][0]["review_text"], "A careful private review.")
+
+    def test_admin_data_scope_reads_cross_user_reviews_without_credentials(self):
+        member = self.store.create_user("bob", hash_password("member-secret"))
+        self.store.upsert_book_review(
+            "book", member.user_id, 4, "Member's full review text"
+        )
+        headers = self.bearer("admin:data:read")
+
+        users = self.client.get("/api/v1/admin/users", headers=headers)
+        reviews = self.client.get(
+            "/api/v1/admin/users/{}/reviews".format(member.user_id),
+            headers=headers,
+        )
+
+        self.assertEqual(users.status_code, 200, users.text)
+        self.assertEqual(reviews.status_code, 200, reviews.text)
+        self.assertEqual(reviews.json()["items"][0]["review_text"], "Member's full review text")
+        serialized = json.dumps({"users": users.json(), "reviews": reviews.json()})
+        self.assertNotIn("password_hash", serialized)
+        self.assertNotIn("token_digest", serialized)
+
+    def test_admin_data_namespace_is_read_only_and_requires_current_admin_role(self):
+        headers = self.bearer("admin:data:read")
+        self.assertEqual(
+            self.client.put("/api/v1/admin/users", headers=headers, json={}).status_code,
+            405,
+        )
+        member = self.store.create_user("bob", hash_password("member-secret"))
+        member_token = self.store.create_personal_access_token(
+            member.user_id, "invalid admin scope", {"admin:data:read"}, expires_at=None
+        )
+        denied = self.client.get(
+            "/api/v1/admin/users",
+            headers={"Authorization": "Bearer " + member_token.raw_token},
+        )
+        self.assertEqual(denied.status_code, 403)
+
+    def test_admin_data_endpoints_cover_all_approved_user_owned_resources(self):
+        member = self.store.create_user("bob", hash_password("member-secret"))
+        headers = self.bearer("admin:data:read")
+        resources = (
+            "bookshelf",
+            "progress",
+            "annotations",
+            "reviews",
+            "reading-sessions",
+            "reading-insights",
+            "ai-conversations",
+            "ai-results",
+        )
+        for resource in resources:
+            with self.subTest(resource=resource):
+                response = self.client.get(
+                    "/api/v1/admin/users/{}/{}".format(member.user_id, resource),
+                    headers=headers,
+                )
+                self.assertEqual(response.status_code, 200, response.text)
 
 
 if __name__ == "__main__":
