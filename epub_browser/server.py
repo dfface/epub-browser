@@ -60,6 +60,7 @@ from .processor import (
     SERVER_OUTPUT_REVISION_FILE,
     server_book_public_path_allowed,
 )
+from .public_api import PUBLIC_API_CONTEXT_KEY, PublicAPIContext, public_api_routes
 from .server_library import library_metadata
 from .server_pages import ServerPageError, ServerPageRenderer
 from .site import render_library_shell
@@ -3437,6 +3438,7 @@ window.location.assign(payload.redirect||'/');
             )
         return response({'insights': insights})
 
+    public_api_context = PublicAPIContext(store=store, public_dir=Path(base_directory))
     routes = [
         Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
@@ -3472,6 +3474,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/dictionaries/{dictionary_id}/default', admin_dictionary_default, methods=['PUT']),
         Route('/api/admin/dictionaries/{dictionary_id}', admin_dictionary, methods=['PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
+        *public_api_routes(public_api_context),
         Route('/', library_index),
         Route('/index.html', library_index),
         Route('/reading-insights', reading_insights_page, methods=['GET']),
@@ -3525,6 +3528,7 @@ window.location.assign(payload.redirect||'/');
         },
         lifespan=ai_worker_lifespan,
     )
+    setattr(app.state, PUBLIC_API_CONTEXT_KEY, public_api_context)
 
     async def auth_middleware(request, call_next):
         path = request.url.path
@@ -3539,6 +3543,10 @@ window.location.assign(payload.redirect||'/');
             return setup_required_response(request)
         if path == '/sw.js':
             return await call_next(request)
+        if path.startswith('/api/v1/'):
+            authorized = await call_next(request)
+            authorized.headers['Cache-Control'] = 'private, no-store'
+            return authorized
         raw_session = request.cookies.get(SESSION_COOKIE)
         session_principal = auth_service.principal_from_session(raw_session)
         principal = session_principal
