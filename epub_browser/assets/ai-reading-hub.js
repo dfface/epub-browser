@@ -207,7 +207,7 @@
   function close() { if (!state.modal || state.modal.hidden) return; state.modal.hidden = true; document.body.classList.remove('ai-reading-hub-open'); document.body.style.top = ''; root.scrollTo(0, state.scrollY); if (state.opener && state.opener.focus) state.opener.focus(); }
   function addChapterBadge(link) {
     if (link.querySelector('.ai-reading-chapter-badge')) return;
-    var badge = el('span', 'ai-reading-chapter-badge', t('ai.library')); badge.setAttribute('title', t('ai.library')); badge.setAttribute('data-ai-reading-chapter-badge', ''); var icon = el('i', 'fas fa-wand-magic-sparkles'); icon.setAttribute('aria-hidden', 'true'); badge.insertBefore(icon, badge.firstChild);
+    var badge = el('span', 'ai-reading-chapter-badge'); badge.setAttribute('title', t('ai.library')); badge.setAttribute('aria-label', t('ai.library')); badge.setAttribute('data-ai-reading-chapter-badge', ''); var icon = el('i', 'fas fa-wand-magic-sparkles'); icon.setAttribute('aria-hidden', 'true'); var label = el('span', 'ai-reading-chapter-label', t('ai.library')); badge.appendChild(icon); badge.appendChild(label);
     // The book page has a title/sync grouping; the chapter drawer only has a
     // plain link.  Keep both layouts native to their own navigation surface.
     var title = link.querySelector('.chapter-title');

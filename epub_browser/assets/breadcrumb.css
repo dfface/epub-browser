@@ -171,8 +171,15 @@ html {
 .chapter-link:target .ai-reading-chapter-badge { color: inherit; background: color-mix(in srgb, white 18%, transparent); }
 
 @media (max-width: 600px) {
-    .ai-reading-chapter-badge { padding: 3px 6px; font-size: .68rem; }
-    .ai-reading-chapter-badge i { display: none; }
+    .ai-reading-chapter-badge {
+        min-width: 24px;
+        min-height: 22px;
+        justify-content: center;
+        gap: 0;
+        padding: 3px 5px;
+        font-size: .68rem;
+    }
+    .ai-reading-chapter-label { display: none; }
 }
 
 .app-nav-link i,

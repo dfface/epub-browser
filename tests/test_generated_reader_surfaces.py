@@ -1625,6 +1625,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("function loadReadingIndicators()", feature_loader)
         self.assertIn("load('aiReadingHub').catch", feature_loader)
         self.assertIn('.ai-reading-chapter-badge', breadcrumb_stylesheet)
+        self.assertIn("'ai-reading-chapter-label'", hub_script)
+        self.assertIn('.ai-reading-chapter-label { display: none; }', breadcrumb_stylesheet)
+        self.assertNotIn('.ai-reading-chapter-badge i { display: none; }', breadcrumb_stylesheet)
 
     def test_chapter_overview_waits_for_mermaid_rendering_and_layout(self):
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
