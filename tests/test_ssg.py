@@ -209,6 +209,48 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertEqual(sidecar.read_bytes(), original_sidecar)
             self.assertEqual((output / "index.html").read_bytes(), original_output)
 
+    def test_post_commit_cleanup_failure_keeps_new_output_and_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=1)
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+            original_sidecar = read_exact_sidecar(source)
+            self._write_pdf(source, pages=2)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher,
+                "_remove_path",
+                side_effect=OSError("previous cleanup exploded"),
+            ):
+                self.assertEqual(publisher.build(), output.resolve())
+
+            updated_sidecar = read_exact_sidecar(source)
+            toc = json.loads(
+                next((output / "book").iterdir()).joinpath("toc.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(len(toc), 2)
+            self.assertNotEqual(
+                updated_sidecar.source_fingerprint,
+                original_sidecar.source_fingerprint,
+            )
+            self.assertEqual(len(list(root.glob(".dist.previous-*"))), 1)
+
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+
+            self.assertEqual(list(root.glob(".dist.previous-*")), [])
+            self.assertEqual(read_exact_sidecar(source), updated_sidecar)
+
     def test_pdf_ssg_escapes_hostile_document_metadata_in_shared_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

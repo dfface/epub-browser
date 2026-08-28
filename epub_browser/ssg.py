@@ -635,6 +635,7 @@ class SSGPublisher:
         return tuple(paths)
 
     def _activate(self, staging: Path) -> None:
+        self._cleanup_previous_snapshots()
         previous = self.output_dir.parent / (
             f".{self.output_dir.name}.previous-{uuid.uuid4().hex}"
         )
@@ -651,7 +652,25 @@ class SSGPublisher:
             raise
         else:
             if previous.exists():
+                try:
+                    self._remove_path(previous)
+                except OSError as error:
+                    # The staging rename above is the publication commit
+                    # boundary. Cleanup cannot turn a committed snapshot into
+                    # a failure that rolls its identity back.
+                    self.reporter.detail(
+                        f"Deferred previous SSG snapshot cleanup: {error}"
+                    )
+
+    def _cleanup_previous_snapshots(self) -> None:
+        pattern = f".{self.output_dir.name}.previous-*"
+        for previous in sorted(self.output_dir.parent.glob(pattern), key=str):
+            try:
                 self._remove_path(previous)
+            except OSError as error:
+                self.reporter.detail(
+                    f"Unable to clean previous SSG snapshot yet: {error}"
+                )
 
     @staticmethod
     def _remove_path(path: Path) -> None:
