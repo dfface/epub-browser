@@ -12,6 +12,7 @@ from typing import Callable, Optional, Sequence
 
 from .asset_publisher import AssetPublisher, PublishedAssets
 from .book_identity import (
+    BOOK_ID_STORAGE_EMBEDDED,
     BOOK_ID_STORAGE_SIDECAR,
     ExternalBookIdentity,
     KnownSourceFingerprint,
@@ -31,6 +32,14 @@ from .processor import (
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import discover_orphan_sidecars
+from .source_format import (
+    EPUB_FORMAT,
+    PDF_CONVERSION_UNAVAILABLE,
+    PDF_EMBEDDED_STORAGE_NOTICE,
+    PDF_FORMAT,
+    is_supported_source,
+    source_format,
+)
 from .state import BookRecord, StateStore
 from .urls import SiteURLs
 
@@ -169,6 +178,7 @@ class ServerLibraryManager:
         )
         self._queued_generations = {}
         self._event_future = None
+        self._pdf_embedded_storage_notice_reported = False
         self.on_reconcile_started = None
         self.on_reconciled = None
         self._validate_source_boundaries()
@@ -229,6 +239,13 @@ class ServerLibraryManager:
                 return self._stopped_summary()
             if self._stop_event.is_set():
                 return self._stopped_summary()
+            if (
+                self.book_id_storage == BOOK_ID_STORAGE_EMBEDDED
+                and not self._pdf_embedded_storage_notice_reported
+                and any(source_format(path) == PDF_FORMAT for path in discovered)
+            ):
+                self.reporter.notice(PDF_EMBEDDED_STORAGE_NOTICE)
+                self._pdf_embedded_storage_notice_reported = True
             discovered_set = {str(path.resolve()) for path in discovered}
             removed = 0
             with self._commit_lock:
@@ -256,7 +273,13 @@ class ServerLibraryManager:
             self.prepare_public_shell()
             if self._stop_event.is_set():
                 return self._stopped_summary(removed=removed)
-            legacy_ids = self._legacy_id_matches(discovered)
+            legacy_ids = self._legacy_id_matches(
+                tuple(
+                    source
+                    for source in discovered
+                    if source_format(source) == EPUB_FORMAT
+                )
+            )
             reused_records = []
             plans = []
             failures = []
@@ -267,6 +290,8 @@ class ServerLibraryManager:
                 existing = self.state_store.book_by_source(source)
                 resolved_book_id = existing.book_id if existing else None
                 try:
+                    if source_format(source) == PDF_FORMAT:
+                        raise ValueError(PDF_CONVERSION_UNAVAILABLE)
                     source_stat = source.stat()
                     existing_cache_valid = bool(
                         existing and self._cache_valid(existing)
@@ -664,7 +689,7 @@ class ServerLibraryManager:
             if self._stop_event.is_set():
                 raise _ConversionCancelled("Server is stopping")
             if source.is_file():
-                if logical_source.suffix.lower() == ".epub":
+                if is_supported_source(logical_source):
                     discovered.add(logical_source)
                 continue
             if not source.is_dir():
@@ -680,9 +705,11 @@ class ServerLibraryManager:
                     and not (root_path / name).is_symlink()
                 ]
                 for filename in files:
-                    if filename.startswith(".") or not filename.lower().endswith(".epub"):
+                    if filename.startswith("."):
                         continue
                     candidate = root_path / filename
+                    if not is_supported_source(candidate):
+                        continue
                     try:
                         resolved = candidate.resolve()
                     except OSError:

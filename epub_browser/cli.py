@@ -42,11 +42,6 @@ class ServerConfig:
 
 CommandConfig = Union[SSGConfig, ServerConfig]
 
-PDF_EMBEDDED_STORAGE_NOTICE = (
-    "Embedded book ID storage is EPUB-only; "
-    "PDF identities use adjacent sidecars."
-)
-
 
 def _parse_base_path(value: str) -> str:
     try:

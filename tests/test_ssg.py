@@ -61,6 +61,31 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
             self.assertIn("PDF identities use adjacent sidecars", output)
 
+    def test_pdf_build_fails_before_identity_or_epub_inspection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.PDF"
+            output = root / "dist"
+            source.write_bytes(b"%PDF-1.4\nunchanged\n%%EOF\n")
+            before = source.read_bytes()
+
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                status = run_ssg(
+                    SSGConfig(
+                        (source,),
+                        output,
+                        book_id_storage="embedded",
+                    )
+                )
+
+            message = stderr.getvalue()
+            self.assertEqual(status, 4)
+            self.assertIn("PDF conversion is not available yet", message)
+            self.assertNotIn("Unable to inspect EPUB", message)
+            self.assertEqual(source.read_bytes(), before)
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertFalse(output.exists())
+
     def test_sidecar_id_survives_package_metadata_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

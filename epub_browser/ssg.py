@@ -24,13 +24,19 @@ from .book_identity import (
     inspect_book_identity,
     resolve_book_identity,
 )
-from .cli import PDF_EMBEDDED_STORAGE_NOTICE, SSGConfig
+from .cli import SSGConfig
 from .models import ConvertedBook
 from .processor import EPUBProcessor
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import discover_orphan_sidecars
-from .source_format import PDF_FORMAT, is_supported_source, source_format
+from .source_format import (
+    PDF_CONVERSION_UNAVAILABLE,
+    PDF_EMBEDDED_STORAGE_NOTICE,
+    PDF_FORMAT,
+    is_supported_source,
+    source_format,
+)
 from .urls import SiteURLs
 
 
@@ -104,6 +110,8 @@ class SSGPublisher:
             for source in sources:
                 processor = None
                 try:
+                    if source_format(source) == PDF_FORMAT:
+                        raise ValueError(PDF_CONVERSION_UNAVAILABLE)
                     inspection = inspect_book_identity(
                         source,
                         orphan_sidecars=orphan_sidecars,
@@ -135,7 +143,9 @@ class SSGPublisher:
                         processor.cleanup()
 
         if failures:
-            raise SSGBuildError(self._format_failures("Unable to inspect EPUB inputs", failures))
+            raise SSGBuildError(
+                self._format_failures("Unable to prepare book inputs", failures)
+            )
 
         collisions = {}
         for book in prepared:

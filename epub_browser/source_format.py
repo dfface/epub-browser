@@ -3,6 +3,11 @@ from pathlib import Path
 
 EPUB_FORMAT = "epub"
 PDF_FORMAT = "pdf"
+PDF_CONVERSION_UNAVAILABLE = "PDF conversion is not available yet"
+PDF_EMBEDDED_STORAGE_NOTICE = (
+    "Embedded book ID storage is EPUB-only; "
+    "PDF identities use adjacent sidecars."
+)
 
 
 def source_format(path: Path) -> str:

@@ -1103,6 +1103,51 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(summary.active_books, ())
         manager.shutdown()
 
+    def test_pdf_reconcile_discovers_directory_and_explicit_sources_without_identity_mutation(self):
+        self.source.unlink()
+        directory_pdf = self.source_dir / "directory.PDF"
+        directory_pdf.write_bytes(b"%PDF-1.4\ndirectory\n%%EOF\n")
+        explicit_dir = self.root / "explicit"
+        explicit_dir.mkdir()
+        explicit_pdf = explicit_dir / "explicit.pdf"
+        explicit_pdf.write_bytes(b"%PDF-1.4\nexplicit\n%%EOF\n")
+        before = {
+            directory_pdf: directory_pdf.read_bytes(),
+            explicit_pdf: explicit_pdf.read_bytes(),
+        }
+        manager = ServerLibraryManager(
+            server_dir=self.server_dir,
+            sources=(self.source_dir, explicit_pdf),
+            state_store=self.store,
+            migration_manager=self.migration,
+            reporter=Reporter(True),
+            book_id_storage="embedded",
+        )
+
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            first = manager.reconcile()
+            second = manager.reconcile(trigger="watch")
+
+        self.assertEqual(first.failed, 2)
+        self.assertEqual(second.failed, 2)
+        self.assertEqual(
+            {failure.source.name for failure in first.failures},
+            {"directory.PDF", "explicit.pdf"},
+        )
+        for failure in first.failures:
+            self.assertIn("PDF conversion is not available yet", failure.message)
+            self.assertNotIn("EPUB", failure.message)
+        self.assertEqual(first.active_books, ())
+        self.assertEqual(second.active_books, ())
+        for source, original in before.items():
+            self.assertEqual(source.read_bytes(), original)
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertIsNone(self.store.book_by_source(source))
+        output = stderr.getvalue()
+        self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
+        self.assertIn("PDF identities use adjacent sidecars", output)
+        manager.shutdown()
+
     def test_rejects_managed_and_source_directory_nesting(self):
         nested_server = self.source_dir / "server"
         with self.assertRaisesRegex(ValueError, "must not be nested"):
