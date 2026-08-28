@@ -6877,7 +6877,7 @@
   });
   var pdfLocaleAdditions = {
     en: {
-      'pdf.page': 'Page {number}', 'pdf.pageOf': 'Page {number} of {total}', 'pdf.loadingPage': 'Loading page…',
+      'pdf.formatBadge': 'PDF', 'pdf.page': 'Page {number}', 'pdf.pageOf': 'Page {number} of {total}', 'pdf.loadingPage': 'Loading page…',
       'pdf.textUnavailable': 'Text selection, annotations, dictionary, and encyclopedia are unavailable because this PDF has no usable text layer.',
       'pdf.selectionWithinPageRequired': 'Select text within one PDF page to use annotations, dictionary, or encyclopedia.',
       'pdf.passwordRequired': 'This PDF is password protected. Enter its password in the reader to display the page.'
@@ -6981,6 +6981,7 @@
   };
   Object.keys(pdfLocaleAdditions).forEach(function(code) {
     Object.assign(dictionaries[code], pdfLocaleAdditions[code]);
+    dictionaries[code]['pdf.formatBadge'] = 'PDF';
   });
   var pdfActionLocaleAdditions = {
     en: {'pdf.search': 'Search PDF', 'pdf.searchPlaceholder': 'Search PDF', 'pdf.searchNoResults': 'No matching pages.', 'pdf.closeSearch': 'Close PDF search', 'pdf.zoomOut': 'Zoom out', 'pdf.zoomIn': 'Zoom in', 'pdf.fitWidth': 'Fit width', 'pdf.fitPage': 'Fit page', 'pdf.rotate': 'Rotate page', 'pdf.print': 'Print PDF', 'pdf.download': 'Download PDF'},

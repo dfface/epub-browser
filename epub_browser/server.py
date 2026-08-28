@@ -2890,12 +2890,20 @@ window.location.assign(payload.redirect||'/');
             'ETag': etag,
             'X-Content-Type-Options': 'nosniff',
         }
-        if if_none_match_matches(request.headers.get('if-none-match'), etag):
+        range_header = request.headers.get('range')
+        # A PDF.js range fetch needs the selected bytes even when the browser
+        # adds a cache validator for the same document. Returning 304 here
+        # leaves the worker without the requested chunk and can produce a
+        # successfully "rendered" but empty canvas. Full-document requests
+        # still use ordinary ETag revalidation.
+        if range_header is None and if_none_match_matches(
+            request.headers.get('if-none-match'), etag
+        ):
             validated.close()
             return Response(status_code=304, headers=headers)
         try:
             requested_range = parse_single_range(
-                request.headers.get('range'), expected_size
+                range_header, expected_size
             )
         except RangeNotSatisfiable:
             validated.close()
@@ -3438,7 +3446,27 @@ window.location.assign(payload.redirect||'/');
 
     def authorized_chapter_snapshot(book_id, chapter_index):
         """Return cache-derived labels only after the caller has book access."""
-        renderer = ServerPageRenderer(base_directory, book_id)
+        book = store.book_by_id(book_id)
+        if book is None:
+            raise ServerPageError('Book content cache is invalid')
+        renderer = ServerPageRenderer(
+            base_directory,
+            book_id,
+            source_format=book.source_format,
+        )
+        if book.source_format == PDF_FORMAT:
+            _metadata, processor = renderer._pdf_processor()
+            if chapter_index >= len(processor.chapters):
+                raise ValueError('chapter index is outside the book')
+            chapter_label = processor.chapters[chapter_index].get('title')
+            if (
+                not isinstance(processor.book_title, str)
+                or not processor.book_title.strip()
+                or not isinstance(chapter_label, str)
+                or not chapter_label.strip()
+            ):
+                raise ServerPageError('PDF metadata cache is invalid')
+            return processor.book_title, chapter_label
         metadata = renderer._read_json(renderer.content_dir / 'metadata.json')
         if not isinstance(metadata, dict):
             raise ServerPageError('Book content cache is invalid')

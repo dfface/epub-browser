@@ -228,7 +228,7 @@ class PDFDocumentDeliveryTests(unittest.TestCase):
                 )
                 self.assertEqual(response.headers["content-length"], "0")
 
-    def test_etag_supports_conditional_get_and_precedes_range(self):
+    def test_pdf_range_precedes_browser_added_etag_revalidation(self):
         first = self.owner.get(self.url)
         etag = first.headers["etag"]
 
@@ -237,10 +237,13 @@ class PDFDocumentDeliveryTests(unittest.TestCase):
             headers={"If-None-Match": f'W/{etag}, "other"', "Range": "bytes=0-1"},
         )
 
-        self.assertEqual(response.status_code, 304)
-        self.assertEqual(response.content, b"")
+        self.assertEqual(response.status_code, 206)
+        self.assertEqual(response.content, self.original_bytes[:2])
         self.assertEqual(response.headers["etag"], etag)
-        self.assertNotIn("content-range", response.headers)
+        self.assertEqual(
+            response.headers["content-range"],
+            f"bytes 0-1/{len(self.original_bytes)}",
+        )
 
     def test_unauthenticated_and_inaccessible_books_are_hidden_before_cache_reads(self):
         anonymous = TestClient(self.app)

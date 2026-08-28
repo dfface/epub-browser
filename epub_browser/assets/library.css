@@ -396,7 +396,8 @@ body {
     width: 100%;
     height: auto;
     aspect-ratio: 4 / 5;
-    object-fit: cover;
+    object-fit: contain;
+    background: #fff;
     display: block;
     border-bottom: 1px solid transparent;
 }
@@ -452,6 +453,31 @@ body {
     font-weight: 600;
     line-height: 1;
     pointer-events: none;
+}
+
+.book-format-badge {
+    position: absolute;
+    z-index: 1;
+    right: 10px;
+    bottom: 10px;
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    padding: 0 9px;
+    border: 1px solid color-mix(in srgb, #fff 44%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--button-bg) 92%, transparent);
+    box-shadow: 0 2px 8px color-mix(in srgb, #000 24%, transparent);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.pdf-cover-frame .book-rating-badge {
+    bottom: 44px;
 }
 
 .book-rating-badge i {

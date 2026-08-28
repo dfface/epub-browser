@@ -339,6 +339,21 @@ test('renders a large Library catalog in animation-frame batches', () => {
   assert.equal(harness.cardIds().length, 25);
 });
 
+test('renders a PDF format badge below its optional cover rating', () => {
+  const harness = createLibraryHarness([[{
+    hash: 'pdf-book', url: '/book/pdf-book/index.html', cover: '/book/pdf-book/cover.png',
+    title: 'PDF Book', authors: [], tags: [], rating: 4, format: 'pdf',
+  }]]);
+
+  harness.window.initScriptLibrary();
+
+  const frame = harness.card('pdf-book').children[0].children[0];
+  assert.equal(frame.classList.contains('pdf-cover-frame'), true);
+  assert.equal(frame.children[1].className, 'book-rating-badge');
+  assert.equal(frame.children[2].className, 'book-format-badge');
+  assert.equal(frame.children[2].textContent, 'pdf.formatBadge');
+});
+
 test('cancels stale card batches when a metadata refresh starts during rendering', async () => {
   const books = Array.from({ length: 25 }, (_, index) => ({
     hash: 'book-' + index,

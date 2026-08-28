@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import os
 from pathlib import Path
@@ -287,7 +287,13 @@ def inspect_pdf(source: Path) -> PDFMetadata:
                 raise PDFProcessingError("PDF signature is missing")
             bounded_stream.seek(0)
             try:
-                return _inspect_pdf_contents(bounded_stream)
+                metadata = _inspect_pdf_contents(bounded_stream)
+                if metadata.title is None:
+                    metadata = replace(
+                        metadata,
+                        title=source.stem.strip() or "PDF Book",
+                    )
+                return metadata
             except PDFProcessingError:
                 raise
             except Exception:

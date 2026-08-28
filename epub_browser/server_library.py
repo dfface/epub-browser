@@ -45,9 +45,9 @@ from .state import BookRecord, StateStore
 from .urls import SiteURLs
 
 
-PDF_OUTPUT_REVISION = "server-pdf-v1"
+PDF_OUTPUT_REVISION = "server-pdf-v2"
 PDF_OUTPUT_REVISION_FILE = ".server-pdf-revision"
-PDF_METADATA_SCHEMA_VERSION = 1
+PDF_METADATA_SCHEMA_VERSION = 2
 
 
 def library_metadata(
@@ -94,6 +94,7 @@ def library_metadata(
                     else None
                 ),
                 "rating": ratings.get(record.book_id),
+                "format": record.source_format,
             }
         )
     return books
@@ -1014,10 +1015,7 @@ class ServerLibraryManager:
             or cached_digest != expected_digest
         ):
             return False
-        if (
-            payload.get("title") is not None
-            and not isinstance(payload.get("title"), str)
-        ):
+        if not isinstance(payload.get("title"), str) or not payload["title"].strip():
             return False
         for field in ("authors", "tags"):
             if not isinstance(payload.get(field), list) or not all(

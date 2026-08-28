@@ -97,6 +97,7 @@ function createHarness(options = {}) {
   document.createElement = (tagName) => new Element(tagName, document);
   document.ownerDocument = document;
   document.body = document.createElement('body');
+  document.documentElement = document;
   document.appendChild(document.body);
   document.getElementById = (id) => {
     let match = null;
@@ -123,6 +124,10 @@ function createHarness(options = {}) {
   class TextLayer {
     constructor(params) { this.params = params; }
     render() {
+      if (options.textLayerOverwritesSize) {
+        this.params.container.style.width = 'round(down, var(--total-scale-factor) * 200px, var(--scale-round-x))';
+        this.params.container.style.height = 'round(down, var(--total-scale-factor) * 300px, var(--scale-round-y))';
+      }
       this.params.container.appendChild(document.createElement('span'));
       return Promise.resolve();
     }
@@ -187,7 +192,12 @@ function createHarness(options = {}) {
   const window = {
     document,
     location: { href: document.baseURI, origin: 'https://reader.example' },
+    innerHeight: options.innerHeight || 800,
     devicePixelRatio: options.devicePixelRatio || 2,
+    getComputedStyle() {
+      const padding = options.stagePadding || 0;
+      return { paddingLeft: `${padding}px`, paddingRight: `${padding}px` };
+    },
     EpubPDFConfig: {
       documentUrl: 'document.pdf',
       pdfjsModuleUrl: '/assets/immutable/vendor/pdfjs/build/pdf.0123456789ab.mjs',
@@ -261,7 +271,7 @@ function createHarness(options = {}) {
     results.setAttribute('id', 'pdfSearchResults');
     document.body.appendChild(results);
     control('readerDrawerBackdrop');
-    ['pdfZoomOut', 'pdfZoomIn', 'pdfFitWidth', 'pdfFitPage', 'pdfRotate', 'pdfPrint', 'pdfDownload'].forEach(control);
+    ['pdfZoomOut', 'pdfZoomIn', 'pdfFitWidth', 'pdfFitPage', 'pdfRotate'].forEach(control);
     return { drawer, toggle, mobileToggle, close, form, input, results };
   }
 
@@ -369,33 +379,6 @@ test('shows an accessible localized error when PDF search extraction fails', asy
   assert.equal(controls.results.children[0].textContent, 'translated:pdf.searchFailed');
 });
 
-test('removes a print iframe after the browser reports printing complete', () => {
-  const harness = createHarness({ controlledTimers: true });
-
-  harness.adapter.print();
-  const frame = harness.document.body.children.find((node) => node.tagName === 'IFRAME');
-  assert.ok(frame);
-  frame.dispatchEvent({ type: 'load' });
-  harness.window.dispatchEvent({ type: 'afterprint' });
-
-  assert.equal(frame.parentNode, null);
-});
-
-test('removes a print iframe after a load failure or timeout fallback', () => {
-  const failed = createHarness({ controlledTimers: true });
-  failed.adapter.print();
-  const failedFrame = failed.document.body.children.find((node) => node.tagName === 'IFRAME');
-  failedFrame.dispatchEvent({ type: 'error' });
-  assert.equal(failedFrame.parentNode, null);
-
-  const timedOut = createHarness({ controlledTimers: true });
-  timedOut.adapter.print();
-  const timedOutFrame = timedOut.document.body.children.find((node) => node.tagName === 'IFRAME');
-  timedOutFrame.dispatchEvent({ type: 'load' });
-  timedOut.runTimeout();
-  assert.equal(timedOutFrame.parentNode, null);
-});
-
 test('search resolves results to canonical PDF chapter URLs', async () => {
   const harness = createHarness({ pageTexts: ['alpha', 'beta alpha'] });
 
@@ -414,7 +397,7 @@ test('rotation and fit preferences do not mutate reading mode keys', async () =>
   assert.equal(harness.storage.getItem('continuousScroll'), null);
 });
 
-test('loads one local PDF.js document with its paired worker and disabled optional fetch paths', async () => {
+test('loads one local PDF.js document with recovery enabled for imperfect PDFs', async () => {
   const harness = createHarness();
   harness.document.appendChild(harness.page(1));
   harness.document.appendChild(harness.page(2));
@@ -435,7 +418,11 @@ test('loads one local PDF.js document with its paired worker and disabled option
     isImageDecoderSupported: false,
     isOffscreenCanvasSupported: false,
     enableXfa: false,
-    stopAtErrors: true,
+    stopAtErrors: false,
+    disableRange: false,
+    disableStream: true,
+    disableAutoFetch: true,
+    rangeChunkSize: 65536,
   });
 });
 
@@ -455,6 +442,36 @@ test('renders the requested page into a DPR canvas and selectable text layer', a
   assert.equal(text.style['--total-scale-factor'], '2');
   assert.equal(node.style.minHeight, '600px');
   assert.equal(node.getAttribute('aria-busy'), 'false');
+  assert.equal(node.children.some((child) => child.className === 'pdf-page-status'), false);
+});
+
+test('keeps a visible loading status over the paper until PDF.js finishes painting', async () => {
+  const harness = createHarness({ pendingRender: true });
+  const node = harness.page(2);
+  harness.document.appendChild(node);
+
+  harness.adapter.renderWithin(harness.document);
+  await harness.flush();
+
+  const status = node.children.find((child) => child.className === 'pdf-page-status');
+  assert.equal(node.getAttribute('aria-busy'), 'true');
+  assert.equal(node.children.some((child) => child.className === 'pdf-page-canvas'), true);
+  assert.equal(status.getAttribute('data-pdf-status'), 'loading');
+  assert.equal(status.textContent, 'translated:pdf.loadingPage');
+});
+
+test('restores the PDF text layer viewport after PDF.js sizing for physical pointer selection', async () => {
+  const harness = createHarness({ textLayerOverwritesSize: true });
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  const canvas = node.children.find((child) => child.className === 'pdf-page-canvas');
+  const text = node.children.find((child) => child.className.includes('pdf-page-text-layer'));
+  assert.equal(text.style.width, canvas.style.width);
+  assert.equal(text.style.height, canvas.style.height);
 });
 
 test('keeps page geometry, zoom, rotation and fit inside the existing content width', async () => {
@@ -468,7 +485,169 @@ test('keeps page geometry, zoom, rotation and fit inside the existing content wi
   const viewport = harness.renderCalls[0].params.viewport;
   assert.equal(viewport.rotation, 90);
   assert.equal(viewport.width, 675);
-  assert.equal(node.style.aspectRatio, '200 / 300');
+  assert.equal(node.style.aspectRatio, 'auto');
+  assert.equal(node.style.width, '675px');
+});
+
+test('rendered page owns its exact canvas box instead of retaining a stale width-ratio placeholder', async () => {
+  const harness = createHarness({ config: { zoom: 0.5, fit: 'width' } });
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  const canvas = node.children.find((child) => child.className === 'pdf-page-canvas');
+  assert.equal(canvas.style.width, '200px');
+  assert.equal(canvas.style.height, '300px');
+  assert.equal(node.style.width, canvas.style.width);
+  assert.equal(node.style.height, canvas.style.height);
+  assert.equal(node.style.minHeight, canvas.style.height);
+  assert.equal(node.style.aspectRatio, 'auto');
+});
+
+test('fit actions reset custom zoom while zoom actions clear both fit active states', async () => {
+  const harness = createHarness({ innerHeight: 350, config: { zoom: 1.5, fit: 'width' } });
+  harness.installReaderControls();
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+  await harness.adapter.renderWithin(harness.document);
+
+  await harness.adapter.fitPage();
+  assert.ok(harness.renderCalls.at(-1).params.viewport.height <= 243);
+  assert.equal(harness.document.getElementById('pdfFitPage').getAttribute('aria-pressed'), 'true');
+
+  await harness.adapter.zoomIn();
+  assert.equal(harness.document.getElementById('pdfFitPage').getAttribute('aria-pressed'), 'false');
+  assert.equal(harness.document.getElementById('pdfFitWidth').getAttribute('aria-pressed'), 'false');
+
+  await harness.adapter.fitWidth();
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 400);
+  assert.equal(harness.document.getElementById('pdfFitWidth').getAttribute('aria-pressed'), 'true');
+});
+
+test('fit width measures the reader stage after fit page has made the paper narrower', async () => {
+  const harness = createHarness({ innerHeight: 350, config: { fit: 'page' } });
+  harness.installReaderControls();
+  const stage = harness.document.createElement('article');
+  stage.setAttribute('id', 'eb-content');
+  stage.clientWidth = 500;
+  const node = harness.page(1);
+  node.clientWidth = 200;
+  stage.appendChild(node);
+  harness.document.appendChild(stage);
+
+  await harness.adapter.renderWithin(harness.document);
+  await harness.adapter.fitWidth();
+
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 500);
+});
+
+test('large zoom is based on the fixed outer PDF stage instead of expanding the page layout', async () => {
+  const harness = createHarness({ config: { zoom: 4, fit: 'width' } });
+  const stage = harness.document.createElement('main');
+  stage.classList.add('eb-content-container');
+  stage.clientWidth = 500;
+  const content = harness.document.createElement('article');
+  content.setAttribute('id', 'eb-content');
+  content.clientWidth = 900;
+  const node = harness.page(1);
+  content.appendChild(node);
+  stage.appendChild(content);
+  harness.document.appendChild(stage);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 2000);
+});
+
+test('fit width uses the PDF stage content box without creating padding overflow', async () => {
+  const harness = createHarness({ config: { fit: 'width' }, stagePadding: 20 });
+  const stage = harness.document.createElement('main');
+  stage.classList.add('eb-content-container');
+  stage.clientWidth = 500;
+  const content = harness.document.createElement('article');
+  content.setAttribute('id', 'eb-content');
+  const node = harness.page(1);
+  content.appendChild(node);
+  stage.appendChild(content);
+  harness.document.appendChild(stage);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  assert.ok(Math.abs(harness.renderCalls.at(-1).params.viewport.width - 460) < 0.001);
+});
+
+test('continuous page gap follows rendered paper width within a restrained range', async () => {
+  const harness = createHarness({ config: { zoom: 2, fit: 'width' } });
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  assert.equal(harness.document.documentElement.style['--pdf-page-gap'], '12px');
+});
+
+test('PDF page-width presets top out at the reader stage instead of overflowing it', async () => {
+  const harness = createHarness({ config: { fit: 'width' } });
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+  await harness.adapter.renderWithin(harness.document);
+
+  await harness.adapter.setPageWidthPreset('4');
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 400);
+  await harness.adapter.setPageWidthPreset('1');
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 240);
+});
+
+test('PDF custom page width accepts an exact percentage and clamps unsafe values', async () => {
+  const harness = createHarness({ config: { fit: 'page' } });
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+  await harness.adapter.renderWithin(harness.document);
+
+  await harness.adapter.setZoomPercent(137);
+  assert.equal(harness.adapter.getZoomPercent(), 137);
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 548);
+
+  await harness.adapter.setZoomPercent(999);
+  assert.equal(harness.adapter.getZoomPercent(), 400);
+  assert.equal(harness.renderCalls.at(-1).params.viewport.width, 1600);
+});
+
+test('fit page uses the visible reader viewport while fit width fills the canvas', async () => {
+  const harness = createHarness({ innerHeight: 350, config: { fit: 'width' } });
+  harness.installReaderControls();
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+
+  await harness.adapter.renderWithin(harness.document);
+  const widthViewport = harness.renderCalls.at(-1).params.viewport;
+  await harness.adapter.fitPage();
+  const pageViewport = harness.renderCalls.at(-1).params.viewport;
+  assert.equal(harness.document.getElementById('pdfFitPage').getAttribute('aria-pressed'), 'true');
+  assert.equal(harness.document.getElementById('pdfFitWidth').getAttribute('aria-pressed'), 'false');
+  const pageCanvas = node.children.find((child) => child.className === 'pdf-page-canvas');
+  const pageTextLayer = node.children.find((child) => child.className.includes('pdf-page-text-layer'));
+  assert.equal(pageCanvas.style.marginLeft, '0px');
+  assert.equal(node.style.width, pageCanvas.style.width);
+  assert.equal(pageTextLayer.style.left, pageCanvas.style.marginLeft);
+  await harness.adapter.fitWidth();
+  const restoredWidthViewport = harness.renderCalls.at(-1).params.viewport;
+  const widthCanvas = node.children.find((child) => child.className === 'pdf-page-canvas');
+  assert.equal(harness.document.getElementById('pdfFitPage').getAttribute('aria-pressed'), 'false');
+  assert.equal(harness.document.getElementById('pdfFitWidth').getAttribute('aria-pressed'), 'true');
+
+  assert.equal(widthViewport.width, 400);
+  assert.equal(restoredWidthViewport.width, 400);
+  assert.ok(pageViewport.width < widthViewport.width);
+  assert.ok(pageViewport.height <= 243);
+  assert.equal(widthCanvas.style.marginLeft, '0px');
 });
 
 test('uses only the client password callback and never adds a password to document requests', async () => {
@@ -567,6 +746,20 @@ test('lazily paints a descriptor only when it enters the viewport', async () => 
 
   assert.equal(harness.renderCalls.length, 1);
   assert.equal(harness.intersectionObservers[0].unobserved, true);
+});
+
+test('sizes lazy placeholders from the active PDF width preset before painting', async () => {
+  const harness = createHarness({ lazy: true, config: { zoom: 0.6, fit: 'width' } });
+  const node = harness.page(1);
+  node.clientWidth = 400;
+  harness.document.appendChild(node);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  assert.equal(harness.renderCalls.length, 0);
+  assert.equal(node.getAttribute('data-pdf-rendered'), 'placeholder');
+  assert.equal(node.style.width, '240px');
+  assert.equal(node.style.height, '360px');
 });
 
 test('rejects external or unhashed PDF.js assets before importing or fetching', async () => {

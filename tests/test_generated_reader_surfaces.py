@@ -81,6 +81,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertEqual(book_html.count('Opening'), 1)
             self.assertEqual(book_html.count('Part I'), 1)
             self.assertEqual(book_html.count('class=chapter-outline-labels'), 1)
+            self.assertNotIn('— Opening', book_html)
+            self.assertIn('>Opening · Part I</span>', book_html)
+            self.assertNotIn('data-ai-reading-hub', book_html)
+            self.assertNotIn('data-ai-book-chat', book_html)
+            self.assertNotIn('data-ai-reading-indicators', book_html)
+            self.assertIn('data-reading-insights', book_html)
+            self.assertIn('class=book-source-format data-i18n=pdf.formatBadge', book_html)
+            self.assertIn('aria-label=PDF', book_html)
 
     def test_pdf_page_adds_only_a_scoped_descriptor_to_the_shared_reader(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -152,6 +160,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('data-i18n-aria-label="pdf.pageOf"', pdf_html)
             self.assertIn('window.EpubPDFConfig=', pdf_html)
             self.assertIn('"documentUrl":"/api/books/pdf-book/document"', pdf_html)
+            self.assertNotIn('"pages":', pdf_html)
+            self.assertIn('"hasExtractableText":true', pdf_html)
             self.assertRegex(
                 pdf_html,
                 r'"pdfjsModuleUrl":"/assets/immutable/vendor/pdfjs/build/pdf\.[0-9a-f]{12}\.mjs"',
@@ -174,7 +184,37 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('class="toc-floating reader-drawer pdf-search-drawer"', pdf_html)
             self.assertIn('id="mobilePdfSearchToggle"', pdf_html)
             self.assertIn('id="mobilePdfZoomOut"', pdf_html)
-            self.assertIn('id="mobilePdfDownload"', pdf_html)
+            self.assertRegex(
+                pdf_html,
+                r'id="pageWidthSlider"[^>]+min="25"[^>]+max="400"[^>]+step="1"',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'id="pageWidthValue"[^>]+type="number"[^>]+min="25"[^>]+max="400"',
+            )
+            self.assertIn('data-pdf-zoom-control', pdf_html)
+            self.assertRegex(
+                epub_html,
+                r'id="pageWidthSlider"[^>]+min="1"[^>]+max="4"[^>]+step="1"',
+            )
+            self.assertNotIn('id="pageWidthValue"', epub_html)
+            for removed_pdf_action in (
+                'id="pdfPrint"', 'id="pdfDownload"',
+                'id="mobilePdfPrint"', 'id="mobilePdfDownload"',
+                'data-ai-learning-canvas', 'data-ai-followup-drawer',
+                'data-ai-reading-hub',
+            ):
+                self.assertNotIn(removed_pdf_action, pdf_html)
+            self.assertIn('data-ai-learning-canvas', epub_html)
+            self.assertIn('data-ai-followup-drawer', epub_html)
+            self.assertIn('data-ai-reading-hub', epub_html)
+            self.assertIn('<body class="pdf-source">', pdf_html)
+            self.assertNotIn('<body class="pdf-source">', epub_html)
+            pdf_css = Path('epub_browser/assets/pdf-chapter.css').read_text(encoding='utf-8')
+            self.assertNotIn('body.pdf-source .container {', pdf_css)
+            self.assertIn('body.pdf-source .eb-content-container {', pdf_css)
+            self.assertIn('body.pdf-source .pdf-page-canvas {', pdf_css)
+            self.assertIn('overflow: visible;', pdf_css)
             self.assertNotIn('id="pdfSearchToggle"', epub_html)
             self.assertNotIn('id="pdfSearchDrawer"', epub_html)
             self.assertNotIn('id="mobilePdfSearchToggle"', epub_html)
@@ -1421,6 +1461,16 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'/assets/immutable/version-check\.[0-9a-f]{12}\.js',
             )
 
+    def test_ssg_footers_do_not_make_runtime_release_requests(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            footer = html[html.index('<footer'):html.index('</footer>')]
+            self.assertNotIn('api.github.com', footer)
+            self.assertRegex(footer, r'data-release-api(?:=(?:""|\'\'))?(?:[ >])')
+
+        for html in (self._server_html(), self._server_book_html(), self._server_chapter_html()):
+            footer = html[html.index('<footer'):html.index('</footer>')]
+            self.assertRegex(footer, r'data-release-api=(?:"/api/version"|/api/version)')
+
     def test_shared_footer_link_uses_the_surrounding_text_color(self):
         css = Path("epub_browser/assets/theme.css").read_text(encoding="utf-8")
         link_rules = css[css.index(".eb-footer a {"):css.index("}", css.index(".eb-footer a {"))]
@@ -1508,7 +1558,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("i18n.t('reader.loadingNextChapter'", script)
         self.assertIn("i18n.t('reader.chapterLoadFailed'", script)
         self.assertIn("i18n.t('settings.saved'", script)
-        self.assertIn("i18n.t('reader.chapterNumber'", script)
+        self.assertIn('continuousChapterPresentation(', script)
+        self.assertIn('i18n.t.bind(i18n)', script)
         self.assertIn("i18n.t('settings.continuousScrollTip'", script)
 
     def test_reader_chapter_navigation_swaps_only_the_reading_body(self):
@@ -2848,13 +2899,19 @@ assert.deepEqual(
     def test_continuous_reader_disables_the_chapter_local_toc(self):
         chapter = self._chapter_html()
         chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
 
         mobile_toc = re.search(
             r'<button\b[^>]*\bid=(?:["\'])?mobileTocBtn(?:["\' >])[^>]*>',
             chapter,
         )
         self.assertIsNotNone(mobile_toc)
-        self.assertIn('syncChapterTocAvailability(document, isContinuousScroll)', chapter_js)
+        self.assertIn(
+            'syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig))',
+            chapter_js,
+        )
+        self.assertIn('.reader-toolbar.top-controls .control-btn[hidden]', chapter_css)
+        self.assertIn('display: none !important;', chapter_css)
         self.assertRegex(chapter, r'/assets/immutable/reader-layout\.[0-9a-f]{12}\.js')
 
     def test_reader_settings_offer_four_responsive_page_widths(self):
@@ -3071,6 +3128,29 @@ assert.deepEqual(
         self.assertIn('aspect-ratio: 4 / 5;', cover_rule)
         self.assertIn('height: auto;', cover_rule)
         self.assertNotRegex(css, r'\.book-cover\s*\{[^}]*height:\s*\d+px')
+
+    def test_library_cover_preserves_pdf_page_proportions_and_stacks_format_badges(self):
+        css = Path('epub_browser/assets/library.css').read_text(encoding='utf-8')
+        cover_start = css.index('.book-cover {')
+        cover_rule = css[cover_start:css.index('}', cover_start)]
+
+        self.assertIn('object-fit: contain;', cover_rule)
+        self.assertIn('.book-format-badge', css)
+        self.assertIn('.pdf-cover-frame .book-rating-badge', css)
+
+    def test_pdf_reader_stage_follows_the_active_reader_theme(self):
+        css = Path('epub_browser/assets/pdf-chapter.css').read_text(encoding='utf-8')
+        body_start = css.index('body.pdf-source {')
+        body_rule = css[body_start:css.index('}', body_start)]
+        stage_start = css.index('body.pdf-source .eb-content-container {')
+        stage_rule = css[stage_start:css.index('}', stage_start)]
+
+        self.assertIn('padding-inline: 0;', body_rule)
+        self.assertIn('margin-top: 0;', stage_rule)
+        self.assertIn('var(--background)', stage_rule)
+        self.assertNotIn('var(--text) 88%', stage_rule)
+        self.assertIn('body.pdf-source:not(.continuous-scroll-mode) .eb-content-container', css)
+        self.assertIn('body.pdf-source:not(.continuous-scroll-mode) #eb-content', css)
 
     def test_server_book_ai_assets_stay_off_critical_path(self):
         book_html = self._server_book_html()

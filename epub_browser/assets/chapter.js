@@ -1636,8 +1636,17 @@ function initScript() {
                     a.setAttribute('data-chapter-index', item.chapter_index);
                     var title = document.createElement('span');
                     title.className = 'chapter-title';
-                    title.textContent = item.title;
+                    var presentation = window.EpubReaderLayout.chapterNavigationPresentation(
+                        item, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
+                    );
+                    title.textContent = presentation.title;
                     a.appendChild(title);
+                    if (presentation.outlineLabels.length) {
+                        var outlineLabels = document.createElement('span');
+                        outlineLabels.className = 'chapter-outline-labels';
+                        outlineLabels.textContent = presentation.outlineLabels.join(' · ');
+                        a.appendChild(outlineLabels);
+                    }
                     a.addEventListener('click', function(e) {
                         if (!isContinuousScroll && isDifferentScrollingChapter(this.href)) {
                             e.preventDefault();
@@ -1936,7 +1945,7 @@ function initScript() {
     }
 
     if (window.EpubReaderLayout) {
-        window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll);
+        window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig));
     }
 
     tocToggle.addEventListener('click', function() {
@@ -2150,6 +2159,7 @@ function initScript() {
     
     function showSettingsModal(opener) {
         closeReaderDrawers(false);
+        syncPdfZoomControls();
         settingsOpener = opener;
         settingsModal.classList.add('show');
         settingsModal.setAttribute('aria-hidden', 'false');
@@ -2224,6 +2234,10 @@ function initScript() {
 
     function updatePageWidth(preset, reflowPagination) {
         if (!window.EpubReaderLayout) return;
+        if (window.EpubPDFConfig) {
+            syncPdfZoomControls();
+            return;
+        }
         pageWidthPreset = window.EpubReaderLayout.applyPageWidth(
             document.documentElement,
             preset
@@ -2240,12 +2254,49 @@ function initScript() {
             slider.value = pageWidthPreset;
             slider.setAttribute('aria-valuetext', translatedLabel);
         }
+        if (
+            reflowPagination && window.EpubPDFConfig && window.EpubPDFChapter &&
+            typeof window.EpubPDFChapter.setPageWidthPreset === 'function'
+        ) {
+            window.EpubPDFChapter.setPageWidthPreset(pageWidthPreset);
+        }
         if (reflowPagination && isPaginationMode) {
             window.requestAnimationFrame(function() {
                 calculateTotalPages();
                 showPage(Math.min(currentPage, totalPages - 1));
             });
         }
+    }
+
+    function normalizePdfZoomPercent(value) {
+        return Math.max(25, Math.min(400, Math.round(Number(value) || 100)));
+    }
+
+    function syncPdfZoomControls(value) {
+        if (!window.EpubPDFConfig) return false;
+        var adapter = window.EpubPDFChapter;
+        var percent = value;
+        if (percent === undefined && adapter && typeof adapter.getZoomPercent === 'function') {
+            percent = adapter.getZoomPercent();
+        }
+        percent = normalizePdfZoomPercent(percent);
+        var slider = document.getElementById('pageWidthSlider');
+        var input = document.getElementById('pageWidthValue');
+        if (slider) {
+            slider.value = String(percent);
+            slider.setAttribute('aria-valuetext', percent + '%');
+        }
+        if (input) input.value = String(percent);
+        return true;
+    }
+
+    function applyPdfZoomPercent(value) {
+        var percent = normalizePdfZoomPercent(value);
+        syncPdfZoomControls(percent);
+        var adapter = window.EpubPDFChapter;
+        if (!adapter || typeof adapter.setZoomPercent !== 'function') return;
+        var refresh = adapter.setZoomPercent(percent);
+        if (refresh && typeof refresh.catch === 'function') refresh.catch(function() {});
     }
 
     var fontSizeSlider = document.getElementById('fontSizeSlider');
@@ -2261,11 +2312,27 @@ function initScript() {
     var pageWidthSlider = document.getElementById('pageWidthSlider');
     if (pageWidthSlider) {
         pageWidthSlider.addEventListener('input', function() {
+            if (window.EpubPDFConfig) {
+                syncPdfZoomControls(this.value);
+                return;
+            }
             pageWidthPreset = window.EpubReaderLayout.normalizePageWidth(this.value);
             setReadingPreference('page_width', pageWidthPreset);
             if (!window.epubBrowserCache) window.epubBrowserCache = {};
             window.epubBrowserCache.page_width = pageWidthPreset;
             updatePageWidth(pageWidthPreset, true);
+        });
+        if (window.EpubPDFConfig) {
+            pageWidthSlider.addEventListener('change', function() {
+                applyPdfZoomPercent(this.value);
+            });
+        }
+    }
+
+    var pageWidthValue = document.getElementById('pageWidthValue');
+    if (pageWidthValue) {
+        pageWidthValue.addEventListener('change', function() {
+            applyPdfZoomPercent(this.value);
         });
     }
     
@@ -2565,8 +2632,11 @@ function initScript() {
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
                     separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
-                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: nextIdx });
-                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: nextIdx });
+                    var chapterPresentation = window.EpubReaderLayout.continuousChapterPresentation(
+                        chapterTitle, nextIdx, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
+                    );
+                    separator.querySelector('.chapter-sep-title').textContent = chapterPresentation.title;
+                    separator.querySelector('.chapter-sep-index').textContent = chapterPresentation.index;
                     chapterSection.appendChild(separator);
                     
                     // 追加章节内容
@@ -2672,8 +2742,11 @@ function initScript() {
                     var separator = document.createElement('div');
                     separator.className = 'chapter-separator';
                     separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
-                    separator.querySelector('.chapter-sep-title').textContent = chapterTitle || i18n.t('reader.chapterNumber', { number: prevIdx });
-                    separator.querySelector('.chapter-sep-index').textContent = i18n.t('reader.chapterNumber', { number: prevIdx });
+                    var chapterPresentation = window.EpubReaderLayout.continuousChapterPresentation(
+                        chapterTitle, prevIdx, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
+                    );
+                    separator.querySelector('.chapter-sep-title').textContent = chapterPresentation.title;
+                    separator.querySelector('.chapter-sep-index').textContent = chapterPresentation.index;
                     
                     var childNodes = chapterContent.childNodes;
                     for (var i = 0; i < childNodes.length; i++) {
@@ -2826,7 +2899,7 @@ function initScript() {
             
             isContinuousScroll = this.checked;
             if (window.EpubReaderLayout) {
-                window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll);
+                window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig));
             }
             if (!isKindleMode()) {
                 localStorage.setItem('continuousScroll', isContinuousScroll ? 'true' : 'false');

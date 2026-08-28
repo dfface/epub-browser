@@ -32,7 +32,11 @@ from epub_browser.processor import (
     EPUBProcessor,
     SERVER_OUTPUT_REVISION_FILE,
 )
-from epub_browser.server_library import PDF_OUTPUT_REVISION, PDF_OUTPUT_REVISION_FILE
+from epub_browser.server_library import (
+    PDF_OUTPUT_REVISION,
+    PDF_OUTPUT_REVISION_FILE,
+    library_metadata,
+)
 from epub_browser.reporting import Reporter
 from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
@@ -151,6 +155,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         cache_metadata = json.loads(
             (book_root / "pdf" / "metadata.json").read_text(encoding="utf-8")
         )
+        self.assertEqual(cache_metadata["title"], "Server PDF")
         self.assertEqual(cache_metadata["page_count"], 2)
         self.assertEqual(cache_metadata["source_sha256"], source_sha256(pdf_source))
         self.assertEqual(cache_metadata["document_sha256"], source_sha256(pdf_source))
@@ -162,6 +167,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertFalse((book_root / "index.html").exists())
         self.assertFalse((book_root / "chapter_0.html").exists())
         self.assertNotIn("password", json.dumps(cache_metadata).casefold())
+        library_entry = library_metadata((record,), manager.public_dir)[0]
+        self.assertEqual(library_entry["format"], "pdf")
 
         app = create_app(
             manager.public_dir,
@@ -184,6 +191,22 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertIn('"documentUrl":"/api/books/', chapter.text)
         self.assertIn('data-pdf-page-number="2"', chapter.text)
         self.assertNotIn(str(pdf_source), chapter.text)
+        manager.shutdown()
+
+    def test_pdf_server_cache_persists_filename_title_fallback(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "Original filename.pdf"
+        self._write_pdf(pdf_source, title="   ", pages=1)
+        manager = self._manager()
+
+        record = manager.reconcile().active_books[0]
+        payload = json.loads(
+            (manager.public_dir / "book" / record.book_id / "pdf" / "metadata.json")
+            .read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(payload["title"], "Original filename")
+        self.assertEqual(json.loads(record.metadata_json)["title"], "Original filename")
         manager.shutdown()
 
     def test_pdf_cache_corruption_and_changed_source_rebuild_the_whole_cache(self):

@@ -124,7 +124,14 @@
         isImageDecoderSupported: false,
         isOffscreenCanvasSupported: false,
         enableXfa: false,
-        stopAtErrors: true
+        // PDFs in the wild frequently contain recoverable operator/resource
+        // errors. PDF.js defaults to recovery mode; keep that behavior so one
+        // imperfect object cannot turn an otherwise readable page white.
+        stopAtErrors: false,
+        disableRange: false,
+        disableStream: true,
+        disableAutoFetch: true,
+        rangeChunkSize: 65536
       });
       entry = {
         url: config.documentUrl,
@@ -185,6 +192,7 @@
     var status = node.ownerDocument.createElement('p');
     status.className = 'pdf-page-status';
     status.setAttribute('role', role);
+    status.setAttribute('data-pdf-status', role === 'status' ? 'loading' : 'error');
     status.setAttribute('aria-live', role === 'alert' ? 'assertive' : 'polite');
     status.textContent = translate(key);
     node.replaceChildren(status);
@@ -223,6 +231,77 @@
     record.textLayer = null;
   }
 
+  function availablePageHeight(node, bounds) {
+    var viewportHeight = Number(root.innerHeight);
+    if (!(viewportHeight > 0) && node.ownerDocument && node.ownerDocument.documentElement) {
+      viewportHeight = Number(node.ownerDocument.documentElement.clientHeight);
+    }
+    if (!(viewportHeight > 0)) return Math.max(1, bounds.height || node.clientHeight || 1);
+    var measuredTop = Number(bounds.top);
+    var topInset = measuredTop >= 0 && measuredTop <= viewportHeight / 2
+      ? measuredTop
+      : Math.min(92, viewportHeight / 4);
+    return Math.max(1, viewportHeight - topInset - 20);
+  }
+
+  function pageStageFor(node) {
+    var content = chapterRootFor(node);
+    var parent = content && content.parentNode;
+    if (parent && parent.classList && parent.classList.contains('eb-content-container')) return parent;
+    return content || node;
+  }
+
+  function availablePageWidth(node, baseViewport) {
+    var stage = pageStageFor(node);
+    var bounds = stage.getBoundingClientRect ? stage.getBoundingClientRect() : {};
+    var width = Number(stage.clientWidth) || Number(bounds.width) || Number(node.clientWidth) || baseViewport.width;
+    if (stage !== node && typeof root.getComputedStyle === 'function') {
+      var style = root.getComputedStyle(stage);
+      width -= (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    }
+    return Math.max(1, width);
+  }
+
+  function updateContinuousPageGap(viewportWidth) {
+    var document = root.document;
+    var documentElement = document && document.documentElement;
+    if (!documentElement || !documentElement.style || !documentElement.style.setProperty) return;
+    var gap = Math.round(Math.max(8, Math.min(20, Number(viewportWidth) * 0.015)));
+    documentElement.style.setProperty('--pdf-page-gap', gap + 'px');
+  }
+
+  function setPlaceholderGeometry(node) {
+    var width = Number(node.getAttribute('data-pdf-page-width'));
+    var height = Number(node.getAttribute('data-pdf-page-height'));
+    if (!(width > 0) || !(height > 0)) return;
+    var config;
+    try {
+      config = configForPage();
+    } catch (error) {
+      var fallback = root.EpubPDFConfig || {};
+      config = {
+        zoom: Math.max(0.25, Math.min(4, Number(fallback.zoom) || 1)),
+        rotation: normalizeRotation(fallback.rotation),
+        fit: fallback.fit === 'page' || fallback.fitMode === 'page' ? 'page' : 'width'
+      };
+    }
+    var rotated = config.rotation % 180 !== 0;
+    var baseViewport = { width: rotated ? height : width, height: rotated ? width : height };
+    var availableWidth = availablePageWidth(node, baseViewport);
+    var bounds = node.getBoundingClientRect ? node.getBoundingClientRect() : {};
+    var scale = config.fit === 'page'
+      ? Math.min(availableWidth / baseViewport.width, availablePageHeight(node, bounds) / baseViewport.height)
+      : availableWidth / baseViewport.width;
+    var renderedWidth = baseViewport.width * scale * config.zoom;
+    var renderedHeight = baseViewport.height * scale * config.zoom;
+    node.style.aspectRatio = 'auto';
+    node.style.width = renderedWidth + 'px';
+    node.style.height = renderedHeight + 'px';
+    node.style.minHeight = renderedHeight + 'px';
+    node.setAttribute('data-pdf-rendered', 'placeholder');
+    node.setAttribute('aria-busy', 'false');
+  }
+
   async function paintNode(node, isRerender) {
     var record = records.get(node);
     if (!record || record.disposed) return;
@@ -230,7 +309,7 @@
     var generation = ++record.generation;
     node.setAttribute('data-pdf-rendered', 'pending');
     node.setAttribute('aria-busy', 'true');
-    statusNode(node, 'status', 'pdf.loadingPage');
+    var loadingStatus = statusNode(node, 'status', 'pdf.loadingPage');
     try {
       var config = configForPage();
       var pdfjs = await loadPDFModule(config);
@@ -247,8 +326,10 @@
       if (record.disposed || generation !== record.generation) return;
       var baseViewport = page.getViewport({ scale: 1, rotation: config.rotation });
       var bounds = node.getBoundingClientRect();
-      var availableWidth = Math.max(1, bounds.width || node.clientWidth || baseViewport.width);
-      var availableHeight = Math.max(1, bounds.height || node.clientHeight || baseViewport.height);
+      var availableWidth = availablePageWidth(node, baseViewport);
+      var availableHeight = config.fit === 'page'
+        ? availablePageHeight(node, bounds)
+        : Math.max(1, bounds.height || node.clientHeight || baseViewport.height);
       record.renderedWidth = availableWidth;
       record.renderedHeight = availableHeight;
       record.fit = config.fit;
@@ -263,11 +344,17 @@
       canvas.height = Math.max(1, Math.floor(viewport.height * dpr));
       canvas.style.width = viewport.width + 'px';
       canvas.style.height = viewport.height + 'px';
+      canvas.style.marginLeft = '0px';
       var textLayerNode = node.ownerDocument.createElement('div');
       textLayerNode.className = 'pdf-page-text-layer textLayer';
+      textLayerNode.style.left = '0px';
       textLayerNode.style.setProperty('--total-scale-factor', viewport.scale);
+      node.style.aspectRatio = 'auto';
+      node.style.width = viewport.width + 'px';
+      node.style.height = viewport.height + 'px';
       node.style.minHeight = viewport.height + 'px';
-      node.replaceChildren(canvas, textLayerNode);
+      updateContinuousPageGap(viewport.width);
+      node.replaceChildren(canvas, textLayerNode, loadingStatus);
       var renderTask = page.render({
         canvasContext: canvas.getContext('2d'),
         viewport: viewport,
@@ -287,6 +374,12 @@
         });
         record.textLayer = textLayer;
         await textLayer.render();
+        // PDF.js writes a CSS round() expression that depends on viewer-only
+        // custom properties. This standalone reader owns exact viewport
+        // geometry, so restore concrete dimensions after TextLayer.render().
+        textLayerNode.style.width = viewport.width + 'px';
+        textLayerNode.style.height = viewport.height + 'px';
+        textLayerNode.style.left = '0px';
         if (record.textLayer === textLayer) record.textLayer = null;
         if (record.disposed || generation !== record.generation) return;
         announceAnnotationContentReady(node);
@@ -294,6 +387,7 @@
         textLayerNode.setAttribute('aria-label', translate('pdf.textUnavailable'));
       }
       if (record.disposed || generation !== record.generation) return;
+      loadingStatus.remove();
       node.setAttribute('data-pdf-rendered', 'complete');
       node.setAttribute('aria-busy', 'false');
     } catch (error) {
@@ -307,9 +401,7 @@
   function prepareNode(node) {
     var record = records.get(node);
     if (record && !record.disposed) return record.promise || Promise.resolve();
-    var width = Number(node.getAttribute('data-pdf-page-width'));
-    var height = Number(node.getAttribute('data-pdf-page-height'));
-    if (width > 0 && height > 0) node.style.aspectRatio = width + ' / ' + height;
+    setPlaceholderGeometry(node);
     record = {
       disposed: false,
       generation: 0,
@@ -330,13 +422,15 @@
       record.resizeObserver = new root.ResizeObserver(function() {
         if (record.disposed || !record.started || record.renderedWidth === null) return;
         var bounds = node.getBoundingClientRect();
-        var width = Math.max(1, bounds.width || node.clientWidth || 1);
-        var height = Math.max(1, bounds.height || node.clientHeight || 1);
+        var width = availablePageWidth(node, { width: 1 });
+        var height = record.fit === 'page'
+          ? availablePageHeight(node, bounds)
+          : Math.max(1, bounds.height || node.clientHeight || 1);
         var widthChanged = Math.abs(width - record.renderedWidth) > 0.5;
         var heightChanged = record.fit === 'page' && Math.abs(height - record.renderedHeight) > 0.5;
         if (widthChanged || heightChanged) record.promise = paintNode(node, true);
       });
-      record.resizeObserver.observe(node);
+      record.resizeObserver.observe(pageStageFor(node));
     }
     if (typeof root.IntersectionObserver === 'function') {
       record.intersectionObserver = new root.IntersectionObserver(function(entries) {
@@ -397,8 +491,21 @@
     return refreshActivePages();
   }
 
+  function syncFitControlState() {
+    var document = root.document;
+    if (!document || !document.getElementById) return;
+    var config = configForPage();
+    var fit = Math.abs(config.zoom - 1) < 0.001 ? config.fit : '';
+    [['pdfFitWidth', 'width'], ['mobilePdfFitWidth', 'width'],
+     ['pdfFitPage', 'page'], ['mobilePdfFitPage', 'page']].forEach(function(pair) {
+      var button = document.getElementById(pair[0]);
+      if (button) button.setAttribute('aria-pressed', String(fit === pair[1]));
+    });
+  }
+
   function setFit(fit) {
-    writePreferences({ fit: fit === 'page' ? 'page' : 'width' });
+    writePreferences({ fit: fit === 'page' ? 'page' : 'width', zoom: 1 });
+    syncFitControlState();
     return refreshActivePages();
   }
 
@@ -409,6 +516,26 @@
     var config = configForPage();
     var zoom = Math.max(0.25, Math.min(4, Math.round((config.zoom + delta) * 100) / 100));
     writePreferences({ zoom: zoom });
+    syncFitControlState();
+    return refreshActivePages();
+  }
+
+  function getZoomPercent() {
+    return Math.round(configForPage().zoom * 100);
+  }
+
+  function setZoomPercent(percent) {
+    var normalized = Math.max(25, Math.min(400, Math.round(Number(percent) || 100)));
+    writePreferences({ fit: 'width', zoom: normalized / 100 });
+    syncFitControlState();
+    return refreshActivePages();
+  }
+
+  function setPageWidthPreset(preset) {
+    var zoomByPreset = { '1': 0.6, '2': 0.75, '3': 0.88, '4': 1 };
+    var zoom = zoomByPreset[String(preset)] || 1;
+    writePreferences({ fit: 'width', zoom: zoom });
+    syncFitControlState();
     return refreshActivePages();
   }
 
@@ -446,45 +573,6 @@
 
   function cancelSearch() {
     searchGeneration += 1;
-  }
-
-  function authorizedDocumentURL() {
-    return configForPage().documentUrl;
-  }
-
-  function download() {
-    var link = root.document.createElement('a');
-    link.href = authorizedDocumentURL();
-    link.download = '';
-    link.style.display = 'none';
-    var parent = root.document.body || root.document.documentElement;
-    if (parent) parent.appendChild(link);
-    if (typeof link.click === 'function') link.click();
-    if (typeof link.remove === 'function') link.remove();
-  }
-
-  function print() {
-    var frame = root.document.createElement('iframe');
-    frame.hidden = true;
-    frame.src = authorizedDocumentURL();
-    var cleaned = false;
-    function cleanup() {
-      if (cleaned) return;
-      cleaned = true;
-      if (typeof frame.remove === 'function') frame.remove();
-    }
-    frame.addEventListener('load', function() {
-      if (typeof root.addEventListener === 'function') root.addEventListener('afterprint', cleanup, { once: true });
-      try {
-        if (frame.contentWindow && typeof frame.contentWindow.print === 'function') frame.contentWindow.print();
-      } catch (error) {
-        cleanup();
-      }
-      root.setTimeout(cleanup, 60000);
-    }, { once: true });
-    frame.addEventListener('error', cleanup, { once: true });
-    var parent = root.document.body || root.document.documentElement;
-    if (parent) parent.appendChild(frame);
   }
 
   function bindReaderControls() {
@@ -563,8 +651,7 @@
     bindAction(['pdfFitWidth', 'mobilePdfFitWidth'], fitWidth);
     bindAction(['pdfFitPage', 'mobilePdfFitPage'], fitPage);
     bindAction(['pdfRotate', 'mobilePdfRotate'], rotate);
-    bindAction(['pdfPrint', 'mobilePdfPrint'], print);
-    bindAction(['pdfDownload', 'mobilePdfDownload'], download);
+    syncFitControlState();
   }
 
   if (root && typeof root.addEventListener === 'function') {
@@ -587,6 +674,8 @@
     renderWithin: renderWithin, disposeWithin: disposeWithin,
     search: search, rotate: rotate, fitWidth: fitWidth, fitPage: fitPage,
     zoomIn: function() { return setZoom(0.25); }, zoomOut: function() { return setZoom(-0.25); },
-    print: print, download: download, cancelSearch: cancelSearch, bindReaderControls: bindReaderControls
+    getZoomPercent: getZoomPercent, setZoomPercent: setZoomPercent,
+    setPageWidthPreset: setPageWidthPreset,
+    cancelSearch: cancelSearch, bindReaderControls: bindReaderControls
   };
 });

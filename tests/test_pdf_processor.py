@@ -155,6 +155,15 @@ class PDFProcessorTests(unittest.TestCase):
         self.assertEqual(metadata.language, "en-GB")
         self.assertIsNone(metadata.cover)
 
+    def test_inspect_pdf_falls_back_to_the_original_filename_stem_for_a_missing_title(self):
+        source = self.fixture_pdf(metadata={"/Title": "   "})
+        named_source = source.with_name("Safe fallback title.pdf")
+        source.rename(named_source)
+
+        metadata = inspect_pdf(named_source)
+
+        self.assertEqual(metadata.title, "Safe fallback title")
+
     def test_inspect_pdf_keeps_one_bounded_source_stream_alive(self):
         source = self.fixture_pdf(
             page_sizes=((200, 400), (300, 500)), text_pages=(1,)
@@ -342,7 +351,7 @@ class PDFProcessorTests(unittest.TestCase):
             [(200.0, 400.0), (300.0, 500.0)],
         )
         self.assertFalse(metadata.has_extractable_text)
-        self.assertIsNone(metadata.title)
+        self.assertEqual(metadata.title, source.stem)
 
     def test_inspect_pdf_uses_an_empty_password_when_it_unlocks_the_document(self):
         source = self.fixture_pdf(

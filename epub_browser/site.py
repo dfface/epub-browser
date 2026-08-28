@@ -20,7 +20,7 @@ from .server_chrome import (
     SERVER_LOCALE_SCRIPT,
 )
 from .urls import SiteURLs, rewrite_root_urls
-from .version import LATEST_RELEASE_API_URL, render_footer
+from .version import render_footer
 from .source_format import EPUB_FORMAT
 from .processor import metadata_text
 
@@ -393,7 +393,7 @@ if (isKindle) {
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year, release_api_url='/api/version' if deployment_mode == 'server' else LATEST_RELEASE_API_URL)}
+{render_footer(datetime.now().year, release_api_url='/api/version' if deployment_mode == 'server' else '')}
 """
     library_html += """
     <script src="/assets/cache-boundary.js" defer></script>

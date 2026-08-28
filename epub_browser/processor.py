@@ -37,7 +37,7 @@ from .server_chrome import (
 )
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs, rewrite_root_urls
-from .version import LATEST_RELEASE_API_URL, render_footer
+from .version import render_footer
 
 if TYPE_CHECKING:
     from .pdf_processor import PDFMetadata
@@ -1490,6 +1490,7 @@ class EPUBProcessor:
     
     def create_index_page(self, write=True, initial_book_review=None):
         """创建章节索引页面"""
+        is_pdf_book = getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -1519,7 +1520,7 @@ class EPUBProcessor:
             authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{authors_text}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
-        ai_feature_assets = self._server_ai_feature_assets()
+        ai_feature_assets = "" if is_pdf_book else self._server_ai_feature_assets()
         book_feature_assets = json.dumps({
             "bookshelf": self.asset_manifest.url_for("bookshelf.js"),
             "annotationHubCss": self.asset_manifest.url_for("annotation-hub.css"),
@@ -1538,7 +1539,7 @@ class EPUBProcessor:
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         reading_insights_navigation = (
             '<button type="button" class="app-nav-link" data-reading-insights '
@@ -1548,17 +1549,17 @@ class EPUBProcessor:
         )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         ai_reading_script = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         ai_book_chat_button = (
             f'<button type="button" class="css-btn secondary" data-ai-book-chat '
             f'data-book-id="{book_id_attribute}"><i class="fas fa-comments" aria-hidden="true"></i>'
             '<span data-i18n="ai.askBook">Ask AI</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         ai_book_chat_script = ""
         book_review_assets = (
@@ -1642,6 +1643,11 @@ class EPUBProcessor:
             '<i class="fas fa-chart-column" aria-hidden="true"></i>'
             '<span data-book-reading-time-label></span></p>'
             if self.deployment_mode == "server" else ""
+        )
+        book_source_format = (
+            '<span class="book-source-format" aria-label="PDF" data-i18n-aria-label="pdf.formatBadge" '
+            'data-i18n="pdf.formatBadge">PDF</span>'
+            if is_pdf_book else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
@@ -1775,6 +1781,7 @@ class EPUBProcessor:
                     <img src="{html.escape(self.get_book_info()['cover'], quote=True)}" alt="">
                 </div>
                 {book_reading_time}
+                {book_source_format}
             </div>
             <div class="book-info-content">
                 <h2 class="book-info-title" lang="{book_language}" dir="auto">{book_title_text}</h2>
@@ -1845,7 +1852,7 @@ class EPUBProcessor:
                 )
                 outline_labels_html = (
                     f'<span class="chapter-outline-labels" lang="{book_language}" '
-                    f'dir="auto">— {outline_labels}</span>'
+                    f'dir="auto">{outline_labels}</span>'
                 )
             if toc_item.get('kind') == 'section':
                 index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
@@ -1938,7 +1945,7 @@ class EPUBProcessor:
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else LATEST_RELEASE_API_URL)}"""
+{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '')}"""
 
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
@@ -2588,6 +2595,14 @@ document.addEventListener('DOMContentLoaded', function() {{
         pdf_reader_controls = ""
         pdf_mobile_controls = ""
         pdf_search_drawer = ""
+        page_width_control_attribute = ""
+        page_width_slider_attributes = 'min="1" max="4" value="3" step="1"'
+        page_width_value_control = ""
+        page_width_scale = '''
+                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
+                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
+                            <span data-i18n="settings.pageWidthWide">Wide</span>
+                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>'''
         if pdf_page is not None:
             page_number = int(pdf_page["page_number"])
             total_pages = len(self.chapters)
@@ -2621,6 +2636,8 @@ document.addEventListener('DOMContentLoaded', function() {{
                     "pdfjsWorkerUrl": self.asset_manifest.url_for(
                         "vendor/pdfjs/build/pdf.worker.mjs"
                     ),
+                    "encrypted": bool(self._pdf_encrypted),
+                    "hasExtractableText": bool(self._pdf_has_extractable_text),
                 },
                 separators=(",", ":"),
             )
@@ -2645,21 +2662,17 @@ document.addEventListener('DOMContentLoaded', function() {{
                 <button class="control-btn" id="pdfSearchToggle" type="button" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-controls="pdfSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.search">Search PDF</span></button>
                 <button class="control-btn" id="pdfZoomOut" type="button" aria-label="Zoom out" data-i18n-aria-label="pdf.zoomOut"><i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.zoomOut">Zoom out</span></button>
                 <button class="control-btn" id="pdfZoomIn" type="button" aria-label="Zoom in" data-i18n-aria-label="pdf.zoomIn"><i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.zoomIn">Zoom in</span></button>
-                <button class="control-btn" id="pdfFitWidth" type="button" aria-label="Fit width" data-i18n-aria-label="pdf.fitWidth"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitWidth">Fit width</span></button>
-                <button class="control-btn" id="pdfFitPage" type="button" aria-label="Fit page" data-i18n-aria-label="pdf.fitPage"><i class="fas fa-maximize" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitPage">Fit page</span></button>
+                <button class="control-btn" id="pdfFitWidth" type="button" aria-label="Fit width" data-i18n-aria-label="pdf.fitWidth" aria-pressed="false"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitWidth">Fit width</span></button>
+                <button class="control-btn" id="pdfFitPage" type="button" aria-label="Fit page" data-i18n-aria-label="pdf.fitPage" aria-pressed="false"><i class="fas fa-maximize" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitPage">Fit page</span></button>
                 <button class="control-btn" id="pdfRotate" type="button" aria-label="Rotate page" data-i18n-aria-label="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.rotate">Rotate page</span></button>
-                <button class="control-btn" id="pdfPrint" type="button" aria-label="Print PDF" data-i18n-aria-label="pdf.print"><i class="fas fa-print" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.print">Print PDF</span></button>
-                <button class="control-btn" id="pdfDownload" type="button" aria-label="Download PDF" data-i18n-aria-label="pdf.download"><i class="fas fa-download" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.download">Download PDF</span></button>
             </span>'''
             pdf_mobile_controls = '''
         <button class="control-btn" id="mobilePdfSearchToggle" type="button" aria-label="Search PDF" title="Search PDF" data-i18n-aria-label="pdf.search" data-i18n-title="pdf.search" aria-controls="pdfSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span data-i18n="pdf.search">Search PDF</span></button>
         <button class="control-btn" id="mobilePdfZoomOut" type="button" aria-label="Zoom out" title="Zoom out" data-i18n-aria-label="pdf.zoomOut" data-i18n-title="pdf.zoomOut"><i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i><span data-i18n="pdf.zoomOut">Zoom out</span></button>
         <button class="control-btn" id="mobilePdfZoomIn" type="button" aria-label="Zoom in" title="Zoom in" data-i18n-aria-label="pdf.zoomIn" data-i18n-title="pdf.zoomIn"><i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i><span data-i18n="pdf.zoomIn">Zoom in</span></button>
-        <button class="control-btn" id="mobilePdfFitWidth" type="button" aria-label="Fit width" title="Fit width" data-i18n-aria-label="pdf.fitWidth" data-i18n-title="pdf.fitWidth"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span data-i18n="pdf.fitWidth">Fit width</span></button>
-        <button class="control-btn" id="mobilePdfFitPage" type="button" aria-label="Fit page" title="Fit page" data-i18n-aria-label="pdf.fitPage" data-i18n-title="pdf.fitPage"><i class="fas fa-maximize" aria-hidden="true"></i><span data-i18n="pdf.fitPage">Fit page</span></button>
-        <button class="control-btn" id="mobilePdfRotate" type="button" aria-label="Rotate page" title="Rotate page" data-i18n-aria-label="pdf.rotate" data-i18n-title="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span data-i18n="pdf.rotate">Rotate page</span></button>
-        <button class="control-btn" id="mobilePdfPrint" type="button" aria-label="Print PDF" title="Print PDF" data-i18n-aria-label="pdf.print" data-i18n-title="pdf.print"><i class="fas fa-print" aria-hidden="true"></i><span data-i18n="pdf.print">Print PDF</span></button>
-        <button class="control-btn" id="mobilePdfDownload" type="button" aria-label="Download PDF" title="Download PDF" data-i18n-aria-label="pdf.download" data-i18n-title="pdf.download"><i class="fas fa-download" aria-hidden="true"></i><span data-i18n="pdf.download">Download PDF</span></button>'''
+        <button class="control-btn" id="mobilePdfFitWidth" type="button" aria-label="Fit width" title="Fit width" data-i18n-aria-label="pdf.fitWidth" data-i18n-title="pdf.fitWidth" aria-pressed="false"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span data-i18n="pdf.fitWidth">Fit width</span></button>
+        <button class="control-btn" id="mobilePdfFitPage" type="button" aria-label="Fit page" title="Fit page" data-i18n-aria-label="pdf.fitPage" data-i18n-title="pdf.fitPage" aria-pressed="false"><i class="fas fa-maximize" aria-hidden="true"></i><span data-i18n="pdf.fitPage">Fit page</span></button>
+        <button class="control-btn" id="mobilePdfRotate" type="button" aria-label="Rotate page" title="Rotate page" data-i18n-aria-label="pdf.rotate" data-i18n-title="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span data-i18n="pdf.rotate">Rotate page</span></button>'''
             pdf_search_drawer = '''
     <nav class="toc-floating reader-drawer pdf-search-drawer" id="pdfSearchDrawer" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-hidden="true">
         <div class="toc-header">
@@ -2673,6 +2686,18 @@ document.addEventListener('DOMContentLoaded', function() {{
         </form>
         <ul class="toc-list pdf-search-results" id="pdfSearchResults" aria-live="polite"></ul>
     </nav>'''
+            page_width_control_attribute = " data-pdf-zoom-control"
+            page_width_slider_attributes = 'min="25" max="400" value="100" step="1"'
+            page_width_value_control = '''
+                        <label class="pdf-zoom-value" for="pageWidthValue">
+                            <input id="pageWidthValue" type="number" min="25" max="400" value="100" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                            <span aria-hidden="true">%</span>
+                        </label>'''
+            page_width_scale = '''
+                            <span>25%</span>
+                            <span>100%</span>
+                            <span>200%</span>
+                            <span>400%</span>'''
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -2686,7 +2711,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.chapterRead">AI reading</span></button>'
-            if self.deployment_mode == "server"
+            if self.deployment_mode == "server" and pdf_page is None
             else ""
         )
         ai_followup_button = (
@@ -2695,16 +2720,19 @@ document.addEventListener('DOMContentLoaded', function() {{
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-comments" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.askChapter">Ask AI</span></button>'
-            if self.deployment_mode == "server"
+            if self.deployment_mode == "server" and pdf_page is None
             else ""
         )
-        ai_feature_assets = self._server_ai_feature_assets()
+        ai_feature_assets = (
+            self._server_ai_feature_assets()
+            if pdf_page is None else ""
+        )
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         reading_insights_navigation = (
             '<button type="button" class="app-nav-link" data-reading-insights '
@@ -2714,7 +2742,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         mobile_ai_reading_button = (
             '<button class="control-btn" id="mobileAIReadingBtn" type="button" '
@@ -2724,7 +2752,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             'data-i18n-aria-label="ai.chapterRead" data-i18n-title="ai.chapterRead">'
             '<i class="fas fa-wand-magic-sparkles"></i>'
             '<span data-i18n="ai.chapterRead">AI reading</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         mobile_ai_followup_button = (
             '<button class="control-btn" id="mobileAIChatBtn" type="button" '
@@ -2734,11 +2762,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             'data-i18n-aria-label="ai.askChapter" data-i18n-title="ai.askChapter">'
             '<i class="fas fa-comments" aria-hidden="true"></i>'
             '<span data-i18n="ai.askChapter">Ask AI</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         ai_chapter_scripts = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         dictionary_assets = (
             '<link rel="stylesheet" href="/assets/dictionary.css">\n'
@@ -2885,7 +2913,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 </head>
 """
         chapter_html +=f"""
-<body>
+<body{(' class="pdf-source"' if pdf_page is not None else '')}>
 
     <a class="skip-link" href="#eb-content" data-i18n="reader.skipToContent">Skip to reading content</a>
 
@@ -3078,14 +3106,14 @@ document.addEventListener('DOMContentLoaded', function() {{
                     </div>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
-                    <div class="page-width-control">
-                        <input type="range" id="pageWidthSlider" min="1" max="4" value="3" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                    <div class="settings-label-row">
+                        <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
+                        {page_width_value_control}
+                    </div>
+                    <div class="page-width-control"{page_width_control_attribute}>
+                        <input type="range" id="pageWidthSlider" {page_width_slider_attributes} aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
                         <div class="page-width-scale" aria-hidden="true">
-                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
-                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
-                            <span data-i18n="settings.pageWidthWide">Wide</span>
-                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
+                            {page_width_scale}
                         </div>
                     </div>
                 </div>
@@ -3283,7 +3311,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         </div>
     </div>
     {server_account_panel}
-    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else LATEST_RELEASE_API_URL)}
+    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '')}
 """
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
