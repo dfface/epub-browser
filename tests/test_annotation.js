@@ -32,6 +32,7 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
     },
   };
   const authenticatedRequests = [];
+  const eventListeners = new Map();
   const window = {
     __EPUB_BROWSER_TESTING__: true,
     EpubBrowserMode: mode,
@@ -60,6 +61,14 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
           'annotations.error.server_error': '标注服务发生错误。',
         }[key] || key;
       },
+    },
+    addEventListener(type, listener) {
+      const listeners = eventListeners.get(type) || [];
+      listeners.push(listener);
+      eventListeners.set(type, listeners);
+    },
+    dispatchEvent(event) {
+      (eventListeners.get(event.type) || []).forEach(listener => listener(event));
     },
   };
   const context = {
@@ -227,6 +236,82 @@ test('clicking a draft highlight reopens its selection actions instead of readin
 
   assert.equal(reopenedSource, source);
   assert.equal(detailId, null);
+});
+
+test('PDF sources keep page-local annotation contexts and reject unavailable or cross-page text', () => {
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', undefined,
+    { exposeHighlightInteraction: true },
+  );
+  const interaction = window.__testHighlightInteraction;
+  const pageNode = (pageNumber, hasText = true) => ({
+    parentNode: null,
+    getAttribute(name) {
+      if (name === 'data-pdf-page-number') return String(pageNumber);
+      if (name === 'data-pdf-has-extractable-text') return String(hasText);
+      return null;
+    },
+  });
+  const textNode = page => ({ parentNode: page });
+  const firstPage = pageNode(3);
+  const unavailablePage = pageNode(4, false);
+
+  interaction.getHighlightNodesByAnnotationId = () => [textNode(firstPage)];
+  assert.equal(interaction.selectionCapabilityMessage({ id: 'same-page' }), '');
+  assert.equal(interaction.getChapterIndexFromSource({ id: 'same-page' }), 2);
+
+  interaction.getHighlightNodesByAnnotationId = () => [textNode(unavailablePage)];
+  assert.equal(interaction.selectionCapabilityMessage({ id: 'no-text' }), 'pdf.textUnavailable');
+
+  interaction.getHighlightNodesByAnnotationId = () => [textNode(firstPage), textNode(pageNode(4))];
+  assert.equal(interaction.selectionCapabilityMessage({ id: 'cross-page' }), 'pdf.selectionWithinPageRequired');
+});
+
+test('annotation refreshes through the format-neutral content-ready event once', () => {
+  const window = loadAnnotationWindow({ status: 200, body: JSON.stringify({ data: [] }) });
+  let refreshes = 0;
+  window.AnnotationModule.initialized = true;
+  window.AnnotationModule.refresh = () => { refreshes += 1; return Promise.resolve(); };
+
+  window.dispatchEvent({
+    type: 'epub-browser:annotation-content-ready',
+    detail: { root: {} },
+  });
+
+  assert.equal(refreshes, 1);
+});
+
+test('a page-local PDF selection uses the shared menu and dictionary action', () => {
+  const document = createAnnotationDialogDocument();
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', document,
+    { exposeHighlightInteraction: true },
+  );
+  const interaction = window.__testHighlightInteraction;
+  const page = {
+    parentNode: null,
+    getAttribute(name) { return name === 'data-pdf-page-number' ? '3' : 'true'; },
+  };
+  const source = { id: 'pdf-selection', text: 'little prince', startMeta: {}, endMeta: {} };
+  interaction.getHighlightNodesByAnnotationId = () => [{ parentNode: page }];
+  const calls = [];
+  window.EpubBrowserDictionary = { open(...args) { calls.push(args); } };
+
+  interaction.showCreateDialogFromSource(source);
+
+  const menu = document.body.children[0];
+  assert.equal(menu.className, 'annotation-selection-menu');
+  assert.equal(document.body.querySelectorAll('.pdf-selection-menu').length, 0);
+  const dictionary = menu.children.find(button => button.textContent === 'annotations.dictionary');
+  dictionary.click();
+  assert.equal(calls[0][0], 'dictionary');
+  assert.equal(calls[0][1], 'little prince');
+  interaction.showCreateDialogFromSource(source);
+  const encyclopedia = document.body.children.at(-1).children.find(button => button.textContent === 'annotations.encyclopedia');
+  encyclopedia.click();
+  assert.equal(calls[1][0], 'encyclopedia');
+  assert.equal(calls[1][1], 'little prince');
+  assert.equal(interaction.getChapterIndexFromSource(source), 2);
 });
 
 test('note dialog keeps colors compact and lets readers expand every configured color', () => {

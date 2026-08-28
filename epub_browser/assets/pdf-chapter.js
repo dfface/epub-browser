@@ -191,6 +191,30 @@
     return status;
   }
 
+  function chapterRootFor(node) {
+    var current = node;
+    while (current) {
+      if (current.getAttribute && current.getAttribute('id') === 'eb-content') return current;
+      current = current.parentNode;
+    }
+    return null;
+  }
+
+  function announceAnnotationContentReady(node) {
+    var rootNode = chapterRootFor(node);
+    var pageNumber = Number(node.getAttribute('data-pdf-page-number'));
+    if (!rootNode || !Number.isInteger(pageNumber) || pageNumber < 1 || !root.dispatchEvent) return;
+    var detail = {
+      root: rootNode,
+      chapterIndex: pageNumber - 1,
+      chapterUrl: 'chapter_' + (pageNumber - 1) + '.html'
+    };
+    var event = typeof root.CustomEvent === 'function'
+      ? new root.CustomEvent('epub-browser:annotation-content-ready', { detail: detail })
+      : { type: 'epub-browser:annotation-content-ready', detail: detail };
+    root.dispatchEvent(event);
+  }
+
   function cancelRendering(record) {
     record.generation += 1;
     if (record.renderTask && typeof record.renderTask.cancel === 'function') record.renderTask.cancel();
@@ -264,6 +288,8 @@
         record.textLayer = textLayer;
         await textLayer.render();
         if (record.textLayer === textLayer) record.textLayer = null;
+        if (record.disposed || generation !== record.generation) return;
+        announceAnnotationContentReady(node);
       } else {
         textLayerNode.setAttribute('aria-label', translate('pdf.textUnavailable'));
       }

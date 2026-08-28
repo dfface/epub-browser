@@ -146,6 +146,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('data-pdf-page-width="792.5"', pdf_html)
             self.assertIn('data-pdf-page-height="612.25"', pdf_html)
             self.assertIn('data-pdf-has-extractable-text="true"', pdf_html)
+            self.assertIn('data-chapter-index="1"', pdf_html)
+            self.assertIn('data-book-hash="pdf-book"', pdf_html)
             self.assertIn('aria-label="Page 2 of 3"', pdf_html)
             self.assertIn('data-i18n-aria-label="pdf.pageOf"', pdf_html)
             self.assertIn('window.EpubPDFConfig=', pdf_html)
@@ -176,6 +178,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertNotIn('id="pdfSearchToggle"', epub_html)
             self.assertNotIn('id="pdfSearchDrawer"', epub_html)
             self.assertNotIn('id="mobilePdfSearchToggle"', epub_html)
+            self.assertNotIn('pdf-selection-menu', pdf_html)
             self.assertNotIn('cdn.', pdf_html)
             for duplicate_ui in (
                 'pdf-reader', 'pdf-settings', 'pdf-selection-menu',
