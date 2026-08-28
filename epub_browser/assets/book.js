@@ -444,8 +444,15 @@ function markReadingChapter(readKey, username) {
         var displayUsername = username === 'shared' ? bookT('book.sharedUser') : username;
         var syncTag = document.createElement('span');
         syncTag.className = 'chapter-sync-tag';
-        syncTag.textContent = bookT('book.cloudSyncUser', { username: displayUsername });
         syncTag.setAttribute('aria-label', bookT('book.cloudSyncUserAria', { username: displayUsername }));
+        var syncIcon = document.createElement('i');
+        syncIcon.className = 'fas fa-cloud';
+        syncIcon.setAttribute('aria-hidden', 'true');
+        var syncLabel = document.createElement('span');
+        syncLabel.className = 'chapter-sync-label';
+        syncLabel.textContent = bookT('bookshelf.sync');
+        syncTag.appendChild(syncIcon);
+        syncTag.appendChild(syncLabel);
         var title = chapterElement.querySelector('.chapter-title');
         var titleWithSync = chapterElement.querySelector('.chapter-title-with-sync');
         if (title) {

@@ -1449,9 +1449,9 @@ class EPUBProcessor:
                 html.escape(metadata_text(author), quote=False)
                 for author in self.authors
             )
-            authors_html = f'<p class="book-info-author" lang="{book_language}">{authors_text}</p>'
+            authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{authors_text}</p>'
         elif self.authors:
-            authors_html = f'<p class="book-info-author" lang="{book_language}">{" & ".join(self.authors)}</p>'
+            authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         ai_feature_assets = self._server_ai_feature_assets()
@@ -1712,7 +1712,7 @@ class EPUBProcessor:
                 {book_reading_time}
             </div>
             <div class="book-info-content">
-                <h2 class="book-info-title" lang="{book_language}">{book_title_text}</h2>
+                <h2 class="book-info-title" lang="{book_language}" dir="auto">{book_title_text}</h2>
                 {authors_html}"""
         if self.description:
             description = (
@@ -1721,11 +1721,11 @@ class EPUBProcessor:
                 else self.description
             )
             index_html += f""" 
-                <div class="book-info-desc" lang="{book_language}">
+                <div class="book-info-desc" lang="{book_language}" dir="auto">
                     {description}
                 </div>"""
         index_html += f"""
-                <div class="book-info-tags" lang="{book_language}">"""
+                <div class="book-info-tags" lang="{book_language}" dir="auto">"""
         if self.tags:
             for tag in self.tags:
                 tag_text = (
@@ -1771,7 +1771,7 @@ class EPUBProcessor:
                 else toc_item["title"]
             )
             if toc_item.get('kind') == 'section':
-                index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}">{toc_title}</span></li>\n'
+                index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
                 continue
 
             chapter_index = toc_item['chapter_index']
@@ -1782,9 +1782,9 @@ class EPUBProcessor:
                     if self.deployment_mode == "server"
                     else chapter_anchor
                 )
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}" dir="auto">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
             else:
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}" dir="auto">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
@@ -2764,7 +2764,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}">
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" dir="auto" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}">
             {content}
             </article>
         </div>

@@ -1272,6 +1272,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         self.assertIn('<html lang="en"', html)
         self.assertRegex(html, r'<article[^>]+id="eb-content"[^>]+lang="en"')
+        self.assertRegex(html, r'<article[^>]+id="eb-content"[^>]+dir="auto"')
 
     def test_book_and_chapter_keep_epub_language_off_the_ui_shell(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1286,9 +1287,23 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             chapter_html = processor.create_chapter_template("<p>Texte</p>", "", 0, "One")
 
         self.assertRegex(book_html, r'<html\s+lang=(?:"en"|en)(?:\s|>)')
-        self.assertRegex(book_html, r'<div\b(?=[^>]*\bclass=(?:"book-info-desc"|book-info-desc))(?=[^>]*\blang=(?:"fr"|fr))[^>]*>')
+        self.assertRegex(book_html, r'<div\b(?=[^>]*\bclass=(?:"book-info-desc"|book-info-desc))(?=[^>]*\blang=(?:"fr"|fr))(?=[^>]*\bdir=(?:"auto"|auto))[^>]*>')
+        self.assertRegex(book_html, r'<h2\b(?=[^>]*\bclass=(?:"book-info-title"|book-info-title))(?=[^>]*\blang=(?:"fr"|fr))(?=[^>]*\bdir=(?:"auto"|auto))[^>]*>')
         self.assertIn('<html lang="en"', chapter_html)
         self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+lang="fr"')
+        self.assertRegex(chapter_html, r'<article[^>]+id="eb-content"[^>]+dir="auto"')
+
+    def test_book_card_reflows_on_narrow_screens_without_optional_content(self):
+        styles = Path('epub_browser/assets/book.css').read_text(encoding='utf-8')
+
+        self.assertIn(
+            '@media (max-width: 480px) {\n'
+            '    .book-info-card {\n'
+            '        flex-direction: column;',
+            styles,
+        )
+        self.assertIn('        width: 100%;\n        min-width: 0;', styles)
+        self.assertIn('        max-width: 100%;\n        white-space: normal;', styles)
 
     def test_book_page_localizes_shell_but_marks_metadata_as_content(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -2013,15 +2028,21 @@ assert.deepEqual(
         self.assertIn("if (username) {", script)
         self.assertIn("chapter-sync-tag", script)
         self.assertIn("chapter-title-with-sync", script)
-        self.assertIn("bookT('book.cloudSyncUser'", script)
         self.assertIn("bookT('book.cloudSyncUserAria'", script)
+        self.assertIn("syncIcon.className = 'fas fa-cloud'", script)
+        self.assertIn("syncLabel.textContent = bookT('bookshelf.sync')", script)
         self.assertIn(".chapter-sync-tag", css)
+        self.assertIn(".chapter-sync-label", css)
         self.assertIn(".chapter-title-with-sync", css)
         self.assertIn(".chapter-page", css)
         self.assertIn("flex: 0 0 auto;", css)
         self.assertIn("margin-left: auto;", css)
         self.assertIn("padding-left: 16px;", css)
         self.assertIn("padding-left: 10px;", css)
+        self.assertRegex(
+            css,
+            r"(?s)@media \(max-width: 480px\)\s*\{.*?\.chapter-sync-label\s*\{[^}]*display:\s*none;",
+        )
 
     def test_reader_includes_chapter_sync_and_progress_bar_controls(self):
         book_html = self._book_html()
