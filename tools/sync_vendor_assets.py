@@ -7,9 +7,13 @@ import json
 import os
 import re
 import sys
+import tarfile
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, Tuple
+from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, build_opener, urlopen
 
 
 LOCK_SCHEMA = 1
@@ -19,6 +23,19 @@ DRIVE_PATH_PATTERN = re.compile(r"[A-Za-z]:")
 
 class VendorAssetError(Exception):
     """The lock or installed vendor files do not meet the supply-chain contract."""
+
+
+class HTTPSOnlyRedirectHandler(HTTPRedirectHandler):
+    """Retain urllib's bounded redirect accounting while forbidding downgrades."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urlparse(newurl).scheme != "https":
+            raise VendorAssetError("download redirected away from HTTPS")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _https_urlopen(url):
+    return build_opener(HTTPSOnlyRedirectHandler()).open(url)
 
 
 @dataclass(frozen=True)
@@ -80,6 +97,21 @@ def safe_relative(value: str) -> PurePosixPath:
     return path
 
 
+def _safe_archive_relative(value: str) -> PurePosixPath:
+    """Normalize a safe archive member path for duplicate detection."""
+    if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
+        raise VendorAssetError("archive contains an unsafe member path")
+    if DRIVE_PATH_PATTERN.match(value):
+        raise VendorAssetError("archive contains an unsafe member path")
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts:
+        raise VendorAssetError("archive contains an unsafe member path")
+    normalized = path.as_posix()
+    if normalized in ("", "."):
+        raise VendorAssetError("archive contains an unsafe member path")
+    return PurePosixPath(normalized)
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as asset_file:
@@ -123,6 +155,178 @@ def verify_assets(lock_path: Path, vendor_root: Path) -> None:
             raise VendorAssetError("{} SHA-256 mismatch".format(relative))
 
 
+def copy_bounded(response, destination: Path, limit: int) -> str:
+    digest = hashlib.sha256()
+    total = 0
+    with destination.open("wb") as output:
+        while True:
+            chunk = response.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > limit:
+                raise VendorAssetError("archive exceeds max_bytes")
+            digest.update(chunk)
+            output.write(chunk)
+    return digest.hexdigest()
+
+
+def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
+    """Fetch, validate, and atomically install the locked vendor files."""
+    lock = load_lock(lock_path)
+    for package in lock.packages:
+        if package.source.kind != "npm-tarball":
+            raise VendorAssetError(
+                "{} uses unsupported archive kind: {}".format(
+                    package.name, package.source.kind
+                )
+            )
+        if urlparse(package.source.url).scheme != "https":
+            raise VendorAssetError("{} download requires HTTPS".format(package.name))
+    if vendor_root.is_symlink():
+        raise VendorAssetError("vendor root must not be a symbolic link")
+    try:
+        verify_assets(lock_path, vendor_root)
+        return
+    except VendorAssetError:
+        pass
+    _validate_existing_install_tree(lock, vendor_root)
+    if not vendor_root.parent.is_dir():
+        raise VendorAssetError("vendor root parent must be an existing directory")
+
+    with tempfile.TemporaryDirectory(
+        prefix=".vendor-assets-", dir=vendor_root.parent
+    ) as temporary_directory:
+        staging_root = Path(temporary_directory) / "staging"
+        staging_root.mkdir()
+        open_url = _https_urlopen if opener is urlopen else opener
+        for package_index, package in enumerate(lock.packages):
+            archive_path = Path(temporary_directory) / "archive-{}".format(package_index)
+            try:
+                with open_url(package.source.url) as response:
+                    final_url = response.geturl()
+                    if urlparse(final_url).scheme != "https":
+                        raise VendorAssetError(
+                            "{} download redirected away from HTTPS".format(package.name)
+                        )
+                    digest = copy_bounded(response, archive_path, package.archive.max_bytes)
+            except VendorAssetError:
+                raise
+            except Exception as error:
+                raise VendorAssetError(
+                    "{} download failed".format(package.name)
+                ) from error
+            if digest != package.archive.sha256:
+                raise VendorAssetError("{} archive SHA-256 mismatch".format(package.name))
+            try:
+                extracted = set()
+                with tarfile.open(archive_path, mode="r:gz") as archive:
+                    allowlist = {item.source: item for item in package.files}
+                    seen_members = set()
+                    expanded_bytes = 0
+                    for member in archive.getmembers():
+                        relative = _safe_archive_relative(member.name).as_posix()
+                        if relative in seen_members:
+                            raise VendorAssetError(
+                                "{} archive contains duplicate normalized members".format(
+                                    package.name
+                                )
+                            )
+                        seen_members.add(relative)
+                        if not member.isfile() and not member.isdir():
+                            raise VendorAssetError(
+                                "{} archive contains unsupported entry".format(package.name)
+                            )
+                        if member.size < 0:
+                            raise VendorAssetError(
+                                "{} archive contains an invalid member size".format(
+                                    package.name
+                                )
+                            )
+                        expanded_bytes += member.size
+                        if expanded_bytes > package.archive.max_expanded_bytes:
+                            raise VendorAssetError(
+                                "{} archive exceeds max_expanded_bytes".format(
+                                    package.name
+                                )
+                            )
+                        item = allowlist.get(relative)
+                        if item is None or member.isdir():
+                            continue
+                        source = archive.extractfile(member)
+                        if source is None:
+                            raise VendorAssetError(
+                                "{} cannot read archive member {}".format(
+                                    package.name, relative
+                                )
+                            )
+                        destination = staging_root / safe_relative(item.target)
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        with source:
+                            file_digest = copy_bounded(
+                                source, destination, package.archive.max_expanded_bytes
+                            )
+                        if file_digest != item.sha256:
+                            raise VendorAssetError(
+                                "{} {} SHA-256 mismatch".format(package.name, relative)
+                            )
+                        extracted.add(relative)
+                missing = set(allowlist).difference(extracted)
+                if missing:
+                    raise VendorAssetError(
+                        "{} archive is missing locked files: {}".format(
+                            package.name, ", ".join(sorted(missing))
+                        )
+                    )
+            except (tarfile.TarError, OSError) as error:
+                raise VendorAssetError(
+                    "{} archive extraction failed".format(package.name)
+                ) from error
+
+        for package in lock.packages:
+            for item in package.files:
+                relative = safe_relative(item.target)
+                _assert_safe_managed_parent(vendor_root, relative)
+                target = vendor_root / relative
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(staging_root / relative, target)
+                except OSError as error:
+                    raise VendorAssetError(
+                        "{} install failed for {}".format(package.name, item.target)
+                    ) from error
+        verify_assets(lock_path, vendor_root)
+
+
+def clean_assets(lock_path: Path, vendor_root: Path) -> None:
+    """Remove only files owned by the current lock and now-empty parents."""
+    lock = load_lock(lock_path)
+    for package in lock.packages:
+        for item in package.files:
+            relative = safe_relative(item.target)
+            _assert_safe_managed_parent(vendor_root, relative)
+            try:
+                (vendor_root / relative).unlink(missing_ok=True)
+            except OSError as error:
+                raise VendorAssetError(
+                    "{} clean failed for {}".format(package.name, item.target)
+                ) from error
+    expected = {
+        item.target: item.sha256
+        for package in lock.packages
+        for item in package.files
+    }
+    for directory in sorted(
+        _expected_directories(expected),
+        key=lambda value: len(PurePosixPath(value).parts),
+        reverse=True,
+    ):
+        try:
+            (vendor_root / safe_relative(directory)).rmdir()
+        except (FileNotFoundError, OSError):
+            pass
+
+
 def _expected_directories(expected: Dict[str, str]) -> set:
     directories = set()
     for target in expected:
@@ -131,6 +335,38 @@ def _expected_directories(expected: Dict[str, str]) -> set:
             directories.add(parent.as_posix())
             parent = parent.parent
     return directories
+
+
+def _validate_existing_install_tree(lock: AssetLock, vendor_root: Path) -> None:
+    """Allow missing or incorrect managed files, but reject all unowned entries."""
+    expected = {
+        item.target: item.sha256
+        for package in lock.packages
+        for item in package.files
+    }
+    expected_directories = _expected_directories(expected)
+    for relative, kind in _vendor_entries(vendor_root):
+        if kind == "directory":
+            if relative not in expected_directories:
+                raise VendorAssetError(
+                    "unexpected directory in vendor root: {}".format(relative)
+                )
+        elif relative not in expected:
+            raise VendorAssetError("unexpected file in vendor root: {}".format(relative))
+
+
+def _assert_safe_managed_parent(vendor_root: Path, relative: PurePosixPath) -> None:
+    if vendor_root.is_symlink():
+        raise VendorAssetError("vendor root must not be a symbolic link")
+    if vendor_root.exists() and not vendor_root.is_dir():
+        raise VendorAssetError("vendor root must be a directory")
+    parent = vendor_root
+    for part in relative.parent.parts:
+        parent = parent / part
+        if parent.is_symlink():
+            raise VendorAssetError("symbolic link in managed target path")
+        if parent.exists() and not parent.is_dir():
+            raise VendorAssetError("managed target parent must be a directory")
 
 
 def _vendor_entries(vendor_root: Path) -> Iterable[Tuple[str, str]]:
@@ -302,15 +538,35 @@ def _require_sha256(value: Any, label: str) -> str:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
-    verify = subcommands.add_parser("verify", help="verify the local vendor tree without networking")
     repository_root = Path(__file__).resolve().parents[1]
-    verify.add_argument("--lock", type=Path, default=repository_root / "third_party" / "assets.lock.json")
-    verify.add_argument("--vendor-root", type=Path, default=repository_root / "epub_browser" / "assets" / "vendor")
+    commands = {
+        "fetch": subcommands.add_parser("fetch", help="fetch and install locked vendor assets"),
+        "verify": subcommands.add_parser(
+            "verify", help="verify the local vendor tree without networking"
+        ),
+        "clean": subcommands.add_parser("clean", help="remove locked vendor assets"),
+    }
+    for command in commands.values():
+        command.add_argument(
+            "--lock",
+            type=Path,
+            default=repository_root / "third_party" / "assets.lock.json",
+        )
+        command.add_argument(
+            "--vendor-root",
+            type=Path,
+            default=repository_root / "epub_browser" / "assets" / "vendor",
+        )
     arguments = parser.parse_args(argv)
     try:
-        verify_assets(arguments.lock, arguments.vendor_root)
+        if arguments.command == "fetch":
+            fetch_assets(arguments.lock, arguments.vendor_root)
+        elif arguments.command == "verify":
+            verify_assets(arguments.lock, arguments.vendor_root)
+        else:
+            clean_assets(arguments.lock, arguments.vendor_root)
     except VendorAssetError as error:
-        parser.exit(1, "vendor asset verification failed: {}\n".format(error))
+        parser.exit(1, "vendor asset {} failed: {}\n".format(arguments.command, error))
     return 0
 
 
