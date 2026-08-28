@@ -30,17 +30,37 @@ assert.deepStrictEqual(
     '#eb-content img',
     '#eb-content img',
     '#eb-content img',
+    '#eb-content img',
+    '#eb-content img',
   ],
   'EPUB data attributes must not influence reader lightbox membership'
+);
+const continuousReplacement = chapterSource.slice(
+  chapterSource.indexOf('function replaceContinuousChapterWindow('),
+  chapterSource.indexOf('function ensureContinuousScrollBuffer(')
+);
+assert.match(
+  continuousReplacement,
+  /content\.appendChild\(chapterSection\);[\s\S]*Fancybox\.bind\('#eb-content img'/,
+  'direct continuous chapter replacement must bind its new image nodes'
+);
+const backwardLoad = chapterSource.slice(
+  chapterSource.indexOf('function loadPrevChapter('),
+  chapterSource.indexOf('function saveContinuousScrollProgress(')
+);
+assert.match(
+  backwardLoad,
+  /pruneContinuousWindow\('previous', prevIdx\);[\s\S]*Fancybox\.bind\('#eb-content img'/,
+  'backward prepend and prune must refresh image indexes and stale listeners'
 );
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function createImage(currentSrc, src, hostileValues = {}) {
+function createImage(currentSrc, src, hostileValues = {}, rawSrc = src) {
   const listeners = new Map();
-  const attributes = {};
+  const attributes = { src: rawSrc };
   for (const [name, value] of Object.entries(hostileValues)) {
     attributes[name] = value;
   }
@@ -110,9 +130,10 @@ const reservedAttributes = {
 };
 
 const first = createImage(
-  'https://reader.example/book/demo/resources/first.png',
-  'https://reader.example/book/demo/resources/ignored-fallback.jpg',
-  reservedAttributes
+  'https://evil.example/attacker/first.png',
+  'https://evil.example/attacker/first.png',
+  reservedAttributes,
+  'resources/first.png'
 );
 const excludedCrossOrigin = createImage(
   'https://evil.example/youtube.com/movie.mp4#inline?goajax=true',
@@ -125,19 +146,50 @@ const excludedOutsideBook = createImage(
   reservedAttributes
 );
 const second = createImage(
-  '',
-  'https://reader.example/book/demo/resources/second.webp',
-  reservedAttributes
+  'https://evil.example/attacker/second.webp',
+  'https://evil.example/attacker/second.webp',
+  reservedAttributes,
+  'resources/second.webp'
 );
-let selectedImages = [first, excludedCrossOrigin, excludedOutsideBook, second];
+const encodedAliases = [
+  'resources%2Fslash.png',
+  'resources%5Cbackslash.png',
+  'resources/%2E%2E/dot-segment.png',
+  'resources/%252E%252E%252Fdouble-encoded.png',
+  'resources/%252Fdouble-slash.png',
+  'resources//duplicate-separator.png',
+].map((rawSrc) => createImage(
+  'https://reader.example/book/demo/resources/apparently-safe.png',
+  'https://reader.example/book/demo/resources/apparently-safe.png',
+  reservedAttributes,
+  rawSrc
+));
+let selectedImages = [
+  first,
+  excludedCrossOrigin,
+  excludedOutsideBook,
+  ...encodedAliases,
+  second,
+];
 const compatibilityClasses = [];
 const constructorCalls = [];
 const instances = [];
+const timers = [];
+
+function flushTimers() {
+  while (timers.length) timers.shift()();
+}
 
 const context = {
   URL,
+  setTimeout(callback) {
+    timers.push(callback);
+  },
+  location: {
+    href: 'https://reader.example/book/demo/chapter_0.html',
+  },
   document: {
-    baseURI: 'https://reader.example/book/demo/chapter_0.html',
+    baseURI: 'https://evil.example/attacker/',
     querySelectorAll(selector) {
       assert.strictEqual(selector, '#eb-content img');
       return selectedImages;
@@ -160,13 +212,29 @@ const context = {
       setElementsCalls: [],
       openAtCalls: [],
       destroyCount: 0,
+      closeCount: 0,
+      activeIndex: null,
+      lightboxOpen: false,
+      destroyedWhileOpen: false,
       setElements(elements) {
         this.setElementsCalls.push(elements);
+        if (this.lightboxOpen) this.activeIndex = 0;
       },
       openAt(index) {
         this.openAtCalls.push(index);
+        this.activeIndex = index;
+        this.lightboxOpen = true;
+        if (events.open) events.open();
+      },
+      close() {
+        this.closeCount += 1;
+      },
+      finishClose() {
+        this.lightboxOpen = false;
+        if (events.close) events.close();
       },
       destroy() {
+        if (this.lightboxOpen) this.destroyedWhileOpen = true;
         this.destroyCount += 1;
       },
       on(name, callback) {
@@ -216,12 +284,15 @@ for (const value of Object.values(reservedAttributes)) {
 assert.ok(!serializedOptions.includes('cdn.plyr.io'));
 assert.strictEqual(excludedCrossOrigin.listenerCount('click'), 0);
 assert.strictEqual(excludedOutsideBook.listenerCount('click'), 0);
+for (const encodedAlias of encodedAliases) {
+  assert.strictEqual(encodedAlias.listenerCount('click'), 0);
+}
 
 assert.strictEqual(first.listenerCount('click'), 1);
 assert.strictEqual(second.listenerCount('click'), 1);
 assert.strictEqual(second.click(), true);
 assert.deepStrictEqual(firstInstance.openAtCalls, [1]);
-firstInstance.trigger('open');
+assert.strictEqual(firstInstance.activeIndex, 1);
 assert.deepStrictEqual(compatibilityClasses, ['fancybox__container']);
 
 assert.strictEqual(
@@ -243,6 +314,25 @@ context.Fancybox.bind('#eb-content img');
 assert.strictEqual(second.listenerCount('click'), 0, 'AJAX replacement must unbind removed images');
 assert.strictEqual(first.listenerCount('click'), 1);
 assert.strictEqual(appended.listenerCount('click'), 1);
+assert.strictEqual(firstInstance.activeIndex, 1, 'open rebinding must not jump to slide zero');
+assert.deepStrictEqual(
+  firstInstance.setElementsCalls,
+  [],
+  'GLightbox gallery replacement must wait for the close event'
+);
+firstInstance.finishClose();
+assert.deepStrictEqual(
+  firstInstance.setElementsCalls,
+  [],
+  'gallery replacement must wait until GLightbox finishes its close callback'
+);
+assert.strictEqual(appended.click(), true);
+assert.deepStrictEqual(
+  firstInstance.openAtCalls,
+  [1],
+  'clicks during close-time gallery replacement must wait for current indexes'
+);
+flushTimers();
 assert.deepStrictEqual(plain(firstInstance.setElementsCalls), [
   [
     {
@@ -250,12 +340,11 @@ assert.deepStrictEqual(plain(firstInstance.setElementsCalls), [
       type: 'image',
     },
     {
-      href: 'https://reader.example/book/demo/resources/appended.avif',
+      href: 'https://reader.example/book/demo/resources/appended-fallback.png',
       type: 'image',
     },
   ],
 ]);
-assert.strictEqual(appended.click(), true);
 assert.deepStrictEqual(firstInstance.openAtCalls, [1, 1]);
 
 assert.strictEqual(typeof context.Fancybox.destroy, 'function');
@@ -263,10 +352,20 @@ context.Fancybox.destroy();
 context.Fancybox.destroy();
 assert.strictEqual(first.listenerCount('click'), 0);
 assert.strictEqual(appended.listenerCount('click'), 0);
-assert.strictEqual(firstInstance.destroyCount, 1, 'destroy must be idempotent');
+assert.strictEqual(firstInstance.closeCount, 1, 'destroy must request one asynchronous close');
+assert.strictEqual(firstInstance.destroyCount, 0, 'open GLightbox must not be destroyed before close');
+assert.strictEqual(firstInstance.destroyedWhileOpen, false);
 
 selectedImages = [second];
-assert.strictEqual(context.Fancybox.bind('#eb-content img'), instances[1]);
+assert.strictEqual(context.Fancybox.bind('#eb-content img'), firstInstance);
+assert.strictEqual(constructorCalls.length, 1, 'reinitialization must wait for the closing instance');
+assert.strictEqual(second.listenerCount('click'), 0);
+firstInstance.finishClose();
+assert.strictEqual(firstInstance.destroyCount, 0, 'close handlers must finish before destruction');
+assert.strictEqual(constructorCalls.length, 1);
+flushTimers();
+assert.strictEqual(firstInstance.destroyCount, 1, 'destroy must finalize after close');
+assert.strictEqual(firstInstance.destroyedWhileOpen, false);
 assert.strictEqual(constructorCalls.length, 2, 'binding after destroy must create a fresh instance');
 assert.strictEqual(second.listenerCount('click'), 1);
 

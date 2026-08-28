@@ -2360,6 +2360,9 @@ function initScript() {
             chapterSection.appendChild(childNodes[i].cloneNode(true));
         }
         content.appendChild(chapterSection);
+        if (typeof Fancybox !== 'undefined') {
+            Fancybox.bind('#eb-content img', {});
+        }
         loadedChapters = {};
         loadedChapters[target.index] = true;
         continuousChapterWindow = new EpubChapterWindow(target.index, 5);
@@ -2627,6 +2630,9 @@ function initScript() {
                     
                     loadedChapters[prevIdx] = true;
                     pruneContinuousWindow('previous', prevIdx);
+                    if (typeof Fancybox !== 'undefined') {
+                        Fancybox.bind('#eb-content img', {});
+                    }
                     EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
                     EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
                     appendedChapter = true;
