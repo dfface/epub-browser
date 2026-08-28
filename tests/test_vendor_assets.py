@@ -1,3 +1,4 @@
+import gzip
 import hashlib
 import io
 import json
@@ -104,6 +105,20 @@ class VendorAssetTests(unittest.TestCase):
 
         with self.assertRaisesRegex(VendorAssetError, "max_expanded_bytes"):
             fetch_assets(lock_path, self.vendor_root, opener=self.opener(archive))
+
+    def test_fetch_rejects_oversized_member_from_header_without_reading_body(self):
+        """The expansion guard must fire before streaming an oversized member body."""
+        clean_assets(self.lock_path, self.vendor_root)
+        info = tarfile.TarInfo("oversized.bin")
+        info.size = 1 << 30
+        archive = gzip.compress(info.tobuf(format=tarfile.USTAR_FORMAT))
+
+        with self.assertRaisesRegex(VendorAssetError, "max_expanded_bytes"):
+            fetch_assets(
+                self.lock_for_archive(archive, max_expanded_bytes=2048),
+                self.vendor_root,
+                opener=self.opener(archive),
+            )
 
     def test_fetch_rejects_duplicate_normalized_archive_members(self):
         """Two archive entries must not compete for one normalized source path."""
@@ -219,6 +234,42 @@ class VendorAssetTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(VendorAssetError, "unsupported archive kind"):
             fetch_assets(unknown_kind_lock, self.vendor_root, opener=self.opener(b""))
+
+    def test_load_lock_rejects_unsupported_archive_kind(self):
+        """Unsupported archive formats must be invalid in the shared lock contract."""
+        lock_path = self.changed_lock(
+            self.lock_path,
+            "load-unknown-kind.lock.json",
+            lambda package: package["source"].update({"kind": "release-zip"}),
+        )
+
+        with self.assertRaisesRegex(VendorAssetError, "unsupported archive kind"):
+            load_lock(lock_path)
+
+    def test_verify_rejects_unsupported_archive_kind(self):
+        """Offline verification must not bless an installed tree from an unknown format."""
+        lock_path = self.changed_lock(
+            self.lock_path,
+            "verify-unknown-kind.lock.json",
+            lambda package: package["source"].update({"kind": "release-zip"}),
+        )
+
+        with self.assertRaisesRegex(VendorAssetError, "unsupported archive kind"):
+            verify_assets(lock_path, self.vendor_root)
+
+    def test_clean_rejects_unsupported_archive_kind_without_removing_files(self):
+        """Clean must validate the common lock before unlinking any managed target."""
+        lock_path = self.changed_lock(
+            self.lock_path,
+            "clean-unknown-kind.lock.json",
+            lambda package: package["source"].update({"kind": "release-zip"}),
+        )
+
+        with self.assertRaisesRegex(VendorAssetError, "unsupported archive kind"):
+            clean_assets(lock_path, self.vendor_root)
+
+        self.assertEqual((self.vendor_root / "pkg/LICENSE").read_bytes(), b"license")
+        self.assertEqual((self.vendor_root / "pkg/file.js").read_bytes(), b"asset")
 
     def test_redirect_handler_rejects_an_intermediate_https_downgrade(self):
         """Every redirect hop must remain HTTPS even when a later final URL is secure."""

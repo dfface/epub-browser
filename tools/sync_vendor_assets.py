@@ -2,6 +2,7 @@
 """Validate the locked third-party browser asset inventory without networking."""
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -175,12 +176,6 @@ def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
     """Fetch, validate, and atomically install the locked vendor files."""
     lock = load_lock(lock_path)
     for package in lock.packages:
-        if package.source.kind != "npm-tarball":
-            raise VendorAssetError(
-                "{} uses unsupported archive kind: {}".format(
-                    package.name, package.source.kind
-                )
-            )
         if urlparse(package.source.url).scheme != "https":
             raise VendorAssetError("{} download requires HTTPS".format(package.name))
     if vendor_root.is_symlink():
@@ -220,11 +215,16 @@ def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
                 raise VendorAssetError("{} archive SHA-256 mismatch".format(package.name))
             try:
                 extracted = set()
-                with tarfile.open(archive_path, mode="r:gz") as archive:
+                compressed_archive = gzip.GzipFile(filename=archive_path, mode="rb")
+                with compressed_archive, tarfile.open(
+                    fileobj=compressed_archive,
+                    mode="r|",
+                    bufsize=tarfile.BLOCKSIZE,
+                ) as archive:
                     allowlist = {item.source: item for item in package.files}
                     seen_members = set()
                     expanded_bytes = 0
-                    for member in archive.getmembers():
+                    for member in archive:
                         relative = _safe_archive_relative(member.name).as_posix()
                         if relative in seen_members:
                             raise VendorAssetError(
@@ -278,7 +278,7 @@ def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
                             package.name, ", ".join(sorted(missing))
                         )
                     )
-            except (tarfile.TarError, OSError) as error:
+            except (tarfile.TarError, OSError, EOFError) as error:
                 raise VendorAssetError(
                     "{} archive extraction failed".format(package.name)
                 ) from error
@@ -452,7 +452,12 @@ def _parse_package(data: Any, index: int) -> LockedPackage:
 def _parse_source(data: Any, label: str) -> LockedSource:
     _require_object(data, label)
     _require_keys(data, {"kind", "url"}, label)
-    return LockedSource(_require_text(data["kind"], label + ".kind"), _require_text(data["url"], label + ".url"))
+    kind = _require_text(data["kind"], label + ".kind")
+    if kind != "npm-tarball":
+        raise VendorAssetError(
+            "{} uses unsupported archive kind: {}".format(label, kind)
+        )
+    return LockedSource(kind, _require_text(data["url"], label + ".url"))
 
 
 def _parse_archive(data: Any, label: str) -> LockedArchive:
