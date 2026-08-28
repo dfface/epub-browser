@@ -324,7 +324,7 @@ git commit -m "feat: generate PDF page chapters in SSG"
 
 **Interfaces:**
 - Adds: `BookRecord.source_format: str`
-- Produces: `.server-pdf-revision` and `pdf/metadata.json`
+- Produces: `.server-pdf-revision`, byte-identical `pdf/document.pdf`, and `pdf/metadata.json`
 - Produces: `ServerPageRenderer.render_pdf_chapter(chapter_index: int) -> str`
 - Produces: dynamic `/book/{book_id}/chapter_{chapter_index}.html`
 
@@ -338,6 +338,7 @@ def test_existing_book_rows_migrate_to_epub_format(self):
 def test_pdf_server_cache_contains_metadata_not_html(self):
     record = self.manager.convert_pdf(self.fixture_pdf(pages=2))
     root = self.public_dir / "book" / record.book_id
+    self.assertEqual((root / "pdf" / "document.pdf").read_bytes(), self.source.read_bytes())
     self.assertTrue((root / "pdf" / "metadata.json").is_file())
     self.assertFalse((root / "content").exists())
     self.assertFalse((root / "chapter_0.html").exists())
@@ -365,8 +366,10 @@ def render_pdf_chapter(self, chapter_index: int) -> str:
 ```
 
 Route format dispatch happens only after authentication and visibility checks.
-PDF cache validity checks PDF revision, metadata schema, page count, cover, and
-fingerprint without touching `SERVER_OUTPUT_REVISION`.
+Copy the complete source to `pdf/document.pdf` through a sibling temporary file
+and atomic replace; never split or rewrite its bytes. PDF cache validity checks
+PDF revision, metadata schema, page count, cover, source fingerprint, and the
+cached document size/digest without touching `SERVER_OUTPUT_REVISION`.
 
 - [ ] **Step 4: Run migration, cache, route, and dynamic-UI tests**
 
@@ -405,6 +408,7 @@ def test_document_hides_inaccessible_and_changed_sources(self):
     self.assertEqual(self.other_user.get(self.url).status_code, 404)
     self.source.write_bytes(self.source.read_bytes() + b"changed")
     self.assertEqual(self.owner.get(self.url).status_code, 409)
+    self.assertEqual(self.cached_document.read_bytes(), self.original_bytes)
 ```
 
 - [ ] **Step 2: Run delivery tests**
@@ -428,10 +432,11 @@ def parse_single_range(value: str, size: int) -> Optional[ByteRange]:
     return normalize_range(match.group(1), match.group(2), size)
 ```
 
-Check Session, visibility, format, current stat/fingerprint, GET/HEAD, one
-range, conditional ETag, sanitized inline filename, `Accept-Ranges`, private
-cache policy, and `nosniff`. Never expose the source path or mount under
-`/api/v1`.
+Check Session, visibility, format, current source stat/fingerprint, cached-file
+digest, GET/HEAD, one range, conditional ETag, sanitized inline filename,
+`Accept-Ranges`, private cache policy, and `nosniff`. Read ranges only from the
+immutable cached `pdf/document.pdf`; never stream the Library source, expose
+its path, or mount the route under `/api/v1`.
 
 - [ ] **Step 4: Run PDF delivery and Server security tests**
 
