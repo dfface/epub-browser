@@ -33,13 +33,16 @@ jobs:
       - name: "Installs dependencies"
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install setuptools wheel twine
+          python3 -m pip install build setuptools wheel
 
       # Build and install the project
       - name: "Builds and installs the project"
         run: |
-          python3 setup.py sdist bdist_wheel
-          python3 -m pip install -e . --break-system-packages
+          python tools/sync_vendor_assets.py fetch
+          python tools/sync_vendor_assets.py verify
+          python -m build --wheel
+          python tools/verify_release_artifacts.py --wheel dist/*.whl
+          python3 -m pip install dist/*.whl --break-system-packages
 
       # Generate test files
       - name: "Generates test files"

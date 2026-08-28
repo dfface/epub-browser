@@ -1,5 +1,6 @@
 # epub_browser/setup.py
 import re
+from pathlib import Path
 
 from setuptools import setup, find_packages
 
@@ -8,6 +9,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 with open("epub_browser/version.py", "r", encoding="utf-8") as fh:
     version = re.search(r'^VERSION = ["\']([^"\']+)', fh.read(), re.MULTILINE).group(1)
+
+vendor_package_data = [
+    path.relative_to("epub_browser").as_posix()
+    for path in sorted(Path("epub_browser/assets/vendor").rglob("*"))
+    if path.is_file()
+]
 
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
@@ -25,12 +32,21 @@ setup(
         "Release notes": "https://github.com/dfface/epub-browser/tree/main/docs/releases",
     },
     packages=find_packages(exclude=("tests", "tests.*")),
-    package_data={'epub_browser': ['assets/*', 'assets/vendor/katex/*', 'assets/vendor/katex/fonts/*', 'assets/vendor/markdown-it/*', 'assets/vendor/mermaid/*', 'prompt_templates/*.json']},
+    package_data={
+        "epub_browser": [
+            "assets/*",
+            "assets/vendor/**/*",
+            "prompt_templates/*.json",
+            *vendor_package_data,
+        ]
+    },
+    data_files=[("share/doc/epub-browser", ["THIRD_PARTY_NOTICES.md"])],
     classifiers=[  # 项目分类器，帮助用户找到你的项目
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
     license="MIT",
+    license_files=["License.txt", "THIRD_PARTY_NOTICES.md"],
     python_requires='>=3.9',  # Path and type syntax used by the v2 runtime
     install_requires=[  # 项目依赖的第三方包
         # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []

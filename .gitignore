@@ -5,6 +5,7 @@ build
 dist
 epub_browser.egg-info
 epub_browser/__pycache__/
+epub_browser/assets/vendor/
 .worktrees/
 .agents/
 .codegraph/

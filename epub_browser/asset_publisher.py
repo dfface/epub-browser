@@ -69,18 +69,15 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
     'ai-reading-hub.js',
     'ai-rich-text.css',
     'ai-rich-text.js',
-    'vendor/katex/katex.min.css',
-    'vendor/katex/katex.min.js',
-    'vendor/markdown-it/markdown-it.min.js',
-    'vendor/markdown-it/LICENSE',
-    'vendor/mermaid/mermaid.min.js',
 })
 
-# KaTeX ships its glyphs below this directory. A path-level exclusion would
-# leave those fonts in static exports even though no SSG surface can use them.
+# Rich-renderer packages ship supporting files below these directories. A
+# path-level exclusion would leave those files in static exports even though
+# no SSG surface can use them.
 SERVER_ONLY_ASSET_PREFIXES = frozenset({
     'vendor/katex/',
     'vendor/markdown-it/',
+    'vendor/mermaid/',
 })
 
 

@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,349 @@ from epub_browser.urls import SiteURLs
 
 
 class AssetPublisherTests(unittest.TestCase):
+    def test_every_generated_vendor_file_is_locked_and_untracked(self):
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        locked = {
+            item["target"]
+            for package in lock["packages"]
+            for item in (
+                package["files"] + package.get("supplemental_license_files", [])
+            )
+        }
+        generated = {
+            path.relative_to("epub_browser/assets/vendor").as_posix()
+            for path in Path("epub_browser/assets/vendor").rglob("*")
+            if path.is_file()
+        }
+        tracked = subprocess.check_output(
+            ["git", "ls-files", "epub_browser/assets/vendor"], text=True
+        ).splitlines()
+
+        self.assertEqual(generated, locked)
+        self.assertEqual(tracked, [])
+        self.assertIn("pdfjs/build/pdf.mjs", locked)
+
+    def test_production_lock_is_release_auditable_and_uses_mit_lightbox(self):
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(lock["schema"], 2)
+        identities = {
+            (package["name"], package["version"])
+            for package in lock["packages"]
+        }
+        self.assertIn(("glightbox", "3.3.1"), identities)
+        self.assertNotIn(("@fancyapps/ui", "6.1.14"), identities)
+        locked_targets = {
+            item["target"]
+            for package in lock["packages"]
+            for item in (
+                package["files"] + package.get("supplemental_license_files", [])
+            )
+        }
+        for package in lock["packages"]:
+            self.assertRegex(package["upstream"], r"^https://")
+            self.assertTrue(package["copyright"])
+            self.assertTrue(package["runtime_files"])
+            self.assertLessEqual(set(package["runtime_files"]), locked_targets)
+
+    def test_pdfjs_main_and_worker_are_modern_and_version_matched(self):
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        pdfjs = next(
+            package for package in lock["packages"] if package["name"] == "pdfjs-dist"
+        )
+        sources = {item["source"] for item in pdfjs["files"]}
+
+        self.assertIn("package/build/pdf.mjs", sources)
+        self.assertIn("package/build/pdf.worker.mjs", sources)
+        self.assertFalse(any("/legacy/" in source for source in sources))
+        main = Path("epub_browser/assets/vendor/pdfjs/build/pdf.mjs").read_text(
+            encoding="utf-8"
+        )
+        worker = Path(
+            "epub_browser/assets/vendor/pdfjs/build/pdf.worker.mjs"
+        ).read_text(encoding="utf-8")
+        version_pattern = re.compile(r"pdfjsVersion\s*=\s*([0-9.]+)")
+        self.assertEqual(version_pattern.search(main).group(1), pdfjs["version"])
+        self.assertEqual(version_pattern.search(worker).group(1), pdfjs["version"])
+        self.assertNotIn("core-js", main)
+        self.assertNotIn("core-js", worker)
+
+    def test_bundled_component_inventory_is_exact_and_not_top_level_only(self):
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        mermaid_components = {
+            (package["name"], package["version"])
+            for package in lock["packages"]
+            if "mermaid/mermaid.min.js" in package["runtime_files"]
+        }
+        expected_mermaid = {
+            ("@braintree/sanitize-url", "7.1.1"),
+            ("@chevrotain/cst-dts-gen", "11.0.3"),
+            ("@chevrotain/gast", "11.0.3"),
+            ("@chevrotain/regexp-to-ast", "11.0.3"),
+            ("@chevrotain/utils", "11.0.3"),
+            ("@iconify/utils", "3.0.2"),
+            ("@mermaid-js/parser", "0.6.2"),
+            ("chevrotain", "11.0.3"),
+            ("chevrotain-allstar", "0.3.1"),
+            ("cose-base", "1.0.3"),
+            ("cose-base", "2.2.0"),
+            ("cytoscape", "3.33.1"),
+            ("cytoscape-cose-bilkent", "4.1.0"),
+            ("cytoscape-embedded-cubic-bezier", "3.33.1"),
+            ("cytoscape-embedded-jquery-events", "3.33.1"),
+            ("cytoscape-embedded-spring-rk4", "3.33.1"),
+            ("cytoscape-embedded-thenable", "1.0.7"),
+            ("cytoscape-fcose", "2.2.0"),
+            ("d3", "7.9.0"),
+            ("d3-array", "2.12.1"),
+            ("d3-array", "3.2.4"),
+            ("d3-axis", "3.0.0"),
+            ("d3-brush", "3.0.0"),
+            ("d3-chord", "3.0.1"),
+            ("d3-color", "3.1.0"),
+            ("d3-contour", "4.0.2"),
+            ("d3-delaunay", "6.0.4"),
+            ("d3-dispatch", "3.0.1"),
+            ("d3-drag", "3.0.0"),
+            ("d3-dsv", "3.0.1"),
+            ("d3-ease", "3.0.1"),
+            ("d3-fetch", "3.0.1"),
+            ("d3-force", "3.0.0"),
+            ("d3-format", "3.1.0"),
+            ("d3-geo", "3.1.1"),
+            ("d3-hierarchy", "3.1.2"),
+            ("d3-interpolate", "3.0.1"),
+            ("d3-path", "1.0.9"),
+            ("d3-path", "3.1.0"),
+            ("d3-polygon", "3.0.1"),
+            ("d3-quadtree", "3.0.1"),
+            ("d3-random", "3.0.1"),
+            ("d3-sankey", "0.12.3"),
+            ("d3-scale", "4.0.2"),
+            ("d3-scale-chromatic", "3.1.0"),
+            ("d3-selection", "3.0.0"),
+            ("d3-shape", "1.3.7"),
+            ("d3-shape", "3.2.0"),
+            ("d3-time", "3.1.0"),
+            ("d3-time-format", "4.1.0"),
+            ("d3-timer", "3.0.1"),
+            ("d3-transition", "3.0.1"),
+            ("d3-zoom", "3.0.0"),
+            ("dagre-d3-es", "7.0.11"),
+            ("dayjs", "1.11.18"),
+            ("dompurify", "3.2.6"),
+            ("esbuild", "0.25.9"),
+            ("internmap", "2.0.3"),
+            ("js-yaml", "4.1.0"),
+            ("katex", "0.16.22"),
+            ("khroma", "2.1.0"),
+            ("langium", "3.3.1"),
+            ("layout-base", "1.0.2"),
+            ("layout-base", "2.0.1"),
+            ("lodash-es", "4.17.21"),
+            ("marked", "16.3.0"),
+            ("mermaid", "11.12.0"),
+            ("path-browserify", "1.0.1"),
+            ("roughjs", "4.6.6"),
+            ("stylis", "4.3.6"),
+            ("ts-dedent", "2.2.0"),
+            ("uuid", "11.1.0"),
+            ("vscode-jsonrpc", "8.2.0"),
+            ("vscode-languageserver-textdocument", "1.0.12"),
+            ("vscode-languageserver-types", "3.17.5"),
+            ("vscode-uri", "3.0.8"),
+            ("webpack", "5.88.2"),
+        }
+        self.assertEqual(mermaid_components, expected_mermaid)
+
+        pdf_components = {
+            (package["name"], package["version"])
+            for package in lock["packages"]
+            if "pdfjs/build/pdf.worker.mjs" in package["runtime_files"]
+        }
+        self.assertEqual(
+            pdf_components,
+            {
+                ("emscripten", "5.0.6"),
+                ("google-brotli", "1.2.0"),
+                (
+                    "mozilla-pdfjs-jbig2-wrapper",
+                    "1e945e7552561c9b45e6d2c7d1a359ea82afc5b7",
+                ),
+                (
+                    "mozilla-pdfjs-openjpeg-wrapper",
+                    "8bb19dc1aeecb104ce2ed3493d41fe131fc681e0",
+                ),
+                (
+                    "mozilla-pdfjs-qcms-wrapper",
+                    "2ae4ee72334782928210ba4050e3e77d9b2d35be",
+                ),
+                ("openjpeg", "2.5.4"),
+                ("pdfium-jbig2", "0455e822ded1a5537d826703988e986a33d2d4a1"),
+                ("pdfjs-dist", "6.2.108"),
+                ("qcms", "0.3.0"),
+                ("wasm-bindgen", "0.2.100"),
+                ("webpack", "5.109.0"),
+            },
+        )
+
+    def test_mermaid_bundle_explicit_attributions_have_locked_notice_rows(self):
+        """Dropping a bundle attribution or folding it into Cytoscape must fail release audit."""
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        fixture = json.loads(
+            Path("tests/fixtures/mermaid_explicit_attributions.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        bundle = Path(
+            "epub_browser/assets/vendor/mermaid/mermaid.min.js"
+        ).read_text(encoding="utf-8")
+        license_block = bundle[bundle.index("/*! Bundled license information:") :]
+        extracted = set()
+        for raw_line in license_block.splitlines():
+            line = raw_line.strip()
+            if line.startswith("(*!"):
+                line = line[3:]
+            if line.endswith("*)"):
+                line = line[:-2]
+            line = line.strip().removeprefix("*").strip()
+            if re.search(
+                r"copyright|\(c\)|^Based on |^Event object based on ",
+                line,
+                flags=re.IGNORECASE,
+            ):
+                extracted.add(line)
+
+        self.assertEqual(
+            extracted,
+            {item["bundle_notice"] for item in fixture},
+            "the evidence fixture must enumerate every explicit bundle attribution",
+        )
+        packages = {
+            (package["name"], package["version"]): package
+            for package in lock["packages"]
+        }
+        vendor_root = Path("epub_browser/assets/vendor")
+        for item in fixture:
+            identity = tuple(item["identity"])
+            with self.subTest(bundle_notice=item["bundle_notice"]):
+                package = packages.get(identity)
+                self.assertIsNotNone(
+                    package, "missing locked attribution row: {}@{}".format(*identity)
+                )
+                self.assertIn(
+                    item["lock_marker"], "\n".join(package["copyright"])
+                )
+                locked_targets = {
+                    entry["target"]
+                    for entry in (
+                        package["files"]
+                        + package.get("supplemental_license_files", [])
+                    )
+                }
+                self.assertIn(item["notice_path"], locked_targets)
+                notice = " ".join(
+                    (vendor_root / item["notice_path"])
+                    .read_text(encoding="utf-8")
+                    .split()
+                )
+                self.assertIn(item["notice_marker"], notice)
+
+    def test_mermaid_installed_license_copyrights_are_exhaustive_in_lock(self):
+        """Every concrete copyright preamble in an installed license stays releasable."""
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        vendor_root = Path("epub_browser/assets/vendor")
+        for package in lock["packages"]:
+            if "mermaid/mermaid.min.js" not in package["runtime_files"]:
+                continue
+            source_to_target = {
+                item["source"]: item["target"] for item in package["files"]
+            }
+            notice_paths = [
+                source_to_target[source] for source in package["license"]["files"]
+            ] + [
+                item["target"]
+                for item in package.get("supplemental_license_files", [])
+            ]
+            recorded = " ".join(" ".join(package["copyright"]).split())
+            for notice_path in notice_paths:
+                lines = (vendor_root / notice_path).read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                attributions = []
+                index = 0
+                while index < len(lines):
+                    line = " ".join(lines[index].strip().split())
+                    if line.startswith("Original ") and "copyright:" in line:
+                        attributions.append(line)
+                    elif line.startswith("Copyright ") and not line.startswith(
+                        ("Copyright [yyyy]", "Copyright and related rights")
+                    ):
+                        attributions.append(line)
+                    elif line.startswith("Based on ") and "copyright" in line:
+                        parts = [line]
+                        while index + 1 < len(lines) and lines[index + 1].strip():
+                            index += 1
+                            parts.append(" ".join(lines[index].strip().split()))
+                        attributions.append(" ".join(parts))
+                    index += 1
+
+                for attribution in attributions:
+                    with self.subTest(
+                        package=(package["name"], package["version"]),
+                        notice=notice_path,
+                        attribution=attribution,
+                    ):
+                        self.assertIn(attribution, recorded)
+
+    def test_third_party_notices_cover_every_locked_package_and_component(self):
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        notices = Path("THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+
+        for package in lock["packages"]:
+            source_to_target = {
+                item["source"]: item["target"] for item in package["files"]
+            }
+            installed_licenses = [
+                source_to_target[source] for source in package["license"]["files"]
+            ] + [
+                item["target"]
+                for item in package.get("supplemental_license_files", [])
+            ]
+            row_prefix = "| `{}` | `{}` | `{}` | `{}` | `{}` |".format(
+                package["name"],
+                package["version"],
+                package["upstream"],
+                package["source"]["url"],
+                package["license"]["spdx"],
+            )
+            with self.subTest(package=(package["name"], package["version"])):
+                matching_rows = [
+                    row for row in notices.splitlines() if row.startswith(row_prefix)
+                ]
+                self.assertEqual(len(matching_rows), 1)
+                row = matching_rows[0]
+                for value in (
+                    *package["copyright"],
+                    *package["runtime_files"],
+                    *installed_licenses,
+                ):
+                    self.assertIn(value, row)
+
     def test_publish_uses_base_path_without_writing_the_prefix_to_disk(self):
         with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
             self._write_source_assets(source)

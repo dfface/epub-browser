@@ -1016,7 +1016,7 @@ function initScript() {
         wrapAllElements('img', 'div', content);
         prepareChapterCodeBlocks(content);
         if (!isKindleMode() && typeof hljs !== 'undefined') hljs.highlightAll();
-        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img:not([data-fancybox])', {});
+        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
         generateToc();
         updateTocHighlight();
         setBookTocActiveChapter(target.index, true);
@@ -2360,6 +2360,9 @@ function initScript() {
             chapterSection.appendChild(childNodes[i].cloneNode(true));
         }
         content.appendChild(chapterSection);
+        if (typeof Fancybox !== 'undefined') {
+            Fancybox.bind('#eb-content img', {});
+        }
         loadedChapters = {};
         loadedChapters[target.index] = true;
         continuousChapterWindow = new EpubChapterWindow(target.index, 5);
@@ -2522,7 +2525,7 @@ function initScript() {
                     
                     // 对新增内容重新绑定 Fancybox
                     if (typeof Fancybox !== 'undefined') {
-                        Fancybox.bind('#eb-content img:not([data-fancybox])', {});
+                        Fancybox.bind('#eb-content img', {});
                     }
                 }
             }
@@ -2627,6 +2630,9 @@ function initScript() {
                     
                     loadedChapters[prevIdx] = true;
                     pruneContinuousWindow('previous', prevIdx);
+                    if (typeof Fancybox !== 'undefined') {
+                        Fancybox.bind('#eb-content img', {});
+                    }
                     EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
                     EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
                     appendedChapter = true;

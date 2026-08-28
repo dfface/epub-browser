@@ -476,6 +476,28 @@ OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本
 
 欢迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。一份有效的问题报告应包含准确命令、浏览器/设备、复现步骤、相关日志，以及在法律和版权允许时附上的 EPUB。
 
+### 从源码仓库开发
+
+第三方浏览器文件是构建输入，不是本项目源码，因此 Git 会故意忽略
+`epub_browser/assets/vendor/`。开发或构建前需要显式生成锁定版本的资源，
+再离线验证：
+
+```bash
+python3 tools/sync_vendor_assets.py fetch
+python3 tools/sync_vendor_assets.py verify
+python3 -m unittest tests.test_vendor_assets -v
+python3 -m build
+```
+
+上述命令只有 `fetch` 会下载浏览器 vendor 资源。锁文件记录不可变的 npm
+tarball、文件摘要、允许列表和许可证；`verify`、测试、已生成资源的源码构建以及
+安装后的阅读器都不会下载浏览器资源。标准的隔离构建命令 `python3 -m build`
+仍可能从 Python 包索引获取构建依赖。若要在完全断网的环境构建，需在断网前生成 vendor
+资源并预装 `build`、`setuptools` 和 `wheel`，断网后再运行
+`PIP_NO_INDEX=1 python3 -m build --no-isolation`。wheel、sdist、Docker 镜像和生成的
+SSG 站点均包含已验证文件，运行时不依赖 CDN。更新、发布和仓库清洁度流程见
+[third_party/README.md](third_party/README.md)。
+
 ## 许可证
 
 [MIT](../../License.txt)

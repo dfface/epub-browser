@@ -1,0 +1,58 @@
+[
+  {
+    "bundle_notice": "@license DOMPurify 3.2.6 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.2.6/LICENSE",
+    "identity": ["dompurify", "3.2.6"],
+    "lock_marker": "Cure53 and other contributors",
+    "notice_path": "licenses/mermaid-components/dompurify-3.2.6/LICENSE",
+    "notice_marker": "Cure53"
+  },
+  {
+    "bundle_notice": "Copyright OpenJS Foundation and other contributors <https://openjsf.org/>",
+    "identity": ["lodash-es", "4.17.21"],
+    "lock_marker": "Copyright OpenJS Foundation and other contributors",
+    "notice_path": "licenses/mermaid-components/lodash-es-4.17.21/LICENSE",
+    "notice_marker": "Copyright OpenJS Foundation and other contributors"
+  },
+  {
+    "bundle_notice": "Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>",
+    "identity": ["lodash-es", "4.17.21"],
+    "lock_marker": "Based on Underscore.js 1.8.3",
+    "notice_path": "licenses/mermaid-components/lodash-es-4.17.21/LICENSE",
+    "notice_marker": "Based on Underscore.js, copyright Jeremy Ashkenas"
+  },
+  {
+    "bundle_notice": "Copyright Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors",
+    "identity": ["lodash-es", "4.17.21"],
+    "lock_marker": "Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors",
+    "notice_path": "licenses/mermaid-components/lodash-es-4.17.21/LICENSE",
+    "notice_marker": "Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors"
+  },
+  {
+    "bundle_notice": "Copyright (c) 2013-2014 Ralf S. Engelschall (http://engelschall.com)",
+    "identity": ["cytoscape-embedded-thenable", "1.0.7"],
+    "lock_marker": "Copyright (c) 2013-2014 Ralf S. Engelschall",
+    "notice_path": "licenses/mermaid-components/cytoscape-embedded-thenable-1.0.7/NOTICE.mjs",
+    "notice_marker": "Copyright (c) 2013-2014 Ralf S. Engelschall"
+  },
+  {
+    "bundle_notice": "Event object based on jQuery events, MIT license",
+    "identity": ["cytoscape-embedded-jquery-events", "3.33.1"],
+    "lock_marker": "Event object based on jQuery events",
+    "notice_path": "licenses/mermaid-components/cytoscape-embedded-jquery-events-3.33.1/NOTICE.mjs",
+    "notice_marker": "Event object based on jQuery events"
+  },
+  {
+    "bundle_notice": "Bezier curve function generator. Copyright Gaetan Renaudeau. MIT License: http://en.wikipedia.org/wiki/MIT_License",
+    "identity": ["cytoscape-embedded-cubic-bezier", "3.33.1"],
+    "lock_marker": "Copyright Gaetan Renaudeau",
+    "notice_path": "licenses/mermaid-components/cytoscape-embedded-cubic-bezier-3.33.1/NOTICE.mjs",
+    "notice_marker": "Copyright Gaetan Renaudeau"
+  },
+  {
+    "bundle_notice": "Runge-Kutta spring physics function generator. Adapted from Framer.js, copyright Koen Bok. MIT License: http://en.wikipedia.org/wiki/MIT_License",
+    "identity": ["cytoscape-embedded-spring-rk4", "3.33.1"],
+    "lock_marker": "Adapted from Framer.js, copyright Koen Bok",
+    "notice_path": "licenses/mermaid-components/cytoscape-embedded-spring-rk4-3.33.1/NOTICE.mjs",
+    "notice_marker": "Adapted from Framer.js, copyright Koen Bok"
+  }
+]

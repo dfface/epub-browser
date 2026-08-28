@@ -1461,7 +1461,7 @@ class EPUBProcessor:
             "annotationHubCss": self.asset_manifest.url_for("annotation-hub.css"),
             "annotation": self.asset_manifest.url_for("annotation.js"),
             "annotationHub": self.asset_manifest.url_for("annotation-hub.js"),
-            "sortable": self.asset_manifest.url_for("sortable.min.js"),
+            "sortable": self.asset_manifest.url_for("vendor/sortablejs/sortable.min.js"),
         }, separators=(",", ":"))
         if self.deployment_mode == "server":
             book_feature_assets = json.dumps({
@@ -1599,7 +1599,7 @@ class EPUBProcessor:
     <script>window.EpubBrowserI18n.init();</script>
     {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
-    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
@@ -2603,9 +2603,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
-    <link id="code-light" rel="stylesheet" href="/assets/github.min.css">
-    <link id="code-dark" rel="stylesheet" disabled href="/assets/github-dark.min.css">
-    <link rel="stylesheet" href="/assets/fa.all.min.css">
+    <link id="code-light" rel="stylesheet" href="/assets/vendor/highlight/github.min.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/vendor/highlight/github-dark.min.css">
+    <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
@@ -2615,7 +2615,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
     {server_account_stylesheet}
-    <link rel="stylesheet" href="/assets/fancybox.min.css">
+    <link rel="stylesheet" href="/assets/vendor/glightbox/glightbox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
@@ -3130,8 +3130,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
-    <script src="/assets/fancybox.min.js" defer></script>
-    <script src="/assets/web-highlighter.min.js" defer></script>
+    <script src="/assets/vendor/glightbox/glightbox.min.js" defer></script>
+    <script src="/assets/lightbox-adapter.js" defer></script>
+    <script src="/assets/vendor/web-highlighter/web-highlighter.min.js" defer></script>
     <script src="/assets/chapter-window.js" defer></script>
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
@@ -3141,9 +3142,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/annotation-hub.js" defer></script>
-    <script src="/assets/sortable.min.js" defer></script>
+    <script src="/assets/vendor/sortablejs/sortable.min.js" defer></script>
     {dictionary_assets}
-    <script src="/assets/highlight.min.js" defer></script>
+    <script src="/assets/vendor/highlight/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
     {reading_insights_assets}
     {reading_session_script}

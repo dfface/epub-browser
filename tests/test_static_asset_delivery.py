@@ -9,6 +9,22 @@ from epub_browser.locales import SUPPORTED_LOCALES
 
 
 class StaticAssetDeliveryTests(unittest.TestCase):
+    def test_generated_library_publishes_nested_vendor_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            library = EPUBLibrary(directory)
+
+            library.create_library_home()
+
+            root = Path(directory)
+            html = (root / 'index.html').read_text(encoding='utf-8')
+            vendor_urls = re.findall(
+                r'/assets/immutable/vendor/[A-Za-z0-9_./-]+\.[0-9a-f]{12}\.[A-Za-z0-9]+',
+                html,
+            )
+            self.assertTrue(vendor_urls)
+            for public_url in vendor_urls:
+                self.assertTrue((root / public_url.lstrip('/')).is_file(), public_url)
+
     def test_generated_library_has_complete_versioned_app_shell(self):
         with tempfile.TemporaryDirectory() as directory:
             library = EPUBLibrary(directory)
@@ -16,7 +32,10 @@ class StaticAssetDeliveryTests(unittest.TestCase):
 
             root = Path(directory)
             html = (root / 'index.html').read_text(encoding='utf-8')
-            asset_urls = re.findall(r'/assets/immutable/[A-Za-z0-9_.-]+', html)
+            asset_urls = re.findall(
+                r'/assets/immutable/[A-Za-z0-9_./-]+\.[0-9a-f]{12}\.[A-Za-z0-9]+',
+                html,
+            )
 
             self.assertTrue(asset_urls)
             self.assertNotIn('?v=', html)
