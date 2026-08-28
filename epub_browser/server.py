@@ -63,12 +63,14 @@ from .processor import (
 )
 from .pdf_delivery import (
     ByteRange,
+    OwnedPDFFileResponse,
+    PDFDeliverySpecification,
+    PDFValidationError,
     RangeNotSatisfiable,
     if_none_match_matches,
     inline_pdf_disposition,
-    iter_file_range,
     parse_single_range,
-    sha256_stream,
+    prepare_pdf_delivery_async,
 )
 from .public_api import (
     PUBLIC_API_CONTEXT_KEY,
@@ -2850,91 +2852,37 @@ window.location.assign(payload.redirect||'/');
         if book is None or book.source_format != PDF_FORMAT:
             return response(error_payload('not_found', 'Not Found'), 404)
 
-        source = Path(book.source_path)
-        try:
-            source_before = source.stat()
-            if (
-                book.source_size is not None
-                and source_before.st_size != book.source_size
-            ) or (
-                book.source_mtime_ns is not None
-                and source_before.st_mtime_ns != book.source_mtime_ns
-            ):
-                raise ValueError('changed source')
-            with source.open('rb') as source_stream:
-                source_opened = os.fstat(source_stream.fileno())
-                source_digest = sha256_stream(source_stream)
-                source_after = os.fstat(source_stream.fileno())
-            if (
-                source_opened.st_dev != source_after.st_dev
-                or source_opened.st_ino != source_after.st_ino
-                or source_opened.st_size != source_after.st_size
-                or source_opened.st_mtime_ns != source_after.st_mtime_ns
-                or (
-                    book.source_size is not None
-                    and source_opened.st_size != book.source_size
-                )
-                or (
-                    book.source_mtime_ns is not None
-                    and source_opened.st_mtime_ns != book.source_mtime_ns
-                )
-                or source_digest != book.source_fingerprint
-            ):
-                raise ValueError('changed source')
-        except (OSError, ValueError):
+        if (
+            not isinstance(book.source_size, int)
+            or isinstance(book.source_size, bool)
+            or not isinstance(book.source_mtime_ns, int)
+            or isinstance(book.source_mtime_ns, bool)
+        ):
             return response(
-                error_payload('source_changed', 'PDF source changed; refresh the library'),
+                error_payload('pdf_cache_stale', 'PDF cache requires refresh'),
                 409,
             )
-
-        pdf_root = Path(base_directory, 'book', book_id, 'pdf')
-        cached_stream = None
+        source = Path(book.source_path)
         try:
-            revision = (pdf_root.parent / PDF_OUTPUT_REVISION_FILE).read_text(
-                encoding='utf-8'
-            ).strip()
-            metadata = json.loads(
-                (pdf_root / 'metadata.json').read_text(encoding='utf-8')
+            validated = await prepare_pdf_delivery_async(
+                PDFDeliverySpecification(
+                    source_path=source,
+                    book_root=Path(base_directory, 'book', book_id),
+                    source_size=book.source_size,
+                    source_mtime_ns=book.source_mtime_ns,
+                    source_digest=book.source_fingerprint,
+                    output_revision=PDF_OUTPUT_REVISION,
+                    metadata_schema_version=PDF_METADATA_SCHEMA_VERSION,
+                )
             )
-            expected_size = metadata['document_size']
-            expected_digest = metadata['document_sha256']
-            if (
-                not isinstance(expected_size, int)
-                or isinstance(expected_size, bool)
-                or expected_size < 0
-                or not isinstance(expected_digest, str)
-                or revision != PDF_OUTPUT_REVISION
-                or metadata.get('schema_version') != PDF_METADATA_SCHEMA_VERSION
-                or expected_digest != book.source_fingerprint
-                or metadata.get('source_format') != PDF_FORMAT
-                or metadata.get('source_sha256') != book.source_fingerprint
-                or metadata.get('source_size') != book.source_size
-                or metadata.get('source_mtime_ns') != book.source_mtime_ns
-                or expected_size != book.source_size
-            ):
-                raise ValueError('invalid PDF cache metadata')
-            cached_stream = (pdf_root / 'document.pdf').open('rb')
-            cached_before = os.fstat(cached_stream.fileno())
-            cached_digest = sha256_stream(cached_stream)
-            cached_after = os.fstat(cached_stream.fileno())
-            if (
-                cached_before.st_dev != cached_after.st_dev
-                or cached_before.st_ino != cached_after.st_ino
-                or cached_before.st_size != cached_after.st_size
-                or cached_before.st_mtime_ns != cached_after.st_mtime_ns
-                or cached_before.st_size != expected_size
-                or cached_digest != expected_digest
-            ):
-                raise ValueError('invalid cached PDF document')
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, ValueError):
-            if cached_stream is not None:
-                cached_stream.close()
+        except PDFValidationError:
             return response(
                 error_payload('pdf_cache_stale', 'PDF cache requires refresh'),
                 409,
             )
 
-        etag = f'"{expected_digest}"'
+        expected_size = validated.size
+        etag = f'"{validated.digest}"'
         headers = {
             'Accept-Ranges': 'bytes',
             'Cache-Control': 'private, no-cache',
@@ -2943,14 +2891,14 @@ window.location.assign(payload.redirect||'/');
             'X-Content-Type-Options': 'nosniff',
         }
         if if_none_match_matches(request.headers.get('if-none-match'), etag):
-            cached_stream.close()
+            validated.close()
             return Response(status_code=304, headers=headers)
         try:
             requested_range = parse_single_range(
                 request.headers.get('range'), expected_size
             )
         except RangeNotSatisfiable:
-            cached_stream.close()
+            validated.close()
             headers.update({
                 'Content-Range': f'bytes */{expected_size}',
                 'Content-Length': '0',
@@ -2965,18 +2913,23 @@ window.location.assign(payload.redirect||'/');
                 f'bytes {selected.start}-{selected.end}/{expected_size}'
             )
         if request.method == 'HEAD' or expected_size == 0:
-            cached_stream.close()
+            validated.close()
             return Response(
                 status_code=status_code,
                 media_type='application/pdf',
                 headers=headers,
             )
-        return StreamingResponse(
-            iter_file_range(cached_stream, selected),
-            status_code=status_code,
-            media_type='application/pdf',
-            headers=headers,
-        )
+        descriptor = validated.detach()
+        try:
+            return OwnedPDFFileResponse(
+                descriptor,
+                selected,
+                status_code=status_code,
+                headers=headers,
+            )
+        except BaseException:
+            os.close(descriptor)
+            raise
 
     async def protected_public_file(request):
         try:

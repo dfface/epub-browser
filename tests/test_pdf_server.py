@@ -1,13 +1,18 @@
+import asyncio
+import hashlib
 import json
 import os
 import re
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from pypdf import PdfWriter
 from starlette.testclient import TestClient
+from starlette.requests import ClientDisconnect
 
 from epub_browser.auth import (
     AuthConfig,
@@ -125,6 +130,38 @@ class PDFDocumentDeliveryTests(unittest.TestCase):
             response.headers["content-length"], str(len(self.original_bytes))
         )
         self.assertEqual(response.headers["accept-ranges"], "bytes")
+
+    def test_head_and_not_modified_close_the_validated_descriptor_immediately(self):
+        from epub_browser import server as server_module
+
+        original = server_module.prepare_pdf_delivery_async
+        descriptors = []
+
+        async def capture(specification):
+            validated = await original(specification)
+            descriptors.append(validated.file_descriptor)
+            return validated
+
+        with mock.patch.object(
+            server_module,
+            "prepare_pdf_delivery_async",
+            side_effect=capture,
+        ):
+            head = self.owner.head(self.url)
+            self.assertEqual(head.status_code, 200)
+            descriptor = descriptors.pop()
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+            etag = self.owner.get(self.url).headers["etag"]
+            descriptor = descriptors.pop()
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+            cached = self.owner.get(self.url, headers={"If-None-Match": etag})
+            self.assertEqual(cached.status_code, 304)
+            descriptor = descriptors.pop()
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
 
     def test_closed_and_open_ended_ranges_are_bounded(self):
         cases = (
@@ -302,6 +339,161 @@ class SingleRangeParserTests(unittest.TestCase):
         with self.assertRaises(RangeNotSatisfiable) as caught:
             parse_single_range("bytes=0-0", 0)
         self.assertEqual(caught.exception.size, 0)
+
+
+class PDFFileSafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.path = self.root / "document.pdf"
+        self.content = b"0123456789" * 10000
+        self.path.write_bytes(self.content)
+        self.digest = hashlib.sha256(self.content).hexdigest()
+
+    def _open(self, path=None):
+        from epub_browser.pdf_delivery import open_validated_pdf_file
+
+        return open_validated_pdf_file(
+            path or self.path,
+            expected_size=len(self.content),
+            expected_digest=self.digest,
+        )
+
+    def test_owned_response_closes_descriptor_when_send_disconnects_or_cancels(self):
+        from epub_browser.pdf_delivery import ByteRange, OwnedPDFFileResponse
+
+        async def receive():
+            await asyncio.sleep(3600)
+
+        for failure in (ClientDisconnect(), asyncio.CancelledError()):
+            with self.subTest(failure=type(failure).__name__):
+                descriptor = self._open()
+                response = OwnedPDFFileResponse(
+                    descriptor,
+                    ByteRange(0, len(self.content) - 1),
+                    status_code=200,
+                    headers={"Content-Length": str(len(self.content))},
+                )
+
+                async def send(message):
+                    if message["type"] == "http.response.body":
+                        raise failure
+
+                with self.assertRaises(type(failure)):
+                    asyncio.run(response(
+                        {
+                            "type": "http",
+                            "asgi": {"version": "3.0", "spec_version": "2.4"},
+                        },
+                        receive,
+                        send,
+                    ))
+                self.assertIsNone(response.file_descriptor)
+                with self.assertRaises(OSError):
+                    os.fstat(descriptor)
+
+    def test_validation_runs_off_the_event_loop(self):
+        from epub_browser import pdf_delivery
+
+        original_hash = pdf_delivery._hash_file_descriptor
+        started = threading.Event()
+
+        def delayed_hash(descriptor, expected_size):
+            started.set()
+            time.sleep(0.15)
+            return original_hash(descriptor, expected_size)
+
+        async def exercise():
+            with mock.patch.object(
+                pdf_delivery,
+                "_hash_file_descriptor",
+                side_effect=delayed_hash,
+            ):
+                task = asyncio.create_task(
+                    pdf_delivery.open_validated_pdf_file_async(
+                        self.path,
+                        expected_size=len(self.content),
+                        expected_digest=self.digest,
+                    )
+                )
+                while not started.is_set():
+                    await asyncio.sleep(0)
+                heartbeats = 0
+                for _ in range(5):
+                    await asyncio.sleep(0.01)
+                    heartbeats += 1
+                self.assertFalse(task.done())
+                descriptor = await task
+                os.close(descriptor)
+                return heartbeats
+
+        self.assertEqual(asyncio.run(exercise()), 5)
+
+    def test_safe_open_rejects_symlink_fifo_device_and_path_swap(self):
+        from epub_browser import pdf_delivery
+
+        symlink = self.root / "symlink.pdf"
+        symlink.symlink_to(self.path)
+        fifo = self.root / "fifo.pdf"
+        os.mkfifo(fifo)
+        for candidate in (symlink, fifo, Path("/dev/null")):
+            if not candidate.exists():
+                continue
+            with self.subTest(candidate=candidate.name):
+                started = time.monotonic()
+                with self.assertRaises(pdf_delivery.PDFValidationError):
+                    self._open(candidate)
+                self.assertLess(time.monotonic() - started, 1.0)
+
+        replacement = self.root / "replacement.pdf"
+        replacement.write_bytes(self.content)
+        original_hash = pdf_delivery._hash_file_descriptor
+
+        def swap_path(descriptor, expected_size):
+            digest = original_hash(descriptor, expected_size)
+            os.replace(replacement, self.path)
+            return digest
+
+        with mock.patch.object(
+            pdf_delivery,
+            "_hash_file_descriptor",
+            side_effect=swap_path,
+        ):
+            with self.assertRaises(pdf_delivery.PDFValidationError):
+                self._open()
+
+    def test_bounded_hash_rejects_early_eof_and_growth(self):
+        from epub_browser import pdf_delivery
+
+        original_hash = pdf_delivery._hash_file_descriptor
+
+        def truncate_before_hash(descriptor, expected_size):
+            self.path.write_bytes(self.content[:-1])
+            return original_hash(descriptor, expected_size)
+
+        with mock.patch.object(
+            pdf_delivery,
+            "_hash_file_descriptor",
+            side_effect=truncate_before_hash,
+        ):
+            with self.assertRaises(pdf_delivery.PDFValidationError):
+                self._open()
+
+        self.path.write_bytes(self.content)
+
+        def grow_before_hash(descriptor, expected_size):
+            with self.path.open("ab") as output:
+                output.write(b"x")
+            return original_hash(descriptor, expected_size)
+
+        with mock.patch.object(
+            pdf_delivery,
+            "_hash_file_descriptor",
+            side_effect=grow_before_hash,
+        ):
+            with self.assertRaises(pdf_delivery.PDFValidationError):
+                self._open()
 
 
 if __name__ == "__main__":
