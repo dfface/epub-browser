@@ -559,6 +559,142 @@
       "supplemental_license_files": []
     },
     {
+      "name": "cytoscape-embedded-cubic-bezier",
+      "version": "3.33.1",
+      "upstream": "https://github.com/cytoscape/cytoscape.js",
+      "copyright": [
+        "Copyright Gaetan Renaudeau"
+      ],
+      "runtime_files": [
+        "mermaid/mermaid.min.js"
+      ],
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/cytoscape/-/cytoscape-3.33.1.tgz"
+      },
+      "archive": {
+        "sha256": "2ef5c37203a0147af105d3cd8e1c25a5158eff638ae9f2425dfe3cd78c4a61fe",
+        "max_bytes": 2097152,
+        "max_expanded_bytes": 33554432
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": [
+          "package/src/core/animation/cubic-bezier.mjs"
+        ]
+      },
+      "files": [
+        {
+          "source": "package/src/core/animation/cubic-bezier.mjs",
+          "target": "licenses/mermaid-components/cytoscape-embedded-cubic-bezier-3.33.1/NOTICE.mjs",
+          "sha256": "ac0c873e3efc9209efdfca1276bce21ad9d42bff4d81fa0834c698c60b2ed939"
+        }
+      ],
+      "supplemental_license_files": []
+    },
+    {
+      "name": "cytoscape-embedded-jquery-events",
+      "version": "3.33.1",
+      "upstream": "https://github.com/cytoscape/cytoscape.js",
+      "copyright": [
+        "Event object based on jQuery events"
+      ],
+      "runtime_files": [
+        "mermaid/mermaid.min.js"
+      ],
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/cytoscape/-/cytoscape-3.33.1.tgz"
+      },
+      "archive": {
+        "sha256": "2ef5c37203a0147af105d3cd8e1c25a5158eff638ae9f2425dfe3cd78c4a61fe",
+        "max_bytes": 2097152,
+        "max_expanded_bytes": 33554432
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": [
+          "package/src/event.mjs"
+        ]
+      },
+      "files": [
+        {
+          "source": "package/src/event.mjs",
+          "target": "licenses/mermaid-components/cytoscape-embedded-jquery-events-3.33.1/NOTICE.mjs",
+          "sha256": "5cb8280758bf91767096f0b711ae2eb3e42cbce72107196be30d6d1a28ded015"
+        }
+      ],
+      "supplemental_license_files": []
+    },
+    {
+      "name": "cytoscape-embedded-spring-rk4",
+      "version": "3.33.1",
+      "upstream": "https://github.com/cytoscape/cytoscape.js",
+      "copyright": [
+        "Adapted from Framer.js, copyright Koen Bok"
+      ],
+      "runtime_files": [
+        "mermaid/mermaid.min.js"
+      ],
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/cytoscape/-/cytoscape-3.33.1.tgz"
+      },
+      "archive": {
+        "sha256": "2ef5c37203a0147af105d3cd8e1c25a5158eff638ae9f2425dfe3cd78c4a61fe",
+        "max_bytes": 2097152,
+        "max_expanded_bytes": 33554432
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": [
+          "package/src/core/animation/spring.mjs"
+        ]
+      },
+      "files": [
+        {
+          "source": "package/src/core/animation/spring.mjs",
+          "target": "licenses/mermaid-components/cytoscape-embedded-spring-rk4-3.33.1/NOTICE.mjs",
+          "sha256": "a44025d0fbdc257abd02beb46a8e3dd427dc6ba3a81804a4966f115bfb7fe103"
+        }
+      ],
+      "supplemental_license_files": []
+    },
+    {
+      "name": "cytoscape-embedded-thenable",
+      "version": "1.0.7",
+      "upstream": "https://github.com/cytoscape/cytoscape.js",
+      "copyright": [
+        "Copyright (c) 2013-2014 Ralf S. Engelschall (http://engelschall.com)"
+      ],
+      "runtime_files": [
+        "mermaid/mermaid.min.js"
+      ],
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/cytoscape/-/cytoscape-3.33.1.tgz"
+      },
+      "archive": {
+        "sha256": "2ef5c37203a0147af105d3cd8e1c25a5158eff638ae9f2425dfe3cd78c4a61fe",
+        "max_bytes": 2097152,
+        "max_expanded_bytes": 33554432
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": [
+          "package/src/promise.mjs"
+        ]
+      },
+      "files": [
+        {
+          "source": "package/src/promise.mjs",
+          "target": "licenses/mermaid-components/cytoscape-embedded-thenable-1.0.7/NOTICE.mjs",
+          "sha256": "f12e7bfaa4eeadff9545f48668593c9e8dc1e03403b980dc8e26720d0bbdf868"
+        }
+      ],
+      "supplemental_license_files": []
+    },
+    {
       "name": "cytoscape-fcose",
       "version": "2.2.0",
       "upstream": "https://github.com/iVis-at-Bilkent/cytoscape.js-fcose",
@@ -1791,6 +1927,9 @@
       "version": "7.0.11",
       "upstream": "https://github.com/tbo47/dagre-es",
       "copyright": [
+        "Original dagre-d3 copyright: Copyright (c) 2013 Chris Pettitt",
+        "Original dagre copyright: Copyright (c) 2012-2014 Chris Pettitt",
+        "Original graphlib copyright: Copyright (c) 2012-2014 Chris Pettitt",
         "Copyright (c) 2022-2024 Thibaut Lassalle, David Newell, Alois Klink, Sidharth Vinod and dagre-es contributors"
       ],
       "runtime_files": [
@@ -1859,7 +1998,8 @@
       "version": "3.2.6",
       "upstream": "https://github.com/cure53/DOMPurify",
       "copyright": [
-        "Copyright 2025 Dr.-Ing. Mario Heiderich, Cure53"
+        "Copyright 2025 Dr.-Ing. Mario Heiderich, Cure53",
+        "(c) Cure53 and other contributors"
       ],
       "runtime_files": [
         "mermaid/mermaid.min.js"
@@ -2441,7 +2581,9 @@
       "version": "4.17.21",
       "upstream": "https://lodash.com/custom-builds",
       "copyright": [
-        "Copyright OpenJS Foundation and other contributors <https://openjsf.org/>"
+        "Copyright OpenJS Foundation and other contributors <https://openjsf.org/>",
+        "Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>",
+        "Based on Underscore.js, copyright Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors <http://underscorejs.org/>"
       ],
       "runtime_files": [
         "mermaid/mermaid.min.js"

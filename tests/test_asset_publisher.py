@@ -113,6 +113,10 @@ class AssetPublisherTests(unittest.TestCase):
             ("cose-base", "2.2.0"),
             ("cytoscape", "3.33.1"),
             ("cytoscape-cose-bilkent", "4.1.0"),
+            ("cytoscape-embedded-cubic-bezier", "3.33.1"),
+            ("cytoscape-embedded-jquery-events", "3.33.1"),
+            ("cytoscape-embedded-spring-rk4", "3.33.1"),
+            ("cytoscape-embedded-thenable", "1.0.7"),
             ("cytoscape-fcose", "2.2.0"),
             ("d3", "7.9.0"),
             ("d3-array", "2.12.1"),
@@ -206,6 +210,119 @@ class AssetPublisherTests(unittest.TestCase):
                 ("webpack", "5.109.0"),
             },
         )
+
+    def test_mermaid_bundle_explicit_attributions_have_locked_notice_rows(self):
+        """Dropping a bundle attribution or folding it into Cytoscape must fail release audit."""
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        fixture = json.loads(
+            Path("tests/fixtures/mermaid_explicit_attributions.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        bundle = Path(
+            "epub_browser/assets/vendor/mermaid/mermaid.min.js"
+        ).read_text(encoding="utf-8")
+        license_block = bundle[bundle.index("/*! Bundled license information:") :]
+        extracted = set()
+        for raw_line in license_block.splitlines():
+            line = raw_line.strip()
+            if line.startswith("(*!"):
+                line = line[3:]
+            if line.endswith("*)"):
+                line = line[:-2]
+            line = line.strip().removeprefix("*").strip()
+            if re.search(
+                r"copyright|\(c\)|^Based on |^Event object based on ",
+                line,
+                flags=re.IGNORECASE,
+            ):
+                extracted.add(line)
+
+        self.assertEqual(
+            extracted,
+            {item["bundle_notice"] for item in fixture},
+            "the evidence fixture must enumerate every explicit bundle attribution",
+        )
+        packages = {
+            (package["name"], package["version"]): package
+            for package in lock["packages"]
+        }
+        vendor_root = Path("epub_browser/assets/vendor")
+        for item in fixture:
+            identity = tuple(item["identity"])
+            with self.subTest(bundle_notice=item["bundle_notice"]):
+                package = packages.get(identity)
+                self.assertIsNotNone(
+                    package, "missing locked attribution row: {}@{}".format(*identity)
+                )
+                self.assertIn(
+                    item["lock_marker"], "\n".join(package["copyright"])
+                )
+                locked_targets = {
+                    entry["target"]
+                    for entry in (
+                        package["files"]
+                        + package.get("supplemental_license_files", [])
+                    )
+                }
+                self.assertIn(item["notice_path"], locked_targets)
+                notice = " ".join(
+                    (vendor_root / item["notice_path"])
+                    .read_text(encoding="utf-8")
+                    .split()
+                )
+                self.assertIn(item["notice_marker"], notice)
+
+    def test_mermaid_installed_license_copyrights_are_exhaustive_in_lock(self):
+        """Every concrete copyright preamble in an installed license stays releasable."""
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        vendor_root = Path("epub_browser/assets/vendor")
+        for package in lock["packages"]:
+            if "mermaid/mermaid.min.js" not in package["runtime_files"]:
+                continue
+            source_to_target = {
+                item["source"]: item["target"] for item in package["files"]
+            }
+            notice_paths = [
+                source_to_target[source] for source in package["license"]["files"]
+            ] + [
+                item["target"]
+                for item in package.get("supplemental_license_files", [])
+            ]
+            recorded = " ".join(" ".join(package["copyright"]).split())
+            for notice_path in notice_paths:
+                lines = (vendor_root / notice_path).read_text(
+                    encoding="utf-8"
+                ).splitlines()
+                attributions = []
+                index = 0
+                while index < len(lines):
+                    line = " ".join(lines[index].strip().split())
+                    if line.startswith("Original ") and "copyright:" in line:
+                        attributions.append(line)
+                    elif line.startswith("Copyright ") and not line.startswith(
+                        ("Copyright [yyyy]", "Copyright and related rights")
+                    ):
+                        attributions.append(line)
+                    elif line.startswith("Based on ") and "copyright" in line:
+                        parts = [line]
+                        while index + 1 < len(lines) and lines[index + 1].strip():
+                            index += 1
+                            parts.append(" ".join(lines[index].strip().split()))
+                        attributions.append(" ".join(parts))
+                    index += 1
+
+                for attribution in attributions:
+                    with self.subTest(
+                        package=(package["name"], package["version"]),
+                        notice=notice_path,
+                        attribution=attribution,
+                    ):
+                        self.assertIn(attribution, recorded)
 
     def test_third_party_notices_cover_every_locked_package_and_component(self):
         lock = json.loads(
