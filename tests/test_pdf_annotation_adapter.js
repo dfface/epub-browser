@@ -27,8 +27,10 @@ class Element {
   getContext() { return {}; }
   querySelectorAll(selector) {
     const matches = [];
+    const className = selector.startsWith('.') ? selector.slice(1) : '';
     const visit = node => {
       if (selector === '[data-pdf-page-number]' && node.hasAttribute('data-pdf-page-number')) matches.push(node);
+      if (className && node.className.split(/\s+/).includes(className)) matches.push(node);
       node.children.forEach(visit);
     };
     this.children.forEach(visit);
@@ -101,6 +103,15 @@ function pdfAnnotationHarness({ pageNumber = 3 } = {}) {
     renderTextLayer() { return adapter.renderWithin(root); },
   };
 }
+
+test('the PDF adapter DOM harness detects a PDF-specific selection menu fixture', () => {
+  const harness = pdfAnnotationHarness();
+  const forbiddenMenu = harness.document.createElement('div');
+  forbiddenMenu.className = 'pdf-selection-menu';
+  harness.page.appendChild(forbiddenMenu);
+
+  assert.equal(harness.root.querySelectorAll('.pdf-selection-menu').length, 1);
+});
 
 test('PDF text layer announces the normal chapter root and canonical annotation index once', async () => {
   const harness = pdfAnnotationHarness({ pageNumber: 3 });
