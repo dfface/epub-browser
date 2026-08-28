@@ -1016,7 +1016,7 @@ function initScript() {
         wrapAllElements('img', 'div', content);
         prepareChapterCodeBlocks(content);
         if (!isKindleMode() && typeof hljs !== 'undefined') hljs.highlightAll();
-        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img:not([data-fancybox])', {});
+        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
         generateToc();
         updateTocHighlight();
         setBookTocActiveChapter(target.index, true);
@@ -2522,7 +2522,7 @@ function initScript() {
                     
                     // 对新增内容重新绑定 Fancybox
                     if (typeof Fancybox !== 'undefined') {
-                        Fancybox.bind('#eb-content img:not([data-fancybox])', {});
+                        Fancybox.bind('#eb-content img', {});
                     }
                 }
             }
