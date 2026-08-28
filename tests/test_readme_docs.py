@@ -28,7 +28,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 "GLightbox dependency",
                 "Fancyapps/Fancybox is not a runtime",
             ),
-            Path("README.zh-CN.md"): (
+            Path("docs/readme/README.zh-CN.md"): (
                 "| PDF 概念 | SSG | Server |",
                 "第 N 页 URL",
                 "chapter_{N-1}.html",

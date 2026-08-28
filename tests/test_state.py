@@ -117,11 +117,51 @@ class StateStoreTests(unittest.TestCase):
             Path(self.temporary.name, "document.pdf"),
             None,
             "pdf-digest",
-            {"title": "Document"},
+            {"title": "Document", "authors": ["PDF Author"]},
             source_format="pdf",
         )
 
         self.assertEqual(record.source_format, "pdf")
+        self.assertEqual(
+            self.store.get_admin_book_detail(record.book_id)["format"],
+            "pdf",
+        )
+        self.assertEqual(
+            next(
+                item
+                for item in self.store.list_admin_book_summaries()
+                if item["id"] == record.book_id
+            )["format"],
+            "pdf",
+        )
+
+    def test_pdf_metadata_and_tag_updates_emit_pdf_webhook_format(self):
+        record = self.store.resolve_book(
+            Path(self.temporary.name, "managed.pdf"),
+            None,
+            "managed-pdf-digest",
+            {"title": "Original PDF", "tags": []},
+            source_format="pdf",
+        )
+        tag = self.store.create_ai_tag("PDF tag")
+
+        self.store.update_admin_book_settings(
+            record.book_id,
+            title="Curated PDF",
+            authors=["Curator"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[tag["id"]],
+            profile="auto",
+        )
+        self.store.rename_ai_tag(tag["id"], "Renamed PDF tag")
+
+        events = self.store.list_webhook_events(event_type="book.updated")
+        self.assertEqual(len(events), 2)
+        self.assertTrue(all(
+            event["data"] == {"book_id": record.book_id, "format": "pdf"}
+            for event in events
+        ))
 
     def test_heartbeat_is_idempotent_and_changes_chapter_session(self):
         self._reading_book()
