@@ -2585,6 +2585,8 @@ document.addEventListener('DOMContentLoaded', function() {{
         pdf_config_script = ""
         pdf_stylesheet = ""
         pdf_chapter_script = ""
+        pdf_reader_controls = ""
+        pdf_search_drawer = ""
         if pdf_page is not None:
             page_number = int(pdf_page["page_number"])
             total_pages = len(self.chapters)
@@ -2637,6 +2639,30 @@ document.addEventListener('DOMContentLoaded', function() {{
                 + self.asset_manifest.url_for("pdf-chapter.js")
                 + '" defer></script>'
             )
+            pdf_reader_controls = '''
+            <span class="pdf-chapter-actions" data-pdf-actions>
+                <button class="control-btn" id="pdfSearchToggle" type="button" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-controls="pdfSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.search">Search PDF</span></button>
+                <button class="control-btn" id="pdfZoomOut" type="button" aria-label="Zoom out" data-i18n-aria-label="pdf.zoomOut"><i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.zoomOut">Zoom out</span></button>
+                <button class="control-btn" id="pdfZoomIn" type="button" aria-label="Zoom in" data-i18n-aria-label="pdf.zoomIn"><i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.zoomIn">Zoom in</span></button>
+                <button class="control-btn" id="pdfFitWidth" type="button" aria-label="Fit width" data-i18n-aria-label="pdf.fitWidth"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitWidth">Fit width</span></button>
+                <button class="control-btn" id="pdfFitPage" type="button" aria-label="Fit page" data-i18n-aria-label="pdf.fitPage"><i class="fas fa-maximize" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitPage">Fit page</span></button>
+                <button class="control-btn" id="pdfRotate" type="button" aria-label="Rotate page" data-i18n-aria-label="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.rotate">Rotate page</span></button>
+                <button class="control-btn" id="pdfPrint" type="button" aria-label="Print PDF" data-i18n-aria-label="pdf.print"><i class="fas fa-print" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.print">Print PDF</span></button>
+                <button class="control-btn" id="pdfDownload" type="button" aria-label="Download PDF" data-i18n-aria-label="pdf.download"><i class="fas fa-download" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.download">Download PDF</span></button>
+            </span>'''
+            pdf_search_drawer = '''
+    <nav class="toc-floating reader-drawer pdf-search-drawer" id="pdfSearchDrawer" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="pdf.search">Search PDF</h3>
+            <button class="toc-close" id="pdfSearchClose" type="button" aria-label="Close PDF search" data-i18n-aria-label="pdf.closeSearch"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
+        <form class="pdf-search-form" id="pdfSearchForm" role="search">
+            <label class="visually-hidden" for="pdfSearchInput" data-i18n="pdf.search">Search PDF</label>
+            <input id="pdfSearchInput" type="search" autocomplete="off" placeholder="Search PDF" data-i18n-placeholder="pdf.searchPlaceholder">
+            <button class="control-btn" type="submit" aria-label="Search PDF" data-i18n-aria-label="pdf.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
+        </form>
+        <ul class="toc-list pdf-search-results" id="pdfSearchResults" aria-live="polite"></ul>
+    </nav>'''
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -2888,6 +2914,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <!-- 动态生成的目录将放在这里 -->
         </ul>
     </nav>
+    {pdf_search_drawer}
 
     <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
 
@@ -2912,6 +2939,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
             <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            {pdf_reader_controls}
             {ai_chapter_button}
             {ai_followup_button}
         </div>

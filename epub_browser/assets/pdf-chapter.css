@@ -67,8 +67,102 @@
     margin-block: 1rem;
 }
 
+/* The optional PDF actions deliberately inherit the shared reader rail. */
+.pdf-chapter-actions {
+    display: contents;
+}
+
+.pdf-search-form {
+    display: flex;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.pdf-search-form input {
+    min-width: 0;
+    min-height: 44px;
+    flex: 1;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg, var(--card-bg));
+    color: var(--text);
+    font: inherit;
+}
+
+.pdf-search-form input:focus-visible {
+    outline: 3px solid var(--reader-action, var(--button-bg));
+    outline-offset: 2px;
+}
+
+.pdf-search-form .control-btn {
+    display: inline-grid;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--reader-action, var(--button-bg));
+    cursor: pointer;
+    font: inherit;
+}
+
+.pdf-search-form .control-btn:hover {
+    background: var(--hover);
+}
+
+.pdf-search-form .control-btn:focus-visible {
+    outline: 3px solid var(--reader-action, var(--button-bg));
+    outline-offset: 2px;
+}
+
+.pdf-search-results li {
+    margin: 2px 0;
+    color: var(--text-secondary);
+}
+
+.pdf-search-results a {
+    display: block;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    text-decoration: none;
+}
+
+.pdf-search-results a:hover,
+.pdf-search-results a:focus-visible {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.pdf-search-results a:focus-visible {
+    outline: 3px solid var(--reader-action, var(--button-bg));
+    outline-offset: 2px;
+}
+
+.pdf-search-form .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
 @media (forced-colors: active) {
     .pdf-page-content .pdf-page-text-layer ::selection {
         background: Highlight;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pdf-search-drawer,
+    .pdf-search-form .control-btn {
+        transition: none;
     }
 }

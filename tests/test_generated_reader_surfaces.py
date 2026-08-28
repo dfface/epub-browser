@@ -167,6 +167,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'<script src="/assets/immutable/pdf-chapter\.[0-9a-f]{12}\.js" defer></script>',
             )
             self.assertNotIn('pdf-chapter.', epub_html)
+            self.assertIn('id="pdfSearchToggle"', pdf_html)
+            self.assertIn('id="pdfSearchDrawer"', pdf_html)
+            self.assertIn('class="toc-floating reader-drawer pdf-search-drawer"', pdf_html)
+            self.assertNotIn('id="pdfSearchToggle"', epub_html)
+            self.assertNotIn('id="pdfSearchDrawer"', epub_html)
             self.assertNotIn('cdn.', pdf_html)
             for duplicate_ui in (
                 'pdf-reader', 'pdf-settings', 'pdf-selection-menu',

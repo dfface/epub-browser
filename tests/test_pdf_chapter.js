@@ -65,6 +65,12 @@ function createHarness(options = {}) {
   const importUrls = [];
   let cancelCount = 0;
   let textCancelCount = 0;
+  const storageValues = new Map();
+  const storage = {
+    getItem(key) { return storageValues.has(key) ? storageValues.get(key) : null; },
+    setItem(key, value) { storageValues.set(key, String(value)); },
+    removeItem(key) { storageValues.delete(key); },
+  };
 
   const document = new Element('document');
   document.baseURI = 'https://reader.example/book/demo/chapter_0.html';
@@ -115,7 +121,11 @@ function createHarness(options = {}) {
               return renderTask;
             },
             getTextContent() {
-              return Promise.resolve({ items: [{ str: `Page ${pageNumber}` }], styles: {}, lang: 'en' });
+              const pageTexts = options.pageTexts || [];
+              return Promise.resolve({
+                items: [{ str: pageTexts[pageNumber - 1] || `Page ${pageNumber}` }],
+                styles: {}, lang: 'en'
+              });
             },
           };
         },
@@ -156,6 +166,7 @@ function createHarness(options = {}) {
       disconnect() { this.disconnected = true; }
       fire() { this.callback([{ target: this.node }]); }
     },
+    localStorage: storage,
   };
   if (options.lazy) {
     window.IntersectionObserver = class {
@@ -182,7 +193,7 @@ function createHarness(options = {}) {
 
   return {
     adapter, document, window, pdfjs, page, renderCalls, getDocumentCalls,
-    loadingTasks, resizeObservers, intersectionObservers, importUrls,
+    loadingTasks, resizeObservers, intersectionObservers, importUrls, storage,
     get cancelCount() { return cancelCount; },
     get textCancelCount() { return textCancelCount; },
     async flush() {
@@ -190,6 +201,24 @@ function createHarness(options = {}) {
     },
   };
 }
+
+test('search resolves results to canonical PDF chapter URLs', async () => {
+  const harness = createHarness({ pageTexts: ['alpha', 'beta alpha'] });
+
+  const results = await harness.adapter.search('alpha');
+
+  assert.deepEqual(results.map((item) => item.href), ['chapter_0.html', 'chapter_1.html']);
+});
+
+test('rotation and fit preferences do not mutate reading mode keys', async () => {
+  const harness = createHarness({ pages: 1 });
+
+  await harness.adapter.rotate();
+  await harness.adapter.fitWidth();
+
+  assert.equal(harness.storage.getItem('turning'), null);
+  assert.equal(harness.storage.getItem('continuousScroll'), null);
+});
 
 test('loads one local PDF.js document with its paired worker and disabled optional fetch paths', async () => {
   const harness = createHarness();
