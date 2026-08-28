@@ -474,6 +474,28 @@ Read the first logged migration or validation error, preserve the data and sourc
 
 Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the exact command, browser/device, reproduction steps, relevant logs, and the EPUB when it can be shared legally.
 
+### Development from a source checkout
+
+Third-party browser files are generated build inputs, not project source, so
+`epub_browser/assets/vendor/` is intentionally absent from Git. Hydrate the
+exact locked versions explicitly before developing or building, then verify
+them offline:
+
+```bash
+python3 tools/sync_vendor_assets.py fetch
+python3 tools/sync_vendor_assets.py verify
+python3 -m unittest tests.test_vendor_assets -v
+python3 -m build
+```
+
+`fetch` is the only command above that accesses upstream package servers. The
+lock records immutable npm tarballs, file digests, allowlists, and licenses;
+`verify`, tests, builds from a hydrated checkout, and the installed reader do
+not download browser assets. Wheels, source distributions, Docker images, and
+generated SSG sites contain the verified files and have no runtime CDN
+dependency. See [third_party/README.md](third_party/README.md) for the update,
+release, and repository-hygiene workflow.
+
 ## License
 
 [MIT](License.txt)
