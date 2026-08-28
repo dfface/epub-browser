@@ -342,44 +342,84 @@ class OwnedPDFFileResponse(Response):
             media_type=self.media_type,
         )
 
+    async def _stream_response(self, descriptor: int, send) -> None:
+        await send({
+            "type": "http.response.start",
+            "status": self.status_code,
+            "headers": self.raw_headers,
+        })
+        offset = self.byte_range.start
+        remaining = self.byte_range.length
+        while remaining:
+            requested = min(_STREAM_CHUNK_SIZE, remaining)
+            chunk = await anyio.to_thread.run_sync(
+                _read_descriptor_chunk,
+                descriptor,
+                offset,
+                requested,
+            )
+            if len(chunk) != requested:
+                raise OSError("Validated PDF ended during delivery")
+            remaining -= len(chunk)
+            offset += len(chunk)
+            await send({
+                "type": "http.response.body",
+                "body": chunk,
+                "more_body": remaining > 0,
+            })
+        if self.byte_range.length == 0:
+            await send({
+                "type": "http.response.body",
+                "body": b"",
+                "more_body": False,
+            })
+
+    @staticmethod
+    async def _listen_for_disconnect(receive) -> None:
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+
+    async def _stream_until_disconnect(self, descriptor, receive, send) -> None:
+        async with anyio.create_task_group() as task_group:
+            async def run_and_cancel(operation, *args):
+                try:
+                    await operation(*args)
+                finally:
+                    task_group.cancel_scope.cancel()
+
+            task_group.start_soon(
+                run_and_cancel,
+                self._stream_response,
+                descriptor,
+                send,
+            )
+            task_group.start_soon(
+                run_and_cancel,
+                self._listen_for_disconnect,
+                receive,
+            )
+
     async def __call__(self, scope, receive, send) -> None:
         descriptor = self.file_descriptor
         self.file_descriptor = None
         if descriptor is None:
             raise RuntimeError("PDF response was already consumed")
         try:
-            await send({
-                "type": "http.response.start",
-                "status": self.status_code,
-                "headers": self.raw_headers,
-            })
-            offset = self.byte_range.start
-            remaining = self.byte_range.length
-            while remaining:
-                requested = min(_STREAM_CHUNK_SIZE, remaining)
-                chunk = await anyio.to_thread.run_sync(
-                    _read_descriptor_chunk,
-                    descriptor,
-                    offset,
-                    requested,
+            spec_version = tuple(
+                map(
+                    int,
+                    scope.get("asgi", {}).get("spec_version", "2.0").split("."),
                 )
-                if len(chunk) != requested:
-                    raise OSError("Validated PDF ended during delivery")
-                remaining -= len(chunk)
-                offset += len(chunk)
-                await send({
-                    "type": "http.response.body",
-                    "body": chunk,
-                    "more_body": remaining > 0,
-                })
-            if self.byte_range.length == 0:
-                await send({
-                    "type": "http.response.body",
-                    "body": b"",
-                    "more_body": False,
-                })
-        except OSError as error:
-            raise ClientDisconnect() from error
+            )
+            if spec_version >= (2, 4):
+                try:
+                    await self._stream_response(descriptor, send)
+                except OSError as error:
+                    raise ClientDisconnect() from error
+            else:
+                await self._stream_until_disconnect(descriptor, receive, send)
         finally:
             try:
                 os.close(descriptor)

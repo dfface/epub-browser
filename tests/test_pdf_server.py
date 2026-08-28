@@ -393,6 +393,157 @@ class PDFFileSafetyTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     os.fstat(descriptor)
 
+    def test_asgi_23_immediate_disconnect_stops_streaming_and_closes_descriptor(self):
+        from epub_browser import pdf_delivery
+
+        descriptor = self._open()
+        response = pdf_delivery.OwnedPDFFileResponse(
+            descriptor,
+            pdf_delivery.ByteRange(0, len(self.content) - 1),
+            status_code=200,
+            headers={"Content-Length": str(len(self.content))},
+        )
+        reads = []
+        original_read = pdf_delivery._read_descriptor_chunk
+
+        def counted_read(*args):
+            reads.append(args[2])
+            return original_read(*args)
+
+        async def exercise():
+            async def receive():
+                return {"type": "http.disconnect"}
+
+            async def send(_message):
+                await asyncio.sleep(0)
+
+            with mock.patch.object(
+                pdf_delivery,
+                "_read_descriptor_chunk",
+                side_effect=counted_read,
+            ):
+                await response(
+                    {
+                        "type": "http",
+                        "asgi": {"version": "3.0", "spec_version": "2.3"},
+                    },
+                    receive,
+                    send,
+                )
+            await asyncio.sleep(0)
+            current = asyncio.current_task()
+            return [
+                task
+                for task in asyncio.all_tasks()
+                if task is not current
+                and "OwnedPDFFileResponse" in repr(task.get_coro())
+            ]
+
+        self.assertEqual(asyncio.run(exercise()), [])
+        self.assertLessEqual(len(reads), 1)
+        self.assertIsNone(response.file_descriptor)
+        with self.assertRaises(OSError):
+            os.fstat(descriptor)
+
+    def test_asgi_23_midstream_disconnect_cancels_further_file_reads(self):
+        from epub_browser import pdf_delivery
+
+        content = b"x" * (64 * 1024 * 16)
+        self.path.write_bytes(content)
+        descriptor = pdf_delivery.open_validated_pdf_file(
+            self.path,
+            expected_size=len(content),
+            expected_digest=hashlib.sha256(content).hexdigest(),
+        )
+        response = pdf_delivery.OwnedPDFFileResponse(
+            descriptor,
+            pdf_delivery.ByteRange(0, len(content) - 1),
+            status_code=200,
+            headers={"Content-Length": str(len(content))},
+        )
+        reads = []
+        sent = bytearray()
+        original_read = pdf_delivery._read_descriptor_chunk
+
+        def counted_read(*args):
+            reads.append(args[2])
+            return original_read(*args)
+
+        async def exercise():
+            disconnect = asyncio.Event()
+
+            async def receive():
+                await disconnect.wait()
+                return {"type": "http.disconnect"}
+
+            async def send(message):
+                if message["type"] == "http.response.body" and message["body"]:
+                    sent.extend(message["body"])
+                    disconnect.set()
+                    await asyncio.sleep(0)
+
+            with mock.patch.object(
+                pdf_delivery,
+                "_read_descriptor_chunk",
+                side_effect=counted_read,
+            ):
+                await response(
+                    {
+                        "type": "http",
+                        "asgi": {"version": "3.0", "spec_version": "2.3"},
+                    },
+                    receive,
+                    send,
+                )
+            await asyncio.sleep(0)
+
+        asyncio.run(exercise())
+        self.assertLess(len(sent), len(content))
+        self.assertLessEqual(len(reads), 2)
+        self.assertIsNone(response.file_descriptor)
+        with self.assertRaises(OSError):
+            os.fstat(descriptor)
+
+    def test_asgi_23_normal_stream_completes_and_cancels_disconnect_listener(self):
+        from epub_browser import pdf_delivery
+
+        descriptor = self._open()
+        response = pdf_delivery.OwnedPDFFileResponse(
+            descriptor,
+            pdf_delivery.ByteRange(0, len(self.content) - 1),
+            status_code=200,
+            headers={"Content-Length": str(len(self.content))},
+        )
+        sent = bytearray()
+        listener_finished = []
+
+        async def exercise():
+            async def receive():
+                try:
+                    await asyncio.sleep(3600)
+                finally:
+                    listener_finished.append(True)
+
+            async def send(message):
+                if message["type"] == "http.response.body":
+                    sent.extend(message["body"])
+
+            await response(
+                {
+                    "type": "http",
+                    "asgi": {"version": "3.0", "spec_version": "2.3"},
+                },
+                receive,
+                send,
+            )
+
+        asyncio.run(exercise())
+        self.assertEqual(bytes(sent), self.content)
+        self.assertEqual(listener_finished, [True])
+        self.assertIsNone(response.file_descriptor)
+        with self.assertRaises(OSError):
+            os.fstat(descriptor)
+
     def test_validation_runs_off_the_event_loop(self):
         from epub_browser import pdf_delivery
 
