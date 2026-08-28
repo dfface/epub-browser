@@ -58,7 +58,9 @@
         (resolved.protocol === 'http:' || resolved.protocol === 'https:') &&
         resolved.origin === page.origin
       ) || (
-        resolved.protocol === 'file:' && page.protocol === 'file:'
+        resolved.protocol === 'file:' &&
+        page.protocol === 'file:' &&
+        resolved.host === page.host
       );
       if (!protocolAllowed) return '';
 

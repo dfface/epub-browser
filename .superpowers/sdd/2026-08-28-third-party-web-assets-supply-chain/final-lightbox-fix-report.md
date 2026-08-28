@@ -40,7 +40,9 @@ semantics or the Server content-cache schema.
 - Accepts only sanitizer-compatible base64 raster image data URLs or resolved
   HTTP(S)/`file:` URLs under the exact generated page-directory segments and
   its literal `resources` child. Cross-origin and same-origin outside-book
-  sources are not rebound or reloaded.
+  sources are not rebound or reloaded. For `file:` pages, the resolved image
+  host must exactly equal the generated page host, preventing remote file/UNC
+  authorities from passing path-only containment.
 - Rejects raw or repeatedly decoded slash, backslash, dot-segment, malformed
   percent-encoding, excessive decoding, and duplicate-separator aliases before
   URL resolution. Containment compares path segments rather than string
@@ -86,6 +88,10 @@ The assertions prove that:
   the raw generated resource URL;
 - cross-origin, outside-book, `%2F`, `%5C`, `%2E` dot-segment,
   double-encoded, and duplicate-separator aliases are excluded;
+- local relative and absolute `file:` resources remain accepted, remote file
+  authorities are excluded, invalid credential/port file forms fail closed,
+  and the test records the platform parser's canonical empty-host treatment
+  of `file://localhost`;
 - clicks open the correct explicit index;
 - duplicate binds do not stack handlers;
 - AJAX/continuous rebinding removes stale handlers and updates indexes without
@@ -152,13 +158,17 @@ Observed RED stages before their corresponding production changes:
 11. The first real Chromium close-time run timed out opening the appended
     image, exposing the narrow click-before-deferred-index-update race; the
     focused queued-image test failed before the adapter correction.
+12. The file-page constructor assertion showed
+    `file://evil.invalid/local/book/resources/remote.png` entering the exact
+    GLightbox `elements` array before the file-host equality check.
 
 Each failure was followed by the smallest production change and a green
 focused rerun before proceeding.
 
 ## Final verification
 
-All commands were run after the final source-policy change:
+The complete suite was run after the preceding lifecycle and source-policy
+hardening:
 
 ```text
 node --test tests/*.js
@@ -173,6 +183,24 @@ python3 tools/sync_vendor_assets.py verify
 node --check epub_browser/assets/lightbox-adapter.js
 node --check epub_browser/assets/chapter.js
 node --check tests/test_lightbox_browser.js
+git diff --check
+# all exit 0
+```
+
+After the final exact file-host correction, the focused adapter regression,
+actual locked-bundle Chromium harness, syntax check, vendor verification, and
+diff check were rerun:
+
+```text
+node tests/test_lightbox_adapter.js
+# lightbox adapter tests passed; exit 0
+
+node --test tests/test_lightbox_browser.js
+# 1 passed, 0 failed; exit 0
+
+node --check epub_browser/assets/lightbox-adapter.js
+node --check tests/test_lightbox_adapter.js
+python3 tools/sync_vendor_assets.py verify
 git diff --check
 # all exit 0
 ```

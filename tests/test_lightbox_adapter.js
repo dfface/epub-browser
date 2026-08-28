@@ -369,4 +369,86 @@ assert.strictEqual(firstInstance.destroyedWhileOpen, false);
 assert.strictEqual(constructorCalls.length, 2, 'binding after destroy must create a fresh instance');
 assert.strictEqual(second.listenerCount('click'), 1);
 
+const fileRelative = createImage('', '', {}, 'resources/relative.png');
+const fileAbsolute = createImage(
+  '',
+  '',
+  {},
+  'file:///local/book/resources/absolute.png'
+);
+const fileRemoteAuthority = createImage(
+  '',
+  '',
+  {},
+  'file://evil.invalid/local/book/resources/remote.png'
+);
+const fileLocalhostAuthority = createImage(
+  '',
+  '',
+  {},
+  'file://localhost/local/book/resources/localhost.png'
+);
+const fileCredentialAuthority = createImage(
+  '',
+  '',
+  {},
+  'file://user:pass@evil.invalid/local/book/resources/credentials.png'
+);
+const filePortAuthority = createImage(
+  '',
+  '',
+  {},
+  'file://evil.invalid:8123/local/book/resources/port.png'
+);
+const fileImages = [
+  fileRelative,
+  fileAbsolute,
+  fileRemoteAuthority,
+  fileLocalhostAuthority,
+  fileCredentialAuthority,
+  filePortAuthority,
+];
+const fileConstructorCalls = [];
+const fileContext = {
+  URL,
+  setTimeout(callback) {
+    callback();
+  },
+  location: { href: 'file:///local/book/chapter_0.html' },
+  document: {
+    querySelectorAll() {
+      return fileImages;
+    },
+    querySelector() {
+      return null;
+    },
+  },
+  GLightbox(options) {
+    fileConstructorCalls.push(options);
+    return {
+      destroy() {},
+      on() {},
+      openAt() {},
+      setElements() {},
+    };
+  },
+};
+fileContext.globalThis = fileContext;
+vm.createContext(fileContext);
+vm.runInContext(source, fileContext, { filename: adapterPath });
+fileContext.Fancybox.bind('#eb-content img');
+
+assert.deepStrictEqual(plain(fileConstructorCalls[0].elements), [
+  { href: 'file:///local/book/resources/relative.png', type: 'image' },
+  { href: 'file:///local/book/resources/absolute.png', type: 'image' },
+  // The platform URL parser canonicalizes file://localhost to an empty host.
+  { href: 'file:///local/book/resources/localhost.png', type: 'image' },
+]);
+assert.strictEqual(fileRelative.listenerCount('click'), 1);
+assert.strictEqual(fileAbsolute.listenerCount('click'), 1);
+assert.strictEqual(fileLocalhostAuthority.listenerCount('click'), 1);
+assert.strictEqual(fileRemoteAuthority.listenerCount('click'), 0);
+assert.strictEqual(fileCredentialAuthority.listenerCount('click'), 0);
+assert.strictEqual(filePortAuthority.listenerCount('click'), 0);
+
 console.log('lightbox adapter tests passed');
