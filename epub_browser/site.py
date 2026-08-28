@@ -58,8 +58,8 @@ def render_library_shell(
         asset_manifest=assets,
     )
     library_feature_assets = json.dumps({
-        "pinyin": assets.url_for("pinyin-pro.min.js"),
-        "sortable": assets.url_for("sortable.min.js"),
+        "pinyin": assets.url_for("vendor/pinyin-pro/pinyin-pro.min.js"),
+        "sortable": assets.url_for("vendor/sortablejs/sortable.min.js"),
         "bookshelf": assets.url_for("bookshelf.js"),
         "annotationHubCss": assets.url_for("annotation-hub.css"),
         "annotation": assets.url_for("annotation.js"),
@@ -159,7 +159,7 @@ def render_library_shell(
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserI18n.init();</script>
 <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
-<link rel="stylesheet" href="/assets/fa.all.min.css">
+<link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
 <link rel="stylesheet" href="/assets/theme.css">

@@ -1,4 +1,440 @@
 {
   "schema": 1,
-  "packages": []
+  "packages": [
+    {
+      "name": "@fancyapps/ui",
+      "version": "6.1.14",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/@fancyapps/ui/-/ui-6.1.14.tgz"
+      },
+      "archive": {
+        "sha256": "4be56d95b3fa4ec1f2e43caef6358d18cd2c3f36a1f178436fee577c464f5c5a",
+        "max_bytes": 262144,
+        "max_expanded_bytes": 1048576
+      },
+      "license": {
+        "spdx": "LicenseRef-Fancyapps-UI",
+        "files": ["package/LICENSE.md"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE.md",
+          "target": "fancybox/LICENSE.md",
+          "sha256": "f9d3d65b81b98082ef32de1a27307f146022281da08e0ee2d8609332b86af070"
+        },
+        {
+          "source": "package/dist/fancybox/fancybox.css",
+          "target": "fancybox/fancybox.min.css",
+          "sha256": "99d68cc6b22d116ea130854924d3cab97d01eca092250544bf7995638376c1ee"
+        },
+        {
+          "source": "package/dist/fancybox/fancybox.umd.js",
+          "target": "fancybox/fancybox.min.js",
+          "sha256": "427255e074f9afc8bcf68bd91910fcea2ca766a1deac46d3db1b7af6f0ccdfa2"
+        }
+      ]
+    },
+    {
+      "name": "@fortawesome/fontawesome-free",
+      "version": "7.1.0",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/@fortawesome/fontawesome-free/-/fontawesome-free-7.1.0.tgz"
+      },
+      "archive": {
+        "sha256": "566426b219fdb2a703ae9388b13add58274a4867df154b1d950de511f089bfde",
+        "max_bytes": 7340032,
+        "max_expanded_bytes": 29360128
+      },
+      "license": {
+        "spdx": "CC-BY-4.0 AND OFL-1.1 AND MIT",
+        "files": ["package/LICENSE.txt"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE.txt",
+          "target": "fontawesome/LICENSE.txt",
+          "sha256": "329f24fdba0c57714d7d202d30a74767feac6907685ee24f0abbf1bd47581a07"
+        },
+        {
+          "source": "package/css/all.min.css",
+          "target": "fontawesome/css/all.min.css",
+          "sha256": "e2b4c87e8e464138bfed426aa3250940acf15bc54dfd8047df5f82cbebd3663e"
+        },
+        {
+          "source": "package/webfonts/fa-brands-400.woff2",
+          "target": "fontawesome/webfonts/fa-brands-400.woff2",
+          "sha256": "061dd5c333459ea42dba764617793fd6ea2d316b7ab644f157e4d2354dac02af"
+        },
+        {
+          "source": "package/webfonts/fa-regular-400.woff2",
+          "target": "fontawesome/webfonts/fa-regular-400.woff2",
+          "sha256": "81159a6b36876a5545555ae689144f074e2fc802d57d36f2c21bc6f3a12f4e48"
+        },
+        {
+          "source": "package/webfonts/fa-solid-900.woff2",
+          "target": "fontawesome/webfonts/fa-solid-900.woff2",
+          "sha256": "bdd7887ef769948024a5cc37a018f19da6a9b355b4a09973836115e0d31ead55"
+        },
+        {
+          "source": "package/webfonts/fa-v4compatibility.woff2",
+          "target": "fontawesome/webfonts/fa-v4compatibility.woff2",
+          "sha256": "c18e29ec6e1d46025f8fb1cf2e636c38078598ffa9399ccc52c7df07bb4ab1d0"
+        }
+      ]
+    },
+    {
+      "name": "@highlightjs/cdn-assets",
+      "version": "11.11.1",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/@highlightjs/cdn-assets/-/cdn-assets-11.11.1.tgz"
+      },
+      "archive": {
+        "sha256": "28a06bf6ebcc2218c6e842bdb4f1c8353508a8cada59e85110f91892f5726195",
+        "max_bytes": 1048576,
+        "max_expanded_bytes": 5242880
+      },
+      "license": {
+        "spdx": "BSD-3-Clause",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "highlight/LICENSE",
+          "sha256": "6c081431591d9df696c82dc598fe1423765b8a299b200ed00b281afd0f64c490"
+        },
+        {
+          "source": "package/styles/github-dark.min.css",
+          "target": "highlight/github-dark.min.css",
+          "sha256": "9f208d022102b1d0c7aebfecd8e42ca7997d5de636649d2b31ea63093d809019"
+        },
+        {
+          "source": "package/styles/github.min.css",
+          "target": "highlight/github.min.css",
+          "sha256": "3a9a5def8b9c311e5ae43abde85c63133185eed4f0d9f67fea4b00a8308cf066"
+        },
+        {
+          "source": "package/highlight.min.js",
+          "target": "highlight/highlight.min.js",
+          "sha256": "c4a399dd6f488bc97a3546e3476747b3e714c99c57b9473154c6fb8d259b9381"
+        }
+      ]
+    },
+    {
+      "name": "katex",
+      "version": "0.16.47",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/katex/-/katex-0.16.47.tgz"
+      },
+      "archive": {
+        "sha256": "ad2d1ab2f7fcc227019784320e8a2c5218ff6bb333b36df4136d10365ae29375",
+        "max_bytes": 2097152,
+        "max_expanded_bytes": 5242880
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "katex/LICENSE",
+          "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_AMS-Regular.woff2",
+          "target": "katex/fonts/KaTeX_AMS-Regular.woff2",
+          "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Caligraphic-Bold.woff2",
+          "target": "katex/fonts/KaTeX_Caligraphic-Bold.woff2",
+          "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Caligraphic-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Caligraphic-Regular.woff2",
+          "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Fraktur-Bold.woff2",
+          "target": "katex/fonts/KaTeX_Fraktur-Bold.woff2",
+          "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Fraktur-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Fraktur-Regular.woff2",
+          "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Main-Bold.woff2",
+          "target": "katex/fonts/KaTeX_Main-Bold.woff2",
+          "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Main-BoldItalic.woff2",
+          "target": "katex/fonts/KaTeX_Main-BoldItalic.woff2",
+          "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Main-Italic.woff2",
+          "target": "katex/fonts/KaTeX_Main-Italic.woff2",
+          "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Main-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Main-Regular.woff2",
+          "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Math-BoldItalic.woff2",
+          "target": "katex/fonts/KaTeX_Math-BoldItalic.woff2",
+          "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Math-Italic.woff2",
+          "target": "katex/fonts/KaTeX_Math-Italic.woff2",
+          "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_SansSerif-Bold.woff2",
+          "target": "katex/fonts/KaTeX_SansSerif-Bold.woff2",
+          "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_SansSerif-Italic.woff2",
+          "target": "katex/fonts/KaTeX_SansSerif-Italic.woff2",
+          "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_SansSerif-Regular.woff2",
+          "target": "katex/fonts/KaTeX_SansSerif-Regular.woff2",
+          "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Script-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Script-Regular.woff2",
+          "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Size1-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Size1-Regular.woff2",
+          "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Size2-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Size2-Regular.woff2",
+          "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Size3-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Size3-Regular.woff2",
+          "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Size4-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Size4-Regular.woff2",
+          "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+        },
+        {
+          "source": "package/dist/fonts/KaTeX_Typewriter-Regular.woff2",
+          "target": "katex/fonts/KaTeX_Typewriter-Regular.woff2",
+          "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+        },
+        {
+          "source": "package/dist/katex.min.css",
+          "target": "katex/katex.min.css",
+          "sha256": "0289a02cf451a44dd73add683a09644252363871ac11713a647b732cee8b1ee3"
+        },
+        {
+          "source": "package/dist/katex.min.js",
+          "target": "katex/katex.min.js",
+          "sha256": "a29d2961d3146de5949d78ac7c1a9d93ae54955bad22a6db4fbe836e88e8bf48"
+        }
+      ]
+    },
+    {
+      "name": "markdown-it",
+      "version": "15.0.0",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/markdown-it/-/markdown-it-15.0.0.tgz"
+      },
+      "archive": {
+        "sha256": "a001817160e84c90bc007a577c1548699f765cfbc16727fe4010cc398ecff354",
+        "max_bytes": 1048576,
+        "max_expanded_bytes": 2097152
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "markdown-it/LICENSE",
+          "sha256": "792c48c5a849a15fdf9e37e8bcf9e6d1dd13b32b46c642a748a0a46a9919d473"
+        },
+        {
+          "source": "package/dist/browser/markdown-it.umd.min.js",
+          "target": "markdown-it/markdown-it.min.js",
+          "sha256": "8d0f6aca8f4de3321b6d07e03286176c59ec19b7b84abb6eb31f0fa795e83abc"
+        }
+      ]
+    },
+    {
+      "name": "mermaid",
+      "version": "11.12.0",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/mermaid/-/mermaid-11.12.0.tgz"
+      },
+      "archive": {
+        "sha256": "93492e4d609be83653a41c435f4cbd7e74419f7fa6b4fc90a8c983195f64af82",
+        "max_bytes": 15728640,
+        "max_expanded_bytes": 67108864
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "mermaid/LICENSE",
+          "sha256": "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80"
+        },
+        {
+          "source": "package/dist/mermaid.min.js",
+          "target": "mermaid/mermaid.min.js",
+          "sha256": "07e37dfa97b337ccc85365d57eddf99b9706f09db3b59b260d0333b23b343c4b"
+        }
+      ]
+    },
+    {
+      "name": "pdfjs-dist",
+      "version": "6.2.108",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-6.2.108.tgz"
+      },
+      "archive": {
+        "sha256": "b3e68d5cda70551a90b3f771419d379e20fc788ce056fa32de73608e01df47f4",
+        "max_bytes": 9437184,
+        "max_expanded_bytes": 35651584
+      },
+      "license": {
+        "spdx": "Apache-2.0",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "pdfjs/LICENSE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "source": "package/legacy/build/pdf.mjs",
+          "target": "pdfjs/build/pdf.mjs",
+          "sha256": "842284e0d1d439e60701e3355c2128cd3016ebebf14220e27f512467682aad66"
+        },
+        {
+          "source": "package/legacy/build/pdf.worker.mjs",
+          "target": "pdfjs/build/pdf.worker.mjs",
+          "sha256": "b4e582882f5e811f4d1b7b511f68d9a0c3209141e6f68856f01408c5cc155131"
+        }
+      ]
+    },
+    {
+      "name": "pinyin-pro",
+      "version": "3.28.0",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/pinyin-pro/-/pinyin-pro-3.28.0.tgz"
+      },
+      "archive": {
+        "sha256": "5ec1bf440b47fb96bf18485803417c60065f9158cecf60a60dd770f3cb6ce807",
+        "max_bytes": 524288,
+        "max_expanded_bytes": 1048576
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "pinyin-pro/LICENSE",
+          "sha256": "824f6069c5a59b0c1650d0fb9f8d091866c6019eb761c8e658dfc03f001eabd2"
+        },
+        {
+          "source": "package/dist/index.js",
+          "target": "pinyin-pro/pinyin-pro.min.js",
+          "sha256": "2517533c0eb34b85e0804f4388f753ea7084dd7db45298b12bd00ac3884bf7fe"
+        }
+      ]
+    },
+    {
+      "name": "sortablejs",
+      "version": "1.15.6",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/sortablejs/-/sortablejs-1.15.6.tgz"
+      },
+      "archive": {
+        "sha256": "7a5de41e4a184f43178f3b7cfd4e22f9ac2945a4b7c715ddc3e1c752b5a631dd",
+        "max_bytes": 262144,
+        "max_expanded_bytes": 1048576
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "sortablejs/LICENSE",
+          "sha256": "e94dfc31e800d169257569db270457c9f028440c9ccae41e7eb78b2db18f1298"
+        },
+        {
+          "source": "package/Sortable.min.js",
+          "target": "sortablejs/sortable.min.js",
+          "sha256": "6d0a831fc19b4bae851797ad3393157e861afb7862459c11226359b27e2c4337"
+        }
+      ]
+    },
+    {
+      "name": "web-highlighter",
+      "version": "0.7.4",
+      "source": {
+        "kind": "npm-tarball",
+        "url": "https://registry.npmjs.org/web-highlighter/-/web-highlighter-0.7.4.tgz"
+      },
+      "archive": {
+        "sha256": "2282b8014c801f232400b940f8cee0e57e4976c2591f11c96538af2bf117d44f",
+        "max_bytes": 3145728,
+        "max_expanded_bytes": 3145728
+      },
+      "license": {
+        "spdx": "MIT",
+        "files": ["package/LICENSE"]
+      },
+      "files": [
+        {
+          "source": "package/LICENSE",
+          "target": "web-highlighter/LICENSE",
+          "sha256": "9265f086e18d45168bf79035784f6126b51d4f657fa674680bd51d4b8b66aac6"
+        },
+        {
+          "source": "package/dist/web-highlighter.min.js",
+          "target": "web-highlighter/web-highlighter.min.js",
+          "sha256": "7360ce01d835e3760dbe5a509fa4b4830341e8f94316bbf2c23dd9c1a2096e53"
+        }
+      ]
+    }
+  ]
 }

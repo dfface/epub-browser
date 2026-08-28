@@ -305,7 +305,7 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 <title data-i18n="readingInsights.pageTitle">Reading insights · EPUB Browser</title>
 <script src="/assets/i18n.js"></script>
 <script>window.EpubBrowserBasePath={urls.base_path!r};window.EpubBrowserMode="server";window.EpubBrowserI18n.init();</script>
-<link rel="stylesheet" href="/assets/fa.all.min.css">
+<link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/notification.css">

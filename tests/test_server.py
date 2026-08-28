@@ -3984,7 +3984,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
                     "vendor/katex/katex.min.css", "vendor/katex/katex.min.js",
                     "vendor/mermaid/mermaid.min.js",
                     "bookshelf.js", "annotation-hub.css", "annotation.js",
-                    "annotation-hub.js", "sortable.min.js", "book-reviews.css",
+                    "annotation-hub.js", "vendor/sortablejs/sortable.min.js", "book-reviews.css",
                     "book-reviews.js",
                 )
         }

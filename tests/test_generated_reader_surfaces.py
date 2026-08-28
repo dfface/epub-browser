@@ -2266,6 +2266,19 @@ assert.deepEqual(
         self.assertRegex(book_html, r'/assets/immutable/book\.[0-9a-f]{12}\.js')
         self.assertNotIn('?v=', library_html + book_html)
 
+    def test_reader_uses_versioned_vendor_paths(self):
+        html = self._chapter_html()
+
+        self.assertRegex(
+            html,
+            r"/assets/immutable/vendor/fontawesome/.+\.[0-9a-f]{12}\.css",
+        )
+        self.assertRegex(
+            html,
+            r"/assets/immutable/vendor/fancybox/.+\.[0-9a-f]{12}\.js",
+        )
+        self.assertNotIn("fancybox.min.js", html)
+
     def test_pagination_mode_does_not_access_the_removed_custom_css_panel(self):
         script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
 
@@ -2888,12 +2901,15 @@ assert.deepEqual(
         self.assertIn('grid-column: 3;', css)
 
     def test_font_awesome_uses_non_blocking_font_display(self):
-        stylesheet = Path('epub_browser/assets/fa.all.min.css').read_text(
+        stylesheet = Path('epub_browser/assets/theme.css').read_text(
             encoding='utf-8'
         )
 
-        self.assertNotIn('font-display:block', stylesheet)
-        self.assertIn('font-display:swap', stylesheet)
+        self.assertIn('font-display: swap;', stylesheet)
+        self.assertIn(
+            'url("./vendor/fontawesome/webfonts/fa-solid-900.woff2")',
+            stylesheet,
+        )
 
     def test_annotation_modal_announces_loading_while_data_is_requested(self):
         script = Path("epub_browser/assets/annotation-hub.js").read_text(encoding="utf-8")
@@ -3298,8 +3314,20 @@ assert.deepEqual(
             processor.chapters = [{'title': 'One'}]
             chapter = processor.create_chapter_template('<p>Text</p>', '', 0, 'One')
 
-        for asset in ('fancybox.min.js', 'web-highlighter.min.js', 'sortable.min.js', 'highlight.min.js'):
-            self.assertRegex(chapter, r'<script src="/assets/immutable/' + re.escape(asset.rsplit('.', 1)[0]) + r'\.[0-9a-f]{12}\.js" defer></script>')
+        for logical_path in (
+            'vendor/fancybox/fancybox.min.js',
+            'vendor/web-highlighter/web-highlighter.min.js',
+            'vendor/sortablejs/sortable.min.js',
+            'vendor/highlight/highlight.min.js',
+        ):
+            directory, filename = logical_path.rsplit('/', 1)
+            stem = filename.rsplit('.', 1)[0]
+            self.assertRegex(
+                chapter,
+                r'<script src="/assets/immutable/'
+                + re.escape(directory + '/' + stem)
+                + r'\.[0-9a-f]{12}\.js" defer></script>',
+            )
 
     def test_reader_scroll_visual_updates_are_coalesced_per_animation_frame(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
@@ -3341,7 +3369,9 @@ assert.deepEqual(
         with tempfile.TemporaryDirectory() as directory:
             library = EPUBLibrary(directory)
             self.assertFalse(any(
-                logical_path.startswith(('ai-', 'vendor/katex/', 'vendor/mermaid/'))
+                logical_path.startswith((
+                    'ai-', 'vendor/katex/', 'vendor/markdown-it/', 'vendor/mermaid/',
+                ))
                 for logical_path in library.asset_manifest.assets
             ))
 

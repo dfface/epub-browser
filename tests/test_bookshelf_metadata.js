@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Metadata = require('../epub_browser/assets/bookshelf.js');
-const Pinyin = require('../epub_browser/assets/pinyin-pro.min.js');
+const Pinyin = require('../epub_browser/assets/vendor/pinyin-pro/pinyin-pro.min.js');
 
 test('bookshelf metadata follows the generated base path and published cover URL', () => {
   assert.equal(Metadata.metadataUrl('/project/'), '/project/book-metadata.json');

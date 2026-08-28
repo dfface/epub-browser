@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,28 @@ from epub_browser.urls import SiteURLs
 
 
 class AssetPublisherTests(unittest.TestCase):
+    def test_every_generated_vendor_file_is_locked_and_untracked(self):
+        lock = json.loads(
+            Path("third_party/assets.lock.json").read_text(encoding="utf-8")
+        )
+        locked = {
+            item["target"]
+            for package in lock["packages"]
+            for item in package["files"]
+        }
+        generated = {
+            path.relative_to("epub_browser/assets/vendor").as_posix()
+            for path in Path("epub_browser/assets/vendor").rglob("*")
+            if path.is_file()
+        }
+        tracked = subprocess.check_output(
+            ["git", "ls-files", "epub_browser/assets/vendor"], text=True
+        ).splitlines()
+
+        self.assertEqual(generated, locked)
+        self.assertEqual(tracked, [])
+        self.assertIn("pdfjs/build/pdf.mjs", locked)
+
     def test_publish_uses_base_path_without_writing_the_prefix_to_disk(self):
         with tempfile.TemporaryDirectory() as source, tempfile.TemporaryDirectory() as output:
             self._write_source_assets(source)
