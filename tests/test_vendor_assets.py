@@ -8,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from urllib.request import Request
 
@@ -678,6 +679,79 @@ class VendorAssetTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(fetch.returncode, 0, fetch.stderr)
+
+    def test_setup_packages_recursive_vendor_assets(self):
+        """Dropping the recursive package-data rule would omit nested licenses and fonts."""
+        repository_root = Path(__file__).parents[1]
+        completed = subprocess.run(
+            [sys.executable, "setup.py", "--version"],
+            cwd=repository_root,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        self.assertRegex(completed.stdout.strip(), r"^\d+\.\d+\.\d+")
+        self.assertIn(
+            "assets/vendor/**/*",
+            (repository_root / "setup.py").read_text(encoding="utf-8"),
+        )
+
+    def test_release_jobs_fetch_and_verify_before_build(self):
+        """A release build must fail closed before packaging an incomplete vendor tree."""
+        repository_root = Path(__file__).parents[1]
+        for relative in (
+            ".github/workflows/pypi.yml",
+            ".github/workflows/gh-pages.yml",
+            "Dockerfile",
+        ):
+            with self.subTest(path=relative):
+                source = (repository_root / relative).read_text(encoding="utf-8")
+                fetch = source.index("sync_vendor_assets.py fetch")
+                verify = source.index("sync_vendor_assets.py verify")
+                build = source.index("python -m build")
+                self.assertLess(fetch, verify)
+                self.assertLess(verify, build)
+
+    def test_wheel_contains_complete_locked_vendor_inventory_and_notices(self):
+        """A wheel must not drop deeply nested fonts, workers, or license notices."""
+        repository_root = Path(__file__).parents[1]
+        lock = json.loads(
+            (repository_root / "third_party/assets.lock.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        expected_vendor = {
+            "epub_browser/assets/vendor/" + item["target"]
+            for package in lock["packages"]
+            for field in ("files", "supplemental_license_files")
+            for item in package.get(field, [])
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "build",
+                    "--wheel",
+                    "--no-isolation",
+                    "--outdir",
+                    directory,
+                ],
+                cwd=repository_root,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            wheel = next(Path(directory).glob("*.whl"))
+            with zipfile.ZipFile(wheel) as archive:
+                names = set(archive.namelist())
+
+        self.assertEqual(sorted(expected_vendor - names), [])
+        self.assertTrue(
+            any(name.endswith("/THIRD_PARTY_NOTICES.md") for name in names),
+            "wheel is missing THIRD_PARTY_NOTICES.md",
+        )
 
     def fixture_lock(self, files, root=None):
         root = root or self.directory / "vendor"

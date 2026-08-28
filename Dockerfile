@@ -10,8 +10,13 @@ WORKDIR /build/epub-browser
 # also prevents documentation and local development state from invalidating
 # the wheel build cache.
 COPY setup.py MANIFEST.in README.md README.zh-CN.md License.txt ./
+COPY THIRD_PARTY_NOTICES.md ./
+COPY third_party ./third_party
+COPY tools/sync_vendor_assets.py ./tools/sync_vendor_assets.py
 COPY epub_browser ./epub_browser
-RUN python -m build --wheel
+RUN python tools/sync_vendor_assets.py fetch \
+    && python tools/sync_vendor_assets.py verify \
+    && python -m build --wheel
 
 
 FROM python:3.14-alpine

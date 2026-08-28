@@ -8,6 +8,7 @@
 venv
 build
 dist
+epub_browser/assets/vendor
 *.egg-info
 .pytest_cache
 __pycache__
