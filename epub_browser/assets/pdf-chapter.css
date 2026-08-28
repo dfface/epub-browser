@@ -1,0 +1,74 @@
+.pdf-page-content {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-height: 12rem;
+    margin-inline: auto;
+    overflow: auto;
+    color: var(--reader-ink, var(--text));
+    background: #fff;
+    border: 1px solid var(--reader-border, var(--border));
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
+    contain: layout paint;
+}
+
+.pdf-page-content[aria-busy="true"] {
+    background: color-mix(in srgb, var(--background) 94%, var(--primary));
+}
+
+.pdf-page-content .pdf-page-canvas {
+    display: block;
+    margin: 0;
+}
+
+.pdf-page-content .pdf-page-text-layer {
+    --scale-factor: calc(var(--total-scale-factor) / var(--min-font-size, 1));
+    position: absolute;
+    inset: 0 auto auto 0;
+    overflow: hidden;
+    line-height: 1;
+    text-align: initial;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+}
+
+.pdf-page-content .pdf-page-text-layer span,
+.pdf-page-content .pdf-page-text-layer br {
+    position: absolute;
+    color: transparent;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0 0;
+}
+
+.pdf-page-content .pdf-page-text-layer span {
+    font-size: calc(var(--font-height) * var(--scale-factor));
+    transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1));
+}
+
+.pdf-page-content .pdf-page-text-layer ::selection {
+    color: transparent;
+    background: color-mix(in srgb, var(--primary) 34%, transparent);
+}
+
+.pdf-page-content .pdf-page-status {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: min(32rem, calc(100% - 2rem));
+    margin: 0;
+    color: var(--text-secondary);
+    text-align: center;
+    transform: translate(-50%, -50%);
+}
+
+.continuous-chapter .pdf-page-content {
+    margin-block: 1rem;
+}
+
+@media (forced-colors: active) {
+    .pdf-page-content .pdf-page-text-layer ::selection {
+        background: Highlight;
+    }
+}

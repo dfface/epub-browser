@@ -333,6 +333,13 @@ function initScript() {
     var continuousChapterXhr = null;
     var activeContinuousChapterRequest = 0;
 
+    function dispatchChapterContentLifecycle(type, rootNode) {
+        if (!rootNode || typeof window.CustomEvent !== 'function') return;
+        window.dispatchEvent(new CustomEvent('epub-browser:chapter-content-' + type, {
+            detail: { root: rootNode }
+        }));
+    }
+
     function getReadingPreference(key) {
         return isKindleMode() ? getCookie(key) : localStorage.getItem(key);
     }
@@ -656,8 +663,12 @@ function initScript() {
     
     function createPages(target) {
         showLoading();
-        var original = preprocessContent(content);
+        var hasPDFPage = !!content.querySelector('[data-pdf-page-number]');
+        if (hasPDFPage) dispatchChapterContentLifecycle('removed', content);
+        var original = hasPDFPage ? content.innerHTML : preprocessContent(content);
+        if (!hasPDFPage) dispatchChapterContentLifecycle('removed', content);
         content.innerHTML = original;
+        dispatchChapterContentLifecycle('added', content);
         
         setTimeout(function() {
             content.style.columnCount = 'auto';
@@ -1039,12 +1050,14 @@ function initScript() {
         if (window.AnnotationModule && typeof window.AnnotationModule.closeTransient === 'function') {
             window.AnnotationModule.closeTransient();
         }
+        dispatchChapterContentLifecycle('removed', content);
         while (content.firstChild) content.removeChild(content.firstChild);
         var childNodes = chapterContent.childNodes;
         for (var i = 0; i < childNodes.length; i++) {
             content.appendChild(childNodes[i].cloneNode(true));
         }
         syncChapterContentAttributes(chapterContent);
+        dispatchChapterContentLifecycle('added', content);
         syncChapterNavigationLinks(source);
         var pageTitle = source.querySelector('title');
         if (pageTitle) document.title = pageTitle.textContent;
@@ -2335,6 +2348,7 @@ function initScript() {
         if (window.AnnotationModule && typeof window.AnnotationModule.closeTransient === 'function') {
             window.AnnotationModule.closeTransient();
         }
+        dispatchChapterContentLifecycle('removed', content);
         while (content.firstChild) content.removeChild(content.firstChild);
         syncChapterContentAttributes(chapterContent);
         syncChapterNavigationLinks(source);
@@ -2360,6 +2374,7 @@ function initScript() {
             chapterSection.appendChild(childNodes[i].cloneNode(true));
         }
         content.appendChild(chapterSection);
+        dispatchChapterContentLifecycle('added', chapterSection);
         if (typeof Fancybox !== 'undefined') {
             Fancybox.bind('#eb-content img', {});
         }
@@ -2392,6 +2407,7 @@ function initScript() {
         change.evicted.forEach(function(index) {
             var chapter = content.querySelector('.continuous-chapter[data-chapter-index="' + index + '"]');
             if (!chapter) return;
+            dispatchChapterContentLifecycle('removed', chapter);
             chapter.remove();
             delete loadedChapters[index];
         });
@@ -2516,6 +2532,7 @@ function initScript() {
                     }
                     var viewportAnchor = EpubViewportAnchor.capture(content);
                     content.appendChild(chapterSection);
+                    dispatchChapterContentLifecycle('added', chapterSection);
                     
                     loadedChapters[nextIdx] = true;
                     pruneContinuousWindow('next', nextIdx);
@@ -2627,6 +2644,7 @@ function initScript() {
                     } else {
                         content.appendChild(chapterSection);
                     }
+                    dispatchChapterContentLifecycle('added', chapterSection);
                     
                     loadedChapters[prevIdx] = true;
                     pruneContinuousWindow('previous', prevIdx);

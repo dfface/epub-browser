@@ -2583,6 +2583,8 @@ document.addEventListener('DOMContentLoaded', function() {{
         chapter_title_text = html.escape(safe_chapter_title, quote=False)
         chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
         pdf_config_script = ""
+        pdf_stylesheet = ""
+        pdf_chapter_script = ""
         if pdf_page is not None:
             page_number = int(pdf_page["page_number"])
             total_pages = len(self.chapters)
@@ -2625,6 +2627,16 @@ document.addEventListener('DOMContentLoaded', function() {{
                 .replace(">", "\\u003e")
             )
             pdf_config_script = f"<script>window.EpubPDFConfig={pdf_config};</script>"
+            pdf_stylesheet = (
+                '<link rel="stylesheet" href="'
+                + self.asset_manifest.url_for("pdf-chapter.css")
+                + '">'
+            )
+            pdf_chapter_script = (
+                '<script src="'
+                + self.asset_manifest.url_for("pdf-chapter.js")
+                + '" defer></script>'
+            )
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -2751,6 +2763,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
+    {pdf_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
@@ -3279,6 +3292,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/continuous-buffer.js" defer></script>
     <script src="/assets/reading-progress.js" defer></script>
     <script src="/assets/reader-layout.js" defer></script>
+    {pdf_chapter_script}
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>

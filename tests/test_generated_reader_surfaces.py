@@ -158,6 +158,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 pdf_html,
                 r'"pdfjsWorkerUrl":"/assets/immutable/vendor/pdfjs/build/pdf\.worker\.[0-9a-f]{12}\.mjs"',
             )
+            self.assertRegex(
+                pdf_html,
+                r'<link rel="stylesheet" href="/assets/immutable/pdf-chapter\.[0-9a-f]{12}\.css">',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'<script src="/assets/immutable/pdf-chapter\.[0-9a-f]{12}\.js" defer></script>',
+            )
+            self.assertNotIn('pdf-chapter.', epub_html)
             self.assertNotIn('cdn.', pdf_html)
             for duplicate_ui in (
                 'pdf-reader', 'pdf-settings', 'pdf-selection-menu',
