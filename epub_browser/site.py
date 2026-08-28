@@ -20,6 +20,7 @@ from .server_chrome import (
 )
 from .urls import SiteURLs, rewrite_root_urls
 from .version import LATEST_RELEASE_API_URL, render_footer
+from .source_format import EPUB_FORMAT
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class LibraryBook:
     authors: Tuple[str, ...]
     tags: Tuple[str, ...]
     cover: Optional[str]
+    source_format: str = EPUB_FORMAT
 
 
 def render_library_shell(
@@ -481,6 +483,7 @@ def publish_library_shell(
             "authors": list(book.authors),
             "tags": list(book.tags),
             "cover": urls.public(book.cover) if book.cover else None,
+            "format": book.source_format,
         }
         for book in ordered_books
     ]

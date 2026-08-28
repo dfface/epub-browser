@@ -3436,6 +3436,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             cover=cover_path,
             language=self.lang or 'en',
             epub_identifier=self.epub_identifier,
+            source_format=self.source_format,
         )
     
     def cleanup(self):

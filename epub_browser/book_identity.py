@@ -135,6 +135,7 @@ def resolve_book_identity(
     storage: str,
     *,
     external_candidates: Sequence[ExternalBookIdentity] = (),
+    persist: bool = True,
 ) -> ResolvedBookIdentity:
     storage = validate_book_id_storage(storage)
     current_candidates = []
@@ -182,6 +183,14 @@ def resolve_book_identity(
     _require_candidate_agreement(candidates)
     book_id = candidates[0][1] if candidates else new_server_book_id()
     _assert_snapshot(inspection)
+
+    if not persist:
+        return ResolvedBookIdentity(
+            book_id=book_id,
+            source_fingerprint=inspection.source_fingerprint,
+            source_size=inspection.source_size,
+            source_mtime_ns=inspection.source_mtime_ns,
+        )
 
     if (
         storage == BOOK_ID_STORAGE_SIDECAR
