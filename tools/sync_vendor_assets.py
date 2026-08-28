@@ -113,6 +113,80 @@ def _safe_archive_relative(value: str) -> PurePosixPath:
     return PurePosixPath(normalized)
 
 
+class _ExpandedArchiveReader:
+    """Read gzip output without allowing decompressed bytes past the lock bound."""
+
+    def __init__(self, source, limit: int, package_name: str):
+        self.source = source
+        self.remaining = limit
+        self.package_name = package_name
+
+    def read(self, size: int) -> bytes:
+        chunk = self.source.read(min(size, self.remaining + 1))
+        if len(chunk) > self.remaining:
+            raise VendorAssetError(
+                "{} archive exceeds max_expanded_bytes".format(self.package_name)
+            )
+        self.remaining -= len(chunk)
+        return chunk
+
+
+def _read_exact(source, size: int, package_name: str, allow_eof: bool = False):
+    chunks = []
+    remaining = size
+    while remaining:
+        chunk = source.read(remaining)
+        if not chunk:
+            if allow_eof and not chunks:
+                return None
+            raise VendorAssetError(
+                "{} archive contains truncated tar data".format(package_name)
+            )
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _preflight_tar_archive(archive_path: Path, limit: int, package_name: str) -> None:
+    """Bound every raw tar record before tarfile may interpret extensions."""
+    compressed_archive = gzip.GzipFile(filename=archive_path, mode="rb")
+    with compressed_archive:
+        expanded = _ExpandedArchiveReader(compressed_archive, limit, package_name)
+        while True:
+            header = _read_exact(
+                expanded, tarfile.BLOCKSIZE, package_name, allow_eof=True
+            )
+            if header is None:
+                return
+            if header == tarfile.NUL * tarfile.BLOCKSIZE:
+                continue
+            try:
+                member = tarfile.TarInfo.frombuf(
+                    header, encoding="utf-8", errors="surrogateescape"
+                )
+            except tarfile.HeaderError as error:
+                raise VendorAssetError(
+                    "{} archive contains an invalid tar header".format(package_name)
+                ) from error
+            _safe_archive_relative(member.name)
+            if member.size < 0:
+                raise VendorAssetError(
+                    "{} archive contains an invalid member size".format(package_name)
+                )
+            padded_size = (
+                (member.size + tarfile.BLOCKSIZE - 1) // tarfile.BLOCKSIZE
+            ) * tarfile.BLOCKSIZE
+            if padded_size > expanded.remaining:
+                raise VendorAssetError(
+                    "{} archive exceeds max_expanded_bytes".format(package_name)
+                )
+            if member.type == tarfile.GNUTYPE_SPARSE:
+                raise VendorAssetError(
+                    "{} archive contains unsupported entry".format(package_name)
+                )
+            _read_exact(expanded, padded_size, package_name)
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as asset_file:
@@ -214,6 +288,11 @@ def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
             if digest != package.archive.sha256:
                 raise VendorAssetError("{} archive SHA-256 mismatch".format(package.name))
             try:
+                _preflight_tar_archive(
+                    archive_path,
+                    package.archive.max_expanded_bytes,
+                    package.name,
+                )
                 extracted = set()
                 compressed_archive = gzip.GzipFile(filename=archive_path, mode="rb")
                 with compressed_archive, tarfile.open(

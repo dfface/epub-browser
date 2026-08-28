@@ -101,7 +101,7 @@ class VendorAssetTests(unittest.TestCase):
                 ("large-ignored.bin", b"x" * 4096, "file"),
             ]
         )
-        lock_path = self.lock_for_archive(archive, max_expanded_bytes=2048)
+        lock_path = self.lock_for_archive(archive, max_expanded_bytes=4096)
 
         with self.assertRaisesRegex(VendorAssetError, "max_expanded_bytes"):
             fetch_assets(lock_path, self.vendor_root, opener=self.opener(archive))
@@ -119,6 +119,50 @@ class VendorAssetTests(unittest.TestCase):
                 self.vendor_root,
                 opener=self.opener(archive),
             )
+
+    def test_fetch_preflights_oversized_extension_headers_before_their_bodies(self):
+        """PAX and GNU extension payloads must be bounded before tarfile sees them."""
+        clean_assets(self.lock_path, self.vendor_root)
+        for extension_type in (
+            tarfile.XHDTYPE,
+            tarfile.XGLTYPE,
+            tarfile.GNUTYPE_LONGNAME,
+            tarfile.GNUTYPE_SPARSE,
+        ):
+            with self.subTest(extension_type=extension_type):
+                info = tarfile.TarInfo("extension")
+                info.type = extension_type
+                info.size = 1 << 30
+                archive = gzip.compress(info.tobuf(format=tarfile.USTAR_FORMAT))
+
+                with self.assertRaisesRegex(VendorAssetError, "max_expanded_bytes"):
+                    fetch_assets(
+                        self.lock_for_archive(archive, max_expanded_bytes=2048),
+                        self.vendor_root,
+                        opener=self.opener(archive),
+                    )
+
+    def test_fetch_supports_bounded_pax_and_gnu_long_name_records(self):
+        """Safe extension metadata in ordinary npm-style tarballs must remain usable."""
+        long_name = "nested/" + "a" * 120 + ".txt"
+        for archive_format in (tarfile.PAX_FORMAT, tarfile.GNU_FORMAT):
+            with self.subTest(archive_format=archive_format):
+                clean_assets(self.lock_path, self.vendor_root)
+                archive = self.tar_archive(
+                    [
+                        ("LICENSE", b"license", "file"),
+                        ("file.js", b"asset", "file"),
+                        (long_name, b"ignored", "file"),
+                    ],
+                    archive_format=archive_format,
+                )
+
+                fetch_assets(
+                    self.lock_for_archive(archive),
+                    self.vendor_root,
+                    opener=self.opener(archive),
+                )
+                verify_assets(self.lock_path, self.vendor_root)
 
     def test_fetch_rejects_duplicate_normalized_archive_members(self):
         """Two archive entries must not compete for one normalized source path."""
@@ -538,7 +582,7 @@ class VendorAssetTests(unittest.TestCase):
                     "archive": {
                         "sha256": "0" * 64,
                         "max_bytes": 1024,
-                        "max_expanded_bytes": 2048,
+                        "max_expanded_bytes": 32 * 1024,
                     },
                     "license": {"spdx": "MIT", "files": ["LICENSE"]},
                     "files": entries,
@@ -575,9 +619,11 @@ class VendorAssetTests(unittest.TestCase):
         )
 
     @staticmethod
-    def tar_archive(entries):
+    def tar_archive(entries, archive_format=tarfile.PAX_FORMAT):
         archive = io.BytesIO()
-        with tarfile.open(fileobj=archive, mode="w:gz") as tar:
+        with tarfile.open(
+            fileobj=archive, mode="w:gz", format=archive_format
+        ) as tar:
             for member, contents, kind in entries:
                 info = tarfile.TarInfo(member)
                 if kind == "symlink":
