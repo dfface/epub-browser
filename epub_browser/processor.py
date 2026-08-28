@@ -2586,6 +2586,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         pdf_stylesheet = ""
         pdf_chapter_script = ""
         pdf_reader_controls = ""
+        pdf_mobile_controls = ""
         pdf_search_drawer = ""
         if pdf_page is not None:
             page_number = int(pdf_page["page_number"])
@@ -2650,6 +2651,15 @@ document.addEventListener('DOMContentLoaded', function() {{
                 <button class="control-btn" id="pdfPrint" type="button" aria-label="Print PDF" data-i18n-aria-label="pdf.print"><i class="fas fa-print" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.print">Print PDF</span></button>
                 <button class="control-btn" id="pdfDownload" type="button" aria-label="Download PDF" data-i18n-aria-label="pdf.download"><i class="fas fa-download" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.download">Download PDF</span></button>
             </span>'''
+            pdf_mobile_controls = '''
+        <button class="control-btn" id="mobilePdfSearchToggle" type="button" aria-label="Search PDF" title="Search PDF" data-i18n-aria-label="pdf.search" data-i18n-title="pdf.search" aria-controls="pdfSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span data-i18n="pdf.search">Search PDF</span></button>
+        <button class="control-btn" id="mobilePdfZoomOut" type="button" aria-label="Zoom out" title="Zoom out" data-i18n-aria-label="pdf.zoomOut" data-i18n-title="pdf.zoomOut"><i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i><span data-i18n="pdf.zoomOut">Zoom out</span></button>
+        <button class="control-btn" id="mobilePdfZoomIn" type="button" aria-label="Zoom in" title="Zoom in" data-i18n-aria-label="pdf.zoomIn" data-i18n-title="pdf.zoomIn"><i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i><span data-i18n="pdf.zoomIn">Zoom in</span></button>
+        <button class="control-btn" id="mobilePdfFitWidth" type="button" aria-label="Fit width" title="Fit width" data-i18n-aria-label="pdf.fitWidth" data-i18n-title="pdf.fitWidth"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span data-i18n="pdf.fitWidth">Fit width</span></button>
+        <button class="control-btn" id="mobilePdfFitPage" type="button" aria-label="Fit page" title="Fit page" data-i18n-aria-label="pdf.fitPage" data-i18n-title="pdf.fitPage"><i class="fas fa-maximize" aria-hidden="true"></i><span data-i18n="pdf.fitPage">Fit page</span></button>
+        <button class="control-btn" id="mobilePdfRotate" type="button" aria-label="Rotate page" title="Rotate page" data-i18n-aria-label="pdf.rotate" data-i18n-title="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span data-i18n="pdf.rotate">Rotate page</span></button>
+        <button class="control-btn" id="mobilePdfPrint" type="button" aria-label="Print PDF" title="Print PDF" data-i18n-aria-label="pdf.print" data-i18n-title="pdf.print"><i class="fas fa-print" aria-hidden="true"></i><span data-i18n="pdf.print">Print PDF</span></button>
+        <button class="control-btn" id="mobilePdfDownload" type="button" aria-label="Download PDF" title="Download PDF" data-i18n-aria-label="pdf.download" data-i18n-title="pdf.download"><i class="fas fa-download" aria-hidden="true"></i><span data-i18n="pdf.download">Download PDF</span></button>'''
             pdf_search_drawer = '''
     <nav class="toc-floating reader-drawer pdf-search-drawer" id="pdfSearchDrawer" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-hidden="true">
         <div class="toc-header">
@@ -3178,6 +3188,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <i class="fas fa-list"></i>
             <span data-i18n="reader.thisChapterContents">This chapter</span>
         </button>
+        {pdf_mobile_controls}
         {mobile_ai_reading_button}
         {mobile_ai_followup_button}
         {prev_link_mobile}

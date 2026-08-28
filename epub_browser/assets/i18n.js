@@ -6987,6 +6987,14 @@
   Object.keys(pdfActionLocaleAdditions).forEach(function(code) {
     Object.assign(dictionaries[code], pdfActionLocaleAdditions[code]);
   });
+  var pdfSearchErrorLocaleAdditions = {
+    en: 'PDF search failed.', 'zh-CN': 'PDF 搜索失败。', 'zh-TW': 'PDF 搜尋失敗。', ko: 'PDF 검색에 실패했습니다.', ja: 'PDF の検索に失敗しました。',
+    es: 'La búsqueda en PDF falló.', de: 'Die PDF-Suche ist fehlgeschlagen.', fr: 'La recherche dans le PDF a échoué.', ru: 'Не удалось выполнить поиск в PDF.', it: 'La ricerca nel PDF non è riuscita.',
+    'pt-BR': 'A pesquisa no PDF falhou.', ar: 'فشل البحث في ملف PDF.', id: 'Pencarian PDF gagal.', hi: 'PDF खोज विफल हुई।', vi: 'Tìm kiếm PDF không thành công.', th: 'การค้นหา PDF ล้มเหลว', ms: 'Carian PDF gagal.'
+  };
+  Object.keys(pdfSearchErrorLocaleAdditions).forEach(function(code) {
+    dictionaries[code]['pdf.searchFailed'] = pdfSearchErrorLocaleAdditions[code];
+  });
   var finalLocaleCorrections = {
     es: {'common.chinese': 'Chino', 'common.english': 'Inglés', 'common.version': 'Versión {version}', 'version.updateAvailable': 'Actualización disponible: v{version}'},
     de: {'common.chinese': 'Chinesisch', 'common.english': 'Englisch', 'library.cover': 'Umschlag', 'book.cover': 'Umschlag', 'version.updateAvailable': 'Aktualisierung verfügbar: v{version}'},

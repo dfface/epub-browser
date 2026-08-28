@@ -170,8 +170,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('id="pdfSearchToggle"', pdf_html)
             self.assertIn('id="pdfSearchDrawer"', pdf_html)
             self.assertIn('class="toc-floating reader-drawer pdf-search-drawer"', pdf_html)
+            self.assertIn('id="mobilePdfSearchToggle"', pdf_html)
+            self.assertIn('id="mobilePdfZoomOut"', pdf_html)
+            self.assertIn('id="mobilePdfDownload"', pdf_html)
             self.assertNotIn('id="pdfSearchToggle"', epub_html)
             self.assertNotIn('id="pdfSearchDrawer"', epub_html)
+            self.assertNotIn('id="mobilePdfSearchToggle"', epub_html)
             self.assertNotIn('cdn.', pdf_html)
             for duplicate_ui in (
                 'pdf-reader', 'pdf-settings', 'pdf-selection-menu',
@@ -2811,6 +2815,32 @@ assert.deepEqual(
         self.assertIn('.reader-drawer-backdrop.is-active', chapter_css)
         self.assertIn('transform: translateX(calc(100% + 42px));', chapter_css)
         self.assertIn('body.reader-drawer-open', chapter_css)
+
+    def test_pdf_search_registers_with_the_shared_reader_drawer_controller(self):
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        pdf_js = Path('epub_browser/assets/pdf-chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn('function registerReaderDrawer(options)', chapter_js)
+        self.assertIn('window.EpubReaderDrawers = {', chapter_js)
+        self.assertIn("window.dispatchEvent(new CustomEvent('epub-browser:reader-drawers-ready'))", chapter_js)
+        self.assertIn('readerDrawerEntries.forEach(function(entry)', chapter_js)
+
+        self.assertIn('root.EpubReaderDrawers', pdf_js)
+        self.assertIn('drawerController.register({', pdf_js)
+        self.assertIn('mobileToggle: mobileToggle', pdf_js)
+        self.assertIn('controller.close(true)', pdf_js)
+        self.assertIn("root.addEventListener('epub-browser:reader-drawers-ready', bindReaderControls)", pdf_js)
+        self.assertNotIn('function closeDrawer(', pdf_js)
+
+    def test_shared_pdf_drawer_keeps_exclusive_focus_and_escape_lifecycle(self):
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        opening = chapter_js[chapter_js.index('function openReaderDrawer('):chapter_js.index('\n    if (window.EpubReaderLayout)', chapter_js.index('function openReaderDrawer('))]
+        closing = chapter_js[chapter_js.index('function closeReaderDrawers('):chapter_js.index('\n    function openReaderDrawer(', chapter_js.index('function closeReaderDrawers('))]
+
+        self.assertLess(opening.index('closeReaderDrawers(false);'), opening.index("panel.classList.add('active');"))
+        self.assertIn('if (restoreFocus && readerDrawerOpener) readerDrawerOpener.focus();', closing)
+        self.assertIn("if (event.key === 'Escape' && document.body.classList.contains('reader-drawer-open'))", chapter_js)
+        self.assertIn('closeReaderDrawers(true);', chapter_js)
 
     def test_continuous_reader_disables_the_chapter_local_toc(self):
         chapter = self._chapter_html()

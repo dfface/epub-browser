@@ -387,9 +387,9 @@
   }
 
   async function search(query) {
+    var generation = ++searchGeneration;
     var needle = String(query || '').trim().toLocaleLowerCase();
     if (!needle) return [];
-    var generation = ++searchGeneration;
     var config = configForPage();
     var pdfjs = await loadPDFModule(config);
     if (generation !== searchGeneration) return [];
@@ -418,6 +418,10 @@
     }
   }
 
+  function cancelSearch() {
+    searchGeneration += 1;
+  }
+
   function authorizedDocumentURL() {
     return configForPage().documentUrl;
   }
@@ -437,9 +441,22 @@
     var frame = root.document.createElement('iframe');
     frame.hidden = true;
     frame.src = authorizedDocumentURL();
+    var cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      if (typeof frame.remove === 'function') frame.remove();
+    }
     frame.addEventListener('load', function() {
-      if (frame.contentWindow && typeof frame.contentWindow.print === 'function') frame.contentWindow.print();
+      if (typeof root.addEventListener === 'function') root.addEventListener('afterprint', cleanup, { once: true });
+      try {
+        if (frame.contentWindow && typeof frame.contentWindow.print === 'function') frame.contentWindow.print();
+      } catch (error) {
+        cleanup();
+      }
+      root.setTimeout(cleanup, 60000);
     }, { once: true });
+    frame.addEventListener('error', cleanup, { once: true });
     var parent = root.document.body || root.document.documentElement;
     if (parent) parent.appendChild(frame);
   }
@@ -449,53 +466,34 @@
     if (!document || !document.getElementById) return;
     var drawer = document.getElementById('pdfSearchDrawer');
     var toggle = document.getElementById('pdfSearchToggle');
-    if (!drawer || !toggle || drawer.getAttribute('data-pdf-controls-bound') === 'true') return;
+    var mobileToggle = document.getElementById('mobilePdfSearchToggle');
+    var drawerController = root.EpubReaderDrawers;
+    if (!drawer || !toggle || !drawerController || typeof drawerController.register !== 'function' || drawer.getAttribute('data-pdf-controls-bound') === 'true') return;
     drawer.setAttribute('data-pdf-controls-bound', 'true');
-    var opener = null;
-    function closeDrawer(restoreFocus) {
-      if (!drawer.classList.contains('active')) return;
-      drawer.classList.remove('active');
-      drawer.setAttribute('aria-hidden', 'true');
-      toggle.setAttribute('aria-expanded', 'false');
-      var otherOpen = document.querySelector('.reader-drawer.active');
-      if (!otherOpen) {
-        document.body.classList.remove('reader-drawer-open');
-        var closingBackdrop = document.getElementById('readerDrawerBackdrop');
-        if (closingBackdrop) {
-          closingBackdrop.classList.remove('is-active');
-          closingBackdrop.setAttribute('aria-hidden', 'true');
-        }
+    var displayedSearchGeneration = 0;
+    var controller = drawerController.register({
+      panel: drawer,
+      toggle: toggle,
+      mobileToggle: mobileToggle,
+      onClose: function() {
+        displayedSearchGeneration += 1;
+        cancelSearch();
       }
-      if (restoreFocus && opener && typeof opener.focus === 'function') opener.focus();
-      opener = null;
-    }
-    function openDrawer() {
-      if (drawer.classList.contains('active')) return closeDrawer(true);
-      opener = toggle;
-      drawer.classList.add('active');
-      drawer.setAttribute('aria-hidden', 'false');
-      toggle.setAttribute('aria-expanded', 'true');
-      document.body.classList.add('reader-drawer-open');
-      var backdrop = document.getElementById('readerDrawerBackdrop');
-      if (backdrop) {
-        backdrop.classList.add('is-active');
-        backdrop.setAttribute('aria-hidden', 'false');
-      }
-      var input = document.getElementById('pdfSearchInput');
-      if (input && typeof input.focus === 'function') root.requestAnimationFrame(function() { input.focus(); });
-    }
-    toggle.addEventListener('click', openDrawer);
-    var close = document.getElementById('pdfSearchClose');
-    if (close) close.addEventListener('click', function() { closeDrawer(true); });
-    var backdrop = document.getElementById('readerDrawerBackdrop');
-    if (backdrop) backdrop.addEventListener('click', function() { closeDrawer(true); });
-    document.addEventListener('keydown', function(event) {
-      if (event.key === 'Escape') closeDrawer(true);
     });
+    toggle.addEventListener('click', function() { controller.open(toggle); });
+    if (mobileToggle) mobileToggle.addEventListener('click', function() { controller.open(mobileToggle); });
+    var close = document.getElementById('pdfSearchClose');
+    if (close) close.addEventListener('click', function() { controller.close(true); });
     var form = document.getElementById('pdfSearchForm');
     var input = document.getElementById('pdfSearchInput');
     var resultsNode = document.getElementById('pdfSearchResults');
-    var displayedSearchGeneration = 0;
+    function searchError() {
+      resultsNode.replaceChildren();
+      var error = document.createElement('li');
+      error.setAttribute('role', 'alert');
+      error.textContent = translate('pdf.searchFailed');
+      resultsNode.appendChild(error);
+    }
     if (form && input && resultsNode) form.addEventListener('submit', function(event) {
       event.preventDefault();
       var displayedGeneration = ++displayedSearchGeneration;
@@ -516,25 +514,35 @@
           item.appendChild(link);
           resultsNode.appendChild(item);
         });
-      }).catch(function() {});
+      }).catch(function() {
+        if (displayedGeneration === displayedSearchGeneration && drawer.classList.contains('active')) searchError();
+      });
     });
-    [['pdfZoomOut', -0.25], ['pdfZoomIn', 0.25]].forEach(function(pair) {
-      var button = document.getElementById(pair[0]);
-      if (button) button.addEventListener('click', function() { setZoom(pair[1]); });
+    if (input && resultsNode) input.addEventListener('input', function() {
+      if (input.value.trim() === '') {
+        displayedSearchGeneration += 1;
+        cancelSearch();
+        resultsNode.replaceChildren();
+      }
     });
-    var width = document.getElementById('pdfFitWidth');
-    var page = document.getElementById('pdfFitPage');
-    var rotation = document.getElementById('pdfRotate');
-    var printButton = document.getElementById('pdfPrint');
-    var downloadButton = document.getElementById('pdfDownload');
-    if (width) width.addEventListener('click', fitWidth);
-    if (page) page.addEventListener('click', fitPage);
-    if (rotation) rotation.addEventListener('click', rotate);
-    if (printButton) printButton.addEventListener('click', print);
-    if (downloadButton) downloadButton.addEventListener('click', download);
+    function bindAction(ids, action) {
+      ids.forEach(function(id) {
+        var button = document.getElementById(id);
+        if (button) button.addEventListener('click', action);
+      });
+    }
+    [['pdfZoomOut', 'mobilePdfZoomOut', -0.25], ['pdfZoomIn', 'mobilePdfZoomIn', 0.25]].forEach(function(pair) {
+      bindAction([pair[0], pair[1]], function() { setZoom(pair[2]); });
+    });
+    bindAction(['pdfFitWidth', 'mobilePdfFitWidth'], fitWidth);
+    bindAction(['pdfFitPage', 'mobilePdfFitPage'], fitPage);
+    bindAction(['pdfRotate', 'mobilePdfRotate'], rotate);
+    bindAction(['pdfPrint', 'mobilePdfPrint'], print);
+    bindAction(['pdfDownload', 'mobilePdfDownload'], download);
   }
 
   if (root && typeof root.addEventListener === 'function') {
+    root.addEventListener('epub-browser:reader-drawers-ready', bindReaderControls);
     root.addEventListener('epub-browser:chapter-content-added', function(event) {
       renderWithin(event.detail && event.detail.root).catch(function() {});
     });
@@ -553,6 +561,6 @@
     renderWithin: renderWithin, disposeWithin: disposeWithin,
     search: search, rotate: rotate, fitWidth: fitWidth, fitPage: fitPage,
     zoomIn: function() { return setZoom(0.25); }, zoomOut: function() { return setZoom(-0.25); },
-    print: print, download: download, bindReaderControls: bindReaderControls
+    print: print, download: download, cancelSearch: cancelSearch, bindReaderControls: bindReaderControls
   };
 });

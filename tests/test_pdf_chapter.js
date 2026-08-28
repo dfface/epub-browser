@@ -17,6 +17,15 @@ class Element {
     this.style = { setProperty(name, value) { this[name] = String(value); } };
     this.className = '';
     this.textContent = '';
+    this.hidden = false;
+    this.value = '';
+    this.events = new Map();
+    this.focused = false;
+    this.classList = {
+      add: (...names) => { this.className = Array.from(new Set(this.className.split(/\s+/).filter(Boolean).concat(names))).join(' '); },
+      remove: (...names) => { this.className = this.className.split(/\s+/).filter((name) => !names.includes(name)).join(' '); },
+      contains: (name) => this.className.split(/\s+/).includes(name),
+    };
   }
 
   setAttribute(name, value) {
@@ -42,6 +51,16 @@ class Element {
     this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
     this.parentNode = null;
   }
+  addEventListener(name, callback) {
+    const callbacks = this.events.get(name) || [];
+    callbacks.push(callback);
+    this.events.set(name, callbacks);
+  }
+  dispatchEvent(event) {
+    for (const callback of this.events.get(event.type) || []) callback(event);
+  }
+  click() { this.dispatchEvent({ type: 'click', preventDefault() {} }); }
+  focus() { this.focused = true; }
   getBoundingClientRect() { return { width: this.clientWidth, height: this.clientHeight }; }
   querySelectorAll(selector) {
     const found = [];
@@ -63,6 +82,7 @@ function createHarness(options = {}) {
   const resizeObservers = [];
   const intersectionObservers = [];
   const importUrls = [];
+  const textRequests = [];
   let cancelCount = 0;
   let textCancelCount = 0;
   const storageValues = new Map();
@@ -76,6 +96,29 @@ function createHarness(options = {}) {
   document.baseURI = 'https://reader.example/book/demo/chapter_0.html';
   document.createElement = (tagName) => new Element(tagName, document);
   document.ownerDocument = document;
+  document.body = document.createElement('body');
+  document.appendChild(document.body);
+  document.getElementById = (id) => {
+    let match = null;
+    const visit = (node) => {
+      if (node.getAttribute && node.getAttribute('id') === id) match = node;
+      node.children.forEach(visit);
+    };
+    visit(document);
+    return match;
+  };
+  document.querySelector = (selector) => {
+    if (selector === '.reader-drawer.active') {
+      let match = null;
+      const visit = (node) => {
+        if (node.classList && node.classList.contains('reader-drawer') && node.classList.contains('active')) match = node;
+        node.children.forEach(visit);
+      };
+      visit(document);
+      return match;
+    }
+    return null;
+  };
 
   class TextLayer {
     constructor(params) { this.params = params; }
@@ -122,6 +165,10 @@ function createHarness(options = {}) {
             },
             getTextContent() {
               const pageTexts = options.pageTexts || [];
+              if (options.textError) return Promise.reject(new Error('broken text layer'));
+              if (options.deferText && options.deferText.includes(pageNumber)) {
+                return new Promise((resolve, reject) => textRequests.push({ pageNumber, resolve, reject }));
+              }
               return Promise.resolve({
                 items: [{ str: pageTexts[pageNumber - 1] || `Page ${pageNumber}` }],
                 styles: {}, lang: 'en'
@@ -157,7 +204,10 @@ function createHarness(options = {}) {
     dispatchEvent(event) {
       for (const callback of events.get(event.type) || []) callback(event);
     },
-    setTimeout(callback) { callback(); return 1; },
+    setTimeout(callback) {
+      if (options.controlledTimers) { events.set('timeout', callback); return 1; }
+      callback(); return 1;
+    },
     clearTimeout() {},
     requestAnimationFrame(callback) { callback(); return 1; },
     ResizeObserver: class {
@@ -191,16 +241,160 @@ function createHarness(options = {}) {
     return node;
   }
 
+  function control(id, className = '') {
+    const node = document.createElement('button');
+    node.setAttribute('id', id);
+    node.className = className;
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function installReaderControls() {
+    const drawer = control('pdfSearchDrawer', 'reader-drawer');
+    drawer.setAttribute('aria-hidden', 'true');
+    const toggle = control('pdfSearchToggle');
+    const mobileToggle = control('mobilePdfSearchToggle');
+    const close = control('pdfSearchClose');
+    const form = control('pdfSearchForm');
+    const input = control('pdfSearchInput');
+    const results = document.createElement('ul');
+    results.setAttribute('id', 'pdfSearchResults');
+    document.body.appendChild(results);
+    control('readerDrawerBackdrop');
+    ['pdfZoomOut', 'pdfZoomIn', 'pdfFitWidth', 'pdfFitPage', 'pdfRotate', 'pdfPrint', 'pdfDownload'].forEach(control);
+    return { drawer, toggle, mobileToggle, close, form, input, results };
+  }
+
   return {
     adapter, document, window, pdfjs, page, renderCalls, getDocumentCalls,
-    loadingTasks, resizeObservers, intersectionObservers, importUrls, storage,
+    loadingTasks, resizeObservers, intersectionObservers, importUrls, storage, textRequests, installReaderControls,
     get cancelCount() { return cancelCount; },
     get textCancelCount() { return textCancelCount; },
     async flush() {
       for (let index = 0; index < 10; index += 1) await Promise.resolve();
     },
+    runTimeout() {
+      const timeout = events.get('timeout');
+      if (timeout) timeout();
+    },
   };
 }
+
+test('registers the PDF search surface with the shared drawer controller for desktop and mobile toggles', () => {
+  const registrations = [];
+  const controller = {
+    register(options) {
+      registrations.push(options);
+      return { open() {}, close() {} };
+    },
+  };
+  const harness = createHarness({ drawerController: controller });
+  const controls = harness.installReaderControls();
+  harness.window.EpubReaderDrawers = controller;
+
+  harness.adapter.bindReaderControls();
+
+  assert.equal(registrations.length, 1);
+  assert.equal(registrations[0].panel, controls.drawer);
+  assert.equal(registrations[0].toggle, controls.toggle);
+  assert.equal(registrations[0].mobileToggle, controls.mobileToggle);
+});
+
+test('invalidating a PDF search stops stale extraction before later pages', async () => {
+  const harness = createHarness({ pages: 2, deferText: [1] });
+  const search = harness.adapter.search('alpha');
+  await harness.flush();
+
+  harness.adapter.cancelSearch();
+  harness.textRequests[0].resolve({ items: [{ str: 'alpha' }] });
+
+  assert.deepEqual(await search, []);
+  assert.equal(harness.textRequests.filter((request) => request.pageNumber === 2).length, 0);
+});
+
+test('clearing a PDF search invalidates an in-flight extraction', async () => {
+  const harness = createHarness({ pages: 2, deferText: [1] });
+  const search = harness.adapter.search('alpha');
+  await harness.flush();
+
+  assert.deepEqual(await harness.adapter.search(''), []);
+  harness.textRequests[0].resolve({ items: [{ str: 'alpha' }] });
+
+  assert.deepEqual(await search, []);
+});
+
+test('closing the shared PDF drawer invalidates an in-flight extraction', async () => {
+  let registration = null;
+  const controller = {
+    register(options) {
+      registration = options;
+      return { open() {}, close() { options.onClose(); } };
+    },
+  };
+  const harness = createHarness({ pages: 2, deferText: [1], drawerController: controller });
+  harness.installReaderControls();
+  harness.window.EpubReaderDrawers = controller;
+  harness.adapter.bindReaderControls();
+  const search = harness.adapter.search('alpha');
+  await harness.flush();
+
+  registration.onClose();
+  harness.textRequests[0].resolve({ items: [{ str: 'alpha' }] });
+
+  assert.deepEqual(await search, []);
+});
+
+test('shows an accessible localized error when PDF search extraction fails', async () => {
+  const registrations = [];
+  const controller = {
+    register(options) {
+      registrations.push(options);
+      return {
+        open() { options.panel.classList.add('active'); },
+        close() { options.panel.classList.remove('active'); options.onClose(); },
+      };
+    },
+  };
+  const harness = createHarness({ drawerController: controller, textError: true });
+  const controls = harness.installReaderControls();
+  harness.window.EpubReaderDrawers = controller;
+  harness.adapter.bindReaderControls();
+  controls.toggle.click();
+  controls.input.value = 'alpha';
+  controls.form.dispatchEvent({ type: 'submit', preventDefault() {} });
+  await harness.flush();
+
+  assert.equal(controls.results.children.length, 1);
+  assert.equal(controls.results.children[0].getAttribute('role'), 'alert');
+  assert.equal(controls.results.children[0].textContent, 'translated:pdf.searchFailed');
+});
+
+test('removes a print iframe after the browser reports printing complete', () => {
+  const harness = createHarness({ controlledTimers: true });
+
+  harness.adapter.print();
+  const frame = harness.document.body.children.find((node) => node.tagName === 'IFRAME');
+  assert.ok(frame);
+  frame.dispatchEvent({ type: 'load' });
+  harness.window.dispatchEvent({ type: 'afterprint' });
+
+  assert.equal(frame.parentNode, null);
+});
+
+test('removes a print iframe after a load failure or timeout fallback', () => {
+  const failed = createHarness({ controlledTimers: true });
+  failed.adapter.print();
+  const failedFrame = failed.document.body.children.find((node) => node.tagName === 'IFRAME');
+  failedFrame.dispatchEvent({ type: 'error' });
+  assert.equal(failedFrame.parentNode, null);
+
+  const timedOut = createHarness({ controlledTimers: true });
+  timedOut.adapter.print();
+  const timedOutFrame = timedOut.document.body.children.find((node) => node.tagName === 'IFRAME');
+  timedOutFrame.dispatchEvent({ type: 'load' });
+  timedOut.runTimeout();
+  assert.equal(timedOutFrame.parentNode, null);
+});
 
 test('search resolves results to canonical PDF chapter URLs', async () => {
   const harness = createHarness({ pageTexts: ['alpha', 'beta alpha'] });

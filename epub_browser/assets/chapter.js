@@ -1835,6 +1835,7 @@ function initScript() {
     var tocList = document.getElementById('tocList');
     var readerDrawerBackdrop = document.getElementById('readerDrawerBackdrop');
     var readerDrawerOpener = null;
+    var readerDrawerEntries = [];
     
     generateToc();
     
@@ -1854,16 +1855,52 @@ function initScript() {
             window.innerWidth >= 1360;
     }
 
+    function registerReaderDrawer(options) {
+        options = options || {};
+        if (!options.panel || !options.toggle) return null;
+        var entry = {
+            panel: options.panel,
+            toggle: options.toggle,
+            mobileToggle: options.mobileToggle || null,
+            afterOpen: options.afterOpen || function() {},
+            onClose: options.onClose || function() {}
+        };
+        readerDrawerEntries.push(entry);
+        return {
+            open: function(opener) {
+                openReaderDrawer(entry.panel, entry.toggle, entry.mobileToggle, entry.afterOpen, opener || entry.toggle);
+            },
+            close: function(restoreFocus) {
+                closeReaderDrawers(restoreFocus);
+            }
+        };
+    }
+
+    registerReaderDrawer({
+        panel: tocFloating,
+        toggle: tocToggle,
+        mobileToggle: mobileTocBtn,
+        afterOpen: tocFloatingScrolling
+    });
+    registerReaderDrawer({
+        panel: bookHomeFloating,
+        toggle: bookHomeToggle,
+        mobileToggle: mobileBookHomeBtn,
+        afterOpen: bookHomeFloatingScrolling
+    });
+
     function closeReaderDrawers(restoreFocus) {
-        [tocFloating, bookHomeFloating].forEach(function(panel) {
-            panel.classList.remove('active');
-            panel.setAttribute('aria-hidden', isPersistentBookDrawer(panel) ? 'false' : 'true');
+        readerDrawerEntries.forEach(function(entry) {
+            var wasActive = entry.panel.classList.contains('active');
+            entry.panel.classList.remove('active');
+            entry.panel.setAttribute('aria-hidden', isPersistentBookDrawer(entry.panel) ? 'false' : 'true');
+            if (wasActive) entry.onClose();
         });
-        [tocToggle, bookHomeToggle].forEach(function(toggle) {
-            toggle.setAttribute('aria-expanded', 'false');
+        readerDrawerEntries.forEach(function(entry) {
+            entry.toggle.setAttribute('aria-expanded', 'false');
         });
-        [mobileTocBtn, mobileBookHomeBtn].forEach(function(toggle) {
-            if (toggle) toggle.classList.remove('active');
+        readerDrawerEntries.forEach(function(entry) {
+            if (entry.mobileToggle) entry.mobileToggle.classList.remove('active');
         });
         document.body.classList.remove('reader-drawer-open');
         readerDrawerBackdrop.classList.remove('is-active');
@@ -1933,6 +1970,13 @@ function initScript() {
             closeReaderDrawers(true);
         }
     });
+    window.EpubReaderDrawers = {
+        register: registerReaderDrawer,
+        close: closeReaderDrawers
+    };
+    if (typeof window.CustomEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('epub-browser:reader-drawers-ready'));
+    }
     
     function generateToc() {
         var c = document.getElementById('eb-content');
