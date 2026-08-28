@@ -413,6 +413,131 @@ class VendorAssetTests(unittest.TestCase):
         self.assertEqual(lock.packages[0].name, "example")
         self.assertEqual(lock.packages[0].files[1].target, "pkg/file.js")
 
+    def test_schema_two_records_release_notice_metadata_and_runtime_consumers(self):
+        """Every releasable package must identify its project, copyright, and consumers."""
+        document = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        package = document["packages"][0]
+        document["schema"] = 2
+        package.update(
+            {
+                "upstream": "https://example.test/example",
+                "copyright": ["Copyright (c) Example Authors"],
+                "runtime_files": ["pkg/file.js"],
+            }
+        )
+        self.lock_path.write_text(json.dumps(document), encoding="utf-8")
+
+        lock = load_lock(self.lock_path)
+
+        self.assertEqual(lock.schema, 2)
+        self.assertEqual(lock.packages[0].upstream, "https://example.test/example")
+        self.assertEqual(
+            lock.packages[0].copyright,
+            ("Copyright (c) Example Authors",),
+        )
+        self.assertEqual(lock.packages[0].runtime_files, ("pkg/file.js",))
+
+    def test_schema_one_still_requires_an_archive_license_file(self):
+        """Adding supplemental schema-two licenses must not weaken legacy locks."""
+        document = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        document["packages"][0]["license"]["files"] = []
+        self.lock_path.write_text(json.dumps(document), encoding="utf-8")
+
+        with self.assertRaisesRegex(VendorAssetError, "license.files must not be empty"):
+            load_lock(self.lock_path)
+
+    def test_schema_two_rejects_unknown_runtime_consumers(self):
+        """Notice metadata must not name a runtime file outside the locked inventory."""
+        document = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        package = document["packages"][0]
+        document["schema"] = 2
+        package.update(
+            {
+                "upstream": "https://example.test/example",
+                "copyright": ["Copyright (c) Example Authors"],
+                "runtime_files": ["pkg/missing.js"],
+            }
+        )
+        self.lock_path.write_text(json.dumps(document), encoding="utf-8")
+
+        with self.assertRaisesRegex(VendorAssetError, "runtime_files.*locked target"):
+            load_lock(self.lock_path)
+
+    def test_schema_two_allows_two_versions_but_rejects_duplicate_identities(self):
+        """Bundled dependency inventories may legitimately contain two exact versions."""
+        document = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        first = document["packages"][0]
+        document["schema"] = 2
+        first.update(
+            {
+                "upstream": "https://example.test/example",
+                "copyright": ["Copyright (c) Example Authors"],
+                "runtime_files": ["pkg/file.js"],
+            }
+        )
+        second = json.loads(json.dumps(first))
+        second["version"] = "2.0.0"
+        second["files"] = [
+            {
+                "source": "LICENSE",
+                "target": "pkg-v2/LICENSE",
+                "sha256": hashlib.sha256(b"license").hexdigest(),
+            }
+        ]
+        second["runtime_files"] = ["pkg/file.js"]
+        document["packages"].append(second)
+        self.lock_path.write_text(json.dumps(document), encoding="utf-8")
+
+        lock = load_lock(self.lock_path)
+
+        self.assertEqual(
+            [(package.name, package.version) for package in lock.packages],
+            [("example", "1.0.0"), ("example", "2.0.0")],
+        )
+        document["packages"].append(second)
+        self.lock_path.write_text(json.dumps(document), encoding="utf-8")
+        with self.assertRaisesRegex(VendorAssetError, "duplicate package"):
+            load_lock(self.lock_path)
+
+    def test_schema_two_installs_digest_locked_supplemental_license_text(self):
+        """An upstream license omitted from a distribution tarball remains generated and verified."""
+        document = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        package = document["packages"][0]
+        text = "Copyright (c) Upstream Authors\n\nPermission is hereby granted.\n"
+        document["schema"] = 2
+        package.update(
+            {
+                "upstream": "https://example.test/example",
+                "copyright": ["Copyright (c) Example Authors"],
+                "runtime_files": ["pkg/file.js"],
+                "supplemental_license_files": [
+                    {
+                        "target": "pkg/UPSTREAM-LICENSE",
+                        "sha256": hashlib.sha256(text.encode()).hexdigest(),
+                        "text": text,
+                        "upstream": "https://example.test/commit/LICENSE",
+                    }
+                ],
+            }
+        )
+        self.lock_path.write_text(json.dumps(document), encoding="utf-8")
+        clean_assets(self.lock_path, self.vendor_root)
+        archive = self.tar_archive(
+            [("LICENSE", b"license", "file"), ("file.js", b"asset", "file")]
+        )
+
+        fetch_assets(
+            self.lock_for_archive(archive),
+            self.vendor_root,
+            opener=self.opener(archive),
+        )
+
+        self.assertEqual(
+            (self.vendor_root / "pkg/UPSTREAM-LICENSE").read_text(encoding="utf-8"),
+            text,
+        )
+        verify_assets(self.lock_for_archive(archive), self.vendor_root)
+
     def test_lock_rejects_unknown_fields_and_duplicate_package_names(self):
         """Accepting unrecognized fields or duplicate packages could hide a bad lock edit."""
         lock_path, _ = self.fixture_lock({"pkg/LICENSE": b"license", "pkg/file.js": b"asset"})

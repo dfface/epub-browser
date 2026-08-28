@@ -2615,7 +2615,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/annotation.css">
     <link rel="stylesheet" href="/assets/annotation-hub.css">
     {server_account_stylesheet}
-    <link rel="stylesheet" href="/assets/vendor/fancybox/fancybox.min.css">
+    <link rel="stylesheet" href="/assets/vendor/glightbox/glightbox.min.css">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
     <link rel="apple-touch-icon" href="/assets/icon-192.png">
     <link rel="stylesheet" href="/assets/bookshelf.css">
@@ -3130,7 +3130,8 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
-    <script src="/assets/vendor/fancybox/fancybox.min.js" defer></script>
+    <script src="/assets/vendor/glightbox/glightbox.min.js" defer></script>
+    <script src="/assets/lightbox-adapter.js" defer></script>
     <script src="/assets/vendor/web-highlighter/web-highlighter.min.js" defer></script>
     <script src="/assets/chapter-window.js" defer></script>
     <script src="/assets/viewport-anchor.js" defer></script>

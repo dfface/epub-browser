@@ -2275,9 +2275,13 @@ assert.deepEqual(
         )
         self.assertRegex(
             html,
-            r"/assets/immutable/vendor/fancybox/.+\.[0-9a-f]{12}\.js",
+            r"/assets/immutable/vendor/glightbox/.+\.[0-9a-f]{12}\.js",
         )
-        self.assertNotIn("fancybox.min.js", html)
+        self.assertRegex(
+            html,
+            r"/assets/immutable/lightbox-adapter\.[0-9a-f]{12}\.js",
+        )
+        self.assertNotIn("vendor/fancybox/", html)
 
     def test_pagination_mode_does_not_access_the_removed_custom_css_panel(self):
         script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
@@ -3315,17 +3319,19 @@ assert.deepEqual(
             chapter = processor.create_chapter_template('<p>Text</p>', '', 0, 'One')
 
         for logical_path in (
-            'vendor/fancybox/fancybox.min.js',
+            'vendor/glightbox/glightbox.min.js',
+            'lightbox-adapter.js',
             'vendor/web-highlighter/web-highlighter.min.js',
             'vendor/sortablejs/sortable.min.js',
             'vendor/highlight/highlight.min.js',
         ):
-            directory, filename = logical_path.rsplit('/', 1)
+            directory, _, filename = logical_path.rpartition('/')
             stem = filename.rsplit('.', 1)[0]
+            immutable_stem = (directory + '/' if directory else '') + stem
             self.assertRegex(
                 chapter,
                 r'<script src="/assets/immutable/'
-                + re.escape(directory + '/' + stem)
+                + re.escape(immutable_stem)
                 + r'\.[0-9a-f]{12}\.js" defer></script>',
             )
 
