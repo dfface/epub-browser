@@ -2,7 +2,9 @@
 
 > A private EPUB reading service and a self-contained static-site generator.
 
-[English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
+**README:** [English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
+
+**Interface languages (17):** English, 简体中文, 繁體中文, 日本語, 한국어, Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية, Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
@@ -53,7 +55,7 @@ that help the reader carry the argument forward.
   passive reading into reflection.
 
 <p align="center">
-  <img src="[https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-inline-claim.png" alt="An AI explanation opens from a highlighted claim" width="48%">
+  <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-inline-claim.png" alt="An AI explanation opens from a highlighted claim" width="48%">
   <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-paragraph-note.png" alt="A paragraph-role note remains tied to its original text" width="48%">
 </p>
 
