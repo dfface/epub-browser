@@ -16,9 +16,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
+from typing import Optional, TYPE_CHECKING
 
 from .asset_publisher import (
     AssetPublisher,
+    PublishedAssets,
     SERVER_ONLY_ASSET_PATHS,
     SERVER_ONLY_ASSET_PREFIXES,
     rewrite_asset_urls,
@@ -33,8 +35,12 @@ from .server_chrome import (
     SERVER_LOCALE_CONTROL,
     SERVER_LOCALE_SCRIPT,
 )
+from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs, rewrite_root_urls
 from .version import LATEST_RELEASE_API_URL, render_footer
+
+if TYPE_CHECKING:
+    from .pdf_processor import PDFMetadata
 
 # Server mode stores only EPUB-derived content. Reader HTML is rendered from
 # that cache for each request, so changes to UI, i18n, permissions, or hashed
@@ -561,6 +567,70 @@ class EPUBProcessor:
     """处理EPUB文件的类"""
 
     @classmethod
+    def from_pdf_metadata(
+        cls,
+        *,
+        book_id: str,
+        metadata: "PDFMetadata",
+        cover_path: Optional[str],
+        asset_manifest: PublishedAssets,
+        urls: SiteURLs,
+        deployment_mode: str,
+    ) -> "EPUBProcessor":
+        """Hydrate PDF pages into the state consumed by the shared templates."""
+        if deployment_mode not in {"ssg", "server"}:
+            raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
+
+        processor = cls.__new__(cls)
+        processor.epub_path = ""
+        processor.output_dir = None
+        processor.urls = urls or SiteURLs()
+        processor.reporter = Reporter(False)
+        processor.deployment_mode = deployment_mode
+        processor.source_format = PDF_FORMAT
+        processor._caller_supplied_book_id = True
+        processor.book_hash = str(book_id)
+        processor.temp_dir = ""
+        processor.extract_dir = ""
+        processor.web_dir = ""
+        processor.book_title = metadata.title or "PDF Book"
+        processor.authors = list(metadata.authors)
+        processor.tags = list(metadata.tags)
+        processor.description = None
+        processor.epub_identifier = None
+        processor.cover_info = (
+            {"full_path": cover_path, "web_path": cover_path}
+            if cover_path else None
+        )
+        processor.lang = metadata.language or "en"
+        processor.chapters = [
+            {
+                "title": f"Page {page.page_number}",
+                "path": f"chapter_{page.page_number - 1}.html",
+            }
+            for page in metadata.pages
+        ]
+        processor.toc = [
+            {
+                "title": f"Page {page.page_number}",
+                "level": 0,
+                "kind": "chapter",
+                "chapter_index": page.page_number - 1,
+                "chapter_file": f"chapter_{page.page_number - 1}.html",
+                "page_label": str(page.page_number),
+                "outline_labels": list(page.outline_labels),
+            }
+            for page in metadata.pages
+        ]
+        processor.resources_base = "resources"
+        processor._server_chapter_payloads = {}
+        processor.asset_manifest = asset_manifest
+        processor._pdf_pages = tuple(metadata.pages)
+        processor._pdf_encrypted = bool(metadata.encrypted)
+        processor._pdf_has_extractable_text = bool(metadata.has_extractable_text)
+        return processor
+
+    @classmethod
     def from_server_content_cache(
         cls,
         *,
@@ -591,6 +661,7 @@ class EPUBProcessor:
         processor.urls = urls or SiteURLs()
         processor.reporter = reporter or Reporter(False)
         processor.deployment_mode = "server"
+        processor.source_format = EPUB_FORMAT
         processor._caller_supplied_book_id = True
         processor.book_hash = str(book_id)
         processor.temp_dir = ""
@@ -627,6 +698,7 @@ class EPUBProcessor:
         if deployment_mode not in {"ssg", "server"}:
             raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
         self.deployment_mode = deployment_mode
+        self.source_format = EPUB_FORMAT
         self._caller_supplied_book_id = book_id is not None
         self.book_hash = book_id or base64.urlsafe_b64encode(
             hashlib.md5(self.epub_path.encode('utf-8')).digest()
@@ -1771,6 +1843,28 @@ class EPUBProcessor:
                 if self.deployment_mode == "server"
                 else toc_item["title"]
             )
+            toc_title_attributes = f' lang="{book_language}" dir="auto"'
+            if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('page_label'):
+                page_params = html.escape(
+                    json.dumps(
+                        {'number': toc_item['page_label']},
+                        separators=(',', ':'),
+                    ),
+                    quote=True,
+                )
+                toc_title_attributes += (
+                    f' data-i18n="pdf.page" data-i18n-params="{page_params}"'
+                )
+            outline_labels_html = ""
+            if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('outline_labels'):
+                outline_labels = " · ".join(
+                    html.escape(metadata_text(label), quote=False)
+                    for label in toc_item['outline_labels']
+                )
+                outline_labels_html = (
+                    f'<span class="chapter-outline-labels" lang="{book_language}" '
+                    f'dir="auto">— {outline_labels}</span>'
+                )
             if toc_item.get('kind') == 'section':
                 index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
                 continue
@@ -1783,9 +1877,9 @@ class EPUBProcessor:
                     if self.deployment_mode == "server"
                     else chapter_anchor
                 )
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}" dir="auto">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title"{toc_title_attributes}>{toc_title}</span>{outline_labels_html}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
             else:
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}" dir="auto">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title"{toc_title_attributes}>{toc_title}</span>{outline_labels_html}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
@@ -1985,6 +2079,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     
     def _build_toc_data(self):
         """Return the EPUB-derived table of contents for either publisher."""
+        if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT:
+            return [dict(item) for item in self.toc]
+
         toc_data = []
 
         def title_key(value):
@@ -2466,7 +2563,36 @@ document.addEventListener('DOMContentLoaded', function() {{
         
         return content
     
-    def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
+    def create_pdf_chapter_template(self, chapter_index: int, document_url: str) -> str:
+        """Render one PDF page through the canonical chapter template."""
+        try:
+            page = self._pdf_pages[chapter_index]
+            chapter = self.chapters[chapter_index]
+        except (AttributeError, IndexError):
+            raise ValueError(f"PDF chapter index is out of range: {chapter_index}") from None
+        return self.create_chapter_template(
+            "",
+            "",
+            chapter_index,
+            chapter["title"],
+            pdf_page={
+                "document_url": document_url,
+                "page_number": page.page_number,
+                "width": page.width,
+                "height": page.height,
+                "encrypted": self._pdf_encrypted,
+                "has_extractable_text": self._pdf_has_extractable_text,
+            },
+        )
+
+    def create_chapter_template(
+        self,
+        content,
+        style_links,
+        chapter_index,
+        chapter_title,
+        pdf_page=None,
+    ):
         """创建章节页面模板"""
         if self.deployment_mode == "server":
             content = sanitize_html_fragment(content)
@@ -2485,6 +2611,49 @@ document.addEventListener('DOMContentLoaded', function() {{
             book_title_attribute = self.book_title
             chapter_title_text = chapter_title
             chapter_title_attribute = chapter_title
+        pdf_config_script = ""
+        if pdf_page is not None:
+            page_number = int(pdf_page["page_number"])
+            total_pages = len(self.chapters)
+            page_params = html.escape(
+                json.dumps(
+                    {"number": page_number, "total": total_pages},
+                    separators=(",", ":"),
+                ),
+                quote=True,
+            )
+            content = (
+                '<div class="pdf-page-content"'
+                f' data-pdf-page-number="{page_number}"'
+                f' data-pdf-page-width="{html.escape(str(pdf_page["width"]), quote=True)}"'
+                f' data-pdf-page-height="{html.escape(str(pdf_page["height"]), quote=True)}"'
+                f' data-pdf-encrypted="{str(bool(pdf_page["encrypted"])).lower()}"'
+                f' data-pdf-has-extractable-text="{str(bool(pdf_page["has_extractable_text"])).lower()}"'
+                ' data-pdf-loading-message-key="pdf.loadingPage"'
+                ' data-pdf-text-unavailable-message-key="pdf.textUnavailable"'
+                ' data-pdf-password-required-message-key="pdf.passwordRequired"'
+                f' aria-label="Page {page_number} of {total_pages}"'
+                ' data-i18n-aria-label="pdf.pageOf"'
+                f' data-i18n-params="{page_params}"></div>'
+            )
+            pdf_config = json.dumps(
+                {
+                    "documentUrl": str(pdf_page["document_url"]),
+                    "pdfjsModuleUrl": self.asset_manifest.url_for(
+                        "vendor/pdfjs/build/pdf.mjs"
+                    ),
+                    "pdfjsWorkerUrl": self.asset_manifest.url_for(
+                        "vendor/pdfjs/build/pdf.worker.mjs"
+                    ),
+                },
+                separators=(",", ":"),
+            )
+            pdf_config = (
+                pdf_config.replace("&", "\\u0026")
+                .replace("<", "\\u003c")
+                .replace(">", "\\u003e")
+            )
+            pdf_config_script = f"<script>window.EpubPDFConfig={pdf_config};</script>"
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -2600,6 +2769,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     {reading_session_context}
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
+    {pdf_config_script}
     {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
@@ -3235,7 +3405,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     def get_book_info(self):
         """获取书籍信息"""
         cover_path = ""
-        if self.cover_info and self.cover_info['full_path']:
+        if self.cover_info and self.cover_info.get('web_path'):
+            cover_path = self.cover_info['web_path']
+        elif self.cover_info and self.cover_info['full_path']:
             cover_path = os.path.normpath(os.path.join(self.resources_base, self.cover_info["full_path"]))
         return {
             'title': self.book_title,
@@ -3251,7 +3423,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     def get_metadata(self):
         """Return immutable metadata shared by SSG and Server publishers."""
         cover_path = None
-        if self.cover_info and self.cover_info.get('full_path'):
+        if self.cover_info and self.cover_info.get('web_path'):
+            cover_path = self.cover_info['web_path']
+        elif self.cover_info and self.cover_info.get('full_path'):
             cover_path = os.path.normpath(
                 os.path.join(self.resources_base, self.cover_info['full_path'])
             )

@@ -6875,6 +6875,96 @@
   Object.keys(apiDocsExampleTranslations).forEach(function(code) {
     dictionaries[code]['apiDocs.exampleListBooks'] = apiDocsExampleTranslations[code];
   });
+  var pdfLocaleAdditions = {
+    en: {
+      'pdf.page': 'Page {number}', 'pdf.pageOf': 'Page {number} of {total}', 'pdf.loadingPage': 'Loading page…',
+      'pdf.textUnavailable': 'Text selection, annotations, dictionary, and encyclopedia are unavailable because this PDF has no usable text layer.',
+      'pdf.passwordRequired': 'This PDF is password protected. Enter its password in the reader to display the page.'
+    },
+    'zh-CN': {
+      'pdf.page': '第 {number} 页', 'pdf.pageOf': '第 {number} 页，共 {total} 页', 'pdf.loadingPage': '正在加载页面…',
+      'pdf.textUnavailable': '此 PDF 没有可用的文本层，因此无法使用文本选择、标注、词典和百科。',
+      'pdf.passwordRequired': '此 PDF 受密码保护。请在阅读器中输入密码以显示页面。'
+    },
+    'zh-TW': {
+      'pdf.page': '第 {number} 頁', 'pdf.pageOf': '第 {number} 頁，共 {total} 頁', 'pdf.loadingPage': '正在載入頁面…',
+      'pdf.textUnavailable': '此 PDF 沒有可用的文字層，因此無法使用文字選取、標註、詞典和百科。',
+      'pdf.passwordRequired': '此 PDF 受密碼保護。請在閱讀器中輸入密碼以顯示頁面。'
+    },
+    ko: {
+      'pdf.page': '{number}페이지', 'pdf.pageOf': '전체 {total}페이지 중 {number}페이지', 'pdf.loadingPage': '페이지를 불러오는 중…',
+      'pdf.textUnavailable': '이 PDF에는 사용 가능한 텍스트 레이어가 없어 텍스트 선택, 주석, 사전 및 백과사전을 사용할 수 없습니다.',
+      'pdf.passwordRequired': '이 PDF는 암호로 보호되어 있습니다. 페이지를 표시하려면 리더에서 암호를 입력하세요.'
+    },
+    ja: {
+      'pdf.page': '{number}ページ', 'pdf.pageOf': '{total}ページ中{number}ページ', 'pdf.loadingPage': 'ページを読み込んでいます…',
+      'pdf.textUnavailable': 'この PDF には利用可能なテキストレイヤーがないため、テキスト選択、注釈、辞書、百科事典は使用できません。',
+      'pdf.passwordRequired': 'この PDF はパスワードで保護されています。ページを表示するにはリーダーでパスワードを入力してください。'
+    },
+    es: {
+      'pdf.page': 'Página {number}', 'pdf.pageOf': 'Página {number} de {total}', 'pdf.loadingPage': 'Cargando página…',
+      'pdf.textUnavailable': 'La selección de texto, las anotaciones, el diccionario y la enciclopedia no están disponibles porque este PDF no tiene una capa de texto utilizable.',
+      'pdf.passwordRequired': 'Este PDF está protegido con contraseña. Introdúcela en el lector para mostrar la página.'
+    },
+    de: {
+      'pdf.page': 'Seite {number}', 'pdf.pageOf': 'Seite {number} von {total}', 'pdf.loadingPage': 'Seite wird geladen…',
+      'pdf.textUnavailable': 'Textauswahl, Anmerkungen, Wörterbuch und Enzyklopädie sind nicht verfügbar, da dieses PDF keine nutzbare Textebene enthält.',
+      'pdf.passwordRequired': 'Dieses PDF ist passwortgeschützt. Geben Sie das Passwort im Reader ein, um die Seite anzuzeigen.'
+    },
+    fr: {
+      'pdf.page': 'Page nº {number}', 'pdf.pageOf': 'Page {number} sur {total}', 'pdf.loadingPage': 'Chargement de la page…',
+      'pdf.textUnavailable': 'La sélection de texte, les annotations, le dictionnaire et l’encyclopédie ne sont pas disponibles, car ce PDF ne possède pas de couche de texte exploitable.',
+      'pdf.passwordRequired': 'Ce PDF est protégé par un mot de passe. Saisissez-le dans le lecteur pour afficher la page.'
+    },
+    ru: {
+      'pdf.page': 'Страница {number}', 'pdf.pageOf': 'Страница {number} из {total}', 'pdf.loadingPage': 'Загрузка страницы…',
+      'pdf.textUnavailable': 'Выделение текста, аннотации, словарь и энциклопедия недоступны, поскольку в этом PDF нет пригодного текстового слоя.',
+      'pdf.passwordRequired': 'Этот PDF защищён паролем. Введите пароль в читалке, чтобы показать страницу.'
+    },
+    it: {
+      'pdf.page': 'Pagina {number}', 'pdf.pageOf': 'Pagina {number} di {total}', 'pdf.loadingPage': 'Caricamento della pagina…',
+      'pdf.textUnavailable': 'La selezione del testo, le annotazioni, il dizionario e l’enciclopedia non sono disponibili perché questo PDF non ha un livello di testo utilizzabile.',
+      'pdf.passwordRequired': 'Questo PDF è protetto da password. Inseriscila nel lettore per visualizzare la pagina.'
+    },
+    'pt-BR': {
+      'pdf.page': 'Página {number}', 'pdf.pageOf': 'Página {number} de {total}', 'pdf.loadingPage': 'Carregando página…',
+      'pdf.textUnavailable': 'A seleção de texto, as anotações, o dicionário e a enciclopédia não estão disponíveis porque este PDF não tem uma camada de texto utilizável.',
+      'pdf.passwordRequired': 'Este PDF é protegido por senha. Digite-a no leitor para exibir a página.'
+    },
+    ar: {
+      'pdf.page': 'الصفحة {number}', 'pdf.pageOf': 'الصفحة {number} من {total}', 'pdf.loadingPage': 'جارٍ تحميل الصفحة…',
+      'pdf.textUnavailable': 'لا يتوفر تحديد النص والتعليقات والقاموس والموسوعة لأن ملف PDF هذا لا يحتوي على طبقة نص قابلة للاستخدام.',
+      'pdf.passwordRequired': 'ملف PDF هذا محمي بكلمة مرور. أدخلها في القارئ لعرض الصفحة.'
+    },
+    id: {
+      'pdf.page': 'Halaman {number}', 'pdf.pageOf': 'Halaman {number} dari {total}', 'pdf.loadingPage': 'Memuat halaman…',
+      'pdf.textUnavailable': 'Pemilihan teks, anotasi, kamus, dan ensiklopedia tidak tersedia karena PDF ini tidak memiliki lapisan teks yang dapat digunakan.',
+      'pdf.passwordRequired': 'PDF ini dilindungi kata sandi. Masukkan kata sandi di pembaca untuk menampilkan halaman.'
+    },
+    hi: {
+      'pdf.page': 'पृष्ठ {number}', 'pdf.pageOf': '{total} में से पृष्ठ {number}', 'pdf.loadingPage': 'पृष्ठ लोड हो रहा है…',
+      'pdf.textUnavailable': 'इस PDF में उपयोग योग्य टेक्स्ट लेयर नहीं है, इसलिए टेक्स्ट चयन, टिप्पणियाँ, शब्दकोश और विश्वकोश उपलब्ध नहीं हैं।',
+      'pdf.passwordRequired': 'यह PDF पासवर्ड से सुरक्षित है। पृष्ठ दिखाने के लिए रीडर में पासवर्ड दर्ज करें।'
+    },
+    vi: {
+      'pdf.page': 'Trang {number}', 'pdf.pageOf': 'Trang {number} / {total}', 'pdf.loadingPage': 'Đang tải trang…',
+      'pdf.textUnavailable': 'Không thể chọn văn bản, tạo chú thích, dùng từ điển hoặc bách khoa toàn thư vì PDF này không có lớp văn bản khả dụng.',
+      'pdf.passwordRequired': 'PDF này được bảo vệ bằng mật khẩu. Hãy nhập mật khẩu trong trình đọc để hiển thị trang.'
+    },
+    th: {
+      'pdf.page': 'หน้า {number}', 'pdf.pageOf': 'หน้า {number} จาก {total}', 'pdf.loadingPage': 'กำลังโหลดหน้า…',
+      'pdf.textUnavailable': 'ไม่สามารถเลือกข้อความ ใช้คำอธิบายประกอบ พจนานุกรม หรือสารานุกรมได้ เนื่องจาก PDF นี้ไม่มีชั้นข้อความที่ใช้งานได้',
+      'pdf.passwordRequired': 'PDF นี้ป้องกันด้วยรหัสผ่าน โปรดป้อนรหัสผ่านในโปรแกรมอ่านเพื่อแสดงหน้า'
+    },
+    ms: {
+      'pdf.page': 'Halaman {number}', 'pdf.pageOf': 'Halaman {number} daripada {total}', 'pdf.loadingPage': 'Memuatkan halaman…',
+      'pdf.textUnavailable': 'Pemilihan teks, anotasi, kamus dan ensiklopedia tidak tersedia kerana PDF ini tiada lapisan teks yang boleh digunakan.',
+      'pdf.passwordRequired': 'PDF ini dilindungi kata laluan. Masukkannya dalam pembaca untuk memaparkan halaman.'
+    }
+  };
+  Object.keys(pdfLocaleAdditions).forEach(function(code) {
+    Object.assign(dictionaries[code], pdfLocaleAdditions[code]);
+  });
   var finalLocaleCorrections = {
     es: {'common.chinese': 'Chino', 'common.english': 'Inglés', 'common.version': 'Versión {version}', 'version.updateAvailable': 'Actualización disponible: v{version}'},
     de: {'common.chinese': 'Chinesisch', 'common.english': 'Englisch', 'library.cover': 'Umschlag', 'book.cover': 'Umschlag', 'version.updateAvailable': 'Aktualisierung verfügbar: v{version}'},

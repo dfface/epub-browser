@@ -254,6 +254,18 @@ def find_literal_ui_sinks(path):
 
 
 class I18nCoverageTests(unittest.TestCase):
+    def test_pdf_page_and_degradation_copy_exists_in_every_locale(self):
+        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+
+        for key in (
+            'pdf.page',
+            'pdf.pageOf',
+            'pdf.loadingPage',
+            'pdf.textUnavailable',
+            'pdf.passwordRequired',
+        ):
+            self.assertEqual(source.count("'" + key + "'"), 17, key)
+
     def test_account_and_administration_copy_exists_in_both_locales(self):
         required = {
             'account.menu',

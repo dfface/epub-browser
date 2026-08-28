@@ -10,12 +10,161 @@ from pathlib import Path
 from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
+from epub_browser.pdf_processor import PDFMetadata, PDFPageMetadata
 from epub_browser.processor import EPUBProcessor, server_book_public_path_allowed
 from epub_browser.site import publish_library_shell
 from epub_browser.urls import SiteURLs
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_pdf_metadata_hydrates_page_chapters_and_a_complete_page_toc(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF',
+                authors=('Author One', 'Author Two'),
+                tags=('reference',),
+                language='fr',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 792.0, 612.0, ('Opening', 'Part I')),
+                    PDFPageMetadata(3, 612.0, 792.0),
+                ),
+                encrypted=False,
+                has_extractable_text=True,
+                cover=None,
+            )
+
+            processor = EPUBProcessor.from_pdf_metadata(
+                book_id='pdf-book',
+                metadata=metadata,
+                cover_path='cover.png',
+                asset_manifest=assets,
+                urls=SiteURLs('/reader/'),
+                deployment_mode='server',
+            )
+
+            self.assertEqual(processor.book_title, 'A PDF')
+            self.assertEqual(processor.authors, ['Author One', 'Author Two'])
+            self.assertEqual(processor.tags, ['reference'])
+            self.assertEqual(processor.lang, 'fr')
+            self.assertEqual(processor.get_book_info()['cover'], 'cover.png')
+            self.assertEqual(processor.chapters, [
+                {'title': 'Page 1', 'path': 'chapter_0.html'},
+                {'title': 'Page 2', 'path': 'chapter_1.html'},
+                {'title': 'Page 3', 'path': 'chapter_2.html'},
+            ])
+            self.assertEqual(processor._build_toc_data(), [
+                {
+                    'title': 'Page 1', 'level': 0, 'kind': 'chapter',
+                    'chapter_index': 0, 'chapter_file': 'chapter_0.html',
+                    'page_label': '1', 'outline_labels': [],
+                },
+                {
+                    'title': 'Page 2', 'level': 0, 'kind': 'chapter',
+                    'chapter_index': 1, 'chapter_file': 'chapter_1.html',
+                    'page_label': '2', 'outline_labels': ['Opening', 'Part I'],
+                },
+                {
+                    'title': 'Page 3', 'level': 0, 'kind': 'chapter',
+                    'chapter_index': 2, 'chapter_file': 'chapter_2.html',
+                    'page_label': '3', 'outline_labels': [],
+                },
+            ])
+
+            book_html = processor.create_index_page(write=False)
+            self.assertIn('data-id=toc-container', book_html)
+            self.assertEqual(book_html.count('class=chapter-link'), 3)
+            self.assertIn('data-i18n=pdf.page', book_html)
+            self.assertEqual(book_html.count('Opening'), 1)
+            self.assertEqual(book_html.count('Part I'), 1)
+            self.assertEqual(book_html.count('class=chapter-outline-labels'), 1)
+
+    def test_pdf_page_adds_only_a_scoped_descriptor_to_the_shared_reader(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 792.5, 612.25, ('Opening',)),
+                    PDFPageMetadata(3, 612.0, 792.0),
+                ),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            pdf = EPUBProcessor.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets, urls=SiteURLs(),
+                deployment_mode='server',
+            )
+            epub = EPUBProcessor(
+                'book.epub', directory, asset_manifest=assets,
+                book_id='epub-book', deployment_mode='server',
+            )
+            epub.book_title = 'An EPUB'
+            epub.chapters = [{'title': 'One'}]
+
+            pdf_html = pdf.create_pdf_chapter_template(
+                1, '/api/books/pdf-book/document',
+            )
+            epub_html = epub.create_chapter_template('<p>Text</p>', '', 0, 'One')
+
+            shared_markers = (
+                'class="chapter-top-bar app-header"',
+                'id="bookHomeFloating"',
+                'id="tocFloating"',
+                'id="eb-content"',
+                'id="paginationInfo"',
+                'id="settingsModal"',
+                'data-tab="font"',
+                'id="font-tab"',
+                'data-tab="reading"',
+                'id="reading-tab"',
+                'id="continuousScrollToggle"',
+                'data-annotation-hub',
+                'data-reading-insights',
+            )
+            for marker in shared_markers:
+                self.assertEqual(pdf_html.count(marker), epub_html.count(marker), marker)
+
+            for asset_name in (
+                'chapter', 'annotation-position', 'annotation',
+                'annotation-hub', 'dictionary', 'reading-insights',
+            ):
+                pattern = rf'/assets/immutable/{asset_name}\.[0-9a-f]{{12}}\.(?:js|css)'
+                self.assertEqual(
+                    re.findall(pattern, pdf_html), re.findall(pattern, epub_html),
+                    asset_name,
+                )
+
+            self.assertIn('class="pdf-page-content"', pdf_html)
+            self.assertIn('data-pdf-page-number="2"', pdf_html)
+            self.assertIn('data-pdf-page-width="792.5"', pdf_html)
+            self.assertIn('data-pdf-page-height="612.25"', pdf_html)
+            self.assertIn('data-pdf-has-extractable-text="true"', pdf_html)
+            self.assertIn('aria-label="Page 2 of 3"', pdf_html)
+            self.assertIn('data-i18n-aria-label="pdf.pageOf"', pdf_html)
+            self.assertIn('window.EpubPDFConfig=', pdf_html)
+            self.assertIn('"documentUrl":"/api/books/pdf-book/document"', pdf_html)
+            self.assertRegex(
+                pdf_html,
+                r'"pdfjsModuleUrl":"/assets/immutable/vendor/pdfjs/build/pdf\.[0-9a-f]{12}\.mjs"',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'"pdfjsWorkerUrl":"/assets/immutable/vendor/pdfjs/build/pdf\.worker\.[0-9a-f]{12}\.mjs"',
+            )
+            self.assertNotIn('cdn.', pdf_html)
+            for duplicate_ui in (
+                'pdf-reader', 'pdf-settings', 'pdf-selection-menu',
+                'pdf-annotation-tab', 'pdf-annotation-toolbar',
+            ):
+                self.assertNotIn(duplicate_ui, pdf_html)
+
     def test_server_includes_real_account_controls_but_ssg_includes_none(self):
         server_html = self._server_html()
         ssg_html = self._library_html()
