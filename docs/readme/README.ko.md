@@ -2,13 +2,13 @@
 
 > 개인 EPUB 읽기 서비스이자 독립 실행형 정적 사이트 생성기입니다.
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **인터페이스 언어(17개):** 영어, 중국어 간체, 중국어 번체, 일본어, 한국어, 스페인어, 독일어, 프랑스어, 러시아어, 이탈리아어, 브라질 포르투갈어, 아랍어, 인도네시아어, 힌디어, 베트남어, 태국어, 말레이어.
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser에는 역할이 분명히 구분된 두 가지 모드가 있습니다.
 
@@ -38,6 +38,8 @@ AI 읽기는 책 옆에 일반적인 요약을 붙이는 기능이 아닙니다.
 - Python 3.9 이상
 - 하나 이상의 `.epub` 파일, EPUB가 있는 중첩 디렉터리 또는 Calibre 형식의 라이브러리 디렉터리
 
+PyPI 설치는 SSG와 Server 모드를 모두 지원합니다:
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+Docker에서 영속적인 Server를 실행하려면 공개 이미지를 사용하세요. 호스트에 Python을 설치할 필요가 없습니다:
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## 빠른 시작
@@ -86,8 +94,8 @@ epub-browser server book.epub --ephemeral
 
 컨테이너에서는 도서 디렉터리를 읽기 전용으로 마운트하고 `--server-dir`은 영속 볼륨에 마운트하세요. 리버스 프록시 헤더는 신뢰할 수 있는 프록시에서 온 경우에만 허용해야 합니다. 공개 배포에서는 HTTPS를 사용하고 배포 문서에 따라 신뢰 프록시와 호스트 이름을 설정하세요.
 
-전체 Docker Compose 예시, CLI 인수, 데이터 이전, LAN/리버스 프록시, 문제 해결은 [영문 전체 README](README.md) 또는 [간체 중국어 전체 README](README.zh-CN.md)를 참고하세요. 명령줄 옵션과 두 모드의 동작은 모든 언어에서 동일합니다.
+전체 Docker Compose 예시, CLI 인수, 데이터 이전, LAN/리버스 프록시, 문제 해결은 [영문 전체 README](../../README.md) 또는 [간체 중국어 전체 README](README.zh-CN.md)를 참고하세요. 명령줄 옵션과 두 모드의 동작은 모든 언어에서 동일합니다.
 
 ## 기여 및 라이선스
 
-Issue와 Pull Request를 환영합니다. 라이선스는 [License.txt](License.txt)를 참고하세요.
+Issue와 Pull Request를 환영합니다. 라이선스는 [License.txt](../../License.txt)를 참고하세요.

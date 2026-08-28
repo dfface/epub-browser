@@ -2,13 +2,13 @@
 
 > プライベートな EPUB 読書サービスと、自己完結型の静的サイトジェネレーターです。
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **インターフェース言語（17 言語）：** 英語、簡体字中国語、繁体字中国語、日本語、韓国語、スペイン語、ドイツ語、フランス語、ロシア語、イタリア語、ブラジルポルトガル語、アラビア語、インドネシア語、ヒンディー語、ベトナム語、タイ語、マレー語。
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser には、役割を明確に分けた 2 つのモードがあります。
 
@@ -38,6 +38,8 @@ AI 読書は、書籍の横に一般的な要約を置く機能ではありま�
 - Python 3.9 以降
 - 1 つ以上の `.epub` ファイル、EPUB を含む入れ子のディレクトリー、または Calibre 形式のライブラリーディレクトリー
 
+PyPI からインストールすると、SSG と Server の両方のモードを利用できます：
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+Docker で永続的な Server を実行する場合は、公開イメージを使用します。ホスト側の Python は不要です：
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## クイックスタート
@@ -86,8 +94,8 @@ epub-browser server book.epub --ephemeral
 
 コンテナーでは書籍ディレクトリーを読み取り専用でマウントし、`--server-dir` は永続ボリュームにマウントしてください。リバースプロキシのヘッダーは、信頼できるプロキシからのものだけを受け入れる必要があります。公開環境では HTTPS を使用し、デプロイの説明に従って信頼するプロキシとホスト名を設定してください。
 
-Docker Compose の完全な例、CLI 引数、データ移行、LAN／リバースプロキシ、トラブルシューティングは、[英語版の完全な README](README.md) または [簡体字中国語版の完全な README](README.zh-CN.md) を参照してください。コマンドラインオプションと 2 つのモードの動作は、すべての言語で同じです。
+Docker Compose の完全な例、CLI 引数、データ移行、LAN／リバースプロキシ、トラブルシューティングは、[英語版の完全な README](../../README.md) または [簡体字中国語版の完全な README](README.zh-CN.md) を参照してください。コマンドラインオプションと 2 つのモードの動作は、すべての言語で同じです。
 
 ## コントリビュートとライセンス
 
-Issue と Pull Request を歓迎します。ライセンスは [License.txt](License.txt) を参照してください。
+Issue と Pull Request を歓迎します。ライセンスは [License.txt](../../License.txt) を参照してください。

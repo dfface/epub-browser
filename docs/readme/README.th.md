@@ -2,13 +2,13 @@
 
 > บริการอ่าน EPUB แบบส่วนตัวและเครื่องมือสร้างเว็บไซต์สแตติกแบบครบในตัว
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **ภาษาอินเทอร์เฟซ (17 ภาษา):** อังกฤษ จีนตัวย่อ จีนตัวเต็ม ญี่ปุ่น เกาหลี สเปน เยอรมัน ฝรั่งเศส รัสเซีย อิตาลี โปรตุเกสบราซิล อาหรับ อินโดนีเซีย ฮินดี เวียดนาม ไทย และมลายู
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser มีสองโหมดที่แยกหน้าที่กันอย่างชัดเจน:
 
@@ -38,6 +38,8 @@ EPUB Browser มีสองโหมดที่แยกหน้าที่�
 - Python 3.9 หรือใหม่กว่า
 - ไฟล์ `.epub` หนึ่งไฟล์ขึ้นไป โฟลเดอร์ซ้อนที่มี EPUB หรือไลบรารีแบบ Calibre
 
+การติดตั้งจาก PyPI รองรับทั้งโหมด SSG และ Server:
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+หากต้องการเรียกใช้ Server แบบถาวรด้วย Docker ให้ใช้อิมเมจที่เผยแพร่แล้ว โดยไม่ต้องติดตั้ง Python บนโฮสต์:
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## เริ่มต้นอย่างรวดเร็ว
@@ -78,8 +86,8 @@ epub-browser server /path/to/books \
 
 ในคอนเทนเนอร์ ให้เมานต์หนังสือแบบอ่านอย่างเดียวและเมานต์ `--server-dir` เป็นโวลุมถาวร ยอมรับส่วนหัวพร็อกซีจากพร็อกซีที่เชื่อถือได้เท่านั้น และใช้ HTTPS สำหรับการนำไปใช้สาธารณะ
 
-ดู Docker Compose ตัวเลือก CLI ทั้งหมด การย้ายข้อมูล LAN รีเวิร์สพร็อกซี และการแก้ไขปัญหาได้ใน [README ภาษาอังกฤษฉบับเต็ม](README.md) หรือ [README ภาษาจีนตัวย่อฉบับเต็ม](README.zh-CN.md) การทำงานของทั้งสองโหมดเหมือนกันในทุกภาษา
+ดู Docker Compose ตัวเลือก CLI ทั้งหมด การย้ายข้อมูล LAN รีเวิร์สพร็อกซี และการแก้ไขปัญหาได้ใน [README ภาษาอังกฤษฉบับเต็ม](../../README.md) หรือ [README ภาษาจีนตัวย่อฉบับเต็ม](README.zh-CN.md) การทำงานของทั้งสองโหมดเหมือนกันในทุกภาษา
 
 ## การมีส่วนร่วมและสัญญาอนุญาต
 
-ยินดีรับ Issues และ Pull Requests โปรดดูสัญญาอนุญาตใน [License.txt](License.txt)
+ยินดีรับ Issues และ Pull Requests โปรดดูสัญญาอนุญาตใน [License.txt](../../License.txt)

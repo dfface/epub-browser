@@ -2,13 +2,13 @@
 
 > एक निजी EPUB पठन सेवा और स्व-निहित स्थैतिक साइट जनरेटर।
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **इंटरफ़ेस भाषाएँ (17):** अंग्रेज़ी, सरलीकृत चीनी, पारंपरिक चीनी, जापानी, कोरियाई, स्पेनी, जर्मन, फ़्रांसीसी, रूसी, इतालवी, ब्राज़ीली पुर्तगाली, अरबी, इंडोनेशियाई, हिन्दी, वियतनामी, थाई और मलय।
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser दो स्पष्ट रूप से अलग जिम्मेदारियों वाले मोड प्रदान करता है:
 
@@ -38,6 +38,8 @@ AI पठन पुस्तक के पास कोई सामान्य
 - Python 3.9 या नया
 - एक या अधिक `.epub` फ़ाइलें, EPUB वाले नेस्टेड फ़ोल्डर या Calibre-शैली की लाइब्रेरी
 
+PyPI स्थापना SSG और Server दोनों मोड उपलब्ध कराती है:
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+Docker में स्थायी Server चलाने के लिए प्रकाशित इमेज का उपयोग करें; होस्ट पर Python आवश्यक नहीं है:
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## त्वरित शुरुआत
@@ -78,8 +86,8 @@ Server मोड में `--server-dir`, SQLite, कैश और माइग
 
 कंटेनर में पुस्तकों को केवल-पढ़ने योग्य और `--server-dir` को स्थायी वॉल्यूम के रूप में माउंट करें। प्रॉक्सी हेडर केवल विश्वसनीय प्रॉक्सी से स्वीकार करें और सार्वजनिक परिनियोजन में HTTPS उपयोग करें।
 
-Docker Compose, सभी CLI विकल्प, माइग्रेशन, LAN, रिवर्स प्रॉक्सी और समस्या निवारण के लिए [पूरा अंग्रेज़ी README](README.md) या [पूरा सरलीकृत चीनी README](README.zh-CN.md) देखें। दोनों मोड का व्यवहार सभी भाषाओं में समान है।
+Docker Compose, सभी CLI विकल्प, माइग्रेशन, LAN, रिवर्स प्रॉक्सी और समस्या निवारण के लिए [पूरा अंग्रेज़ी README](../../README.md) या [पूरा सरलीकृत चीनी README](README.zh-CN.md) देखें। दोनों मोड का व्यवहार सभी भाषाओं में समान है।
 
 ## योगदान और लाइसेंस
 
-Issues और Pull Requests का स्वागत है। लाइसेंस के लिए [License.txt](License.txt) देखें।
+Issues और Pull Requests का स्वागत है। लाइसेंस के लिए [License.txt](../../License.txt) देखें।

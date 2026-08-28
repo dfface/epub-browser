@@ -2,13 +2,13 @@
 
 > Приватный сервис для чтения EPUB и автономный генератор статических сайтов.
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **Языки интерфейса (17):** английский, упрощённый китайский, традиционный китайский, японский, корейский, испанский, немецкий, французский, русский, итальянский, бразильский португальский, арабский, индонезийский, хинди, вьетнамский, тайский и малайский.
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser поддерживает два режима с чётко разделёнными обязанностями:
 
@@ -38,6 +38,8 @@ EPUB Browser поддерживает два режима с чётко разд
 - Python 3.9 или новее
 - Один или несколько файлов `.epub`, вложенные каталоги с EPUB или библиотека в стиле Calibre
 
+Установка из PyPI поддерживает режимы SSG и Server:
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+Для постоянного Server в Docker используйте опубликованный образ; Python на хосте не требуется:
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## Быстрый старт
@@ -78,8 +86,8 @@ epub-browser server /путь/к/книгам \
 
 В контейнере подключайте книги только для чтения, а `--server-dir` — как постоянный том. Принимайте прокси-заголовки только от доверенных прокси и используйте HTTPS для публичных развёртываний.
 
-Docker Compose, все параметры CLI, миграции, работу в LAN, обратный прокси и устранение неполадок см. в [полном README на английском](README.md) или [полном README на упрощённом китайском](README.zh-CN.md). Поведение обоих режимов одинаково на всех языках.
+Docker Compose, все параметры CLI, миграции, работу в LAN, обратный прокси и устранение неполадок см. в [полном README на английском](../../README.md) или [полном README на упрощённом китайском](README.zh-CN.md). Поведение обоих режимов одинаково на всех языках.
 
 ## Участие и лицензия
 
-Issues и Pull Requests приветствуются. Условия лицензии приведены в [License.txt](License.txt).
+Issues и Pull Requests приветствуются. Условия лицензии приведены в [License.txt](../../License.txt).

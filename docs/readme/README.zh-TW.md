@@ -2,13 +2,13 @@
 
 > 私人 EPUB 閱讀服務，以及自包含的靜態網站產生器。
 
-**README：** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README：** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **介面語言（17 種）：** 英語、簡體中文、繁體中文、日語、韓語、西班牙語、德語、法語、俄語、義大利語、巴西葡萄牙語、阿拉伯語、印尼語、印地語、越南語、泰語及馬來語。
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser 提供兩種明確分工的部署模式：
 
@@ -38,6 +38,8 @@ AI 是 Server 專屬功能。管理員必須設定 OpenAI 相容供應商並逐�
 - Python 3.9 或更新版本
 - 一個或多個 `.epub` 檔案、含 EPUB 的巢狀目錄，或 Calibre 風格的書庫目錄
 
+從 PyPI 安裝可使用 SSG 與 Server 兩種模式：
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+若要透過 Docker 執行持久化 Server，請使用已發布的映像；主機不需要安裝 Python：
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## 快速開始
@@ -86,8 +94,8 @@ epub-browser server book.epub --ephemeral
 
 容器化時，將書籍目錄以唯讀方式掛載，並將 `--server-dir` 掛載到持久化磁碟區。反向代理僅應轉送來自可信任代理的標頭；公開網路部署請使用 HTTPS，並依部署說明設定可信任代理與主機名稱。
 
-完整 Docker Compose、CLI 參數、資料遷移、LAN／反向代理和疑難排解請見[英文完整 README](README.md)或[簡體中文完整 README](README.zh-CN.md)；命令列選項與兩種模式的行為在所有語言版本中相同。
+完整 Docker Compose、CLI 參數、資料遷移、LAN／反向代理和疑難排解請見[英文完整 README](../../README.md)或[簡體中文完整 README](README.zh-CN.md)；命令列選項與兩種模式的行為在所有語言版本中相同。
 
 ## 貢獻與授權
 
-歡迎提交 Issue 與 Pull Request。授權條款請見 [License.txt](License.txt)。
+歡迎提交 Issue 與 Pull Request。授權條款請見 [License.txt](../../License.txt)。

@@ -1,4 +1,4 @@
 include License.txt
-include README.zh-CN.md
+include docs/readme/README.zh-CN.md
 recursive-include epub_browser/prompt_templates *.json
 recursive-include epub_browser/assets/vendor *
