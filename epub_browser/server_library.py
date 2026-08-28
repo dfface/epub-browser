@@ -484,6 +484,7 @@ class ServerLibraryManager:
                         "book.conversion.failed",
                         {
                             "book_id": resolved_book_id,
+                            "format": existing.source_format if existing else source_format(source),
                             "source_name": source.name,
                             "error_code": "conversion_failed",
                         },
@@ -515,7 +516,7 @@ class ServerLibraryManager:
                         converted_records.append(converted)
                         self.state_store.enqueue_webhook_event(
                             "book.conversion.succeeded",
-                            {"book_id": converted.book_id},
+                            {"book_id": converted.book_id, "format": converted.source_format},
                         )
                     elif not isinstance(error, _ConversionCancelled):
                         kept = self._cache_valid(plan.record)
@@ -541,6 +542,7 @@ class ServerLibraryManager:
                             "book.conversion.failed",
                             {
                                 "book_id": plan.record.book_id,
+                                "format": plan.source_format,
                                 "source_name": plan.source.name,
                                 "error_code": "conversion_failed",
                             },

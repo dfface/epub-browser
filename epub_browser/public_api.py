@@ -16,6 +16,7 @@ from starlette.routing import Match, Route
 
 from .pat import AuthenticatedPAT, PAT_SCOPES
 from .server_pages import ServerPageError, ServerPageRenderer
+from .source_format import PDF_FORMAT
 
 
 PUBLIC_API_CONTEXT_KEY = "epub_browser.public_api_context"
@@ -94,6 +95,7 @@ def _book_payload(book):
         "author": metadata.get("author") or metadata.get("creator") or "",
         "language": metadata.get("language") or "",
         "tags": list(metadata.get("tags") or ()),
+        "format": book.source_format,
         "visibility": book.visibility,
         "created_at": book.created_at,
         "updated_at": book.updated_at,
@@ -132,6 +134,17 @@ async def _book_detail(request, authenticated: AuthenticatedPAT):
 
 
 def _chapter_list(renderer):
+    if renderer.source_format == PDF_FORMAT:
+        metadata, _processor = renderer._pdf_processor()
+        return [
+            {
+                "index": index,
+                "title": f"Page {page.page_number}",
+                "format": PDF_FORMAT,
+                "page_number": page.page_number,
+            }
+            for index, page in enumerate(metadata.pages)
+        ]
     metadata = renderer._read_json(renderer.content_dir / "metadata.json")
     chapters = metadata.get("chapters")
     if not isinstance(chapters, list):
@@ -146,10 +159,13 @@ def _chapter_list(renderer):
 
 async def _book_chapters(request, authenticated: AuthenticatedPAT):
     book_id = request.path_params["book_id"]
-    if _authorized_book(request, authenticated, book_id) is None:
+    book = _authorized_book(request, authenticated, book_id)
+    if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
     try:
-        items = _chapter_list(ServerPageRenderer(_context(request).public_dir, book_id))
+        items = _chapter_list(ServerPageRenderer(
+            _context(request).public_dir, book_id, source_format=book.source_format
+        ))
     except ServerPageError:
         return public_api_error(
             "book_content_unavailable", "Book content is unavailable", 503
@@ -193,7 +209,8 @@ class _PlainTextExtractor(HTMLParser):
 
 async def _chapter_detail(request, authenticated: AuthenticatedPAT):
     book_id = request.path_params["book_id"]
-    if _authorized_book(request, authenticated, book_id) is None:
+    book = _authorized_book(request, authenticated, book_id)
+    if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
     values = request.query_params.getlist("format")
     output_format = values[0] if len(values) == 1 else "html" if not values else None
@@ -206,9 +223,27 @@ async def _chapter_detail(request, authenticated: AuthenticatedPAT):
     except (TypeError, ValueError):
         return public_api_error("chapter_not_found", "Chapter not found", 404)
     try:
-        renderer = ServerPageRenderer(_context(request).public_dir, book_id)
-        if chapter_index >= len(_chapter_list(renderer)):
+        renderer = ServerPageRenderer(
+            _context(request).public_dir, book_id, source_format=book.source_format
+        )
+        chapters = _chapter_list(renderer)
+        if chapter_index >= len(chapters):
             return public_api_error("chapter_not_found", "Chapter not found", 404)
+        if renderer.source_format == PDF_FORMAT:
+            chapter = chapters[chapter_index]
+            if output_format == "text":
+                return PlainTextResponse(
+                    "", headers={"Cache-Control": "private, no-store"}
+                )
+            return JSONResponse(
+                {"chapter": {
+                    **chapter,
+                    "content_type": "application/pdf-page",
+                    "content_html": None,
+                    "text": "",
+                }},
+                headers={"Cache-Control": "private, no-store"},
+            )
         chapter = renderer.chapter_content(chapter_index)
     except ServerPageError:
         return public_api_error(
@@ -682,6 +717,65 @@ async def _public_api_fallback(request):
 
 
 def openapi_document():
+    schemas = {
+        "Book": {
+            "type": "object",
+            "required": [
+                "id", "title", "author", "language", "tags", "format",
+                "visibility", "created_at", "updated_at",
+            ],
+            "properties": {
+                "id": {"type": "string"},
+                "title": {"type": "string"},
+                "author": {"type": "string"},
+                "language": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "format": {"enum": ["epub", "pdf"]},
+                "visibility": {"type": "string"},
+                "created_at": {"type": "string"},
+                "updated_at": {"type": "string"},
+            },
+        },
+        "ChapterListItem": {
+            "type": "object",
+            "required": ["index", "title"],
+            "properties": {
+                "index": {"type": "integer", "minimum": 0},
+                "title": {"type": "string"},
+                "format": {"enum": ["epub", "pdf"]},
+                "page_number": {"type": "integer", "minimum": 1},
+            },
+            "allOf": [{
+                "if": {"properties": {"format": {"const": "pdf"}}, "required": ["format"]},
+                "then": {"required": ["page_number"]},
+            }],
+        },
+        "Chapter": {
+            "type": "object",
+            "required": ["index", "title"],
+            "properties": {
+                "index": {"type": "integer", "minimum": 0},
+                "title": {"type": "string"},
+                "format": {"enum": ["epub", "pdf"]},
+                "page_number": {"type": "integer", "minimum": 1},
+                "content_type": {"type": "string"},
+                "content_html": {"type": ["string", "null"]},
+                "text": {"type": "string"},
+            },
+            "allOf": [{
+                "if": {"properties": {"format": {"const": "pdf"}}, "required": ["format"]},
+                "then": {
+                    "required": [
+                        "page_number", "content_type", "content_html", "text",
+                    ],
+                    "properties": {
+                        "content_type": {"const": "application/pdf-page"},
+                        "content_html": {"type": "null"},
+                    },
+                },
+            }],
+        },
+    }
     paths = {}
     for operation in public_api_operations():
         path_item = paths.setdefault(operation.path, {})
@@ -696,6 +790,29 @@ def openapi_document():
                     "403": {"description": "Insufficient scope"},
                 },
             }
+    paths["/api/v1/books"]["get"]["responses"]["200"]["content"] = {
+        "application/json": {"schema": {"type": "object", "properties": {
+            "items": {"type": "array", "items": {"$ref": "#/components/schemas/Book"}},
+        }}}
+    }
+    paths["/api/v1/books/{book_id}"]["get"]["responses"]["200"]["content"] = {
+        "application/json": {"schema": {"type": "object", "properties": {
+            "book": {"$ref": "#/components/schemas/Book"},
+        }}}
+    }
+    paths["/api/v1/books/{book_id}/chapters"]["get"]["responses"]["200"]["content"] = {
+        "application/json": {"schema": {"type": "object", "properties": {
+            "items": {"type": "array", "items": {"$ref": "#/components/schemas/ChapterListItem"}},
+        }}}
+    }
+    paths["/api/v1/books/{book_id}/chapters/{chapter_index}"]["get"]["responses"]["200"]["content"] = {
+        "application/json": {"schema": {"oneOf": [
+            {"$ref": "#/components/schemas/Chapter"},
+            {"type": "object", "required": ["chapter"], "properties": {
+                "chapter": {"$ref": "#/components/schemas/Chapter"},
+            }},
+        ]}}
+    }
     return {
         "openapi": "3.1.0",
         "info": {"title": "EPUB Browser API", "version": "1.0.0"},
@@ -708,6 +825,7 @@ def openapi_document():
                     "bearerFormat": "EPUB Browser PAT",
                     "x-scopes": sorted(PAT_SCOPES),
                 }
-            }
+            },
+            "schemas": schemas,
         },
     }

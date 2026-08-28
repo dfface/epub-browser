@@ -5554,7 +5554,10 @@ class StateStore:
                 ),
             )
             self._enqueue_webhook_event_connection(
-                connection, "book.created", {"book_id": book_id}, self._timestamp()
+                connection,
+                "book.created",
+                {"book_id": book_id, "format": source_format},
+                self._timestamp(),
             )
             return self._get_book(connection, book_id)
 
@@ -5626,21 +5629,31 @@ class StateStore:
             )
             if cursor.rowcount != 1:
                 raise KeyError(f"Unknown book ID: {book_id}")
+            updated = self._get_book(connection, book_id)
             self._enqueue_webhook_event_connection(
-                connection, "book.updated", {"book_id": book_id}, self._timestamp()
+                connection,
+                "book.updated",
+                {"book_id": book_id, "format": updated.source_format},
+                self._timestamp(),
             )
-            return self._get_book(connection, book_id)
+            return updated
 
     def mark_missing(self, book_id: str) -> None:
         with self._connection() as connection:
+            row = connection.execute(
+                "SELECT source_format FROM books WHERE book_id = ?", (book_id,)
+            ).fetchone()
             cursor = connection.execute(
                 "UPDATE books SET active = 0, updated_at = CURRENT_TIMESTAMP "
                 "WHERE book_id = ? AND active = 1",
                 (book_id,),
             )
-            if cursor.rowcount:
+            if cursor.rowcount and row is not None:
                 self._enqueue_webhook_event_connection(
-                    connection, "book.removed", {"book_id": book_id}, self._timestamp()
+                    connection,
+                    "book.removed",
+                    {"book_id": book_id, "format": row["source_format"]},
+                    self._timestamp(),
                 )
 
     def active_books(self) -> tuple[BookRecord, ...]:
