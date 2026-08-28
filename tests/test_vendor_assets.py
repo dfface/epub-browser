@@ -753,6 +753,77 @@ class VendorAssetTests(unittest.TestCase):
             "wheel is missing THIRD_PARTY_NOTICES.md",
         )
 
+    def test_pypi_release_gate_rebuilds_sdist_before_upload(self):
+        """PyPI must gate upload on an offline rebuild and artifact comparison."""
+        repository_root = Path(__file__).parents[1]
+        source = (repository_root / ".github/workflows/pypi.yml").read_text(
+            encoding="utf-8"
+        )
+
+        direct = source.index("python -m build --wheel")
+        sdist = source.index("python -m build --sdist")
+        gate = source.index("verify_release_artifacts.py")
+        upload = source.index("twine upload")
+        self.assertLess(direct, gate)
+        self.assertLess(sdist, gate)
+        self.assertLess(gate, upload)
+
+    def test_release_artifact_gate_checks_sdist_and_offline_wheel(self):
+        """Manifest omissions must fail before an sdist or wheel can be published."""
+        repository_root = Path(__file__).parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct = root / "direct"
+            source = root / "source"
+            direct.mkdir()
+            source.mkdir()
+            for kind, output in (("--wheel", direct), ("--sdist", source)):
+                completed = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "build",
+                        kind,
+                        "--no-isolation",
+                        "--outdir",
+                        str(output),
+                    ],
+                    cwd=repository_root,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "tools/verify_release_artifacts.py",
+                    "--wheel",
+                    str(next(direct.glob("*.whl"))),
+                    "--sdist",
+                    str(next(source.glob("*.tar.gz"))),
+                ],
+                cwd=repository_root,
+                text=True,
+                capture_output=True,
+            )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("offline sdist wheel verified", completed.stdout)
+
+    def test_docker_final_stage_copies_prefetched_runtime_without_pip(self):
+        """The final image must not resolve or download Python dependencies."""
+        repository_root = Path(__file__).parents[1]
+        source = (repository_root / "Dockerfile").read_text(encoding="utf-8")
+        builder, final = source.rsplit("\nFROM ", 1)
+
+        self.assertIn("verify_release_artifacts.py --wheel", builder)
+        self.assertIn("--prefix=/runtime", builder)
+        self.assertIn("--ignore-installed", builder)
+        self.assertIn("COPY --from=builder /runtime/ /usr/local/", final)
+        self.assertNotIn("pip install", final)
+        self.assertNotIn("sync_vendor_assets.py", final)
+
     def fixture_lock(self, files, root=None):
         root = root or self.directory / "vendor"
         for target, contents in files.items():

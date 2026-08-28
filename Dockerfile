@@ -12,11 +12,14 @@ WORKDIR /build/epub-browser
 COPY setup.py MANIFEST.in README.md README.zh-CN.md License.txt ./
 COPY THIRD_PARTY_NOTICES.md ./
 COPY third_party ./third_party
-COPY tools/sync_vendor_assets.py ./tools/sync_vendor_assets.py
+COPY tools/sync_vendor_assets.py tools/verify_release_artifacts.py ./tools/
 COPY epub_browser ./epub_browser
 RUN python tools/sync_vendor_assets.py fetch \
     && python tools/sync_vendor_assets.py verify \
-    && python -m build --wheel
+    && python -m build --wheel \
+    && python tools/verify_release_artifacts.py --wheel dist/*.whl \
+    && python -m pip install --no-cache-dir --no-compile --ignore-installed \
+        --prefix=/runtime dist/*.whl
 
 
 FROM python:3.14-alpine
@@ -26,9 +29,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONOPTIMIZE=2
 
 WORKDIR /app
-COPY --from=builder /build/epub-browser/dist/*.whl /tmp/packages/
-RUN pip install --no-cache-dir --no-compile /tmp/packages/*.whl \
-    && rm -rf /tmp/packages
+COPY --from=builder /runtime/ /usr/local/
 
 # /app/Library is EPUB input. The Docker default stores book IDs in the EPUB,
 # so the mount must be writable when an ID needs to be embedded or refreshed.

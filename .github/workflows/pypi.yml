@@ -37,8 +37,13 @@ jobs:
         run: |
           python tools/sync_vendor_assets.py fetch
           python tools/sync_vendor_assets.py verify
-          python -m build
-          python3 -m twine upload dist/*
+          python -m build --wheel --outdir dist/direct
+          python -m build --sdist --outdir dist/release
+          python tools/verify_release_artifacts.py \
+            --wheel dist/direct/*.whl \
+            --sdist dist/release/*.tar.gz \
+            --rebuilt-wheel-dir dist/rebuilt
+          python3 -m twine upload dist/direct/*.whl dist/release/*.tar.gz
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TWINE_TOKEN }}

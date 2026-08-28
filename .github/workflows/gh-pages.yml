@@ -40,7 +40,8 @@ jobs:
         run: |
           python tools/sync_vendor_assets.py fetch
           python tools/sync_vendor_assets.py verify
-          python -m build
+          python -m build --wheel
+          python tools/verify_release_artifacts.py --wheel dist/*.whl
           python3 -m pip install dist/*.whl --break-system-packages
 
       # Generate test files
