@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Verify release artifacts and rebuild an sdist without package indexes."""
+"""Verify release artifacts and rebuild an sdist without network access."""
 
 import argparse
 import hashlib
-import os
 import re
 import subprocess
 import sys
 import tarfile
 import tempfile
+import unicodedata
 import zipfile
 from pathlib import Path
 
@@ -25,6 +25,75 @@ class ReleaseArtifactError(Exception):
 
 
 DRIVE_LIKE_SEGMENT = re.compile(r"^[A-Za-z]:")
+
+
+class DockerNetworkIsolationRunner:
+    """Build wheels inside a pre-provisioned container with no network."""
+
+    def __init__(
+        self,
+        builder_image: str,
+        docker_executable: str = "docker",
+    ) -> None:
+        if not builder_image:
+            raise ReleaseArtifactError(
+                "a pre-provisioned builder image is required for network isolation"
+            )
+        self.builder_image = builder_image
+        self.docker_executable = docker_executable
+
+    def __call__(self, source_root: Path, output_dir: Path):
+        try:
+            inspected = subprocess.run(
+                [self.docker_executable, "image", "inspect", self.builder_image],
+                text=True,
+                capture_output=True,
+            )
+        except OSError as error:
+            raise ReleaseArtifactError(
+                "Docker network isolation is unavailable"
+            ) from error
+        if inspected.returncode != 0:
+            raise ReleaseArtifactError(
+                "Docker network isolation is unavailable: builder image is not present"
+            )
+
+        source_root = source_root.resolve()
+        output_dir = output_dir.resolve()
+        try:
+            return subprocess.run(
+                [
+                    self.docker_executable,
+                    "run",
+                    "--rm",
+                    "--network",
+                    "none",
+                    "--env",
+                    "PIP_NO_INDEX=1",
+                    "--env",
+                    "PIP_DISABLE_PIP_VERSION_CHECK=1",
+                    "--mount",
+                    "type=bind,src={},dst=/source".format(source_root),
+                    "--mount",
+                    "type=bind,src={},dst=/wheel".format(output_dir),
+                    "--workdir",
+                    "/source",
+                    self.builder_image,
+                    "python",
+                    "-m",
+                    "build",
+                    "--wheel",
+                    "--no-isolation",
+                    "--outdir",
+                    "/wheel",
+                ],
+                text=True,
+                capture_output=True,
+            )
+        except OSError as error:
+            raise ReleaseArtifactError(
+                "Docker network isolation is unavailable"
+            ) from error
 
 
 def _canonical_member_name(
@@ -64,6 +133,22 @@ def _sha256_stream(stream) -> str:
     return digest.hexdigest()
 
 
+def _add_portable_member(
+    members: dict,
+    canonical_name: str,
+    artifact_kind: str,
+) -> None:
+    portable_name = unicodedata.normalize("NFC", canonical_name).casefold()
+    previous = members.get(portable_name)
+    if previous is not None and previous != canonical_name:
+        raise ReleaseArtifactError(
+            "{} contains a portable filename collision: {!r} and {!r}".format(
+                artifact_kind, previous, canonical_name
+            )
+        )
+    members[portable_name] = canonical_name
+
+
 def _locked_vendor_digests(lock_path: Path):
     lock = load_lock(lock_path)
     expected = {
@@ -91,6 +176,7 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
         with zipfile.ZipFile(wheel_path) as archive:
             members = archive.infolist()
             canonical_members = {}
+            portable_members = {}
             for member in members:
                 raw_name = getattr(member, "orig_filename", member.filename)
                 canonical = _canonical_member_name(
@@ -103,6 +189,7 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
                         "wheel contains duplicate canonical members"
                     )
                 canonical_members[canonical] = member
+                _add_portable_member(portable_members, canonical, "wheel")
             names = set(canonical_members)
             actual_names = {
                 name
@@ -148,6 +235,7 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
 def _safe_sdist_members(archive: tarfile.TarFile):
     members = archive.getmembers()
     canonical_members = {}
+    portable_members = {}
     roots = set()
     for member in members:
         canonical = _canonical_member_name(
@@ -158,6 +246,7 @@ def _safe_sdist_members(archive: tarfile.TarFile):
         if canonical in canonical_members:
             raise ReleaseArtifactError("sdist contains duplicate canonical members")
         canonical_members[canonical] = member
+        _add_portable_member(portable_members, canonical, "sdist")
         roots.add(canonical.split("/", 1)[0])
         if not member.isfile() and not member.isdir():
             raise ReleaseArtifactError("sdist contains a linked or special entry")
@@ -246,6 +335,7 @@ def verify_release_artifacts(
     sync_tool_path: Path,
     sdist_path=None,
     rebuilt_wheel_dir=None,
+    isolation_runner=None,
 ) -> None:
     """Verify a direct wheel and optionally rebuild and compare an sdist."""
     verify_wheel(wheel_path, lock_path, notices_path)
@@ -253,6 +343,10 @@ def verify_release_artifacts(
     if sdist_path is None:
         return
     verify_sdist(sdist_path, lock_path, notices_path, sync_tool_path)
+    if isolation_runner is None:
+        raise ReleaseArtifactError(
+            "network isolation is required for an sdist rebuild"
+        )
     with tempfile.TemporaryDirectory(prefix="epub-browser-sdist-") as directory:
         temporary_root = Path(directory)
         source_root = _extract_verified_sdist(sdist_path, temporary_root / "source")
@@ -261,37 +355,18 @@ def verify_release_artifacts(
         else:
             output_dir = rebuilt_wheel_dir
         output_dir.mkdir(parents=True, exist_ok=True)
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "PIP_NO_INDEX": "1",
-                "PIP_DISABLE_PIP_VERSION_CHECK": "1",
-            }
-        )
-        completed = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "build",
-                "--wheel",
-                "--no-isolation",
-                "--outdir",
-                str(output_dir),
-            ],
-            cwd=source_root,
-            env=environment,
-            text=True,
-            capture_output=True,
-        )
+        completed = isolation_runner(source_root, output_dir)
         if completed.returncode != 0:
             raise ReleaseArtifactError(
-                "offline sdist wheel build failed:\n{}".format(completed.stderr)
+                "network-isolated sdist wheel build failed:\n{}".format(
+                    completed.stderr
+                )
             )
         rebuilt = sorted(output_dir.glob("*.whl"))
         if len(rebuilt) != 1:
             raise ReleaseArtifactError("offline sdist build did not produce one wheel")
         verify_wheel(rebuilt[0], lock_path, notices_path)
-        print("offline sdist wheel verified: {}".format(rebuilt[0]))
+        print("network-isolated sdist wheel verified: {}".format(rebuilt[0]))
 
 
 def main(argv=None) -> int:
@@ -299,6 +374,15 @@ def main(argv=None) -> int:
     parser.add_argument("--wheel", type=Path, required=True)
     parser.add_argument("--sdist", type=Path)
     parser.add_argument("--rebuilt-wheel-dir", type=Path)
+    parser.add_argument(
+        "--network-isolation",
+        choices=("docker",),
+        help="required isolation mechanism for an sdist rebuild",
+    )
+    parser.add_argument(
+        "--builder-image",
+        help="pre-provisioned Docker image containing Python build tools",
+    )
     parser.add_argument(
         "--lock",
         type=Path,
@@ -316,6 +400,13 @@ def main(argv=None) -> int:
     )
     arguments = parser.parse_args(argv)
     try:
+        isolation_runner = None
+        if arguments.network_isolation == "docker":
+            isolation_runner = DockerNetworkIsolationRunner(arguments.builder_image)
+        elif arguments.builder_image:
+            raise ReleaseArtifactError(
+                "--builder-image requires --network-isolation docker"
+            )
         verify_release_artifacts(
             wheel_path=arguments.wheel,
             lock_path=arguments.lock,
@@ -323,6 +414,7 @@ def main(argv=None) -> int:
             sync_tool_path=arguments.sync_tool,
             sdist_path=arguments.sdist,
             rebuilt_wheel_dir=arguments.rebuilt_wheel_dir,
+            isolation_runner=isolation_runner,
         )
     except (OSError, ReleaseArtifactError, VendorAssetError) as error:
         parser.exit(1, "release artifact verification failed: {}\n".format(error))

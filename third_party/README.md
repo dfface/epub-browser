@@ -90,15 +90,28 @@ PIP_NO_INDEX=1 python3 -m build --no-isolation
 ```
 
 The PyPI workflow builds the direct wheel and sdist separately, verifies their
-exact vendor inventories and digests, rebuilds a wheel from the sdist with
-`PIP_NO_INDEX=1`, and compares it with the direct wheel. The artifact gate can
-be run after producing those two artifacts with:
+exact vendor inventories and digests, rebuilds a wheel from the sdist inside a
+Docker container with `--network none`, and compares it with the direct wheel.
+Provision the builder image while online; the image must already contain the
+Python build frontend and backend before the isolated gate starts:
+
+```bash
+docker build --tag epub-browser-release-builder:local - <<'DOCKERFILE'
+FROM python:3.14-slim
+RUN python -m pip install --no-cache-dir build setuptools wheel
+DOCKERFILE
+```
+
+The artifact gate then fails closed if Docker or the pre-provisioned image is
+unavailable:
 
 ```bash
 python3 tools/verify_release_artifacts.py \
   --wheel dist/direct/*.whl \
   --sdist dist/release/*.tar.gz \
-  --rebuilt-wheel-dir dist/rebuilt
+  --rebuilt-wheel-dir dist/rebuilt \
+  --network-isolation docker \
+  --builder-image epub-browser-release-builder:local
 ```
 
 GitHub Pages uses a verified wheel. Docker fetches and verifies only in its

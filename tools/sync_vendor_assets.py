@@ -660,7 +660,7 @@ def _parse_source(data: Any, label: str) -> LockedSource:
         raise VendorAssetError(
             "{} uses unsupported archive kind: {}".format(label, kind)
         )
-    return LockedSource(kind, _require_text(data["url"], label + ".url"))
+    return LockedSource(kind, _require_https_url(data["url"], label + ".url"))
 
 
 def _parse_archive(data: Any, label: str) -> LockedArchive:
@@ -756,7 +756,20 @@ def _text_tuple(value: Any, label: str) -> Tuple[str, ...]:
 
 def _require_https_url(value: Any, label: str) -> str:
     value = _require_text(value, label)
-    if urlparse(value).scheme != "https" or not urlparse(value).netloc:
+    try:
+        parsed = urlparse(value)
+        hostname = parsed.hostname
+        parsed.port
+    except ValueError as error:
+        raise VendorAssetError(label + " must be an HTTPS URL") from error
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or any(character.isspace() or ord(character) < 32 for character in value)
+    ):
         raise VendorAssetError(label + " must be an HTTPS URL")
     return value
 

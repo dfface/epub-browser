@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.request import Request
 
 from tools import sync_vendor_assets
+from tools import verify_release_artifacts as release_artifacts
 from tools.sync_vendor_assets import (
     VendorAssetError,
     clean_assets,
@@ -26,6 +27,7 @@ from tools.sync_vendor_assets import (
 from tools.verify_release_artifacts import (
     ReleaseArtifactError,
     verify_release_artifacts,
+    verify_sdist,
 )
 
 
@@ -297,6 +299,41 @@ class VendorAssetTests(unittest.TestCase):
 
         with self.assertRaisesRegex(VendorAssetError, "unsupported archive kind"):
             load_lock(lock_path)
+
+    def test_all_offline_commands_reject_insecure_or_malformed_source_urls(self):
+        """Load, verify, and clean must share strict HTTPS source validation."""
+        operations = (
+            ("load", lambda path: load_lock(path)),
+            ("verify", lambda path: verify_assets(path, self.vendor_root)),
+            ("clean", lambda path: clean_assets(path, self.vendor_root)),
+        )
+        for url in (
+            "http://registry.example.test/example.tgz",
+            "https://",
+            "https://registry.example.test:invalid/example.tgz",
+            "https://user:password@registry.example.test/example.tgz",
+            "https://registry.example.test/example.tgz\n",
+        ):
+            lock_path = self.changed_lock(
+                self.lock_path,
+                "invalid-source-{}.lock.json".format(
+                    hashlib.sha256(url.encode("utf-8")).hexdigest()
+                ),
+                lambda package, value=url: package["source"].update({"url": value}),
+            )
+            for operation_name, operation in operations:
+                with self.subTest(operation=operation_name, url=url):
+                    for relative, contents in (
+                        ("pkg/LICENSE", b"license"),
+                        ("pkg/file.js", b"asset"),
+                    ):
+                        destination = self.vendor_root / relative
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        destination.write_bytes(contents)
+                    with self.assertRaisesRegex(VendorAssetError, "HTTPS URL"):
+                        operation(lock_path)
+                    self.assertTrue((self.vendor_root / "pkg/LICENSE").is_file())
+                    self.assertTrue((self.vendor_root / "pkg/file.js").is_file())
 
     def test_verify_rejects_unsupported_archive_kind(self):
         """Offline verification must not bless an installed tree from an unknown format."""
@@ -761,7 +798,7 @@ class VendorAssetTests(unittest.TestCase):
         )
 
     def test_pypi_release_gate_rebuilds_sdist_before_upload(self):
-        """PyPI must gate upload on an offline rebuild and artifact comparison."""
+        """PyPI must gate upload on a network-isolated rebuild and comparison."""
         repository_root = Path(__file__).parents[1]
         source = (repository_root / ".github/workflows/pypi.yml").read_text(
             encoding="utf-8"
@@ -774,49 +811,153 @@ class VendorAssetTests(unittest.TestCase):
         self.assertLess(direct, gate)
         self.assertLess(sdist, gate)
         self.assertLess(gate, upload)
+        self.assertIn(
+            "docker build --tag epub-browser-release-builder:local", source
+        )
+        self.assertIn(
+            "EPUB_BROWSER_RELEASE_BUILDER_IMAGE=epub-browser-release-builder:local",
+            source,
+        )
+        self.assertIn("--network-isolation docker", source)
+        self.assertIn(
+            "--builder-image epub-browser-release-builder:local", source
+        )
 
-    def test_release_artifact_gate_checks_sdist_and_offline_wheel(self):
-        """Manifest omissions must fail before an sdist or wheel can be published."""
+    def test_release_artifact_gate_fails_closed_without_network_isolation(self):
+        """An sdist rebuild must never silently fall back to host networking."""
         repository_root = Path(__file__).parents[1]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            direct = root / "direct"
-            source = root / "source"
-            direct.mkdir()
-            source.mkdir()
-            for kind, output in (("--wheel", direct), ("--sdist", source)):
-                completed = subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "build",
-                        kind,
-                        "--no-isolation",
-                        "--outdir",
-                        str(output),
-                    ],
-                    cwd=repository_root,
-                    text=True,
-                    capture_output=True,
-                )
-                self.assertEqual(completed.returncode, 0, completed.stderr)
-
+            direct, sdist = self.build_release_artifacts(repository_root, root)
             completed = subprocess.run(
                 [
                     sys.executable,
                     "tools/verify_release_artifacts.py",
                     "--wheel",
-                    str(next(direct.glob("*.whl"))),
+                    str(direct),
                     "--sdist",
-                    str(next(source.glob("*.tar.gz"))),
+                    str(sdist),
                 ],
                 cwd=repository_root,
                 text=True,
                 capture_output=True,
             )
 
-        self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("offline sdist wheel verified", completed.stdout)
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("network isolation is required", completed.stderr)
+
+    def test_release_artifact_gate_accepts_an_injected_isolation_runner(self):
+        """Tests and embedding callers may supply an explicit isolation boundary."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            with redirect_stdout(io.StringIO()):
+                verify_release_artifacts(
+                    wheel_path=direct,
+                    lock_path=lock_path,
+                    notices_path=notices_path,
+                    sync_tool_path=sync_tool_path,
+                    sdist_path=sdist,
+                    isolation_runner=self.local_build_runner,
+                )
+
+    def test_release_artifact_gate_rejects_an_unavailable_isolation_runtime(self):
+        """A missing container runtime must stop the build instead of weakening it."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            runner = release_artifacts.DockerNetworkIsolationRunner(
+                "fixture-builder:latest",
+                docker_executable=str(root / "missing-docker"),
+            )
+            with redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(
+                    ReleaseArtifactError, "network isolation.*unavailable"
+                ):
+                    verify_release_artifacts(
+                        wheel_path=direct,
+                        lock_path=lock_path,
+                        notices_path=notices_path,
+                        sync_tool_path=sync_tool_path,
+                        sdist_path=sdist,
+                        isolation_runner=runner,
+                    )
+
+    @unittest.skipUnless(
+        os.environ.get("EPUB_BROWSER_RELEASE_BUILDER_IMAGE"),
+        "set EPUB_BROWSER_RELEASE_BUILDER_IMAGE to run the Docker isolation proof",
+    )
+    def test_docker_network_isolation_blocks_backend_network_attempts(self):
+        """The release container must block socket, urllib, and subprocess access."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        network_probe = b'''\
+import socket as _probe_socket
+import subprocess as _probe_subprocess
+import sys as _probe_sys
+import urllib.request as _probe_urllib
+
+def _require_blocked(label, operation):
+    try:
+        operation()
+    except Exception:
+        return
+    raise RuntimeError(label + " unexpectedly reached the network")
+
+_require_blocked(
+    "direct socket",
+    lambda: _probe_socket.create_connection(("1.1.1.1", 443), timeout=1),
+)
+_require_blocked(
+    "urllib",
+    lambda: _probe_urllib.urlopen("https://pypi.org/simple/", timeout=2).read(1),
+)
+_probe_child = _probe_subprocess.run(
+    [
+        _probe_sys.executable,
+        "-c",
+        "import socket; socket.create_connection(('1.1.1.1', 443), timeout=1)",
+    ],
+    stdout=_probe_subprocess.DEVNULL,
+    stderr=_probe_subprocess.DEVNULL,
+    timeout=3,
+)
+if _probe_child.returncode == 0:
+    raise RuntimeError("subprocess unexpectedly reached the network")
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            hostile_sdist = root / "network-probe.tar.gz"
+            self.rewrite_sdist(
+                sdist,
+                hostile_sdist,
+                change=lambda name, data: network_probe + data
+                if name.endswith("/setup.py")
+                else data,
+            )
+            runner = release_artifacts.DockerNetworkIsolationRunner(
+                os.environ["EPUB_BROWSER_RELEASE_BUILDER_IMAGE"]
+            )
+            with redirect_stdout(io.StringIO()):
+                verify_release_artifacts(
+                    wheel_path=direct,
+                    lock_path=lock_path,
+                    notices_path=notices_path,
+                    sync_tool_path=sync_tool_path,
+                    sdist_path=hostile_sdist,
+                    isolation_runner=runner,
+                )
 
     def test_release_artifact_gate_rejects_real_artifact_tampering(self):
         """The public gate must reject malformed derivatives of real artifacts."""
@@ -913,6 +1054,7 @@ class VendorAssetTests(unittest.TestCase):
                                 notices_path=notices_path,
                                 sync_tool_path=sync_tool_path,
                                 sdist_path=source,
+                                isolation_runner=self.local_build_runner,
                             )
 
     def test_release_gate_rejects_noncanonical_real_archive_members(self):
@@ -985,6 +1127,62 @@ class VendorAssetTests(unittest.TestCase):
                                 sdist_path=destination,
                             )
 
+    def test_release_gate_rejects_portable_name_collisions_in_real_artifacts(self):
+        """Casefold and Unicode aliases must not produce ambiguous release files."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        collisions = (
+            ("casefold", "portable/Asset.txt", "portable/asset.txt"),
+            (
+                "unicode",
+                "portable/caf\N{LATIN SMALL LETTER E WITH ACUTE}.txt",
+                "portable/cafe\N{COMBINING ACUTE ACCENT}.txt",
+            ),
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            for label, first, second in collisions:
+                wheel_intermediate = root / (label + "-first.whl")
+                wheel_collision = root / (label + "-collision.whl")
+                self.rewrite_wheel_with_extra_member(
+                    direct, wheel_intermediate, first, b"first"
+                )
+                self.rewrite_wheel_with_extra_member(
+                    wheel_intermediate, wheel_collision, second, b"second"
+                )
+                with self.subTest(archive="wheel", collision=label):
+                    with redirect_stdout(io.StringIO()):
+                        with self.assertRaisesRegex(
+                            ReleaseArtifactError, "portable.*collision"
+                        ):
+                            verify_release_artifacts(
+                                wheel_path=wheel_collision,
+                                lock_path=lock_path,
+                                notices_path=notices_path,
+                                sync_tool_path=sync_tool_path,
+                            )
+
+                sdist_collision = root / (label + "-collision.tar.gz")
+                self.rewrite_sdist(
+                    sdist,
+                    sdist_collision,
+                    raw_append=((first, b"first"), (second, b"second")),
+                )
+                with self.subTest(archive="sdist", collision=label):
+                    with self.assertRaisesRegex(
+                        ReleaseArtifactError, "portable.*collision"
+                    ):
+                        verify_sdist(
+                            sdist_collision,
+                            lock_path,
+                            notices_path,
+                            sync_tool_path,
+                        )
+
     def test_docker_final_stage_copies_prefetched_runtime_without_pip(self):
         """The final image must not resolve or download Python dependencies."""
         repository_root = Path(__file__).parents[1]
@@ -1031,6 +1229,28 @@ class VendorAssetTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             outputs.append(next(output.glob(pattern)))
         return tuple(outputs)
+
+    @staticmethod
+    def local_build_runner(source_root, output_dir):
+        environment = os.environ.copy()
+        environment.update(
+            {"PIP_NO_INDEX": "1", "PIP_DISABLE_PIP_VERSION_CHECK": "1"}
+        )
+        return subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "build",
+                "--wheel",
+                "--no-isolation",
+                "--outdir",
+                str(output_dir),
+            ],
+            cwd=source_root,
+            env=environment,
+            text=True,
+            capture_output=True,
+        )
 
     @staticmethod
     def rewrite_sdist(
