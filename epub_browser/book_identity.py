@@ -16,6 +16,7 @@ from .sidecar_identity import (
     validate_source_fingerprint,
     write_sidecar,
 )
+from .source_format import EPUB_FORMAT, PDF_FORMAT, source_format
 
 
 BOOK_ID_STORAGE_SIDECAR = "sidecar"
@@ -86,6 +87,7 @@ def inspect_book_identity(
     orphan_sidecars: Sequence[Path] = (),
 ) -> BookIdentityInspection:
     source_path = Path(source)
+    format_name = source_format(source_path)
     before = _source_snapshot(source_path)
     if (
         known_fingerprint is not None
@@ -100,7 +102,11 @@ def inspect_book_identity(
         fingerprint = source_sha256(source_path)
 
     exact_sidecar = read_exact_sidecar(source_path)
-    embedded_book_id = read_embedded_book_id(source_path)
+    embedded_book_id = (
+        read_embedded_book_id(source_path)
+        if format_name == EPUB_FORMAT
+        else None
+    )
     matching_orphans = []
     for orphan_path in orphan_sidecars:
         orphan = read_sidecar_file(orphan_path)
@@ -177,7 +183,10 @@ def resolve_book_identity(
     book_id = candidates[0][1] if candidates else new_server_book_id()
     _assert_snapshot(inspection)
 
-    if storage == BOOK_ID_STORAGE_SIDECAR:
+    if (
+        storage == BOOK_ID_STORAGE_SIDECAR
+        or source_format(inspection.source) == PDF_FORMAT
+    ):
         if selected_orphan is not None:
             adopt_sidecar(selected_orphan, inspection.source)
         write_sidecar(

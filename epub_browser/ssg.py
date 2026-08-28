@@ -19,13 +19,18 @@ from .asset_publisher import (
     SERVER_ONLY_ASSET_PREFIXES,
     WEB_MANIFEST_SOURCES,
 )
-from .book_identity import inspect_book_identity, resolve_book_identity
-from .cli import SSGConfig
+from .book_identity import (
+    BOOK_ID_STORAGE_EMBEDDED,
+    inspect_book_identity,
+    resolve_book_identity,
+)
+from .cli import PDF_EMBEDDED_STORAGE_NOTICE, SSGConfig
 from .models import ConvertedBook
 from .processor import EPUBProcessor
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import discover_orphan_sidecars
+from .source_format import PDF_FORMAT, is_supported_source, source_format
 from .urls import SiteURLs
 
 
@@ -160,10 +165,10 @@ class SSGPublisher:
                 continue
             absolute = source.absolute()
             if absolute.is_file():
-                if absolute.suffix.lower() == ".epub":
+                if is_supported_source(absolute):
                     discovered.append(absolute)
                 else:
-                    failures.append((absolute, "file is not an EPUB"))
+                    failures.append((absolute, "file is not an EPUB or PDF"))
                 continue
             resolved = source.resolve()
             if not resolved.is_dir():
@@ -173,14 +178,21 @@ class SSGPublisher:
                 relative = candidate.relative_to(resolved)
                 if any(part.startswith(".") for part in relative.parts):
                     continue
-                if candidate.is_file() and candidate.suffix.lower() == ".epub":
+                if candidate.is_file() and is_supported_source(candidate):
                     discovered.append(candidate.resolve())
 
         if failures:
-            raise SSGBuildError(self._format_failures("Invalid SSG sources", failures))
+            raise SSGBuildError(
+                self._format_failures("Invalid SSG sources", failures)
+            )
         unique = tuple(sorted(set(discovered), key=str))
         if not unique:
-            raise SSGBuildError("No EPUB files were discovered")
+            raise SSGBuildError("No EPUB or PDF files were discovered")
+        if (
+            self.config.book_id_storage == BOOK_ID_STORAGE_EMBEDDED
+            and any(source_format(path) == PDF_FORMAT for path in unique)
+        ):
+            self.reporter.notice(PDF_EMBEDDED_STORAGE_NOTICE)
         return unique
 
     def _validate_output_target(self, sources: Sequence[Path]) -> None:

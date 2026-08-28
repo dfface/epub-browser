@@ -10,11 +10,57 @@ from pathlib import Path
 
 from epub_browser.cli import SSGConfig
 from epub_browser.epub_identity import read_embedded_book_id
+from epub_browser.reporting import Reporter
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.ssg import SSGBuildError, SSGPublisher, run_ssg
 
 
 class SSGPublicationTests(unittest.TestCase):
+    def test_discovery_accepts_epub_and_pdf_case_insensitively(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = root / "books"
+            sources.mkdir()
+            self._write_minimal_epub(
+                sources / "one.EPUB", identifier="urn:test:discovery"
+            )
+            (sources / "two.PDF").write_bytes(b"%PDF-1.4\n%%EOF\n")
+            (sources / "ignored.txt").write_text("ignored", encoding="utf-8")
+            publisher = SSGPublisher(
+                SSGConfig((sources,), root / "dist"), show_progress=False
+            )
+
+            discovered = publisher._discover_sources()
+
+            self.assertEqual(
+                {path.name for path in discovered}, {"one.EPUB", "two.PDF"}
+            )
+
+    def test_embedded_storage_reports_pdf_sidecar_fallback_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "one.pdf"
+            second = root / "two.PDF"
+            first.write_bytes(b"%PDF-1.4\none\n%%EOF\n")
+            second.write_bytes(b"%PDF-1.4\ntwo\n%%EOF\n")
+            publisher = SSGPublisher(
+                SSGConfig(
+                    (first, second),
+                    root / "dist",
+                    log=True,
+                    book_id_storage="embedded",
+                ),
+                reporter=Reporter(True),
+                show_progress=False,
+            )
+
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                publisher._discover_sources()
+
+            output = stderr.getvalue()
+            self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
+            self.assertIn("PDF identities use adjacent sidecars", output)
+
     def test_sidecar_id_survives_package_metadata_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

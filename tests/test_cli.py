@@ -60,6 +60,17 @@ class NewCommandTests(unittest.TestCase):
                 ]
             )
 
+    def test_book_id_storage_help_explains_pdf_fallback(self):
+        with contextlib.redirect_stdout(io.StringIO()) as stdout, self.assertRaises(
+            SystemExit
+        ) as raised:
+            parse_cli(["ssg", "--help"])
+
+        self.assertEqual(raised.exception.code, 0)
+        help_text = " ".join(stdout.getvalue().split())
+        self.assertIn("embedded storage is EPUB-only", help_text)
+        self.assertIn("PDF always uses a sidecar", help_text)
+
     def test_ssg_cli_parses_without_loading_argon2(self):
         script = """
 import builtins

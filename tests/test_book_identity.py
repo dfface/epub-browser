@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from epub_browser.book_identity import (
+    BOOK_ID_STORAGE_EMBEDDED,
     BookIdentityConflict,
     BookIdentityError,
     ExternalBookIdentity,
@@ -16,10 +17,17 @@ from epub_browser.book_identity import (
 from epub_browser.epub_identity import read_embedded_book_id
 from epub_browser.identity import source_sha256
 from epub_browser.sidecar_identity import (
+    discover_orphan_sidecars,
     read_exact_sidecar,
     read_sidecar_file,
     sidecar_path_for,
     write_sidecar,
+)
+from epub_browser.source_format import (
+    EPUB_FORMAT,
+    PDF_FORMAT,
+    is_supported_source,
+    source_format,
 )
 
 
@@ -61,6 +69,48 @@ class BookIdentityTests(unittest.TestCase):
         self.assertEqual(resolved.book_id, "sidecar_id")
         self.assertEqual(read_embedded_book_id(self.source), "sidecar_id")
         self.assertEqual(sidecar_path_for(self.source).read_bytes(), sidecar_before)
+
+    def test_pdf_uses_sidecar_when_embedded_storage_is_requested(self):
+        source = self.root / "book.PDF"
+        source.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        before = source.read_bytes()
+
+        resolved = resolve_book_identity(
+            inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED
+        )
+
+        self.assertEqual(read_exact_sidecar(source).book_id, resolved.book_id)
+        self.assertEqual(source.read_bytes(), before)
+
+    def test_explicit_pdf_source_parent_contributes_orphan_sidecars(self):
+        source = self.root / "old.PDF"
+        source.write_bytes(b"%PDF-1.4\nold\n%%EOF\n")
+        first = resolve_book_identity(
+            inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED
+        )
+        orphan = sidecar_path_for(source)
+        moved = self.root / "moved.pdf"
+        source.rename(moved)
+
+        orphan_sidecars = discover_orphan_sidecars((moved,), (moved,))
+        second = resolve_book_identity(
+            inspect_book_identity(moved, orphan_sidecars=orphan_sidecars),
+            BOOK_ID_STORAGE_EMBEDDED,
+        )
+
+        self.assertEqual(orphan_sidecars, (orphan,))
+        self.assertEqual(second.book_id, first.book_id)
+        self.assertFalse(orphan.exists())
+        self.assertEqual(read_exact_sidecar(moved).book_id, first.book_id)
+
+    def test_source_format_classifies_supported_suffixes_case_insensitively(self):
+        self.assertEqual(source_format(Path("book.EPUB")), EPUB_FORMAT)
+        self.assertEqual(source_format(Path("book.PdF")), PDF_FORMAT)
+        self.assertTrue(is_supported_source(Path("book.epub")))
+        self.assertTrue(is_supported_source(Path("book.PDF")))
+        self.assertFalse(is_supported_source(Path("book.txt")))
+        with self.assertRaisesRegex(ValueError, "Unsupported book format: <none>"):
+            source_format(Path("book"))
 
     def test_conflicting_carriers_fail_without_mutation(self):
         self._write_epub(self.source, embedded_book_id="embedded_id")
