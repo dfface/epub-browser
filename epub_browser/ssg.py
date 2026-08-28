@@ -35,7 +35,6 @@ from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import (
     discover_orphan_sidecars,
-    read_exact_sidecar,
     sidecar_path_for,
 )
 from .source_format import (
@@ -62,6 +61,12 @@ class _PreparedBook:
     identity_inspection: Optional[BookIdentityInspection] = None
 
 
+@dataclass(frozen=True)
+class _SidecarState:
+    path: Path
+    contents: Optional[bytes]
+
+
 class SSGPublisher:
     def __init__(
         self,
@@ -84,13 +89,6 @@ class SSGPublisher:
         self._validate_output_target(sources)
         orphan_sidecars = discover_orphan_sidecars(self.config.sources, sources)
         prepared = self._prepare_books(sources, orphan_sidecars)
-        rollback_sidecars = tuple(
-            book for book in prepared
-            if book.source_format == PDF_FORMAT
-            and book.identity_inspection is not None
-            and book.identity_inspection.exact_sidecar is None
-            and not book.identity_inspection.matching_orphans
-        )
 
         self.output_dir.parent.mkdir(parents=True, exist_ok=True)
         staging = Path(
@@ -111,12 +109,14 @@ class SSGPublisher:
             books = self._convert_all(prepared, staging, assets)
             publish_library_shell(staging, books, assets, self.urls)
             self._validate_snapshot(staging, books, assets)
-            self._persist_pdf_identities(prepared)
-            self._activate(staging)
+            identity_state = self._capture_pdf_identity_state(prepared)
+            try:
+                self._persist_pdf_identities(prepared)
+                self._activate(staging)
+            except Exception:
+                self._restore_pdf_identity_state(identity_state)
+                raise
             return self.output_dir
-        except Exception:
-            self._rollback_new_pdf_sidecars(rollback_sidecars)
-            raise
         finally:
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
@@ -480,15 +480,59 @@ class SSGPublisher:
                 raise SSGBuildError("PDF identity changed during conversion")
 
     @staticmethod
-    def _rollback_new_pdf_sidecars(prepared: Sequence[_PreparedBook]) -> None:
+    def _capture_pdf_identity_state(
+        prepared: Sequence[_PreparedBook],
+    ) -> tuple[_SidecarState, ...]:
+        paths = set()
         for book in prepared:
-            sidecar = read_exact_sidecar(book.source)
-            if (
-                sidecar is not None
-                and sidecar.book_id == book.book_id
-                and sidecar.source_fingerprint == book.source_fingerprint
-            ):
-                sidecar_path_for(book.source).unlink()
+            if book.source_format != PDF_FORMAT:
+                continue
+            paths.add(sidecar_path_for(book.source))
+            if book.identity_inspection is not None:
+                paths.update(
+                    sidecar.path
+                    for sidecar in book.identity_inspection.matching_orphans
+                )
+        return tuple(
+            _SidecarState(
+                path=path,
+                contents=(
+                    path.read_bytes()
+                    if path.exists() or path.is_symlink()
+                    else None
+                ),
+            )
+            for path in sorted(paths, key=str)
+        )
+
+    def _restore_pdf_identity_state(
+        self,
+        states: Sequence[_SidecarState],
+    ) -> None:
+        for state in states:
+            if state.contents is None and (state.path.exists() or state.path.is_symlink()):
+                state.path.unlink()
+        for state in states:
+            if state.contents is not None:
+                self._atomic_write_bytes(state.path, state.contents)
+
+    @staticmethod
+    def _atomic_write_bytes(destination: Path, contents: bytes) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(contents)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     def _validate_snapshot(
         self,

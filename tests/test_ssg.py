@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import unittest
 import zipfile
+from html.parser import HTMLParser
 from pathlib import Path
 from unittest.mock import patch
 
@@ -135,6 +136,123 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertFalse(sidecar_path_for(source).exists())
             self.assertFalse(output.exists())
             self.assertEqual(list(root.glob(".dist.staging-*")), [])
+
+    def test_failed_pdf_activation_removes_a_new_identity_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=1)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher, "_activate", side_effect=RuntimeError("activation exploded")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "activation exploded"):
+                    publisher.build()
+
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertFalse(output.exists())
+
+    def test_failed_pdf_activation_restores_an_adopted_orphan_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_source = root / "old.pdf"
+            source = root / "renamed.pdf"
+            output = root / "dist"
+            self._write_pdf(old_source, pages=1)
+            SSGPublisher(
+                SSGConfig((old_source,), root / "seed"), show_progress=False
+            ).build()
+            orphan = sidecar_path_for(old_source)
+            orphan_bytes = orphan.read_bytes()
+            old_source.rename(source)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher, "_activate", side_effect=RuntimeError("activation exploded")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "activation exploded"):
+                    publisher.build()
+
+            self.assertEqual(orphan.read_bytes(), orphan_bytes)
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertFalse(output.exists())
+
+    def test_failed_pdf_activation_restores_an_existing_sidecar_exactly(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=1)
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+            original_output = (output / "index.html").read_bytes()
+            sidecar = sidecar_path_for(source)
+            original_sidecar = sidecar.read_bytes()
+            self._write_pdf(source, pages=2)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher, "_activate", side_effect=RuntimeError("activation exploded")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "activation exploded"):
+                    publisher.build()
+
+            self.assertEqual(sidecar.read_bytes(), original_sidecar)
+            self.assertEqual((output / "index.html").read_bytes(), original_output)
+
+    def test_pdf_ssg_escapes_hostile_document_metadata_in_shared_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "hostile.pdf"
+            output = root / "dist"
+            title = 'Title </title><script data-pdf-attack="title">boom</script>'
+            author = 'Author <img src=x onerror="pdfAttack()">'
+            tag = 'Tag <svg onload="pdfAttack()">'
+            self._write_pdf(
+                source,
+                pages=1,
+                metadata={
+                    "/Title": title,
+                    "/Author": author,
+                    "/Keywords": tag,
+                },
+            )
+
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book = output / "book" / metadata[0]["hash"]
+            for page_name in ("index.html", "chapter_0.html"):
+                page = (book / page_name).read_text(encoding="utf-8")
+                probe = _HTMLSafetyProbe()
+                probe.feed(page)
+                self.assertEqual(probe.attack_elements, [], page_name)
+                self.assertNotIn("onerror=", page.lower(), page_name)
+                self.assertNotIn("onload=", page.lower(), page_name)
+                self.assertIn("Title boom", probe.text, page_name)
+            library_page = (output / "index.html").read_text(encoding="utf-8")
+            library_probe = _HTMLSafetyProbe()
+            library_probe.feed(library_page)
+            self.assertEqual(library_probe.attack_elements, [])
+            self.assertNotIn("onload=", library_page.lower())
+            self.assertIn("Tag", library_probe.text)
+            index_probe = _HTMLSafetyProbe()
+            index_probe.feed((book / "index.html").read_text(encoding="utf-8"))
+            self.assertIn("Author", index_probe.text)
+            self.assertIn("Tag", index_probe.text)
 
     def test_sidecar_id_survives_package_metadata_changes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -553,13 +671,38 @@ class SSGPublicationTests(unittest.TestCase):
         temporary.replace(path)
 
     @staticmethod
-    def _write_pdf(path, pages):
+    def _write_pdf(path, pages, metadata=None):
         writer = PdfWriter()
         for page_number in range(pages):
             writer.add_blank_page(width=200 + page_number, height=400 + page_number)
-        writer.add_metadata({"/Title": "SSG PDF", "/Author": "PDF Author"})
+        writer.add_metadata(
+            metadata or {"/Title": "SSG PDF", "/Author": "PDF Author"}
+        )
         with Path(path).open("wb") as stream:
             writer.write(stream)
+
+
+class _HTMLSafetyProbe(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.attack_elements = []
+        self.text_parts = []
+
+    @property
+    def text(self):
+        return "".join(self.text_parts)
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if (
+            attributes.get("data-pdf-attack") is not None
+            or "onerror" in attributes
+            or "onload" in attributes
+        ):
+            self.attack_elements.append((tag, attributes))
+
+    def handle_data(self, data):
+        self.text_parts.append(data)
 
 
 if __name__ == "__main__":

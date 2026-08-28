@@ -1506,25 +1506,17 @@ class EPUBProcessor:
                     <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                 </button>
                 <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
-        if self.deployment_mode == "server":
-            safe_book_title = metadata_text(self.book_title)
-            book_title_text = html.escape(safe_book_title, quote=False)
-            book_title_attribute = html.escape(safe_book_title, quote=True)
-            book_id_attribute = html.escape(str(self.book_hash), quote=True)
-            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
-        else:
-            book_title_text = self.book_title
-            book_title_attribute = self.book_title
-            book_id_attribute = self.book_hash
-            book_id_url = self.book_hash
-        if self.authors and self.deployment_mode == "server":
+        safe_book_title = metadata_text(self.book_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        book_title_attribute = html.escape(safe_book_title, quote=True)
+        book_id_attribute = html.escape(str(self.book_hash), quote=True)
+        book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+        if self.authors:
             authors_text = " & ".join(
                 html.escape(metadata_text(author), quote=False)
                 for author in self.authors
             )
             authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{authors_text}</p>'
-        elif self.authors:
-            authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
         ai_feature_assets = self._server_ai_feature_assets()
@@ -1780,7 +1772,7 @@ class EPUBProcessor:
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover-wrap">
                 <div class="book-info-cover">
-                    <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
+                    <img src="{html.escape(self.get_book_info()['cover'], quote=True)}" alt="">
                 </div>
                 {book_reading_time}
             </div>
@@ -1788,11 +1780,7 @@ class EPUBProcessor:
                 <h2 class="book-info-title" lang="{book_language}" dir="auto">{book_title_text}</h2>
                 {authors_html}"""
         if self.description:
-            description = (
-                sanitize_html_fragment(self.description)
-                if self.deployment_mode == "server"
-                else self.description
-            )
+            description = sanitize_html_fragment(self.description)
             index_html += f""" 
                 <div class="book-info-desc" lang="{book_language}" dir="auto">
                     {description}
@@ -1801,11 +1789,7 @@ class EPUBProcessor:
                 <div class="book-info-tags" lang="{book_language}" dir="auto">"""
         if self.tags:
             for tag in self.tags:
-                tag_text = (
-                    html.escape(metadata_text(tag), quote=False)
-                    if self.deployment_mode == "server"
-                    else tag
-                )
+                tag_text = html.escape(metadata_text(tag), quote=False)
                 index_html += """<span class="book-tag">{}</span>""".format(tag_text)
         index_html += f"""
                 </div>
@@ -1838,10 +1822,8 @@ class EPUBProcessor:
         # contributes titles, anchors and non-navigable grouping nodes.
         for toc_item in self._build_toc_data():
             level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
-            toc_title = (
-                html.escape(metadata_text(toc_item.get("title")), quote=False)
-                if self.deployment_mode == "server"
-                else toc_item["title"]
+            toc_title = html.escape(
+                metadata_text(toc_item.get("title")), quote=False
             )
             toc_title_attributes = f' lang="{book_language}" dir="auto"'
             if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('page_label'):
@@ -1872,11 +1854,7 @@ class EPUBProcessor:
             chapter_index = toc_item['chapter_index']
             chapter_anchor = toc_item.get('anchor')
             if chapter_anchor is not None:
-                safe_anchor = (
-                    urllib.parse.quote(str(chapter_anchor), safe='')
-                    if self.deployment_mode == "server"
-                    else chapter_anchor
-                )
+                safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
                 index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title"{toc_title_attributes}>{toc_title}</span>{outline_labels_html}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
             else:
                 index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title"{toc_title_attributes}>{toc_title}</span>{outline_labels_html}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
@@ -2596,21 +2574,14 @@ document.addEventListener('DOMContentLoaded', function() {{
         """创建章节页面模板"""
         if self.deployment_mode == "server":
             content = sanitize_html_fragment(content)
-            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
-            book_id_attribute = html.escape(str(self.book_hash), quote=True)
-            safe_book_title = metadata_text(self.book_title)
-            safe_chapter_title = metadata_text(chapter_title)
-            book_title_text = html.escape(safe_book_title, quote=False)
-            book_title_attribute = html.escape(safe_book_title, quote=True)
-            chapter_title_text = html.escape(safe_chapter_title, quote=False)
-            chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
-        else:
-            book_id_url = self.book_hash
-            book_id_attribute = self.book_hash
-            book_title_text = self.book_title
-            book_title_attribute = self.book_title
-            chapter_title_text = chapter_title
-            chapter_title_attribute = chapter_title
+        book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+        book_id_attribute = html.escape(str(self.book_hash), quote=True)
+        safe_book_title = metadata_text(self.book_title)
+        safe_chapter_title = metadata_text(chapter_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        book_title_attribute = html.escape(safe_book_title, quote=True)
+        chapter_title_text = html.escape(safe_chapter_title, quote=False)
+        chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
         pdf_config_script = ""
         if pdf_page is not None:
             page_number = int(pdf_page["page_number"])

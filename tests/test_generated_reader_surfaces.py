@@ -1188,7 +1188,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('width="640"', rendered)
         self.assertIn('height="480"', rendered)
 
-    def test_ssg_processor_preserves_existing_epub_markup_metadata_and_resources(self):
+    def test_ssg_processor_preserves_authored_content_but_makes_metadata_inert(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor("book.epub", directory, deployment_mode="ssg")
             processor.book_title = '<script id="ssg-title">title()</script>'
@@ -1234,14 +1234,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('id="ssg-body"', chapter_html)
             self.assertIn("background: url(image.png)", chapter_html)
             self.assertIn("https://example.test/book.css", chapter_html)
-            for marker in (
+            self.assertIn("title()", index_html)
+            self.assertIn("Author", index_html)
+            self.assertIn("Tag", index_html)
+            self.assertIn("ssg-description", index_html)
+            for active_metadata_marker in (
                 "ssg-title",
                 "ssg-author",
-                "ssg-description",
                 "ssg-tag",
+                "ssg-chapter",
             ):
-                self.assertIn(marker, index_html)
-            self.assertIn("ssg-chapter", chapter_html)
+                self.assertNotIn(active_metadata_marker, index_html + chapter_html)
             self.assertIn(
                 'onload="run()"',
                 Path(processor.web_dir, "resources", "active.svg").read_text(
