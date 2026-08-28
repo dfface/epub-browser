@@ -4,12 +4,13 @@
 import argparse
 import hashlib
 import os
+import re
 import subprocess
 import sys
 import tarfile
 import tempfile
 import zipfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +22,39 @@ from tools.sync_vendor_assets import VendorAssetError, load_lock  # noqa: E402
 
 class ReleaseArtifactError(Exception):
     """A release artifact is incomplete, altered, or unsafe to rebuild."""
+
+
+DRIVE_LIKE_SEGMENT = re.compile(r"^[A-Za-z]:")
+
+
+def _canonical_member_name(
+    value: str,
+    *,
+    is_directory: bool,
+    directory_trailing_slash: bool,
+) -> str:
+    """Return one canonical POSIX archive name or reject every path alias."""
+    if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
+        raise ReleaseArtifactError("archive contains a non-canonical member name")
+    if value.startswith("/"):
+        raise ReleaseArtifactError("archive contains a non-canonical member name")
+    if is_directory and directory_trailing_slash:
+        if not value.endswith("/"):
+            raise ReleaseArtifactError("archive contains a non-canonical member name")
+        core = value[:-1]
+    else:
+        if value.endswith("/"):
+            raise ReleaseArtifactError("archive contains a non-canonical member name")
+        core = value
+    parts = core.split("/")
+    if (
+        not parts
+        or any(part in ("", ".", "..") for part in parts)
+        or any(DRIVE_LIKE_SEGMENT.match(part) for part in parts)
+        or "/".join(parts) != core
+    ):
+        raise ReleaseArtifactError("archive contains a non-canonical member name")
+    return core
 
 
 def _sha256_stream(stream) -> str:
@@ -55,15 +89,26 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
     }
     try:
         with zipfile.ZipFile(wheel_path) as archive:
-            member_names = archive.namelist()
-            if len(member_names) != len(set(member_names)):
-                raise ReleaseArtifactError("wheel contains duplicate members")
-            names = set(member_names)
+            members = archive.infolist()
+            canonical_members = {}
+            for member in members:
+                raw_name = getattr(member, "orig_filename", member.filename)
+                canonical = _canonical_member_name(
+                    raw_name,
+                    is_directory=member.is_dir(),
+                    directory_trailing_slash=True,
+                )
+                if canonical in canonical_members:
+                    raise ReleaseArtifactError(
+                        "wheel contains duplicate canonical members"
+                    )
+                canonical_members[canonical] = member
+            names = set(canonical_members)
             actual_names = {
                 name
-                for name in names
-                if name.startswith("epub_browser/assets/vendor/")
-                and not name.endswith("/")
+                for name, member in canonical_members.items()
+                if not member.is_dir()
+                and name.startswith("epub_browser/assets/vendor/")
             }
             if actual_names != expected_names:
                 missing = sorted(expected_names - actual_names)
@@ -75,7 +120,7 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
                 )
             for relative, expected_digest in expected.items():
                 name = "epub_browser/assets/vendor/" + relative
-                with archive.open(name) as member:
+                with archive.open(canonical_members[name]) as member:
                     actual_digest = _sha256_stream(member)
                 if actual_digest != expected_digest:
                     raise ReleaseArtifactError(
@@ -90,7 +135,7 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
                 )
             expected_notice = notices_path.read_bytes()
             for name in notice_names:
-                if archive.read(name) != expected_notice:
+                if archive.read(canonical_members[name]) != expected_notice:
                     raise ReleaseArtifactError(
                         "wheel contains altered THIRD_PARTY_NOTICES.md"
                     )
@@ -102,15 +147,18 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
 
 def _safe_sdist_members(archive: tarfile.TarFile):
     members = archive.getmembers()
-    member_names = [member.name for member in members]
-    if len(member_names) != len(set(member_names)):
-        raise ReleaseArtifactError("sdist contains duplicate members")
+    canonical_members = {}
     roots = set()
     for member in members:
-        path = PurePosixPath(member.name)
-        if path.is_absolute() or ".." in path.parts or not path.parts:
-            raise ReleaseArtifactError("sdist contains an unsafe path")
-        roots.add(path.parts[0])
+        canonical = _canonical_member_name(
+            member.name,
+            is_directory=member.isdir(),
+            directory_trailing_slash=False,
+        )
+        if canonical in canonical_members:
+            raise ReleaseArtifactError("sdist contains duplicate canonical members")
+        canonical_members[canonical] = member
+        roots.add(canonical.split("/", 1)[0])
         if not member.isfile() and not member.isdir():
             raise ReleaseArtifactError("sdist contains a linked or special entry")
     if len(roots) != 1:

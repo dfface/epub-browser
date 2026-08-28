@@ -893,7 +893,12 @@ class VendorAssetTests(unittest.TestCase):
                 ("duplicate changed vendor", direct, duplicate_vendor, "duplicate"),
                 ("extra vendor file", direct, extra_vendor, "inventory"),
                 ("link member", direct, linked_member, "linked|special"),
-                ("traversal member", direct, traversal_member, "unsafe"),
+                (
+                    "traversal member",
+                    direct,
+                    traversal_member,
+                    "canonical|unsafe",
+                ),
                 ("altered direct wheel", changed_wheel, None, "digest"),
                 ("duplicate changed wheel", duplicate_wheel, None, "duplicate"),
                 ("altered rebuilt wheel", direct, rebuilt_tamper, "digest"),
@@ -908,6 +913,76 @@ class VendorAssetTests(unittest.TestCase):
                                 notices_path=notices_path,
                                 sync_tool_path=sync_tool_path,
                                 sdist_path=source,
+                            )
+
+    def test_release_gate_rejects_noncanonical_real_archive_members(self):
+        """Archive path aliases must fail before inventory checks or extraction."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        first_target = load_lock(lock_path).packages[0].files[0].target
+        canonical = "epub_browser/assets/vendor/" + first_target
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            wheel_aliases = (
+                ("double slash", canonical.replace("/assets/", "//assets/")),
+                ("dot segment", canonical.replace("/assets/", "/./assets/")),
+                ("backslash", canonical.replace("/", "\\")),
+                ("drive rooted", "C:/" + canonical),
+                ("absolute", "/" + canonical),
+            )
+            for label, alias in wheel_aliases:
+                destination = root / ("wheel-" + label.replace(" ", "-") + ".whl")
+                self.rewrite_wheel_with_extra_member(
+                    direct, destination, alias, b"alias"
+                )
+                with self.subTest(archive="wheel", alias=label):
+                    with redirect_stdout(io.StringIO()):
+                        with self.assertRaisesRegex(
+                            ReleaseArtifactError, "canonical"
+                        ):
+                            verify_release_artifacts(
+                                wheel_path=destination,
+                                lock_path=lock_path,
+                                notices_path=notices_path,
+                                sync_tool_path=sync_tool_path,
+                            )
+
+            sdist_aliases = (
+                ("double slash", [("aliases//double.js", b"alias")], ()),
+                ("dot segment", [("aliases/./dot.js", b"alias")], ()),
+                ("backslash", [("aliases\\backslash.js", b"alias")], ()),
+                ("nested drive", [("C:/escape.js", b"alias")], ()),
+                (
+                    "normalized collision",
+                    [("epub_browser//assets/vendor/" + first_target, b"changed")],
+                    (),
+                ),
+                ("drive rooted", (), [("C:/escape.js", b"alias")]),
+                ("absolute", (), [("/escape.js", b"alias")]),
+            )
+            for label, relative, exact in sdist_aliases:
+                destination = root / ("sdist-" + label.replace(" ", "-") + ".tar.gz")
+                self.rewrite_sdist(
+                    sdist,
+                    destination,
+                    raw_append=relative,
+                    exact_append=exact,
+                )
+                with self.subTest(archive="sdist", alias=label):
+                    with redirect_stdout(io.StringIO()):
+                        with self.assertRaisesRegex(
+                            ReleaseArtifactError, "canonical"
+                        ):
+                            verify_release_artifacts(
+                                wheel_path=direct,
+                                lock_path=lock_path,
+                                notices_path=notices_path,
+                                sync_tool_path=sync_tool_path,
+                                sdist_path=destination,
                             )
 
     def test_docker_final_stage_copies_prefetched_runtime_without_pip(self):
@@ -966,6 +1041,7 @@ class VendorAssetTests(unittest.TestCase):
         prepend=(),
         append=(),
         raw_append=(),
+        exact_append=(),
         symlink=None,
     ):
         with tarfile.open(source, mode="r:gz") as original:
@@ -996,6 +1072,8 @@ class VendorAssetTests(unittest.TestCase):
                     )
                 for name, data in raw_append:
                     VendorAssetTests.add_tar_bytes(rewritten, root + "/" + name, data)
+                for name, data in exact_append:
+                    VendorAssetTests.add_tar_bytes(rewritten, name, data)
                 if symlink is not None:
                     member = tarfile.TarInfo(root + "/" + symlink)
                     member.type = tarfile.SYMTYPE
@@ -1031,6 +1109,15 @@ class VendorAssetTests(unittest.TestCase):
                     else original.read(member.filename)
                 )
                 rewritten.writestr(member, data)
+
+    @staticmethod
+    def rewrite_wheel_with_extra_member(source, destination, name, data):
+        with zipfile.ZipFile(source) as original, zipfile.ZipFile(
+            destination, mode="w"
+        ) as rewritten:
+            for member in original.infolist():
+                rewritten.writestr(member, original.read(member.filename))
+            rewritten.writestr(name, data)
 
     def write_lock(self, files=None, targets=None):
         files = files or {target: b"asset" for target in targets}
