@@ -488,13 +488,17 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-`fetch` is the only command above that accesses upstream package servers. The
+`fetch` is the only command above that downloads browser vendor assets. The
 lock records immutable npm tarballs, file digests, allowlists, and licenses;
 `verify`, tests, builds from a hydrated checkout, and the installed reader do
-not download browser assets. Wheels, source distributions, Docker images, and
-generated SSG sites contain the verified files and have no runtime CDN
-dependency. See [third_party/README.md](third_party/README.md) for the update,
-release, and repository-hygiene workflow.
+not download browser assets. The standard isolated `python3 -m build` command
+may still consult a Python package index for build requirements. For a fully
+network-disabled build, hydrate the vendor tree and preinstall `build`,
+`setuptools`, and `wheel` before disconnecting, then run
+`PIP_NO_INDEX=1 python3 -m build --no-isolation`. Wheels, source distributions,
+Docker images, and generated SSG sites contain the verified files and have no
+runtime CDN dependency. See [third_party/README.md](third_party/README.md) for
+the update, release, and repository-hygiene workflow.
 
 ## License
 

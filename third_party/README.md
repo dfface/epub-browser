@@ -24,6 +24,10 @@ verifies archive and installed-file SHA-256 values, extraction bounds, and
 licenses before atomically installing the allowlisted files. An already valid
 tree is reused.
 
+This statement applies to browser vendor assets: the standard isolated
+`python3 -m build` command may separately consult a Python package index for
+its build requirements.
+
 `verify` is completely offline and fails on missing, extra, altered, linked,
 or special files. To remove generated files owned by the current lock, run:
 
@@ -67,6 +71,22 @@ python3 tools/sync_vendor_assets.py fetch
 python3 tools/sync_vendor_assets.py verify
 python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
+```
+
+For a fully network-disabled build, first hydrate the vendor tree and provision
+the Python environment while network access is available:
+
+```bash
+python3 tools/sync_vendor_assets.py fetch
+python3 -m pip install build setuptools wheel
+```
+
+After disconnecting, verify the tree and disable both index access and PEP 517
+build isolation so the pre-provisioned tools are used:
+
+```bash
+python3 tools/sync_vendor_assets.py verify
+PIP_NO_INDEX=1 python3 -m build --no-isolation
 ```
 
 The PyPI workflow builds the direct wheel and sdist separately, verifies their

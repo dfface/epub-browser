@@ -467,10 +467,13 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-上述命令只有 `fetch` 会访问上游包服务器。锁文件记录不可变的 npm tarball、
-文件摘要、允许列表和许可证；`verify`、测试、已生成资源的源码构建以及安装后的
-阅读器都不会下载浏览器资源。wheel、sdist、Docker 镜像和生成的 SSG 站点均包含
-已验证文件，运行时不依赖 CDN。更新、发布和仓库清洁度流程见
+上述命令只有 `fetch` 会下载浏览器 vendor 资源。锁文件记录不可变的 npm
+tarball、文件摘要、允许列表和许可证；`verify`、测试、已生成资源的源码构建以及
+安装后的阅读器都不会下载浏览器资源。标准的隔离构建命令 `python3 -m build`
+仍可能从 Python 包索引获取构建依赖。若要在完全断网的环境构建，需在断网前生成 vendor
+资源并预装 `build`、`setuptools` 和 `wheel`，断网后再运行
+`PIP_NO_INDEX=1 python3 -m build --no-isolation`。wheel、sdist、Docker 镜像和生成的
+SSG 站点均包含已验证文件，运行时不依赖 CDN。更新、发布和仓库清洁度流程见
 [third_party/README.md](third_party/README.md)。
 
 ## 许可证
