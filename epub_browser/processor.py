@@ -697,6 +697,7 @@ class EPUBProcessor:
             "aiChat": "ai-chat.js",
             "aiRichTextCss": "ai-rich-text.css",
             "aiRichText": "ai-rich-text.js",
+            "markdownIt": "vendor/markdown-it/markdown-it.min.js",
             "katexCss": "vendor/katex/katex.min.css",
             "katex": "vendor/katex/katex.min.js",
             "mermaid": "vendor/mermaid/mermaid.min.js",

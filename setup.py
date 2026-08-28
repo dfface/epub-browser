@@ -25,7 +25,7 @@ setup(
         "Release notes": "https://github.com/dfface/epub-browser/tree/main/docs/releases",
     },
     packages=find_packages(exclude=("tests", "tests.*")),
-    package_data={'epub_browser': ['assets/*', 'assets/vendor/katex/*', 'assets/vendor/katex/fonts/*', 'assets/vendor/mermaid/*', 'prompt_templates/*.json']},
+    package_data={'epub_browser': ['assets/*', 'assets/vendor/katex/*', 'assets/vendor/katex/fonts/*', 'assets/vendor/markdown-it/*', 'assets/vendor/mermaid/*', 'prompt_templates/*.json']},
     classifiers=[  # 项目分类器，帮助用户找到你的项目
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

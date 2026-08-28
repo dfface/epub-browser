@@ -43,8 +43,17 @@
 .ai-chat-markdown > :first-child { margin-top: 0; }
 .ai-chat-markdown > :last-child { margin-bottom: 0; }
 .ai-chat-markdown h3, .ai-chat-markdown h4 { margin: 14px 0 6px; font-size: 1rem; line-height: 1.4; }
-.ai-chat-markdown p, .ai-chat-markdown ul, .ai-chat-markdown ol, .ai-chat-markdown blockquote, .ai-chat-markdown pre { margin: 8px 0; line-height: 1.58; }
-.ai-chat-markdown ul, .ai-chat-markdown ol { padding-left: 1.25em; }
+.ai-chat-markdown p, .ai-chat-markdown ul, .ai-chat-markdown ol, .ai-chat-markdown blockquote, .ai-chat-markdown pre, .ai-chat-markdown table { margin: 8px 0; line-height: 1.58; }
+.ai-chat-markdown ul, .ai-chat-markdown ol { padding-left: 1.45em; }
+.ai-chat-markdown ul { list-style: disc outside; }
+.ai-chat-markdown ol { list-style: decimal outside; }
+.ai-chat-markdown li > p { margin: 5px 0; }
+.ai-chat-markdown li + li { margin-top: 8px; }
+.ai-chat-markdown li > ul, .ai-chat-markdown li > ol { margin: 5px 0; }
+.ai-chat-markdown hr { height: 1px; margin: 18px 0; border: 0; background: color-mix(in srgb, var(--text, #333) 14%, var(--border, #ddd)); }
+.ai-chat-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.ai-chat-markdown th, .ai-chat-markdown td { padding: 7px 9px; border: 1px solid var(--border, #ddd); text-align: start; }
+.ai-chat-markdown th { background: color-mix(in srgb, var(--text, #333) 5%, var(--card-bg, #fff)); }
 .ai-chat-markdown code { padding: .08em .3em; border-radius: 4px; background: rgba(37, 45, 65, .08); font-size: .88em; }
 .ai-chat-markdown pre { overflow: auto; padding: 12px; border-radius: 8px; background: rgba(37, 45, 65, .08); }
 .ai-chat-markdown pre code { padding: 0; background: transparent; }

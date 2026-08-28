@@ -27,7 +27,7 @@
     });
   }
   function enable(name) {
-    return load('aiRichText').then(function() {
+    return load('markdownIt').then(function() { return load('aiRichText'); }).then(function() {
       var stylesheet = name === 'aiReadingHub'
         ? 'aiReadingHubCss'
         : name === 'aiCanvas'

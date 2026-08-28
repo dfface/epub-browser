@@ -3980,6 +3980,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
                     "ai-canvas.css", "ai-canvas.js", "ai-reading-hub.css",
                     "ai-reading-hub.js", "ai-chat.css", "ai-chat.js",
                     "ai-rich-text.css", "ai-rich-text.js",
+                    "vendor/markdown-it/markdown-it.min.js",
                     "vendor/katex/katex.min.css", "vendor/katex/katex.min.js",
                     "vendor/mermaid/mermaid.min.js",
                     "bookshelf.js", "annotation-hub.css", "annotation.js",

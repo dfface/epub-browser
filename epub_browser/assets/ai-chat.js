@@ -36,35 +36,6 @@
     button.setAttribute('title', text);
     button.setAttribute('aria-label', text);
   }
-  function appendInline(parent, value) {
-    String(value || '').split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|mailto:|\/)[^)]+\)|\*[^*\n]+\*|_[^_\n]+_)/g).forEach(function(part) {
-      if (!part) return;
-      if (/^(\*\*.*\*\*|__.*__)$/.test(part)) parent.appendChild(el('strong', '', part.slice(2, -2)));
-      else if (/^\*.*\*$/.test(part) || /^_.*_$/.test(part)) parent.appendChild(el('em', '', part.slice(1, -1)));
-      else if (/^`.*`$/.test(part)) parent.appendChild(el('code', '', part.slice(1, -1)));
-      else {
-        var link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (!link) { parent.appendChild(document.createTextNode(part)); return; }
-        var anchor = el('a', '', link[1]); anchor.href = link[2];
-        if (/^https?:\/\//i.test(link[2])) { anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; }
-        parent.appendChild(anchor);
-      }
-    });
-  }
-  function renderMarkdown(parent, source) {
-    parent.textContent = ''; var lines = String(source || '').replace(/\r\n?/g, '\n').split('\n'), paragraph = [], list, code, language = '';
-    function flushParagraph() { if (!paragraph.length) return; var p = el('p'); paragraph.forEach(function(line, index) { if (index) p.appendChild(el('br')); appendInline(p, line); }); parent.appendChild(p); paragraph = []; }
-    function flushList() { list = null; }
-    function flushCode() { var raw = code.join('\n'); if ((language === 'mermaid' || language === 'math') && root.EpubBrowserAIRich) { var rich = el('div', 'ai-chat-rich-block'); root.EpubBrowserAIRich.render(rich, language, raw); parent.appendChild(rich); } else { var pre = el('pre'); pre.appendChild(el('code', '', raw)); parent.appendChild(pre); } code = null; language = ''; }
-    lines.forEach(function(line) { var fence = line.match(/^```\s*([\w-]*)\s*$/); if (fence) { flushParagraph(); flushList(); if (code) flushCode(); else { code = []; language = String(fence[1] || '').toLowerCase(); } return; } if (code) { code.push(line); return; }
-      var heading = line.match(/^(#{1,3})\s+(.+)$/), item = line.match(/^\s*([-*+]|\d+\.)\s+(.+)$/), quote = line.match(/^>\s?(.*)$/);
-      if (heading) { flushParagraph(); flushList(); var h = el(heading[1].length === 1 ? 'h3' : 'h4'); appendInline(h, heading[2]); parent.appendChild(h); }
-      else if (item) { flushParagraph(); var ordered = /\d+\./.test(item[1]); if (!list || list.tagName !== (ordered ? 'OL' : 'UL')) { list = el(ordered ? 'ol' : 'ul'); parent.appendChild(list); } var li = el('li'); appendInline(li, item[2]); list.appendChild(li); }
-      else if (quote) { flushParagraph(); flushList(); var block = el('blockquote'); appendInline(block, quote[1]); parent.appendChild(block); }
-      else if (!line.trim()) { flushParagraph(); flushList(); } else { flushList(); paragraph.push(line); }
-    });
-    if (code) flushCode(); flushParagraph();
-  }
   function threadIsNearBottom() { return !thread || thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80; }
   function scrollThread() { if (thread) root.requestAnimationFrame(function() { thread.scrollTop = thread.scrollHeight; }); }
   function statusText(turn) { if (turn.status === 'queued') return t('ai.queued', { current: 0, total: 1 }); if (turn.status === 'running') return t('ai.generating', { current: 0, total: 1 }); return t('ai.error.' + (turn.error_code || 'unknown')); }
@@ -136,7 +107,7 @@
     var question = el('section', 'ai-chat-message ai-chat-message-user');
     var label = el('span', 'ai-chat-message-label', t('ai.you')), turnScope = turnScopeLabel(turn); if (turnScope) label.appendChild(el('span', 'ai-chat-chapter-pill', turnScope)); question.appendChild(label); question.appendChild(el('p', '', turn.question || '')); node.appendChild(question);
     var answer = el('section', 'ai-chat-message ai-chat-message-assistant'); answer.appendChild(el('span', 'ai-chat-message-label', t('ai.assistant')));
-    if (turn.status === 'complete') { var markdown = el('div', 'ai-chat-markdown'); renderMarkdown(markdown, turn.answer || ''); answer.appendChild(markdown); }
+    if (turn.status === 'complete') { var markdown = el('div', 'ai-chat-markdown'); root.EpubBrowserAIRich.renderMarkdown(markdown, turn.answer || '', 'ai-chat-rich-block'); answer.appendChild(markdown); }
     else answer.appendChild(el('p', 'ai-chat-pending', statusText(turn)));
     node.appendChild(answer); var existing = findTurn(turn.id), shouldScroll = !existing || threadIsNearBottom(); if (existing) thread.replaceChild(node, existing); else thread.appendChild(node); syncQuestionNavigator(); if (shouldScroll) scrollThread();
   }

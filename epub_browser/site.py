@@ -105,6 +105,7 @@ def render_library_shell(
             "aiReadingHub": assets.url_for("ai-reading-hub.js"),
             "aiRichTextCss": assets.url_for("ai-rich-text.css"),
             "aiRichText": assets.url_for("ai-rich-text.js"),
+            "markdownIt": assets.url_for("vendor/markdown-it/markdown-it.min.js"),
             "katexCss": assets.url_for("vendor/katex/katex.min.css"),
             "katex": assets.url_for("vendor/katex/katex.min.js"),
             "mermaid": assets.url_for("vendor/mermaid/mermaid.min.js"),

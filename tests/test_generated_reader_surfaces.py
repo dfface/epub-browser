@@ -1689,7 +1689,72 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             canvas,
         )
         self.assertIn('function renderMarkdown(parent, source, className)', rich_text)
-        self.assertIn('appendInlineMarkdown', rich_text)
+        self.assertIn('root.markdownit', rich_text)
+        self.assertIn('html: false', rich_text)
+
+    def test_ai_markdown_component_supports_commonmark_lists_rules_and_safe_html(self):
+        fixture = r'''
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+
+const context = {
+  atob(value) { return Buffer.from(value, 'base64').toString('binary'); },
+};
+context.window = context;
+context.document = {
+  createElement(tagName) {
+    return {
+      tagName: tagName.toUpperCase(), className: '', children: [], dataset: {},
+      classList: { add() {} },
+      appendChild(child) { this.children.push(child); return child; },
+      querySelectorAll() { return []; },
+      set textContent(value) { this._textContent = String(value || ''); },
+      get textContent() { return this._textContent || ''; },
+    };
+  },
+};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('epub_browser/assets/vendor/markdown-it/markdown-it.min.js', 'utf8'), context);
+vm.runInContext(fs.readFileSync('epub_browser/assets/ai-rich-text.js', 'utf8'), context);
+
+const parent = context.document.createElement('div');
+context.EpubBrowserAIRich.renderMarkdown(parent, [
+  '---',
+  '',
+  '1. **First point**  ',
+  '   Supporting paragraph.',
+  '',
+  '2. **Second point**  ',
+  '   - nested detail',
+  '',
+  '3. **Third point**',
+  '',
+  '<script>alert(1)</script>',
+  '[unsafe](javascript:alert(1))',
+  '![tracking pixel](https://example.com/pixel.gif)',
+].join('\n'));
+const output = parent.innerHTML;
+
+assert.match(output, /<hr>/);
+assert.equal((output.match(/<ol>/g) || []).length, 1);
+assert.equal((output.match(/<li>/g) || []).length, 4);
+assert.match(output, /<ul>/);
+assert.doesNotMatch(output, /<script>/);
+assert.match(output, /&lt;script&gt;/);
+assert.doesNotMatch(output, /href="javascript:/);
+assert.doesNotMatch(output, /<img/);
+assert.doesNotMatch(output, /pixel\.gif/);
+assert.match(output, /tracking pixel/);
+'''
+        completed = subprocess.run(
+            ['node', '-e', fixture],
+            cwd=Path.cwd(),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_feynman_renderers_preserve_empty_and_populated_paragraph_semantics(self):
         fixture = r'''
@@ -3113,6 +3178,8 @@ assert.deepEqual(
         self.assertIn("ai.chatScope", chat_script)
         self.assertIn("ai_reading_required", chat_script)
         self.assertIn('root.EpubBrowserAIRich.render', chat_script)
+        self.assertIn('root.EpubBrowserAIRich.renderMarkdown', chat_script)
+        self.assertNotIn('function renderMarkdown(parent, source)', chat_script)
         self.assertIn('ai.chatNoReadingTitle', chat_script)
         self.assertIn("'/api/ai/status'", chat_script)
         self.assertIn("ai_disabled", chat_script)
@@ -3172,8 +3239,10 @@ assert.deepEqual(
         self.assertIn('"aiCanvas":', chapter)
         self.assertIn('"aiChat":', chapter)
         self.assertIn('"aiReadingHub":', chapter)
+        self.assertIn('"markdownIt":', chapter)
         self.assertIn('/assets/immutable/ai-feature-loader.', chapter)
         self.assertIn('function ensureRenderer(language)', Path('epub_browser/assets/ai-rich-text.js').read_text(encoding='utf-8'))
+        self.assertIn("return load('markdownIt').then", Path('epub_browser/assets/ai-feature-loader.js').read_text(encoding='utf-8'))
 
     def test_ai_chat_uses_one_context_badge_across_book_and_chapter_pages(self):
         script = Path('epub_browser/assets/ai-chat.js').read_text(encoding='utf-8')

@@ -71,6 +71,8 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
     'ai-rich-text.js',
     'vendor/katex/katex.min.css',
     'vendor/katex/katex.min.js',
+    'vendor/markdown-it/markdown-it.min.js',
+    'vendor/markdown-it/LICENSE',
     'vendor/mermaid/mermaid.min.js',
 })
 
@@ -78,6 +80,7 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
 # leave those fonts in static exports even though no SSG surface can use them.
 SERVER_ONLY_ASSET_PREFIXES = frozenset({
     'vendor/katex/',
+    'vendor/markdown-it/',
 })
 
 

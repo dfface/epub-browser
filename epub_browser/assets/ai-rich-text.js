@@ -2,6 +2,7 @@
   'use strict';
   var sequence = 0;
   var assetLoads = {};
+  var markdownParser = null;
   function featureUrl(name) { return root.EpubBrowserFeatureAssets && root.EpubBrowserFeatureAssets[name]; }
   function loadAsset(name, tag, attribute) {
     var url = featureUrl(name);
@@ -43,20 +44,30 @@
     return String(source || '')
       .replace(/\r\n?/g, '\n');
   }
-  function appendInlineMarkdown(parent, source) {
-    var text = String(source || '');
-    var token = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|`([^`]+)`/g;
-    var index = 0;
-    text.replace(token, function(match, linkText, href, boldA, boldB, code, offset) {
-      if (offset > index) parent.appendChild(root.document.createTextNode(text.slice(index, offset)));
-      if (href) {
-        var link = el('a', '', linkText); link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; parent.appendChild(link);
-      } else if (boldA || boldB) parent.appendChild(el('strong', '', boldA || boldB));
-      else parent.appendChild(el('code', '', code));
-      index = offset + match.length;
-      return match;
+  function getMarkdownParser() {
+    if (markdownParser) return markdownParser;
+    if (!root.markdownit) return null;
+    markdownParser = root.markdownit({
+      html: false,
+      linkify: false,
+      typographer: false,
+      breaks: false,
     });
-    if (index < text.length) parent.appendChild(root.document.createTextNode(text.slice(index)));
+    // AI output must not be able to cause a remote image request. Preserve the
+    // useful alt text while dropping the image element itself.
+    markdownParser.renderer.rules.image = function(tokens, index) {
+      return markdownParser.utils.escapeHtml(tokens[index].content || '');
+    };
+    markdownParser.renderer.rules.link_open = function(tokens, index, options, env, renderer) {
+      var token = tokens[index];
+      var href = token.attrGet('href') || '';
+      if (/^https?:\/\//i.test(href)) {
+        token.attrSet('target', '_blank');
+        token.attrSet('rel', 'noopener noreferrer');
+      }
+      return renderer.renderToken(tokens, index, options);
+    };
+    return markdownParser;
   }
   function safeMermaid(source) {
     return !/(?:^|\n)\s*(?:click|link)\b|https?:\/\/|<\/?[a-z]/i.test(source);
@@ -108,7 +119,7 @@
       return root.mermaid.render(id, text).then(function(result) {
         parent.textContent = '';
         // Mermaid generated this SVG in strict mode from a constrained code
-        // block.  Model HTML is never assigned to innerHTML anywhere else.
+        // block. Raw model HTML is never assigned to innerHTML.
         parent.innerHTML = result.svg;
       }).catch(function() { fallback(parent, text, language); });
     }
@@ -117,39 +128,21 @@
   }
   function renderMarkdown(parent, source, className) {
     parent.textContent = '';
-    var code = null, language = '', paragraph = [], list = null;
-    function flushParagraph() {
-      if (!paragraph.length) return;
-      var block = el('p');
-      paragraph.forEach(function(line, index) {
-        if (index) block.appendChild(el('br'));
-        appendInlineMarkdown(block, line);
-      });
-      parent.appendChild(block); paragraph = [];
+    var parser = getMarkdownParser();
+    if (!parser) {
+      parent.appendChild(el('p', '', normalizeMarkdown(source)));
+      return;
     }
-    function flushList() { list = null; }
-    function flushCode() {
-      if (!code) return;
-      var raw = code.join('\n');
-      if (language === 'mermaid' || language === 'math') {
-        var rich = el('div', className || 'ai-rich-markdown-block'); parent.appendChild(rich); render(rich, language, raw);
-      } else {
-        var pre = el('pre'), block = el('code', '', raw); pre.appendChild(block); parent.appendChild(pre);
-      }
-      code = null; language = '';
-    }
-    normalizeMarkdown(source).split('\n').forEach(function(line) {
-      var fence = line.match(/^```\s*([\w-]*)\s*$/i);
-      if (fence) { if (code) flushCode(); else { flushParagraph(); flushList(); code = []; language = fence[1].toLowerCase(); } return; }
-      if (code) { code.push(line); return; }
-      var heading = line.match(/^(#{1,3})\s+(.+)$/), item = line.match(/^[-*+]\s+(.+)$/), quote = line.match(/^>\s?(.+)$/);
-      if (heading) { flushParagraph(); flushList(); var title = el(heading[1].length === 1 ? 'h4' : 'h5'); appendInlineMarkdown(title, heading[2]); parent.appendChild(title); }
-      else if (item) { flushParagraph(); if (!list) { list = el('ul'); parent.appendChild(list); } var entry = el('li'); appendInlineMarkdown(entry, item[1]); list.appendChild(entry); }
-      else if (quote) { flushParagraph(); flushList(); var blockquote = el('blockquote'); appendInlineMarkdown(blockquote, quote[1]); parent.appendChild(blockquote); }
-      else if (!line.trim()) { flushParagraph(); flushList(); }
-      else { flushList(); paragraph.push(line); }
+    // markdown-it escapes source HTML because `html` is disabled. The string
+    // assigned here is renderer output, never raw model output.
+    parent.innerHTML = parser.render(normalizeMarkdown(source));
+    Array.prototype.forEach.call(parent.querySelectorAll('pre > code[class*="language-"]'), function(code) {
+      var match = String(code.className || '').match(/(?:^|\s)language-(mermaid|math)(?:\s|$)/i);
+      if (!match || !code.parentNode) return;
+      var rich = el('div', className || 'ai-rich-markdown-block');
+      code.parentNode.parentNode.replaceChild(rich, code.parentNode);
+      render(rich, match[1].toLowerCase(), code.textContent || '');
     });
-    flushParagraph(); flushList(); flushCode();
   }
   root.EpubBrowserAIRich = { render: render, renderMarkdown: renderMarkdown, loadStyle: loadStyle, ensureRenderer: ensureRenderer };
 })(window);
