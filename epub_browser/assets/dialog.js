@@ -66,10 +66,15 @@
             document.body.appendChild(modal);
 
             function close(result) {
+                var restoreFocus = function() {
+                    if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+                };
                 document.removeEventListener('keydown', onKeydown);
                 modal.remove();
-                if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
                 resolve(result);
+                if (typeof root.setTimeout === 'function') root.setTimeout(restoreFocus, 0);
+                else if (typeof setTimeout === 'function') setTimeout(restoreFocus, 0);
+                else restoreFocus();
             }
 
             function submit() {
@@ -101,7 +106,7 @@
             confirm.addEventListener('click', submit);
             backdrop.addEventListener('click', function() { close(options.input ? null : false); });
             document.addEventListener('keydown', onKeydown);
-            (input || confirm).focus();
+            (input || (options.destructive ? cancel : confirm)).focus();
             if (input && options.selectOnOpen) input.select();
         });
     }

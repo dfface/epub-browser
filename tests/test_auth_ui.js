@@ -242,6 +242,10 @@ function bookUiHarness(fetchImpl) {
     adminMenu: fakeElement('button'),
     adminClose: fakeElement('button'),
     adminPanel: fakeElement('section'),
+    adminConsole: fakeElement('section'),
+    adminBookEditorModal: fakeElement('div'),
+    adminBookEditorContent: fakeElement('div'),
+    adminBookEditorClose: fakeElement('button'),
     adminBookTableSurface: fakeElement('div'),
     adminBookLegacyList: fakeElement('ul'),
     adminBookSearch: fakeElement('input'),
@@ -264,6 +268,8 @@ function bookUiHarness(fetchImpl) {
   };
   elements.adminBookTableSurface.hidden = true;
   elements.adminBookBulkActions.hidden = true;
+  elements.adminBookEditorModal.hidden = true;
+  elements.adminBookList.editorContent = elements.adminBookEditorContent;
   elements.adminBookSort.value = 'title_asc';
   elements.adminBookPageSize.value = '20';
   const root = rootWithFetch(fetchImpl);
@@ -305,7 +311,9 @@ function adminBookButtons(body, bookId) {
 }
 
 function editorRows(body) {
-  return body.children.filter(row => row.className === 'admin-book-editor-row');
+  return body.editorContent ? body.editorContent.children.filter(
+    panel => panel.className === 'admin-book-editor'
+  ) : [];
 }
 
 test('book index renders only the current page and resets pagination for controls', async () => {
@@ -579,7 +587,7 @@ test('a stale initial book index response cannot overwrite a newer refresh', asy
   assert.deepEqual(rowTitles(elements.adminBookList), ['Fresh index']);
 });
 
-test('book editor lazy-loads one detail row, reuses cached detail, and ignores a closed request', async () => {
+test('book editor lazy-loads one modal, reuses cached detail, and ignores a closed request', async () => {
   const delayedDetail = deferred();
   const calls = [];
   const books = [
@@ -604,26 +612,85 @@ test('book editor lazy-loads one detail row, reuses cached detail, and ignores a
 
   const firstOpen = adminBookButtons(elements.adminBookList, 'book/id')[0].click();
   assert.equal(editorRows(elements.adminBookList).length, 1);
+  assert.equal(elements.adminBookEditorModal.getAttribute('aria-hidden'), 'false');
+  assert.equal(elements.adminConsole.inert, true);
+  assert.equal(elements.adminConsole.getAttribute('aria-hidden'), 'true');
+  assert.equal(elements.adminPanel.getAttribute('aria-modal'), 'false');
   assert.equal(adminBookButtons(elements.adminBookList, 'book/id')[0].getAttribute('aria-expanded'), 'true');
   await tick();
   assert.equal(calls.filter(url => url === '/api/admin/books/book%2Fid').length, 1);
   await auth.openBookEditor('book-2');
   assert.equal(editorRows(elements.adminBookList).length, 1);
-  assert.equal(elements.adminBookList.children.indexOf(editorRows(elements.adminBookList)[0]), 2);
+  assert.equal(elements.adminBookEditorModal.hidden, false);
+  assert.equal(elements.adminBookList.children.length, 2);
   delayedDetail.resolve(response(200, { book: detail('book/id') }));
   await firstOpen;
   await tick();
   assert.equal(editorRows(elements.adminBookList).length, 1);
 
+  const actionButtons = descendants(editorRows(elements.adminBookList)[0]).filter(
+    node => node.tagName === 'BUTTON' && node.parentNode
+      && node.parentNode.className === 'admin-book-editor-actions'
+  );
+  assert.deepEqual(actionButtons.map(button => button.textContent), [
+    '[admin.books.clearResults]',
+    '[admin.books.cancel]',
+    '[admin.books.save]',
+  ]);
+  assert.match(actionButtons[0].className, /admin-book-clear-action/);
+  assert.match(actionButtons[2].className, /admin-book-save-action/);
+
   const cancel = descendants(editorRows(elements.adminBookList)[0]).find(node => node.tagName === 'BUTTON'
     && node.textContent === '[admin.books.cancel]');
-  cancel.click();
+  await cancel.click();
+  assert.equal(elements.adminBookEditorModal.hidden, true);
+  assert.equal(elements.adminConsole.inert, false);
+  assert.equal(elements.adminPanel.getAttribute('aria-modal'), 'true');
   assert.equal(adminBookButtons(elements.adminBookList, 'book-2')[0].focused, true);
   await auth.openBookEditor('book-2');
   assert.equal(calls.filter(url => url === '/api/admin/books/book-2').length, 1);
   await auth.openBookEditor('book/id');
   assert.equal(editorRows(elements.adminBookList).length, 1);
   assert.equal(calls.filter(url => url === '/api/admin/books/book%2Fid').length, 2);
+});
+
+test('book editor modal confirms before discarding dirty fields', async () => {
+  const detail = adminBook({ id: 'dirty-book', title: 'Dirty book' });
+  const { root, elements } = bookUiHarness(url => {
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [detail] }));
+    if (url === '/api/admin/books/dirty-book') return Promise.resolve(response(200, {
+      book: Object.assign({}, detail, { grants: [], tags: [] }),
+    }));
+    return Promise.resolve(response(404, {}));
+  });
+  let allowDiscard = false;
+  root.EpubDialog = {
+    confirm(options) {
+      assert.equal(options.title, '[admin.books.closeEditor]');
+      assert.equal(options.message, '[admin.books.discardChangesConfirm]');
+      assert.equal(options.confirmText, '[admin.discardChanges]');
+      assert.equal(options.destructive, true);
+      return Promise.resolve(allowDiscard);
+    },
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  await auth.openBookEditor('dirty-book');
+
+  const title = descendants(editorRows(elements.adminBookList)[0]).find(
+    node => node.tagName === 'INPUT' && node.type === 'text'
+  );
+  title.value = 'Changed';
+  title.listeners.input();
+  await elements.adminBookEditorClose.click();
+  assert.equal(elements.adminBookEditorModal.hidden, false);
+
+  allowDiscard = true;
+  await elements.adminBookEditorClose.click();
+  assert.equal(elements.adminBookEditorModal.hidden, true);
+  assert.equal(adminBookButtons(elements.adminBookList, 'dirty-book')[0].focused, true);
 });
 
 test('book editor saves one atomic payload and patches only its held summary', async () => {
@@ -658,6 +725,69 @@ test('book editor saves one atomic payload and patches only its held summary', a
   assert.deepEqual(rowTitles(elements.adminBookList), ['Atomic book']);
   assert.equal(calls.filter(call => call.url !== '/api/admin/books/index'
     && call.url !== '/api/admin/books/book%2Fid/settings').length, 0);
+});
+
+test('book editor validates and saves managed title authors and unified tags', async () => {
+  const calls = [];
+  const summary = adminBook({
+    id: 'managed-book',
+    title: 'Imported title',
+    authors: ['Imported author'],
+    tags: [{ id: 'tag-1', name: 'History' }],
+  });
+  const detail = Object.assign({}, summary, {
+    grants: [], tags: [{ id: 'tag-1', name: 'History' }], ai_tags: [], ai_profile: 'auto',
+  });
+  const { root, elements } = bookUiHarness((url, options) => {
+    calls.push({ url, options });
+    if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books: [summary] }));
+    if (url === '/api/admin/books/managed-book') return Promise.resolve(response(200, { book: detail }));
+    if (url === '/api/admin/books/managed-book/settings') return Promise.resolve(response(200, {
+      book: Object.assign({}, detail, { title: 'Managed title', authors: ['First author', 'Second author'] }),
+      summary: Object.assign({}, summary, { title: 'Managed title', authors: ['First author', 'Second author'] }),
+    }));
+    return Promise.resolve(response(404, {}));
+  });
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+  assert.equal((elements.adminBookList.textContent.match(/History/g) || []).length, 1);
+  await auth.openBookEditor('managed-book');
+
+  const editor = editorRows(elements.adminBookList)[0];
+  const title = descendants(editor).find(node => node.tagName === 'INPUT' && node.type === 'text');
+  const authors = descendants(editor).find(node => node.tagName === 'TEXTAREA');
+  const save = descendants(editor).find(node => node.tagName === 'BUTTON'
+    && node.textContent === '[admin.books.save]');
+  assert.match(title.parentNode.textContent, /\[admin\.books\.required\]/);
+  assert.equal(title.getAttribute('aria-describedby'), 'adminBookTitleError-managed-book');
+  title.value = '   ';
+  save.click();
+  assert.equal(calls.filter(call => call.url.endsWith('/settings')).length, 0);
+  assert.equal(title.getAttribute('aria-invalid'), 'true');
+  assert.equal(title.focused, true);
+
+  title.value = ' Managed title ';
+  authors.value = 'First author\n\n Second author ';
+  save.click();
+  const savingEditor = editorRows(elements.adminBookList)[0];
+  assert.ok(savingEditor.textContent.includes('[admin.books.saving]'));
+  assert.equal(savingEditor.textContent.includes('[admin.books.cancel]'), false);
+  assert.equal(elements.adminBookLive.textContent, '[admin.books.live.saving]');
+  await tick();
+  await tick();
+
+  const request = calls.find(call => call.url === '/api/admin/books/managed-book/settings');
+  assert.deepEqual(JSON.parse(request.options.body), {
+    title: 'Managed title',
+    authors: ['First author', 'Second author'],
+    visibility: 'authenticated',
+    user_ids: [],
+    tag_ids: ['tag-1'],
+    profile: 'auto',
+  });
+  assert.equal(adminBookButtons(elements.adminBookList, 'managed-book')[0].focused, true);
 });
 
 test('a late book settings save cannot patch an editor that has been closed', async () => {
@@ -705,9 +835,14 @@ test('book result clearing confirms first and patches only the affected count', 
   const translate = root.EpubBrowserI18n.t;
   root.EpubBrowserI18n.t = (key, params) => key === 'admin.books.clearResultsConfirm'
     ? `Clear AI results for ${params.title}?` : translate(key, params);
-  root.confirm = message => {
-    assert.equal(message, 'Clear AI results for Clear me?');
-    return confirmation;
+  root.EpubDialog = {
+    confirm(options) {
+      assert.equal(options.title, '[admin.books.clearResults]');
+      assert.equal(options.message, 'Clear AI results for Clear me?');
+      assert.equal(options.confirmText, '[admin.books.clearResults]');
+      assert.equal(options.destructive, true);
+      return Promise.resolve(confirmation);
+    },
   };
   const auth = AuthModule.create(root);
   auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
@@ -734,7 +869,7 @@ test('a failed book result clear leaves the summary and editor detail unchanged'
     if (url === '/api/admin/ai/results') return Promise.resolve(response(500, { code: 'unknown' }));
     return Promise.resolve(response(404, {}));
   });
-  root.confirm = () => true;
+  root.EpubDialog = { confirm: () => Promise.resolve(true) };
   const auth = AuthModule.create(root);
   auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
   await auth.init();
@@ -1213,7 +1348,15 @@ test('clearing all AI results requires an explicit administrator confirmation', 
     }));
     return Promise.resolve(response(200, { deleted: 3 }));
   });
-  root.confirm = () => confirmed;
+  root.EpubDialog = {
+    confirm(options) {
+      assert.equal(options.title, 'admin.ai.clearAll');
+      assert.equal(options.message, 'admin.ai.clearAllConfirm');
+      assert.equal(options.confirmText, 'admin.ai.clearAll');
+      assert.equal(options.destructive, true);
+      return Promise.resolve(confirmed);
+    },
+  };
   root.document = {
     getElementById(id) { return id === 'adminAiClearAll' ? clearAll : null; },
     querySelectorAll() { return []; },

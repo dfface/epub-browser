@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 17
+DB_SCHEMA_VERSION = 18
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -128,6 +128,8 @@ class BookRecord:
     source_size: Optional[int]
     source_mtime_ns: Optional[int]
     metadata_json: str
+    title: str
+    authors_json: str
     visibility: str
     active: bool
     created_at: str
@@ -319,6 +321,8 @@ class StateStore:
                 self._require_foreign_key_integrity(connection)
             if version < 17:
                 self._migrate_schema_v17(connection, max(version, 16))
+            if version < 18:
+                self._migrate_schema_v18(connection, max(version, 17))
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -448,6 +452,18 @@ class StateStore:
             "visibility",
             "TEXT NOT NULL DEFAULT 'authenticated' "
             "CHECK(visibility IN ('authenticated', 'restricted'))",
+        )
+        self._add_column_if_missing(
+            connection,
+            "books",
+            "title",
+            "TEXT NOT NULL DEFAULT 'EPUB Book'",
+        )
+        self._add_column_if_missing(
+            connection,
+            "books",
+            "authors_json",
+            "TEXT NOT NULL DEFAULT '[]'",
         )
         if latest:
             self._create_v14_review_tables(connection)
@@ -1558,6 +1574,27 @@ class StateStore:
         self._create_v11_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 17")
+
+    def _migrate_schema_v18(self, connection, source_version) -> None:
+        """Initialize Server-managed display metadata from the EPUB snapshot once."""
+        if source_version >= 18:
+            return
+        rows = connection.execute(
+            "SELECT book_id, metadata_json FROM books ORDER BY book_id"
+        ).fetchall()
+        for row in rows:
+            title, authors, tags = self._admin_book_metadata(row["metadata_json"])
+            connection.execute(
+                "UPDATE books SET title = ?, authors_json = ? WHERE book_id = ?",
+                (
+                    title,
+                    json.dumps(authors, ensure_ascii=False, separators=(",", ":")),
+                    row["book_id"],
+                ),
+            )
+            self._import_book_tags(connection, row["book_id"], tags)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 18")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:
@@ -3804,21 +3841,44 @@ class StateStore:
     def create_ai_tag(self, name: str) -> dict:
         normalized, display = self._normalize_ai_tag(name)
         with self._connection() as connection:
-            row = connection.execute(
-                "SELECT id, normalized_name, name FROM ai_tags WHERE normalized_name = ?",
-                (normalized,),
-            ).fetchone()
-            if row is None:
-                tag_id = uuid.uuid4().hex
-                connection.execute(
-                    "INSERT INTO ai_tags (id, normalized_name, name) VALUES (?, ?, ?)",
-                    (tag_id, normalized, display),
-                )
-                row = connection.execute(
-                    "SELECT id, normalized_name, name FROM ai_tags WHERE id = ?",
-                    (tag_id,),
-                ).fetchone()
+            row = self._ensure_tag(connection, normalized, display)
         return {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
+
+    @staticmethod
+    def _ensure_tag(connection, normalized: str, display: str):
+        row = connection.execute(
+            "SELECT id, normalized_name, name FROM ai_tags WHERE normalized_name = ?",
+            (normalized,),
+        ).fetchone()
+        if row is None:
+            tag_id = uuid.uuid4().hex
+            connection.execute(
+                "INSERT INTO ai_tags (id, normalized_name, name) VALUES (?, ?, ?)",
+                (tag_id, normalized, display),
+            )
+            row = connection.execute(
+                "SELECT id, normalized_name, name FROM ai_tags WHERE id = ?",
+                (tag_id,),
+            ).fetchone()
+        return row
+
+    @classmethod
+    def _import_book_tags(
+        cls,
+        connection,
+        book_id: str,
+        names: Sequence[str],
+    ) -> None:
+        for name in names:
+            try:
+                normalized, display = cls._normalize_ai_tag(name)
+            except ValueError:
+                continue
+            tag = cls._ensure_tag(connection, normalized, display)
+            connection.execute(
+                "INSERT OR IGNORE INTO book_ai_tags (book_id, tag_id) VALUES (?, ?)",
+                (book_id, tag["id"]),
+            )
 
     def list_ai_tags(self) -> tuple[dict, ...]:
         with self._connection() as connection:
@@ -3846,6 +3906,19 @@ class StateStore:
     def rename_ai_tag(self, tag_id: str, name: str) -> dict:
         normalized, display = self._normalize_ai_tag(name)
         with self._connection() as connection:
+            book_ids = tuple(
+                row["book_id"]
+                for row in connection.execute(
+                    """
+                    SELECT books.book_id
+                    FROM book_ai_tags
+                    JOIN books ON books.book_id = book_ai_tags.book_id
+                    WHERE book_ai_tags.tag_id = ? AND books.active = 1
+                    ORDER BY books.book_id
+                    """,
+                    (tag_id,),
+                ).fetchall()
+            )
             try:
                 cursor = connection.execute(
                     """
@@ -3863,12 +3936,45 @@ class StateStore:
                 "SELECT id, normalized_name, name FROM ai_tags WHERE id = ?",
                 (tag_id,),
             ).fetchone()
+            self._mark_books_updated(connection, book_ids)
         return {"id": row["id"], "normalized_name": row["normalized_name"], "name": row["name"]}
 
     def delete_ai_tag(self, tag_id: str) -> bool:
         with self._connection() as connection:
+            book_ids = tuple(
+                row["book_id"]
+                for row in connection.execute(
+                    """
+                    SELECT books.book_id
+                    FROM book_ai_tags
+                    JOIN books ON books.book_id = book_ai_tags.book_id
+                    WHERE book_ai_tags.tag_id = ? AND books.active = 1
+                    ORDER BY books.book_id
+                    """,
+                    (tag_id,),
+                ).fetchall()
+            )
             cursor = connection.execute("DELETE FROM ai_tags WHERE id = ?", (tag_id,))
+            if cursor.rowcount:
+                self._mark_books_updated(connection, book_ids)
         return cursor.rowcount == 1
+
+    def _mark_books_updated(self, connection, book_ids: Sequence[str]) -> None:
+        unique_ids = tuple(dict.fromkeys(book_ids))
+        if not unique_ids:
+            return
+        connection.executemany(
+            "UPDATE books SET updated_at = CURRENT_TIMESTAMP WHERE book_id = ? AND active = 1",
+            ((book_id,) for book_id in unique_ids),
+        )
+        timestamp = self._timestamp()
+        for book_id in unique_ids:
+            self._enqueue_webhook_event_connection(
+                connection,
+                "book.updated",
+                {"book_id": book_id},
+                timestamp,
+            )
 
     def book_ai_tags(self, book_id: str) -> tuple[dict, ...]:
         with self._connection() as connection:
@@ -3916,22 +4022,34 @@ class StateStore:
 
     def effective_book_tags(self, book_id: str) -> tuple[str, ...]:
         with self._connection() as connection:
-            book = self._get_book(connection, book_id)
-        metadata = json.loads(book.metadata_json)
-        merged = {}
-        for name in tuple(metadata.get("tags") or ()) + tuple(
-            item["name"] for item in self.book_ai_tags(book_id)
-        ):
-            try:
-                normalized, display = self._normalize_ai_tag(name)
-            except ValueError:
-                continue
-            merged.setdefault(normalized, display)
-        return tuple(sorted(merged.values(), key=str.casefold))
+            return tuple(
+                tag["name"] for tag in self._book_ai_tags(connection, book_id)
+            )
 
     def set_book_ai_profile(self, book_id: str, profile: str) -> None:
         with self._connection() as connection:
             self._set_book_ai_profile(connection, book_id, profile)
+
+    def update_book_ai_settings(
+        self,
+        book_id: str,
+        *,
+        profile: Optional[str] = None,
+        tag_ids: Optional[Sequence[str]] = None,
+    ) -> tuple[str, tuple[dict, ...]]:
+        """Update the compatibility AI endpoint and emit one book event."""
+        if profile is None and tag_ids is None:
+            raise ValueError("At least one book AI setting is required")
+        with self._connection() as connection:
+            self._get_book(connection, book_id)
+            if profile is not None:
+                self._set_book_ai_profile(connection, book_id, profile)
+            if tag_ids is not None:
+                self._replace_book_ai_tags(connection, book_id, tag_ids)
+            current_profile = self._book_ai_profile(connection, book_id)
+            tags = self._book_ai_tags(connection, book_id)
+            self._mark_books_updated(connection, (book_id,))
+        return current_profile, tags
 
     def _set_book_ai_profile(
         self,
@@ -3957,10 +4075,14 @@ class StateStore:
     def get_book_ai_profile(self, book_id: str) -> str:
         with self._connection() as connection:
             self._get_book(connection, book_id)
-            row = connection.execute(
-                "SELECT profile FROM book_ai_profiles WHERE book_id = ?",
-                (book_id,),
-            ).fetchone()
+            return self._book_ai_profile(connection, book_id)
+
+    @staticmethod
+    def _book_ai_profile(connection, book_id: str) -> str:
+        row = connection.execute(
+            "SELECT profile FROM book_ai_profiles WHERE book_id = ?",
+            (book_id,),
+        ).fetchone()
         return row["profile"] if row is not None else "auto"
 
     @staticmethod
@@ -3976,15 +4098,76 @@ class StateStore:
             title = "EPUB Book"
         authors = metadata.get("authors")
         if not isinstance(authors, list):
-            authors = []
+            legacy_authors = metadata.get("author") or metadata.get("creator")
+            if isinstance(legacy_authors, str):
+                authors = [legacy_authors]
+            elif isinstance(legacy_authors, list):
+                authors = legacy_authors
+            else:
+                authors = []
         epub_tags = metadata.get("tags")
         if not isinstance(epub_tags, list):
             epub_tags = []
         return (
-            title,
-            [author for author in authors if isinstance(author, str)],
+            title.strip(),
+            [author.strip() for author in authors if isinstance(author, str) and author.strip()],
             [tag for tag in epub_tags if isinstance(tag, str)],
         )
+
+    @staticmethod
+    def _managed_authors(authors_json: str) -> list[str]:
+        try:
+            authors = json.loads(authors_json)
+        except (TypeError, ValueError):
+            authors = []
+        if not isinstance(authors, list):
+            return []
+        return [
+            author for author in authors
+            if isinstance(author, str) and author
+        ]
+
+    @staticmethod
+    def _validate_managed_book_metadata(
+        title: str,
+        authors: Sequence[str],
+    ) -> tuple[str, tuple[str, ...]]:
+        if not isinstance(title, str):
+            raise ValueError("Book title must be text")
+        normalized_title = unicodedata.normalize("NFKC", title).strip()
+        if not normalized_title or len(normalized_title) > 500:
+            raise ValueError("Book title is invalid")
+        if (
+            not isinstance(authors, (list, tuple))
+            or len(authors) > 100
+            or any(not isinstance(author, str) for author in authors)
+        ):
+            raise ValueError("Book authors are invalid")
+        normalized_authors = tuple(
+            unicodedata.normalize("NFKC", author).strip()
+            for author in authors
+        )
+        if any(not author or len(author) > 500 for author in normalized_authors):
+            raise ValueError("Book authors are invalid")
+        return normalized_title, normalized_authors
+
+    def managed_book_metadata(self, book_id: str) -> dict:
+        """Overlay Server-managed display fields onto the EPUB-derived snapshot."""
+        with self._connection() as connection:
+            book = self._get_book(connection, book_id)
+            tags = self._book_ai_tags(connection, book_id)
+        try:
+            metadata = json.loads(book.metadata_json)
+        except (TypeError, ValueError):
+            metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        metadata.update({
+            "title": book.title,
+            "authors": self._managed_authors(book.authors_json),
+            "tags": [tag["name"] for tag in tags],
+        })
+        return metadata
 
     @classmethod
     def _admin_book_summary_mapping(
@@ -3996,21 +4179,24 @@ class StateStore:
         tags: Sequence[dict] = (),
         result_count: int = 0,
     ) -> dict:
-        title, authors, epub_tags = cls._admin_book_metadata(
-            book_row["metadata_json"]
-        )
+        authors = cls._managed_authors(book_row["authors_json"])
+        managed_tags = [
+            {"id": tag["id"], "name": tag["name"]}
+            for tag in tags
+        ]
         return {
             "id": book_row["book_id"],
-            "title": title,
+            "title": book_row["title"],
             "authors": authors,
-            "epub_tags": epub_tags,
+            "tags": managed_tags,
+            # Compatibility aliases for older administration clients. Both now
+            # project the same SQLite-managed tag relation; EPUB tags are no
+            # longer a second, read-only source.
+            "epub_tags": [],
             "visibility": book_row["visibility"],
             "grant_count": int(grant_count),
             "ai_profile": profile,
-            "ai_tags": [
-                {"id": tag["id"], "name": tag["name"]}
-                for tag in tags
-            ],
+            "ai_tags": managed_tags,
             "ai_result_count": int(result_count),
             "created_at": book_row["created_at"],
             "updated_at": book_row["updated_at"],
@@ -4021,7 +4207,8 @@ class StateStore:
         with self._connection() as connection:
             books = connection.execute(
                 """
-                SELECT book_id, metadata_json, visibility, created_at, updated_at
+                SELECT book_id, title, authors_json, visibility, created_at,
+                       updated_at
                 FROM books
                 WHERE active = 1
                 ORDER BY book_id
@@ -4091,7 +4278,8 @@ class StateStore:
     def _active_admin_book_row(connection, book_id: str):
         row = connection.execute(
             """
-            SELECT book_id, metadata_json, visibility, created_at, updated_at
+            SELECT book_id, title, authors_json, visibility, created_at,
+                   updated_at
             FROM books
             WHERE book_id = ? AND active = 1
             """,
@@ -4100,21 +4288,6 @@ class StateStore:
         if row is None:
             raise KeyError(f"Unknown active book ID: {book_id}")
         return row
-
-    @classmethod
-    def _effective_admin_book_tags(
-        cls,
-        epub_tags: Sequence[str],
-        ai_tags: Sequence[dict],
-    ) -> tuple[str, ...]:
-        merged = {}
-        for name in tuple(epub_tags) + tuple(tag["name"] for tag in ai_tags):
-            try:
-                normalized, display = cls._normalize_ai_tag(name)
-            except ValueError:
-                continue
-            merged.setdefault(normalized, display)
-        return tuple(sorted(merged.values(), key=str.casefold))
 
     def _admin_book_detail(self, connection, book_row) -> dict:
         book_id = book_row["book_id"]
@@ -4155,10 +4328,9 @@ class StateStore:
         )
         detail = dict(summary)
         detail["grants"] = grants
+        detail["tags"] = tags
         detail["ai_tags"] = tags
-        detail["effective_tags"] = self._effective_admin_book_tags(
-            detail["epub_tags"], tags
-        )
+        detail["effective_tags"] = tuple(tag["name"] for tag in tags)
         return detail
 
     @staticmethod
@@ -4167,6 +4339,7 @@ class StateStore:
             "id": detail["id"],
             "title": detail["title"],
             "authors": list(detail["authors"]),
+            "tags": [dict(tag) for tag in detail["tags"]],
             "epub_tags": list(detail["epub_tags"]),
             "visibility": detail["visibility"],
             "grant_count": len(detail["grants"]),
@@ -4190,6 +4363,8 @@ class StateStore:
         user_ids: Sequence[str],
         tag_ids: Sequence[str],
         profile: str,
+        title: Optional[str] = None,
+        authors: Optional[Sequence[str]] = None,
     ) -> tuple[dict, dict]:
         """Atomically replace every editable administrator book setting."""
         with self._connection() as connection:
@@ -4199,17 +4374,44 @@ class StateStore:
             self._replace_book_grants(connection, book_id, user_ids)
             self._replace_book_ai_tags(connection, book_id, tag_ids)
             self._set_book_ai_profile(connection, book_id, profile)
+            managed_title = None
+            managed_authors_json = None
+            if title is not None or authors is not None:
+                if title is None or authors is None:
+                    raise ValueError("Book title and authors must be updated together")
+                managed_title, managed_authors = self._validate_managed_book_metadata(
+                    title, authors
+                )
+                managed_authors_json = json.dumps(
+                    managed_authors,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
             connection.execute(
                 """
                 UPDATE books
-                SET visibility = ?, updated_at = CURRENT_TIMESTAMP
+                SET visibility = ?,
+                    title = COALESCE(?, title),
+                    authors_json = COALESCE(?, authors_json),
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE book_id = ? AND active = 1
                 """,
-                (visibility, book_id),
+                (
+                    visibility,
+                    managed_title,
+                    managed_authors_json,
+                    book_id,
+                ),
             )
             book_row = self._active_admin_book_row(connection, book_id)
             detail = self._admin_book_detail(connection, book_row)
             summary = self._admin_book_summary_from_detail(detail)
+            self._enqueue_webhook_event_connection(
+                connection,
+                "book.updated",
+                {"book_id": book_id},
+                self._timestamp(),
+            )
             connection.execute("COMMIT")
         return detail, summary
 
@@ -5390,6 +5592,9 @@ class StateStore:
         identifier = (epub_identifier or "").strip() or None
         authoritative_id = (authoritative_book_id or "").strip() or None
         metadata_json = self._metadata_json(metadata)
+        managed_title, managed_authors, managed_tags = self._admin_book_metadata(
+            metadata_json
+        )
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
@@ -5508,8 +5713,9 @@ class StateStore:
                 """
                 INSERT INTO books (
                     book_id, source_path, epub_identifier, source_fingerprint,
-                    source_size, source_mtime_ns, metadata_json, active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                    source_size, source_mtime_ns, metadata_json, title,
+                    authors_json, active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """,
                 (
                     book_id,
@@ -5519,8 +5725,15 @@ class StateStore:
                     source_size,
                     source_mtime_ns,
                     metadata_json,
+                    managed_title,
+                    json.dumps(
+                        managed_authors,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
                 ),
             )
+            self._import_book_tags(connection, book_id, managed_tags)
             self._enqueue_webhook_event_connection(
                 connection, "book.created", {"book_id": book_id}, self._timestamp()
             )

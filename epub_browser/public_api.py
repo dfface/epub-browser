@@ -83,15 +83,14 @@ def require_pat(request, scope: str):
     return authenticated
 
 
-def _book_payload(book):
-    try:
-        metadata = json.loads(book.metadata_json)
-    except (TypeError, json.JSONDecodeError):
-        metadata = {}
+def _book_payload(store, book):
+    metadata = store.managed_book_metadata(book.book_id)
+    authors = list(metadata.get("authors") or ())
     return {
         "id": book.book_id,
         "title": metadata.get("title") or "EPUB Book",
-        "author": metadata.get("author") or metadata.get("creator") or "",
+        "author": ", ".join(authors),
+        "authors": authors,
         "language": metadata.get("language") or "",
         "tags": list(metadata.get("tags") or ()),
         "visibility": book.visibility,
@@ -101,9 +100,10 @@ def _book_payload(book):
 
 
 async def _list_books(request, authenticated: AuthenticatedPAT):
-    books = _context(request).store.visible_books(authenticated.principal)
+    store = _context(request).store
+    books = store.visible_books(authenticated.principal)
     return JSONResponse(
-        {"items": [_book_payload(book) for book in books], "next_cursor": None},
+        {"items": [_book_payload(store, book) for book in books], "next_cursor": None},
         headers={"Cache-Control": "private, no-store"},
     )
 
@@ -126,7 +126,7 @@ async def _book_detail(request, authenticated: AuthenticatedPAT):
     if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
     return JSONResponse(
-        {"book": _book_payload(book)},
+        {"book": _book_payload(_context(request).store, book)},
         headers={"Cache-Control": "private, no-store"},
     )
 
@@ -686,19 +686,30 @@ def openapi_document():
     for operation in public_api_operations():
         path_item = paths.setdefault(operation.path, {})
         for method in operation.methods:
+            success = {"description": "Successful response"}
+            schema_name = {
+                "listBooks": "BookList",
+                "getBook": "BookDetail",
+            }.get(operation.operation_id)
+            if schema_name:
+                success["content"] = {
+                    "application/json": {
+                        "schema": {"$ref": "#/components/schemas/" + schema_name}
+                    }
+                }
             path_item[method.lower()] = {
                 "operationId": operation.operation_id,
                 "summary": operation.summary,
                 "security": [{"PATBearer": [operation.required_scope]}],
                 "responses": {
-                    "200": {"description": "Successful response"},
+                    "200": success,
                     "401": {"description": "Missing or invalid token"},
                     "403": {"description": "Insufficient scope"},
                 },
             }
     return {
         "openapi": "3.1.0",
-        "info": {"title": "EPUB Browser API", "version": "1.0.0"},
+        "info": {"title": "EPUB Browser API", "version": "1.1.0"},
         "paths": paths,
         "components": {
             "securitySchemes": {
@@ -707,6 +718,51 @@ def openapi_document():
                     "scheme": "bearer",
                     "bearerFormat": "EPUB Browser PAT",
                     "x-scopes": sorted(PAT_SCOPES),
+                }
+            },
+            "schemas": {
+                "Book": {
+                    "type": "object",
+                    "required": [
+                        "id", "title", "author", "authors", "language", "tags",
+                        "visibility", "created_at", "updated_at"
+                    ],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "title": {"type": "string"},
+                        "author": {
+                            "type": "string",
+                            "deprecated": True,
+                            "description": "Compatibility string formed by joining authors with a comma."
+                        },
+                        "authors": {"type": "array", "items": {"type": "string"}},
+                        "language": {"type": "string"},
+                        "tags": {"type": "array", "items": {"type": "string"}},
+                        "visibility": {
+                            "type": "string",
+                            "enum": ["authenticated", "restricted"]
+                        },
+                        "created_at": {"type": "string"},
+                        "updated_at": {"type": "string"}
+                    }
+                },
+                "BookList": {
+                    "type": "object",
+                    "required": ["items", "next_cursor"],
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Book"}
+                        },
+                        "next_cursor": {"type": ["string", "null"]}
+                    }
+                },
+                "BookDetail": {
+                    "type": "object",
+                    "required": ["book"],
+                    "properties": {
+                        "book": {"$ref": "#/components/schemas/Book"}
+                    }
                 }
             }
         },
