@@ -90,7 +90,7 @@ interaction model and safety boundary.
 ## Requirements and installation
 
 - Python 3.9 or newer
-- One or more `.epub` files, files in nested directories, or a Calibre-style library directory
+- One or more `.epub` or `.pdf` files, files in nested directories, or a Calibre-style library directory
 
 Install from PyPI:
 
@@ -163,7 +163,71 @@ To place the ID in OPF metadata instead, select embedded storage for the entire 
 
 Embedded mode can rebuild the EPUB ZIP, so the source must be writable and safe to modify. EPUB Browser does not silently fall back to a database-only identity. It stops when IDs disagree, active sources duplicate an ID, a carrier is invalid, or a required carrier cannot be written.
 
-When migrating storage modes, the existing ID is copied to the selected carrier; the other valid carrier is retained. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB.
+When migrating storage modes, the existing ID is copied to the selected carrier; the other valid carrier is retained. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB. For PDF, `--book-id-storage embedded` always falls back to the adjacent sidecar (for example, `BOOK.pdf.epub-browser.json`): a PDF is an immutable document and EPUB Browser cannot write an ID into its bytes. This fallback applies only to PDF; existing EPUB embedded/sidecar semantics are unchanged.
+
+## PDF support: page-as-chapter
+
+PDF is supported by both deployment modes. The reader treats each PDF page as
+an ordinary EPUB Browser chapter, so the existing Book page, chapter
+navigation, TOC, pagination, continuous reading, progress, reading sessions,
+annotations, Dictionary, and Encyclopedia remain the single shared UI and data
+model:
+
+| PDF concept | SSG | Server |
+| --- | --- | --- |
+| Page 1 URL | `chapter_0.html` | `/book/<book-id>/chapter_0.html` |
+| Page N URL | `chapter_{N-1}.html` | `/book/<book-id>/chapter_{N-1}.html` |
+| Page labels and TOC | Generated locally; every page is listed | Rendered from the PDF metadata cache; every page is listed |
+| Embedded outline | A marker on its destination page's TOC entry | The same marker, without removing or reordering page entries |
+| Scrolling and pagination/turning | Static chapter shells and local PDF.js | Dynamic shared chapter shells and local PDF.js |
+| Highlights, notes, Dictionary, Encyclopedia | Shared browser-local components when a text layer exists | Shared authenticated components when a text layer exists |
+| Raw PDF bytes | One `document.pdf` in the static book output | Session-only range-capable route for the cached document |
+
+Page numbers are one-based in the visible label and PDF.js; chapter indices are
+zero-based in URLs, state, APIs, and SQLite. Thus PDF page 1 is always
+`chapter_0.html`. The normalized TOC keeps one `Page N` entry for every page;
+embedded PDF outline titles are attached as outline markers to their destination
+entry, including multiple markers on one page.
+
+SSG writes one single `document.pdf` and one `chapter_<index>.html` shell per
+page. SSG output contains no Session scripts, `/api/*` calls, synchronized
+annotation data, or Server dependencies. Server stores the complete,
+byte-identical source as `book/<book-id>/pdf/document.pdf` and never splits or
+rewrites it. Server renders the same chapter shells dynamically from PDF
+metadata, and a changed source invalidates and fully refreshes the PDF cache
+(document, metadata, and derived cover) rather than mixing old and new pages.
+
+The Server raw-document endpoint is Session-only:
+`GET`/`HEAD /api/books/<book-id>/document`. It checks authentication, book
+visibility, PDF format, and source/cache fingerprints, then supports bounded
+single-range responses with `ETag`, `Accept-Ranges`, private caching,
+`nosniff`, and inline PDF disposition. It does not expose an absolute path, is
+not available to PAT authentication, and is not listed in the PAT/OpenAPI
+surface. SSG has only its local `document.pdf` and no raw-document API.
+
+PDFs with a usable PDF.js text layer reuse the exact existing selection popup
+and annotation component for Highlight and Note, plus Dictionary and
+Encyclopedia. Annotation storage, ownership, export, listing, and deep links
+remain shared; there is no PDF-specific annotation table or settings UI.
+Scanned or image-only PDFs remain readable, but selection-based Highlight,
+Note, Dictionary, Encyclopedia, and document search are explicitly unavailable
+when no usable text layer exists. A selection spanning pages may still be
+copied, while annotation and lookup actions show the localized unsupported
+message; page-local selection continues to work.
+
+PDF.js is not a second viewer shell. Before building or publishing, hydrate and
+verify the locked third-party assets:
+
+```bash
+python3 tools/sync_vendor_assets.py fetch
+python3 tools/sync_vendor_assets.py verify
+```
+
+The application then serves local hashed PDF.js module and worker assets at
+runtime; it never fetches them from a CDN. Image lightboxes use the locked
+GLightbox dependency; Fancyapps/Fancybox is not a runtime or redistributed
+dependency. See [third_party/README.md](third_party/README.md) for the locked
+asset and release workflow.
 
 ## SSG mode
 
