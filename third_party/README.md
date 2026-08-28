@@ -103,7 +103,12 @@ DOCKERFILE
 ```
 
 The artifact gate then fails closed if Docker or the pre-provisioned image is
-unavailable:
+unavailable. Docker isolation is supported on POSIX hosts and runs with the
+calling user's numeric UID:GID so its writable bind mounts do not acquire
+root-owned files; a host without POSIX identity APIs fails closed. The optional
+rebuilt-wheel evidence directory must be absent or empty. The gate builds in a
+fresh private directory and publishes the one verified wheel to that evidence
+directory only after verification succeeds:
 
 ```bash
 python3 tools/verify_release_artifacts.py \

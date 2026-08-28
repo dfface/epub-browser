@@ -254,7 +254,7 @@ class VendorAssetTests(unittest.TestCase):
         with self.assertRaisesRegex(VendorAssetError, "HTTPS"):
             fetch_assets(insecure_lock, self.vendor_root, opener=self.opener(archive))
 
-        with self.assertRaisesRegex(VendorAssetError, "redirected"):
+        with self.assertRaisesRegex(VendorAssetError, "final URL"):
             fetch_assets(
                 self.lock_for_archive(archive),
                 self.vendor_root,
@@ -301,18 +301,37 @@ class VendorAssetTests(unittest.TestCase):
             load_lock(lock_path)
 
     def test_all_offline_commands_reject_insecure_or_malformed_source_urls(self):
-        """Load, verify, and clean must share strict HTTPS source validation."""
+        """Every lock consumer must share strict HTTPS source validation."""
+
+        def reject_network(*args, **kwargs):
+            raise AssertionError("invalid locks must not reach the network")
+
         operations = (
             ("load", lambda path: load_lock(path)),
             ("verify", lambda path: verify_assets(path, self.vendor_root)),
             ("clean", lambda path: clean_assets(path, self.vendor_root)),
+            (
+                "fetch",
+                lambda path: fetch_assets(
+                    path,
+                    self.vendor_root,
+                    opener=reject_network,
+                ),
+            ),
         )
         for url in (
             "http://registry.example.test/example.tgz",
             "https://",
             "https://registry.example.test:invalid/example.tgz",
+            "https://registry.example.test:/example.tgz",
             "https://user:password@registry.example.test/example.tgz",
             "https://registry.example.test/example.tgz\n",
+            "https://registry.example.test\\evil/example.tgz",
+            "https://registry.example.test/example\x00.tgz",
+            "https://registry.example.test/example\x7f.tgz",
+            "https://registry.example.test/example\x80.tgz",
+            "https://registry.example.test/example\N{ZERO WIDTH SPACE}.tgz",
+            "https://registry.example.test/example\N{EM SPACE}.tgz",
         ):
             lock_path = self.changed_lock(
                 self.lock_path,
@@ -364,15 +383,44 @@ class VendorAssetTests(unittest.TestCase):
         """Every redirect hop must remain HTTPS even when a later final URL is secure."""
         handler = sync_vendor_assets.HTTPSOnlyRedirectHandler()
 
-        with self.assertRaisesRegex(VendorAssetError, "redirected"):
-            handler.redirect_request(
-                Request("https://registry.example.test/archive.tgz"),
-                None,
-                302,
-                "Found",
-                {},
-                "http://mirror.example.test/archive.tgz",
-            )
+        for redirected_url in (
+            "http://mirror.example.test/archive.tgz",
+            "https://mirror.example.test\\evil/archive.tgz",
+            "https://mirror.example.test:/archive.tgz",
+            "https://mirror.example.test/archive\x7f.tgz",
+            "https://mirror.example.test/archive\N{ZERO WIDTH SPACE}.tgz",
+        ):
+            with self.subTest(url=redirected_url):
+                with self.assertRaisesRegex(VendorAssetError, "redirected"):
+                    handler.redirect_request(
+                        Request("https://registry.example.test/archive.tgz"),
+                        None,
+                        302,
+                        "Found",
+                        {},
+                        redirected_url,
+                    )
+
+    def test_fetch_rejects_malformed_response_final_urls(self):
+        """A downloader response must not bypass strict redirect URL validation."""
+        archive = self.tar_archive(
+            [("LICENSE", b"license", "file"), ("file.js", b"asset", "file")]
+        )
+        lock_path = self.lock_for_archive(archive)
+        for final_url in (
+            "https://mirror.example.test\\evil/archive.tgz",
+            "https://mirror.example.test:/archive.tgz",
+            "https://mirror.example.test/archive\x80.tgz",
+            "https://mirror.example.test/archive\N{ZERO WIDTH SPACE}.tgz",
+        ):
+            with self.subTest(url=final_url):
+                clean_assets(self.lock_path, self.vendor_root)
+                with self.assertRaisesRegex(VendorAssetError, "final URL"):
+                    fetch_assets(
+                        lock_path,
+                        self.vendor_root,
+                        opener=self.opener(archive, final_url=final_url),
+                    )
 
     def test_fetch_rejects_hardlinks_devices_and_fifos(self):
         """No special tar entry type may be accepted as an installable artifact."""
@@ -865,6 +913,81 @@ class VendorAssetTests(unittest.TestCase):
                     isolation_runner=self.local_build_runner,
                 )
 
+    def test_release_gate_rejects_preexisting_rebuilt_wheel_evidence(self):
+        """A stale valid wheel must never satisfy a no-op sdist rebuild."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        runner_called = False
+
+        def no_op_runner(source_root, output_dir):
+            nonlocal runner_called
+            runner_called = True
+            return subprocess.CompletedProcess([], 0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            evidence_dir = root / "rebuilt"
+            evidence_dir.mkdir()
+            stale_wheel = evidence_dir / direct.name
+            stale_wheel.write_bytes(direct.read_bytes())
+
+            with redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(
+                    ReleaseArtifactError, "evidence directory must be empty"
+                ):
+                    verify_release_artifacts(
+                        wheel_path=direct,
+                        lock_path=lock_path,
+                        notices_path=notices_path,
+                        sync_tool_path=sync_tool_path,
+                        sdist_path=sdist,
+                        rebuilt_wheel_dir=evidence_dir,
+                        isolation_runner=no_op_runner,
+                    )
+
+            self.assertFalse(runner_called)
+            self.assertEqual(stale_wheel.read_bytes(), direct.read_bytes())
+
+    def test_release_gate_builds_fresh_then_publishes_verified_evidence(self):
+        """Caller evidence paths must receive only a newly built verified wheel."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        observed_outputs = []
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+            evidence_dir = root / "rebuilt"
+            evidence_dir.mkdir()
+
+            def fixture_runner(source_root, output_dir):
+                observed_outputs.append(output_dir.resolve())
+                self.assertEqual(list(output_dir.iterdir()), [])
+                (output_dir / direct.name).write_bytes(direct.read_bytes())
+                return subprocess.CompletedProcess([], 0, "", "")
+
+            with redirect_stdout(io.StringIO()):
+                verify_release_artifacts(
+                    wheel_path=direct,
+                    lock_path=lock_path,
+                    notices_path=notices_path,
+                    sync_tool_path=sync_tool_path,
+                    sdist_path=sdist,
+                    rebuilt_wheel_dir=evidence_dir,
+                    isolation_runner=fixture_runner,
+                )
+
+            self.assertEqual(len(observed_outputs), 1)
+            self.assertNotEqual(observed_outputs[0], evidence_dir.resolve())
+            published = list(evidence_dir.iterdir())
+            self.assertEqual([path.name for path in published], [direct.name])
+            self.assertEqual(published[0].read_bytes(), direct.read_bytes())
+
     def test_release_artifact_gate_rejects_an_unavailable_isolation_runtime(self):
         """A missing container runtime must stop the build instead of weakening it."""
         repository_root = Path(__file__).parents[1]
@@ -890,6 +1013,105 @@ class VendorAssetTests(unittest.TestCase):
                         sdist_path=sdist,
                         isolation_runner=runner,
                     )
+
+    @unittest.skipUnless(
+        hasattr(os, "getuid") and hasattr(os, "getgid"),
+        "Docker release builds require a POSIX host identity",
+    )
+    def test_docker_runner_fails_closed_when_the_daemon_is_unavailable(self):
+        """A present Docker CLI with an unreachable daemon must not run a build."""
+        fake_docker = self.directory / "unavailable-docker"
+        run_marker = self.directory / "run-called"
+        fake_docker.write_text(
+            """#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+if sys.argv[1:3] == ["image", "inspect"]:
+    raise SystemExit(1)
+Path({!r}).write_text("called", encoding="utf-8")
+""".format(str(run_marker)),
+            encoding="utf-8",
+        )
+        fake_docker.chmod(0o755)
+        runner = release_artifacts.DockerNetworkIsolationRunner(
+            "fixture-builder:latest",
+            docker_executable=str(fake_docker),
+        )
+
+        with self.assertRaisesRegex(
+            ReleaseArtifactError, "network isolation is unavailable"
+        ):
+            runner(self.directory / "source", self.directory / "output")
+
+        self.assertFalse(run_marker.exists())
+
+    def test_release_cli_rejects_option_like_builder_image_before_docker(self):
+        """`--builder-image=--help` must not become a Docker option injection."""
+        repository_root = Path(__file__).parents[1]
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "tools/verify_release_artifacts.py",
+                "--wheel",
+                str(self.directory / "missing.whl"),
+                "--sdist",
+                str(self.directory / "missing.tar.gz"),
+                "--network-isolation",
+                "docker",
+                "--builder-image=--help",
+            ],
+            cwd=repository_root,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("invalid Docker builder image reference", completed.stderr)
+        self.assertNotIn("cannot inspect wheel", completed.stderr)
+
+    @unittest.skipUnless(
+        hasattr(os, "getuid") and hasattr(os, "getgid"),
+        "Docker release builds require a POSIX host identity",
+    )
+    def test_docker_runner_maps_the_host_identity_into_writable_mounts(self):
+        """Container builds must not leave root-owned files in host bind mounts."""
+        fake_docker = self.directory / "fake-docker"
+        argument_log = self.directory / "docker-arguments.json"
+        fake_docker.write_text(
+            """#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+if sys.argv[1:3] == ["image", "inspect"]:
+    raise SystemExit(0)
+Path({!r}).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+""".format(str(argument_log)),
+            encoding="utf-8",
+        )
+        fake_docker.chmod(0o755)
+        source_root = self.directory / "source"
+        output_dir = self.directory / "output"
+        source_root.mkdir()
+        output_dir.mkdir()
+        runner = release_artifacts.DockerNetworkIsolationRunner(
+            "fixture-builder:latest",
+            docker_executable=str(fake_docker),
+        )
+
+        completed = runner(source_root, output_dir)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        arguments = json.loads(argument_log.read_text(encoding="utf-8"))
+        self.assertIn("--user", arguments)
+        user_index = arguments.index("--user")
+        self.assertEqual(
+            arguments[user_index + 1], "{}:{}".format(os.getuid(), os.getgid())
+        )
+        image_index = arguments.index("fixture-builder:latest")
+        self.assertLess(user_index, image_index)
+        self.assertEqual(arguments[image_index - 1], "--")
 
     @unittest.skipUnless(
         os.environ.get("EPUB_BROWSER_RELEASE_BUILDER_IMAGE"),

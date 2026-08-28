@@ -10,6 +10,7 @@ import re
 import sys
 import tarfile
 import tempfile
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, Tuple
@@ -31,8 +32,12 @@ class HTTPSOnlyRedirectHandler(HTTPRedirectHandler):
     """Retain urllib's bounded redirect accounting while forbidding downgrades."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if urlparse(newurl).scheme != "https":
-            raise VendorAssetError("download redirected away from HTTPS")
+        try:
+            _require_https_url(newurl, "redirect URL")
+        except VendorAssetError as error:
+            raise VendorAssetError(
+                "download redirected to an invalid HTTPS URL"
+            ) from error
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -283,10 +288,14 @@ def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
             try:
                 with open_url(package.source.url) as response:
                     final_url = response.geturl()
-                    if urlparse(final_url).scheme != "https":
+                    try:
+                        _require_https_url(final_url, "response final URL")
+                    except VendorAssetError as error:
                         raise VendorAssetError(
-                            "{} download redirected away from HTTPS".format(package.name)
-                        )
+                            "{} download has an invalid final URL".format(
+                                package.name
+                            )
+                        ) from error
                     digest = copy_bounded(response, archive_path, package.archive.max_bytes)
             except VendorAssetError:
                 raise
@@ -762,13 +771,36 @@ def _require_https_url(value: Any, label: str) -> str:
         parsed.port
     except ValueError as error:
         raise VendorAssetError(label + " must be an HTTPS URL") from error
+    invalid_character = any(
+        character == "\\"
+        or character.isspace()
+        or unicodedata.category(character) in {"Cc", "Cf"}
+        for character in value
+    )
+    authority = parsed.netloc
+    if authority.startswith("["):
+        closing_bracket = authority.find("]")
+        port_suffix = authority[closing_bracket + 1 :]
+        malformed_authority = (
+            closing_bracket < 0
+            or (port_suffix and not re.fullmatch(r":[0-9]+", port_suffix))
+        )
+    else:
+        malformed_authority = authority.count(":") > 1 or (
+            ":" in authority and not authority.rsplit(":", 1)[1]
+        )
     if (
         parsed.scheme != "https"
         or not parsed.netloc
         or not hostname
         or parsed.username is not None
         or parsed.password is not None
-        or any(character.isspace() or ord(character) < 32 for character in value)
+        or invalid_character
+        or "%" in authority
+        or malformed_authority
+        or hostname.startswith(".")
+        or hostname.endswith(".")
+        or ".." in hostname
     ):
         raise VendorAssetError(label + " must be an HTTPS URL")
     return value

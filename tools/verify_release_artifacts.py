@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -25,6 +26,15 @@ class ReleaseArtifactError(Exception):
 
 
 DRIVE_LIKE_SEGMENT = re.compile(r"^[A-Za-z]:")
+DOCKER_IMAGE_REFERENCE_PATTERN = re.compile(
+    r"(?=.{1,255}\Z)"
+    r"(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?/)?"
+    r"[a-z0-9]+(?:(?:[._]|__|[-]+)[a-z0-9]+)*"
+    r"(?:/[a-z0-9]+(?:(?:[._]|__|[-]+)[a-z0-9]+)*)*"
+    r"(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?"
+    r"(?:@sha256:[0-9a-f]{64})?",
+    re.ASCII,
+)
 
 
 class DockerNetworkIsolationRunner:
@@ -35,17 +45,31 @@ class DockerNetworkIsolationRunner:
         builder_image: str,
         docker_executable: str = "docker",
     ) -> None:
-        if not builder_image:
+        if (
+            not isinstance(builder_image, str)
+            or not DOCKER_IMAGE_REFERENCE_PATTERN.fullmatch(builder_image)
+        ):
             raise ReleaseArtifactError(
-                "a pre-provisioned builder image is required for network isolation"
+                "invalid Docker builder image reference"
             )
         self.builder_image = builder_image
         self.docker_executable = docker_executable
 
     def __call__(self, source_root: Path, output_dir: Path):
+        if not hasattr(os, "getuid") or not hasattr(os, "getgid"):
+            raise ReleaseArtifactError(
+                "Docker network isolation requires a POSIX host UID and GID"
+            )
+        host_identity = "{}:{}".format(os.getuid(), os.getgid())
         try:
             inspected = subprocess.run(
-                [self.docker_executable, "image", "inspect", self.builder_image],
+                [
+                    self.docker_executable,
+                    "image",
+                    "inspect",
+                    "--",
+                    self.builder_image,
+                ],
                 text=True,
                 capture_output=True,
             )
@@ -66,6 +90,8 @@ class DockerNetworkIsolationRunner:
                     self.docker_executable,
                     "run",
                     "--rm",
+                    "--user",
+                    host_identity,
                     "--network",
                     "none",
                     "--env",
@@ -78,6 +104,7 @@ class DockerNetworkIsolationRunner:
                     "type=bind,src={},dst=/wheel".format(output_dir),
                     "--workdir",
                     "/source",
+                    "--",
                     self.builder_image,
                     "python",
                     "-m",
@@ -328,6 +355,44 @@ def _extract_verified_sdist(sdist_path: Path, destination: Path) -> Path:
     return destination / root
 
 
+def _publish_verified_wheel(wheel_path: Path, evidence_dir: Path) -> Path:
+    try:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        if evidence_dir.is_symlink() or not evidence_dir.is_dir():
+            raise ReleaseArtifactError(
+                "rebuilt wheel evidence directory must be empty"
+            )
+        if any(evidence_dir.iterdir()):
+            raise ReleaseArtifactError(
+                "rebuilt wheel evidence directory must be empty"
+            )
+        destination = evidence_dir / wheel_path.name
+        created_destination = False
+        try:
+            with wheel_path.open("rb") as source:
+                output = destination.open("xb")
+                created_destination = True
+                with output:
+                    for chunk in iter(lambda: source.read(64 * 1024), b""):
+                        output.write(chunk)
+        except Exception:
+            if created_destination:
+                destination.unlink(missing_ok=True)
+            raise
+        if set(evidence_dir.iterdir()) != {destination}:
+            destination.unlink(missing_ok=True)
+            raise ReleaseArtifactError(
+                "rebuilt wheel evidence directory changed during publication"
+            )
+        return destination
+    except ReleaseArtifactError:
+        raise
+    except OSError as error:
+        raise ReleaseArtifactError(
+            "cannot publish rebuilt wheel evidence"
+        ) from error
+
+
 def verify_release_artifacts(
     wheel_path: Path,
     lock_path: Path,
@@ -347,13 +412,19 @@ def verify_release_artifacts(
         raise ReleaseArtifactError(
             "network isolation is required for an sdist rebuild"
         )
+    if rebuilt_wheel_dir is not None and rebuilt_wheel_dir.exists():
+        if (
+            rebuilt_wheel_dir.is_symlink()
+            or not rebuilt_wheel_dir.is_dir()
+            or any(rebuilt_wheel_dir.iterdir())
+        ):
+            raise ReleaseArtifactError(
+                "rebuilt wheel evidence directory must be empty"
+            )
     with tempfile.TemporaryDirectory(prefix="epub-browser-sdist-") as directory:
         temporary_root = Path(directory)
         source_root = _extract_verified_sdist(sdist_path, temporary_root / "source")
-        if rebuilt_wheel_dir is None:
-            output_dir = temporary_root / "wheel"
-        else:
-            output_dir = rebuilt_wheel_dir
+        output_dir = temporary_root / "wheel"
         output_dir.mkdir(parents=True, exist_ok=True)
         completed = isolation_runner(source_root, output_dir)
         if completed.returncode != 0:
@@ -366,7 +437,12 @@ def verify_release_artifacts(
         if len(rebuilt) != 1:
             raise ReleaseArtifactError("offline sdist build did not produce one wheel")
         verify_wheel(rebuilt[0], lock_path, notices_path)
-        print("network-isolated sdist wheel verified: {}".format(rebuilt[0]))
+        verified_wheel = rebuilt[0]
+        if rebuilt_wheel_dir is not None:
+            verified_wheel = _publish_verified_wheel(
+                rebuilt[0], rebuilt_wheel_dir
+            )
+        print("network-isolated sdist wheel verified: {}".format(verified_wheel))
 
 
 def main(argv=None) -> int:
