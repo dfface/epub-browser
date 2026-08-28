@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 17
+DB_SCHEMA_VERSION = 18
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -127,6 +127,7 @@ class BookRecord:
     source_fingerprint: str
     source_size: Optional[int]
     source_mtime_ns: Optional[int]
+    source_format: str
     metadata_json: str
     visibility: str
     active: bool
@@ -319,6 +320,8 @@ class StateStore:
                 self._require_foreign_key_integrity(connection)
             if version < 17:
                 self._migrate_schema_v17(connection, max(version, 16))
+            if version < 18:
+                self._migrate_schema_v18(connection, max(version, 17))
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -425,6 +428,8 @@ class StateStore:
                 source_fingerprint TEXT NOT NULL,
                 source_size INTEGER,
                 source_mtime_ns INTEGER,
+                source_format TEXT NOT NULL DEFAULT 'epub'
+                    CHECK(source_format IN ('epub', 'pdf')),
                 metadata_json TEXT NOT NULL,
                 visibility TEXT NOT NULL DEFAULT 'authenticated'
                     CHECK(visibility IN ('authenticated', 'restricted')),
@@ -433,6 +438,12 @@ class StateStore:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
+        )
+        self._add_column_if_missing(
+            connection,
+            "books",
+            "source_format",
+            "TEXT NOT NULL DEFAULT 'epub' CHECK(source_format IN ('epub', 'pdf'))",
         )
         if not latest:
             connection.execute(
@@ -1558,6 +1569,17 @@ class StateStore:
         self._create_v11_indexes(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 17")
+
+    def _migrate_schema_v18(self, connection, source_version) -> None:
+        if source_version >= 18:
+            return
+        self._add_column_if_missing(
+            connection,
+            "books",
+            "source_format",
+            "TEXT NOT NULL DEFAULT 'epub' CHECK(source_format IN ('epub', 'pdf'))",
+        )
+        connection.execute("PRAGMA user_version = 18")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:
@@ -5385,7 +5407,10 @@ class StateStore:
         source_mtime_ns: Optional[int] = None,
         preferred_book_id: Optional[str] = None,
         authoritative_book_id: Optional[str] = None,
+        source_format: str = "epub",
     ) -> BookRecord:
+        if source_format not in {"epub", "pdf"}:
+            raise ValueError(f"Unsupported source format: {source_format}")
         canonical_path = str(Path(source_path).expanduser().resolve())
         identifier = (epub_identifier or "").strip() or None
         authoritative_id = (authoritative_book_id or "").strip() or None
@@ -5406,6 +5431,7 @@ class StateStore:
                     """
                     UPDATE books SET
                         active = 1,
+                        source_format = ?,
                         epub_identifier = COALESCE(?, epub_identifier),
                         source_size = COALESCE(?, source_size),
                         source_mtime_ns = COALESCE(?, source_mtime_ns),
@@ -5413,6 +5439,7 @@ class StateStore:
                     WHERE book_id = ?
                     """,
                     (
+                        source_format,
                         identifier,
                         source_size,
                         source_mtime_ns,
@@ -5436,6 +5463,7 @@ class StateStore:
                         """
                         UPDATE books SET
                             source_path = ?,
+                            source_format = ?,
                             epub_identifier = COALESCE(?, epub_identifier),
                             source_fingerprint = ?,
                             metadata_json = ?,
@@ -5447,6 +5475,7 @@ class StateStore:
                         """,
                         (
                             canonical_path,
+                            source_format,
                             identifier,
                             source_fingerprint,
                             metadata_json,
@@ -5468,6 +5497,7 @@ class StateStore:
                     """
                     UPDATE books SET
                         source_path = ?,
+                        source_format = ?,
                         metadata_json = ?,
                         source_size = ?,
                         source_mtime_ns = ?,
@@ -5477,6 +5507,7 @@ class StateStore:
                     """,
                     (
                         canonical_path,
+                        source_format,
                         metadata_json,
                         source_size,
                         source_mtime_ns,
@@ -5508,8 +5539,8 @@ class StateStore:
                 """
                 INSERT INTO books (
                     book_id, source_path, epub_identifier, source_fingerprint,
-                    source_size, source_mtime_ns, metadata_json, active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                    source_size, source_mtime_ns, source_format, metadata_json, active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """,
                 (
                     book_id,
@@ -5518,6 +5549,7 @@ class StateStore:
                     source_fingerprint,
                     source_size,
                     source_mtime_ns,
+                    source_format,
                     metadata_json,
                 ),
             )
@@ -5563,7 +5595,10 @@ class StateStore:
         source_size: Optional[int] = None,
         source_mtime_ns: Optional[int] = None,
         epub_identifier: Optional[str] = None,
+        source_format: Optional[str] = None,
     ) -> BookRecord:
+        if source_format is not None and source_format not in {"epub", "pdf"}:
+            raise ValueError(f"Unsupported source format: {source_format}")
         metadata_json = self._metadata_json(metadata)
         with self._connection() as connection:
             cursor = connection.execute(
@@ -5573,6 +5608,7 @@ class StateStore:
                     metadata_json = ?,
                     source_size = ?,
                     source_mtime_ns = ?,
+                    source_format = COALESCE(?, source_format),
                     epub_identifier = COALESCE(?, epub_identifier),
                     active = 1,
                     updated_at = CURRENT_TIMESTAMP
@@ -5583,6 +5619,7 @@ class StateStore:
                     metadata_json,
                     source_size,
                     source_mtime_ns,
+                    source_format,
                     (epub_identifier or "").strip() or None,
                     book_id,
                 ),

@@ -75,6 +75,54 @@ class StateStoreTests(unittest.TestCase):
             authoritative_book_id=book_id,
         )
 
+    def test_existing_book_rows_migrate_to_epub_source_format(self):
+        legacy_database = Path(self.temporary.name, "legacy-v17.db")
+        connection = sqlite3.connect(legacy_database)
+        connection.executescript(
+            """
+            CREATE TABLE books (
+                book_id TEXT PRIMARY KEY,
+                source_path TEXT NOT NULL UNIQUE,
+                epub_identifier TEXT,
+                source_fingerprint TEXT NOT NULL,
+                source_size INTEGER,
+                source_mtime_ns INTEGER,
+                metadata_json TEXT NOT NULL,
+                visibility TEXT NOT NULL DEFAULT 'authenticated',
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO books (
+                book_id, source_path, source_fingerprint, metadata_json
+            ) VALUES ('legacy-book', '/library/legacy.epub', 'digest', '{}');
+            PRAGMA user_version = 17;
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = StateStore(legacy_database)
+        migrated.initialize(BootstrapCredentials("legacy-admin", "secret"))
+
+        self.assertEqual(migrated.active_books()[0].source_format, "epub")
+        with migrated._connection() as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION,
+            )
+
+    def test_resolve_book_records_explicit_pdf_source_format(self):
+        record = self.store.resolve_book(
+            Path(self.temporary.name, "document.pdf"),
+            None,
+            "pdf-digest",
+            {"title": "Document"},
+            source_format="pdf",
+        )
+
+        self.assertEqual(record.source_format, "pdf")
+
     def test_heartbeat_is_idempotent_and_changes_chapter_session(self):
         self._reading_book()
         first = self.store.record_reading_heartbeat(

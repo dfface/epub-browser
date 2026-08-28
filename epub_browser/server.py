@@ -68,9 +68,14 @@ from .public_api import (
     public_api_operations,
     public_api_routes,
 )
-from .server_library import library_metadata
+from .server_library import (
+    PDF_OUTPUT_REVISION,
+    PDF_OUTPUT_REVISION_FILE,
+    library_metadata,
+)
 from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
+from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .site import render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
@@ -495,19 +500,29 @@ def extract_book_id_from_public_path(path):
     return None
 
 
-def server_book_output_is_current(base_directory, book_id):
+def server_book_output_is_current(
+    base_directory,
+    book_id,
+    source_format=EPUB_FORMAT,
+):
+    if source_format == PDF_FORMAT:
+        revision_file = PDF_OUTPUT_REVISION_FILE
+        expected_revision = PDF_OUTPUT_REVISION
+    else:
+        revision_file = SERVER_OUTPUT_REVISION_FILE
+        expected_revision = SERVER_OUTPUT_REVISION
     marker = os.path.join(
         base_directory,
         'book',
         book_id,
-        SERVER_OUTPUT_REVISION_FILE,
+        revision_file,
     )
     try:
         with open(marker, encoding='utf-8') as revision_file:
             revision = revision_file.read().strip()
     except OSError:
         return False
-    return revision == SERVER_OUTPUT_REVISION
+    return revision == expected_revision
 
 
 def sync_bookshelf(
@@ -2830,21 +2845,46 @@ window.location.assign(payload.redirect||'/');
                 book_id,
             ):
                 return response(error_payload('forbidden', 'Forbidden'), 403)
-            if not server_book_output_is_current(base_directory, book_id):
+            book = store.book_by_id(book_id)
+            if book is None or not server_book_output_is_current(
+                base_directory, book_id, book.source_format
+            ):
                 return response(error_payload('not_found', 'Not Found'), 404)
             book_relative_path = '/'.join(path.split('/')[2:])
-            if not server_book_public_path_allowed(book_relative_path):
+            try:
+                recorded_cover = json.loads(book.metadata_json).get('cover')
+            except (TypeError, json.JSONDecodeError):
+                recorded_cover = None
+            pdf_cover_allowed = (
+                book.source_format == PDF_FORMAT
+                and isinstance(recorded_cover, str)
+                and recorded_cover == book_relative_path
+                and recorded_cover == 'cover.png'
+            )
+            if not (
+                server_book_public_path_allowed(book_relative_path)
+                or pdf_cover_allowed
+            ):
                 return response(error_payload('not_found', 'Not Found'), 404)
-            renderer = ServerPageRenderer(base_directory, book_id)
+            renderer = ServerPageRenderer(
+                base_directory,
+                book_id,
+                source_format=book.source_format,
+            )
             # Retain a narrow compatibility path for manually-created test
             # fixtures and legacy caches that still have an accepted marker.
             # Fresh Server conversions always carry content/metadata.json and
             # therefore take the dynamic path below.
-            has_content_cache = (
-                Path(base_directory, 'book', book_id, 'content', 'metadata.json')
-                .is_file()
+            has_dynamic_cache = (
+                Path(
+                    base_directory, 'book', book_id, 'pdf', 'metadata.json'
+                ).is_file()
+                if book.source_format == PDF_FORMAT
+                else Path(
+                    base_directory, 'book', book_id, 'content', 'metadata.json'
+                ).is_file()
             )
-            if has_content_cache:
+            if has_dynamic_cache:
                 try:
                     if book_relative_path == 'index.html':
                         markup = renderer.render_index(
