@@ -1628,7 +1628,10 @@ class AdminAccountTests(unittest.TestCase):
         )
         self.assertEqual(indexed["title"], "Indexed book")
         self.assertEqual(indexed["authors"], ["Index Author"])
-        self.assertEqual(indexed["epub_tags"], ["EPUB Tag"])
+        self.assertEqual(indexed["epub_tags"], [])
+        self.assertEqual(
+            indexed["tags"], [{"id": tag["id"], "name": "Assigned Tag"}]
+        )
         self.assertEqual(indexed["grant_count"], 1)
         self.assertEqual(indexed["ai_profile"], "technical")
         self.assertEqual(indexed["ai_tags"], [{"id": tag["id"], "name": "Assigned Tag"}])
@@ -1690,7 +1693,7 @@ class AdminAccountTests(unittest.TestCase):
         )
         self.assertEqual(
             detail.json()["book"]["effective_tags"],
-            ["Detailed Tag", "Original Tag"],
+            ["Detailed Tag"],
         )
         self.assertNotIn("source_path", detail.text)
         self.assertNotIn("metadata_json", detail.text)
@@ -1805,6 +1808,63 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(hidden_failure.status_code, 400)
         self.assertEqual(hidden_failure.json()["code"], "invalid_book_settings")
         self.assertNotIn("PRIVATE_RESTRICTED_ENTITY_SENTINEL", hidden_failure.text)
+
+    def test_admin_edits_server_managed_book_title_authors_and_tags(self):
+        book = self.store.resolve_book(
+            Path(self.directory.name) / "editable-metadata.epub",
+            "urn:test:editable-metadata",
+            "editable-metadata-fingerprint",
+            {
+                "title": "Imported title",
+                "authors": ["Imported author"],
+                "tags": ["Imported tag", "Remove me"],
+            },
+            preferred_book_id="editable-metadata-book",
+        )
+        tags = {item["name"]: item for item in self.store.list_ai_tags()}
+
+        saved = self.admin_client.put(
+            "/api/admin/books/" + book.book_id + "/settings",
+            json={
+                "title": "Managed title",
+                "authors": ["Managed author", "Second author"],
+                "visibility": "authenticated",
+                "user_ids": [],
+                "tag_ids": [tags["Imported tag"]["id"]],
+                "profile": "auto",
+            },
+        )
+        effective = self.member_client.get(
+            "/api/books/" + book.book_id + "/metadata"
+        )
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["book"]["title"], "Managed title")
+        self.assertEqual(
+            saved.json()["book"]["authors"],
+            ["Managed author", "Second author"],
+        )
+        self.assertEqual(
+            saved.json()["book"]["tags"],
+            [{"id": tags["Imported tag"]["id"], "name": "Imported tag"}],
+        )
+        self.assertEqual(effective.status_code, 200)
+        self.assertEqual(effective.json()["title"], "Managed title")
+        self.assertEqual(
+            effective.json()["authors"], ["Managed author", "Second author"]
+        )
+        self.assertEqual(effective.json()["tags"], ["Imported tag"])
+
+        deleted = self.admin_client.delete(
+            "/api/admin/ai/tags/" + tags["Imported tag"]["id"]
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(
+            self.member_client.get(
+                "/api/books/" + book.book_id + "/metadata"
+            ).json()["tags"],
+            [],
+        )
 
     def test_admin_can_bulk_restrict_and_add_member_grants(self):
         first = self.store.resolve_book(
@@ -2262,6 +2322,10 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(tags.status_code, 200)
         self.assertEqual(tags.json()["profile"], "fiction")
         self.assertEqual(tags.json()["tags"], [tag.json()["tag"]])
+        self.assertEqual(
+            len(self.store.list_webhook_events(event_type="book.updated")),
+            2,
+        )
         self.assertEqual(effective_metadata.status_code, 200)
         self.assertEqual(effective_metadata.json()["tags"], ["History"])
         self.assertEqual(
@@ -4091,6 +4155,43 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(bob_page.status_code, 200)
         self.assertNotIn('Private first-paint review', bob_page.text)
         self.assertNotIn('data-book-review-initial', bob_page.text)
+
+    def test_managed_metadata_overrides_cached_epub_metadata_everywhere(self):
+        tag = self.store.create_ai_tag("Managed tag")
+        self.store.update_admin_book_settings(
+            "book",
+            title="Managed book title",
+            authors=["Managed author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[tag["id"]],
+            profile="auto",
+        )
+
+        page = self.client.get("/book/book/index.html")
+        catalog = {
+            item["hash"]: item
+            for item in self.client.get("/api/library-metadata").json()
+        }
+        heartbeat = self.client.post(
+            "/api/reading-sessions/book/heartbeat",
+            json={
+                "client_id": "managed-title-tab",
+                "client_sequence": 1,
+                "chapter_index": 0,
+                "active_seconds": 1,
+            },
+        )
+
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Managed book title", page.text)
+        self.assertIn("<title>Managed book title</title>", page.text)
+        self.assertEqual(catalog["book"]["title"], "Managed book title")
+        self.assertEqual(catalog["book"]["authors"], ["Managed author"])
+        self.assertEqual(catalog["book"]["tags"], ["Managed tag"])
+        self.assertEqual(
+            heartbeat.json()["session"]["book_title"], "Managed book title"
+        )
 
     def test_library_metadata_projects_only_the_current_users_rating(self):
         self.client.put(

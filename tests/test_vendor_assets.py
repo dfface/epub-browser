@@ -94,6 +94,22 @@ class VendorAssetTests(unittest.TestCase):
         verify_assets(self.lock_path, self.vendor_root)
         self.assertFalse((self.vendor_root / "not-installed.txt").exists())
 
+    def test_fetch_retries_a_transient_archive_digest_mismatch(self):
+        """One corrupt response must not make an otherwise reproducible release flaky."""
+        clean_assets(self.lock_path, self.vendor_root)
+        archive = self.tar_archive(
+            [("LICENSE", b"license", "file"), ("file.js", b"asset", "file")]
+        )
+        responses = iter((b"transient corrupt response", archive))
+
+        fetch_assets(
+            self.lock_for_archive(archive),
+            self.vendor_root,
+            opener=lambda *args, **kwargs: self.opener(next(responses))(),
+        )
+
+        verify_assets(self.lock_path, self.vendor_root)
+
     def test_fetch_is_offline_when_the_locked_tree_is_already_correct(self):
         """Removing the early verification would make an idempotent fetch contact upstream."""
         def reject_network(*args, **kwargs):

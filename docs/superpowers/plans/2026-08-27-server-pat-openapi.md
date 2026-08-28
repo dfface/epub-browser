@@ -423,7 +423,7 @@ git commit -m "feat: add administrator data read API"
 - Modify: `tests/test_static_asset_delivery.py`
 - Modify: `tests/test_mode_integration.py`
 - Modify: `README.md`
-- Modify: `README.zh-CN.md`
+- Modify: `docs/readme/README.zh-CN.md`
 
 **Interfaces:**
 - Produces `/openapi.json` and `/api-docs` after setup.
@@ -465,6 +465,6 @@ Expected: all commands PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add epub_browser/public_api.py epub_browser/server.py epub_browser/asset_publisher.py epub_browser/assets/api-docs.js epub_browser/assets/api-docs.css tests/test_public_api.py tests/test_static_asset_delivery.py tests/test_mode_integration.py README.md README.zh-CN.md
+git add epub_browser/public_api.py epub_browser/server.py epub_browser/asset_publisher.py epub_browser/assets/api-docs.js epub_browser/assets/api-docs.css tests/test_public_api.py tests/test_static_asset_delivery.py tests/test_mode_integration.py README.md docs/readme/README.zh-CN.md
 git commit -m "docs: publish self-contained OpenAPI reference"
 ```

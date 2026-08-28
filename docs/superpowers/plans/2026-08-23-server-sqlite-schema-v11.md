@@ -413,7 +413,7 @@ git commit -m "fix: make server database backups WAL safe"
 **Files:**
 - Modify: `tests/test_state.py`
 - Modify: `README.md`
-- Modify: `README.zh-CN.md`
+- Modify: `docs/readme/README.zh-CN.md`
 - Verify: `epub_browser/state.py`
 - Verify: `epub_browser/migration.py`
 
@@ -480,6 +480,6 @@ Confirm: `.server-content-revision` is byte-for-byte unchanged and SSG tests mak
 - [ ] **Step 6: Commit documentation and final schema verification**
 
 ```bash
-git add tests/test_state.py README.md README.zh-CN.md
+git add tests/test_state.py README.md docs/readme/README.zh-CN.md
 git commit -m "docs: document server SQLite concurrency"
 ```

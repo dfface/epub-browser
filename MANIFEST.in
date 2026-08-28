@@ -1,6 +1,6 @@
 include License.txt
+include docs/readme/README.zh-CN.md
 include THIRD_PARTY_NOTICES.md
-include README.zh-CN.md
 include tools/sync_vendor_assets.py
 include tools/verify_release_artifacts.py
 recursive-include third_party *.json *.md

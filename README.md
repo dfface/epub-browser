@@ -2,7 +2,7 @@
 
 > A private EPUB reading service and a self-contained static-site generator.
 
-**README:** [English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [Español](https://github.com/dfface/epub-browser/blob/main/README.es.md) | [Deutsch](https://github.com/dfface/epub-browser/blob/main/README.de.md) | [Français](https://github.com/dfface/epub-browser/blob/main/README.fr.md) | [Русский](https://github.com/dfface/epub-browser/blob/main/README.ru.md) | [Italiano](https://github.com/dfface/epub-browser/blob/main/README.it.md) | [Português (Brasil)](https://github.com/dfface/epub-browser/blob/main/README.pt-BR.md) | [العربية](https://github.com/dfface/epub-browser/blob/main/README.ar.md) | [Bahasa Indonesia](https://github.com/dfface/epub-browser/blob/main/README.id.md) | [हिन्दी](https://github.com/dfface/epub-browser/blob/main/README.hi.md) | [Tiếng Việt](https://github.com/dfface/epub-browser/blob/main/README.vi.md) | [ไทย](https://github.com/dfface/epub-browser/blob/main/README.th.md) | [Bahasa Melayu](https://github.com/dfface/epub-browser/blob/main/README.ms.md)
+**README:** [English](README.md) | [简体中文](docs/readme/README.zh-CN.md) | [繁體中文](docs/readme/README.zh-TW.md) | [日本語](docs/readme/README.ja.md) | [한국어](docs/readme/README.ko.md) | [Español](docs/readme/README.es.md) | [Deutsch](docs/readme/README.de.md) | [Français](docs/readme/README.fr.md) | [Русский](docs/readme/README.ru.md) | [Italiano](docs/readme/README.it.md) | [Português (Brasil)](docs/readme/README.pt-BR.md) | [العربية](docs/readme/README.ar.md) | [Bahasa Indonesia](docs/readme/README.id.md) | [हिन्दी](docs/readme/README.hi.md) | [Tiếng Việt](docs/readme/README.vi.md) | [ไทย](docs/readme/README.th.md) | [Bahasa Melayu](docs/readme/README.ms.md)
 
 **Interface languages (17):** English, 简体中文, 繁體中文, 日本語, 한국어, Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية, Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
 
@@ -87,12 +87,19 @@ jobs, account data, or provider configuration. See the
 [local rich-text renderer notes](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/third-party-ai-renderers.md) for the
 interaction model and safety boundary.
 
-## Requirements and installation
+## Choose an installation
 
-- Python 3.9 or newer
-- One or more `.epub` or `.pdf` files, files in nested directories, or a Calibre-style library directory
+EPUB Browser supports two installation paths. Both accept one or more `.epub`
+or `.pdf` files, nested directories, or a Calibre-style library directory.
 
-Install from PyPI:
+| Installation | Use it for | Host requirement |
+| --- | --- | --- |
+| PyPI | SSG or Server mode | Python 3.9 or newer |
+| Docker | Persistent Server mode | Docker Engine; Python is included in the image |
+
+### PyPI (SSG or Server)
+
+Install the command-line application:
 
 ```bash
 pip install epub-browser
@@ -105,6 +112,19 @@ epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
 ```
+
+### Docker (Server)
+
+The published [`dfface/epub-browser`](https://hub.docker.com/r/dfface/epub-browser)
+image runs Server mode and does not require Python on the host:
+
+```bash
+docker pull dfface/epub-browser:latest
+```
+
+Use `latest` to evaluate the current release; pin a numbered release tag for a
+repeatable production deployment. See [Docker](#docker) for the required book
+and state mounts, a Compose quick start, first-run setup, and network guidance.
 
 ## Quick start
 
@@ -136,6 +156,9 @@ epub-browser server /path/to/books \
 ```
 
 Open `http://127.0.0.1:8000/`. On first access, EPUB Browser prompts you to create the initial administrator. The library is not scanned or exposed until this one-time setup finishes.
+
+If you chose Docker, skip the Python command above and continue with the
+[Docker Compose quick start](#docker-compose).
 
 ## Sources and stable book identity
 
@@ -381,7 +404,7 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.4
+  dfface/epub-browser:latest
 ```
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
@@ -407,7 +430,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.4
+  dfface/epub-browser:latest
 ```
 
 After the first successful start, the one-time secret mount may be removed. A read-only library works only when every EPUB already contains a matching valid embedded ID. Existing sidecars are retained when their IDs are embedded.

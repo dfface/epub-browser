@@ -137,9 +137,36 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             "/api/v1/books", headers=self.bearer("library:read")
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["items"][0]["id"], "book")
-        self.assertEqual(response.json()["items"][0]["format"], "epub")
+        item = response.json()["items"][0]
+        self.assertEqual(item["id"], "book")
+        self.assertEqual(item["author"], "Author")
+        self.assertEqual(item["authors"], ["Author"])
+        self.assertEqual(item["format"], "epub")
         self.assertEqual(response.headers["cache-control"], "private, no-store")
+
+        tag = self.store.create_ai_tag("Managed tag")
+        self.store.update_admin_book_settings(
+            "book",
+            title="Managed API title",
+            authors=["First managed author", "Second managed author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[tag["id"]],
+            profile="auto",
+        )
+        managed = self.client.get(
+            "/api/v1/books/book", headers=self.bearer("library:read")
+        ).json()["book"]
+        self.assertEqual(managed["title"], "Managed API title")
+        self.assertEqual(
+            managed["authors"],
+            ["First managed author", "Second managed author"],
+        )
+        self.assertEqual(
+            managed["author"],
+            "First managed author, Second managed author",
+        )
+        self.assertEqual(managed["tags"], ["Managed tag"])
 
     def test_openapi_contract_matches_declared_operations_and_scopes(self):
         document = openapi_document()
@@ -147,6 +174,15 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertEqual(
             set(document["components"]["securitySchemes"]["PATBearer"]["x-scopes"]),
             PAT_SCOPES,
+        )
+        book_schema = document["components"]["schemas"]["Book"]
+        self.assertEqual(book_schema["properties"]["authors"]["type"], "array")
+        self.assertEqual(book_schema["properties"]["tags"]["type"], "array")
+        self.assertTrue(book_schema["properties"]["author"]["deprecated"])
+        self.assertEqual(
+            document["paths"]["/api/v1/books"]["get"]["responses"]["200"]
+            ["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/BookList",
         )
         for operation in public_api_operations():
             declared = document["paths"][operation.path][operation.methods[0].lower()]

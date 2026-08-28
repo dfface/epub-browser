@@ -651,7 +651,7 @@ git commit -m "feat: add private reading insights page"
 - Modify: `epub_browser/assets/i18n.js: all five locale dictionaries`
 - Modify: `tests/test_i18n_coverage.py: FIRST_PARTY and namespace mapping`
 - Modify: `tests/test_i18n.js: translation contract assertions`
-- Modify: `tests/test_ssg.py`, `tests/test_mode_integration.py`, `README.md`, `README.zh-CN.md`
+- Modify: `tests/test_ssg.py`, `tests/test_mode_integration.py`, `README.md`, `docs/readme/README.zh-CN.md`
 
 **Interfaces:**
 - Consumes: all feature hooks/assets/routes from Tasks 1–6.
@@ -707,6 +707,6 @@ Expected: every command exits 0; fresh Server conversion writes only `content/` 
 - [ ] **Step 6: Commit localization, docs, and final regression coverage**
 
 ```bash
-git add epub_browser/assets/i18n.js tests/test_i18n_coverage.py tests/test_i18n.js tests/test_ssg.py tests/test_mode_integration.py README.md README.zh-CN.md
+git add epub_browser/assets/i18n.js tests/test_i18n_coverage.py tests/test_i18n.js tests/test_ssg.py tests/test_mode_integration.py README.md docs/readme/README.zh-CN.md
 git commit -m "docs: document private reading insights"
 ```

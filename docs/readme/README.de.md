@@ -2,13 +2,13 @@
 
 > Ein privater EPUB-Lesedienst und ein eigenständiger Generator für statische Websites.
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **Oberflächensprachen (17):** Englisch, vereinfachtes Chinesisch, traditionelles Chinesisch, Japanisch, Koreanisch, Spanisch, Deutsch, Französisch, Russisch, Italienisch, brasilianisches Portugiesisch, Arabisch, Indonesisch, Hindi, Vietnamesisch, Thailändisch und Malaiisch.
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser bietet zwei klar getrennte Betriebsarten:
 
@@ -38,6 +38,8 @@ Ergebnisse werden als Hintergrundaufträge erzeugt, in SQLite gespeichert und vo
 - Python 3.9 oder neuer
 - Eine oder mehrere `.epub`-Dateien, verschachtelte EPUB-Verzeichnisse oder eine Bibliothek im Calibre-Stil
 
+Die Installation von PyPI unterstützt den SSG- und den Server-Modus:
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+Für einen dauerhaften Server mit Docker verwende das veröffentlichte Image; auf dem Host ist kein Python erforderlich:
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## Schnellstart
@@ -78,8 +86,8 @@ Im Server-Modus ist `--server-dir` der maßgebliche Speicherort für SQLite, Cac
 
 Hänge Bücher in Containern schreibgeschützt und `--server-dir` als dauerhaftes Volume ein. Akzeptiere Proxy-Header nur von vertrauenswürdigen Proxys und verwende bei öffentlichen Bereitstellungen HTTPS.
 
-Docker Compose, alle CLI-Optionen, Migrationen, LAN, Reverse Proxy und Fehlerbehebung findest du im [vollständigen englischen README](README.md) oder im [vollständigen README auf vereinfachtem Chinesisch](README.zh-CN.md). Das Verhalten beider Modi ist in allen Sprachen identisch.
+Docker Compose, alle CLI-Optionen, Migrationen, LAN, Reverse Proxy und Fehlerbehebung findest du im [vollständigen englischen README](../../README.md) oder im [vollständigen README auf vereinfachtem Chinesisch](README.zh-CN.md). Das Verhalten beider Modi ist in allen Sprachen identisch.
 
 ## Mitwirken und Lizenz
 
-Issues und Pull Requests sind willkommen. Die Lizenz steht in [License.txt](License.txt).
+Issues und Pull Requests sind willkommen. Die Lizenz steht in [License.txt](../../License.txt).

@@ -93,6 +93,23 @@ test('all supported dictionaries have identical non-empty shapes and interpolati
   });
 });
 
+test('all locales present one unified tag vocabulary without AI or EPUB variants', () => {
+  const labels = {
+    en: 'Tags', 'zh-CN': '标签', 'zh-TW': '標籤', ko: '태그', ja: 'タグ',
+    es: 'Etiquetas', de: 'Schlagwörter', fr: 'Étiquettes', ru: 'Метки', it: 'Tag',
+    'pt-BR': 'Etiquetas', ar: 'الوسوم', id: 'Tag', hi: 'टैग', vi: 'Thẻ', th: 'แท็ก', ms: 'Tag',
+  };
+  Object.entries(labels).forEach(([locale, label]) => {
+    const messages = dictionaries[locale];
+    assert.equal(messages['admin.ai.tags'], label, `${locale}: unified tag label`);
+    assert.equal(messages['admin.ai.epubTags'], label, `${locale}: legacy EPUB label`);
+    assert.equal(messages['admin.ai.noEpubTags'], messages['admin.ai.noTags'], `${locale}: unified empty state`);
+    assert.notEqual(messages['admin.error.invalid_ai_tag'], dictionaries[locale]['admin.error.invalid_ai_access'], `${locale}: tag validation is not AI access copy`);
+  });
+  assert.equal(dictionaries.en['admin.error.invalid_ai_tag'], 'Enter a valid tag.');
+  assert.equal(dictionaries['zh-CN']['admin.error.invalid_ai_tag'], '请输入有效的标签。');
+});
+
 test('new locale packs have no unexpected English fallback copy', () => {
   const locales = ['es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
   const sharedInvariantKeys = new Set([

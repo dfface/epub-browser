@@ -404,7 +404,7 @@ class ModeIntegrationTests(unittest.TestCase):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
         readme = Path("README.md").read_text(encoding="utf-8")
         migration = Path("docs/migration-v2.md")
-        release = Path("docs/releases/v2.5.0.md")
+        release = Path("docs/releases/v2.7.0.md")
         compose = Path("docker-compose.yml")
 
         self.assertIn('"server"', dockerfile)
@@ -427,7 +427,7 @@ class ModeIntegrationTests(unittest.TestCase):
         self.assertIn("127.0.0.1:8080:80", compose_text)
         self.assertIn("./Library:/app/Library:rw", compose_text)
         self.assertIn("./EpubBrowserFiles:/app/EpubBrowserFiles", compose_text)
-        self.assertIn('VERSION = "2.5.0"', Path("epub_browser/version.py").read_text())
+        self.assertIn('VERSION = "2.7.0"', Path("epub_browser/version.py").read_text())
 
     def test_docker_server_defaults_to_embedded_book_id_storage(self):
         dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
@@ -453,12 +453,34 @@ class ModeIntegrationTests(unittest.TestCase):
             "--cookie-secure",
         }
 
-        for readme_path in (Path("README.md"), Path("README.zh-CN.md")):
+        for readme_path in (
+            Path("README.md"),
+            Path("docs/readme/README.zh-CN.md"),
+        ):
             with self.subTest(readme=str(readme_path)):
                 self.assertTrue(readme_path.is_file())
                 readme = readme_path.read_text(encoding="utf-8")
                 for option in documented_options:
                     self.assertIn(option, readme)
+
+    def test_localized_readmes_live_under_docs_and_offer_docker_installation(self):
+        self.assertEqual([Path("README.md")], sorted(Path(".").glob("README*.md")))
+
+        localized_readmes = sorted(Path("docs/readme").glob("README.*.md"))
+        self.assertEqual(16, len(localized_readmes))
+
+        english_readme = Path("README.md").read_text(encoding="utf-8")
+        self.assertIn("docker pull dfface/epub-browser:latest", english_readme)
+        for readme_path in localized_readmes:
+            with self.subTest(readme=str(readme_path)):
+                self.assertIn(
+                    f"(docs/readme/{readme_path.name})",
+                    english_readme,
+                )
+                self.assertIn(
+                    "docker pull dfface/epub-browser:latest",
+                    readme_path.read_text(encoding="utf-8"),
+                )
 
     @staticmethod
     def _create_legacy_accountless_database(path, book_id):

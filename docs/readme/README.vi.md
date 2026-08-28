@@ -2,13 +2,13 @@
 
 > Dịch vụ đọc EPUB riêng tư và trình tạo trang tĩnh độc lập.
 
-**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **Ngôn ngữ giao diện (17):** tiếng Anh, tiếng Trung giản thể, tiếng Trung phồn thể, tiếng Nhật, tiếng Hàn, tiếng Tây Ban Nha, tiếng Đức, tiếng Pháp, tiếng Nga, tiếng Ý, tiếng Bồ Đào Nha (Brasil), tiếng Ả Rập, tiếng Indonesia, tiếng Hindi, tiếng Việt, tiếng Thái và tiếng Mã Lai.
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser cung cấp hai chế độ với trách nhiệm được phân tách rõ ràng:
 
@@ -38,6 +38,8 @@ Kết quả được tạo bằng tác vụ nền, lưu trong SQLite và chia s�
 - Python 3.9 trở lên
 - Một hoặc nhiều tệp `.epub`, thư mục lồng nhau chứa EPUB hoặc thư viện theo cấu trúc Calibre
 
+Cài đặt từ PyPI hỗ trợ cả chế độ SSG và Server:
+
 ```bash
 pip install epub-browser
 
@@ -45,6 +47,12 @@ pip install epub-browser
 epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
+```
+
+Để chạy Server lâu dài bằng Docker, hãy dùng image đã phát hành; máy chủ không cần cài Python:
+
+```bash
+docker pull dfface/epub-browser:latest
 ```
 
 ## Bắt đầu nhanh
@@ -78,8 +86,8 @@ Trong chế độ Server, `--server-dir` là nơi dữ liệu có thẩm quyền
 
 Trong container, gắn sách ở chế độ chỉ đọc và gắn `--server-dir` vào ổ đĩa lâu dài. Chỉ chấp nhận tiêu đề proxy từ proxy đáng tin cậy và dùng HTTPS cho triển khai công khai.
 
-Để xem Docker Compose, toàn bộ tùy chọn CLI, di chuyển dữ liệu, LAN, proxy ngược và khắc phục sự cố, hãy đọc [README tiếng Anh đầy đủ](README.md) hoặc [README tiếng Trung giản thể đầy đủ](README.zh-CN.md). Hai chế độ hoạt động giống nhau trong mọi ngôn ngữ.
+Để xem Docker Compose, toàn bộ tùy chọn CLI, di chuyển dữ liệu, LAN, proxy ngược và khắc phục sự cố, hãy đọc [README tiếng Anh đầy đủ](../../README.md) hoặc [README tiếng Trung giản thể đầy đủ](README.zh-CN.md). Hai chế độ hoạt động giống nhau trong mọi ngôn ngữ.
 
 ## Đóng góp và giấy phép
 
-Chúng tôi hoan nghênh Issues và Pull Requests. Xem [License.txt](License.txt) để biết giấy phép.
+Chúng tôi hoan nghênh Issues và Pull Requests. Xem [License.txt](../../License.txt) để biết giấy phép.

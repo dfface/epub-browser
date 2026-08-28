@@ -2,7 +2,7 @@
 
 > 私有 EPUB 阅读服务，以及自包含的静态站点生成器。
 
-**README：** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+**README：** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **界面语言（17 种）：** 英语、简体中文、繁体中文、日语、韩语、西班牙语、德语、法语、俄语、意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语。
 
@@ -12,7 +12,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
-[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
 EPUB Browser 提供两个职责清晰的模式：
 
@@ -37,7 +37,7 @@ EPUB Browser 提供两个职责清晰的模式：
 而是在原文之上建立一层可追溯、可验证、可回看的共享学习层：章前先给你阅读路径，
 读到证据时就在证据旁解释，想梳理全貌时再打开思维导图，读完还有值得继续思考的问题。
 
-![章节导读保留在原文中，右侧 Ask AI 可随时继续追问。](docs/releases/assets/v2.2.0-chapter-guide-ask-ai.png)
+![章节导读保留在原文中，右侧 Ask AI 可随时继续追问。](../releases/assets/v2.2.0-chapter-guide-ask-ai.png)
 
 ### 和原文一起读，而不是离开原文去看报告
 
@@ -49,8 +49,8 @@ EPUB Browser 提供两个职责清晰的模式：
 - **章末深入思考**：用少量高质量问题帮助你在离开本章前完成理解整合，而不是打断阅读。
 
 <p align="center">
-  <img src="docs/releases/assets/v2.2.0-inline-claim.png" alt="从高亮主张打开的 AI 解释" width="48%">
-  <img src="docs/releases/assets/v2.2.0-paragraph-note.png" alt="与段落原文紧密对应的段落作用便利贴" width="48%">
+  <img src="../releases/assets/v2.2.0-inline-claim.png" alt="从高亮主张打开的 AI 解释" width="48%">
+  <img src="../releases/assets/v2.2.0-paragraph-note.png" alt="与段落原文紧密对应的段落作用便利贴" width="48%">
 </p>
 
 ### Ask AI：不离开书，也能把问题问深
@@ -67,20 +67,27 @@ EPUB Browser 提供两个职责清晰的模式：
 管理员可以管理模型权限与结果；成员只能管理自己有权限的结果。所有 AI 能力都服从既有的
 书籍访问控制。
 
-![AI 阅读汇总按书籍和章节归集可访问的共享学习层。](docs/releases/assets/v2.2.0-ai-reading-library.png)
+![AI 阅读汇总按书籍和章节归集可访问的共享学习层。](../releases/assets/v2.2.0-ai-reading-library.png)
 
 AI 阅读有意限定为 **Server 模式**：管理员配置 OpenAI-compatible Provider 后，仍需
 显式授予成员使用权限。SSG 始终保持完全静态，不会包含 AI 控件、后台任务、账户数据或
 Provider 配置。交互方法与安全边界请见
-[AI 原生阅读设计](docs/ai-native-reading.md) 和
-[本地 AI 富文本渲染器](docs/third-party-ai-renderers.md)。
+[AI 原生阅读设计](../ai-native-reading.md) 和
+[本地 AI 富文本渲染器](../third-party-ai-renderers.md)。
 
-## 环境要求与安装
+## 选择安装方式
 
-- Python 3.9 或更高版本
-- 一个或多个 `.epub` 或 `.pdf` 文件、包含书籍的多级目录，或 Calibre 风格的书库目录
+EPUB Browser 提供两条安装路径。两者都支持一个或多个 `.epub` 或 `.pdf` 文件、包含书籍
+的多级目录，或 Calibre 风格的书库目录。
 
-从 PyPI 安装：
+| 安装方式 | 适用场景 | 主机要求 |
+| --- | --- | --- |
+| PyPI | SSG 或 Server 模式 | Python 3.9 或更高版本 |
+| Docker | 持久化 Server 模式 | Docker Engine；镜像已包含 Python |
+
+### PyPI（SSG 或 Server）
+
+安装命令行程序：
 
 ```bash
 pip install epub-browser
@@ -93,6 +100,18 @@ epub-browser --help
 epub-browser ssg --help
 epub-browser server --help
 ```
+
+### Docker（Server）
+
+官方发布的 [`dfface/epub-browser`](https://hub.docker.com/r/dfface/epub-browser)
+镜像默认运行 Server 模式，宿主机不需要安装 Python：
+
+```bash
+docker pull dfface/epub-browser:latest
+```
+
+体验当前版本可以使用 `latest`；生产部署建议固定到具体版本标签，保证升级可控。
+书籍与状态目录挂载、Compose 快速启动、首次设置和网络安全说明见 [Docker](#docker)。
 
 ## 快速开始
 
@@ -124,6 +143,9 @@ epub-browser server /path/to/books \
 ```
 
 打开 `http://127.0.0.1:8000/`。首次访问时，页面会引导创建初始管理员。完成这次性设置之前，书库不会开始扫描，也不会对外暴露。
+
+如果选择 Docker，请跳过上面的 Python 命令，直接使用
+[Docker Compose 快速启动](#docker-compose)。
 
 ## 输入源与稳定书籍身份
 
@@ -348,14 +370,14 @@ docker run -d \
   -p 127.0.0.1:8080:80 \
   -v /path/to/books:/app/Library:rw \
   -v /path/to/epub-browser-state:/app/EpubBrowserFiles \
-  epub-browser:2.3.4
+  dfface/epub-browser:latest
 ```
 
 修改端口绑定或代理规则之前，请先访问 `http://127.0.0.1:8080/setup` 完成首次设置。
 
 ### Docker Compose
 
-仓库提供了 [docker-compose.yml](docker-compose.yml)，供偏好 Compose 的用户使用。在仓库目录下创建 `Library/` 并放入 EPUB 后，执行：
+仓库提供了 [docker-compose.yml](../../docker-compose.yml)，供偏好 Compose 的用户使用。在仓库目录下创建 `Library/` 并放入 EPUB 后，执行：
 
 ```bash
 docker compose up -d --build
@@ -374,7 +396,7 @@ docker run -d \
   -e EPUB_BROWSER_ADMIN_USERNAME=admin \
   -e EPUB_BROWSER_ADMIN_PASSWORD_FILE=/run/secrets/epub-browser-admin-password \
   --mount type=bind,src=/path/to/admin-password,dst=/run/secrets/epub-browser-admin-password,readonly \
-  epub-browser:2.3.4
+  dfface/epub-browser:latest
 ```
 
 首次成功启动后，可移除这次性密钥挂载。只有所有 EPUB 已经包含有效且匹配的 embedded ID 时，书库才可以只读挂载。把同一 ID 嵌入 EPUB 时，既有 sidecar 会保留。
@@ -476,7 +498,7 @@ OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本
 
 迁移后的根目录 `epub-browser.db` 或 `annotations.db` 会作为敏感的非权威恢复副本保留；`data/epub-browser.db` 才是权威数据库，Server 请求不会读取保留的根目录文件。请严格限制该恢复副本的访问权限。只有在 Server 已停止、权威数据库与迁移状态中记录的备份均已验证，并且不再需要回滚到 v1 时，才可由运维人员手动删除；EPUB Browser 不会自动删除它。
 
-如果旧目录同时包含 `epub-browser.db` 与 `annotations.db`，启动会停止并保留原文件。备份、回滚、缓存重建和冲突恢复见[迁移到 v2](docs/migration-v2.md)。
+如果旧目录同时包含 `epub-browser.db` 与 `annotations.db`，启动会停止并保留原文件。备份、回滚、缓存重建和冲突恢复见[迁移到 v2](../migration-v2.md)。
 
 ## 常见问题
 
@@ -498,7 +520,7 @@ OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本
 
 ### 升级后 Server 拒绝启动
 
-保留数据和源文件，查看第一条迁移或验证错误，并参阅 [docs/migration-v2.md](docs/migration-v2.md)。不要通过删除权威 `data/` 目录来绕过错误。
+保留数据和源文件，查看第一条迁移或验证错误，并参阅 [docs/migration-v2.md](../migration-v2.md)。不要通过删除权威 `data/` 目录来绕过错误。
 
 ## 参与贡献
 
@@ -528,4 +550,4 @@ SSG 站点均包含已验证文件，运行时不依赖 CDN。更新、发布和
 
 ## 许可证
 
-[MIT](License.txt)
+[MIT](../../License.txt)

@@ -9,7 +9,7 @@
     --account-muted: var(--text-secondary, #666);
     --account-border: var(--border, #ddd);
     --account-hover: var(--hover, #f0f0f0);
-    --account-danger: var(--notification-error, #e74c3c);
+    --account-danger: #c0392b;
     --account-success: var(--notification-success, #27ae60);
     --account-warning: var(--notification-warning, #f39c12);
     --account-shadow: var(--shadow-md, 0 2px 10px rgba(0, 0, 0, .08));
@@ -415,14 +415,16 @@ body.auth-page {
 .admin-section-nav {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 5px;
     border: 1px solid var(--account-border);
     border-radius: 11px;
     background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
     scrollbar-width: thin;
+    overscroll-behavior-inline: contain;
 }
 
 .admin-section-tab {
@@ -1616,8 +1618,23 @@ body.auth-page {
     line-height: 1.35;
 }
 
+.admin-book-summary .admin-book-format-badge {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 5px;
+    padding: 2px 7px;
+    border: 1px solid color-mix(in srgb, var(--account-primary) 28%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-primary) 9%, transparent);
+    color: var(--account-primary);
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .045em;
+    line-height: 1.25;
+}
+
 .admin-book-authors,
-.admin-book-epub-tags,
+.admin-book-tags,
 .admin-book-updated {
     color: var(--account-muted);
     font-size: .75rem;
@@ -1627,7 +1644,7 @@ body.auth-page {
     margin-top: 3px;
 }
 
-.admin-book-epub-tags {
+.admin-book-tags {
     margin-top: 5px;
 }
 
@@ -1984,9 +2001,47 @@ body.auth-page {
     flex: 1 1 220px;
 }
 
+.admin-ai-tag-form input,
+.admin-ai-tag-search input,
+.admin-ai-tag-editor input {
+    min-height: 46px;
+    font-size: 1rem;
+}
+
+.admin-ai-tag-message {
+    margin: 12px 0 0;
+}
+
+.admin-ai-tag-search {
+    display: grid;
+    max-width: 360px;
+    gap: 6px;
+    margin-top: 18px;
+    color: var(--account-text);
+    font-size: .82rem;
+    font-weight: 650;
+}
+
+.admin-ai-tag-search[hidden] {
+    display: none;
+}
+
 .admin-ai-access-item,
 .admin-ai-tag-item {
     justify-content: space-between;
+}
+
+.admin-ai-tag-summary {
+    display: grid;
+    flex: 1 1 220px;
+    gap: 4px;
+    min-width: 0;
+}
+
+.admin-ai-tag-name {
+    overflow-wrap: anywhere;
+    color: var(--account-text);
+    font-size: .94rem;
 }
 
 .admin-ai-access-controls,
@@ -1997,6 +2052,15 @@ body.auth-page {
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+.admin-ai-tag-actions {
+    flex: 0 0 auto;
+}
+
+.account-modal .admin-ai-tag-actions .bookshelf-action-btn,
+.account-modal .admin-ai-tag-editor-actions .bookshelf-action-btn {
+    min-height: 44px;
 }
 
 .admin-ai-tag-usage {
@@ -2080,15 +2144,32 @@ body.auth-page {
     font-weight: 650;
 }
 
-.admin-ai-access-quota input[type="number"],
-.admin-ai-tag-item input {
+.admin-ai-access-quota input[type="number"] {
     width: 116px;
     min-height: 36px;
 }
 
-.admin-ai-tag-item input {
+.admin-ai-tag-editor {
+    display: flex;
+    align-items: end;
+    flex: 1 1 100%;
+    gap: 10px;
+    min-width: 0;
+}
+
+.admin-ai-tag-editor-field {
     flex: 1 1 220px;
-    width: auto;
+    min-width: 0;
+}
+
+.admin-ai-tag-editor-field input {
+    width: 100%;
+}
+
+.admin-ai-tag-editor-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
 }
 
 #adminUserForm {
@@ -2410,13 +2491,72 @@ body.auth-page {
     min-height: 44px !important;
 }
 
-.admin-book-editor-row > td {
-    padding: 1rem;
-    background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card));
+.admin-book-editor-modal {
+    position: fixed;
+    z-index: 12;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    padding: clamp(12px, 3vw, 32px);
+    background: color-mix(in srgb, var(--account-text) 32%, transparent);
+    backdrop-filter: blur(4px);
 }
 
-.admin-book-editor-row:hover > td {
-    background: color-mix(in srgb, var(--account-primary) 4%, var(--account-card)) !important;
+.admin-book-editor-dialog {
+    position: relative;
+    display: flex;
+    width: min(920px, 100%);
+    max-height: min(860px, calc(100dvh - 32px));
+    overflow: hidden;
+    border: 1px solid var(--account-border);
+    border-radius: 16px;
+    background: var(--account-bg);
+    box-shadow: 0 24px 72px color-mix(in srgb, var(--account-text) 26%, transparent);
+}
+
+.admin-book-editor-modal-body {
+    width: 100%;
+    min-width: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 22px;
+}
+
+.admin-book-editor-close {
+    position: absolute;
+    z-index: 1;
+    top: 14px;
+    right: 14px;
+    display: inline-grid;
+    width: 44px;
+    min-height: 44px;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--account-muted);
+    cursor: pointer;
+}
+
+.admin-book-editor-close:hover {
+    border-color: var(--account-border);
+    background: color-mix(in srgb, var(--account-text) 6%, transparent);
+    color: var(--account-text);
+}
+
+.admin-book-editor-close:active {
+    background: color-mix(in srgb, var(--account-text) 10%, transparent);
+}
+
+.admin-book-editor-close:focus-visible {
+    outline: 2px solid var(--account-primary);
+    outline-offset: 2px;
+}
+
+.admin-book-editor-close:disabled {
+    cursor: wait;
+    opacity: .55;
 }
 
 .admin-book-editor {
@@ -2427,8 +2567,9 @@ body.auth-page {
 
 .admin-book-editor-title {
     margin: 0;
+    padding-right: 52px;
     color: var(--account-text);
-    font-size: .9rem;
+    font-size: 1.05rem;
 }
 
 .admin-book-editor-grid {
@@ -2455,7 +2596,57 @@ body.auth-page {
 
 .admin-book-field select {
     width: 100%;
-    min-height: 40px;
+    min-height: 44px;
+}
+
+.admin-book-metadata-fields {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-book-metadata-fields > legend {
+    grid-column: 1 / -1;
+}
+
+.admin-book-metadata-field {
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.admin-book-metadata-field input,
+.admin-book-metadata-field textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 11px;
+    border: 1px solid var(--account-border);
+    border-radius: 7px;
+    background: var(--account-card);
+    color: var(--account-text);
+    font: inherit;
+    font-weight: 500;
+}
+
+.admin-book-metadata-field textarea {
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.admin-book-field-help,
+.admin-book-field-error {
+    color: var(--account-muted);
+    font-size: .72rem;
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.admin-book-field-error {
+    color: var(--account-danger);
+}
+
+.admin-book-metadata-field [aria-invalid="true"] {
+    border-color: var(--account-danger);
 }
 
 .admin-book-editor .account-book-grants legend {
@@ -2476,7 +2667,7 @@ body.auth-page {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-height: 30px;
+    min-height: 44px;
     box-sizing: border-box;
     padding: 4px 9px;
     border-radius: 999px;
@@ -2503,20 +2694,44 @@ body.auth-page {
 }
 
 .admin-book-editor-actions {
+    position: sticky;
+    bottom: -22px;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
+    margin: 2px -22px -22px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--account-border);
+    background: color-mix(in srgb, var(--account-bg) 94%, transparent);
+    backdrop-filter: blur(8px);
 }
 
 .admin-book-editor-actions .bookshelf-action-btn {
-    min-height: 40px;
+    min-height: 44px;
+}
+
+.admin-book-editor-actions .admin-book-clear-action {
+    margin-right: auto;
+}
+
+.admin-book-editor-actions .admin-book-save-action {
+    border-color: color-mix(in srgb, var(--account-primary) 55%, var(--account-border));
+    background: var(--account-primary);
+    color: var(--account-primary-contrast, #fff);
+}
+
+.admin-book-editor-actions .admin-book-save-action:hover {
+    border-color: var(--account-primary);
+    background: color-mix(in srgb, var(--account-primary) 88%, #000);
+    color: var(--account-primary-contrast, #fff);
 }
 
 .admin-book-manage:focus-visible,
 .admin-book-editor .bookshelf-action-btn:focus-visible,
 .admin-book-editor select:focus-visible,
-.admin-book-editor input:focus-visible {
+.admin-book-editor input:focus-visible,
+.admin-book-editor textarea:focus-visible {
     outline: 2px solid var(--account-primary);
     outline-offset: 2px;
 }
@@ -2542,6 +2757,10 @@ body.auth-page {
     }
 
     .admin-book-editor-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-book-metadata-fields {
         grid-template-columns: 1fr;
     }
 
@@ -2740,6 +2959,20 @@ body.auth-page {
         justify-content: flex-start;
     }
 
+    .admin-ai-tag-editor {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-ai-tag-editor-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-ai-tag-editor-actions .bookshelf-action-btn {
+        width: 100%;
+    }
+
     .admin-ai-access-quota {
         flex: 1 1 180px;
         justify-content: space-between;
@@ -2749,17 +2982,43 @@ body.auth-page {
         width: min(100%, 150px);
     }
 
-    .admin-book-editor-row > td {
-        padding: 12px;
-    }
-
     .admin-book-editor-actions .bookshelf-action-btn {
         width: 100%;
+    }
+
+    .admin-book-editor-modal {
+        padding: 8px;
+    }
+
+    .admin-book-editor-dialog {
+        max-height: calc(100dvh - 16px);
+        border-radius: 12px;
+    }
+
+    .admin-book-editor-modal-body {
+        padding: 18px 14px;
+    }
+
+    .admin-book-editor-actions {
+        bottom: -18px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        margin: 2px -14px -18px;
+        padding: 12px 14px;
+    }
+
+    .admin-book-editor-actions .admin-book-clear-action {
+        grid-column: 1 / -1;
+        margin-right: 0;
     }
 }
 
 .dark-mode body.auth-page {
     color-scheme: dark;
+}
+
+.dark-mode {
+    --account-danger: #ff746c;
 }
 
 @media (prefers-reduced-motion: reduce) {

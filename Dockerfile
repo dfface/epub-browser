@@ -9,7 +9,8 @@ WORKDIR /build/epub-browser
 # Keep the build input limited to the files that contribute to the wheel.  This
 # also prevents documentation and local development state from invalidating
 # the wheel build cache.
-COPY setup.py MANIFEST.in README.md README.zh-CN.md License.txt ./
+COPY setup.py MANIFEST.in README.md License.txt ./
+COPY docs/readme/README.zh-CN.md ./docs/readme/README.zh-CN.md
 COPY THIRD_PARTY_NOTICES.md ./
 COPY third_party ./third_party
 COPY tools/sync_vendor_assets.py tools/verify_release_artifacts.py ./tools/

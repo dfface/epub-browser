@@ -298,7 +298,7 @@ git commit -m "feat: add webhook administration interface"
 - Modify as findings require: `epub_browser/server_chrome.py`, `epub_browser/assets/auth.js`, `epub_browser/assets/account.css`, `epub_browser/assets/i18n.js`
 - Modify: relevant UI and generated-surface tests
 - Modify: `README.md`
-- Modify: `README.zh-CN.md`
+- Modify: `docs/readme/README.zh-CN.md`
 
 **Interfaces:**
 - Consumes the completed PAT and WebHook interfaces.
@@ -342,6 +342,6 @@ Expected: all commands PASS.
 Update both READMEs with PAT examples, scope meanings, chapter formats, WebHook signature verification, retry behavior, review privacy, and operator warnings. Hand off manual acceptance for PAT creation/copy/revoke, curl calls, restricted chapters, admin cross-user reads, WebHook create/test/receive/retry/rotate, responsive layout, dark mode, keyboard navigation, and screen-reader announcements.
 
 ```bash
-git add epub_browser tests README.md README.zh-CN.md
+git add epub_browser tests README.md docs/readme/README.zh-CN.md
 git commit -m "feat: finish PAT OpenAPI and webhook experience"
 ```

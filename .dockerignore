@@ -14,7 +14,10 @@ epub_browser/assets/vendor
 __pycache__
 *.py[cod]
 .DS_Store
-docs
+docs/*
+!docs/readme/
+docs/readme/*
+!docs/readme/README.zh-CN.md
 examples
 tests
 Library

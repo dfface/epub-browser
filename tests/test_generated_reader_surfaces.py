@@ -258,6 +258,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "adminBookLegacyList",
             "adminBookPagination",
             "adminBookLive",
+            "adminBookEditorModal",
+            "adminBookEditorContent",
+            "adminBookEditorClose",
         ):
             self.assertRegex(server_html, rf'\bid=(?:["\'])?{control_id}(?:["\' >])')
             self.assertNotIn(control_id, ssg_html)
@@ -305,6 +308,19 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(server_html, r'<ul\b[^>]*id=(?:["\'])?adminBookLegacyList')
         self.assertRegex(server_html, r'<nav\b[^>]*id=(?:["\'])?adminBookPagination')
         self.assertRegex(server_html, r'<p\b(?=[^>]*id=(?:["\'])?adminBookLive)(?=[^>]*aria-live=(?:["\'])?polite)')
+        self.assertRegex(
+            server_html,
+            r'<div\b(?=[^>]*id=(?:["\'])?adminBookEditorModal)'
+            r'(?=[^>]*role=(?:["\'])?dialog)'
+            r'(?=[^>]*aria-modal=(?:["\'])?true)'
+            r'(?=[^>]*aria-hidden=(?:["\'])?true)'
+            r'(?=[^>]*hidden)',
+        )
+        self.assertRegex(
+            server_html,
+            r'<button\b(?=[^>]*id=(?:["\'])?adminBookEditorClose)'
+            r'(?=[^>]*data-i18n-aria-label=(?:["\'])?admin.books.closeEditor)',
+        )
         for key in ('book', 'access', 'profile', 'results', 'updated', 'action'):
             self.assertIn('data-i18n=admin.books.header.' + key, server_html)
         for value in ('10', '20', '50', '100'):

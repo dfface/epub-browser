@@ -26,11 +26,19 @@ class ServerPageRenderer:
     freshly published asset manifest, avoiding a second HTML template system.
     """
 
-    def __init__(self, public_dir, book_id, urls=None, source_format=EPUB_FORMAT):
+    def __init__(
+        self,
+        public_dir,
+        book_id,
+        urls=None,
+        source_format=EPUB_FORMAT,
+        metadata_overrides=None,
+    ):
         self.public_dir = Path(public_dir)
         self.book_id = str(book_id)
         self.urls = urls or SiteURLs()
         self.source_format = source_format
+        self.metadata_overrides = dict(metadata_overrides or {})
         if self.source_format not in {EPUB_FORMAT, PDF_FORMAT}:
             raise ServerPageError("Unsupported book format")
         self.book_dir = self.public_dir / "book" / self.book_id
@@ -97,6 +105,9 @@ class ServerPageRenderer:
 
     def _processor(self) -> EPUBProcessor:
         metadata = self._read_json(self.content_dir / "metadata.json")
+        for key in ("title", "authors", "tags"):
+            if key in self.metadata_overrides:
+                metadata[key] = self.metadata_overrides[key]
         # EPUBProcessor already owns the single source of truth for page
         # templates. Hydrating an instance avoids duplicating its large,
         # security-sensitive reader chrome while keeping transient state out
@@ -118,6 +129,9 @@ class ServerPageRenderer:
 
     def _pdf_processor(self) -> tuple[PDFMetadata, EPUBProcessor]:
         payload = self._read_json(self.pdf_dir / "metadata.json")
+        for key in ("title", "authors", "tags"):
+            if key in self.metadata_overrides:
+                payload[key] = self.metadata_overrides[key]
         try:
             raw_pages = payload["pages"]
             if payload.get("page_count") != len(raw_pages):

@@ -73,8 +73,12 @@ def library_metadata(
         if not available:
             continue
         try:
-            metadata = json.loads(record.metadata_json)
-        except json.JSONDecodeError:
+            metadata = (
+                state_store.managed_book_metadata(record.book_id)
+                if state_store is not None
+                else json.loads(record.metadata_json)
+            )
+        except (KeyError, json.JSONDecodeError):
             continue
         cover = metadata.get("cover")
         books.append(
@@ -83,11 +87,7 @@ def library_metadata(
                 "url": f"/book/{record.book_id}/index.html",
                 "title": metadata.get("title") or "EPUB Book",
                 "authors": list(metadata.get("authors") or ()),
-                "tags": list(
-                    state_store.effective_book_tags(record.book_id)
-                    if state_store is not None
-                    else (metadata.get("tags") or ())
-                ),
+                "tags": list(metadata.get("tags") or ()),
                 "cover": (
                     f"/book/{record.book_id}/{cover.lstrip('/')}"
                     if isinstance(cover, str) and cover

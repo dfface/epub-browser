@@ -819,24 +819,25 @@ def create_app(
         return payload
 
     def admin_book_data(book):
-        try:
-            metadata = json.loads(book.metadata_json)
-        except json.JSONDecodeError:
-            metadata = {}
+        metadata = store.managed_book_metadata(book.book_id)
+        tags = list(store.book_ai_tags(book.book_id))
         return {
             'id': book.book_id,
             'title': metadata.get('title') or 'EPUB Book',
-            'epub_tags': list(metadata.get('tags') or ()),
+            'authors': list(metadata.get('authors') or ()),
+            'tags': tags,
+            'epub_tags': [],
             'visibility': book.visibility,
             'grants': list(store.book_grants(book.book_id)),
             'ai_profile': store.get_book_ai_profile(book.book_id),
-            'ai_tags': list(store.book_ai_tags(book.book_id)),
-            'effective_tags': list(store.effective_book_tags(book.book_id)),
+            'ai_tags': tags,
+            'effective_tags': [tag['name'] for tag in tags],
         }
 
     def admin_book_summary_data(book):
         payload = dict(book)
         payload['authors'] = list(book['authors'])
+        payload['tags'] = [dict(tag) for tag in book['tags']]
         payload['epub_tags'] = list(book['epub_tags'])
         payload['ai_tags'] = [dict(tag) for tag in book['ai_tags']]
         return payload
@@ -1745,8 +1746,11 @@ window.location.assign(payload.redirect||'/');
         require_admin(request)
         book_id = request.path_params['book_id']
         data = await bounded_unique_json_object(request)
-        required = {'visibility', 'user_ids', 'tag_ids', 'profile'}
-        if data is None or set(data) != required:
+        legacy_required = {'visibility', 'user_ids', 'tag_ids', 'profile'}
+        managed_required = legacy_required | {'title', 'authors'}
+        if data is None or frozenset(data) not in {
+            frozenset(legacy_required), frozenset(managed_required)
+        }:
             return response(
                 error_payload(
                     'invalid_book_settings',
@@ -1758,6 +1762,8 @@ window.location.assign(payload.redirect||'/');
         user_ids = data['user_ids']
         tag_ids = data['tag_ids']
         profile = data['profile']
+        title = data.get('title')
+        authors = data.get('authors')
         if (
             not isinstance(visibility, str)
             or visibility not in {'authenticated', 'restricted'}
@@ -1773,6 +1779,19 @@ window.location.assign(payload.redirect||'/');
             )
             or not isinstance(profile, str)
             or profile not in {'auto', 'technical', 'fiction', 'general'}
+            or ('title' in data and (
+                not isinstance(title, str)
+                or not title.strip()
+                or len(title.strip()) > 500
+                or not isinstance(authors, list)
+                or len(authors) > 100
+                or any(
+                    not isinstance(author, str)
+                    or not author.strip()
+                    or len(author.strip()) > 500
+                    for author in authors
+                )
+            ))
         ):
             return response(
                 error_payload(
@@ -1786,13 +1805,15 @@ window.location.assign(payload.redirect||'/');
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
         try:
-            book, summary = store.update_admin_book_settings(
-                book_id,
-                visibility=visibility,
-                user_ids=user_ids,
-                tag_ids=tag_ids,
-                profile=profile,
-            )
+            settings = {
+                'visibility': visibility,
+                'user_ids': user_ids,
+                'tag_ids': tag_ids,
+                'profile': profile,
+            }
+            if 'title' in data:
+                settings.update({'title': title, 'authors': authors})
+            book, summary = store.update_admin_book_settings(book_id, **settings)
         except (KeyError, ValueError):
             return response(
                 error_payload(
@@ -2017,11 +2038,11 @@ window.location.assign(payload.redirect||'/');
         data = await json_object(request)
         name = data.get('name') if isinstance(data, dict) else None
         if not isinstance(name, str):
-            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+            return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         try:
             tag = store.create_ai_tag(name)
         except ValueError:
-            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+            return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         return response({'tag': tag}, 201)
 
     async def admin_ai_tag(request):
@@ -2029,18 +2050,18 @@ window.location.assign(payload.redirect||'/');
         tag_id = request.path_params['tag_id']
         if request.method == 'DELETE':
             if not store.delete_ai_tag(tag_id):
-                return response(error_payload('not_found', 'AI tag not found'), 404)
-            return response({'message': 'AI tag deleted'})
+                return response(error_payload('not_found', 'Tag not found'), 404)
+            return response({'message': 'Tag deleted'})
         data = await json_object(request)
         name = data.get('name') if isinstance(data, dict) else None
         if not isinstance(name, str):
-            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+            return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         try:
             tag = store.rename_ai_tag(tag_id, name)
         except KeyError:
-            return response(error_payload('not_found', 'AI tag not found'), 404)
+            return response(error_payload('not_found', 'Tag not found'), 404)
         except ValueError:
-            return response(error_payload('invalid_ai_tag', 'Invalid AI tag'), 400)
+            return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         return response({'tag': tag})
 
     async def admin_book_ai(request):
@@ -2074,16 +2095,17 @@ window.location.assign(payload.redirect||'/');
         ):
             return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
         try:
-            if has_profile:
-                store.set_book_ai_profile(book_id, profile)
-            if has_tag_ids:
-                store.replace_book_ai_tags(book_id, tag_ids)
+            current_profile, current_tags = store.update_book_ai_settings(
+                book_id,
+                profile=profile if has_profile else None,
+                tag_ids=tag_ids if has_tag_ids else None,
+            )
         except (ValueError, KeyError):
             return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
         return response({
-            'profile': store.get_book_ai_profile(book_id),
-            'tags': list(store.book_ai_tags(book_id)),
-            'effective_tags': list(store.effective_book_tags(book_id)),
+            'profile': current_profile,
+            'tags': list(current_tags),
+            'effective_tags': [tag['name'] for tag in current_tags],
         })
 
     async def admin_ai_results(request):
@@ -2218,8 +2240,11 @@ window.location.assign(payload.redirect||'/');
         book_id = request.path_params['book_id']
         if not store.can_read_book(principal.user_id, principal.role, book_id):
             return response(error_payload('forbidden', 'Forbidden'), 403)
+        metadata = store.managed_book_metadata(book_id)
         return response({
-            'tags': list(store.effective_book_tags(book_id)),
+            'title': metadata['title'],
+            'authors': list(metadata['authors']),
+            'tags': list(metadata['tags']),
             'ai_profile': store.get_book_ai_profile(book_id),
         })
 
@@ -2557,10 +2582,7 @@ window.location.assign(payload.redirect||'/');
             results = list(store.list_ai_reading_results(book.book_id))
             if not results:
                 continue
-            try:
-                metadata = json.loads(book.metadata_json)
-            except (TypeError, ValueError):
-                metadata = {}
+            metadata = store.managed_book_metadata(book.book_id)
             chapter_titles = {}
             try:
                 book_output = Path(base_directory, 'book', book.book_id)
@@ -2987,6 +3009,7 @@ window.location.assign(payload.redirect||'/');
                 base_directory,
                 book_id,
                 source_format=book.source_format,
+                metadata_overrides=store.managed_book_metadata(book_id),
             )
             # Retain a narrow compatibility path for manually-created test
             # fixtures and legacy caches that still have an accepted marker.
@@ -3453,6 +3476,7 @@ window.location.assign(payload.redirect||'/');
             base_directory,
             book_id,
             source_format=book.source_format,
+            metadata_overrides=store.managed_book_metadata(book_id),
         )
         if book.source_format == PDF_FORMAT:
             _metadata, processor = renderer._pdf_processor()
@@ -3488,7 +3512,7 @@ window.location.assign(payload.redirect||'/');
         chapter = renderer._read_json(
             renderer.content_dir / f'chapter_{chapter_index}.json'
         )
-        book_title = metadata.get('title')
+        book_title = store.managed_book_metadata(book_id).get('title')
         chapter_label = chapter.get('title')
         if (
             not isinstance(book_title, str) or not book_title.strip()

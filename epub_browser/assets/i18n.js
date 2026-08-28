@@ -7066,6 +7066,302 @@
     return base + value.replace(/^\/+/, '');
   }
 
+  var managedBookMetadataEnglish = {
+    'admin.overview.tags': 'Tags',
+    'admin.booksDescription': 'Manage book metadata, visibility, member access, tags, AI reading classification, and AI results.',
+    'admin.tagsDescription': 'Tags imported from books are managed here. Renaming or deleting a tag updates every assigned book.',
+    'admin.books.tagFilter': 'Tag',
+    'admin.books.tag.all': 'All tags',
+    'admin.books.serverTags': 'Tags',
+    'admin.books.metadata': 'Book metadata',
+    'admin.books.bookTitle': 'Book title',
+    'admin.books.required': 'Required',
+    'admin.books.authors': 'Authors',
+    'admin.books.authorsHelp': 'Enter one author per line. Leave empty when the author is unknown.',
+    'admin.books.titleRequired': 'Enter a book title.',
+    'admin.books.authorsInvalid': 'Use no more than 100 authors, one per line and up to 500 characters each.',
+    'admin.books.saving': 'Saving book settings…',
+    'admin.books.live.saving': 'Saving book settings.',
+    'admin.books.closeEditor': 'Close book settings',
+    'admin.books.discardChangesConfirm': 'Discard the unsaved changes to this book?',
+    'admin.books.tags': 'Tags',
+    'admin.ai.tags': 'Tags',
+    'admin.ai.noTags': 'No tags yet.',
+    'admin.ai.newTagName': 'New tag name',
+    'admin.ai.searchTags': 'Search tags',
+    'admin.ai.searchPlaceholder': 'Search by tag name',
+    'admin.ai.editTag': 'Edit',
+    'admin.ai.saveTag': 'Save',
+    'admin.ai.cancelTagEdit': 'Cancel',
+    'admin.ai.renameTagLabel': 'New name for “{name}”',
+    'admin.ai.renamingTag': 'Saving…',
+    'admin.ai.tagRenamed': 'Tag renamed to “{name}”.',
+    'admin.ai.tagDeleted': 'Tag “{name}” deleted from the library.',
+    'admin.ai.noMatchingTags': 'No tags match this search.',
+    'admin.error.invalid_ai_tag': 'Enter a valid tag.',
+    'admin.ai.deleteTagConfirm': 'Delete tag “{name}”? It will be removed from {count} assigned books.'
+  };
+  var managedBookMetadataTranslations = {
+    'zh-CN': {
+      'admin.overview.tags': '标签',
+      'admin.booksDescription': '管理书籍元数据、可见性、成员权限、标签、AI 阅读分类和 AI 结果。',
+      'admin.tagsDescription': '从书籍导入的标签统一在这里管理；重命名或删除标签会同步更新所有关联书籍。',
+      'admin.books.tagFilter': '标签', 'admin.books.tag.all': '全部标签', 'admin.books.serverTags': '标签',
+      'admin.books.metadata': '书籍元数据', 'admin.books.bookTitle': '书名', 'admin.books.required': '必填', 'admin.books.authors': '作者',
+      'admin.books.authorsHelp': '每行填写一位作者；作者未知时可以留空。',
+      'admin.books.titleRequired': '请输入书名。', 'admin.books.authorsInvalid': '作者最多 100 位，每行一位，每位最多 500 个字符。',
+      'admin.books.saving': '正在保存书籍设置…', 'admin.books.live.saving': '正在保存书籍设置。',
+      'admin.books.closeEditor': '关闭书籍设置', 'admin.books.discardChangesConfirm': '要放弃这本书尚未保存的修改吗？',
+      'admin.books.tags': '标签', 'admin.ai.tags': '标签', 'admin.ai.noTags': '暂无标签。',
+      'admin.ai.newTagName': '新标签名称', 'admin.ai.searchTags': '搜索标签', 'admin.ai.searchPlaceholder': '按标签名称搜索',
+      'admin.ai.editTag': '编辑', 'admin.ai.saveTag': '保存', 'admin.ai.cancelTagEdit': '取消',
+      'admin.ai.renameTagLabel': '“{name}”的新名称', 'admin.ai.renamingTag': '正在保存…',
+      'admin.ai.tagRenamed': '标签已重命名为“{name}”。', 'admin.ai.tagDeleted': '标签“{name}”已从书库删除。',
+      'admin.ai.noMatchingTags': '没有匹配的标签。',
+      'admin.ai.deleteTagConfirm': '要删除标签“{name}”吗？它会从 {count} 本关联书籍中移除。'
+    },
+    'zh-TW': {
+      'admin.overview.tags': '標籤',
+      'admin.booksDescription': '管理書籍中繼資料、可見性、成員權限、標籤、AI 閱讀分類和 AI 結果。',
+      'admin.tagsDescription': '從書籍匯入的標籤統一在此管理；重新命名或刪除標籤會同步更新所有關聯書籍。',
+      'admin.books.tagFilter': '標籤', 'admin.books.tag.all': '全部標籤', 'admin.books.serverTags': '標籤',
+      'admin.books.metadata': '書籍中繼資料', 'admin.books.bookTitle': '書名', 'admin.books.required': '必填', 'admin.books.authors': '作者',
+      'admin.books.authorsHelp': '每行填寫一位作者；作者未知時可以留空。',
+      'admin.books.titleRequired': '請輸入書名。', 'admin.books.authorsInvalid': '作者最多 100 位，每行一位，每位最多 500 個字元。',
+      'admin.books.saving': '正在儲存書籍設定…', 'admin.books.live.saving': '正在儲存書籍設定。',
+      'admin.books.closeEditor': '關閉書籍設定', 'admin.books.discardChangesConfirm': '要放棄這本書尚未儲存的修改嗎？',
+      'admin.books.tags': '標籤', 'admin.ai.tags': '標籤', 'admin.ai.noTags': '暫無標籤。',
+      'admin.ai.newTagName': '新標籤名稱', 'admin.ai.searchTags': '搜尋標籤', 'admin.ai.searchPlaceholder': '依標籤名稱搜尋',
+      'admin.ai.editTag': '編輯', 'admin.ai.saveTag': '儲存', 'admin.ai.cancelTagEdit': '取消',
+      'admin.ai.renameTagLabel': '「{name}」的新名稱', 'admin.ai.renamingTag': '正在儲存…',
+      'admin.ai.tagRenamed': '標籤已重新命名為「{name}」。', 'admin.ai.tagDeleted': '標籤「{name}」已從書庫刪除。',
+      'admin.ai.noMatchingTags': '沒有符合的標籤。',
+      'admin.ai.deleteTagConfirm': '要刪除標籤「{name}」嗎？它會從 {count} 本關聯書籍中移除。'
+    },
+    ko: {
+      'admin.overview.tags': '태그',
+      'admin.booksDescription': '책 메타데이터, 공개 범위, 회원 접근, 태그, AI 읽기 분류와 결과를 관리합니다.',
+      'admin.tagsDescription': '책에서 가져온 태그를 여기서 관리합니다. 태그 이름 변경이나 삭제는 연결된 모든 책에 반영됩니다.',
+      'admin.books.tagFilter': '태그', 'admin.books.tag.all': '모든 태그', 'admin.books.serverTags': '태그',
+      'admin.books.metadata': '책 메타데이터', 'admin.books.bookTitle': '책 제목', 'admin.books.required': '필수', 'admin.books.authors': '저자',
+      'admin.books.authorsHelp': '한 줄에 저자 한 명을 입력하세요. 저자를 모르면 비워 둘 수 있습니다.',
+      'admin.books.titleRequired': '책 제목을 입력하세요.', 'admin.books.authorsInvalid': '저자는 줄마다 한 명씩 최대 100명, 각각 500자 이내로 입력하세요.',
+      'admin.books.saving': '책 설정을 저장하는 중…', 'admin.books.live.saving': '책 설정을 저장하는 중입니다.',
+      'admin.books.closeEditor': '책 설정 닫기', 'admin.books.discardChangesConfirm': '저장하지 않은 책 변경 사항을 폐기할까요?',
+      'admin.books.tags': '태그', 'admin.ai.tags': '태그', 'admin.ai.noTags': '아직 태그가 없습니다.',
+      'admin.ai.newTagName': '새 태그 이름', 'admin.ai.searchTags': '태그 검색', 'admin.ai.searchPlaceholder': '태그 이름으로 검색',
+      'admin.ai.editTag': '편집', 'admin.ai.saveTag': '저장', 'admin.ai.cancelTagEdit': '취소',
+      'admin.ai.renameTagLabel': '“{name}”의 새 이름', 'admin.ai.renamingTag': '저장 중…',
+      'admin.ai.tagRenamed': '태그 이름을 “{name}”(으)로 변경했습니다.', 'admin.ai.tagDeleted': '라이브러리에서 “{name}” 태그를 삭제했습니다.',
+      'admin.ai.noMatchingTags': '검색과 일치하는 태그가 없습니다.',
+      'admin.ai.deleteTagConfirm': '“{name}” 태그를 삭제할까요? 연결된 책 {count}권에서 제거됩니다.'
+    },
+    ja: {
+      'admin.overview.tags': 'タグ',
+      'admin.booksDescription': '書籍メタデータ、公開範囲、メンバーアクセス、タグ、AI 読書分類と結果を管理します。',
+      'admin.tagsDescription': '書籍から取り込んだタグをここで管理します。名前の変更や削除は割り当て済みのすべての書籍に反映されます。',
+      'admin.books.tagFilter': 'タグ', 'admin.books.tag.all': 'すべてのタグ', 'admin.books.serverTags': 'タグ',
+      'admin.books.metadata': '書籍メタデータ', 'admin.books.bookTitle': '書名', 'admin.books.required': '必須', 'admin.books.authors': '著者',
+      'admin.books.authorsHelp': '1 行に 1 人の著者を入力します。著者不明の場合は空欄にできます。',
+      'admin.books.titleRequired': '書名を入力してください。', 'admin.books.authorsInvalid': '著者は 1 行に 1 人、100 人以内、1 人 500 文字以内で入力してください。',
+      'admin.books.saving': '書籍設定を保存中…', 'admin.books.live.saving': '書籍設定を保存中です。',
+      'admin.books.closeEditor': '書籍設定を閉じる', 'admin.books.discardChangesConfirm': 'この書籍の未保存の変更を破棄しますか？',
+      'admin.books.tags': 'タグ', 'admin.ai.tags': 'タグ', 'admin.ai.noTags': 'タグはまだありません。',
+      'admin.ai.newTagName': '新しいタグ名', 'admin.ai.searchTags': 'タグを検索', 'admin.ai.searchPlaceholder': 'タグ名で検索',
+      'admin.ai.editTag': '編集', 'admin.ai.saveTag': '保存', 'admin.ai.cancelTagEdit': 'キャンセル',
+      'admin.ai.renameTagLabel': '「{name}」の新しい名前', 'admin.ai.renamingTag': '保存中…',
+      'admin.ai.tagRenamed': 'タグ名を「{name}」に変更しました。', 'admin.ai.tagDeleted': 'タグ「{name}」をライブラリから削除しました。',
+      'admin.ai.noMatchingTags': '検索条件に一致するタグはありません。',
+      'admin.ai.deleteTagConfirm': 'タグ「{name}」を削除しますか？割り当て済みの {count} 冊から削除されます。'
+    },
+    es: {
+      'admin.overview.tags': 'Etiquetas', 'admin.booksDescription': 'Gestiona metadatos, visibilidad, acceso, etiquetas, clasificación de lectura con IA y resultados de los libros.',
+      'admin.tagsDescription': 'Las etiquetas importadas de los libros se gestionan aquí. Al renombrar o eliminar una etiqueta se actualizan todos los libros asociados.',
+      'admin.books.tagFilter': 'Etiqueta', 'admin.books.tag.all': 'Todas las etiquetas', 'admin.books.serverTags': 'Etiquetas', 'admin.books.metadata': 'Metadatos del libro',
+      'admin.books.bookTitle': 'Título del libro', 'admin.books.required': 'Obligatorio', 'admin.books.authors': 'Autores', 'admin.books.authorsHelp': 'Introduce un autor por línea. Déjalo vacío si se desconoce.',
+      'admin.books.titleRequired': 'Introduce un título.', 'admin.books.authorsInvalid': 'Usa como máximo 100 autores, uno por línea y hasta 500 caracteres cada uno.',
+      'admin.books.saving': 'Guardando ajustes del libro…', 'admin.books.live.saving': 'Guardando ajustes del libro.', 'admin.books.closeEditor': 'Cerrar ajustes del libro',
+      'admin.books.discardChangesConfirm': '¿Descartar los cambios sin guardar de este libro?', 'admin.books.tags': 'Etiquetas', 'admin.ai.tags': 'Etiquetas', 'admin.ai.noTags': 'Aún no hay etiquetas.',
+      'admin.ai.newTagName': 'Nombre de la nueva etiqueta', 'admin.ai.searchTags': 'Buscar etiquetas', 'admin.ai.searchPlaceholder': 'Buscar por nombre', 'admin.ai.editTag': 'Editar',
+      'admin.ai.saveTag': 'Guardar', 'admin.ai.cancelTagEdit': 'Cancelar', 'admin.ai.renameTagLabel': 'Nuevo nombre para «{name}»', 'admin.ai.renamingTag': 'Guardando…',
+      'admin.ai.tagRenamed': 'Etiqueta renombrada a «{name}».', 'admin.ai.tagDeleted': 'La etiqueta «{name}» se eliminó de la biblioteca.', 'admin.ai.noMatchingTags': 'Ninguna etiqueta coincide con la búsqueda.',
+      'admin.ai.deleteTagConfirm': '¿Eliminar la etiqueta «{name}»? Se quitará de {count} libros asociados.'
+    },
+    de: {
+      'admin.overview.tags': 'Schlagwörter', 'admin.booksDescription': 'Buchmetadaten, Sichtbarkeit, Mitgliederzugriff, Tags, KI-Leseklassifizierung und Ergebnisse verwalten.',
+      'admin.tagsDescription': 'Aus Büchern importierte Tags werden hier verwaltet. Umbenennen oder Löschen aktualisiert alle zugeordneten Bücher.',
+      'admin.books.tagFilter': 'Schlagwort', 'admin.books.tag.all': 'Alle Tags', 'admin.books.serverTags': 'Schlagwörter', 'admin.books.metadata': 'Buchmetadaten',
+      'admin.books.bookTitle': 'Buchtitel', 'admin.books.required': 'Erforderlich', 'admin.books.authors': 'Autorinnen und Autoren', 'admin.books.authorsHelp': 'Eine Person pro Zeile eingeben. Bei unbekannter Urheberschaft leer lassen.',
+      'admin.books.titleRequired': 'Gib einen Buchtitel ein.', 'admin.books.authorsInvalid': 'Höchstens 100 Personen, eine pro Zeile und jeweils bis zu 500 Zeichen.',
+      'admin.books.saving': 'Bucheinstellungen werden gespeichert…', 'admin.books.live.saving': 'Bucheinstellungen werden gespeichert.', 'admin.books.closeEditor': 'Bucheinstellungen schließen',
+      'admin.books.discardChangesConfirm': 'Ungespeicherte Änderungen an diesem Buch verwerfen?', 'admin.books.tags': 'Schlagwörter', 'admin.ai.tags': 'Schlagwörter', 'admin.ai.noTags': 'Noch keine Tags.',
+      'admin.ai.newTagName': 'Neuer Tag-Name', 'admin.ai.searchTags': 'Tags suchen', 'admin.ai.searchPlaceholder': 'Nach Tag-Namen suchen', 'admin.ai.editTag': 'Bearbeiten',
+      'admin.ai.saveTag': 'Speichern', 'admin.ai.cancelTagEdit': 'Abbrechen', 'admin.ai.renameTagLabel': 'Neuer Name für „{name}“', 'admin.ai.renamingTag': 'Wird gespeichert…',
+      'admin.ai.tagRenamed': 'Tag in „{name}“ umbenannt.', 'admin.ai.tagDeleted': 'Tag „{name}“ aus der Bibliothek gelöscht.', 'admin.ai.noMatchingTags': 'Keine passenden Tags gefunden.',
+      'admin.ai.deleteTagConfirm': 'Tag „{name}“ löschen? Er wird aus {count} zugeordneten Büchern entfernt.'
+    },
+    fr: {
+      'admin.overview.tags': 'Étiquettes', 'admin.booksDescription': 'Gérez les métadonnées, la visibilité, les accès, les étiquettes, la classification de lecture par IA et les résultats des livres.',
+      'admin.tagsDescription': 'Les étiquettes importées des livres sont gérées ici. Les renommer ou les supprimer met à jour tous les livres associés.',
+      'admin.books.tagFilter': 'Étiquette', 'admin.books.tag.all': 'Toutes les étiquettes', 'admin.books.serverTags': 'Étiquettes', 'admin.books.metadata': 'Métadonnées du livre',
+      'admin.books.bookTitle': 'Titre du livre', 'admin.books.required': 'Obligatoire', 'admin.books.authors': 'Auteurs', 'admin.books.authorsHelp': 'Saisissez un auteur par ligne. Laissez vide si l’auteur est inconnu.',
+      'admin.books.titleRequired': 'Saisissez un titre.', 'admin.books.authorsInvalid': 'Utilisez au plus 100 auteurs, un par ligne et 500 caractères chacun.',
+      'admin.books.saving': 'Enregistrement des réglages du livre…', 'admin.books.live.saving': 'Enregistrement des réglages du livre.', 'admin.books.closeEditor': 'Fermer les réglages du livre',
+      'admin.books.discardChangesConfirm': 'Abandonner les modifications non enregistrées de ce livre ?', 'admin.books.tags': 'Étiquettes', 'admin.ai.tags': 'Étiquettes', 'admin.ai.noTags': 'Aucune étiquette pour le moment.',
+      'admin.ai.newTagName': 'Nom de la nouvelle étiquette', 'admin.ai.searchTags': 'Rechercher des étiquettes', 'admin.ai.searchPlaceholder': 'Rechercher par nom', 'admin.ai.editTag': 'Modifier',
+      'admin.ai.saveTag': 'Enregistrer', 'admin.ai.cancelTagEdit': 'Annuler', 'admin.ai.renameTagLabel': 'Nouveau nom pour « {name} »', 'admin.ai.renamingTag': 'Enregistrement…',
+      'admin.ai.tagRenamed': 'Étiquette renommée « {name} ».', 'admin.ai.tagDeleted': 'Étiquette « {name} » supprimée de la bibliothèque.', 'admin.ai.noMatchingTags': 'Aucune étiquette ne correspond à la recherche.',
+      'admin.ai.deleteTagConfirm': 'Supprimer l’étiquette « {name} » ? Elle sera retirée de {count} livres associés.'
+    },
+    ru: {
+      'admin.overview.tags': 'Метки', 'admin.booksDescription': 'Управляйте метаданными, видимостью, доступом, метками, классификацией ИИ-чтения и результатами книг.',
+      'admin.tagsDescription': 'Импортированные из книг метки управляются здесь. Переименование или удаление обновляет все связанные книги.',
+      'admin.books.tagFilter': 'Метка', 'admin.books.tag.all': 'Все метки', 'admin.books.serverTags': 'Метки', 'admin.books.metadata': 'Метаданные книги',
+      'admin.books.bookTitle': 'Название книги', 'admin.books.required': 'Обязательно', 'admin.books.authors': 'Авторы', 'admin.books.authorsHelp': 'Укажите одного автора в строке. Оставьте пустым, если автор неизвестен.',
+      'admin.books.titleRequired': 'Введите название книги.', 'admin.books.authorsInvalid': 'Не более 100 авторов, по одному в строке и до 500 символов для каждого.',
+      'admin.books.saving': 'Сохранение настроек книги…', 'admin.books.live.saving': 'Настройки книги сохраняются.', 'admin.books.closeEditor': 'Закрыть настройки книги',
+      'admin.books.discardChangesConfirm': 'Отменить несохранённые изменения этой книги?', 'admin.books.tags': 'Метки', 'admin.ai.tags': 'Метки', 'admin.ai.noTags': 'Меток пока нет.',
+      'admin.ai.newTagName': 'Название новой метки', 'admin.ai.searchTags': 'Поиск меток', 'admin.ai.searchPlaceholder': 'Поиск по названию', 'admin.ai.editTag': 'Изменить',
+      'admin.ai.saveTag': 'Сохранить', 'admin.ai.cancelTagEdit': 'Отмена', 'admin.ai.renameTagLabel': 'Новое название для «{name}»', 'admin.ai.renamingTag': 'Сохранение…',
+      'admin.ai.tagRenamed': 'Метка переименована в «{name}».', 'admin.ai.tagDeleted': 'Метка «{name}» удалена из библиотеки.', 'admin.ai.noMatchingTags': 'Подходящих меток не найдено.',
+      'admin.ai.deleteTagConfirm': 'Удалить метку «{name}»? Она будет удалена из {count} связанных книг.'
+    },
+    it: {
+      'admin.overview.tags': 'Tag', 'admin.booksDescription': 'Gestisci metadati, visibilità, accesso, tag, classificazione di lettura IA e risultati dei libri.',
+      'admin.tagsDescription': 'I tag importati dai libri vengono gestiti qui. Rinominarli o eliminarli aggiorna tutti i libri associati.',
+      'admin.books.tagFilter': 'Etichetta', 'admin.books.tag.all': 'Tutti i tag', 'admin.books.serverTags': 'Tag', 'admin.books.metadata': 'Metadati del libro',
+      'admin.books.bookTitle': 'Titolo del libro', 'admin.books.required': 'Obbligatorio', 'admin.books.authors': 'Autori', 'admin.books.authorsHelp': 'Inserisci un autore per riga. Lascia vuoto se sconosciuto.',
+      'admin.books.titleRequired': 'Inserisci il titolo del libro.', 'admin.books.authorsInvalid': 'Usa al massimo 100 autori, uno per riga e fino a 500 caratteri ciascuno.',
+      'admin.books.saving': 'Salvataggio impostazioni del libro…', 'admin.books.live.saving': 'Salvataggio impostazioni del libro.', 'admin.books.closeEditor': 'Chiudi impostazioni del libro',
+      'admin.books.discardChangesConfirm': 'Scartare le modifiche non salvate di questo libro?', 'admin.books.tags': 'Tag', 'admin.ai.tags': 'Tag', 'admin.ai.noTags': 'Nessun tag per ora.',
+      'admin.ai.newTagName': 'Nome del nuovo tag', 'admin.ai.searchTags': 'Cerca tag', 'admin.ai.searchPlaceholder': 'Cerca per nome', 'admin.ai.editTag': 'Modifica',
+      'admin.ai.saveTag': 'Salva', 'admin.ai.cancelTagEdit': 'Annulla', 'admin.ai.renameTagLabel': 'Nuovo nome per “{name}”', 'admin.ai.renamingTag': 'Salvataggio…',
+      'admin.ai.tagRenamed': 'Tag rinominato in “{name}”.', 'admin.ai.tagDeleted': 'Tag “{name}” eliminato dalla raccolta.', 'admin.ai.noMatchingTags': 'Nessun tag corrisponde alla ricerca.',
+      'admin.ai.deleteTagConfirm': 'Eliminare il tag “{name}”? Verrà rimosso da {count} libri associati.'
+    },
+    'pt-BR': {
+      'admin.overview.tags': 'Etiquetas', 'admin.booksDescription': 'Gerencie metadados, visibilidade, acesso, tags, classificação de leitura com IA e resultados dos livros.',
+      'admin.tagsDescription': 'As tags importadas dos livros são gerenciadas aqui. Renomear ou excluir uma tag atualiza todos os livros associados.',
+      'admin.books.tagFilter': 'Etiqueta', 'admin.books.tag.all': 'Todas as tags', 'admin.books.serverTags': 'Etiquetas', 'admin.books.metadata': 'Metadados do livro',
+      'admin.books.bookTitle': 'Título do livro', 'admin.books.required': 'Obrigatório', 'admin.books.authors': 'Autores', 'admin.books.authorsHelp': 'Digite um autor por linha. Deixe em branco quando for desconhecido.',
+      'admin.books.titleRequired': 'Digite o título do livro.', 'admin.books.authorsInvalid': 'Use no máximo 100 autores, um por linha e até 500 caracteres cada.',
+      'admin.books.saving': 'Salvando configurações do livro…', 'admin.books.live.saving': 'Salvando configurações do livro.', 'admin.books.closeEditor': 'Fechar configurações do livro',
+      'admin.books.discardChangesConfirm': 'Descartar as alterações não salvas deste livro?', 'admin.books.tags': 'Etiquetas', 'admin.ai.tags': 'Etiquetas', 'admin.ai.noTags': 'Ainda não há tags.',
+      'admin.ai.newTagName': 'Nome da nova tag', 'admin.ai.searchTags': 'Pesquisar tags', 'admin.ai.searchPlaceholder': 'Pesquisar por nome', 'admin.ai.editTag': 'Editar',
+      'admin.ai.saveTag': 'Salvar', 'admin.ai.cancelTagEdit': 'Cancelar', 'admin.ai.renameTagLabel': 'Novo nome para “{name}”', 'admin.ai.renamingTag': 'Salvando…',
+      'admin.ai.tagRenamed': 'Tag renomeada para “{name}”.', 'admin.ai.tagDeleted': 'Tag “{name}” excluída da biblioteca.', 'admin.ai.noMatchingTags': 'Nenhuma tag corresponde à pesquisa.',
+      'admin.ai.deleteTagConfirm': 'Excluir a tag “{name}”? Ela será removida de {count} livros associados.'
+    },
+    ar: {
+      'admin.overview.tags': 'الوسوم', 'admin.booksDescription': 'أدر بيانات الكتب الوصفية وظهورها ووصول الأعضاء ووسومها وتصنيف القراءة بالذكاء الاصطناعي ونتائجها.',
+      'admin.tagsDescription': 'تُدار هنا الوسوم المستوردة من الكتب. تؤدي إعادة التسمية أو الحذف إلى تحديث كل الكتب المرتبطة.',
+      'admin.books.tagFilter': 'الوسم', 'admin.books.tag.all': 'كل الوسوم', 'admin.books.serverTags': 'الوسوم', 'admin.books.metadata': 'بيانات الكتاب الوصفية',
+      'admin.books.bookTitle': 'عنوان الكتاب', 'admin.books.required': 'مطلوب', 'admin.books.authors': 'المؤلفون', 'admin.books.authorsHelp': 'أدخل مؤلفًا واحدًا في كل سطر. اتركه فارغًا إذا كان المؤلف غير معروف.',
+      'admin.books.titleRequired': 'أدخل عنوان الكتاب.', 'admin.books.authorsInvalid': 'استخدم 100 مؤلف كحد أقصى، واحدًا في كل سطر وحتى 500 حرف لكل منهم.',
+      'admin.books.saving': 'جارٍ حفظ إعدادات الكتاب…', 'admin.books.live.saving': 'جارٍ حفظ إعدادات الكتاب.', 'admin.books.closeEditor': 'إغلاق إعدادات الكتاب',
+      'admin.books.discardChangesConfirm': 'هل تريد تجاهل تغييرات هذا الكتاب غير المحفوظة؟', 'admin.books.tags': 'الوسوم', 'admin.ai.tags': 'الوسوم', 'admin.ai.noTags': 'لا توجد وسوم بعد.',
+      'admin.ai.newTagName': 'اسم الوسم الجديد', 'admin.ai.searchTags': 'البحث في الوسوم', 'admin.ai.searchPlaceholder': 'البحث باسم الوسم', 'admin.ai.editTag': 'تعديل',
+      'admin.ai.saveTag': 'حفظ', 'admin.ai.cancelTagEdit': 'إلغاء', 'admin.ai.renameTagLabel': 'الاسم الجديد للوسم «{name}»', 'admin.ai.renamingTag': 'جارٍ الحفظ…',
+      'admin.ai.tagRenamed': 'أُعيدت تسمية الوسم إلى «{name}».', 'admin.ai.tagDeleted': 'حُذف الوسم «{name}» من المكتبة.', 'admin.ai.noMatchingTags': 'لا توجد وسوم مطابقة للبحث.',
+      'admin.ai.deleteTagConfirm': 'هل تريد حذف الوسم «{name}»؟ سيُزال من {count} كتب مرتبطة.'
+    },
+    id: {
+      'admin.overview.tags': 'Tag', 'admin.booksDescription': 'Kelola metadata, visibilitas, akses anggota, tag, klasifikasi membaca dengan AI, dan hasil buku.',
+      'admin.tagsDescription': 'Tag yang diimpor dari buku dikelola di sini. Mengubah nama atau menghapus tag akan memperbarui semua buku terkait.',
+      'admin.books.tagFilter': 'Label', 'admin.books.tag.all': 'Semua tag', 'admin.books.serverTags': 'Tag', 'admin.books.metadata': 'Metadata buku',
+      'admin.books.bookTitle': 'Judul buku', 'admin.books.required': 'Wajib', 'admin.books.authors': 'Penulis', 'admin.books.authorsHelp': 'Masukkan satu penulis per baris. Kosongkan jika tidak diketahui.',
+      'admin.books.titleRequired': 'Masukkan judul buku.', 'admin.books.authorsInvalid': 'Gunakan maksimal 100 penulis, satu per baris dan hingga 500 karakter masing-masing.',
+      'admin.books.saving': 'Menyimpan pengaturan buku…', 'admin.books.live.saving': 'Menyimpan pengaturan buku.', 'admin.books.closeEditor': 'Tutup pengaturan buku',
+      'admin.books.discardChangesConfirm': 'Buang perubahan buku yang belum disimpan?', 'admin.books.tags': 'Tag', 'admin.ai.tags': 'Tag', 'admin.ai.noTags': 'Belum ada tag.',
+      'admin.ai.newTagName': 'Nama tag baru', 'admin.ai.searchTags': 'Cari tag', 'admin.ai.searchPlaceholder': 'Cari berdasarkan nama', 'admin.ai.editTag': 'Ubah',
+      'admin.ai.saveTag': 'Simpan', 'admin.ai.cancelTagEdit': 'Batal', 'admin.ai.renameTagLabel': 'Nama baru untuk “{name}”', 'admin.ai.renamingTag': 'Menyimpan…',
+      'admin.ai.tagRenamed': 'Tag diubah namanya menjadi “{name}”.', 'admin.ai.tagDeleted': 'Tag “{name}” dihapus dari pustaka.', 'admin.ai.noMatchingTags': 'Tidak ada tag yang cocok.',
+      'admin.ai.deleteTagConfirm': 'Hapus tag “{name}”? Tag akan dihapus dari {count} buku terkait.'
+    },
+    hi: {
+      'admin.overview.tags': 'टैग', 'admin.booksDescription': 'पुस्तक का मेटाडेटा, दृश्यता, सदस्य पहुँच, टैग, AI पठन वर्गीकरण और परिणाम प्रबंधित करें।',
+      'admin.tagsDescription': 'पुस्तकों से आयात किए गए टैग यहाँ प्रबंधित होते हैं। नाम बदलने या हटाने पर सभी संबंधित पुस्तकें अपडेट होती हैं।',
+      'admin.books.tagFilter': 'टैग', 'admin.books.tag.all': 'सभी टैग', 'admin.books.serverTags': 'टैग', 'admin.books.metadata': 'पुस्तक मेटाडेटा',
+      'admin.books.bookTitle': 'पुस्तक का शीर्षक', 'admin.books.required': 'आवश्यक', 'admin.books.authors': 'लेखक', 'admin.books.authorsHelp': 'हर पंक्ति में एक लेखक लिखें। लेखक अज्ञात हो तो खाली छोड़ें।',
+      'admin.books.titleRequired': 'पुस्तक का शीर्षक लिखें।', 'admin.books.authorsInvalid': 'अधिकतम 100 लेखक रखें, हर पंक्ति में एक और प्रत्येक के लिए अधिकतम 500 वर्ण।',
+      'admin.books.saving': 'पुस्तक सेटिंग सहेजी जा रही हैं…', 'admin.books.live.saving': 'पुस्तक सेटिंग सहेजी जा रही हैं।', 'admin.books.closeEditor': 'पुस्तक सेटिंग बंद करें',
+      'admin.books.discardChangesConfirm': 'इस पुस्तक के बिना सहेजे बदलाव छोड़ दें?', 'admin.books.tags': 'टैग', 'admin.ai.tags': 'टैग', 'admin.ai.noTags': 'अभी कोई टैग नहीं है।',
+      'admin.ai.newTagName': 'नए टैग का नाम', 'admin.ai.searchTags': 'टैग खोजें', 'admin.ai.searchPlaceholder': 'टैग के नाम से खोजें', 'admin.ai.editTag': 'संपादित करें',
+      'admin.ai.saveTag': 'सहेजें', 'admin.ai.cancelTagEdit': 'रद्द करें', 'admin.ai.renameTagLabel': '“{name}” का नया नाम', 'admin.ai.renamingTag': 'सहेजा जा रहा है…',
+      'admin.ai.tagRenamed': 'टैग का नाम “{name}” कर दिया गया।', 'admin.ai.tagDeleted': '“{name}” टैग लाइब्रेरी से हटा दिया गया।', 'admin.ai.noMatchingTags': 'खोज से कोई टैग मेल नहीं खाता।',
+      'admin.ai.deleteTagConfirm': '“{name}” टैग हटाएँ? यह {count} संबंधित पुस्तकों से हट जाएगा।'
+    },
+    vi: {
+      'admin.overview.tags': 'Thẻ', 'admin.booksDescription': 'Quản lý siêu dữ liệu, khả năng hiển thị, quyền thành viên, thẻ, phân loại đọc cùng AI và kết quả của sách.',
+      'admin.tagsDescription': 'Các thẻ nhập từ sách được quản lý tại đây. Đổi tên hoặc xóa thẻ sẽ cập nhật mọi sách liên quan.',
+      'admin.books.tagFilter': 'Thẻ', 'admin.books.tag.all': 'Tất cả thẻ', 'admin.books.serverTags': 'Thẻ', 'admin.books.metadata': 'Siêu dữ liệu sách',
+      'admin.books.bookTitle': 'Tên sách', 'admin.books.required': 'Bắt buộc', 'admin.books.authors': 'Tác giả', 'admin.books.authorsHelp': 'Nhập mỗi dòng một tác giả. Để trống khi không rõ tác giả.',
+      'admin.books.titleRequired': 'Nhập tên sách.', 'admin.books.authorsInvalid': 'Tối đa 100 tác giả, mỗi dòng một người và tối đa 500 ký tự mỗi người.',
+      'admin.books.saving': 'Đang lưu cài đặt sách…', 'admin.books.live.saving': 'Đang lưu cài đặt sách.', 'admin.books.closeEditor': 'Đóng cài đặt sách',
+      'admin.books.discardChangesConfirm': 'Bỏ các thay đổi chưa lưu của sách này?', 'admin.books.tags': 'Thẻ', 'admin.ai.tags': 'Thẻ', 'admin.ai.noTags': 'Chưa có thẻ.',
+      'admin.ai.newTagName': 'Tên thẻ mới', 'admin.ai.searchTags': 'Tìm thẻ', 'admin.ai.searchPlaceholder': 'Tìm theo tên thẻ', 'admin.ai.editTag': 'Sửa',
+      'admin.ai.saveTag': 'Lưu', 'admin.ai.cancelTagEdit': 'Hủy', 'admin.ai.renameTagLabel': 'Tên mới cho “{name}”', 'admin.ai.renamingTag': 'Đang lưu…',
+      'admin.ai.tagRenamed': 'Đã đổi tên thẻ thành “{name}”.', 'admin.ai.tagDeleted': 'Đã xóa thẻ “{name}” khỏi thư viện.', 'admin.ai.noMatchingTags': 'Không có thẻ khớp tìm kiếm.',
+      'admin.ai.deleteTagConfirm': 'Xóa thẻ “{name}”? Thẻ sẽ bị gỡ khỏi {count} sách liên quan.'
+    },
+    th: {
+      'admin.overview.tags': 'แท็ก', 'admin.booksDescription': 'จัดการข้อมูลหนังสือ การมองเห็น สิทธิ์สมาชิก แท็ก การจัดประเภทการอ่านด้วย AI และผลลัพธ์',
+      'admin.tagsDescription': 'จัดการแท็กที่นำเข้าจากหนังสือได้ที่นี่ การเปลี่ยนชื่อหรือลบแท็กจะอัปเดตหนังสือที่เกี่ยวข้องทั้งหมด',
+      'admin.books.tagFilter': 'แท็ก', 'admin.books.tag.all': 'แท็กทั้งหมด', 'admin.books.serverTags': 'แท็ก', 'admin.books.metadata': 'ข้อมูลหนังสือ',
+      'admin.books.bookTitle': 'ชื่อหนังสือ', 'admin.books.required': 'จำเป็น', 'admin.books.authors': 'ผู้เขียน', 'admin.books.authorsHelp': 'กรอกผู้เขียนหนึ่งคนต่อบรรทัด เว้นว่างหากไม่ทราบ',
+      'admin.books.titleRequired': 'กรอกชื่อหนังสือ', 'admin.books.authorsInvalid': 'ใช้ผู้เขียนไม่เกิน 100 คน คนละหนึ่งบรรทัดและไม่เกิน 500 อักขระต่อคน',
+      'admin.books.saving': 'กำลังบันทึกการตั้งค่าหนังสือ…', 'admin.books.live.saving': 'กำลังบันทึกการตั้งค่าหนังสือ', 'admin.books.closeEditor': 'ปิดการตั้งค่าหนังสือ',
+      'admin.books.discardChangesConfirm': 'ละทิ้งการเปลี่ยนแปลงหนังสือที่ยังไม่ได้บันทึกหรือไม่', 'admin.books.tags': 'แท็ก', 'admin.ai.tags': 'แท็ก', 'admin.ai.noTags': 'ยังไม่มีแท็ก',
+      'admin.ai.newTagName': 'ชื่อแท็กใหม่', 'admin.ai.searchTags': 'ค้นหาแท็ก', 'admin.ai.searchPlaceholder': 'ค้นหาตามชื่อแท็ก', 'admin.ai.editTag': 'แก้ไข',
+      'admin.ai.saveTag': 'บันทึก', 'admin.ai.cancelTagEdit': 'ยกเลิก', 'admin.ai.renameTagLabel': 'ชื่อใหม่สำหรับ “{name}”', 'admin.ai.renamingTag': 'กำลังบันทึก…',
+      'admin.ai.tagRenamed': 'เปลี่ยนชื่อแท็กเป็น “{name}” แล้ว', 'admin.ai.tagDeleted': 'ลบแท็ก “{name}” ออกจากคลังแล้ว', 'admin.ai.noMatchingTags': 'ไม่พบแท็กที่ตรงกับการค้นหา',
+      'admin.ai.deleteTagConfirm': 'ลบแท็ก “{name}” หรือไม่ แท็กจะถูกนำออกจากหนังสือที่เกี่ยวข้อง {count} เล่ม'
+    },
+    ms: {
+      'admin.overview.tags': 'Tag', 'admin.booksDescription': 'Urus metadata buku, keterlihatan, akses ahli, tag, klasifikasi pembacaan AI dan hasil.',
+      'admin.tagsDescription': 'Tag yang diimport daripada buku diurus di sini. Menamakan semula atau memadam tag akan mengemas kini semua buku berkaitan.',
+      'admin.books.tagFilter': 'Label', 'admin.books.tag.all': 'Semua tag', 'admin.books.serverTags': 'Tag', 'admin.books.metadata': 'Metadata buku',
+      'admin.books.bookTitle': 'Tajuk buku', 'admin.books.required': 'Diperlukan', 'admin.books.authors': 'Pengarang', 'admin.books.authorsHelp': 'Masukkan seorang pengarang setiap baris. Biarkan kosong jika tidak diketahui.',
+      'admin.books.titleRequired': 'Masukkan tajuk buku.', 'admin.books.authorsInvalid': 'Gunakan paling banyak 100 pengarang, seorang setiap baris dan sehingga 500 aksara setiap seorang.',
+      'admin.books.saving': 'Menyimpan tetapan buku…', 'admin.books.live.saving': 'Menyimpan tetapan buku.', 'admin.books.closeEditor': 'Tutup tetapan buku',
+      'admin.books.discardChangesConfirm': 'Buang perubahan buku yang belum disimpan?', 'admin.books.tags': 'Tag', 'admin.ai.tags': 'Tag', 'admin.ai.noTags': 'Belum ada tag.',
+      'admin.ai.newTagName': 'Nama tag baharu', 'admin.ai.searchTags': 'Cari tag', 'admin.ai.searchPlaceholder': 'Cari mengikut nama tag', 'admin.ai.editTag': 'Sunting',
+      'admin.ai.saveTag': 'Simpan', 'admin.ai.cancelTagEdit': 'Batal', 'admin.ai.renameTagLabel': 'Nama baharu untuk “{name}”', 'admin.ai.renamingTag': 'Menyimpan…',
+      'admin.ai.tagRenamed': 'Tag dinamakan semula kepada “{name}”.', 'admin.ai.tagDeleted': 'Tag “{name}” dipadam daripada pustaka.', 'admin.ai.noMatchingTags': 'Tiada tag sepadan dengan carian.',
+      'admin.ai.deleteTagConfirm': 'Padam tag “{name}”? Tag akan dialih keluar daripada {count} buku berkaitan.'
+    }
+  };
+  var managedTagErrorTranslations = {
+    'zh-CN': '请输入有效的标签。', 'zh-TW': '請輸入有效的標籤。', ko: '올바른 태그를 입력하세요.', ja: '有効なタグを入力してください。',
+    es: 'Introduce una etiqueta válida.', de: 'Gib ein gültiges Schlagwort ein.', fr: 'Saisissez une étiquette valide.', ru: 'Введите корректную метку.',
+    it: 'Inserisci un tag valido.', 'pt-BR': 'Digite uma etiqueta válida.', ar: 'أدخل وسمًا صالحًا.', id: 'Masukkan tag yang valid.',
+    hi: 'मान्य टैग लिखें।', vi: 'Nhập thẻ hợp lệ.', th: 'กรอกแท็กที่ถูกต้อง', ms: 'Masukkan tag yang sah.'
+  };
+  Object.keys(dictionaries).forEach(function(code) {
+    Object.assign(dictionaries[code], managedBookMetadataEnglish);
+    if (managedBookMetadataTranslations[code]) {
+      Object.assign(dictionaries[code], managedBookMetadataTranslations[code]);
+    }
+    if (managedTagErrorTranslations[code]) {
+      dictionaries[code]['admin.error.invalid_ai_tag'] = managedTagErrorTranslations[code];
+    }
+    dictionaries[code]['admin.ai.epubTags'] = dictionaries[code]['admin.ai.tags'];
+    dictionaries[code]['admin.ai.noEpubTags'] = dictionaries[code]['admin.ai.noTags'];
+    ['admin.ai.tagUsage', 'admin.ai.deleteTagConfirm'].forEach(function(key) {
+      if (typeof dictionaries[code][key] === 'string') {
+        dictionaries[code][key] = { one: dictionaries[code][key], other: dictionaries[code][key] };
+      }
+    });
+  });
+  dictionaries.en['admin.ai.tagUsage'] = {
+    one: 'Used by {count} book',
+    other: 'Used by {count} books'
+  };
+  dictionaries.en['admin.ai.deleteTagConfirm'] = {
+    one: 'Delete tag “{name}”? It will be removed from {count} assigned book.',
+    other: 'Delete tag “{name}”? It will be removed from {count} assigned books.'
+  };
+
   function createRuntime(root, messages) {
     var locale = '';
     var initialized = false;
