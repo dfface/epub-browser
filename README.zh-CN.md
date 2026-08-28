@@ -2,7 +2,7 @@
 
 > 私有 EPUB 阅读服务，以及自包含的静态站点生成器。
 
-**README：** [English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
+**README：** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **界面语言（17 种）：** 英语、简体中文、繁体中文、日语、韩语、西班牙语、德语、法语、俄语、意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语。
 

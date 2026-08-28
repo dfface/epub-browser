@@ -2,7 +2,7 @@
 
 > 개인 EPUB 읽기 서비스이자 독립 실행형 정적 사이트 생성기입니다.
 
-**README:** [English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
+**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **인터페이스 언어(17개):** 영어, 중국어 간체, 중국어 번체, 일본어, 한국어, 스페인어, 독일어, 프랑스어, 러시아어, 이탈리아어, 브라질 포르투갈어, 아랍어, 인도네시아어, 힌디어, 베트남어, 태국어, 말레이어.
 

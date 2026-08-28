@@ -1,0 +1,85 @@
+# EPUB Browser
+
+> Un servicio privado de lectura EPUB y un generador de sitios estáticos autocontenido.
+
+**README:** [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
+
+**Idiomas de la interfaz (17):** inglés, chino simplificado, chino tradicional, japonés, coreano, español, alemán, francés, ruso, italiano, portugués de Brasil, árabe, indonesio, hindi, vietnamita, tailandés y malayo.
+
+[![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
+[![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
+[![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
+
+EPUB Browser ofrece dos modos con responsabilidades claramente separadas:
+
+| | `ssg` | `server` |
+| --- | --- | --- |
+| Despliegue | Hosting estático, Pages, almacenamiento de objetos, Nginx | Servicio privado de lectura persistente |
+| Cuentas | Ninguna | Cuentas locales |
+| Progreso, anotaciones y estantería | Solo en este navegador | Datos de la cuenta autenticada en SQLite |
+| Actualización de fuentes | Ejecutar `ssg` de nuevo | Reiniciar el servicio o usar `--watch` |
+| Base de datos en tiempo de ejecución | No | Obligatoria |
+
+Usa `ssg` para publicar archivos estáticos normales. Usa `server` cuando necesites cuentas, datos entre dispositivos, control de acceso a libros o sincronización automática de las fuentes.
+
+## Demostraciones
+
+- **Modo SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
+- **Modo Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — usuario y contraseña: `demo`.
+
+## Lectura nativa con IA (solo Server)
+
+La lectura con IA crea sobre el texto original una capa de aprendizaje compartida y revisable, no un resumen genérico separado del libro. Incluye una guía antes de leer, una vista general opcional del capítulo, explicaciones vinculadas a citas, notas sobre la función de los párrafos, aclaraciones de vocabulario, una explicación sencilla al final y preguntas para seguir pensando.
+
+Los resultados se generan como tareas en segundo plano, se guardan en SQLite y se comparten entre lectores con acceso al libro. Las conversaciones de seguimiento son privadas para cada cuenta. El administrador debe configurar un proveedor compatible con OpenAI y autorizar a cada miembro. El texto EPUB seleccionado se envía a dicho proveedor, por lo que esta función solo debe habilitarse con el consentimiento del lector. La salida SSG nunca incluye cuentas, controles de IA, tareas ni configuración del proveedor.
+
+## Requisitos e instalación
+
+- Python 3.9 o posterior
+- Uno o varios archivos `.epub`, un directorio anidado con EPUB o una biblioteca con estructura de Calibre
+
+```bash
+pip install epub-browser
+
+# Ayuda completa para cada modo
+epub-browser --help
+epub-browser ssg --help
+epub-browser server --help
+```
+
+## Inicio rápido
+
+### Generar un sitio estático
+
+```bash
+epub-browser ssg /ruta/a/libros \
+  --output-dir /ruta/a/dist
+```
+
+Publica `dist/` mediante HTTP; no abras las páginas generadas directamente con `file://`. Para desplegar bajo una subruta, añade `--base-path /mi-repositorio/`; esta opción modifica las URL generadas, no el directorio de salida.
+
+### Ejecutar una biblioteca Server persistente
+
+```bash
+epub-browser server /ruta/a/libros \
+  --server-dir /ruta/al/estado-de-epub-browser \
+  --watch
+```
+
+Abre `http://127.0.0.1:8000/`. En la primera visita se crea el administrador inicial; la biblioteca no se analiza ni se publica hasta completar esa configuración. `--no-browser` solo impide que el servicio abra automáticamente el navegador local.
+
+## Datos, cuentas y límites de acceso
+
+Cada libro tiene un `book_id` estable. Por defecto, `--book-id-storage sidecar` guarda la identidad junto al EPUB sin modificar sus bytes; `--book-id-storage embedded` la escribe en los metadatos OPF y requiere una fuente modificable.
+
+En modo Server, `--server-dir` es la ubicación autoritativa para SQLite, cachés y copias de migración. Allí también se guardan cuentas, estanterías, progreso, anotaciones, resultados de IA y tareas. Los administradores gestionan usuarios, roles, sesiones y permisos de libros; los miembros solo pueden usar los libros autorizados y sus propios datos privados. Protege los permisos de este directorio y de sus copias de seguridad.
+
+## Docker, proxy inverso y documentación completa
+
+En contenedores, monta los libros como solo lectura y `--server-dir` en un volumen persistente. Acepta cabeceras de proxy únicamente desde proxies de confianza y usa HTTPS en despliegues públicos.
+
+Para Docker Compose, todas las opciones de CLI, migraciones, LAN, proxy inverso y solución de problemas, consulta el [README completo en inglés](README.md) o el [README completo en chino simplificado](README.zh-CN.md). El comportamiento de ambos modos es el mismo en todos los idiomas.
+
+## Contribuir y licencia
+
+Se aceptan Issues y Pull Requests. Consulta [License.txt](License.txt) para conocer la licencia.
