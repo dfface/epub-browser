@@ -14,6 +14,39 @@ from pypdfium2 import raw as pdfium_raw
 PDF_SIGNATURE_BYTES = 1024
 
 
+class _UnboundedPDFReadError(Exception):
+    pass
+
+
+class _BoundedPDFStream:
+    """Seekable proxy that refuses parser recovery paths which copy the file."""
+
+    def __init__(self, stream: BinaryIO):
+        self._stream = stream
+
+    def read(self, size=-1):
+        if size is None or size < 0:
+            raise _UnboundedPDFReadError
+        return self._stream.read(size)
+
+    def read1(self, size=-1):
+        if size is None or size < 0:
+            raise _UnboundedPDFReadError
+        return self._stream.read1(size)
+
+    def readall(self):
+        raise _UnboundedPDFReadError
+
+    def readinto(self, buffer):
+        raise _UnboundedPDFReadError
+
+    def readinto1(self, buffer):
+        raise _UnboundedPDFReadError
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
 class PDFProcessingError(Exception):
     """A stable, user-safe PDF inspection or rendering failure."""
 
@@ -249,11 +282,12 @@ def inspect_pdf(source: Path) -> PDFMetadata:
     source = Path(source)
     try:
         with source.open("rb") as stream:
-            if b"%PDF-" not in stream.read(PDF_SIGNATURE_BYTES):
+            bounded_stream = _BoundedPDFStream(stream)
+            if b"%PDF-" not in bounded_stream.read(PDF_SIGNATURE_BYTES):
                 raise PDFProcessingError("PDF signature is missing")
-            stream.seek(0)
+            bounded_stream.seek(0)
             try:
-                return _inspect_pdf_contents(stream)
+                return _inspect_pdf_contents(bounded_stream)
             except PDFProcessingError:
                 raise
             except Exception:

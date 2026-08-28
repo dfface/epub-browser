@@ -1,5 +1,6 @@
 from contextlib import redirect_stderr
 import io
+import re
 import subprocess
 import sys
 import tempfile
@@ -120,6 +121,22 @@ class PDFProcessorTests(unittest.TestCase):
             writer.write(stream)
         return source
 
+    def corrupt_first_xref_offset(self, source):
+        data = source.read_bytes()
+        object_match = re.search(rb"(?:^|\n)(1 0 obj\s)", data)
+        self.assertIsNotNone(object_match)
+        object_offset = object_match.start(1)
+        entry = f"{object_offset:010d} 00000 n ".encode("ascii")
+        self.assertIn(entry, data)
+        source.write_bytes(
+            data.replace(
+                entry,
+                f"{object_offset + 1:010d} 00000 n ".encode("ascii"),
+                1,
+            )
+        )
+        return source
+
     def test_inspect_pdf_returns_document_metadata(self):
         source = self.fixture_pdf(
             metadata={
@@ -160,6 +177,33 @@ class PDFProcessorTests(unittest.TestCase):
         self.assertEqual(len(metadata.pages), 2)
         self.assertEqual(len(spies), 1)
         self.assertTrue(spies[0].read_sizes)
+
+    def test_inspect_pdf_rejects_unbounded_corrupt_xref_recovery(self):
+        source = self.corrupt_first_xref_offset(
+            self.fixture_pdf(metadata={"/Title": "Corrupt xref"})
+        )
+        original_path_open = Path.open
+        spies = []
+
+        def guarded_path_open(path, *args, **kwargs):
+            stream = original_path_open(path, *args, **kwargs)
+            if path == source and args and args[0] == "rb":
+                spy = BoundedReadSpy(stream)
+                spies.append(spy)
+                return spy
+            return stream
+
+        with patch.object(Path, "open", new=guarded_path_open):
+            with redirect_stderr(io.StringIO()):
+                with self.assertRaises(PDFProcessingError) as raised:
+                    inspect_pdf(source)
+
+        self.assertEqual(str(raised.exception), "Unable to inspect PDF")
+        self.assertIsNone(raised.exception.__cause__)
+        self.assertEqual(len(spies), 1)
+        self.assertFalse(
+            any(size is None or size < 0 for size in spies[0].read_sizes)
+        )
 
     def test_inspect_pdf_returns_rotation_aware_geometry_for_every_page(self):
         source = self.fixture_pdf(
