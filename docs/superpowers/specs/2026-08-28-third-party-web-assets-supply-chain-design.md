@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-28
 
-**Status:** Pending written-spec review
+**Status:** Approved
 
 ## Summary
 
