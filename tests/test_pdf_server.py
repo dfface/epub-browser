@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -195,6 +196,33 @@ class PDFDocumentDeliveryTests(unittest.TestCase):
                     response.headers["content-range"],
                     f"bytes {normalized}/{len(self.original_bytes)}",
                 )
+
+    def test_repeated_ranges_hash_each_stable_file_generation_once(self):
+        from epub_browser import pdf_delivery
+
+        pdf_delivery._clear_validation_cache()
+        original_hash = pdf_delivery._hash_file_descriptor
+        hashes = []
+
+        def counted_hash(descriptor, expected_size):
+            hashes.append(expected_size)
+            return original_hash(descriptor, expected_size)
+
+        with mock.patch.object(
+            pdf_delivery,
+            "_hash_file_descriptor",
+            side_effect=counted_hash,
+        ):
+            first = self.owner.get(
+                self.url, headers={"Range": "bytes=0-31"}
+            )
+            second = self.owner.get(
+                self.url, headers={"Range": "bytes=32-63"}
+            )
+
+        self.assertEqual(first.status_code, 206)
+        self.assertEqual(second.status_code, 206)
+        self.assertEqual(hashes, [len(self.original_bytes)] * 2)
 
     def test_head_range_has_partial_headers_without_a_body(self):
         response = self.owner.head(self.url, headers={"Range": "bytes=3-7"})
@@ -583,6 +611,68 @@ class PDFFileSafetyTests(unittest.TestCase):
                 return heartbeats
 
         self.assertEqual(asyncio.run(exercise()), 5)
+
+    def test_cached_validation_invalidates_when_same_size_file_changes(self):
+        from epub_browser import pdf_delivery
+
+        pdf_delivery._clear_validation_cache()
+        original_stat = self.path.stat()
+        original_hash = pdf_delivery._hash_file_descriptor
+        hashes = []
+
+        def counted_hash(descriptor, expected_size):
+            hashes.append(expected_size)
+            return original_hash(descriptor, expected_size)
+
+        with mock.patch.object(
+            pdf_delivery,
+            "_hash_file_descriptor",
+            side_effect=counted_hash,
+        ):
+            first = self._open()
+            os.close(first)
+            second = self._open()
+            os.close(second)
+            self.assertEqual(hashes, [len(self.content)])
+
+            changed = b"x" + self.content[1:]
+            self.path.write_bytes(changed)
+            os.utime(
+                self.path,
+                ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+            )
+            with self.assertRaises(pdf_delivery.PDFValidationError):
+                self._open()
+
+        self.assertEqual(hashes, [len(self.content)] * 2)
+
+    def test_concurrent_opens_share_one_generation_hash(self):
+        from epub_browser import pdf_delivery
+
+        pdf_delivery._clear_validation_cache()
+        original_hash = pdf_delivery._hash_file_descriptor
+        hashes = []
+        hashes_lock = threading.Lock()
+
+        def counted_hash(descriptor, expected_size):
+            with hashes_lock:
+                hashes.append(expected_size)
+            time.sleep(0.05)
+            return original_hash(descriptor, expected_size)
+
+        def open_and_close(_index):
+            descriptor = self._open()
+            os.close(descriptor)
+
+        with mock.patch.object(
+            pdf_delivery,
+            "_hash_file_descriptor",
+            side_effect=counted_hash,
+        ):
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                list(executor.map(open_and_close, range(8)))
+
+        self.assertEqual(hashes, [len(self.content)])
 
     def test_safe_open_rejects_symlink_fifo_device_and_path_swap(self):
         from epub_browser import pdf_delivery

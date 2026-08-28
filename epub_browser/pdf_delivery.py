@@ -5,6 +5,8 @@ import json
 import os
 import re
 import stat
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -21,6 +23,10 @@ _MAX_RANGE_DIGITS = 20
 _STREAM_CHUNK_SIZE = 64 * 1024
 _MAX_REVISION_SIZE = 256
 _MAX_METADATA_SIZE = 8 * 1024 * 1024
+_VALIDATION_CACHE_LIMIT = 256
+_VALIDATION_CACHE_LOCK = threading.Lock()
+_VALIDATED_FILE_GENERATIONS = OrderedDict()
+_FILE_GENERATION_LOCKS = {}
 
 
 @dataclass(frozen=True)
@@ -164,6 +170,68 @@ def _hash_file_descriptor(descriptor: int, expected_size: int) -> str:
     return digest.hexdigest()
 
 
+def _clear_validation_cache() -> None:
+    """Clear validated generations; intended for deterministic tests."""
+    with _VALIDATION_CACHE_LOCK:
+        _VALIDATED_FILE_GENERATIONS.clear()
+
+
+def _validated_generation_key(file_stat, expected_digest: str) -> tuple:
+    return _identity(file_stat) + (expected_digest,)
+
+
+def _generation_is_cached(key: tuple) -> bool:
+    with _VALIDATION_CACHE_LOCK:
+        if key not in _VALIDATED_FILE_GENERATIONS:
+            return False
+        _VALIDATED_FILE_GENERATIONS.move_to_end(key)
+        return True
+
+
+def _validate_file_generation(
+    path: Path,
+    descriptor: int,
+    before,
+    *,
+    expected_size: int,
+    expected_digest: str,
+) -> None:
+    """Hash one immutable file generation once, including concurrent opens."""
+    key = _validated_generation_key(before, expected_digest)
+    if _generation_is_cached(key):
+        return
+    with _VALIDATION_CACHE_LOCK:
+        generation_lock = _FILE_GENERATION_LOCKS.setdefault(
+            key, threading.Lock()
+        )
+    try:
+        with generation_lock:
+            if _generation_is_cached(key):
+                return
+            digest = _hash_file_descriptor(descriptor, expected_size)
+            after = os.fstat(descriptor)
+            if (
+                _identity(before) != _identity(after)
+                or not _path_matches_descriptor(path, after)
+                or digest != expected_digest
+            ):
+                raise PDFValidationError(
+                    "PDF file changed during validation"
+                )
+            with _VALIDATION_CACHE_LOCK:
+                _VALIDATED_FILE_GENERATIONS[key] = None
+                _VALIDATED_FILE_GENERATIONS.move_to_end(key)
+                while (
+                    len(_VALIDATED_FILE_GENERATIONS)
+                    > _VALIDATION_CACHE_LIMIT
+                ):
+                    _VALIDATED_FILE_GENERATIONS.popitem(last=False)
+    finally:
+        with _VALIDATION_CACHE_LOCK:
+            if _FILE_GENERATION_LOCKS.get(key) is generation_lock:
+                _FILE_GENERATION_LOCKS.pop(key, None)
+
+
 def open_validated_pdf_file(
     path: Path,
     *,
@@ -192,12 +260,17 @@ def open_validated_pdf_file(
             or not _path_matches_descriptor(Path(path), before)
         ):
             raise PDFValidationError("PDF file metadata changed")
-        digest = _hash_file_descriptor(descriptor, expected_size)
+        _validate_file_generation(
+            Path(path),
+            descriptor,
+            before,
+            expected_size=expected_size,
+            expected_digest=expected_digest,
+        )
         after = os.fstat(descriptor)
         if (
             _identity(before) != _identity(after)
             or not _path_matches_descriptor(Path(path), after)
-            or digest != expected_digest
         ):
             raise PDFValidationError("PDF file changed during validation")
         os.lseek(descriptor, 0, os.SEEK_SET)
