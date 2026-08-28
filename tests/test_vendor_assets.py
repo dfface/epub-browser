@@ -1,3 +1,4 @@
+import copy
 import gzip
 import hashlib
 import io
@@ -8,7 +9,9 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import warnings
 import zipfile
+from contextlib import redirect_stdout
 from pathlib import Path
 from urllib.request import Request
 
@@ -19,6 +22,10 @@ from tools.sync_vendor_assets import (
     fetch_assets,
     load_lock,
     verify_assets,
+)
+from tools.verify_release_artifacts import (
+    ReleaseArtifactError,
+    verify_release_artifacts,
 )
 
 
@@ -811,6 +818,98 @@ class VendorAssetTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("offline sdist wheel verified", completed.stdout)
 
+    def test_release_artifact_gate_rejects_real_artifact_tampering(self):
+        """The public gate must reject malformed derivatives of real artifacts."""
+        repository_root = Path(__file__).parents[1]
+        lock_path = repository_root / "third_party/assets.lock.json"
+        notices_path = repository_root / "THIRD_PARTY_NOTICES.md"
+        sync_tool_path = repository_root / "tools/sync_vendor_assets.py"
+        first_target = load_lock(lock_path).packages[0].files[0].target
+        wheel_target = "epub_browser/assets/vendor/" + first_target
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            direct, sdist = self.build_release_artifacts(repository_root, root)
+
+            missing_input = root / "missing-input.tar.gz"
+            self.rewrite_sdist(
+                sdist,
+                missing_input,
+                omit=lambda name: name.endswith("/tools/sync_vendor_assets.py"),
+            )
+            changed_vendor = root / "changed-vendor.tar.gz"
+            self.rewrite_sdist(
+                sdist,
+                changed_vendor,
+                change=lambda name, data: b"changed"
+                if name.endswith("/epub_browser/assets/vendor/" + first_target)
+                else data,
+            )
+            duplicate_vendor = root / "duplicate-vendor.tar.gz"
+            self.rewrite_sdist(
+                sdist,
+                duplicate_vendor,
+                prepend=[("epub_browser/assets/vendor/" + first_target, b"changed")],
+            )
+            extra_vendor = root / "extra-vendor.tar.gz"
+            self.rewrite_sdist(
+                sdist,
+                extra_vendor,
+                append=[("epub_browser/assets/vendor/unlocked.js", b"extra")],
+            )
+            linked_member = root / "linked-member.tar.gz"
+            self.rewrite_sdist(sdist, linked_member, symlink="unsafe-link")
+            traversal_member = root / "traversal-member.tar.gz"
+            self.rewrite_sdist(
+                sdist,
+                traversal_member,
+                raw_append=[("../escape", b"escape")],
+            )
+            rebuilt_tamper = root / "rebuilt-tamper.tar.gz"
+            mutation = (
+                "from pathlib import Path as _ArtifactPath\n"
+                "_ArtifactPath('epub_browser/assets/vendor/{}')"
+                ".write_bytes(b'rebuilt-tamper')\n".format(first_target)
+            ).encode("utf-8")
+            self.rewrite_sdist(
+                sdist,
+                rebuilt_tamper,
+                change=lambda name, data: mutation + data
+                if name.endswith("/setup.py")
+                else data,
+            )
+            changed_wheel = root / "changed-wheel.whl"
+            self.rewrite_wheel_with_changed_file(
+                direct, changed_wheel, wheel_target
+            )
+            duplicate_wheel = root / "duplicate-wheel.whl"
+            self.rewrite_wheel_with_changed_duplicate(
+                direct, duplicate_wheel, wheel_target
+            )
+
+            cases = (
+                ("missing required input", direct, missing_input, "missing"),
+                ("changed locked vendor byte", direct, changed_vendor, "digest"),
+                ("duplicate changed vendor", direct, duplicate_vendor, "duplicate"),
+                ("extra vendor file", direct, extra_vendor, "inventory"),
+                ("link member", direct, linked_member, "linked|special"),
+                ("traversal member", direct, traversal_member, "unsafe"),
+                ("altered direct wheel", changed_wheel, None, "digest"),
+                ("duplicate changed wheel", duplicate_wheel, None, "duplicate"),
+                ("altered rebuilt wheel", direct, rebuilt_tamper, "digest"),
+            )
+            for label, wheel, source, message in cases:
+                with self.subTest(case=label):
+                    with redirect_stdout(io.StringIO()):
+                        with self.assertRaisesRegex(ReleaseArtifactError, message):
+                            verify_release_artifacts(
+                                wheel_path=wheel,
+                                lock_path=lock_path,
+                                notices_path=notices_path,
+                                sync_tool_path=sync_tool_path,
+                                sdist_path=source,
+                            )
+
     def test_docker_final_stage_copies_prefetched_runtime_without_pip(self):
         """The final image must not resolve or download Python dependencies."""
         repository_root = Path(__file__).parents[1]
@@ -831,6 +930,107 @@ class VendorAssetTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(contents)
         return self.write_lock(files=files), root
+
+    def build_release_artifacts(self, repository_root, root):
+        outputs = []
+        for kind, name, pattern in (
+            ("--wheel", "direct", "*.whl"),
+            ("--sdist", "source", "*.tar.gz"),
+        ):
+            output = root / name
+            output.mkdir()
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "build",
+                    kind,
+                    "--no-isolation",
+                    "--outdir",
+                    str(output),
+                ],
+                cwd=repository_root,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            outputs.append(next(output.glob(pattern)))
+        return tuple(outputs)
+
+    @staticmethod
+    def rewrite_sdist(
+        source,
+        destination,
+        omit=lambda name: False,
+        change=lambda name, data: data,
+        prepend=(),
+        append=(),
+        raw_append=(),
+        symlink=None,
+    ):
+        with tarfile.open(source, mode="r:gz") as original:
+            members = original.getmembers()
+            root = members[0].name.split("/", 1)[0]
+            with tarfile.open(destination, mode="w:gz") as rewritten:
+                for relative, data in prepend:
+                    VendorAssetTests.add_tar_bytes(
+                        rewritten, root + "/" + relative, data
+                    )
+                for member in members:
+                    if omit(member.name):
+                        continue
+                    cloned = copy.copy(member)
+                    if member.isfile():
+                        stream = original.extractfile(member)
+                        if stream is None:
+                            raise AssertionError("cannot read " + member.name)
+                        with stream:
+                            data = change(member.name, stream.read())
+                        cloned.size = len(data)
+                        rewritten.addfile(cloned, io.BytesIO(data))
+                    else:
+                        rewritten.addfile(cloned)
+                for relative, data in append:
+                    VendorAssetTests.add_tar_bytes(
+                        rewritten, root + "/" + relative, data
+                    )
+                for name, data in raw_append:
+                    VendorAssetTests.add_tar_bytes(rewritten, root + "/" + name, data)
+                if symlink is not None:
+                    member = tarfile.TarInfo(root + "/" + symlink)
+                    member.type = tarfile.SYMTYPE
+                    member.linkname = "../outside"
+                    rewritten.addfile(member)
+
+    @staticmethod
+    def add_tar_bytes(archive, name, data):
+        member = tarfile.TarInfo(name)
+        member.size = len(data)
+        archive.addfile(member, io.BytesIO(data))
+
+    @staticmethod
+    def rewrite_wheel_with_changed_duplicate(source, destination, target):
+        with zipfile.ZipFile(source) as original, zipfile.ZipFile(
+            destination, mode="w"
+        ) as rewritten:
+            rewritten.writestr(target, b"changed")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                for member in original.infolist():
+                    rewritten.writestr(member, original.read(member.filename))
+
+    @staticmethod
+    def rewrite_wheel_with_changed_file(source, destination, target):
+        with zipfile.ZipFile(source) as original, zipfile.ZipFile(
+            destination, mode="w"
+        ) as rewritten:
+            for member in original.infolist():
+                data = (
+                    b"changed"
+                    if member.filename == target
+                    else original.read(member.filename)
+                )
+                rewritten.writestr(member, data)
 
     def write_lock(self, files=None, targets=None):
         files = files or {target: b"asset" for target in targets}

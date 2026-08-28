@@ -55,7 +55,10 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
     }
     try:
         with zipfile.ZipFile(wheel_path) as archive:
-            names = set(archive.namelist())
+            member_names = archive.namelist()
+            if len(member_names) != len(set(member_names)):
+                raise ReleaseArtifactError("wheel contains duplicate members")
+            names = set(member_names)
             actual_names = {
                 name
                 for name in names
@@ -99,6 +102,9 @@ def verify_wheel(wheel_path: Path, lock_path: Path, notices_path: Path) -> None:
 
 def _safe_sdist_members(archive: tarfile.TarFile):
     members = archive.getmembers()
+    member_names = [member.name for member in members]
+    if len(member_names) != len(set(member_names)):
+        raise ReleaseArtifactError("sdist contains duplicate members")
     roots = set()
     for member in members:
         path = PurePosixPath(member.name)
