@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -77,6 +78,40 @@ class VendorAssetTests(unittest.TestCase):
         (root / "pkg/extra.js").write_bytes(b"unreviewed")
 
         with self.assertRaisesRegex(VendorAssetError, "file set"):
+            verify_assets(lock_path, root)
+
+    def test_verify_rejects_dangling_and_directory_symlinks_without_following_them(self):
+        """A symlink must not hide unexpected content outside the managed tree."""
+        lock_path, root = self.fixture_lock({"pkg/LICENSE": b"license", "pkg/file.js": b"asset"})
+        (root / "pkg/dangling").symlink_to(root / "outside")
+
+        with self.assertRaisesRegex(VendorAssetError, "symbolic link"):
+            verify_assets(lock_path, root)
+
+        (root / "pkg/dangling").unlink()
+        outside = self.directory / "outside"
+        outside.mkdir()
+        (outside / "unlocked.js").write_bytes(b"not managed")
+        (root / "pkg/linked-directory").symlink_to(outside, target_is_directory=True)
+
+        with self.assertRaisesRegex(VendorAssetError, "symbolic link"):
+            verify_assets(lock_path, root)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "platform does not support FIFOs")
+    def test_verify_rejects_special_files(self):
+        """A FIFO must not be silently omitted from the managed inventory."""
+        lock_path, root = self.fixture_lock({"pkg/LICENSE": b"license", "pkg/file.js": b"asset"})
+        os.mkfifo(root / "pkg/pipe")
+
+        with self.assertRaisesRegex(VendorAssetError, "unsupported entry"):
+            verify_assets(lock_path, root)
+
+    def test_verify_rejects_unowned_empty_directories(self):
+        """Only directories needed to contain locked files may exist in the vendor root."""
+        lock_path, root = self.fixture_lock({"pkg/LICENSE": b"license", "pkg/file.js": b"asset"})
+        (root / "unowned").mkdir()
+
+        with self.assertRaisesRegex(VendorAssetError, "unexpected directory"):
             verify_assets(lock_path, root)
 
     def test_verify_command_accepts_explicit_lock_and_vendor_root(self):

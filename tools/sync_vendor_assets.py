@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -106,17 +107,55 @@ def verify_assets(lock_path: Path, vendor_root: Path) -> None:
     }
     if vendor_root.is_symlink():
         raise VendorAssetError("vendor root must not be a symbolic link")
-    actual = {
-        path.relative_to(vendor_root).as_posix()
-        for path in vendor_root.rglob("*")
-        if path.is_file()
-    }
+    expected_directories = _expected_directories(expected)
+    actual = set()
+    for relative, kind in _vendor_entries(vendor_root):
+        if kind == "directory":
+            if relative not in expected_directories:
+                raise VendorAssetError("unexpected directory in vendor root: {}".format(relative))
+        else:
+            actual.add(relative)
     if actual != set(expected):
         raise VendorAssetError("generated vendor file set does not match lock")
     for relative, digest in expected.items():
         candidate = vendor_root / safe_relative(relative)
         if candidate.is_symlink() or sha256_file(candidate) != digest:
             raise VendorAssetError("{} SHA-256 mismatch".format(relative))
+
+
+def _expected_directories(expected: Dict[str, str]) -> set:
+    directories = set()
+    for target in expected:
+        parent = safe_relative(target).parent
+        while parent != PurePosixPath("."):
+            directories.add(parent.as_posix())
+            parent = parent.parent
+    return directories
+
+
+def _vendor_entries(vendor_root: Path) -> Iterable[Tuple[str, str]]:
+    """Yield regular files and directories, refusing links and special entries."""
+    if not vendor_root.exists():
+        return
+    if not vendor_root.is_dir():
+        raise VendorAssetError("vendor root must be a directory")
+
+    def walk(directory: Path) -> Iterable[Tuple[str, str]]:
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                path = Path(entry.path)
+                relative = path.relative_to(vendor_root).as_posix()
+                if entry.is_symlink():
+                    raise VendorAssetError("symbolic link in vendor root: {}".format(relative))
+                if entry.is_dir(follow_symlinks=False):
+                    yield relative, "directory"
+                    yield from walk(path)
+                elif entry.is_file(follow_symlinks=False):
+                    yield relative, "file"
+                else:
+                    raise VendorAssetError("unsupported entry in vendor root: {}".format(relative))
+
+    yield from walk(vendor_root)
 
 
 def _unique_object(pairs: Iterable[Tuple[str, Any]]) -> Dict[str, Any]:
