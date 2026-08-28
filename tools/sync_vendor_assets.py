@@ -20,6 +20,7 @@ from urllib.request import HTTPRedirectHandler, build_opener, urlopen
 
 LOCK_SCHEMA = 2
 SUPPORTED_LOCK_SCHEMAS = frozenset({1, LOCK_SCHEMA})
+ARCHIVE_DOWNLOAD_ATTEMPTS = 3
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 DRIVE_PATH_PATTERN = re.compile(r"[A-Za-z]:")
 
@@ -285,26 +286,33 @@ def fetch_assets(lock_path: Path, vendor_root: Path, opener=urlopen) -> None:
         open_url = _https_urlopen if opener is urlopen else opener
         for package_index, package in enumerate(lock.packages):
             archive_path = Path(temporary_directory) / "archive-{}".format(package_index)
-            try:
-                with open_url(package.source.url) as response:
-                    final_url = response.geturl()
-                    try:
-                        _require_https_url(final_url, "response final URL")
-                    except VendorAssetError as error:
-                        raise VendorAssetError(
-                            "{} download has an invalid final URL".format(
-                                package.name
-                            )
-                        ) from error
-                    digest = copy_bounded(response, archive_path, package.archive.max_bytes)
-            except VendorAssetError:
-                raise
-            except Exception as error:
-                raise VendorAssetError(
-                    "{} download failed".format(package.name)
-                ) from error
-            if digest != package.archive.sha256:
-                raise VendorAssetError("{} archive SHA-256 mismatch".format(package.name))
+            for attempt in range(ARCHIVE_DOWNLOAD_ATTEMPTS):
+                try:
+                    with open_url(package.source.url) as response:
+                        final_url = response.geturl()
+                        try:
+                            _require_https_url(final_url, "response final URL")
+                        except VendorAssetError as error:
+                            raise VendorAssetError(
+                                "{} download has an invalid final URL".format(
+                                    package.name
+                                )
+                            ) from error
+                        digest = copy_bounded(
+                            response, archive_path, package.archive.max_bytes
+                        )
+                except VendorAssetError:
+                    raise
+                except Exception as error:
+                    raise VendorAssetError(
+                        "{} download failed".format(package.name)
+                    ) from error
+                if digest == package.archive.sha256:
+                    break
+                if attempt + 1 == ARCHIVE_DOWNLOAD_ATTEMPTS:
+                    raise VendorAssetError(
+                        "{} archive SHA-256 mismatch".format(package.name)
+                    )
             try:
                 _preflight_tar_archive(
                     archive_path,
