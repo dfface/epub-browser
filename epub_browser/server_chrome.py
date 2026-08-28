@@ -113,7 +113,7 @@ SERVER_ACCOUNT_PANEL = '''
     <span data-i18n="admin.loading">Loading administration…</span>
 </div>
 <div class="account-modal-body"><div class="account-layout">
-<section class="account-admin account-admin-console" aria-labelledby="adminTitle">
+<section class="account-admin account-admin-console" id="adminConsole" aria-labelledby="adminTitle">
     <p class="account-admin-intro" data-i18n="admin.description">Manage users and access to restricted books.</p>
     <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
         <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
@@ -133,7 +133,7 @@ SERVER_ACCOUNT_PANEL = '''
         <div class="admin-overview-grid">
             <button type="button" class="admin-overview-stat" data-admin-section="users"><span data-i18n="admin.overview.users">Users</span><strong id="adminOverviewUsers">—</strong></button>
             <button type="button" class="admin-overview-stat" data-admin-section="ai-configuration"><span data-i18n="admin.overview.ai">AI reading</span><strong id="adminOverviewAi">—</strong></button>
-            <button type="button" class="admin-overview-stat" data-admin-section="tags"><span data-i18n="admin.overview.tags">Server tags</span><strong id="adminOverviewTags">—</strong></button>
+            <button type="button" class="admin-overview-stat" data-admin-section="tags"><span data-i18n="admin.overview.tags">Tags</span><strong id="adminOverviewTags">—</strong></button>
             <button type="button" class="admin-overview-stat" data-admin-section="books"><span data-i18n="admin.overview.books">Books</span><strong id="adminOverviewBooks">—</strong></button>
         </div>
         <section class="admin-system-limits" id="adminSystemLimits" aria-labelledby="adminSystemLimitsTitle">
@@ -226,12 +226,15 @@ SERVER_ACCOUNT_PANEL = '''
     </section>
     <section class="account-admin-section account-card-wide account-tags-section" id="adminTagsSection" role="tabpanel" aria-labelledby="adminSectionTagsTab" data-admin-panel="tags" hidden>
         <h4 id="adminTagsTitle" data-i18n="admin.tags">Tag management</h4>
-        <p class="account-section-copy" data-i18n="admin.tagsDescription">Create server-managed tags and assign them to books. They complement read-only EPUB tags.</p>
+        <p class="account-section-copy" data-i18n="admin.tagsDescription">Tags imported from books are managed here. Renaming or deleting a tag updates every assigned book.</p>
         <form class="account-form admin-ai-tag-form" id="adminAiTagForm">
-            <label><span data-i18n="admin.ai.tagName">Tag name</span><input type="text" name="name" required></label>
+            <label><span data-i18n="admin.ai.newTagName">New tag name</span><input type="text" name="name" maxlength="80" required></label>
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminAiTagSubmit" data-i18n="admin.ai.addTag">Add tag</button>
         </form>
-        <ul class="account-list" id="adminAiTagList"></ul>
+        <p id="adminAiTagMessage" class="auth-alert admin-ai-tag-message" role="alert" hidden></p>
+        <p id="adminAiTagLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
+        <label class="admin-ai-tag-search" id="adminAiTagSearchControl" for="adminAiTagSearch" hidden><span data-i18n="admin.ai.searchTags">Search tags</span><input id="adminAiTagSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.ai.searchPlaceholder" placeholder="Search by tag name"></label>
+        <ul class="account-list" id="adminAiTagList" aria-labelledby="adminTagsTitle"></ul>
     </section>
     <section class="account-admin-section account-card-wide admin-webhooks-section" id="adminWebhooksSection" role="tabpanel" aria-labelledby="adminSectionWebhooksTab" data-admin-panel="webhooks" hidden>
         <h4 data-i18n="admin.webhooks.title">WebHooks</h4>
@@ -253,12 +256,12 @@ SERVER_ACCOUNT_PANEL = '''
     </section>
     <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
         <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
-        <p class="account-section-copy" data-i18n="admin.booksDescription">Manage visibility, member access, server tags, AI reading classification, and AI results for each book.</p>
+        <p class="account-section-copy" data-i18n="admin.booksDescription">Manage book metadata, visibility, member access, tags, AI reading classification, and AI results.</p>
         <div id="adminBookTableSurface" class="admin-books-workspace" hidden>
             <div class="account-form admin-books-controls" role="search" aria-labelledby="adminBooksTitle">
                 <label class="admin-book-search-control" for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
                 <label class="admin-book-filter-control" for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
-                <label class="admin-book-filter-control" for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Server tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All server tags</option></select></label>
+                <label class="admin-book-filter-control" for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All tags</option></select></label>
                 <label class="admin-book-sort-control" for="adminBookSort"><span data-i18n="admin.books.sortLabel">Sort by</span><select id="adminBookSort"><option value="title_asc" data-i18n="admin.books.sort.titleAsc">Title (A–Z)</option><option value="title_desc" data-i18n="admin.books.sort.titleDesc">Title (Z–A)</option><option value="created_desc" data-i18n="admin.books.sort.createdDesc">Recently added</option><option value="updated_desc" data-i18n="admin.books.sort.updatedDesc">Recently updated</option></select></label>
                 <label class="admin-book-page-size-control" for="adminBookPageSize"><span data-i18n="admin.books.pageSize">Books per page</span><select id="adminBookPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button type="button" class="bookshelf-action-btn account-inline-action admin-book-clear-filters" id="adminBookClearFilters" data-i18n="admin.books.clearFilters">Clear filters</button>
@@ -287,6 +290,12 @@ SERVER_ACCOUNT_PANEL = '''
     </div>
 </section>
 </div></div>
+    </div>
+    <div class="admin-book-editor-modal" id="adminBookEditorModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="adminBookEditorModalTitle" hidden>
+        <div class="admin-book-editor-dialog">
+            <div class="admin-book-editor-modal-body" id="adminBookEditorContent"></div>
+            <button type="button" class="admin-book-editor-close" id="adminBookEditorClose" aria-label="Close book settings" data-i18n-aria-label="admin.books.closeEditor"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
     </div>
 </div>'''
 

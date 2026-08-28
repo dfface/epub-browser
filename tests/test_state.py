@@ -918,7 +918,8 @@ class StateStoreTests(unittest.TestCase):
                 "id": book.book_id,
                 "title": "算法导论",
                 "authors": ["作者甲"],
-                "epub_tags": ["算法"],
+                "tags": [{"id": tag["id"], "name": "Computer Science"}],
+                "epub_tags": [],
                 "visibility": "restricted",
                 "grant_count": 2,
                 "ai_profile": "technical",
@@ -982,12 +983,175 @@ class StateStoreTests(unittest.TestCase):
                 {"id": second_tag["id"], "name": "Second tag"},
             ),
         )
-        self.assertEqual(detail["effective_tags"], ("EPUB", "First tag", "Second tag"))
+        self.assertEqual(detail["effective_tags"], ("First tag", "Second tag"))
         self.assertEqual(detail["ai_profile"], "fiction")
         self.assertEqual(summary["id"], book.book_id)
         self.assertEqual(summary["grant_count"], 2)
         self.assertEqual(summary["ai_profile"], "fiction")
         self.assertEqual(summary["ai_tags"], list(detail["ai_tags"]))
+
+    def test_imported_metadata_is_initialized_once_then_managed_by_sqlite(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "managed.epub"),
+            "urn:test:managed-metadata",
+            "managed-fingerprint-a",
+            {
+                "title": "Original title",
+                "authors": ["Original author"],
+                "tags": ["History", "Novel"],
+            },
+            preferred_book_id="managed-book",
+        )
+
+        imported_tags = {
+            item["name"]: item for item in self.store.list_ai_tags()
+        }
+        self.assertEqual(set(imported_tags), {"History", "Novel"})
+        self.assertEqual(imported_tags["History"]["book_count"], 1)
+        self.assertEqual(imported_tags["Novel"]["book_count"], 1)
+
+        detail, summary = self.store.update_admin_book_settings(
+            book.book_id,
+            title="Curated title",
+            authors=["Curated author", "Second author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[imported_tags["History"]["id"]],
+            profile="auto",
+        )
+        self.assertEqual(detail["title"], "Curated title")
+        self.assertEqual(detail["authors"], ["Curated author", "Second author"])
+        self.assertEqual(detail["tags"], ({
+            "id": imported_tags["History"]["id"],
+            "name": "History",
+        },))
+        self.assertEqual(summary["title"], "Curated title")
+        self.assertEqual(summary["authors"], ["Curated author", "Second author"])
+        self.assertEqual(summary["tags"], list(detail["tags"]))
+        self.assertEqual(
+            [event["data"] for event in self.store.list_webhook_events(
+                event_type="book.updated"
+            )],
+            [{"book_id": book.book_id}],
+        )
+
+        self.store.update_book_version(
+            book.book_id,
+            "managed-fingerprint-b",
+            {
+                "title": "Replacement EPUB title",
+                "authors": ["Replacement EPUB author"],
+                "tags": ["Replacement EPUB tag"],
+            },
+        )
+
+        refreshed = self.store.get_admin_book_detail(book.book_id)
+        self.assertEqual(refreshed["title"], "Curated title")
+        self.assertEqual(refreshed["authors"], ["Curated author", "Second author"])
+        self.assertEqual(refreshed["tags"], detail["tags"])
+        self.assertEqual(
+            {item["name"] for item in self.store.list_ai_tags()},
+            {"History", "Novel"},
+        )
+
+        self.assertTrue(self.store.delete_ai_tag(imported_tags["History"]["id"]))
+        self.assertEqual(self.store.effective_book_tags(book.book_id), ())
+        with self.store._connection() as connection:
+            association = connection.execute(
+                "SELECT 1 FROM book_ai_tags WHERE book_id = ? AND tag_id = ?",
+                (book.book_id, imported_tags["History"]["id"]),
+            ).fetchone()
+        self.assertIsNone(association)
+        self.assertEqual(
+            len(self.store.list_webhook_events(event_type="book.updated")),
+            3,
+        )
+        self.assertTrue(all(
+            event["data"] == {"book_id": book.book_id}
+            for event in self.store.list_webhook_events(event_type="book.updated")
+        ))
+
+    def test_tag_rename_and_delete_emit_updates_for_active_assigned_books(self):
+        first = self.store.resolve_book(
+            Path(self.temporary.name, "webhook-first.epub"),
+            None,
+            "webhook-first-fingerprint",
+            {"title": "First", "tags": []},
+            preferred_book_id="webhook-first",
+        )
+        second = self.store.resolve_book(
+            Path(self.temporary.name, "webhook-second.epub"),
+            None,
+            "webhook-second-fingerprint",
+            {"title": "Second", "tags": []},
+            preferred_book_id="webhook-second",
+        )
+        inactive = self.store.resolve_book(
+            Path(self.temporary.name, "webhook-inactive.epub"),
+            None,
+            "webhook-inactive-fingerprint",
+            {"title": "Inactive", "tags": []},
+            preferred_book_id="webhook-inactive",
+        )
+        tag = self.store.create_ai_tag("Before rename")
+        for book in (first, second, inactive):
+            self.store.replace_book_ai_tags(book.book_id, [tag["id"]])
+        self.store.mark_missing(inactive.book_id)
+        self.store.create_webhook_endpoint(
+            "Book updates",
+            "https://example.test/books",
+            {"book.updated"},
+        )
+
+        self.store.rename_ai_tag(tag["id"], "After rename")
+        renamed_events = self.store.list_webhook_events(event_type="book.updated")
+        self.assertEqual(
+            {event["data"]["book_id"] for event in renamed_events},
+            {first.book_id, second.book_id},
+        )
+        self.assertEqual(len(self.store.list_webhook_deliveries()), 2)
+
+        self.assertTrue(self.store.delete_ai_tag(tag["id"]))
+        all_events = self.store.list_webhook_events(event_type="book.updated")
+        self.assertEqual(len(all_events), 4)
+        self.assertEqual(
+            {event["data"]["book_id"] for event in all_events},
+            {first.book_id, second.book_id},
+        )
+        self.assertEqual(len(self.store.list_webhook_deliveries()), 4)
+        self.assertEqual(self.store.effective_book_tags(first.book_id), ())
+        self.assertEqual(self.store.effective_book_tags(second.book_id), ())
+
+    def test_v18_migration_imports_existing_display_metadata_and_tags(self):
+        book = self.store.resolve_book(
+            Path(self.temporary.name, "before-v18.epub"),
+            "urn:test:before-v18",
+            "before-v18-fingerprint",
+            {
+                "title": "Migrated title",
+                "authors": ["Migrated author"],
+                "tags": ["Migrated tag"],
+            },
+            preferred_book_id="before-v18-book",
+        )
+        with self.store._connection() as connection:
+            connection.execute(
+                "DELETE FROM book_ai_tags WHERE book_id = ?", (book.book_id,)
+            )
+            connection.execute("DELETE FROM ai_tags")
+            connection.execute(
+                "UPDATE books SET title = 'EPUB Book', authors_json = '[]' "
+                "WHERE book_id = ?",
+                (book.book_id,),
+            )
+            connection.execute("PRAGMA user_version = 17")
+
+        StateStore(self.database).initialize()
+
+        migrated = self.store.managed_book_metadata(book.book_id)
+        self.assertEqual(migrated["title"], "Migrated title")
+        self.assertEqual(migrated["authors"], ["Migrated author"])
+        self.assertEqual(migrated["tags"], ["Migrated tag"])
 
     def test_invalid_admin_book_settings_roll_back(self):
         book = self.store.resolve_book(
@@ -2534,7 +2698,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertTrue(self.store.can_use_ai(member))
         self.assertEqual(self.store.ai_daily_limit(member), 5)
 
-    def test_administrator_tags_merge_with_epub_tags_and_ai_profile_is_independent(self):
+    def test_imported_and_administrator_tags_share_one_managed_collection(self):
         book = self.store.resolve_book(
             Path(self.temporary.name, "book.epub"),
             "urn:test:tags",
@@ -2550,21 +2714,24 @@ class StateStoreTests(unittest.TestCase):
         usage_by_tag = {
             item["name"]: item["book_count"] for item in self.store.list_ai_tags()
         }
-        self.assertEqual(usage_by_tag, {"Domain driven design": 1, "history": 1})
+        self.assertEqual(
+            usage_by_tag,
+            {"DDD": 0, "Domain driven design": 1, "History": 1},
+        )
 
         self.assertEqual(
             self.store.effective_book_tags(book.book_id),
-            ("DDD", "Domain driven design", "History"),
+            ("Domain driven design", "History"),
         )
         self.assertEqual(
             tuple(item["name"] for item in self.store.book_ai_tags(book.book_id)),
-            ("Domain driven design", "history"),
+            ("Domain driven design", "History"),
         )
         self.assertEqual(self.store.get_book_ai_profile(book.book_id), "fiction")
         self.store.delete_ai_tag(tag["id"])
         self.assertEqual(
             self.store.effective_book_tags(book.book_id),
-            ("DDD", "Domain driven design", "History"),
+            ("Domain driven design",),
         )
 
     def test_ai_usage_is_atomic_and_incomplete_jobs_are_marked_interrupted(self):

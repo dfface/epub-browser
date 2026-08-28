@@ -834,10 +834,7 @@ class AIReadingService:
         record = self.store.book_by_id(book_id)
         if record is None:
             raise AIReadingError("book_not_found")
-        try:
-            return json.loads(record.metadata_json)
-        except json.JSONDecodeError:
-            return {}
+        return self.store.managed_book_metadata(book_id)
 
     def _cache_key(
         self, request: ReadingRequest, material: str, profile: str, template: Optional[dict] = None

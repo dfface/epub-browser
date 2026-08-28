@@ -23,10 +23,11 @@ class ServerPageRenderer:
     freshly published asset manifest, avoiding a second HTML template system.
     """
 
-    def __init__(self, public_dir, book_id, urls=None):
+    def __init__(self, public_dir, book_id, urls=None, metadata_overrides=None):
         self.public_dir = Path(public_dir)
         self.book_id = str(book_id)
         self.urls = urls or SiteURLs()
+        self.metadata_overrides = dict(metadata_overrides or {})
         self.content_dir = self.public_dir / "book" / self.book_id / "content"
 
     def render_index(self, initial_book_review=None) -> str:
@@ -70,6 +71,9 @@ class ServerPageRenderer:
 
     def _processor(self) -> EPUBProcessor:
         metadata = self._read_json(self.content_dir / "metadata.json")
+        for key in ("title", "authors", "tags"):
+            if key in self.metadata_overrides:
+                metadata[key] = self.metadata_overrides[key]
         # EPUBProcessor already owns the single source of truth for page
         # templates. Hydrating an instance avoids duplicating its large,
         # security-sensitive reader chrome while keeping transient state out
