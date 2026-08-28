@@ -5,7 +5,7 @@
 [English](https://github.com/dfface/epub-browser/blob/main/README.md) | [简体中文](https://github.com/dfface/epub-browser/blob/main/README.zh-CN.md) | [繁體中文](https://github.com/dfface/epub-browser/blob/main/README.zh-TW.md) | [한국어](https://github.com/dfface/epub-browser/blob/main/README.ko.md) | [日本語](https://github.com/dfface/epub-browser/blob/main/README.ja.md)
 
 <p align="center">
-  <img src="https://github.com/dfface/epub-browser/blob/aff1def01252481f74c25ebf5b17d142b7db3c5e/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
+  <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
 </p>
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
@@ -37,7 +37,7 @@ learning layer *on the original chapter*: a reading route before the text,
 explanations exactly where evidence appears, a chapter mind map, and questions
 that help the reader carry the argument forward.
 
-![A chapter guide stays with the original text while Ask AI remains available in a private drawer.](docs/releases/assets/v2.2.0-chapter-guide-ask-ai.png)
+![A chapter guide stays with the original text while Ask AI remains available in a private drawer.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-chapter-guide-ask-ai.png)
 
 ### Read with the text, not away from it
 
@@ -53,8 +53,8 @@ that help the reader carry the argument forward.
   passive reading into reflection.
 
 <p align="center">
-  <img src="https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/docs/releases/assets/v2.2.0-inline-claim.png" alt="An AI explanation opens from a highlighted claim" width="48%">
-  <img src="https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/docs/releases/assets/v2.2.0-paragraph-note.png" alt="A paragraph-role note remains tied to its original text" width="48%">
+  <img src="[https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-inline-claim.png" alt="An AI explanation opens from a highlighted claim" width="48%">
+  <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-paragraph-note.png" alt="A paragraph-role note remains tied to its original text" width="48%">
 </p>
 
 ### Ask AI, without losing the book
@@ -75,14 +75,14 @@ configuration version. Administrators can manage model access and results;
 members can only manage their own eligible output. Every AI capability respects
 the existing book-access rules.
 
-![The AI readings hub groups shared learning layers by book and chapter.](https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/docs/releases/assets/v2.2.0-ai-reading-library.png)
+![The AI readings hub groups shared learning layers by book and chapter.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-ai-reading-library.png)
 
 AI reading is intentionally a **Server-mode feature**. Configure an
 OpenAI-compatible provider and explicitly grant member access before enabling
 it. SSG stays fully static and contains none of the AI controls, background
 jobs, account data, or provider configuration. See the
-[AI-native reading design](https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/docs/ai-native-reading.md) and
-[local rich-text renderer notes](https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/docs/third-party-ai-renderers.md) for the
+[AI-native reading design](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/ai-native-reading.md) and
+[local rich-text renderer notes](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/third-party-ai-renderers.md) for the
 interaction model and safety boundary.
 
 ## Requirements and installation
@@ -466,7 +466,7 @@ Regenerate it with a normalized `--base-path`, such as `/reader/`, and configure
 
 ### Server refuses to start after an upgrade
 
-Read the first logged migration or validation error, preserve the data and source files, and consult [docs/migration-v2.md](https://github.com/dfface/epub-browser/blob/008904e2dd913192367c34251a239cb8e8dff222/docs/migration-v2.md). Do not delete the authoritative `data/` directory to work around an error.
+Read the first logged migration or validation error, preserve the data and source files, and consult [docs/migration-v2.md](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/migration-v2.md). Do not delete the authoritative `data/` directory to work around an error.
 
 ## Contributing
 
