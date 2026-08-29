@@ -1743,20 +1743,19 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('flex: 1 1 0;', content_container_rule)
         self.assertIn('min-height: 0;', content_container_rule)
 
-        navigation_start = stylesheet.index('.pagination-mode .navigation {')
-        navigation_rule = stylesheet[navigation_start:stylesheet.index('}', navigation_start)]
-        self.assertIn('flex: 0 0 auto;', navigation_rule)
-
         self.assertRegex(
             stylesheet,
             r'@media \(max-width: 768px\)[\s\S]*?'
             r'\.pagination-mode \.container\s*\{[^}]*'
             r'padding-bottom:\s*calc\(60px \+ env\(safe-area-inset-bottom\)\);',
         )
-        self.assertRegex(
-            stylesheet,
-            r'@media \(max-width: 768px\)[\s\S]*?'
-            r'\.pagination-mode \.navigation\s*\{[^}]*display:\s*none\s*!important;',
+        self.assertNotIn('.pagination-mode .navigation', stylesheet)
+        self.assertIn('var nextHeight = contentContainer.clientHeight;', script)
+        self.assertIn('paginationCanvasSizeChanged(nextWidth, nextHeight)', script)
+        self.assertIn("window.addEventListener('resize', schedulePaginationCanvasSync", script)
+        self.assertIn(
+            'if (paginationCanvasWidthChanged(getPaginationCanvasWidth()))',
+            script,
         )
 
         create_pages_start = script.index('function createPages(')
@@ -2594,6 +2593,7 @@ assert.deepEqual(
         )
 
     def test_pagination_disables_only_incompatible_reading_settings(self):
+        html = self._chapter_html()
         script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
 
         self.assertIn(
@@ -2609,10 +2609,51 @@ assert.deepEqual(
             'navigationBehaviorSettings.disabled = isPaginationMode;',
             script,
         )
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+        self.assertIn('body.pagination-mode .pagination-incompatible-setting', css)
+        self.assertIn('body.pagination-mode .desktop-setting-only', css)
         self.assertNotIn(
             'autoHideDesktopToolbarToggle.disabled = isPaginationMode;',
             script,
         )
+        self.assertIn('id="clickPageToggle"', html)
+        self.assertIn('clickPageToggle.disabled = !isPaginationMode;', script)
+
+    def test_desktop_pagination_navigation_lives_in_the_reader_toolbar(self):
+        html = self._chapter_html()
+        toolbar_start = html.index('reader-toolbar top-controls chapter-tools')
+        toolbar_end = html.index('<div class="eb-content-container"', toolbar_start)
+        pagination_toolbar = html[toolbar_start:toolbar_end]
+        self.assertIn('id="paginationInfo"', pagination_toolbar)
+        control_ids = (
+            'readerPreviousChapter',
+            'prevPage',
+            'reloadPages',
+            'nextPage',
+            'readerNextChapter',
+        )
+        positions = [pagination_toolbar.index(f'id="{control_id}"') for control_id in control_ids]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn('id="pageJumpInput"', pagination_toolbar)
+        self.assertIn('id="goToPage"', pagination_toolbar)
+        self.assertNotIn('id="exitPaginationMode"', html)
+        self.assertNotIn('id="togglePureMode"', html)
+        self.assertNotIn('data-id="navigation"', html)
+        self.assertNotIn('id="navigationHomeBtn"', html)
+
+    def test_mobile_pagination_exposes_an_accessible_page_jump_action(self):
+        html = self._chapter_html()
+        css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        mobile_start = html.index('<div class="mobile-controls"')
+        mobile_end = html.index('<!-- 书架弹窗 -->', mobile_start)
+        mobile_controls = html[mobile_start:mobile_end]
+        self.assertIn('id="mobilePageJumpBtn"', mobile_controls)
+        self.assertIn('data-i18n-aria-label="reader.jump"', mobile_controls)
+        self.assertIn('body:not(.pagination-mode) #mobilePageJumpBtn', css)
+        self.assertIn("window.EpubDialog.prompt({", script)
+        self.assertIn("inputType: 'number'", script)
 
     def test_chapter_script_uses_an_immutable_content_addressed_url(self):
         self.assertRegex(self._chapter_html(), r'/assets/immutable/chapter\.[0-9a-f]{12}\.js')
@@ -2714,7 +2755,7 @@ assert.deepEqual(
         content_rules = css[css.index(".eb-content-container {"):css.index("}", css.index(".eb-content-container {"))]
 
         self.assertIn("margin-top: 18px;", content_rules)
-        self.assertIn(".navigation, .custom-css-panel, .eb-content-container", css)
+        self.assertIn(".breadcrumb, .custom-css-panel, .eb-content-container", css)
 
     def test_book_and_chapter_do_not_repeat_location_breadcrumbs(self):
         for html in (self._book_html(), self._chapter_html()):
@@ -3203,21 +3244,18 @@ assert.deepEqual(
         self.assertIn("settingsModal.setAttribute('aria-hidden', 'false')", chapter_js)
         self.assertIn('settingsOpener.focus()', chapter_js)
 
-    def test_scroll_reader_uses_a_compact_book_level_navigation_bar(self):
+    def test_scroll_reader_uses_toolbar_chapter_navigation_without_a_bottom_bar(self):
         chapter = self._chapter_html()
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
 
-        home = re.search(
-            r'<a\b[^>]*\bid=(?:["\'])?navigationHomeBtn(?:["\' >])[^>]*>',
-            chapter,
-        )
-        self.assertIsNotNone(home)
-        self.assertRegex(home.group(0), r'\bhref=(?:["\'])?/book/[^ >]+/index\.html')
-        self.assertRegex(home.group(0), r'data-i18n-aria-label=(?:["\'])?reader\.book')
-        self.assertIn('body:not(.pagination-mode) .navigation {', chapter_css)
-        self.assertIn('width: min(100%, 520px);', chapter_css)
-        self.assertIn('body:not(.pagination-mode) .navigation .control-btn', chapter_css)
-        self.assertIn('flex-direction: row;', chapter_css)
+        toolbar_start = chapter.index('reader-toolbar top-controls chapter-tools')
+        toolbar_end = chapter.index('<div class="eb-content-container"', toolbar_start)
+        toolbar = chapter[toolbar_start:toolbar_end]
+        self.assertIn('class="control-btn prev-chapter"', toolbar)
+        self.assertIn('class="control-btn next-chapter"', toolbar)
+        self.assertNotIn('data-id="navigation"', chapter)
+        self.assertNotIn('navigationHomeBtn', chapter)
+        self.assertNotIn('.navigation {', chapter_css)
 
     def test_theme_action_is_a_compact_icon_control(self):
         css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
@@ -3563,7 +3601,7 @@ assert.deepEqual(
             )
             self.assertIn(f'data-i18n="{key}"', reading)
         self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
-        self.assertEqual(reading.count('class="switch-slider"'), 8)
+        self.assertEqual(reading.count('class="switch-slider"'), 9)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'

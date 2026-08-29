@@ -293,9 +293,8 @@ function initScript() {
     chapter_index = chapter_index.replace("chapter_", "").replace(".html", "");
 
     var paginationModeToggle = document.getElementById('paginationModeToggle');
-    var exitPaginationModeBtn = document.getElementById('exitPaginationMode');
-    var navigationHomeBtn = document.getElementById('navigationHomeBtn');
     var paginationInfo = document.getElementById('paginationInfo');
+    var paginationToolbarControls = paginationInfo.querySelectorAll('[data-pagination-toolbar-control]');
     var currentPageEl = document.getElementById('currentPage');
     var totalPagesEl = document.getElementById('totalPages');
     var prevPageBtn = document.getElementById('prevPage');
@@ -306,9 +305,8 @@ function initScript() {
     var goToPageBtn = document.getElementById('goToPage');
     var progressFill = document.getElementById('progressBar');
     var readingProgressContainer = document.querySelector('.reading-progress-container');
-    var pageHeightSetBtn = document.querySelector("#setPageHeight");
-    var pageHeightInput = document.querySelector("#pageHeightInput");
-    var toggleClickPageBtn = document.getElementById('toggleClickPage');
+    var clickPageToggle = document.getElementById('clickPageToggle');
+    var mobilePageJumpBtn = document.getElementById('mobilePageJumpBtn');
 
     function getStorageKey(mode) {
         return mode + '_' + book_hash + '_' + chapter_index;
@@ -320,7 +318,9 @@ function initScript() {
     var totalPages = 0;
     var contentWidth = 0;
     var pageWidth = 0;
+    var pageHeight = 0;
     var paginationResizeObserver = null;
+    var paginationWindowResizeBound = false;
     var paginationWidthSyncPending = false;
     var isClickPageEnabled = false;
     var loadedChapters = {};  // 记录已加载的章节 {chapterIndex: true}
@@ -510,12 +510,6 @@ function initScript() {
         });
     });
 
-    if (isKindleMode() || isPaginationMode) {
-        var mobileControls = document.querySelector('.mobile-controls');
-        var bottomNav = document.querySelector('.navigation');
-        bottomNav.style.marginBottom = getElementHeight(mobileControls) + 'px';
-    }
-
     if (isKindleMode()) {
         document.documentElement.classList.remove("kindle-mode");
         document.documentElement.classList.add("kindle-mode");
@@ -569,12 +563,6 @@ function initScript() {
             savePaginationModeAndReload(this.checked);
         });
     }
-    if (exitPaginationModeBtn) {
-        exitPaginationModeBtn.addEventListener('click', function() {
-            savePaginationModeAndReload(false);
-        });
-    }
-    
     function enablePaginationMode() {
         if (!isKindleMode()) localStorage.setItem('turning', 'true');
         else setCookie('turning', 'true');
@@ -584,13 +572,10 @@ function initScript() {
         document.body.classList.add('pagination-mode');
         contentContainer.classList.add('pagination-mode');
         
-        var mobileControls = document.querySelector('.mobile-controls');
-        var bottomNav = document.querySelector('.navigation');
-        bottomNav.style.marginBottom = getElementHeight(mobileControls) + 'px';
-        
         toggleHideUnnecessary(true);
-        paginationInfo.style.display = 'flex';
-        navigationHomeBtn.style.display = 'none';
+        for (var p = 0; p < paginationToolbarControls.length; p++) {
+            paginationToolbarControls[p].hidden = false;
+        }
         
         document.querySelectorAll('.eb-content a').forEach(function(item) {
             var href = item.getAttribute('href');
@@ -658,6 +643,13 @@ function initScript() {
         return Math.round(pageIndex * pageWidth);
     }
 
+    function paginationCanvasSizeChanged(nextWidth, nextHeight) {
+        if (window.EpubReaderLayout && typeof window.EpubReaderLayout.paginationWidthChanged === 'function') {
+            if (window.EpubReaderLayout.paginationWidthChanged(pageWidth, nextWidth)) return true;
+        }
+        return Math.abs(pageWidth - nextWidth) > 0.01 || Math.abs(pageHeight - nextHeight) > 0.01;
+    }
+
     function paginationCanvasWidthChanged(nextWidth) {
         if (window.EpubReaderLayout && typeof window.EpubReaderLayout.paginationWidthChanged === 'function') {
             return window.EpubReaderLayout.paginationWidthChanged(pageWidth, nextWidth);
@@ -669,20 +661,32 @@ function initScript() {
         paginationWidthSyncPending = false;
         if (!isPaginationMode || !pageWidth) return;
         var nextWidth = getPaginationCanvasWidth();
-        if (!paginationCanvasWidthChanged(nextWidth)) return;
-        var savedPage = currentPage;
+        var nextHeight = contentContainer.clientHeight;
+        if (!paginationCanvasSizeChanged(nextWidth, nextHeight)) return;
+        var savedProgress = totalPages > 1 ? currentPage / (totalPages - 1) : 0;
         calculateTotalPages();
-        showPage(Math.min(savedPage, totalPages - 1));
+        showPage(Math.round(savedProgress * Math.max(0, totalPages - 1)));
+    }
+
+    function schedulePaginationCanvasSync() {
+        if (paginationWidthSyncPending) return;
+        paginationWidthSyncPending = true;
+        afterPaginationLayout(syncPaginationCanvasWidth);
     }
 
     function watchPaginationCanvas() {
-        if (paginationResizeObserver || typeof window.ResizeObserver !== 'function') return;
-        paginationResizeObserver = new window.ResizeObserver(function() {
-            if (paginationWidthSyncPending) return;
-            paginationWidthSyncPending = true;
-            afterPaginationLayout(syncPaginationCanvasWidth);
-        });
-        paginationResizeObserver.observe(contentContainer);
+        if (!paginationWindowResizeBound) {
+            window.addEventListener('resize', schedulePaginationCanvasSync, { passive: true });
+            paginationWindowResizeBound = true;
+        }
+        if (!paginationResizeObserver && typeof window.ResizeObserver === 'function') {
+            paginationResizeObserver = new window.ResizeObserver(function() {
+                if (paginationCanvasWidthChanged(getPaginationCanvasWidth())) {
+                    schedulePaginationCanvasSync();
+                }
+            });
+            paginationResizeObserver.observe(contentContainer);
+        }
     }
     
     function createPages(target) {
@@ -759,13 +763,8 @@ function initScript() {
     
     function calculateTotalPages() {
         var w = getPaginationCanvasWidth();
-        var nav = document.querySelector('.pagination-mode .navigation');
-        if (nav) {
-            nav.style.width = w + 'px';
-            nav.style.padding = '20px';
-            nav.style.boxSizing = 'border-box';
-        }
         pageWidth = w;
+        pageHeight = contentContainer.clientHeight;
         content.style.columnCount = 'auto';
         content.style.columnWidth = pageWidth + 'px';
         content.style.boxSizing = 'border-box';
@@ -816,8 +815,9 @@ function initScript() {
         content.style.columnFill = '';
         content.style.columnGap = '';
         toggleHideUnnecessary(false);
-        paginationInfo.style.display = 'none';
-        navigationHomeBtn.style.display = 'flex';
+        for (var p = 0; p < paginationToolbarControls.length; p++) {
+            paginationToolbarControls[p].hidden = true;
+        }
         
         document.querySelectorAll('.eb-content a').forEach(function(item) {
             var href = item.getAttribute('data-original-href');
@@ -901,14 +901,20 @@ function initScript() {
         }
     }
 
-    goToPageBtn.addEventListener('click', function() {
-        var n = parseInt(pageJumpInput.value,10);
+    function jumpToPage(value) {
+        var n = parseInt(value,10);
         if (n >=1 && n <= totalPages) {
             showPage(n-1, true);
+            return true;
         } else {
             showNotification(i18n.t('reader.pageRange', { total: totalPages }), 'warning');
             pageJumpInput.value = currentPage+1;
+            return false;
         }
+    }
+
+    goToPageBtn.addEventListener('click', function() {
+        jumpToPage(pageJumpInput.value);
     });
     
     pageJumpInput.addEventListener('keypress', function(e) {
@@ -918,23 +924,21 @@ function initScript() {
         }
     });
 
-    pageHeightInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            pageHeightSetBtn.click();
-        }
-    });
-
-    pageHeightSetBtn.addEventListener('click', function() {
-        var h = parseFloat(pageHeightInput.value);
-        if (h>0) {
-            if (isKindleMode()) setCookie('page_height', h);
-            else localStorage.setItem('page_height', h);
-            location.reload();
-        } else {
-            showNotification(i18n.t('reader.validNumber'), 'warning');
-        }
-    });
+    if (mobilePageJumpBtn) {
+        mobilePageJumpBtn.addEventListener('click', async function() {
+            if (!isPaginationMode || !window.EpubDialog) return;
+            var value = await window.EpubDialog.prompt({
+                title: i18n.t('reader.jump'),
+                message: i18n.t('reader.pageRange', { total: totalPages }),
+                inputLabel: i18n.t('reader.currentPage'),
+                inputType: 'number',
+                defaultValue: String(currentPage + 1),
+                confirmText: i18n.t('reader.jump'),
+                selectOnOpen: true
+            });
+            if (value !== null) jumpToPage(value);
+        });
+    }
 
     function chapterTargetFromUrl(url) {
         var link = document.createElement('a');
@@ -965,6 +969,9 @@ function initScript() {
         var href = incoming.getAttribute('href');
         if (href) current.setAttribute('href', href);
         else current.removeAttribute('href');
+        if (current.classList.contains('prev-chapter') || current.classList.contains('next-chapter')) {
+            current.setAttribute('aria-disabled', href ? 'false' : 'true');
+        }
     }
 
     function syncChapterNavigationLinks(source) {
@@ -1285,7 +1292,7 @@ function initScript() {
         var tn = t.tagName.toLowerCase();
         if (tn === 'a' || tn === 'button' || tn === 'input' || tn === 'textarea' || tn === 'select' || tn === 'img') interactive = true;
         else if (t.closest('a') || t.closest('button') || t.closest('input') || t.closest('textarea') || t.closest('select')) interactive = true;
-        else if (t.closest('.navigation') || t.closest('.settings-modal') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.fancybox__container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
+        else if (t.closest('.settings-modal') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.fancybox__container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
         if (interactive) return;
         
         var w = window.innerWidth;
@@ -1335,24 +1342,18 @@ function initScript() {
     }
     
     function updateClickPageButton() {
-        if (isClickPageEnabled) {
-            toggleClickPageBtn.classList.add('active');
-            toggleClickPageBtn.style.background = 'var(--primary)';
-            toggleClickPageBtn.style.color = 'white';
-        } else {
-            toggleClickPageBtn.classList.remove('active');
-            toggleClickPageBtn.style.background = '';
-            toggleClickPageBtn.style.color = '';
-        }
+        if (!clickPageToggle) return;
+        clickPageToggle.checked = isClickPageEnabled;
+        clickPageToggle.disabled = !isPaginationMode;
+        clickPageToggle.setAttribute('aria-disabled', clickPageToggle.disabled ? 'true' : 'false');
     }
     
     initClickPageState();
     document.body.addEventListener('click', handleClickPage);
     
     var isPureModeEnabled = false;
-    var togglePureModeBtn = document.getElementById('togglePureMode');
-    
     function initPureModeState() {
+        if (!isMobile()) return;
         if (!isKindleMode()) {
             if (window.epubBrowserCache && window.epubBrowserCache.pureModeEnabled) {
                 isPureModeEnabled = window.epubBrowserCache.pureModeEnabled === 'true';
@@ -1366,35 +1367,17 @@ function initScript() {
         } else {
             isPureModeEnabled = getCookie('pureModeEnabled') === 'true';
         }
-        updatePureModeButton();
-        var nav = document.querySelector('.navigation');
         var cc = document.querySelector('.eb-content-container');
         var eb = document.getElementById('eb-content');
         if (isPureModeEnabled && isPaginationMode) {
-            nav.style.display = 'none';
-            if (isMobile()) {
-                var mc = document.querySelector('.mobile-controls');
-                if (mc) mc.style.display = 'none';
-            } else {
-                var topc = document.querySelector('.top-controls');
-                var rc = document.querySelector('.reading-controls');
-                if (topc) topc.style.display = 'none';
-                if (rc) rc.style.display = 'none';
-            }
+            var mc = document.querySelector('.mobile-controls');
+            if (mc) mc.style.display = 'none';
             cc.style.marginTop = '0';
             cc.style.marginBottom = '0';
             eb.style.minHeight = 'calc(100vh - 80px)';
         } else {
-            nav.style.display = 'flex';
-            if (isMobile()) {
-                var mc = document.querySelector('.mobile-controls');
-                if (mc) mc.style.display = '';
-            } else {
-                var topc = document.querySelector('.top-controls');
-                var rc = document.querySelector('.reading-controls');
-                if (topc) topc.style.display = '';
-                if (rc) rc.style.display = '';
-            }
+            var mc = document.querySelector('.mobile-controls');
+            if (mc) mc.style.display = '';
             cc.style.marginTop = '';
             cc.style.marginBottom = '';
             eb.style.minHeight = '';
@@ -1415,53 +1398,22 @@ function initScript() {
         }
         isPureModeEnabled = !isPureModeEnabled;
         savePureModeState();
-        updatePureModeButton();
-        var nav = document.querySelector('.navigation');
         var cc = document.querySelector('.eb-content-container');
         var eb = document.getElementById('eb-content');
         if (isPureModeEnabled) {
-            nav.style.display = 'none';
-            if (isMobile()) {
-                var mc = document.querySelector('.mobile-controls');
-                if (mc) mc.style.display = 'none';
-            } else {
-                var topc = document.querySelector('.top-controls');
-                var rc = document.querySelector('.reading-controls');
-                if (topc) topc.style.display = 'none';
-                if (rc) rc.style.display = 'none';
-            }
+            var mc = document.querySelector('.mobile-controls');
+            if (mc) mc.style.display = 'none';
             cc.style.marginTop = '0';
             cc.style.marginBottom = '0';
             eb.style.minHeight = 'calc(100vh - 80px)';
             showNotification(i18n.t('reader.pureModeOn'), 'info');
         } else {
-            nav.style.display = 'flex';
-            if (isMobile()) {
-                var mc = document.querySelector('.mobile-controls');
-                if (mc) mc.style.display = '';
-            } else {
-                var topc = document.querySelector('.top-controls');
-                var rc = document.querySelector('.reading-controls');
-                if (topc) topc.style.display = '';
-                if (rc) rc.style.display = '';
-            }
+            var mc = document.querySelector('.mobile-controls');
+            if (mc) mc.style.display = '';
             cc.style.marginTop = '';
             cc.style.marginBottom = '';
             eb.style.minHeight = '';
             showNotification(i18n.t('reader.pureModeOff'), 'info');
-        }
-    }
-    
-    function updatePureModeButton() {
-        if (!togglePureModeBtn) return;
-        if (isPureModeEnabled) {
-            togglePureModeBtn.classList.add('active');
-            togglePureModeBtn.style.background = 'var(--primary)';
-            togglePureModeBtn.style.color = 'white';
-        } else {
-            togglePureModeBtn.classList.remove('active');
-            togglePureModeBtn.style.background = '';
-            togglePureModeBtn.style.color = '';
         }
     }
     
@@ -1481,15 +1433,10 @@ function initScript() {
         if (Math.abs(e.clientX - cx) < w && Math.abs(e.clientY - cy) < h) {
             if (isPaginationMode) {
                 if (isMobile()) togglePureMode();
-                else if (isPureModeEnabled) togglePureMode();
             }
         }
     });
     
-    if (togglePureModeBtn) {
-        togglePureModeBtn.addEventListener('click', togglePureMode);
-    }
-
     var reloadPagesBtn = document.getElementById('reloadPages');
     if (reloadPagesBtn) {
         reloadPagesBtn.addEventListener('click', function() {
@@ -1512,12 +1459,18 @@ function initScript() {
 
     initPureModeState();
     
-    toggleClickPageBtn.addEventListener('click', function() {
-        isClickPageEnabled = !isClickPageEnabled;
-        saveClickPageState();
-        updateClickPageButton();
-        showNotification(i18n.t(isClickPageEnabled ? 'reader.clickPageOn' : 'reader.clickPageOff'), 'info');
-    });
+    if (clickPageToggle) {
+        clickPageToggle.addEventListener('change', function() {
+            if (!isPaginationMode) {
+                this.checked = isClickPageEnabled;
+                return;
+            }
+            isClickPageEnabled = this.checked;
+            saveClickPageState();
+            updateClickPageButton();
+            showNotification(i18n.t(isClickPageEnabled ? 'reader.clickPageOn' : 'reader.clickPageOff'), 'info');
+        });
+    }
     
     function customCssFunc() {
         if (isKindleMode()) return;
@@ -2872,6 +2825,10 @@ function initScript() {
     var navigationBehaviorSettings = document.querySelector('.navigation-behavior-settings');
 
     function syncPaginationSettingsAvailability() {
+        if (clickPageToggle) {
+            clickPageToggle.disabled = !isPaginationMode;
+            clickPageToggle.setAttribute('aria-disabled', clickPageToggle.disabled ? 'true' : 'false');
+        }
         if (desktopChapterSidebarToggle) {
             desktopChapterSidebarToggle.disabled = isPaginationMode;
             desktopChapterSidebarToggle.setAttribute('aria-disabled', isPaginationMode ? 'true' : 'false');

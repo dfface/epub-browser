@@ -2811,8 +2811,8 @@ document.addEventListener('DOMContentLoaded', function() {{
         server_locale_script = SERVER_LOCALE_SCRIPT
         prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
-        prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
-        next_link = f'<a {next_href} aria-label="Next chapter" data-i18n-aria-label="reader.next" class="next-chapter"> <div class="control-btn"> <i class="fas fa-arrow-right"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></div></a>'
+        prev_link = f'<a {prev_href} id="readerPreviousChapter" class="control-btn prev-chapter" aria-label="Previous chapter" data-i18n-aria-label="reader.previous" aria-disabled="{"false" if prev_href else "true"}"><i class="fas fa-arrow-left" aria-hidden="true"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></a>'
+        next_link = f'<a {next_href} id="readerNextChapter" class="control-btn next-chapter" aria-label="Next chapter" data-i18n-aria-label="reader.next" aria-disabled="{"false" if next_href else "true"}"><i class="fas fa-arrow-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></a>'
         prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" title="Previous chapter" data-i18n-aria-label="reader.previous" data-i18n-title="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
         next_link_mobile = f'<a {next_href} aria-label="Next chapter" title="Next chapter" data-i18n-aria-label="reader.next" data-i18n-title="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
         bookshelf_data_actions = """
@@ -2999,6 +2999,21 @@ document.addEventListener('DOMContentLoaded', function() {{
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
             <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            <div class="pagination-toolbar-controls" id="paginationInfo" role="group" aria-label="Page navigation" data-i18n-aria-label="reader.navigation">
+                {prev_link}
+                <button class="control-btn" id="prevPage" type="button" aria-label="Previous page" data-i18n-aria-label="reader.previousPage" data-pagination-toolbar-control hidden><i class="fas fa-chevron-left" aria-hidden="true"></i><span class="control-name" data-i18n="reader.previousPage">Previous page</span></button>
+                <button class="control-btn" id="reloadPages" type="button" aria-label="Reload pages" data-i18n-aria-label="reader.reloadPages" data-pagination-toolbar-control hidden><i class="fas fa-rotate-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.reloadPages">Reload pages</span></button>
+                <button class="control-btn" id="nextPage" type="button" aria-label="Next page" data-i18n-aria-label="reader.nextPage" data-pagination-toolbar-control hidden><i class="fas fa-chevron-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.nextPage">Next page</span></button>
+                {next_link}
+                <div class="pagination-page-jump" role="group" aria-label="Jump" data-i18n-aria-label="reader.jump" data-pagination-toolbar-control hidden>
+                    <label class="sr-only" for="pageJumpInput" data-i18n="reader.currentPage">Current page</label>
+                    <span class="sr-only" id="currentPage" aria-live="polite">1</span>
+                    <input type="number" id="pageJumpInput" min="1" max="1" value="1" inputmode="numeric" aria-label="Current page" data-i18n-aria-label="reader.currentPage">
+                    <span class="pagination-page-total-separator" aria-hidden="true">/</span>
+                    <span id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
+                    <button class="pagination-jump-submit" id="goToPage" type="button" aria-label="Jump" data-i18n-aria-label="reader.jump"><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i></button>
+                </div>
+            </div>
             {pdf_reader_controls}
             {ai_chapter_button}
             {ai_followup_button}
@@ -3012,64 +3027,6 @@ document.addEventListener('DOMContentLoaded', function() {{
             </article>
         </div>
 
-        <div class="navigation" data-id="navigation">
-            {prev_link}
-            <a href="/book/{book_id_url}/index.html" aria-label="Book" data-i18n-aria-label="reader.book" id="navigationHomeBtn">
-                <div class="control-btn">
-                    <i class="fas fa-book"></i>
-                    <span class="control-name" data-i18n="reader.book">Book</span>
-                </div>
-            </a>
-
-            <div id="paginationInfo" style="display: none;">
-                <button class="control-btn pagination-mode-exit" id="exitPaginationMode" type="button" aria-label="Exit page-turning mode" data-i18n-aria-label="settings.exitPaginationMode" title="Exit page-turning mode" data-i18n-title="settings.exitPaginationMode">
-                    <i class="fas fa-scroll"></i>
-                    <span class="control-name" data-i18n="settings.exitPaginationMode">Exit page-turning mode</span>
-                </button>
-                <div class="control-btn" id="prevPage" style="padding-right: 40px;">
-                    <i class="fas fa-chevron-left"></i>
-                    <span class="control-name" data-i18n="reader.previousPage">Previous page</span>
-                </div>
-                <div style="display: flex; flex-direction: row;">
-                    <span class="page-indicator">
-                        <span id="currentPage" style="display:none;"></span>
-                        <input type="number" style="margin-right:2px;" id="pageJumpInput" min="1" max="1" value="1" aria-label="Current page" data-i18n-aria-label="reader.currentPage"> / <span id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
-                    </span>
-                    <div class="control-btn" style="padding-left:10px;" id="goToPage" title="Jump" data-i18n-title="reader.jump">
-                        <i class="fas fa-arrow-right-to-bracket"></i>
-                        <span class="control-name" data-i18n="reader.jump">Jump</span>
-                    </div>
-                    <div class="control-btn" id="toggleClickPage" title="Click to turn page" data-i18n-title="reader.clickToTurn">
-                        <i class="fas fa-hand-pointer"></i>
-                        <span class="control-name" data-i18n="reader.clickToTurn">Click to turn page</span>
-                    </div>
-                    <!-- Pure button only for desktop -->
-                    <div class="control-btn desktop-only" id="togglePureMode" title="Pure reading mode" data-i18n-title="reader.pureReading">
-                        <i class="fas fa-book-open"></i>
-                        <span class="control-name" data-i18n="reader.pureReading">Pure reading mode</span>
-                    </div>
-                    <!-- Reload button for pagination mode -->
-                    <div class="control-btn" id="reloadPages" title="Reload pages" data-i18n-title="reader.reloadPages">
-                        <i class="fas fa-rotate-right"></i>
-                        <span class="control-name" data-i18n="reader.reloadPages">Reload pages</span>
-                    </div>
-                </div>
-                <div style="display: none; flex-direction: row;" class="page-height-adjustment">
-                    <span>
-                        <input type="number" style="margin-right:10px;" id="pageHeightInput" value="1" aria-label="Page height" data-i18n-aria-label="reader.pageHeight">
-                    </span>
-                    <div class="control-btn" id="setPageHeight" style="padding: 0;" title="Set page height" data-i18n-title="reader.setPageHeight">
-                        <i class="fas fa-ruler-vertical"></i>
-                        <span class="control-name" data-i18n="reader.setPageHeight">Set page height</span>
-                    </div>
-                </div>
-                <div class="control-btn" id="nextPage" style="padding-left: 40px;">
-                    <i class="fas fa-chevron-right"></i>
-                    <span class="control-name" data-i18n="reader.nextPage">Next page</span>
-                </div>
-            </div>
-            {next_link}
-        </div>
     </div>
 
     <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay" aria-hidden="true"></div>
@@ -3170,6 +3127,11 @@ document.addEventListener('DOMContentLoaded', function() {{
                         <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
                     </label>
                     <label class="settings-switch">
+                        <input type="checkbox" id="clickPageToggle" disabled aria-disabled="true">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="reader.clickToTurn">Click to turn page</span>
+                    </label>
+                    <label class="settings-switch pagination-incompatible-setting">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
@@ -3223,7 +3185,7 @@ document.addEventListener('DOMContentLoaded', function() {{
                         </label>
                     </div>
                 </fieldset>
-                <fieldset class="settings-group navigation-behavior-settings" aria-describedby="navigationBehaviorHelp">
+                <fieldset class="settings-group navigation-behavior-settings pagination-incompatible-setting" aria-describedby="navigationBehaviorHelp">
                     <legend class="settings-section-title" data-i18n="settings.navigationBehavior">Navigation bar behavior</legend>
                     <p class="settings-section-description" id="navigationBehaviorHelp" data-i18n="settings.navigationBehaviorHelp">Choose when the top navigation stays visible while you read.</p>
                     <div class="navigation-behavior-options">
@@ -3260,6 +3222,10 @@ document.addEventListener('DOMContentLoaded', function() {{
             </div>
         </a>
         {next_link_mobile}
+        <button class="control-btn" id="mobilePageJumpBtn" type="button" aria-label="Jump" title="Jump" data-i18n-aria-label="reader.jump" data-i18n-title="reader.jump">
+            <i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>
+            <span data-i18n="reader.jump">Jump</span>
+        </button>
         <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
             <i class="fas fa-book"></i>
             <span data-i18n="reader.bookChapters">Chapters</span>

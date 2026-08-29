@@ -656,87 +656,6 @@ body.reader-drawer-open {
     margin-right: 0.5rem;
 } */
 
-.navigation {
-    display: flex;
-    justify-content: space-between;
-    margin: 30px 0;
-    padding: 20px;
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
-    transition: var(--transition);
-}
-
-.navigation a {
-    text-decoration: none;
-    line-height: 1;
-}
-
-.navigation .control-btn {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 20px;
-    background: var(--card-bg);
-    color: var(--text);
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 600;
-    transition: var(--transition);
-    border: none;
-    cursor: pointer;
-    flex-direction: column;
-}
-
-.navigation .control-btn:hover {
-    transform: translateY(-4px);
-}
-
-body:not(.pagination-mode) .navigation {
-    justify-content: center;
-    gap: 4px;
-    width: min(100%, 520px);
-    margin: 28px auto;
-    padding: 6px;
-    border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
-    border-radius: 14px;
-    box-shadow: var(--shadow-sm);
-}
-
-body:not(.pagination-mode) .navigation > a {
-    flex: 1 1 0;
-    min-width: 0;
-    border-radius: 10px;
-}
-
-body:not(.pagination-mode) .navigation > a:not([href]) {
-    opacity: .38;
-    pointer-events: none;
-}
-
-body:not(.pagination-mode) .navigation .control-btn {
-    justify-content: center;
-    flex-direction: row;
-    gap: 8px;
-    min-height: 44px;
-    padding: 0 14px;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: .94rem;
-}
-
-body:not(.pagination-mode) .navigation .control-btn:hover {
-    background: var(--hover);
-    color: var(--text);
-    transform: none;
-}
-
-body:not(.pagination-mode) .navigation a:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--button-bg) 34%, transparent);
-    outline-offset: 2px;
-}
-
 .eb-footer {
     text-align: center;
     padding: 10px 0;
@@ -816,8 +735,70 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     display: none !important;
 }
 
+.pagination-toolbar-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+}
+
+.reader-toolbar.top-controls a.control-btn:not([href]) {
+    opacity: 0.42;
+    color: var(--text-muted);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.pagination-page-jump {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 42px;
+    padding: 4px;
+    border: 1px solid var(--reader-border, var(--border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--reader-page, var(--card-bg)) 96%, transparent);
+    color: var(--reader-ink, var(--text));
+    font-size: .78rem;
+    font-weight: 600;
+}
+
+.pagination-page-jump[hidden] {
+    display: none !important;
+}
+
+.pagination-jump-submit {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: var(--reader-action, var(--button-bg));
+    color: var(--button-text);
+    cursor: pointer;
+}
+
+.pagination-jump-submit:hover {
+    background: var(--reader-control-hover, var(--button-hover));
+}
+
+.pagination-jump-submit:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--reader-action, var(--button-bg)) 34%, transparent);
+    outline-offset: 2px;
+}
+
+body:not(.pagination-mode) #mobilePageJumpBtn {
+    display: none;
+}
+
 body.pagination-mode [data-ai-learning-canvas],
 body.pagination-mode [data-ai-followup-drawer] {
+    display: none !important;
+}
+
+body.pagination-mode .pagination-incompatible-setting,
+body.pagination-mode .desktop-setting-only {
     display: none !important;
 }
 
@@ -832,6 +813,7 @@ body.pagination-mode [data-ai-followup-drawer] {
     /* A single quiet rail reads as reading furniture rather than five competing
        primary buttons.  Names stay available to assistive tech and on hover. */
     .top-controls {
+        align-items: flex-end;
         gap: 3px;
         padding: 5px;
         border: 1px solid var(--reader-border, var(--border));
@@ -1671,16 +1653,9 @@ body.pagination-mode [data-ai-followup-drawer] {
 }
 
 /* 页面跳转输入框 */
-.page-jump {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin: 0 5px;
-}
-
-#pageJumpInput, #pageHeightInput {
-    width: 50px;
-    height: 36px;
+#pageJumpInput {
+    width: 44px;
+    height: 32px;
     text-align: center;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -1689,8 +1664,9 @@ body.pagination-mode [data-ai-followup-drawer] {
     font-weight: 600;
 }
 
-#pageJumpInput:focus, #pageHeightInput:focus {
-    outline: none;
+#pageJumpInput:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--reader-action, var(--button-bg)) 34%, transparent);
+    outline-offset: 1px;
     border-color: var(--button-bg);
 }
 
@@ -1720,15 +1696,6 @@ body.pagination-mode {
     overflow: hidden;
     position: relative;
     /* 宽度由 JavaScript 统一设置 */
-}
-
-.pagination-mode .navigation {
-    flex: 0 0 auto;
-    min-height: 50px;
-    margin-top: 0;
-    margin-left: 0;
-    margin-right: 0;
-    /* 宽度和 padding 由 JavaScript 统一设置 */
 }
 
 /* CSS Column 分页样式 - 使用 CSS Column 实现分页 */
@@ -1796,7 +1763,7 @@ body.pagination-mode {
 }
 
 .kindle-mode .eb-header, .kindle-mode .toc-container, 
-.kindle-mode .eb-content-container, .kindle-mode .navigation,
+.kindle-mode .eb-content-container,
 .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .pagination-controls {
     box-shadow: none;
     border-radius: inherit;
@@ -1810,7 +1777,7 @@ body.pagination-mode {
     display: none;
 }
 
-.kindle-mode .breadcrumb,.kindle-mode .navigation {
+.kindle-mode .breadcrumb {
     margin: 0;
 }
 
@@ -2019,7 +1986,7 @@ body.pagination-mode {
         padding: 0;
     }
 
-    .navigation, .custom-css-panel, .eb-content-container {
+    .custom-css-panel, .eb-content-container {
         margin: 0;
         border-radius: unset;
     }
@@ -2036,88 +2003,11 @@ body.pagination-mode {
         font-size: 1.5rem;
     }
     
-    .navigation {
-        padding: 10px 5px;
-        gap: 2px;
-        flex-wrap: nowrap;
-        justify-content: center;
-        overflow-x: auto;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-    }
-
-    body:not(.pagination-mode) .navigation {
-        width: calc(100% - 24px);
-        margin: 18px 12px;
-        padding: 5px;
-        overflow: visible;
-    }
-
-    body:not(.pagination-mode) .navigation .control-btn {
-        min-height: 42px;
-        padding: 0 8px;
-        font-size: .9rem;
-    }
-    
-    .navigation::-webkit-scrollbar {
-        display: none;
-    }
-
-    .pagination-mode .navigation{
-        padding: 10px 5px;
-        gap: 2px;
-        flex-wrap: nowrap;
-        justify-content: space-between;
-    }
-
     .pagination-mode .container {
         box-sizing: border-box;
         padding-bottom: calc(60px + env(safe-area-inset-bottom));
     }
 
-    .pagination-mode .navigation {
-        display: none !important;
-    }
-
-    .pagination-mode .navigation .prev-chapter, .pagination-mode .navigation .next-chapter{
-        display: none;
-    }
-
-    .pagination-mode .navigation #paginationInfo{
-        width: auto;
-        justify-content: center;
-        flex-wrap: nowrap;
-        gap: 2px;
-    }
-
-    .navigation .control-btn {
-        padding: 0 8px;
-        font-size: 0.75rem;
-        min-width: 0;
-        flex-shrink: 0;
-    }
-    
-.navigation .control-btn i {
-        font-size: 0.9rem;
-    }
-    
-    .navigation .control-name {
-        font-size: 0.65rem;
-        white-space: nowrap;
-    }
-    
-    .navigation .page-indicator {
-        font-size: 0.85rem;
-        padding: 0 5px;
-        white-space: nowrap;
-    }
-    
-    .navigation #pageJumpInput {
-        width: 40px;
-        font-size: 0.85rem;
-        padding: 2px;
-    }
-    
     .nav-btn {
         justify-content: center;
     }
@@ -2287,7 +2177,7 @@ body.continuous-scroll-mode #mobileTopBtn {
 
 /* Desktop styles */
 @media (min-width: 769px) {
-    .breadcrumb, .navigation, .custom-css-panel, .eb-content-container {
+    .breadcrumb, .custom-css-panel, .eb-content-container {
         box-shadow: var(--shadow-lg);
     }
 }
