@@ -208,10 +208,11 @@
   function addChapterBadge(link) {
     var existing = link.querySelector('.ai-reading-chapter-badge');
     if (existing) {
-      existing.setAttribute('title', t('ai.library'));
-      existing.setAttribute('aria-label', t('ai.library'));
+      var translatedLabel = t('ai.library');
+      if (existing.getAttribute('title') !== translatedLabel) existing.setAttribute('title', translatedLabel);
+      if (existing.getAttribute('aria-label') !== translatedLabel) existing.setAttribute('aria-label', translatedLabel);
       var existingLabel = existing.querySelector('.ai-reading-chapter-label');
-      if (existingLabel) existingLabel.textContent = t('ai.library');
+      if (existingLabel && existingLabel.textContent !== translatedLabel) existingLabel.textContent = translatedLabel;
       return;
     }
     var badge = el('span', 'ai-reading-chapter-badge'); badge.setAttribute('title', t('ai.library')); badge.setAttribute('aria-label', t('ai.library')); badge.setAttribute('data-ai-reading-chapter-badge', ''); var icon = el('i', 'fas fa-wand-magic-sparkles'); icon.setAttribute('aria-hidden', 'true'); var label = el('span', 'ai-reading-chapter-label', t('ai.library')); badge.appendChild(icon); badge.appendChild(label);
@@ -253,7 +254,7 @@
     var key = chapterIndicatorKey(bookId, language);
     if (state.chapterIndicators[key]) return Promise.resolve(state.chapterIndicators[key]);
     if (!state.chapterIndicatorRequests[key]) {
-      state.chapterIndicatorRequests[key] = request(path('/api/ai/books/' + encodeURIComponent(bookId) + '/results') + '?language=' + encodeURIComponent(language)).then(function(data) {
+      state.chapterIndicatorRequests[key] = request(path('/api/ai/books/' + encodeURIComponent(bookId) + '/results') + '?language=' + encodeURIComponent(language) + '&view=indicators').then(function(data) {
         var chapters = {};
         (data.results || []).forEach(function(result) {
           if (resultLanguage(result) === language && result.scope === 'chapter' && Number.isInteger(Number(result.chapter_index))) chapters[Number(result.chapter_index)] = true;
@@ -272,9 +273,6 @@
     Array.prototype.forEach.call(containers, function(container) {
       if (!container.dataset.aiReadingIndicatorsBound) {
         container.dataset.aiReadingIndicatorsBound = 'true';
-        // The chapter TOC is filled from toc.json after this script loads.
-        // Observe it so badges appear without relying on script timing.
-        if (root.MutationObserver) new root.MutationObserver(function() { refreshIndicatorContainer(container).catch(function() {}); }).observe(container, { childList: true, subtree: true });
       }
       refreshIndicatorContainer(container).catch(function() {});
     });

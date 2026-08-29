@@ -11,6 +11,17 @@ class FakeElement {
     this.className = '';
     this.dataset = {};
     this.parentNode = null;
+    this._textContent = '';
+    this.textContentWrites = 0;
+  }
+
+  set textContent(value) {
+    this._textContent = String(value);
+    this.textContentWrites += 1;
+  }
+
+  get textContent() {
+    return this._textContent;
   }
 
   setAttribute(name, value) {
@@ -18,7 +29,7 @@ class FakeElement {
   }
 
   getAttribute(name) {
-    return this.attributes.get(name) || null;
+    return this.attributes.has(name) ? this.attributes.get(name) : null;
   }
 
   appendChild(child) {
@@ -52,6 +63,16 @@ class FakeElement {
       return this.children.filter(child => child.getAttribute('data-chapter-index') !== null);
     }
     return [];
+  }
+
+  closest(selector) {
+    if (selector !== '[data-ai-reading-indicators]') return null;
+    let node = this;
+    while (node) {
+      if (node.getAttribute('data-ai-reading-indicators') !== null) return node;
+      node = node.parentNode;
+    }
+    return null;
   }
 }
 
@@ -120,6 +141,9 @@ function createHarness({ locale, resultsByLanguage, containerCount = 1 }) {
     chapterLink: chapterLinks[0],
     chapterLinks,
     requested,
+    refreshChapterIndicators() {
+      window.EpubBrowserAIReadingHub.refreshChapterIndicators(chapterLinks[0]);
+    },
     setLocale(nextLocale) {
       activeLocale = nextLocale;
       if (localeChangeListener) localeChangeListener(nextLocale);
@@ -153,7 +177,9 @@ test('does not mark a chapter when AI readings exist only in another language', 
 
   await new Promise(resolve => setImmediate(resolve));
 
-  assert.deepEqual(harness.requested, ['/api/ai/books/book-1/results?language=en']);
+  assert.deepEqual(harness.requested, [
+    '/api/ai/books/book-1/results?language=en&view=indicators',
+  ]);
   assert.equal(harness.chapterLink.querySelector('.ai-reading-chapter-badge'), null);
 });
 
@@ -169,8 +195,8 @@ test('refreshes chapter markers when the interface language changes', async () =
   await new Promise(resolve => setImmediate(resolve));
 
   assert.deepEqual(harness.requested, [
-    '/api/ai/books/book-1/results?language=zh-CN',
-    '/api/ai/books/book-1/results?language=en',
+    '/api/ai/books/book-1/results?language=zh-CN&view=indicators',
+    '/api/ai/books/book-1/results?language=en&view=indicators',
   ]);
   assert.equal(harness.chapterLink.querySelector('.ai-reading-chapter-badge'), null);
 });
@@ -198,6 +224,22 @@ test('relabels a chapter marker when both languages have AI readings', async () 
   );
 });
 
+test('a repeated refresh does not rewrite an unchanged chapter marker', async () => {
+  const harness = createHarness({
+    locale: 'zh-CN',
+    resultsByLanguage: { 'zh-CN': [completeResult()] },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  const badge = harness.chapterLink.querySelector('.ai-reading-chapter-badge');
+  const label = badge.querySelector('.ai-reading-chapter-label');
+  const writesAfterCreation = label.textContentWrites;
+
+  harness.refreshChapterIndicators();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(label.textContentWrites, writesAfterCreation);
+});
+
 test('deduplicates one language-scoped result request across multiple TOCs', async () => {
   const harness = createHarness({
     locale: 'zh-CN',
@@ -208,7 +250,7 @@ test('deduplicates one language-scoped result request across multiple TOCs', asy
   await new Promise(resolve => setImmediate(resolve));
 
   assert.deepEqual(harness.requested, [
-    '/api/ai/books/book-1/results?language=zh-CN',
+    '/api/ai/books/book-1/results?language=zh-CN&view=indicators',
   ]);
   assert.equal(
     harness.chapterLinks.every(link => link.querySelector('.ai-reading-chapter-badge') !== null),

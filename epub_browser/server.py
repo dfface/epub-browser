@@ -145,12 +145,18 @@ PUBLIC_UNAUTHENTICATED_ASSETS = frozenset({
     '/assets/api-docs.css',
     '/assets/api-docs.js',
     '/assets/auth.js',
+    '/assets/favicon.png',
     '/assets/i18n.js',
     '/assets/logo-mark-color.png',
     '/assets/theme-bootstrap.js',
     '/assets/theme.css',
     '/assets/version-check.js',
 })
+PUBLIC_UNAUTHENTICATED_ASSET_NAMES = frozenset(
+    path.removeprefix('/assets/') for path in PUBLIC_UNAUTHENTICATED_ASSETS
+)
+AUTH_NONCE_COOKIE_LIMIT = 8
+AUTH_NONCE_VALUE_PATTERN = re.compile(r'[A-Za-z0-9_-]{32,128}')
 PUBLIC_WEB_MANIFESTS = frozenset(
     f'/assets/{name}' for name in WEB_MANIFEST_SOURCES
 )
@@ -378,7 +384,7 @@ def reader_content_security_policy(markup):
         "font-src 'self' data:; "
         "media-src 'self' data: blob:; "
         "connect-src 'self'; "
-        "object-src 'none'; frame-src 'none'; frame-ancestors *; "
+        "object-src 'none'; frame-src 'none'; "
         "base-uri 'none'; form-action 'self'"
     ).format(script_sources)
 
@@ -717,6 +723,29 @@ def create_app(
             raise ValueError('Invalid asset manifest')
         return PublishedAssets(manifest)
 
+    def current_asset_url(logical_name):
+        try:
+            return current_published_assets().url_for(logical_name)
+        except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            return '/assets/' + logical_name
+
+    def is_public_unauthenticated_asset(path):
+        if path in PUBLIC_UNAUTHENTICATED_ASSETS:
+            return True
+        try:
+            published = current_published_assets()
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            return False
+        for logical_name in PUBLIC_UNAUTHENTICATED_ASSET_NAMES:
+            published_path = published.assets.get(logical_name)
+            if (
+                isinstance(published_path, str)
+                and published_path.startswith('/assets/immutable/')
+                and path == published_path
+            ):
+                return True
+        return False
+
     def heartbeat_rate_limited(user_id, client_id):
         """Permit the normal 15-second cadence and a few transient retries."""
         now = time.monotonic()
@@ -785,10 +814,25 @@ def create_app(
             samesite='strict',
         )
 
-    def set_auth_nonce_cookie(target_response, nonce):
+    def auth_nonce_cookie_values(raw_value):
+        if not isinstance(raw_value, str):
+            return ()
+        return tuple(
+            value
+            for value in raw_value.split('.')[-AUTH_NONCE_COOKIE_LIMIT:]
+            if AUTH_NONCE_VALUE_PATTERN.fullmatch(value)
+        )
+
+    def set_auth_nonce_cookie(target_response, nonce, existing_value=None):
+        values = [
+            value
+            for value in auth_nonce_cookie_values(existing_value)
+            if not secrets.compare_digest(value, nonce)
+        ]
+        values.append(nonce)
         target_response.set_cookie(
             AUTH_NONCE_COOKIE,
-            nonce,
+            '.'.join(values[-AUTH_NONCE_COOKIE_LIMIT:]),
             max_age=600,
             path='/',
             secure=auth_service.config.cookie_secure,
@@ -1101,17 +1145,19 @@ def create_app(
     def valid_anonymous_auth_request(request):
         if not valid_same_origin_request_source(request):
             return False
-        cookie_nonce = request.cookies.get(AUTH_NONCE_COOKIE)
         supplied_nonce = request.headers.get(AUTH_NONCE_HEADER)
         if (
-            not isinstance(cookie_nonce, str)
-            or not isinstance(supplied_nonce, str)
-            or not cookie_nonce
+            not isinstance(supplied_nonce, str)
             or not supplied_nonce
         ):
             return False
         try:
-            return secrets.compare_digest(cookie_nonce, supplied_nonce)
+            return any(
+                secrets.compare_digest(cookie_nonce, supplied_nonce)
+                for cookie_nonce in auth_nonce_cookie_values(
+                    request.cookies.get(AUTH_NONCE_COOKIE)
+                )
+            )
         except TypeError:
             return False
 
@@ -1342,6 +1388,7 @@ if(localeField)localeField.value=localeSelect.value;
         status_code=200,
         locale='en',
         locale_explicit=False,
+        existing_auth_nonce_cookie=None,
     ):
         safe_next = html.escape(_safe_relative_path(next_path), quote=True)
         locale = normalize_login_locale(locale)
@@ -1359,6 +1406,7 @@ if(localeField)localeField.value=localeSelect.value;
         language_options = locale_options(locale)
         footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
         brand_markup = auth_brand_markup()
+        favicon_url = html.escape(current_asset_url('favicon.png'), quote=True)
         oidc_settings = store.get_oidc_settings()
         oidc_markup = ''
         if oidc_settings.enabled:
@@ -1384,6 +1432,7 @@ if(localeField)localeField.value=localeSelect.value;
 <meta name="color-scheme" content="light dark">
 <meta name="epub-browser-auth-nonce" content="{nonce}">
 <title data-i18n="account.loginPageTitle">{copy['page_title']}</title>
+<link rel="icon" type="image/png" href="{favicon_url}">
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
@@ -1459,7 +1508,7 @@ window.location.assign(payload.redirect||'/');
             status_code=status_code,
             headers={'Cache-Control': 'no-store'},
         )
-        set_auth_nonce_cookie(page, nonce)
+        set_auth_nonce_cookie(page, nonce, existing_auth_nonce_cookie)
         return page
 
     def oidc_error_page(request, *, status_code=400):
@@ -1539,7 +1588,11 @@ window.location.assign(payload.redirect||'/');
             status_code=status_code,
             headers={'Cache-Control': 'no-store'},
         )
-        set_auth_nonce_cookie(page, nonce)
+        set_auth_nonce_cookie(
+            page,
+            nonce,
+            request.cookies.get(AUTH_NONCE_COOKIE),
+        )
         return page
 
     def oidc_settings():
@@ -1724,12 +1777,15 @@ window.location.assign(payload.redirect||'/');
             return oidc_error_page(request, status_code=400)
         association_token = data.get('token', '')
         supplied_nonce = data.get('auth_nonce', '')
-        cookie_nonce = request.cookies.get(AUTH_NONCE_COOKIE, '')
         if (
             not valid_same_origin_request_source(request)
             or not supplied_nonce
-            or not cookie_nonce
-            or not secrets.compare_digest(supplied_nonce, cookie_nonce)
+            or not any(
+                secrets.compare_digest(supplied_nonce, cookie_nonce)
+                for cookie_nonce in auth_nonce_cookie_values(
+                    request.cookies.get(AUTH_NONCE_COOKIE)
+                )
+            )
         ):
             return oidc_error_page(request, status_code=403)
         transaction = store.get_oidc_association(
@@ -1783,6 +1839,7 @@ window.location.assign(payload.redirect||'/');
                 requested_next,
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
+                existing_auth_nonce_cookie=request.cookies.get(AUTH_NONCE_COOKIE),
             )
         current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
         if current_principal is None and not valid_anonymous_auth_request(request):
@@ -3281,6 +3338,15 @@ window.location.assign(payload.redirect||'/');
         language = request.query_params.get('language')
         if language is not None and language not in SUPPORTED_LOCALE_SET:
             return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
+        view = request.query_params.get('view')
+        if view == 'indicators':
+            return response({
+                'results': list(store.list_ai_reading_result_indicators(
+                    book_id, language=language
+                )),
+            })
+        if view is not None:
+            return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
         chapter_index = None
         if chapter_index_raw is not None:
             try:
@@ -3700,6 +3766,8 @@ window.location.assign(payload.redirect||'/');
                 media_type=mimetypes.guess_type(path)[0] or 'application/octet-stream',
                 headers={'Cache-Control': 'no-cache'},
             )
+        if is_public_unauthenticated_asset('/' + path):
+            return await public_files.get_response(path, request.scope)
         if '/' + path in PUBLIC_WEB_MANIFESTS:
             return await public_files.get_response(path, request.scope)
         principal = require_principal(request)
@@ -4618,14 +4686,14 @@ window.location.assign(payload.redirect||'/');
         if not store.has_administrator():
             if (
                 path in PUBLIC_PRE_SETUP_ENDPOINTS
-                or path in PUBLIC_UNAUTHENTICATED_ASSETS
+                or is_public_unauthenticated_asset(path)
                 or path in PUBLIC_WEB_MANIFESTS
             ):
                 return await call_next(request)
             return setup_required_response(request)
         if (
             path in PUBLIC_STATELESS_ENDPOINTS
-            or path in PUBLIC_UNAUTHENTICATED_ASSETS
+            or is_public_unauthenticated_asset(path)
             or path in PUBLIC_WEB_MANIFESTS
         ):
             return await call_next(request)
@@ -4639,7 +4707,10 @@ window.location.assign(payload.redirect||'/');
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
         if principal is None:
-            if route_is_public_unauthenticated(path):
+            if (
+                route_is_public_unauthenticated(path)
+                or is_public_unauthenticated_asset(path)
+            ):
                 return await call_next(request)
             return unauthenticated_response(request)
         if request.method not in SAFE_METHODS:

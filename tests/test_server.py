@@ -1349,6 +1349,35 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('.auth-alert[hidden] {', stylesheet.text)
         self.assertIn('display: none;', stylesheet.text)
 
+    def test_public_login_uses_the_published_favicon(self):
+        public = Path(self.directory.name)
+        immutable = public / 'assets' / 'immutable'
+        immutable.mkdir()
+        favicon_path = immutable / 'favicon.0123456789ab.png'
+        favicon_path.write_bytes(b'published favicon')
+        (public / 'assets' / 'asset-manifest.json').write_text(
+            json.dumps({
+                'favicon.png': '/assets/immutable/favicon.0123456789ab.png',
+            }),
+            encoding='utf-8',
+        )
+
+        page = self.client.get('/login')
+        favicon = self.client.get('/assets/immutable/favicon.0123456789ab.png')
+
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(
+            '<link rel="icon" type="image/png" '
+            'href="/assets/immutable/favicon.0123456789ab.png">',
+            page.text,
+        )
+        self.assertEqual(favicon.status_code, 200)
+        self.assertEqual(favicon.content, b'published favicon')
+        self.assertEqual(
+            favicon.headers['cache-control'],
+            'public, max-age=31536000, immutable',
+        )
+
     def test_public_login_supports_traditional_chinese_korean_and_japanese(self):
         cases = (
             ('zh-TW', '登入'),
@@ -1423,6 +1452,32 @@ class ServerAuthBoundaryTests(unittest.TestCase):
                 replaced_client.get("/api/session").status_code,
                 401,
             )
+
+    def test_concurrent_anonymous_login_pages_keep_both_nonces_valid(self):
+        library_nonce = _anonymous_auth_nonce(
+            self,
+            self.client,
+            '/login?next=%2F',
+        )
+        book_nonce = _anonymous_auth_nonce(
+            self,
+            self.client,
+            '/login?next=%2Fbook%2Fid%2Fchapter_0.html',
+        )
+        self.assertNotEqual(library_nonce, book_nonce)
+
+        response = self.client.post(
+            '/login',
+            json={'username': 'alice', 'password': 'secret', 'next': '/'},
+            headers={
+                'X-EPUB-Browser-Auth-Nonce': library_nonce,
+                'Origin': str(self.client.base_url).rstrip('/'),
+                'Sec-Fetch-Site': 'same-origin',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['redirect'], '/')
 
     def test_authenticated_unhandled_error_is_private_and_generic(self):
         class FailingRuntimeStatus:
@@ -3742,6 +3797,37 @@ class BookAuthorizationTests(unittest.TestCase):
         )
         self.assertEqual(rejected.status_code, 400)
 
+    def test_ai_chapter_indicators_exclude_generated_content(self):
+        stored = self.store.store_ai_reading_result(
+            cache_key='indicator-result',
+            book_id='open-id',
+            chapter_index=3,
+            scope='chapter',
+            mode='chapter',
+            profile='auto',
+            language='zh-CN',
+            reading_boundary=None,
+            config_revision=0,
+            template_id='chapter',
+            template_version=1,
+            content={'quick': {'summary': 'x' * (1024 * 1024)}},
+            created_by_user_id=self.member.user_id,
+        )
+
+        response = self.member_client.get(
+            '/api/ai/books/open-id/results?language=zh-CN&view=indicators'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(len(response.content), 1024)
+        self.assertEqual(response.json()['results'], [{
+            'id': stored['id'],
+            'book_id': 'open-id',
+            'chapter_index': 3,
+            'scope': 'chapter',
+            'language': 'zh-CN',
+        }])
+
     def test_ai_followup_and_chat_routes_preserve_every_supported_locale(self):
         result = self.store.store_ai_reading_result(
             cache_key='server-locale-result', book_id='open-id', chapter_index=0,
@@ -4242,7 +4328,7 @@ class ServerCacheTests(unittest.TestCase):
         self.assertIn("client.navigate(client.url)", response.text)
         self.assertNotIn("caches.delete(name)", response.text.split("epub-browser-")[0])
 
-    def test_server_reader_html_allows_cross_site_embedding_with_hash_based_csp(self):
+    def test_server_reader_html_leaves_frame_ancestors_to_the_deployment(self):
         script = "window.generatedReaderBootstrap=true;"
         Path(
             self.directory.name,
@@ -4265,7 +4351,7 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("default-src 'self'", policy)
         self.assertIn("object-src 'none'", policy)
-        self.assertIn("frame-ancestors *", policy)
+        self.assertNotIn("frame-ancestors", policy)
         self.assertNotIn("x-frame-options", response.headers)
         self.assertIn("'sha256-{}'".format(expected_hash), script_directive)
         self.assertNotIn("'unsafe-inline'", script_directive)

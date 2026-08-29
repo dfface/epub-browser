@@ -6484,6 +6484,27 @@ class StateStore:
             rows = connection.execute(statement, tuple(parameters)).fetchall()
         return tuple(self._ai_result_record(row) for row in rows)
 
+    def list_ai_reading_result_indicators(
+        self,
+        book_id: str,
+        *,
+        language: Optional[str] = None,
+    ) -> tuple[dict, ...]:
+        """List only the fields needed to mark chapters with AI readings."""
+        clauses = ["book_id = ?", "scope = 'chapter'"]
+        parameters: list[object] = [book_id]
+        if language is not None:
+            clauses.append("language = ?")
+            parameters.append(language)
+        statement = (
+            "SELECT id, book_id, chapter_index, scope, language "
+            "FROM ai_reading_results WHERE " + " AND ".join(clauses)
+            + " ORDER BY created_at DESC, id DESC"
+        )
+        with self._connection() as connection:
+            rows = connection.execute(statement, tuple(parameters)).fetchall()
+        return tuple(dict(row) for row in rows)
+
     def list_current_ai_reading_results(self, book_id: str) -> tuple[dict, ...]:
         """Return one current shared learning layer for each cache key of a book."""
         with self._connection() as connection:
