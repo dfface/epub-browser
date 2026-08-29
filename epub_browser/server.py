@@ -4,6 +4,7 @@ import hashlib
 import html
 import ipaddress
 import json
+import logging
 import math
 import mimetypes
 import os
@@ -93,6 +94,9 @@ from .site import render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
 from .webhooks import WEBHOOK_EVENT_TYPES, WebhookService
+
+
+LOGGER = logging.getLogger(__name__)
 
 DATABASE_FILENAME = 'epub-browser.db'
 LEGACY_DATABASE_FILENAME = 'annotations.db'
@@ -673,6 +677,7 @@ def create_app(
     auth_service: Optional[AuthService] = None,
     oidc_service: Optional[OIDCService] = None,
     release_lookup: Optional[ReleaseLookup] = None,
+    log_errors: bool = False,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
@@ -692,11 +697,14 @@ def create_app(
     store.requeue_running_ai_followups()
     store.requeue_running_ai_book_chat_turns()
 
-    def response(data, status=200, cache_control='no-cache'):
+    def response(data, status=200, cache_control='no-cache', headers=None):
+        response_headers = {'Cache-Control': cache_control}
+        if headers:
+            response_headers.update(headers)
         return JSONResponse(
             data,
             status_code=status,
-            headers={'Cache-Control': cache_control},
+            headers=response_headers,
         )
 
     def current_published_assets():
@@ -3868,6 +3876,15 @@ window.location.assign(payload.redirect||'/');
         return response(error_payload(code, message), exc.status_code)
 
     async def server_error(request, exc):
+        request_id = secrets.token_hex(8)
+        if log_errors:
+            LOGGER.error(
+                "Unhandled server error id=%s method=%s path=%s",
+                request_id,
+                request.method,
+                request.url.path,
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
         cache_control = (
             'private, no-cache'
             if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None
@@ -3877,6 +3894,7 @@ window.location.assign(payload.redirect||'/');
             error_payload('server_error', 'Internal server error'),
             500,
             cache_control=cache_control,
+            headers={'X-Request-ID': request_id},
         )
 
     def row_data(row):

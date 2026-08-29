@@ -1,6 +1,7 @@
 import json
 import contextlib
 import io
+import logging
 import os
 import re
 import sys
@@ -29,6 +30,7 @@ from epub_browser.reporting import Reporter
 from epub_browser.runtime import (
     RuntimeStatus,
     ServerLock,
+    _SafeAccessLogFilter,
     resolve_bootstrap_credentials,
     run_server,
 )
@@ -161,6 +163,71 @@ class ServerBootstrapTests(unittest.TestCase):
             no_browser=True,
             auth=auth,
         )
+
+    def test_server_defaults_to_errors_without_enabling_access_logs(self):
+        captured = {}
+
+        class CapturingServer(_ReturningServer):
+            def __init__(self, config):
+                super().__init__(config)
+                captured["config"] = config
+
+        with mock.patch("epub_browser.runtime.create_app") as create_app_mock:
+            result = run_server(self._config(), server_factory=CapturingServer)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(captured["config"].log_level, "error")
+        self.assertFalse(captured["config"].access_log)
+        self.assertTrue(create_app_mock.call_args.kwargs["log_errors"])
+
+    def test_info_log_level_enables_operational_and_sanitized_access_logs(self):
+        captured = {}
+
+        class CapturingServer(_ReturningServer):
+            def __init__(self, config):
+                super().__init__(config)
+                captured["config"] = config
+
+        config = ServerConfig(
+            sources=(self.sources,),
+            server_dir=self.server_dir,
+            ephemeral=False,
+            no_browser=True,
+            log_level="info",
+        )
+        with (
+            mock.patch("epub_browser.runtime.create_app") as create_app_mock,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = run_server(config, server_factory=CapturingServer)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(captured["config"].log_level, "info")
+        self.assertTrue(captured["config"].access_log)
+        self.assertTrue(create_app_mock.call_args.kwargs["log_errors"])
+
+    def test_access_log_filter_removes_sensitive_query_string(self):
+        record = logging.LogRecord(
+            "uvicorn.access",
+            logging.INFO,
+            __file__,
+            1,
+            '%s - "%s %s HTTP/%s" %d',
+            (
+                "127.0.0.1:1234",
+                "GET",
+                "/auth/oidc/callback?code=secret&state=private",
+                "1.1",
+                303,
+            ),
+            None,
+        )
+
+        self.assertTrue(_SafeAccessLogFilter().filter(record))
+
+        self.assertEqual(record.args[2], "/auth/oidc/callback")
+        self.assertNotIn("secret", record.getMessage())
+        self.assertNotIn("private", record.getMessage())
 
     def test_first_persistent_start_without_credentials_enters_setup_mode_silently(self):
         with (

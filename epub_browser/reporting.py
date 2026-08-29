@@ -10,7 +10,7 @@ class Reporter:
     def __init__(self, log_enabled: Union[bool, str]):
         # Booleans remain supported for internal callers and integrations that
         # used Reporter before named log levels were introduced.
-        self.log_level = "info" if log_enabled is True else "warning"
+        self.log_level = "info" if log_enabled is True else "error"
         if isinstance(log_enabled, str):
             self.log_level = log_enabled
         if self.log_level not in self._LEVELS:

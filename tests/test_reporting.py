@@ -7,7 +7,7 @@ from epub_browser.reporting import Reporter
 
 
 class ReporterTests(unittest.TestCase):
-    def test_detail_is_silent_without_log_but_errors_remain_visible(self):
+    def test_routine_output_and_warnings_are_silent_by_default(self):
         reporter = Reporter(log_enabled=False)
 
         with (
@@ -15,10 +15,20 @@ class ReporterTests(unittest.TestCase):
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
             reporter.detail("cache hit")
+            reporter.warning("recoverable warning")
             reporter.error("conversion failed")
 
         self.assertEqual(stdout.getvalue(), "")
         self.assertEqual(stderr.getvalue(), "conversion failed\n")
+
+    def test_warning_level_includes_warnings_but_not_details(self):
+        reporter = Reporter(log_enabled="warning")
+
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            reporter.detail("cache hit")
+            reporter.warning("recoverable warning")
+
+        self.assertEqual(stderr.getvalue(), "recoverable warning\n")
 
     def test_detail_is_visible_with_log(self):
         reporter = Reporter(log_enabled=True)

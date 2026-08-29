@@ -22,11 +22,11 @@ class SSGConfig:
     legacy_invocation: bool = False
     legacy_temporary_output: bool = False
     log: bool = False
-    log_level: str = "warning"
+    log_level: str = "error"
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
 
     def __post_init__(self) -> None:
-        if self.log and self.log_level == "warning":
+        if self.log and self.log_level == "error":
             object.__setattr__(self, "log_level", "info")
 
 
@@ -40,7 +40,7 @@ class ServerConfig:
     port: int = 8000
     no_browser: bool = False
     log: bool = False
-    log_level: str = "warning"
+    log_level: str = "error"
     legacy_sync_dir: Optional[Path] = None
     retain_legacy_temporary_dir: bool = False
     legacy_invocation: bool = False
@@ -48,7 +48,7 @@ class ServerConfig:
     auth: ServerAuthOptions = ServerAuthOptions()
 
     def __post_init__(self) -> None:
-        if self.log and self.log_level == "warning":
+        if self.log and self.log_level == "error":
             object.__setattr__(self, "log_level", "info")
 
 
@@ -83,14 +83,14 @@ def _add_logging_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--log-level",
         choices=LOG_LEVELS,
-        help="Operational log verbosity; default: warning",
+        help="Operational log verbosity; default: error",
     )
 
 
 def _log_level(values: argparse.Namespace) -> str:
     if values.log_level is not None:
         return values.log_level
-    return "info" if values.log else "warning"
+    return "info" if values.log else "error"
 
 
 def _uses_log_alias(values: argparse.Namespace) -> bool:
@@ -254,7 +254,7 @@ def format_legacy_migration_hint(config: CommandConfig) -> Optional[str]:
             command.extend(["--base-path", config.base_path])
         if config.log:
             command.append("--log")
-        elif config.log_level != "warning":
+        elif config.log_level != "error":
             command.extend(["--log-level", config.log_level])
     else:
         command.extend(["server", *(str(path) for path in config.sources)])
@@ -272,7 +272,7 @@ def format_legacy_migration_hint(config: CommandConfig) -> Optional[str]:
             command.append("--no-browser")
         if config.log:
             command.append("--log")
-        elif config.log_level != "warning":
+        elif config.log_level != "error":
             command.extend(["--log-level", config.log_level])
         if config.legacy_sync_dir is not None:
             command.extend(["--legacy-sync-dir", str(config.legacy_sync_dir)])

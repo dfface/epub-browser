@@ -1432,11 +1432,32 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             def snapshot(self):
                 raise RuntimeError("sensitive runtime detail")
 
+        quiet_app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            status=FailingRuntimeStatus(),
+        )
+        quiet_client = TestClient(
+            quiet_app,
+            follow_redirects=False,
+            raise_server_exceptions=False,
+        )
+        self.addCleanup(quiet_client.close)
+        self.assertEqual(
+            _json_login(self, quiet_client, "alice", "secret").status_code,
+            200,
+        )
+        with _assert_no_error_logs(self, "epub_browser.server"):
+            quiet_failure = quiet_client.get("/api/health")
+        self.assertEqual(quiet_failure.status_code, 500)
+
         failing_app = create_app(
             self.directory.name,
             state_store=self.store,
             auth_service=self.auth_service,
             status=FailingRuntimeStatus(),
+            log_errors=True,
         )
         client = TestClient(
             failing_app,
@@ -1449,7 +1470,10 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             200,
         )
 
-        failed = client.get("/api/health")
+        with self.assertLogs("epub_browser.server", level="ERROR") as captured:
+            failed = client.get(
+                "/api/health?token=must-not-appear-in-server-logs"
+            )
 
         self.assertEqual(failed.status_code, 500)
         self.assertEqual(
@@ -1461,6 +1485,14 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             {"code": "server_error", "message": "Internal server error"},
         )
         self.assertNotIn("sensitive runtime detail", failed.text)
+        request_id = failed.headers.get("x-request-id")
+        self.assertRegex(request_id or "", r"^[0-9a-f]{16}$")
+        rendered_logs = "\n".join(captured.output)
+        self.assertIn(f"id={request_id}", rendered_logs)
+        self.assertIn("method=GET", rendered_logs)
+        self.assertIn("path=/api/health", rendered_logs)
+        self.assertIn("sensitive runtime detail", rendered_logs)
+        self.assertNotIn("must-not-appear-in-server-logs", rendered_logs)
 
 
 class AdminAccountTests(unittest.TestCase):

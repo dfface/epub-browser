@@ -1,5 +1,6 @@
 import errno
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -11,6 +12,7 @@ import uuid
 import webbrowser
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Union
+from urllib.parse import urlsplit
 
 import uvicorn
 
@@ -34,6 +36,29 @@ from .server import create_app
 from .server_library import ReconcileSummary, ServerLibraryManager
 from .state import DB_SCHEMA_VERSION, StateStore
 from .watch import EPUBWatcher
+
+
+class _SafeAccessLogFilter(logging.Filter):
+    """Remove query strings before Uvicorn renders an HTTP access record."""
+
+    def filter(self, record):
+        arguments = record.args
+        if (
+            isinstance(arguments, tuple)
+            and len(arguments) >= 3
+            and isinstance(arguments[2], str)
+        ):
+            safe_target = urlsplit(arguments[2]).path or "/"
+            record.args = (*arguments[:2], safe_target, *arguments[3:])
+        return True
+
+
+def _install_safe_access_log_filter():
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(
+        isinstance(item, _SafeAccessLogFilter) for item in access_logger.filters
+    ):
+        access_logger.addFilter(_SafeAccessLogFilter())
 
 
 class RuntimeStatus:
@@ -453,6 +478,7 @@ def run_server(
             status=status,
             sync_dir=config.legacy_sync_dir or server_dir,
             progress_broker=progress_broker,
+            log_errors=True,
         )
         uvicorn_config = uvicorn.Config(
             app,
@@ -462,6 +488,7 @@ def run_server(
             access_log=config.log_level in {"debug", "info"},
             proxy_headers=False,
         )
+        _install_safe_access_log_filter()
         server = server_factory(uvicorn_config)
         local_url = _local_url(config.host, config.port)
         availability_reported = threading.Event()

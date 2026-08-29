@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 20
+DB_SCHEMA_VERSION = 21
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -396,6 +396,8 @@ class StateStore:
             else:
                 self._create_v20_oidc_schema(connection)
                 self._require_foreign_key_integrity(connection)
+            if version < 21:
+                self._migrate_schema_v21(connection, max(version, 20))
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -1816,6 +1818,82 @@ class StateStore:
         self._create_v20_oidc_schema(connection)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 20")
+
+    def _migrate_schema_v21(self, connection, source_version) -> None:
+        """Replace the pre-v2.9 identity table left by historical releases.
+
+        Some installations previously created ``user_identities`` with a
+        smaller, unrelated contract. Schema v20 used ``CREATE TABLE IF NOT
+        EXISTS`` and therefore could not distinguish that table from the OIDC
+        identity table introduced in v2.9.
+        """
+        if source_version >= 21:
+            return
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(user_identities)"
+            ).fetchall()
+        }
+        current_columns = {
+            "issuer",
+            "subject",
+            "user_id",
+            "username_claim",
+            "display_name",
+            "email",
+            "created_at",
+            "last_login_at",
+        }
+        legacy_columns = {
+            "issuer",
+            "subject",
+            "user_id",
+            "display_name",
+            "created_at",
+            "updated_at",
+        }
+        if columns == legacy_columns:
+            connection.execute(
+                "ALTER TABLE user_identities "
+                "RENAME TO user_identities__v21_source"
+            )
+            self._create_v20_oidc_schema(connection)
+            connection.execute(
+                """
+                INSERT INTO user_identities (
+                    issuer, subject, user_id, username_claim, display_name,
+                    email, created_at, last_login_at
+                )
+                SELECT issuer, subject, user_id, '', COALESCE(display_name, ''),
+                    NULL,
+                    COALESCE(
+                        CAST(strftime('%s', created_at) AS REAL),
+                        CAST(strftime('%s', 'now') AS REAL)
+                    ),
+                    COALESCE(
+                        CAST(strftime('%s', updated_at) AS REAL),
+                        CAST(strftime('%s', created_at) AS REAL),
+                        CAST(strftime('%s', 'now') AS REAL)
+                    )
+                FROM user_identities__v21_source
+                """
+            )
+            self._assert_matching_row_counts(
+                connection,
+                "user_identities__v21_source",
+                "user_identities",
+            )
+            connection.execute("DROP TABLE user_identities__v21_source")
+            # The legacy index names remain reserved until the source table is
+            # dropped, so create the current index once more afterwards.
+            self._create_v20_oidc_schema(connection)
+        elif columns != current_columns:
+            raise sqlite3.IntegrityError(
+                "schema v21 user_identities column mismatch"
+            )
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 21")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:

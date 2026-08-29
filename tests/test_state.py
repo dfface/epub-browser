@@ -690,6 +690,71 @@ class StateStoreTests(unittest.TestCase):
                 DB_SCHEMA_VERSION,
             )
 
+    def test_v20_migration_rebuilds_legacy_user_identities_table(self):
+        member = self.store.create_user("legacy-identity", hash_password("secret"))
+        with sqlite3.connect(self.database) as connection:
+            connection.executescript(
+                """
+                DROP TABLE user_identities;
+                CREATE TABLE user_identities (
+                    issuer TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    display_name TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (issuer, subject)
+                );
+                CREATE INDEX idx_user_identities_user_id
+                    ON user_identities(user_id);
+                PRAGMA user_version = 20;
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO user_identities (
+                    issuer, subject, user_id, display_name,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "https://legacy.example.test",
+                    "legacy-subject",
+                    member.user_id,
+                    "Legacy Reader",
+                    "2026-08-01 01:02:03",
+                    "2026-08-02 04:05:06",
+                ),
+            )
+
+        StateStore(self.database).initialize()
+
+        identities = self.store.list_oidc_identities(member.user_id)
+        self.assertEqual(len(identities), 1)
+        self.assertEqual(identities[0].issuer, "https://legacy.example.test")
+        self.assertEqual(identities[0].subject, "legacy-subject")
+        self.assertEqual(identities[0].username_claim, "")
+        self.assertEqual(identities[0].display_name, "Legacy Reader")
+        self.assertIsNone(identities[0].email)
+        with self.store._connection() as connection:
+            self.assertEqual(
+                table_columns(connection, "user_identities"),
+                {
+                    "issuer",
+                    "subject",
+                    "user_id",
+                    "username_claim",
+                    "display_name",
+                    "email",
+                    "created_at",
+                    "last_login_at",
+                },
+            )
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION,
+            )
+
     def test_oidc_authorization_transaction_is_browser_bound_and_single_use(self):
         transaction_id = self.store.create_oidc_transaction(
             state_token="raw-state-token",

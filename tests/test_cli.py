@@ -23,7 +23,7 @@ class NewCommandTests(unittest.TestCase):
         )
         legacy_log = parse_cli(["ssg", "books", "--output-dir", "dist", "--log"])
 
-        self.assertEqual(quiet.log_level, "warning")
+        self.assertEqual(quiet.log_level, "error")
         self.assertEqual(debug.log_level, "debug")
         self.assertEqual(legacy_log.log_level, "info")
 
