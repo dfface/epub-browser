@@ -4,6 +4,33 @@ from pathlib import Path
 
 
 class ReadmeDocumentationTests(unittest.TestCase):
+    def test_primary_readmes_document_secure_generic_oidc_and_authelia_setup(self):
+        required = (
+            "OIDC",
+            "/auth/oidc/callback",
+            "Authorization Code",
+            "S256",
+            "(issuer, sub)",
+            "Authelia",
+        )
+        localized = {
+            Path("README.md"): (
+                "local administrator",
+                "passwordless member",
+                "duplicate local accounts",
+            ),
+            Path("docs/readme/README.zh-CN.md"): (
+                "本地管理员",
+                "无密码成员",
+                "重复的本地账户",
+            ),
+        }
+        for path, language_specific in localized.items():
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                for phrase in required + language_specific:
+                    self.assertIn(phrase, text)
+
     def test_why_epub_browser_highlights_ai_native_reading_and_insights(self):
         assets = (
             Path("docs/readme/assets/ai-native-reading.png"),

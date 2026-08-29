@@ -348,6 +348,62 @@ After setup:
 - Administrators can manage users, roles, passwords, sessions, and book grants.
 - Sessions use an HttpOnly cookie, CSRF protection, and a 30-day sliding lifetime.
 
+#### OIDC single sign-on and account linking
+
+Server mode can use one generic OpenID Connect (OIDC) Provider, including
+Authelia, Keycloak, Authentik, and compatible services. In **Administration →
+OIDC login**, enter the Provider name shown to readers, issuer URL, client ID,
+client secret, exact redirect URI, scopes, and username claim. EPUB Browser
+uses discovery plus the Authorization Code flow with S256 PKCE, validates the
+signed ID token, and identifies an external account only by `(issuer, sub)`;
+email and username claims are display/provisioning hints, never identity keys.
+
+Register this exact callback at the Provider, including scheme and host:
+
+```text
+https://reader.example.com/auth/oidc/callback
+```
+
+Existing users can sign in locally and connect the Provider from Account
+settings. An unknown external identity is otherwise asked once for an existing
+local username and password. Optional automatic provisioning creates a
+passwordless member; it never imports an administrator role. Let existing users
+bind first: enabling automatic provisioning too early can create
+**duplicate local accounts**. The **local administrator** password login always remains
+available even if local member password login is disabled. Keep that recovery
+credential tested and protected. Provider logout is not performed, and Provider
+access/refresh tokens are not stored.
+
+For Authelia, configure a confidential client in its OIDC Provider section. The
+following excerpt uses deliberately fake values and assumes Authelia's required
+provider keys and policies are already configured. Store a hash of a strong
+random client secret in Authelia, then enter the corresponding raw secret once
+in EPUB Browser:
+
+```yaml
+identity_providers:
+  oidc:
+    clients:
+      - client_id: 'epub-browser'
+        client_name: 'EPUB Browser'
+        client_secret: '<AUTHELIA_HASH_OF_A_RANDOM_SECRET>'
+        public: false
+        authorization_policy: 'two_factor'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        redirect_uris:
+          - 'https://reader.example.com/auth/oidc/callback'
+        scopes: ['openid', 'profile', 'email']
+        response_types: ['code']
+        grant_types: ['authorization_code']
+        token_endpoint_auth_method: 'client_secret_basic'
+```
+
+In EPUB Browser use issuer `https://auth.example.com`, client ID
+`epub-browser`, scopes `openid profile email`, and username claim
+`preferred_username`. Save performs live discovery and capability validation;
+on failure the previous configuration remains active.
+
 #### Configure and govern AI reading
 
 Administrators configure AI reading in **Administration**, immediately after

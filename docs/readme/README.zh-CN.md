@@ -317,6 +317,55 @@ SSG 有意保持本地化且不包含账户体系：
 - 管理员可以管理用户、角色、密码、会话和书籍授权。
 - 会话使用 HttpOnly Cookie、CSRF 防护和 30 天滑动有效期。
 
+#### OIDC 单点登录与账户绑定
+
+Server 模式可以接入一个通用 OpenID Connect（OIDC）Provider，例如 Authelia、
+Keycloak、Authentik 或其他兼容服务。在 **管理后台 → OIDC 登录** 中填写向用户展示的
+Provider 名称、Issuer URL、客户端 ID、客户端密钥、完整回调 URI、Scopes 和用户名
+Claim。EPUB Browser 使用 discovery、Authorization Code 与 S256 PKCE，验证签名后的
+ID Token，并且只用 `(issuer, sub)` 标识外部身份；邮件地址和用户名 Claim 只用于展示与
+创建账户，绝不会作为身份主键。
+
+请在 Provider 中登记完整且逐字一致的回调地址，包括协议和主机名：
+
+```text
+https://reader.example.com/auth/oidc/callback
+```
+
+已有用户可先用本地密码登录，再从“账户设置”绑定 Provider；未知外部身份也可以通过一次
+现有本地用户名和密码验证完成绑定。可选的自动创建只会生成**无密码成员**，绝不会导入
+管理员角色。应先让已有用户完成绑定：过早开启自动创建可能产生**重复的本地账户**。
+即使关闭成员的本地密码登录，**本地管理员**密码入口也始终保留；请定期验证并妥善保管
+这份恢复凭据。退出只结束 EPUB Browser 本地会话，不会触发 Provider 全局退出；系统也
+不会保存 Provider access token 或 refresh token。
+
+Authelia 需要配置 confidential client。下面只展示 OIDC client 片段，值均为测试占位符，
+并假设 Authelia 必需的 Provider 密钥和策略已另行配置。请在 Authelia 中保存强随机客户端
+密钥的哈希，然后只在 EPUB Browser 中输入一次对应的原始密钥：
+
+```yaml
+identity_providers:
+  oidc:
+    clients:
+      - client_id: 'epub-browser'
+        client_name: 'EPUB Browser'
+        client_secret: '<AUTHELIA_HASH_OF_A_RANDOM_SECRET>'
+        public: false
+        authorization_policy: 'two_factor'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        redirect_uris:
+          - 'https://reader.example.com/auth/oidc/callback'
+        scopes: ['openid', 'profile', 'email']
+        response_types: ['code']
+        grant_types: ['authorization_code']
+        token_endpoint_auth_method: 'client_secret_basic'
+```
+
+EPUB Browser 侧可填写 Issuer `https://auth.example.com`、客户端 ID `epub-browser`、
+Scopes `openid profile email` 和用户名 Claim `preferred_username`。保存时会实时执行
+discovery 与能力校验；如果校验失败，原配置会保持不变。
+
 #### 配置与治理 AI 阅读
 
 管理员可在 **管理后台**（用户管理之后、书籍管理之前）配置 OpenAI-compatible Base
