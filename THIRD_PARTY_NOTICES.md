@@ -1,4 +1,9 @@
-# Third-party browser assets
+# Third-party dependencies and browser assets
+
+The Server OIDC integration uses `Authlib` (BSD-3-Clause) for JOSE signature
+verification and `HTTPX` (BSD-3-Clause) for bounded Provider HTTP requests. Their
+complete license texts and dependency notices are distributed by the installed Python
+packages. Version constraints are recorded in `setup.py`.
 
 This is the release inventory for generated browser assets under `epub_browser/assets/vendor/`.
 Every archive and installed file is pinned by SHA-256 in `third_party/assets.lock.json`;

@@ -56,6 +56,8 @@ setup(
         "starlette>=0.37,<1.0",
         "uvicorn[standard]>=0.30,<1.0",
         "argon2-cffi>=23.1,<26.0",
+        "Authlib>=1.6.11,<1.7",
+        "httpx>=0.27,<1.0",
         "mdict-utils==1.3.14",
         "pypdf>=6.0,<7.0",
         "pypdfium2>=5.0,<6.0",
