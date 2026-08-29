@@ -87,6 +87,8 @@
     // Current book and chapter info (set by external code)
     var currentBookHash = '';
     var currentChapterIndex = -1;
+    var pendingContentRefresh = false;
+    var contentReadyListenerBound = false;
 
     function tr(key, params) {
         var i18n = window.EpubBrowserI18n;
@@ -1015,7 +1017,64 @@
             return null;
         },
 
+        pdfPageForNode: function(node) {
+            var current = node;
+            while (current) {
+                if (current.getAttribute && current.getAttribute('data-pdf-page-number') !== null) return current;
+                current = current.parentNode;
+            }
+            return null;
+        },
+
+        pdfPagesForSource: function(source, sources) {
+            var pages = [];
+            var add = function(node) {
+                var page = this.pdfPageForNode(node);
+                if (page && pages.indexOf(page) === -1) pages.push(page);
+            }.bind(this);
+            var allSources = Array.isArray(sources) && sources.length ? sources : [source];
+            allSources.forEach(function(item) {
+                this.getHighlightNodesByAnnotationId(item && item.id).forEach(add);
+            }, this);
+            if (pages.length || !global.getSelection) return pages;
+            var selection = global.getSelection();
+            if (!selection || !selection.rangeCount) return pages;
+            var range = selection.getRangeAt(0);
+            add(range.startContainer);
+            add(range.endContainer);
+            return pages;
+        },
+
+        selectionCapabilityMessage: function(source, sources) {
+            var pages = this.pdfPagesForSource(source, sources);
+            if (!pages.length) return '';
+            if (pages.some(function(page) {
+                return page.getAttribute('data-pdf-has-extractable-text') !== 'true';
+            })) return 'pdf.textUnavailable';
+            return pages.length === 1 ? '' : 'pdf.selectionWithinPageRequired';
+        },
+
+        rejectUnsupportedSource: function(source, sources) {
+            var key = this.selectionCapabilityMessage(source, sources);
+            if (!key) return false;
+            var i18n = window.EpubBrowserI18n;
+            Utils.showNotification(i18n && i18n.t ? i18n.t(key) : key, 'warning');
+            if (highlighter) {
+                (Array.isArray(sources) && sources.length ? sources : [source]).forEach(function(item) {
+                    if (!item || !item.id) return;
+                    try { highlighter.remove(item.id); } catch (e) {}
+                });
+            }
+            if (window.getSelection) window.getSelection().removeAllRanges();
+            return true;
+        },
+
         getChapterIndexFromSource: function(source) {
+            var pages = this.pdfPagesForSource(source);
+            if (pages.length === 1) {
+                var pageNumber = parseInt(pages[0].getAttribute('data-pdf-page-number'), 10);
+                if (Number.isInteger(pageNumber) && pageNumber > 0) return pageNumber - 1;
+            }
             var nodes = this.getHighlightNodesByAnnotationId(source && source.id);
             if (global.EpubAnnotationPosition) {
                 return global.EpubAnnotationPosition.chapterIndexForNodes(nodes, currentChapterIndex);
@@ -1320,6 +1379,7 @@
             var source = data && data.sources && data.sources[0];
             if (!source || !source.text) return;
             if (this.isRendering) return;
+            if (this.rejectUnsupportedSource(source, data.sources)) return;
             if (!Settings.enabled) {
                 if (source.id && highlighter) {
                     highlighter.remove(source.id);
@@ -1348,6 +1408,7 @@
 
         showCreateDialogFromSource: function(source) {
             var self = this;
+            if (this.rejectUnsupportedSource(source)) return;
             this.closeDialog();
             var dialog = document.createElement('div');
             dialog.className = 'annotation-selection-menu';
@@ -1369,18 +1430,22 @@
                 self.cancelPendingDraft();
             }, 'annotation-btn-copy');
             actionButton('highlight', function() {
+                if (self.rejectUnsupportedSource(source)) return;
                 self.createAnnotationFromSource(source, Settings.defaultColor, '');
             });
             actionButton('noteAction', function() {
+                if (self.rejectUnsupportedSource(source)) return;
                 self.showNoteDialog(source);
             });
             if (global.EpubBrowserMode === 'server' && global.EpubBrowserDictionary) {
                 actionButton('dictionary', function() {
+                    if (self.rejectUnsupportedSource(source)) return;
                     var anchor = self.getSourceAnchorRect(source);
                     self.cancelPendingDraft();
                     global.EpubBrowserDictionary.open('dictionary', source.text, anchor);
                 });
                 actionButton('encyclopedia', function() {
+                    if (self.rejectUnsupportedSource(source)) return;
                     var anchor = self.getSourceAnchorRect(source);
                     self.cancelPendingDraft();
                     global.EpubBrowserDictionary.open('encyclopedia', source.text, anchor);
@@ -1443,6 +1508,7 @@
 
         showNoteDialog: function(source) {
             var self = this;
+            if (this.rejectUnsupportedSource(source)) return;
             this.closeDialog();
             var dialog = document.createElement('div');
             dialog.className = 'annotation-dialog annotation-note-dialog';
@@ -1505,6 +1571,7 @@
             close.addEventListener('click', function() { self.cancelPendingDraft(); });
             cancel.addEventListener('click', function() { self.cancelPendingDraft(); });
             save.addEventListener('click', function() {
+                if (self.rejectUnsupportedSource(source)) return;
                 self.createAnnotationFromSource(source, selectedColor, input.value.trim());
             });
         },
@@ -1629,6 +1696,7 @@
 
         createAnnotationFromSource: function(source, color, note) {
             var self = this;
+            if (this.rejectUnsupportedSource(source)) return;
             var annotation = this.buildAnnotationFromSource(source, color, note);
             StorageManager.create(annotation).then(function() {
                 self.annotations.push(annotation);
@@ -2573,12 +2641,28 @@
     // ========== Main Module ==========
     var AnnotationModule = {
         initialized: false,
+
+        bindContentReadyRefresh: function() {
+            if (contentReadyListenerBound || typeof global.addEventListener !== 'function') return;
+            contentReadyListenerBound = true;
+            var self = this;
+            global.addEventListener('epub-browser:annotation-content-ready', function(event) {
+                var detail = event && event.detail;
+                if (!detail || !detail.root) return;
+                if (!self.initialized) {
+                    pendingContentRefresh = true;
+                    return;
+                }
+                self.refresh();
+            });
+        },
         
         // Initialize
         init: function(options) {
             options = options || {};
             currentBookHash = options.bookHash || '';
             currentChapterIndex = options.chapterIndex || 0;
+            this.bindContentReadyRefresh();
 
             if (this.initialized) {
                 var refresh = HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
@@ -2601,6 +2685,10 @@
                 return HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
             }).then(function() {
                 self.initialized = true;
+                if (pendingContentRefresh) {
+                    pendingContentRefresh = false;
+                    return self.refresh();
+                }
             }).catch(function(err) {
                 console.error('Annotation module init failed:', err);
                 throw err;
@@ -2694,6 +2782,7 @@
     };
     
     // 导出模块
+    AnnotationModule.bindContentReadyRefresh();
     global.AnnotationModule = AnnotationModule;
     global.AnnotationStorage = AnnotationStorage;
     if (global.__EPUB_BROWSER_TESTING__) {

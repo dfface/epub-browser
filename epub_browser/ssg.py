@@ -19,13 +19,31 @@ from .asset_publisher import (
     SERVER_ONLY_ASSET_PREFIXES,
     WEB_MANIFEST_SOURCES,
 )
-from .book_identity import inspect_book_identity, resolve_book_identity
+from .book_identity import (
+    BOOK_ID_STORAGE_EMBEDDED,
+    ExternalBookIdentity,
+    BookIdentityInspection,
+    inspect_book_identity,
+    resolve_book_identity,
+)
 from .cli import SSGConfig
 from .models import ConvertedBook
+from .identity import source_sha256
+from .pdf_processor import PDFMetadata, inspect_pdf, render_pdf_cover
 from .processor import EPUBProcessor
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
-from .sidecar_identity import discover_orphan_sidecars
+from .sidecar_identity import (
+    discover_orphan_sidecars,
+    sidecar_path_for,
+)
+from .source_format import (
+    PDF_EMBEDDED_STORAGE_NOTICE,
+    EPUB_FORMAT,
+    PDF_FORMAT,
+    is_supported_source,
+    source_format,
+)
 from .urls import SiteURLs
 
 
@@ -37,6 +55,16 @@ class SSGBuildError(RuntimeError):
 class _PreparedBook:
     source: Path
     book_id: str
+    source_format: str
+    source_fingerprint: str
+    pdf_metadata: Optional[PDFMetadata] = None
+    identity_inspection: Optional[BookIdentityInspection] = None
+
+
+@dataclass(frozen=True)
+class _SidecarState:
+    path: Path
+    contents: Optional[bytes]
 
 
 class SSGPublisher:
@@ -81,7 +109,13 @@ class SSGPublisher:
             books = self._convert_all(prepared, staging, assets)
             publish_library_shell(staging, books, assets, self.urls)
             self._validate_snapshot(staging, books, assets)
-            self._activate(staging)
+            identity_state = self._capture_pdf_identity_state(prepared)
+            try:
+                self._persist_pdf_identities(prepared)
+                self._activate(staging)
+            except Exception:
+                self._restore_pdf_identity_state(identity_state)
+                raise
             return self.output_dir
         finally:
             if staging.exists():
@@ -99,6 +133,8 @@ class SSGPublisher:
             for source in sources:
                 processor = None
                 try:
+                    format_name = source_format(source)
+                    pdf_metadata = inspect_pdf(source) if format_name == PDF_FORMAT else None
                     inspection = inspect_book_identity(
                         source,
                         orphan_sidecars=orphan_sidecars,
@@ -106,23 +142,34 @@ class SSGPublisher:
                     identity = resolve_book_identity(
                         inspection,
                         self.config.book_id_storage,
+                        persist=format_name != PDF_FORMAT,
                     )
                     book_id = identity.book_id
-                    processor = EPUBProcessor(
-                        source,
-                        probe_root,
-                        PublishedAssets({}),
-                        urls=self.urls,
-                        reporter=self.reporter,
-                    )
-                    if not processor.extract_epub():
-                        raise ValueError("unable to extract EPUB archive")
-                    opf_path = processor.parse_container()
-                    if not opf_path:
-                        raise ValueError("unable to locate EPUB package")
-                    if not processor.parse_opf(opf_path):
-                        raise ValueError("unable to parse EPUB package")
-                    prepared.append(_PreparedBook(source=source, book_id=book_id))
+                    if format_name == EPUB_FORMAT:
+                        processor = EPUBProcessor(
+                            source,
+                            probe_root,
+                            PublishedAssets({}),
+                            urls=self.urls,
+                            reporter=self.reporter,
+                        )
+                        if not processor.extract_epub():
+                            raise ValueError("unable to extract EPUB archive")
+                        opf_path = processor.parse_container()
+                        if not opf_path:
+                            raise ValueError("unable to locate EPUB package")
+                        if not processor.parse_opf(opf_path):
+                            raise ValueError("unable to parse EPUB package")
+                    prepared.append(_PreparedBook(
+                        source=source,
+                        book_id=book_id,
+                        source_format=format_name,
+                        source_fingerprint=identity.source_fingerprint,
+                        pdf_metadata=pdf_metadata,
+                        identity_inspection=(
+                            inspection if format_name == PDF_FORMAT else None
+                        ),
+                    ))
                 except Exception as error:
                     failures.append((source, str(error)))
                 finally:
@@ -130,7 +177,9 @@ class SSGPublisher:
                         processor.cleanup()
 
         if failures:
-            raise SSGBuildError(self._format_failures("Unable to inspect EPUB inputs", failures))
+            raise SSGBuildError(
+                self._format_failures("Unable to prepare book inputs", failures)
+            )
 
         collisions = {}
         for book in prepared:
@@ -160,10 +209,10 @@ class SSGPublisher:
                 continue
             absolute = source.absolute()
             if absolute.is_file():
-                if absolute.suffix.lower() == ".epub":
+                if is_supported_source(absolute):
                     discovered.append(absolute)
                 else:
-                    failures.append((absolute, "file is not an EPUB"))
+                    failures.append((absolute, "file is not an EPUB or PDF"))
                 continue
             resolved = source.resolve()
             if not resolved.is_dir():
@@ -173,14 +222,21 @@ class SSGPublisher:
                 relative = candidate.relative_to(resolved)
                 if any(part.startswith(".") for part in relative.parts):
                     continue
-                if candidate.is_file() and candidate.suffix.lower() == ".epub":
+                if candidate.is_file() and is_supported_source(candidate):
                     discovered.append(candidate.resolve())
 
         if failures:
-            raise SSGBuildError(self._format_failures("Invalid SSG sources", failures))
+            raise SSGBuildError(
+                self._format_failures("Invalid SSG sources", failures)
+            )
         unique = tuple(sorted(set(discovered), key=str))
         if not unique:
-            raise SSGBuildError("No EPUB files were discovered")
+            raise SSGBuildError("No EPUB or PDF files were discovered")
+        if (
+            self.config.book_id_storage == BOOK_ID_STORAGE_EMBEDDED
+            and any(source_format(path) == PDF_FORMAT for path in unique)
+        ):
+            self.reporter.notice(PDF_EMBEDDED_STORAGE_NOTICE)
         return unique
 
     def _validate_output_target(self, sources: Sequence[Path]) -> None:
@@ -252,6 +308,8 @@ class SSGPublisher:
         staging: Path,
         assets: PublishedAssets,
     ) -> LibraryBook:
+        if prepared.source_format == PDF_FORMAT:
+            return self._convert_pdf(prepared, staging, assets)
         self.reporter.detail(f"Converting EPUB: {prepared.source}")
         processor = self.converter_factory(
             prepared.source,
@@ -277,11 +335,204 @@ class SSGPublisher:
                 authors=converted.metadata.authors,
                 tags=converted.metadata.tags,
                 cover=cover,
+                source_format=converted.metadata.source_format,
             )
         finally:
             cleanup = getattr(processor, "cleanup", None)
             if cleanup:
                 cleanup()
+
+    def _convert_pdf(
+        self,
+        prepared: _PreparedBook,
+        staging: Path,
+        assets: PublishedAssets,
+    ) -> LibraryBook:
+        self.reporter.detail(f"Converting PDF: {prepared.source}")
+        metadata = prepared.pdf_metadata
+        if metadata is None:
+            raise SSGBuildError("PDF metadata was not prepared")
+        destination = staging / "book" / prepared.book_id
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        working = Path(tempfile.mkdtemp(
+            prefix=f".{prepared.book_id}.pdf-",
+            dir=destination.parent,
+        ))
+        try:
+            document = working / "document.pdf"
+            self._atomic_copy(prepared.source, document)
+            if source_sha256(document) != prepared.source_fingerprint:
+                raise SSGBuildError("PDF source changed during conversion")
+
+            cover_result = render_pdf_cover(prepared.source, working / "cover.png")
+            cover_name = "cover.png" if cover_result is not None else None
+            processor = EPUBProcessor.from_pdf_metadata(
+                book_id=prepared.book_id,
+                metadata=metadata,
+                cover_path=cover_name,
+                asset_manifest=assets,
+                urls=self.urls,
+                deployment_mode="ssg",
+            )
+            self._atomic_write_text(working / "index.html", processor.create_index_page(write=False))
+            toc = processor._build_toc_data()
+            self._atomic_write_text(
+                working / "toc.json",
+                json.dumps(toc, ensure_ascii=False, separators=(",", ":")),
+            )
+            document_url = self.urls.public(
+                f"/book/{prepared.book_id}/document.pdf"
+            )
+            for chapter_index in range(len(metadata.pages)):
+                self._atomic_write_text(
+                    working / f"chapter_{chapter_index}.html",
+                    processor.create_pdf_chapter_template(
+                        chapter_index, document_url
+                    ),
+                )
+            self._validate_pdf_book(working, toc, len(metadata.pages))
+            os.replace(working, destination)
+            working = None
+            book_metadata = processor.get_metadata()
+            return LibraryBook(
+                book_id=prepared.book_id,
+                title=book_metadata.title,
+                authors=book_metadata.authors,
+                tags=book_metadata.tags,
+                cover=(
+                    f"/book/{prepared.book_id}/{book_metadata.cover}"
+                    if book_metadata.cover else None
+                ),
+                source_format=PDF_FORMAT,
+            )
+        finally:
+            if working is not None and working.exists():
+                shutil.rmtree(working, ignore_errors=True)
+
+    @staticmethod
+    def _atomic_copy(source: Path, destination: Path) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as output, Path(source).open("rb") as input_file:
+                shutil.copyfileobj(input_file, output)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    @staticmethod
+    def _atomic_write_text(destination: Path, contents: str) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            text=True,
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+                output.write(contents)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    @staticmethod
+    def _validate_pdf_book(directory: Path, toc, page_count: int) -> None:
+        expected = [f"chapter_{index}.html" for index in range(page_count)]
+        if [item.get("chapter_file") for item in toc] != expected:
+            raise SSGBuildError("PDF table of contents is incomplete")
+        if [item.get("chapter_index") for item in toc] != list(range(page_count)):
+            raise SSGBuildError("PDF table of contents has invalid chapter indexes")
+        actual = sorted(path.name for path in directory.glob("chapter_*.html"))
+        if actual != sorted(expected):
+            raise SSGBuildError("PDF chapter output is incomplete")
+        for name in ("index.html", "toc.json", "document.pdf", *expected):
+            if not (directory / name).is_file():
+                raise SSGBuildError(f"PDF output is missing {name}")
+
+    def _persist_pdf_identities(self, prepared: Sequence[_PreparedBook]) -> None:
+        for book in prepared:
+            if book.source_format != PDF_FORMAT:
+                continue
+            inspection = book.identity_inspection
+            if inspection is None:
+                raise SSGBuildError("PDF identity was not prepared")
+            resolved = resolve_book_identity(
+                inspection,
+                self.config.book_id_storage,
+                external_candidates=(ExternalBookIdentity(
+                    origin="prepared SSG output",
+                    book_id=book.book_id,
+                    current_path=False,
+                ),),
+            )
+            if resolved.book_id != book.book_id:
+                raise SSGBuildError("PDF identity changed during conversion")
+
+    @staticmethod
+    def _capture_pdf_identity_state(
+        prepared: Sequence[_PreparedBook],
+    ) -> tuple[_SidecarState, ...]:
+        paths = set()
+        for book in prepared:
+            if book.source_format != PDF_FORMAT:
+                continue
+            paths.add(sidecar_path_for(book.source))
+            if book.identity_inspection is not None:
+                paths.update(
+                    sidecar.path
+                    for sidecar in book.identity_inspection.matching_orphans
+                )
+        return tuple(
+            _SidecarState(
+                path=path,
+                contents=(
+                    path.read_bytes()
+                    if path.exists() or path.is_symlink()
+                    else None
+                ),
+            )
+            for path in sorted(paths, key=str)
+        )
+
+    def _restore_pdf_identity_state(
+        self,
+        states: Sequence[_SidecarState],
+    ) -> None:
+        for state in states:
+            if state.contents is None and (state.path.exists() or state.path.is_symlink()):
+                state.path.unlink()
+        for state in states:
+            if state.contents is not None:
+                self._atomic_write_bytes(state.path, state.contents)
+
+    @staticmethod
+    def _atomic_write_bytes(destination: Path, contents: bytes) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(contents)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, destination)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
 
     def _validate_snapshot(
         self,
@@ -384,6 +635,7 @@ class SSGPublisher:
         return tuple(paths)
 
     def _activate(self, staging: Path) -> None:
+        self._cleanup_previous_snapshots()
         previous = self.output_dir.parent / (
             f".{self.output_dir.name}.previous-{uuid.uuid4().hex}"
         )
@@ -400,7 +652,25 @@ class SSGPublisher:
             raise
         else:
             if previous.exists():
+                try:
+                    self._remove_path(previous)
+                except OSError as error:
+                    # The staging rename above is the publication commit
+                    # boundary. Cleanup cannot turn a committed snapshot into
+                    # a failure that rolls its identity back.
+                    self.reporter.detail(
+                        f"Deferred previous SSG snapshot cleanup: {error}"
+                    )
+
+    def _cleanup_previous_snapshots(self) -> None:
+        pattern = f".{self.output_dir.name}.previous-*"
+        for previous in sorted(self.output_dir.parent.glob(pattern), key=str):
+            try:
                 self._remove_path(previous)
+            except OSError as error:
+                self.reporter.detail(
+                    f"Unable to clean previous SSG snapshot yet: {error}"
+                )
 
     @staticmethod
     def _remove_path(path: Path) -> None:

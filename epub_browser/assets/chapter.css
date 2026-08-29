@@ -303,6 +303,11 @@ body.reader-drawer-open {
     text-transform: uppercase;
 }
 
+.toc-item .chapter-outline-labels {
+    margin-inline-start: .4em;
+    color: var(--text-secondary);
+}
+
 /* The book-level TOC can carry an AI-reading badge next to its title. */
 #bookHomeTocList .toc-item > a {
     display: flex;
@@ -787,6 +792,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     box-shadow: none;
 }
 
+.reader-toolbar.top-controls .control-btn[hidden],
+.mobile-controls .control-btn[hidden] {
+    display: none !important;
+}
+
 .theme-toggle:focus-visible,
 .reading-controls .control-btn:focus-visible,
 .top-controls .control-btn:focus-visible {
@@ -1177,6 +1187,42 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     font-weight: 500;
     color: var(--text);
     margin-bottom: 2px;
+}
+
+.settings-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.pdf-zoom-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--background);
+    color: var(--text-secondary);
+    font-size: .82rem;
+}
+
+.pdf-zoom-value:focus-within {
+    border-color: var(--button-bg);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--button-bg) 18%, transparent);
+}
+
+.pdf-zoom-value input {
+    width: 3.7em;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
 }
 
 .font-size-control,

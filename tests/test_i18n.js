@@ -124,6 +124,7 @@ test('new locale packs have no unexpected English fallback copy', () => {
     'admin.dictionaryFormatStardictName',
     'admin.webhooks.title',
     'admin.webhooks.urlPlaceholder',
+    'pdf.formatBadge',
   ]);
   const nativeIdenticalKeys = {
     es: ['theme.sepia', 'admin.books.profile.general', 'admin.ai.profile.general', 'admin.ai.jobs.header.error', 'ai.spoilers', 'book.totalChapters', 'annotations.color', 'readingInsights.duration.minute', 'apiDocs.endpointCount'],

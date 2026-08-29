@@ -705,7 +705,19 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             api.json(),
             {"code": "authentication_required", "message": "Authentication required"},
         )
-        self.assertEqual(self.client.get("/book/id/chapter_0.html").status_code, 403)
+        book_index = self.client.get("/book/id/index.html")
+        self.assertEqual(book_index.status_code, 303)
+        self.assertEqual(
+            book_index.headers["location"],
+            "/login?next=%2Fbook%2Fid%2Findex.html",
+        )
+        book_page = self.client.get("/book/id/chapter_0.html?view=reader")
+        self.assertEqual(book_page.status_code, 303)
+        self.assertEqual(
+            book_page.headers["location"],
+            "/login?next=%2Fbook%2Fid%2Fchapter_0.html%3Fview%3Dreader",
+        )
+        self.assertEqual(self.client.get("/book/id/cover.png").status_code, 403)
         self.assertEqual(self.client.get("/assets/reader.js").status_code, 403)
         self.assertEqual(self.client.get("/assets/auth.js").status_code, 200)
         self.assertEqual(self.client.get("/api/library-events").status_code, 401)
@@ -4007,6 +4019,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
         (public / "index.html").write_text("library", encoding="utf-8")
         self._write_server_content_cache(public, "book", "Book", "Opening chapter")
         self._write_server_content_cache(public, "restricted", "Restricted", "Private chapter")
+        self._write_server_pdf_cache(public, "pdf")
 
         self.store = StateStore(public / "epub-browser.db")
         self.alice = self.store.initialize(
@@ -4021,6 +4034,14 @@ class ReadingInsightsAPITests(unittest.TestCase):
                 {"title": title},
                 preferred_book_id=book_id,
             )
+        self.store.resolve_book(
+            public / "pdf.pdf",
+            None,
+            "pdf-fingerprint",
+            {"title": "PDF Book", "format": "pdf"},
+            preferred_book_id="pdf",
+            source_format="pdf",
+        )
         self.store.set_book_visibility("restricted", "restricted")
         self.app = create_app(
             public,
@@ -4077,6 +4098,27 @@ class ReadingInsightsAPITests(unittest.TestCase):
                 "title": chapter_title,
                 "content": "<p>Cached chapter.</p>",
                 "style_links": "",
+            }),
+            encoding="utf-8",
+        )
+
+    def _write_server_pdf_cache(self, public, book_id):
+        pdf = public / "book" / book_id / "pdf"
+        pdf.mkdir(parents=True)
+        (pdf / "metadata.json").write_text(
+            json.dumps({
+                "title": None,
+                "authors": [],
+                "tags": [],
+                "language": None,
+                "page_count": 2,
+                "pages": [
+                    {"page_number": 1, "width": 612.0, "height": 792.0, "outline_labels": []},
+                    {"page_number": 2, "width": 612.0, "height": 792.0, "outline_labels": ["Opening"]},
+                ],
+                "encrypted": False,
+                "has_extractable_text": True,
+                "cover": None,
             }),
             encoding="utf-8",
         )
@@ -4202,6 +4244,30 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(first.json()["session"]["book_title"], "Book")
         self.assertEqual(first.json()["session"]["chapter_label"], "Opening chapter")
         self.assertEqual(again.json()["session"]["active_seconds"], 15)
+
+    def test_pdf_reading_heartbeat_uses_page_chapter_snapshot(self):
+        self.store.update_admin_book_settings(
+            "pdf",
+            title="Managed PDF title",
+            authors=["Managed PDF author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
+        heartbeat = self.client.post(
+            "/api/reading-sessions/pdf/heartbeat",
+            json={
+                "client_id": "pdf-tab",
+                "client_sequence": 1,
+                "chapter_index": 1,
+                "active_seconds": 15,
+            },
+        )
+
+        self.assertEqual(heartbeat.status_code, 200, heartbeat.text)
+        self.assertEqual(heartbeat.json()["session"]["book_title"], "Managed PDF title")
+        self.assertEqual(heartbeat.json()["session"]["chapter_label"], "Page 2")
 
     def test_book_reading_time_summary_is_private_and_requires_book_access(self):
         self.assertEqual(

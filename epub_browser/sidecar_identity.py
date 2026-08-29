@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from .epub_identity import validate_book_id
+from .source_format import is_supported_source
 
 
 SIDECAR_SUFFIX = ".epub-browser.json"
@@ -26,13 +27,13 @@ class SidecarIdentity:
     document: dict
 
 
-def sidecar_path_for(epub_path: Path) -> Path:
-    source = Path(epub_path)
+def sidecar_path_for(source_path: Path) -> Path:
+    source = Path(source_path)
     return source.with_name(source.name + SIDECAR_SUFFIX)
 
 
-def read_exact_sidecar(epub_path: Path) -> Optional[SidecarIdentity]:
-    path = sidecar_path_for(epub_path)
+def read_exact_sidecar(source_path: Path) -> Optional[SidecarIdentity]:
+    path = sidecar_path_for(source_path)
     if not path.exists() and not path.is_symlink():
         return None
     return read_sidecar_file(path)
@@ -111,12 +112,12 @@ def read_sidecar_file(path: Path) -> SidecarIdentity:
 
 
 def write_sidecar(
-    epub_path: Path,
+    source_path: Path,
     book_id: str,
     source_fingerprint: str,
 ) -> Path:
-    path = sidecar_path_for(epub_path)
-    existing = read_exact_sidecar(epub_path)
+    path = sidecar_path_for(source_path)
+    existing = read_exact_sidecar(source_path)
     payload = dict(existing.document) if existing is not None else {}
     payload.update(
         {
@@ -152,7 +153,7 @@ def write_sidecar(
     return path
 
 
-def adopt_sidecar(orphan: SidecarIdentity, epub_path: Path) -> Path:
+def adopt_sidecar(orphan: SidecarIdentity, source_path: Path) -> Path:
     current = read_sidecar_file(orphan.path)
     if (
         current.book_id != orphan.book_id
@@ -161,7 +162,7 @@ def adopt_sidecar(orphan: SidecarIdentity, epub_path: Path) -> Path:
         raise SidecarIdentityError(
             f"Orphan sidecar changed before adoption: {orphan.path}"
         )
-    destination = sidecar_path_for(epub_path)
+    destination = sidecar_path_for(source_path)
     if destination.exists() or destination.is_symlink():
         raise SidecarIdentityError(
             f"Cannot adopt sidecar because destination exists: {destination}"
@@ -175,15 +176,15 @@ def adopt_sidecar(orphan: SidecarIdentity, epub_path: Path) -> Path:
 
 def discover_orphan_sidecars(
     configured_sources: Sequence[Path],
-    discovered_epubs: Sequence[Path],
+    discovered_sources: Sequence[Path],
 ) -> tuple[Path, ...]:
     exact_sidecars = {
-        _absolute(sidecar_path_for(source)) for source in discovered_epubs
+        _absolute(sidecar_path_for(source)) for source in discovered_sources
     }
     candidates = set()
     for configured in configured_sources:
         source = Path(configured)
-        if source.suffix.lower() == ".epub":
+        if is_supported_source(source):
             _collect_sidecars(source.parent, candidates)
             continue
         if not source.is_dir():

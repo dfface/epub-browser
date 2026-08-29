@@ -221,6 +221,7 @@ function initScript() {
         link.setAttribute('href', book.url);
 
         coverFrame.className = 'book-cover-frame';
+        if (book.format === 'pdf') coverFrame.classList.add('pdf-cover-frame');
         cover.className = 'book-cover';
         cover.setAttribute('src', book.cover);
         cover.setAttribute('alt', t('library.cover'));
@@ -251,6 +252,14 @@ function initScript() {
             rating.appendChild(icon);
             rating.appendChild(score);
             coverFrame.appendChild(rating);
+        }
+
+        if (book.format === 'pdf') {
+            var formatBadge = document.createElement('span');
+            formatBadge.className = 'book-format-badge';
+            formatBadge.setAttribute('aria-label', t('pdf.formatBadge'));
+            formatBadge.textContent = t('pdf.formatBadge');
+            coverFrame.appendChild(formatBadge);
         }
 
         if (book.tags && book.tags.length > 0) {

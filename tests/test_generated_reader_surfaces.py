@@ -10,12 +10,228 @@ from pathlib import Path
 from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
+from epub_browser.pdf_processor import PDFMetadata, PDFPageMetadata
 from epub_browser.processor import EPUBProcessor, server_book_public_path_allowed
 from epub_browser.site import publish_library_shell
 from epub_browser.urls import SiteURLs
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_pdf_metadata_hydrates_page_chapters_and_a_complete_page_toc(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF',
+                authors=('Author One', 'Author Two'),
+                tags=('reference',),
+                language='fr',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 792.0, 612.0, ('Opening', 'Part I')),
+                    PDFPageMetadata(3, 612.0, 792.0),
+                ),
+                encrypted=False,
+                has_extractable_text=True,
+                cover=None,
+            )
+
+            processor = EPUBProcessor.from_pdf_metadata(
+                book_id='pdf-book',
+                metadata=metadata,
+                cover_path='cover.png',
+                asset_manifest=assets,
+                urls=SiteURLs('/reader/'),
+                deployment_mode='server',
+            )
+
+            self.assertEqual(processor.book_title, 'A PDF')
+            self.assertEqual(processor.authors, ['Author One', 'Author Two'])
+            self.assertEqual(processor.tags, ['reference'])
+            self.assertEqual(processor.lang, 'fr')
+            self.assertEqual(processor.get_book_info()['cover'], 'cover.png')
+            self.assertEqual(processor.chapters, [
+                {'title': 'Page 1', 'path': 'chapter_0.html'},
+                {'title': 'Page 2', 'path': 'chapter_1.html'},
+                {'title': 'Page 3', 'path': 'chapter_2.html'},
+            ])
+            self.assertEqual(processor._build_toc_data(), [
+                {
+                    'title': 'Page 1', 'level': 0, 'kind': 'chapter',
+                    'chapter_index': 0, 'chapter_file': 'chapter_0.html',
+                    'page_label': '1', 'outline_labels': [],
+                },
+                {
+                    'title': 'Page 2', 'level': 0, 'kind': 'chapter',
+                    'chapter_index': 1, 'chapter_file': 'chapter_1.html',
+                    'page_label': '2', 'outline_labels': ['Opening', 'Part I'],
+                },
+                {
+                    'title': 'Page 3', 'level': 0, 'kind': 'chapter',
+                    'chapter_index': 2, 'chapter_file': 'chapter_2.html',
+                    'page_label': '3', 'outline_labels': [],
+                },
+            ])
+
+            book_html = processor.create_index_page(write=False)
+            self.assertIn('data-id=toc-container', book_html)
+            self.assertEqual(book_html.count('class=chapter-link'), 3)
+            self.assertIn('data-i18n=pdf.page', book_html)
+            self.assertEqual(book_html.count('Opening'), 1)
+            self.assertEqual(book_html.count('Part I'), 1)
+            self.assertEqual(book_html.count('class=chapter-outline-labels'), 1)
+            self.assertNotIn('— Opening', book_html)
+            self.assertIn('>Opening · Part I</span>', book_html)
+            self.assertRegex(
+                book_html,
+                r'<span class=chapter-title-with-sync><span [^>]*class=chapter-title[^>]*>Page 2</span>'
+                r'<span class=chapter-outline-labels[^>]*>Opening · Part I</span></span>'
+                r'<span class=chapter-page>chapter_1\.html</span>',
+            )
+            self.assertNotIn('data-ai-reading-hub', book_html)
+            self.assertNotIn('data-ai-book-chat', book_html)
+            self.assertNotIn('data-ai-reading-indicators', book_html)
+            self.assertIn('data-reading-insights', book_html)
+            self.assertIn('class=book-source-format data-i18n=pdf.formatBadge', book_html)
+            self.assertIn('aria-label=PDF', book_html)
+
+    def test_pdf_page_adds_only_a_scoped_descriptor_to_the_shared_reader(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 792.5, 612.25, ('Opening',)),
+                    PDFPageMetadata(3, 612.0, 792.0),
+                ),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            pdf = EPUBProcessor.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets, urls=SiteURLs(),
+                deployment_mode='server',
+            )
+            epub = EPUBProcessor(
+                'book.epub', directory, asset_manifest=assets,
+                book_id='epub-book', deployment_mode='server',
+            )
+            epub.book_title = 'An EPUB'
+            epub.chapters = [{'title': 'One'}]
+
+            pdf_html = pdf.create_pdf_chapter_template(
+                1, '/api/books/pdf-book/document',
+            )
+            epub_html = epub.create_chapter_template('<p>Text</p>', '', 0, 'One')
+
+            shared_markers = (
+                'class="chapter-top-bar app-header"',
+                'id="bookHomeFloating"',
+                'id="tocFloating"',
+                'id="eb-content"',
+                'id="paginationInfo"',
+                'id="settingsModal"',
+                'data-tab="font"',
+                'id="font-tab"',
+                'data-tab="reading"',
+                'id="reading-tab"',
+                'id="continuousScrollToggle"',
+                'data-annotation-hub',
+                'data-reading-insights',
+            )
+            for marker in shared_markers:
+                self.assertEqual(pdf_html.count(marker), epub_html.count(marker), marker)
+
+            for asset_name in (
+                'chapter', 'annotation-position', 'annotation',
+                'annotation-hub', 'dictionary', 'reading-insights',
+            ):
+                pattern = rf'/assets/immutable/{asset_name}\.[0-9a-f]{{12}}\.(?:js|css)'
+                self.assertEqual(
+                    re.findall(pattern, pdf_html), re.findall(pattern, epub_html),
+                    asset_name,
+                )
+
+            self.assertIn('class="pdf-page-content"', pdf_html)
+            self.assertIn('data-pdf-page-number="2"', pdf_html)
+            self.assertIn('data-pdf-page-width="792.5"', pdf_html)
+            self.assertIn('data-pdf-page-height="612.25"', pdf_html)
+            self.assertIn('data-pdf-has-extractable-text="true"', pdf_html)
+            self.assertIn('data-chapter-index="1"', pdf_html)
+            self.assertIn('data-book-hash="pdf-book"', pdf_html)
+            self.assertIn('aria-label="Page 2 of 3"', pdf_html)
+            self.assertIn('data-i18n-aria-label="pdf.pageOf"', pdf_html)
+            self.assertIn('window.EpubPDFConfig=', pdf_html)
+            self.assertIn('"documentUrl":"/api/books/pdf-book/document"', pdf_html)
+            self.assertNotIn('"pages":', pdf_html)
+            self.assertIn('"hasExtractableText":true', pdf_html)
+            self.assertRegex(
+                pdf_html,
+                r'"pdfjsModuleUrl":"/assets/immutable/vendor/pdfjs/build/pdf\.[0-9a-f]{12}\.mjs"',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'"pdfjsWorkerUrl":"/assets/immutable/vendor/pdfjs/build/pdf\.worker\.[0-9a-f]{12}\.mjs"',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'<link rel="stylesheet" href="/assets/immutable/pdf-chapter\.[0-9a-f]{12}\.css">',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'<script src="/assets/immutable/pdf-chapter\.[0-9a-f]{12}\.js" defer></script>',
+            )
+            self.assertNotIn('pdf-chapter.', epub_html)
+            self.assertIn('id="pdfSearchToggle"', pdf_html)
+            self.assertIn('id="pdfSearchDrawer"', pdf_html)
+            self.assertIn('class="toc-floating reader-drawer pdf-search-drawer"', pdf_html)
+            self.assertIn('id="mobilePdfSearchToggle"', pdf_html)
+            self.assertIn('id="mobilePdfZoomOut"', pdf_html)
+            self.assertRegex(
+                pdf_html,
+                r'id="pageWidthSlider"[^>]+min="25"[^>]+max="400"[^>]+step="1"',
+            )
+            self.assertRegex(
+                pdf_html,
+                r'id="pageWidthValue"[^>]+type="number"[^>]+min="25"[^>]+max="400"',
+            )
+            self.assertIn('data-pdf-zoom-control', pdf_html)
+            self.assertRegex(
+                epub_html,
+                r'id="pageWidthSlider"[^>]+min="1"[^>]+max="4"[^>]+step="1"',
+            )
+            self.assertNotIn('id="pageWidthValue"', epub_html)
+            for removed_pdf_action in (
+                'id="pdfPrint"', 'id="pdfDownload"',
+                'id="mobilePdfPrint"', 'id="mobilePdfDownload"',
+                'data-ai-learning-canvas', 'data-ai-followup-drawer',
+                'data-ai-reading-hub',
+            ):
+                self.assertNotIn(removed_pdf_action, pdf_html)
+            self.assertIn('data-ai-learning-canvas', epub_html)
+            self.assertIn('data-ai-followup-drawer', epub_html)
+            self.assertIn('data-ai-reading-hub', epub_html)
+            self.assertIn('<body class="pdf-source">', pdf_html)
+            self.assertNotIn('<body class="pdf-source">', epub_html)
+            pdf_css = Path('epub_browser/assets/pdf-chapter.css').read_text(encoding='utf-8')
+            self.assertNotIn('body.pdf-source .container {', pdf_css)
+            self.assertIn('body.pdf-source .eb-content-container {', pdf_css)
+            self.assertIn('body.pdf-source .pdf-page-canvas {', pdf_css)
+            self.assertIn('overflow: visible;', pdf_css)
+            self.assertNotIn('id="pdfSearchToggle"', epub_html)
+            self.assertNotIn('id="pdfSearchDrawer"', epub_html)
+            self.assertNotIn('id="mobilePdfSearchToggle"', epub_html)
+            self.assertNotIn('pdf-selection-menu', pdf_html)
+            self.assertNotIn('cdn.', pdf_html)
+            for duplicate_ui in (
+                'pdf-reader', 'pdf-settings', 'pdf-selection-menu',
+                'pdf-annotation-tab', 'pdf-annotation-toolbar',
+            ):
+                self.assertNotIn(duplicate_ui, pdf_html)
+
     def test_server_includes_real_account_controls_but_ssg_includes_none(self):
         server_html = self._server_html()
         ssg_html = self._library_html()
@@ -1055,7 +1271,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('width="640"', rendered)
         self.assertIn('height="480"', rendered)
 
-    def test_ssg_processor_preserves_existing_epub_markup_metadata_and_resources(self):
+    def test_ssg_processor_preserves_authored_content_but_makes_metadata_inert(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor("book.epub", directory, deployment_mode="ssg")
             processor.book_title = '<script id="ssg-title">title()</script>'
@@ -1101,14 +1317,17 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('id="ssg-body"', chapter_html)
             self.assertIn("background: url(image.png)", chapter_html)
             self.assertIn("https://example.test/book.css", chapter_html)
-            for marker in (
+            self.assertIn("title()", index_html)
+            self.assertIn("Author", index_html)
+            self.assertIn("Tag", index_html)
+            self.assertIn("ssg-description", index_html)
+            for active_metadata_marker in (
                 "ssg-title",
                 "ssg-author",
-                "ssg-description",
                 "ssg-tag",
+                "ssg-chapter",
             ):
-                self.assertIn(marker, index_html)
-            self.assertIn("ssg-chapter", chapter_html)
+                self.assertNotIn(active_metadata_marker, index_html + chapter_html)
             self.assertIn(
                 'onload="run()"',
                 Path(processor.web_dir, "resources", "active.svg").read_text(
@@ -1264,6 +1483,16 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'/assets/immutable/version-check\.[0-9a-f]{12}\.js',
             )
 
+    def test_ssg_footers_do_not_make_runtime_release_requests(self):
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            footer = html[html.index('<footer'):html.index('</footer>')]
+            self.assertNotIn('api.github.com', footer)
+            self.assertRegex(footer, r'data-release-api(?:=(?:""|\'\'))?(?:[ >])')
+
+        for html in (self._server_html(), self._server_book_html(), self._server_chapter_html()):
+            footer = html[html.index('<footer'):html.index('</footer>')]
+            self.assertRegex(footer, r'data-release-api=(?:"/api/version"|/api/version)')
+
     def test_shared_footer_link_uses_the_surrounding_text_color(self):
         css = Path("epub_browser/assets/theme.css").read_text(encoding="utf-8")
         link_rules = css[css.index(".eb-footer a {"):css.index("}", css.index(".eb-footer a {"))]
@@ -1351,7 +1580,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("i18n.t('reader.loadingNextChapter'", script)
         self.assertIn("i18n.t('reader.chapterLoadFailed'", script)
         self.assertIn("i18n.t('settings.saved'", script)
-        self.assertIn("i18n.t('reader.chapterNumber'", script)
+        self.assertIn('continuousChapterPresentation(', script)
+        self.assertIn('i18n.t.bind(i18n)', script)
         self.assertIn("i18n.t('settings.continuousScrollTip'", script)
 
     def test_reader_chapter_navigation_swaps_only_the_reading_body(self):
@@ -2662,16 +2892,48 @@ assert.deepEqual(
         self.assertIn('transform: translateX(calc(100% + 42px));', chapter_css)
         self.assertIn('body.reader-drawer-open', chapter_css)
 
+    def test_pdf_search_registers_with_the_shared_reader_drawer_controller(self):
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        pdf_js = Path('epub_browser/assets/pdf-chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn('function registerReaderDrawer(options)', chapter_js)
+        self.assertIn('window.EpubReaderDrawers = {', chapter_js)
+        self.assertIn("window.dispatchEvent(new CustomEvent('epub-browser:reader-drawers-ready'))", chapter_js)
+        self.assertIn('readerDrawerEntries.forEach(function(entry)', chapter_js)
+
+        self.assertIn('root.EpubReaderDrawers', pdf_js)
+        self.assertIn('drawerController.register({', pdf_js)
+        self.assertIn('mobileToggle: mobileToggle', pdf_js)
+        self.assertIn('controller.close(true)', pdf_js)
+        self.assertIn("root.addEventListener('epub-browser:reader-drawers-ready', bindReaderControls)", pdf_js)
+        self.assertNotIn('function closeDrawer(', pdf_js)
+
+    def test_shared_pdf_drawer_keeps_exclusive_focus_and_escape_lifecycle(self):
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        opening = chapter_js[chapter_js.index('function openReaderDrawer('):chapter_js.index('\n    if (window.EpubReaderLayout)', chapter_js.index('function openReaderDrawer('))]
+        closing = chapter_js[chapter_js.index('function closeReaderDrawers('):chapter_js.index('\n    function openReaderDrawer(', chapter_js.index('function closeReaderDrawers('))]
+
+        self.assertLess(opening.index('closeReaderDrawers(false);'), opening.index("panel.classList.add('active');"))
+        self.assertIn('if (restoreFocus && readerDrawerOpener) readerDrawerOpener.focus();', closing)
+        self.assertIn("if (event.key === 'Escape' && document.body.classList.contains('reader-drawer-open'))", chapter_js)
+        self.assertIn('closeReaderDrawers(true);', chapter_js)
+
     def test_continuous_reader_disables_the_chapter_local_toc(self):
         chapter = self._chapter_html()
         chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
 
         mobile_toc = re.search(
             r'<button\b[^>]*\bid=(?:["\'])?mobileTocBtn(?:["\' >])[^>]*>',
             chapter,
         )
         self.assertIsNotNone(mobile_toc)
-        self.assertIn('syncChapterTocAvailability(document, isContinuousScroll)', chapter_js)
+        self.assertIn(
+            'syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig))',
+            chapter_js,
+        )
+        self.assertIn('.reader-toolbar.top-controls .control-btn[hidden]', chapter_css)
+        self.assertIn('display: none !important;', chapter_css)
         self.assertRegex(chapter, r'/assets/immutable/reader-layout\.[0-9a-f]{12}\.js')
 
     def test_reader_settings_offer_four_responsive_page_widths(self):
@@ -2888,6 +3150,38 @@ assert.deepEqual(
         self.assertIn('aspect-ratio: 4 / 5;', cover_rule)
         self.assertIn('height: auto;', cover_rule)
         self.assertNotRegex(css, r'\.book-cover\s*\{[^}]*height:\s*\d+px')
+
+    def test_library_cover_fills_the_card_and_stacks_pdf_format_badges(self):
+        css = Path('epub_browser/assets/library.css').read_text(encoding='utf-8')
+        cover_start = css.index('.book-cover {')
+        cover_rule = css[cover_start:css.index('}', cover_start)]
+
+        self.assertIn('object-fit: cover;', cover_rule)
+        self.assertNotIn('background: #fff;', cover_rule)
+        self.assertIn('.book-format-badge', css)
+        self.assertIn('.pdf-cover-frame .book-rating-badge', css)
+
+    def test_book_detail_cover_uses_the_same_full_bleed_crop_as_the_library(self):
+        css = Path('epub_browser/assets/book.css').read_text(encoding='utf-8')
+        cover_start = css.index('.book-info-cover img {')
+        cover_rule = css[cover_start:css.index('}', cover_start)]
+
+        self.assertIn('object-fit: cover;', cover_rule)
+        self.assertNotIn('background: #fff;', cover_rule)
+
+    def test_pdf_reader_stage_follows_the_active_reader_theme(self):
+        css = Path('epub_browser/assets/pdf-chapter.css').read_text(encoding='utf-8')
+        body_start = css.index('body.pdf-source {')
+        body_rule = css[body_start:css.index('}', body_start)]
+        stage_start = css.index('body.pdf-source .eb-content-container {')
+        stage_rule = css[stage_start:css.index('}', stage_start)]
+
+        self.assertIn('padding-inline: 0;', body_rule)
+        self.assertIn('margin-top: 0;', stage_rule)
+        self.assertIn('var(--background)', stage_rule)
+        self.assertNotIn('var(--text) 88%', stage_rule)
+        self.assertIn('body.pdf-source:not(.continuous-scroll-mode) .eb-content-container', css)
+        self.assertIn('body.pdf-source:not(.continuous-scroll-mode) #eb-content', css)
 
     def test_server_book_ai_assets_stay_off_critical_path(self):
         book_html = self._server_book_html()
@@ -3236,6 +3530,7 @@ assert.deepEqual(
         self.assertIn("/api/books/" + "' + encodeURIComponent(book_hash) + '/metadata", book_script)
         self.assertIn('renderEffectiveBookTags', book_script)
         self.assertIn("titleWithSync.insertBefore(syncTag, aiBadge.nextSibling)", book_script)
+        self.assertIn("titleWithSync.insertBefore(syncTag, outlineLabels || null)", book_script)
         reading_hub_script = Path('epub_browser/assets/ai-reading-hub.js').read_text(encoding='utf-8')
         self.assertIn("function resultGroups(book)", reading_hub_script)
         self.assertIn("function resultTimestamp(result)", reading_hub_script)

@@ -86,6 +86,32 @@ class EpubFileHandlerTests(unittest.TestCase):
         self.assertIn(Path("/tmp/deleted.epub"), manager.queued)
         self.assertIn(Path("/tmp/old.epub"), manager.queued)
 
+    def test_manager_receives_pdf_events_case_insensitively(self):
+        class Manager:
+            def __init__(self):
+                self.queued = []
+
+            def queue_path(self, path):
+                self.queued.append(Path(path))
+
+        manager = Manager()
+        handler = EpubFileHandler(manager)
+
+        handler.on_created(FileCreatedEvent("/tmp/created.PDF"))
+        handler.on_deleted(FileDeletedEvent("/tmp/deleted.pdf"))
+        handler.on_moved(FileMovedEvent("/tmp/old.PdF", "/tmp/new.PDF"))
+        handler.shutdown()
+
+        self.assertCountEqual(
+            manager.queued,
+            (
+                Path("/tmp/created.PDF"),
+                Path("/tmp/deleted.pdf"),
+                Path("/tmp/old.PdF"),
+                Path("/tmp/new.PDF"),
+            ),
+        )
+
     def test_fast_task_completion_does_not_deadlock_event_dispatch(self):
         library = ImmediateFailureLibrary()
         handler = EpubFileHandler(library)

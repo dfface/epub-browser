@@ -75,6 +75,94 @@ class StateStoreTests(unittest.TestCase):
             authoritative_book_id=book_id,
         )
 
+    def test_existing_book_rows_migrate_to_epub_source_format(self):
+        legacy_database = Path(self.temporary.name, "legacy-v17.db")
+        connection = sqlite3.connect(legacy_database)
+        connection.executescript(
+            """
+            CREATE TABLE books (
+                book_id TEXT PRIMARY KEY,
+                source_path TEXT NOT NULL UNIQUE,
+                epub_identifier TEXT,
+                source_fingerprint TEXT NOT NULL,
+                source_size INTEGER,
+                source_mtime_ns INTEGER,
+                metadata_json TEXT NOT NULL,
+                visibility TEXT NOT NULL DEFAULT 'authenticated',
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO books (
+                book_id, source_path, source_fingerprint, metadata_json
+            ) VALUES ('legacy-book', '/library/legacy.epub', 'digest', '{}');
+            PRAGMA user_version = 17;
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = StateStore(legacy_database)
+        migrated.initialize(BootstrapCredentials("legacy-admin", "secret"))
+
+        self.assertEqual(migrated.active_books()[0].source_format, "epub")
+        with migrated._connection() as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION,
+            )
+
+    def test_resolve_book_records_explicit_pdf_source_format(self):
+        record = self.store.resolve_book(
+            Path(self.temporary.name, "document.pdf"),
+            None,
+            "pdf-digest",
+            {"title": "Document", "authors": ["PDF Author"]},
+            source_format="pdf",
+        )
+
+        self.assertEqual(record.source_format, "pdf")
+        self.assertEqual(
+            self.store.get_admin_book_detail(record.book_id)["format"],
+            "pdf",
+        )
+        self.assertEqual(
+            next(
+                item
+                for item in self.store.list_admin_book_summaries()
+                if item["id"] == record.book_id
+            )["format"],
+            "pdf",
+        )
+
+    def test_pdf_metadata_and_tag_updates_emit_pdf_webhook_format(self):
+        record = self.store.resolve_book(
+            Path(self.temporary.name, "managed.pdf"),
+            None,
+            "managed-pdf-digest",
+            {"title": "Original PDF", "tags": []},
+            source_format="pdf",
+        )
+        tag = self.store.create_ai_tag("PDF tag")
+
+        self.store.update_admin_book_settings(
+            record.book_id,
+            title="Curated PDF",
+            authors=["Curator"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[tag["id"]],
+            profile="auto",
+        )
+        self.store.rename_ai_tag(tag["id"], "Renamed PDF tag")
+
+        events = self.store.list_webhook_events(event_type="book.updated")
+        self.assertEqual(len(events), 2)
+        self.assertTrue(all(
+            event["data"] == {"book_id": record.book_id, "format": "pdf"}
+            for event in events
+        ))
+
     def test_heartbeat_is_idempotent_and_changes_chapter_session(self):
         self._reading_book()
         first = self.store.record_reading_heartbeat(
@@ -213,6 +301,38 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(result["total_active_seconds"], 13)
         self.assertEqual(len(result["sessions"]), 1)
         self.assertEqual(result["sessions"][0]["active_seconds"], 13)
+
+    def test_reading_history_uses_the_current_managed_book_title_by_book_id(self):
+        self._reading_book()
+        self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id,
+            book_id="book-1",
+            client_id="rename-tab",
+            client_sequence=1,
+            chapter_index=0,
+            active_seconds=15,
+            book_title="Imported title snapshot",
+            chapter_label="Chapter 1",
+            received_at=_utc("2026-08-15T08:00:15Z"),
+        )
+        self.store.update_admin_book_settings(
+            "book-1",
+            title="Renamed in book management",
+            authors=["Managed author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
+
+        insights = self.store.reading_insights(
+            self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai"
+        )
+        sessions = self.store.list_reading_sessions_for_user(self.owner.user_id)
+
+        self.assertEqual(insights["top_book"]["title"], "Renamed in book management")
+        self.assertEqual(insights["sessions"][0]["book_title"], "Renamed in book management")
+        self.assertEqual(sessions[0]["book_title"], "Renamed in book management")
 
     def test_insights_split_session_at_local_midnight_without_losing_seconds(self):
         self._reading_book()
@@ -916,6 +1036,7 @@ class StateStoreTests(unittest.TestCase):
             next(item for item in summaries if item["id"] == book.book_id),
             {
                 "id": book.book_id,
+                "format": "epub",
                 "title": "算法导论",
                 "authors": ["作者甲"],
                 "tags": [{"id": tag["id"], "name": "Computer Science"}],
@@ -1032,7 +1153,7 @@ class StateStoreTests(unittest.TestCase):
             [event["data"] for event in self.store.list_webhook_events(
                 event_type="book.updated"
             )],
-            [{"book_id": book.book_id}],
+            [{"book_id": book.book_id, "format": "epub"}],
         )
 
         self.store.update_book_version(
@@ -1067,7 +1188,7 @@ class StateStoreTests(unittest.TestCase):
             3,
         )
         self.assertTrue(all(
-            event["data"] == {"book_id": book.book_id}
+            event["data"] == {"book_id": book.book_id, "format": "epub"}
             for event in self.store.list_webhook_events(event_type="book.updated")
         ))
 
@@ -1152,6 +1273,63 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(migrated["title"], "Migrated title")
         self.assertEqual(migrated["authors"], ["Migrated author"])
         self.assertEqual(migrated["tags"], ["Migrated tag"])
+
+    def test_v19_repairs_pdf_branch_v18_without_overwriting_main_v18(self):
+        pdf_branch = self.store.resolve_book(
+            Path(self.temporary.name, "before-v19.pdf"),
+            None,
+            "before-v19-fingerprint",
+            {
+                "title": "PDF branch title",
+                "authors": ["PDF branch author"],
+                "tags": ["PDF branch tag"],
+            },
+            preferred_book_id="before-v19-book",
+            source_format="pdf",
+        )
+        with self.store._connection() as connection:
+            connection.execute(
+                "DELETE FROM book_ai_tags WHERE book_id = ?", (pdf_branch.book_id,)
+            )
+            connection.execute("DELETE FROM ai_tags")
+            connection.execute("ALTER TABLE books DROP COLUMN title")
+            connection.execute("ALTER TABLE books DROP COLUMN authors_json")
+            connection.execute("PRAGMA user_version = 18")
+
+        StateStore(self.database).initialize()
+
+        repaired = self.store.get_book(pdf_branch.book_id)
+        self.assertEqual(repaired.source_format, "pdf")
+        self.assertEqual(
+            self.store.managed_book_metadata(pdf_branch.book_id),
+            {
+                "title": "PDF branch title",
+                "authors": ["PDF branch author"],
+                "tags": ["PDF branch tag"],
+            },
+        )
+        with self.store._connection() as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION,
+            )
+
+        self.store.update_admin_book_settings(
+            pdf_branch.book_id,
+            title="Curated PDF title",
+            authors=["Curated PDF author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
+        with self.store._connection() as connection:
+            connection.execute("PRAGMA user_version = 18")
+        StateStore(self.database).initialize()
+        preserved = self.store.managed_book_metadata(pdf_branch.book_id)
+        self.assertEqual(preserved["title"], "Curated PDF title")
+        self.assertEqual(preserved["authors"], ["Curated PDF author"])
+        self.assertEqual(preserved["tags"], [])
 
     def test_invalid_admin_book_settings_roll_back(self):
         book = self.store.resolve_book(

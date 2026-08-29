@@ -12,6 +12,12 @@ test('bookshelf metadata follows the generated base path and published cover URL
   );
 });
 
+test('bookshelf metadata preserves PDF format and defaults legacy books to EPUB', () => {
+  assert.equal(Metadata.bookFormat({ format: 'pdf' }), 'pdf');
+  assert.equal(Metadata.bookFormat({ format: 'epub' }), 'epub');
+  assert.equal(Metadata.bookFormat({}), 'epub');
+});
+
 test('add-book search matches Chinese titles and authors by pinyin', () => {
   const book = {
     title: '三国演义',

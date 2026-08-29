@@ -55,6 +55,38 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             }),
             encoding="utf-8",
         )
+        self.store.resolve_book(
+            self.public / "document.pdf",
+            None,
+            "pdf-fingerprint",
+            {"title": "Visible PDF", "author": "PDF Author"},
+            preferred_book_id="pdf",
+            source_format="pdf",
+        )
+        pdf = self.public / "book" / "pdf" / "pdf"
+        pdf.mkdir(parents=True)
+        (pdf / "metadata.json").write_text(
+            json.dumps({
+                "title": "Visible PDF",
+                "authors": ["PDF Author"],
+                "tags": [],
+                "language": "en",
+                "pages": [
+                    {"page_number": 1, "width": 612, "height": 792,
+                     "outline_labels": []},
+                    {"page_number": 2, "width": 612, "height": 792,
+                     "outline_labels": []},
+                ],
+                "page_count": 2,
+                "encrypted": False,
+                "has_extractable_text": False,
+                "cover": None,
+            }),
+            encoding="utf-8",
+        )
+        (self.public / "assets" / "asset-manifest.json").write_text(
+            "{}", encoding="utf-8"
+        )
         self.auth_service = AuthService(self.store, AuthConfig.from_values([]))
         self.app = create_app(
             self.public,
@@ -109,6 +141,7 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertEqual(item["id"], "book")
         self.assertEqual(item["author"], "Author")
         self.assertEqual(item["authors"], ["Author"])
+        self.assertEqual(item["format"], "epub")
         self.assertEqual(response.headers["cache-control"], "private, no-store")
 
         tag = self.store.create_ai_tag("Managed tag")
@@ -161,6 +194,11 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertEqual(served.status_code, 200)
         self.assertEqual(served.json()["openapi"], "3.1.0")
         self.assertEqual(self.client.get("/api-docs").status_code, 200)
+        self.assertNotIn("/api/books/{book_id}/document", document["paths"])
+        self.assertEqual(
+            document["components"]["schemas"]["Book"]["properties"]["format"],
+            {"enum": ["epub", "pdf"]},
+        )
 
     def test_api_docs_are_grouped_searchable_and_public(self):
         page = self.client.get("/api-docs")
@@ -211,10 +249,35 @@ class PublicAPIBoundaryTests(unittest.TestCase):
 
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["book"]["title"], "Visible Book")
+        self.assertEqual(detail.json()["book"]["format"], "epub")
         self.assertEqual(chapters.status_code, 200)
         self.assertEqual(chapters.json()["items"][0]["index"], 0)
         self.assertEqual(chapter.status_code, 200)
         self.assertIn("<strong>reader</strong>", chapter.json()["content_html"])
+
+    def test_pdf_chapters_are_page_chapters_in_public_api(self):
+        headers = self.bearer("library:read")
+        chapters = self.client.get("/api/v1/books/pdf/chapters", headers=headers)
+        response = self.client.get("/api/v1/books/pdf/chapters/1", headers=headers)
+
+        self.assertEqual(chapters.status_code, 200, chapters.text)
+        self.assertEqual(chapters.json()["items"], [
+            {"index": 0, "title": "Page 1", "format": "pdf", "page_number": 1},
+            {"index": 1, "title": "Page 2", "format": "pdf", "page_number": 2},
+        ])
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["chapter"], {
+            "index": 1,
+            "title": "Page 2",
+            "format": "pdf",
+            "page_number": 2,
+            "content_type": "application/pdf-page",
+            "content_html": None,
+            "text": "",
+        })
+
+    def test_raw_pdf_document_is_not_a_pat_operation(self):
+        self.assertNotIn("/api/books/{book_id}/document", openapi_document()["paths"])
 
     def test_chapter_supports_plain_text_and_rejects_unknown_formats(self):
         headers = self.bearer("library:read")

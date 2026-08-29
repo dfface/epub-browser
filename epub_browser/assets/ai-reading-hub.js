@@ -212,7 +212,7 @@
     // plain link.  Keep both layouts native to their own navigation surface.
     var title = link.querySelector('.chapter-title');
     var titleGroup = link.querySelector('.chapter-title-with-sync');
-    if (!titleGroup && title) { titleGroup = el('span', 'chapter-title-with-sync'); title.parentNode.insertBefore(titleGroup, title); titleGroup.appendChild(title); }
+    if (!titleGroup && title) { var outline = link.querySelector('.chapter-outline-labels'); titleGroup = el('span', 'chapter-title-with-sync'); title.parentNode.insertBefore(titleGroup, title); titleGroup.appendChild(title); if (outline) titleGroup.appendChild(outline); }
     var syncTag = titleGroup && titleGroup.querySelector('.chapter-sync-tag');
     if (titleGroup) titleGroup.insertBefore(badge, syncTag || null); else link.appendChild(badge);
   }

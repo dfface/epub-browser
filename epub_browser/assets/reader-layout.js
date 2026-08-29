@@ -56,6 +56,30 @@
         return value !== 'false';
     }
 
+    function chapterNavigationPresentation(item, pdf, translate) {
+        item = item || {};
+        var outlineLabels = Array.isArray(item.outline_labels)
+            ? item.outline_labels.filter(function(label) { return typeof label === 'string' && label; })
+            : [];
+        var title = typeof item.title === 'string' ? item.title : '';
+        if (pdf && item.page_label !== undefined && typeof translate === 'function') {
+            title = translate('pdf.page', { number: item.page_label });
+        }
+        return { title: title, outlineLabels: outlineLabels };
+    }
+
+    function continuousChapterPresentation(chapterTitle, chapterIndex, pdf, translate) {
+        var index = Number(chapterIndex) || 0;
+        if (pdf && typeof translate === 'function') {
+            var page = translate('pdf.page', { number: index + 1 });
+            return { title: page, index: page };
+        }
+        return {
+            title: chapterTitle || translate('reader.chapterNumber', { number: index }),
+            index: translate('reader.chapterNumber', { number: index })
+        };
+    }
+
     function isEditableNavigationNode(node) {
         if (!node || typeof node !== 'object') return false;
         var tagName = String(node.tagName || '').toUpperCase();
@@ -303,10 +327,18 @@
         }
     }
 
-    function syncChapterTocAvailability(documentObject, continuous) {
-        var disabled = Boolean(continuous);
-        setDisabled(documentObject.getElementById('tocToggle'), disabled);
-        setDisabled(documentObject.getElementById('mobileTocBtn'), disabled);
+    function syncChapterTocAvailability(documentObject, continuous, pdf) {
+        var disabled = Boolean(continuous || pdf);
+        var controls = [
+            documentObject.getElementById('tocToggle'),
+            documentObject.getElementById('mobileTocBtn')
+        ];
+        controls.forEach(function(control) {
+            setDisabled(control, disabled);
+            if (!control) return;
+            control.hidden = disabled;
+            control.setAttribute('aria-hidden', disabled ? 'true' : 'false');
+        });
 
         if (disabled) {
             var drawer = documentObject.getElementById('tocFloating');
@@ -321,6 +353,8 @@
         PAGE_WIDTHS: PAGE_WIDTHS,
         allowsReaderNavigationEvent: allowsReaderNavigationEvent,
         applyPageWidth: applyPageWidth,
+        chapterNavigationPresentation: chapterNavigationPresentation,
+        continuousChapterPresentation: continuousChapterPresentation,
         createNavigationBehaviorController: createNavigationBehaviorController,
         getPaginationPageWidth: getPaginationPageWidth,
         getPaginationScrollLeft: getPaginationScrollLeft,

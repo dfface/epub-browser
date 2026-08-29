@@ -6875,6 +6875,144 @@
   Object.keys(apiDocsExampleTranslations).forEach(function(code) {
     dictionaries[code]['apiDocs.exampleListBooks'] = apiDocsExampleTranslations[code];
   });
+  var pdfLocaleAdditions = {
+    en: {
+      'pdf.formatBadge': 'PDF', 'pdf.page': 'Page {number}', 'pdf.pageOf': 'Page {number} of {total}', 'pdf.loadingPage': 'Loading page…',
+      'pdf.textUnavailable': 'Text selection, annotations, dictionary, and encyclopedia are unavailable because this PDF has no usable text layer.',
+      'pdf.selectionWithinPageRequired': 'Select text within one PDF page to use annotations, dictionary, or encyclopedia.',
+      'pdf.passwordRequired': 'This PDF is password protected. Enter its password in the reader to display the page.'
+    },
+    'zh-CN': {
+      'pdf.page': '第 {number} 页', 'pdf.pageOf': '第 {number} 页，共 {total} 页', 'pdf.loadingPage': '正在加载页面…',
+      'pdf.textUnavailable': '此 PDF 没有可用的文本层，因此无法使用文本选择、标注、词典和百科。',
+      'pdf.selectionWithinPageRequired': '请在同一 PDF 页面内选择文本，才能使用标注、词典或百科。',
+      'pdf.passwordRequired': '此 PDF 受密码保护。请在阅读器中输入密码以显示页面。'
+    },
+    'zh-TW': {
+      'pdf.page': '第 {number} 頁', 'pdf.pageOf': '第 {number} 頁，共 {total} 頁', 'pdf.loadingPage': '正在載入頁面…',
+      'pdf.textUnavailable': '此 PDF 沒有可用的文字層，因此無法使用文字選取、標註、詞典和百科。',
+      'pdf.selectionWithinPageRequired': '請在同一 PDF 頁面內選取文字，才能使用標註、詞典或百科。',
+      'pdf.passwordRequired': '此 PDF 受密碼保護。請在閱讀器中輸入密碼以顯示頁面。'
+    },
+    ko: {
+      'pdf.page': '{number}페이지', 'pdf.pageOf': '전체 {total}페이지 중 {number}페이지', 'pdf.loadingPage': '페이지를 불러오는 중…',
+      'pdf.textUnavailable': '이 PDF에는 사용 가능한 텍스트 레이어가 없어 텍스트 선택, 주석, 사전 및 백과사전을 사용할 수 없습니다.',
+      'pdf.selectionWithinPageRequired': '주석, 사전 또는 백과사전을 사용하려면 한 PDF 페이지 안에서 텍스트를 선택하세요.',
+      'pdf.passwordRequired': '이 PDF는 암호로 보호되어 있습니다. 페이지를 표시하려면 리더에서 암호를 입력하세요.'
+    },
+    ja: {
+      'pdf.page': '{number}ページ', 'pdf.pageOf': '{total}ページ中{number}ページ', 'pdf.loadingPage': 'ページを読み込んでいます…',
+      'pdf.textUnavailable': 'この PDF には利用可能なテキストレイヤーがないため、テキスト選択、注釈、辞書、百科事典は使用できません。',
+      'pdf.selectionWithinPageRequired': '注釈、辞書、百科事典を使うには、1 つの PDF ページ内でテキストを選択してください。',
+      'pdf.passwordRequired': 'この PDF はパスワードで保護されています。ページを表示するにはリーダーでパスワードを入力してください。'
+    },
+    es: {
+      'pdf.page': 'Página {number}', 'pdf.pageOf': 'Página {number} de {total}', 'pdf.loadingPage': 'Cargando página…',
+      'pdf.textUnavailable': 'La selección de texto, las anotaciones, el diccionario y la enciclopedia no están disponibles porque este PDF no tiene una capa de texto utilizable.',
+      'pdf.selectionWithinPageRequired': 'Selecciona texto dentro de una sola página PDF para usar anotaciones, diccionario o enciclopedia.',
+      'pdf.passwordRequired': 'Este PDF está protegido con contraseña. Introdúcela en el lector para mostrar la página.'
+    },
+    de: {
+      'pdf.page': 'Seite {number}', 'pdf.pageOf': 'Seite {number} von {total}', 'pdf.loadingPage': 'Seite wird geladen…',
+      'pdf.textUnavailable': 'Textauswahl, Anmerkungen, Wörterbuch und Enzyklopädie sind nicht verfügbar, da dieses PDF keine nutzbare Textebene enthält.',
+      'pdf.selectionWithinPageRequired': 'Wählen Sie Text innerhalb einer einzelnen PDF-Seite aus, um Anmerkungen, Wörterbuch oder Enzyklopädie zu verwenden.',
+      'pdf.passwordRequired': 'Dieses PDF ist passwortgeschützt. Geben Sie das Passwort im Reader ein, um die Seite anzuzeigen.'
+    },
+    fr: {
+      'pdf.page': 'Page nº {number}', 'pdf.pageOf': 'Page {number} sur {total}', 'pdf.loadingPage': 'Chargement de la page…',
+      'pdf.textUnavailable': 'La sélection de texte, les annotations, le dictionnaire et l’encyclopédie ne sont pas disponibles, car ce PDF ne possède pas de couche de texte exploitable.',
+      'pdf.selectionWithinPageRequired': 'Sélectionnez du texte dans une seule page PDF pour utiliser les annotations, le dictionnaire ou l’encyclopédie.',
+      'pdf.passwordRequired': 'Ce PDF est protégé par un mot de passe. Saisissez-le dans le lecteur pour afficher la page.'
+    },
+    ru: {
+      'pdf.page': 'Страница {number}', 'pdf.pageOf': 'Страница {number} из {total}', 'pdf.loadingPage': 'Загрузка страницы…',
+      'pdf.textUnavailable': 'Выделение текста, аннотации, словарь и энциклопедия недоступны, поскольку в этом PDF нет пригодного текстового слоя.',
+      'pdf.selectionWithinPageRequired': 'Выберите текст в пределах одной страницы PDF, чтобы использовать аннотации, словарь или энциклопедию.',
+      'pdf.passwordRequired': 'Этот PDF защищён паролем. Введите пароль в читалке, чтобы показать страницу.'
+    },
+    it: {
+      'pdf.page': 'Pagina {number}', 'pdf.pageOf': 'Pagina {number} di {total}', 'pdf.loadingPage': 'Caricamento della pagina…',
+      'pdf.textUnavailable': 'La selezione del testo, le annotazioni, il dizionario e l’enciclopedia non sono disponibili perché questo PDF non ha un livello di testo utilizzabile.',
+      'pdf.selectionWithinPageRequired': 'Seleziona testo in una sola pagina PDF per usare annotazioni, dizionario o enciclopedia.',
+      'pdf.passwordRequired': 'Questo PDF è protetto da password. Inseriscila nel lettore per visualizzare la pagina.'
+    },
+    'pt-BR': {
+      'pdf.page': 'Página {number}', 'pdf.pageOf': 'Página {number} de {total}', 'pdf.loadingPage': 'Carregando página…',
+      'pdf.textUnavailable': 'A seleção de texto, as anotações, o dicionário e a enciclopédia não estão disponíveis porque este PDF não tem uma camada de texto utilizável.',
+      'pdf.selectionWithinPageRequired': 'Selecione texto dentro de uma única página PDF para usar anotações, dicionário ou enciclopédia.',
+      'pdf.passwordRequired': 'Este PDF é protegido por senha. Digite-a no leitor para exibir a página.'
+    },
+    ar: {
+      'pdf.page': 'الصفحة {number}', 'pdf.pageOf': 'الصفحة {number} من {total}', 'pdf.loadingPage': 'جارٍ تحميل الصفحة…',
+      'pdf.textUnavailable': 'لا يتوفر تحديد النص والتعليقات والقاموس والموسوعة لأن ملف PDF هذا لا يحتوي على طبقة نص قابلة للاستخدام.',
+      'pdf.selectionWithinPageRequired': 'حدد نصًا داخل صفحة PDF واحدة لاستخدام التعليقات أو القاموس أو الموسوعة.',
+      'pdf.passwordRequired': 'ملف PDF هذا محمي بكلمة مرور. أدخلها في القارئ لعرض الصفحة.'
+    },
+    id: {
+      'pdf.page': 'Halaman {number}', 'pdf.pageOf': 'Halaman {number} dari {total}', 'pdf.loadingPage': 'Memuat halaman…',
+      'pdf.textUnavailable': 'Pemilihan teks, anotasi, kamus, dan ensiklopedia tidak tersedia karena PDF ini tidak memiliki lapisan teks yang dapat digunakan.',
+      'pdf.selectionWithinPageRequired': 'Pilih teks dalam satu halaman PDF untuk menggunakan anotasi, kamus, atau ensiklopedia.',
+      'pdf.passwordRequired': 'PDF ini dilindungi kata sandi. Masukkan kata sandi di pembaca untuk menampilkan halaman.'
+    },
+    hi: {
+      'pdf.page': 'पृष्ठ {number}', 'pdf.pageOf': '{total} में से पृष्ठ {number}', 'pdf.loadingPage': 'पृष्ठ लोड हो रहा है…',
+      'pdf.textUnavailable': 'इस PDF में उपयोग योग्य टेक्स्ट लेयर नहीं है, इसलिए टेक्स्ट चयन, टिप्पणियाँ, शब्दकोश और विश्वकोश उपलब्ध नहीं हैं।',
+      'pdf.selectionWithinPageRequired': 'टिप्पणियाँ, शब्दकोश या विश्वकोश का उपयोग करने के लिए एक ही PDF पृष्ठ के भीतर पाठ चुनें।',
+      'pdf.passwordRequired': 'यह PDF पासवर्ड से सुरक्षित है। पृष्ठ दिखाने के लिए रीडर में पासवर्ड दर्ज करें।'
+    },
+    vi: {
+      'pdf.page': 'Trang {number}', 'pdf.pageOf': 'Trang {number} / {total}', 'pdf.loadingPage': 'Đang tải trang…',
+      'pdf.textUnavailable': 'Không thể chọn văn bản, tạo chú thích, dùng từ điển hoặc bách khoa toàn thư vì PDF này không có lớp văn bản khả dụng.',
+      'pdf.selectionWithinPageRequired': 'Chọn văn bản trong một trang PDF để dùng chú thích, từ điển hoặc bách khoa toàn thư.',
+      'pdf.passwordRequired': 'PDF này được bảo vệ bằng mật khẩu. Hãy nhập mật khẩu trong trình đọc để hiển thị trang.'
+    },
+    th: {
+      'pdf.page': 'หน้า {number}', 'pdf.pageOf': 'หน้า {number} จาก {total}', 'pdf.loadingPage': 'กำลังโหลดหน้า…',
+      'pdf.textUnavailable': 'ไม่สามารถเลือกข้อความ ใช้คำอธิบายประกอบ พจนานุกรม หรือสารานุกรมได้ เนื่องจาก PDF นี้ไม่มีชั้นข้อความที่ใช้งานได้',
+      'pdf.selectionWithinPageRequired': 'เลือกข้อความภายในหน้า PDF เดียวเพื่อใช้คำอธิบายประกอบ พจนานุกรม หรือสารานุกรม',
+      'pdf.passwordRequired': 'PDF นี้ป้องกันด้วยรหัสผ่าน โปรดป้อนรหัสผ่านในโปรแกรมอ่านเพื่อแสดงหน้า'
+    },
+    ms: {
+      'pdf.page': 'Halaman {number}', 'pdf.pageOf': 'Halaman {number} daripada {total}', 'pdf.loadingPage': 'Memuatkan halaman…',
+      'pdf.textUnavailable': 'Pemilihan teks, anotasi, kamus dan ensiklopedia tidak tersedia kerana PDF ini tiada lapisan teks yang boleh digunakan.',
+      'pdf.selectionWithinPageRequired': 'Pilih teks dalam satu halaman PDF untuk menggunakan anotasi, kamus atau ensiklopedia.',
+      'pdf.passwordRequired': 'PDF ini dilindungi kata laluan. Masukkannya dalam pembaca untuk memaparkan halaman.'
+    }
+  };
+  Object.keys(pdfLocaleAdditions).forEach(function(code) {
+    Object.assign(dictionaries[code], pdfLocaleAdditions[code]);
+    dictionaries[code]['pdf.formatBadge'] = 'PDF';
+  });
+  var pdfActionLocaleAdditions = {
+    en: {'pdf.search': 'Search PDF', 'pdf.searchPlaceholder': 'Search PDF', 'pdf.searchNoResults': 'No matching pages.', 'pdf.closeSearch': 'Close PDF search', 'pdf.zoomOut': 'Zoom out', 'pdf.zoomIn': 'Zoom in', 'pdf.fitWidth': 'Fit width', 'pdf.fitPage': 'Fit page', 'pdf.rotate': 'Rotate page', 'pdf.print': 'Print PDF', 'pdf.download': 'Download PDF'},
+    'zh-CN': {'pdf.search': '搜索 PDF', 'pdf.searchPlaceholder': '搜索 PDF', 'pdf.searchNoResults': '没有匹配的页面。', 'pdf.closeSearch': '关闭 PDF 搜索', 'pdf.zoomOut': '缩小', 'pdf.zoomIn': '放大', 'pdf.fitWidth': '适合宽度', 'pdf.fitPage': '适合页面', 'pdf.rotate': '旋转页面', 'pdf.print': '打印 PDF', 'pdf.download': '下载 PDF'},
+    'zh-TW': {'pdf.search': '搜尋 PDF', 'pdf.searchPlaceholder': '搜尋 PDF', 'pdf.searchNoResults': '沒有符合的頁面。', 'pdf.closeSearch': '關閉 PDF 搜尋', 'pdf.zoomOut': '縮小', 'pdf.zoomIn': '放大', 'pdf.fitWidth': '符合寬度', 'pdf.fitPage': '符合頁面', 'pdf.rotate': '旋轉頁面', 'pdf.print': '列印 PDF', 'pdf.download': '下載 PDF'},
+    ko: {'pdf.search': 'PDF 검색', 'pdf.searchPlaceholder': 'PDF 검색', 'pdf.searchNoResults': '일치하는 페이지가 없습니다.', 'pdf.closeSearch': 'PDF 검색 닫기', 'pdf.zoomOut': '축소', 'pdf.zoomIn': '확대', 'pdf.fitWidth': '너비에 맞춤', 'pdf.fitPage': '페이지에 맞춤', 'pdf.rotate': '페이지 회전', 'pdf.print': 'PDF 인쇄', 'pdf.download': 'PDF 다운로드'},
+    ja: {'pdf.search': 'PDF を検索', 'pdf.searchPlaceholder': 'PDF を検索', 'pdf.searchNoResults': '一致するページはありません。', 'pdf.closeSearch': 'PDF 検索を閉じる', 'pdf.zoomOut': '縮小', 'pdf.zoomIn': '拡大', 'pdf.fitWidth': '幅に合わせる', 'pdf.fitPage': 'ページに合わせる', 'pdf.rotate': 'ページを回転', 'pdf.print': 'PDF を印刷', 'pdf.download': 'PDF をダウンロード'},
+    es: {'pdf.search': 'Buscar en PDF', 'pdf.searchPlaceholder': 'Buscar en PDF', 'pdf.searchNoResults': 'No hay páginas coincidentes.', 'pdf.closeSearch': 'Cerrar búsqueda de PDF', 'pdf.zoomOut': 'Alejar', 'pdf.zoomIn': 'Acercar', 'pdf.fitWidth': 'Ajustar al ancho', 'pdf.fitPage': 'Ajustar a la página', 'pdf.rotate': 'Girar página', 'pdf.print': 'Imprimir PDF', 'pdf.download': 'Descargar PDF'},
+    de: {'pdf.search': 'PDF durchsuchen', 'pdf.searchPlaceholder': 'PDF durchsuchen', 'pdf.searchNoResults': 'Keine passenden Seiten.', 'pdf.closeSearch': 'PDF-Suche schließen', 'pdf.zoomOut': 'Verkleinern', 'pdf.zoomIn': 'Vergrößern', 'pdf.fitWidth': 'An Breite anpassen', 'pdf.fitPage': 'An Seite anpassen', 'pdf.rotate': 'Seite drehen', 'pdf.print': 'PDF drucken', 'pdf.download': 'PDF herunterladen'},
+    fr: {'pdf.search': 'Rechercher dans le PDF', 'pdf.searchPlaceholder': 'Rechercher dans le PDF', 'pdf.searchNoResults': 'Aucune page correspondante.', 'pdf.closeSearch': 'Fermer la recherche PDF', 'pdf.zoomOut': 'Réduire', 'pdf.zoomIn': 'Agrandir', 'pdf.fitWidth': 'Ajuster à la largeur', 'pdf.fitPage': 'Ajuster à la page', 'pdf.rotate': 'Faire pivoter la page', 'pdf.print': 'Imprimer le PDF', 'pdf.download': 'Télécharger le PDF'},
+    ru: {'pdf.search': 'Поиск в PDF', 'pdf.searchPlaceholder': 'Поиск в PDF', 'pdf.searchNoResults': 'Подходящих страниц нет.', 'pdf.closeSearch': 'Закрыть поиск PDF', 'pdf.zoomOut': 'Уменьшить', 'pdf.zoomIn': 'Увеличить', 'pdf.fitWidth': 'По ширине', 'pdf.fitPage': 'По странице', 'pdf.rotate': 'Повернуть страницу', 'pdf.print': 'Печать PDF', 'pdf.download': 'Скачать PDF'},
+    it: {'pdf.search': 'Cerca nel PDF', 'pdf.searchPlaceholder': 'Cerca nel PDF', 'pdf.searchNoResults': 'Nessuna pagina corrispondente.', 'pdf.closeSearch': 'Chiudi ricerca PDF', 'pdf.zoomOut': 'Riduci', 'pdf.zoomIn': 'Ingrandisci', 'pdf.fitWidth': 'Adatta alla larghezza', 'pdf.fitPage': 'Adatta alla pagina', 'pdf.rotate': 'Ruota pagina', 'pdf.print': 'Stampa PDF', 'pdf.download': 'Scarica PDF'},
+    'pt-BR': {'pdf.search': 'Pesquisar no PDF', 'pdf.searchPlaceholder': 'Pesquisar no PDF', 'pdf.searchNoResults': 'Nenhuma página correspondente.', 'pdf.closeSearch': 'Fechar pesquisa em PDF', 'pdf.zoomOut': 'Reduzir', 'pdf.zoomIn': 'Ampliar', 'pdf.fitWidth': 'Ajustar à largura', 'pdf.fitPage': 'Ajustar à página', 'pdf.rotate': 'Girar página', 'pdf.print': 'Imprimir PDF', 'pdf.download': 'Baixar PDF'},
+    ar: {'pdf.search': 'البحث في PDF', 'pdf.searchPlaceholder': 'البحث في PDF', 'pdf.searchNoResults': 'لا توجد صفحات مطابقة.', 'pdf.closeSearch': 'إغلاق بحث PDF', 'pdf.zoomOut': 'تصغير', 'pdf.zoomIn': 'تكبير', 'pdf.fitWidth': 'ملاءمة العرض', 'pdf.fitPage': 'ملاءمة الصفحة', 'pdf.rotate': 'تدوير الصفحة', 'pdf.print': 'طباعة PDF', 'pdf.download': 'تنزيل PDF'},
+    id: {'pdf.search': 'Cari PDF', 'pdf.searchPlaceholder': 'Cari PDF', 'pdf.searchNoResults': 'Tidak ada halaman yang cocok.', 'pdf.closeSearch': 'Tutup pencarian PDF', 'pdf.zoomOut': 'Perkecil', 'pdf.zoomIn': 'Perbesar', 'pdf.fitWidth': 'Sesuaikan lebar', 'pdf.fitPage': 'Sesuaikan halaman', 'pdf.rotate': 'Putar halaman', 'pdf.print': 'Cetak PDF', 'pdf.download': 'Unduh PDF'},
+    hi: {'pdf.search': 'PDF खोजें', 'pdf.searchPlaceholder': 'PDF खोजें', 'pdf.searchNoResults': 'कोई मेल खाता पृष्ठ नहीं।', 'pdf.closeSearch': 'PDF खोज बंद करें', 'pdf.zoomOut': 'ज़ूम आउट', 'pdf.zoomIn': 'ज़ूम इन', 'pdf.fitWidth': 'चौड़ाई में फिट करें', 'pdf.fitPage': 'पृष्ठ में फिट करें', 'pdf.rotate': 'पृष्ठ घुमाएँ', 'pdf.print': 'PDF प्रिंट करें', 'pdf.download': 'PDF डाउनलोड करें'},
+    vi: {'pdf.search': 'Tìm trong PDF', 'pdf.searchPlaceholder': 'Tìm trong PDF', 'pdf.searchNoResults': 'Không có trang khớp.', 'pdf.closeSearch': 'Đóng tìm kiếm PDF', 'pdf.zoomOut': 'Thu nhỏ', 'pdf.zoomIn': 'Phóng to', 'pdf.fitWidth': 'Vừa chiều rộng', 'pdf.fitPage': 'Vừa trang', 'pdf.rotate': 'Xoay trang', 'pdf.print': 'In PDF', 'pdf.download': 'Tải PDF xuống'},
+    th: {'pdf.search': 'ค้นหา PDF', 'pdf.searchPlaceholder': 'ค้นหา PDF', 'pdf.searchNoResults': 'ไม่พบหน้าที่ตรงกัน', 'pdf.closeSearch': 'ปิดการค้นหา PDF', 'pdf.zoomOut': 'ย่อ', 'pdf.zoomIn': 'ขยาย', 'pdf.fitWidth': 'พอดีความกว้าง', 'pdf.fitPage': 'พอดีหน้า', 'pdf.rotate': 'หมุนหน้า', 'pdf.print': 'พิมพ์ PDF', 'pdf.download': 'ดาวน์โหลด PDF'},
+    ms: {'pdf.search': 'Cari PDF', 'pdf.searchPlaceholder': 'Cari PDF', 'pdf.searchNoResults': 'Tiada halaman sepadan.', 'pdf.closeSearch': 'Tutup carian PDF', 'pdf.zoomOut': 'Zum keluar', 'pdf.zoomIn': 'Zum masuk', 'pdf.fitWidth': 'Muat lebar', 'pdf.fitPage': 'Muat halaman', 'pdf.rotate': 'Putar halaman', 'pdf.print': 'Cetak PDF', 'pdf.download': 'Muat turun PDF'}
+  };
+  Object.keys(pdfActionLocaleAdditions).forEach(function(code) {
+    Object.assign(dictionaries[code], pdfActionLocaleAdditions[code]);
+  });
+  var pdfSearchErrorLocaleAdditions = {
+    en: 'PDF search failed.', 'zh-CN': 'PDF 搜索失败。', 'zh-TW': 'PDF 搜尋失敗。', ko: 'PDF 검색에 실패했습니다.', ja: 'PDF の検索に失敗しました。',
+    es: 'La búsqueda en PDF falló.', de: 'Die PDF-Suche ist fehlgeschlagen.', fr: 'La recherche dans le PDF a échoué.', ru: 'Не удалось выполнить поиск в PDF.', it: 'La ricerca nel PDF non è riuscita.',
+    'pt-BR': 'A pesquisa no PDF falhou.', ar: 'فشل البحث في ملف PDF.', id: 'Pencarian PDF gagal.', hi: 'PDF खोज विफल हुई।', vi: 'Tìm kiếm PDF không thành công.', th: 'การค้นหา PDF ล้มเหลว', ms: 'Carian PDF gagal.'
+  };
+  Object.keys(pdfSearchErrorLocaleAdditions).forEach(function(code) {
+    dictionaries[code]['pdf.searchFailed'] = pdfSearchErrorLocaleAdditions[code];
+  });
   var finalLocaleCorrections = {
     es: {'common.chinese': 'Chino', 'common.english': 'Inglés', 'common.version': 'Versión {version}', 'version.updateAvailable': 'Actualización disponible: v{version}'},
     de: {'common.chinese': 'Chinesisch', 'common.english': 'Englisch', 'library.cover': 'Umschlag', 'book.cover': 'Umschlag', 'version.updateAvailable': 'Aktualisierung verfügbar: v{version}'},

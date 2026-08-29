@@ -8,6 +8,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from .reporting import Reporter
+from .source_format import is_supported_source
 
 
 class EpubFileHandler(FileSystemEventHandler):
@@ -55,8 +56,8 @@ class EpubFileHandler(FileSystemEventHandler):
         return future
 
     @staticmethod
-    def _is_epub(path):
-        return str(path).lower().endswith(".epub")
+    def _is_supported_source(path):
+        return is_supported_source(Path(path))
 
     @staticmethod
     def _is_hidden(path):
@@ -80,7 +81,7 @@ class EpubFileHandler(FileSystemEventHandler):
         return None
 
     def on_created(self, event):
-        if event.is_directory or not self._is_epub(event.src_path):
+        if event.is_directory or not self._is_supported_source(event.src_path):
             return
         if self._is_hidden(event.src_path):
             return
@@ -94,7 +95,7 @@ class EpubFileHandler(FileSystemEventHandler):
         self.on_created(event)
 
     def on_deleted(self, event):
-        if event.is_directory or not self._is_epub(event.src_path):
+        if event.is_directory or not self._is_supported_source(event.src_path):
             return
         self._submit_task(
             f"delete:{event.src_path}",
@@ -105,13 +106,15 @@ class EpubFileHandler(FileSystemEventHandler):
     def on_moved(self, event):
         if event.is_directory:
             return
-        if self._is_epub(event.src_path):
+        if self._is_supported_source(event.src_path):
             self._submit_task(
                 f"delete:{event.src_path}",
                 self._mark_deleted,
                 event.src_path,
             )
-        if self._is_epub(event.dest_path) and not self._is_hidden(event.dest_path):
+        if self._is_supported_source(event.dest_path) and not self._is_hidden(
+            event.dest_path
+        ):
             self._submit_task(
                 f"queue:{event.dest_path}",
                 self._queue_path,

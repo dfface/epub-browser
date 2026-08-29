@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest import mock
 
 from starlette.testclient import TestClient
+from pypdf import PdfWriter
 
 from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials
@@ -30,6 +31,11 @@ from epub_browser.migration import MigrationManager
 from epub_browser.processor import (
     EPUBProcessor,
     SERVER_OUTPUT_REVISION_FILE,
+)
+from epub_browser.server_library import (
+    PDF_OUTPUT_REVISION,
+    PDF_OUTPUT_REVISION_FILE,
+    library_metadata,
 )
 from epub_browser.reporting import Reporter
 from epub_browser.server import create_app
@@ -101,6 +107,15 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
 
     @staticmethod
+    def _write_pdf(path, *, title="Server PDF", pages=2):
+        writer = PdfWriter()
+        for _ in range(pages):
+            writer.add_blank_page(width=320, height=480)
+        writer.add_metadata({"/Title": title, "/Author": "PDF Author"})
+        with Path(path).open("wb") as output:
+            writer.write(output)
+
+    @staticmethod
     def _latest_subscription_snapshot(loop, subscription):
         deadline = time.monotonic() + 1
         latest = None
@@ -120,6 +135,124 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(read_exact_sidecar(self.source).book_id, record.book_id)
         self.assertEqual(self.source.read_bytes(), before)
         self.assertIsNone(read_embedded_book_id(self.source))
+        manager.shutdown()
+
+    def test_pdf_server_cache_is_byte_identical_metadata_only_and_dynamic(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=2)
+        original = pdf_source.read_bytes()
+        manager = self._manager()
+
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.failed, 0)
+        self.assertEqual(summary.converted, 1)
+        record = summary.active_books[0]
+        self.assertEqual(record.source_format, "pdf")
+        book_root = manager.public_dir / "book" / record.book_id
+        self.assertEqual((book_root / "pdf" / "document.pdf").read_bytes(), original)
+        cache_metadata = json.loads(
+            (book_root / "pdf" / "metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(cache_metadata["title"], "Server PDF")
+        self.assertEqual(cache_metadata["page_count"], 2)
+        self.assertEqual(cache_metadata["source_sha256"], source_sha256(pdf_source))
+        self.assertEqual(cache_metadata["document_sha256"], source_sha256(pdf_source))
+        self.assertEqual(
+            (book_root / PDF_OUTPUT_REVISION_FILE).read_text(encoding="utf-8").strip(),
+            PDF_OUTPUT_REVISION,
+        )
+        self.assertFalse((book_root / "content").exists())
+        self.assertFalse((book_root / "index.html").exists())
+        self.assertFalse((book_root / "chapter_0.html").exists())
+        self.assertNotIn("password", json.dumps(cache_metadata).casefold())
+        library_entry = library_metadata((record,), manager.public_dir)[0]
+        self.assertEqual(library_entry["format"], "pdf")
+
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+        )
+        client = TestClient(app)
+        self.addCleanup(client.close)
+        self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+        index = client.get(f"/book/{record.book_id}/index.html")
+        toc = client.get(f"/book/{record.book_id}/toc.json")
+        chapter = client.get(f"/book/{record.book_id}/chapter_1.html")
+        cover = client.get(f"/book/{record.book_id}/cover.png")
+        self.assertEqual(index.status_code, 200)
+        self.assertEqual(toc.status_code, 200)
+        self.assertEqual(chapter.status_code, 200)
+        self.assertEqual(cover.status_code, 200)
+        self.assertEqual(cover.headers["content-type"], "image/png")
+        self.assertEqual([item["chapter_index"] for item in toc.json()], [0, 1])
+        self.assertIn('"documentUrl":"/api/books/', chapter.text)
+        self.assertIn('data-pdf-page-number="2"', chapter.text)
+        self.assertNotIn(str(pdf_source), chapter.text)
+        manager.shutdown()
+
+    def test_pdf_server_cache_persists_filename_title_fallback(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "Original filename.pdf"
+        self._write_pdf(pdf_source, title="   ", pages=1)
+        manager = self._manager()
+
+        record = manager.reconcile().active_books[0]
+        payload = json.loads(
+            (manager.public_dir / "book" / record.book_id / "pdf" / "metadata.json")
+            .read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(payload["title"], "Original filename")
+        self.assertEqual(json.loads(record.metadata_json)["title"], "Original filename")
+        manager.shutdown()
+
+    def test_pdf_cache_corruption_and_changed_source_rebuild_the_whole_cache(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, title="First", pages=1)
+        manager = self._manager()
+        first = manager.reconcile().active_books[0]
+        book_root = manager.public_dir / "book" / first.book_id
+        cached_document = book_root / "pdf" / "document.pdf"
+        cached_document.write_bytes(b"corrupt")
+
+        rebuilt = manager.reconcile()
+
+        self.assertEqual(rebuilt.converted, 1)
+        self.assertEqual(cached_document.read_bytes(), pdf_source.read_bytes())
+        first_cache_metadata = (book_root / "pdf" / "metadata.json").read_bytes()
+        self._write_pdf(pdf_source, title="Second", pages=2)
+
+        changed = manager.reconcile()
+
+        self.assertEqual(changed.converted, 1)
+        self.assertEqual(changed.active_books[0].book_id, first.book_id)
+        self.assertNotEqual(
+            (book_root / "pdf" / "metadata.json").read_bytes(),
+            first_cache_metadata,
+        )
+        self.assertEqual(cached_document.read_bytes(), pdf_source.read_bytes())
+        manager.shutdown()
+
+    def test_pdf_dynamic_pages_pick_up_template_changes_without_reconversion(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=1)
+        manager = self._manager()
+        record = manager.reconcile().active_books[0]
+        with mock.patch.object(
+            EPUBProcessor,
+            "create_pdf_chapter_template",
+            return_value="<html>fresh-pdf-ui</html>",
+        ):
+            rendered = ServerPageRenderer(
+                manager.public_dir, record.book_id
+            ).render_pdf_chapter(0)
+
+        self.assertEqual(rendered, "<html>fresh-pdf-ui</html>")
         manager.shutdown()
 
     def test_v204_embedded_id_migrates_to_sidecar_without_epub_write(self):
@@ -888,7 +1021,10 @@ class ServerLibraryManagerTests(unittest.TestCase):
         succeeded = self.store.list_webhook_events(
             event_type="book.conversion.succeeded"
         )
-        self.assertEqual(succeeded[0]["data"], {"book_id": first.book_id})
+        self.assertEqual(
+            succeeded[0]["data"],
+            {"book_id": first.book_id, "format": "epub"},
+        )
         chapter_path = (
             self.server_dir
             / "cache"
@@ -938,6 +1074,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )[0]
         self.assertEqual(failed["data"]["source_name"], self.source.name)
         self.assertEqual(failed["data"]["error_code"], "conversion_failed")
+        self.assertEqual(failed["data"]["format"], "epub")
         self.assertNotIn(str(self.source.parent), json.dumps(failed))
 
         manager.converter_factory = EPUBProcessor
@@ -1082,11 +1219,34 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )["book_hash"],
             record.book_id,
         )
+        self.assertTrue(
+            any(
+                event["data"]["book_id"] == record.book_id
+                for event in self.store.list_webhook_events(
+                    event_type="book.removed"
+                )
+            )
+        )
+        created_before_restore = len(
+            self.store.list_webhook_events(event_type="book.created")
+        )
+        updated_before_restore = len(
+            self.store.list_webhook_events(event_type="book.updated")
+        )
 
         self._write_epub(self.source, "Original")
         restored = manager.reconcile().active_books[0]
 
         self.assertEqual(restored.book_id, record.book_id)
+        self.assertEqual(
+            len(self.store.list_webhook_events(event_type="book.created")),
+            created_before_restore,
+        )
+        restored_events = self.store.list_webhook_events(
+            event_type="book.updated"
+        )
+        self.assertEqual(len(restored_events), updated_before_restore + 1)
+        self.assertEqual(restored_events[0]["data"]["book_id"], record.book_id)
         manager.shutdown()
 
     def test_discovery_ignores_directory_symlink_outside_source_root(self):
@@ -1101,6 +1261,57 @@ class ServerLibraryManagerTests(unittest.TestCase):
         summary = manager.reconcile()
 
         self.assertEqual(summary.active_books, ())
+        manager.shutdown()
+
+    def test_pdf_reconcile_discovers_directory_and_explicit_sources_without_identity_mutation(self):
+        self.source.unlink()
+        directory_pdf = self.source_dir / "directory.PDF"
+        self._write_pdf(directory_pdf, title="Directory PDF", pages=1)
+        explicit_dir = self.root / "explicit"
+        explicit_dir.mkdir()
+        explicit_pdf = explicit_dir / "explicit.pdf"
+        self._write_pdf(explicit_pdf, title="Explicit PDF", pages=2)
+        before = {
+            directory_pdf: directory_pdf.read_bytes(),
+            explicit_pdf: explicit_pdf.read_bytes(),
+        }
+        manager = ServerLibraryManager(
+            server_dir=self.server_dir,
+            sources=(self.source_dir, explicit_pdf),
+            state_store=self.store,
+            migration_manager=self.migration,
+            reporter=Reporter(True),
+            book_id_storage="embedded",
+        )
+
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            first = manager.reconcile()
+            second = manager.reconcile(trigger="watch")
+
+        self.assertEqual(first.failed, 0)
+        self.assertEqual(first.converted, 2)
+        self.assertEqual(second.failed, 0)
+        self.assertEqual(second.reused, 2)
+        self.assertEqual(len(first.active_books), 2)
+        self.assertEqual(len(second.active_books), 2)
+        for source, original in before.items():
+            self.assertEqual(source.read_bytes(), original)
+            self.assertTrue(sidecar_path_for(source).is_file())
+            record = self.store.book_by_source(source)
+            self.assertEqual(record.source_format, "pdf")
+            self.assertEqual(
+                (
+                    manager.public_dir
+                    / "book"
+                    / record.book_id
+                    / "pdf"
+                    / "document.pdf"
+                ).read_bytes(),
+                original,
+            )
+        output = stderr.getvalue()
+        self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
+        self.assertIn("PDF identities use adjacent sidecars", output)
         manager.shutdown()
 
     def test_rejects_managed_and_source_directory_nesting(self):

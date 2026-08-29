@@ -1618,6 +1618,21 @@ body.auth-page {
     line-height: 1.35;
 }
 
+.admin-book-summary .admin-book-format-badge {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 5px;
+    padding: 2px 7px;
+    border: 1px solid color-mix(in srgb, var(--account-primary) 28%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--account-primary) 9%, transparent);
+    color: var(--account-primary);
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .045em;
+    line-height: 1.25;
+}
+
 .admin-book-authors,
 .admin-book-tags,
 .admin-book-updated {

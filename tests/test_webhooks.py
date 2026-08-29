@@ -90,6 +90,30 @@ class WebhookTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.cleanup_webhook_history(now=10_000_000, retention_days=30), 0)
         self.assertEqual(len(self.store.list_webhook_deliveries()), 1)
 
+    async def test_book_webhook_payloads_add_the_source_format(self):
+        record = self.store.resolve_book(
+            Path(self.directory.name) / "document.pdf",
+            None,
+            "pdf-fingerprint",
+            {"title": "PDF"},
+            preferred_book_id="pdf",
+            source_format="pdf",
+        )
+
+        created = self.store.list_webhook_events(event_type="book.created")[0]
+        self.assertEqual(created["data"], {"book_id": record.book_id, "format": "pdf"})
+
+        self.store.update_book_version(
+            record.book_id, "pdf-fingerprint-2", {"title": "PDF 2"},
+            source_format="pdf",
+        )
+        updated = self.store.list_webhook_events(event_type="book.updated")[0]
+        self.assertEqual(updated["data"], {"book_id": record.book_id, "format": "pdf"})
+
+        self.store.mark_missing(record.book_id)
+        removed = self.store.list_webhook_events(event_type="book.removed")[0]
+        self.assertEqual(removed["data"], {"book_id": record.book_id, "format": "pdf"})
+
 
 class WebhookAdminAPITests(unittest.TestCase):
     def setUp(self):

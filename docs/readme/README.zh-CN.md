@@ -77,7 +77,7 @@ Provider 配置。交互方法与安全边界请见
 
 ## 选择安装方式
 
-EPUB Browser 提供两条安装路径。两者都支持一个或多个 `.epub` 文件、包含 EPUB
+EPUB Browser 提供两条安装路径。两者都支持一个或多个 `.epub` 或 `.pdf` 文件、包含书籍
 的多级目录，或 Calibre 风格的书库目录。
 
 | 安装方式 | 适用场景 | 主机要求 |
@@ -173,7 +173,57 @@ Sidecar 模式会在 EPUB 旁写入可见的身份文件，例如 `BOOK.epub.epu
 
 Embedded 模式可能重建 EPUB ZIP，因此源文件必须可写且适合修改。EPUB Browser 不会悄悄回退为“仅数据库 ID”。当两个载体 ID 不一致、活动源文件存在重复 ID、载体无效，或目标载体无法写入时，命令会停止。
 
-切换存储方式时，既有 ID 会复制到所选载体，另一个有效载体不会被删除。从 v2.0.4 升级时，既有 embedded ID 会复制到默认 sidecar，不会重写 EPUB。
+切换存储方式时，既有 ID 会复制到所选载体，另一个有效载体不会被删除。从 v2.0.4 升级时，既有 embedded ID 会复制到默认 sidecar，不会重写 EPUB。对于 PDF，`--book-id-storage embedded` 必须回退到相邻的 sidecar（例如 `BOOK.pdf.epub-browser.json`）：PDF 是不可变文档，EPUB Browser 不能把 ID 写进 PDF 字节。这一回退只适用于 PDF，现有 EPUB 的 embedded/sidecar 语义保持不变。
+
+## PDF 支持：一页就是一个章节
+
+两种部署模式都支持 PDF。阅读器把 PDF 的每一页当作普通的 EPUB Browser
+章节，因此继续复用同一套书籍页、章节导航、目录、翻页、连续阅读、进度、阅读时段、
+标注、词典和百科 UI 与数据模型：
+
+| PDF 概念 | SSG | Server |
+| --- | --- | --- |
+| 第 1 页 URL | `chapter_0.html` | `/book/<book-id>/chapter_0.html` |
+| 第 N 页 URL | `chapter_{N-1}.html` | `/book/<book-id>/chapter_{N-1}.html` |
+| 页码和目录 | 本地生成；每页都会列出 | 从 PDF 元数据缓存动态渲染；每页都会列出 |
+| 内嵌 outline | 在目标页目录项上显示 marker | 同样显示 marker，不会删除或重排页码项 |
+| 滚动与翻页/分页 | 静态章节壳和本地 PDF.js | 动态共享章节壳和本地 PDF.js |
+| 高亮、笔记、词典、百科 | 有文本层时使用共享的浏览器本地组件 | 有文本层时使用共享的已认证组件 |
+| 原始 PDF 字节 | 静态书籍产物中只有一个 `document.pdf` | 仅 Session 可访问、支持 Range 的缓存文档路由 |
+
+可见页码和 PDF.js 使用从 1 开始的页码；URL、状态、API 和 SQLite 中的章节索引从 0
+开始。因此 PDF 第 1 页始终是 `chapter_0.html`，第 N 页是
+`chapter_{N-1}.html`。规范化目录为每一页保留一个 `Page N` 项；PDF 内嵌的 outline
+标题作为 marker 附加到目标页，且同一页的多个 marker 都会保留。
+
+SSG 只写出一个 `document.pdf`，并为每页写出一个 `chapter_<index>.html` 壳。SSG
+产物不含 Session 脚本、`/api/*` 请求、同步标注数据或 Server 依赖。Server 把完整且
+逐字节一致的源文件缓存为 `book/<book-id>/pdf/document.pdf`，不拆页也不重写；书籍页、
+目录和章节壳根据 PDF 元数据动态生成。源文件发生变化时，PDF 缓存（文档、元数据和派生
+封面）会整体失效并全量刷新，不会混用新旧页面。EPUB 的 `content/` 缓存边界不受影响。
+
+Server 的原始文档路由只接受 Session：
+`GET`/`HEAD /api/books/<book-id>/document`。它会先检查登录、书籍可见性、格式和源/缓存
+摘要，再提供有界的单一 Range 响应，并设置 `ETag`、`Accept-Ranges`、private 缓存、
+`nosniff` 和 inline PDF disposition。路由不会暴露绝对路径，不接受 PAT，也不出现在
+PAT/OpenAPI 接口面中。SSG 只有本地 `document.pdf`，没有原始文档 API。
+
+有可用 PDF.js 文本层的 PDF 复用现有的精确选择操作弹窗和标注组件，提供 Highlight、Note、
+Dictionary 和 Encyclopedia；标注存储、归属、导出、列表和深链接都共享现有实现，不新增
+PDF 专用标注表或设置页。扫描版或纯图片 PDF 仍可阅读，但没有可用文本层时，基于选择的
+Highlight、Note、Dictionary、Encyclopedia 和文档搜索会明确显示不可用。跨页选择可以继续
+Copy，但标注和查词会显示本地化的不支持提示；页内选择仍按正常路径工作。
+
+PDF.js 不是第二套 viewer 外壳。构建或发布前，先 hydrate 并验证锁定的第三方资源：
+
+```bash
+python3 tools/sync_vendor_assets.py fetch
+python3 tools/sync_vendor_assets.py verify
+```
+
+运行时使用本地带 hash 的 PDF.js module 和 worker 资源，绝不从 CDN 获取。图片 lightbox
+使用锁定的 GLightbox 依赖；Fancyapps/Fancybox 不是运行时依赖，也不会被重新分发。锁定
+资源和发布流程见 [third_party/README.md](third_party/README.md)。
 
 ## SSG 模式详解
 

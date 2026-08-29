@@ -14,3 +14,7 @@ __pycache__/
 *.egg-info/
 .opencode/
 .superpowers/
+
+# Local, unlicensed manual/E2E PDF example; do not ignore other PDFs.
+/examples/TheLittlePrince.pdf
+/examples/TheLittlePrince.pdf.epub-browser.json

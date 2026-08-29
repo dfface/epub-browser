@@ -2407,6 +2407,12 @@
         var title = root.document.createElement('strong');
         title.textContent = String(book.title || '');
         bookCell.appendChild(title);
+        if (String(book.format || 'epub').toLowerCase() === 'pdf') {
+          var formatBadge = root.document.createElement('span');
+          formatBadge.className = 'admin-book-format-badge';
+          formatBadge.textContent = t('pdf.formatBadge');
+          bookCell.appendChild(formatBadge);
+        }
         var authors = Array.isArray(book.authors) ? book.authors.filter(Boolean) : [];
         if (authors.length) {
           var authorLine = root.document.createElement('span');

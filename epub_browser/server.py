@@ -61,6 +61,17 @@ from .processor import (
     SERVER_OUTPUT_REVISION_FILE,
     server_book_public_path_allowed,
 )
+from .pdf_delivery import (
+    ByteRange,
+    OwnedPDFFileResponse,
+    PDFDeliverySpecification,
+    PDFValidationError,
+    RangeNotSatisfiable,
+    if_none_match_matches,
+    inline_pdf_disposition,
+    parse_single_range,
+    prepare_pdf_delivery_async,
+)
 from .public_api import (
     PUBLIC_API_CONTEXT_KEY,
     PublicAPIContext,
@@ -68,9 +79,15 @@ from .public_api import (
     public_api_operations,
     public_api_routes,
 )
-from .server_library import library_metadata
+from .server_library import (
+    PDF_METADATA_SCHEMA_VERSION,
+    PDF_OUTPUT_REVISION,
+    PDF_OUTPUT_REVISION_FILE,
+    library_metadata,
+)
 from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
+from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .site import render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
@@ -384,6 +401,17 @@ def _request_expects_html(request):
 
 def unauthenticated_response(request):
     path = request.url.path
+    if (
+        path.startswith('/book/')
+        and path.endswith('.html')
+        and _request_expects_html(request)
+    ):
+        target = quote(_request_relative_path(request), safe='')
+        return RedirectResponse(
+            '/login?next=' + target,
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
     if path == '/book' or path.startswith('/book/'):
         return JSONResponse(
             error_payload('forbidden', 'Forbidden'),
@@ -495,19 +523,29 @@ def extract_book_id_from_public_path(path):
     return None
 
 
-def server_book_output_is_current(base_directory, book_id):
+def server_book_output_is_current(
+    base_directory,
+    book_id,
+    source_format=EPUB_FORMAT,
+):
+    if source_format == PDF_FORMAT:
+        revision_file = PDF_OUTPUT_REVISION_FILE
+        expected_revision = PDF_OUTPUT_REVISION
+    else:
+        revision_file = SERVER_OUTPUT_REVISION_FILE
+        expected_revision = SERVER_OUTPUT_REVISION
     marker = os.path.join(
         base_directory,
         'book',
         book_id,
-        SERVER_OUTPUT_REVISION_FILE,
+        revision_file,
     )
     try:
         with open(marker, encoding='utf-8') as revision_file:
             revision = revision_file.read().strip()
     except OSError:
         return False
-    return revision == SERVER_OUTPUT_REVISION
+    return revision == expected_revision
 
 
 def sync_bookshelf(
@@ -2829,6 +2867,111 @@ window.location.assign(payload.redirect||'/');
             },
         )
 
+    async def pdf_document(request):
+        principal = require_principal(request)
+        if request.method not in {'GET', 'HEAD'}:
+            return Response(
+                status_code=405,
+                headers={
+                    'Allow': 'GET, HEAD',
+                    'Cache-Control': 'private, no-cache',
+                    'Content-Length': '0',
+                },
+            )
+        book_id = request.path_params['book_id']
+        if not store.can_read_book(principal.user_id, principal.role, book_id):
+            return response(error_payload('not_found', 'Not Found'), 404)
+        book = store.book_by_id(book_id)
+        if book is None or book.source_format != PDF_FORMAT:
+            return response(error_payload('not_found', 'Not Found'), 404)
+
+        if (
+            not isinstance(book.source_size, int)
+            or isinstance(book.source_size, bool)
+            or not isinstance(book.source_mtime_ns, int)
+            or isinstance(book.source_mtime_ns, bool)
+        ):
+            return response(
+                error_payload('pdf_cache_stale', 'PDF cache requires refresh'),
+                409,
+            )
+        source = Path(book.source_path)
+        try:
+            validated = await prepare_pdf_delivery_async(
+                PDFDeliverySpecification(
+                    source_path=source,
+                    book_root=Path(base_directory, 'book', book_id),
+                    source_size=book.source_size,
+                    source_mtime_ns=book.source_mtime_ns,
+                    source_digest=book.source_fingerprint,
+                    output_revision=PDF_OUTPUT_REVISION,
+                    metadata_schema_version=PDF_METADATA_SCHEMA_VERSION,
+                )
+            )
+        except PDFValidationError:
+            return response(
+                error_payload('pdf_cache_stale', 'PDF cache requires refresh'),
+                409,
+            )
+
+        expected_size = validated.size
+        etag = f'"{validated.digest}"'
+        headers = {
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'private, no-cache',
+            'Content-Disposition': inline_pdf_disposition(source.name),
+            'ETag': etag,
+            'X-Content-Type-Options': 'nosniff',
+        }
+        range_header = request.headers.get('range')
+        # A PDF.js range fetch needs the selected bytes even when the browser
+        # adds a cache validator for the same document. Returning 304 here
+        # leaves the worker without the requested chunk and can produce a
+        # successfully "rendered" but empty canvas. Full-document requests
+        # still use ordinary ETag revalidation.
+        if range_header is None and if_none_match_matches(
+            request.headers.get('if-none-match'), etag
+        ):
+            validated.close()
+            return Response(status_code=304, headers=headers)
+        try:
+            requested_range = parse_single_range(
+                range_header, expected_size
+            )
+        except RangeNotSatisfiable:
+            validated.close()
+            headers.update({
+                'Content-Range': f'bytes */{expected_size}',
+                'Content-Length': '0',
+            })
+            return Response(status_code=416, headers=headers)
+
+        selected = requested_range or ByteRange(0, expected_size - 1)
+        status_code = 206 if requested_range is not None else 200
+        headers['Content-Length'] = str(selected.length if expected_size else 0)
+        if requested_range is not None:
+            headers['Content-Range'] = (
+                f'bytes {selected.start}-{selected.end}/{expected_size}'
+            )
+        if request.method == 'HEAD' or expected_size == 0:
+            validated.close()
+            return Response(
+                status_code=status_code,
+                media_type='application/pdf',
+                headers=headers,
+            )
+        descriptor = validated.detach()
+        try:
+            return OwnedPDFFileResponse(
+                descriptor,
+                selected,
+                status_code=status_code,
+                headers=headers,
+            )
+        except BaseException:
+            os.close(descriptor)
+            raise
+
     async def protected_public_file(request):
         try:
             path = normalize_public_path(request.path_params['path'])
@@ -2852,25 +2995,47 @@ window.location.assign(payload.redirect||'/');
                 book_id,
             ):
                 return response(error_payload('forbidden', 'Forbidden'), 403)
-            if not server_book_output_is_current(base_directory, book_id):
+            book = store.book_by_id(book_id)
+            if book is None or not server_book_output_is_current(
+                base_directory, book_id, book.source_format
+            ):
                 return response(error_payload('not_found', 'Not Found'), 404)
             book_relative_path = '/'.join(path.split('/')[2:])
-            if not server_book_public_path_allowed(book_relative_path):
+            try:
+                recorded_cover = json.loads(book.metadata_json).get('cover')
+            except (TypeError, json.JSONDecodeError):
+                recorded_cover = None
+            pdf_cover_allowed = (
+                book.source_format == PDF_FORMAT
+                and isinstance(recorded_cover, str)
+                and recorded_cover == book_relative_path
+                and recorded_cover == 'cover.png'
+            )
+            if not (
+                server_book_public_path_allowed(book_relative_path)
+                or pdf_cover_allowed
+            ):
                 return response(error_payload('not_found', 'Not Found'), 404)
             renderer = ServerPageRenderer(
                 base_directory,
                 book_id,
+                source_format=book.source_format,
                 metadata_overrides=store.managed_book_metadata(book_id),
             )
             # Retain a narrow compatibility path for manually-created test
             # fixtures and legacy caches that still have an accepted marker.
             # Fresh Server conversions always carry content/metadata.json and
             # therefore take the dynamic path below.
-            has_content_cache = (
-                Path(base_directory, 'book', book_id, 'content', 'metadata.json')
-                .is_file()
+            has_dynamic_cache = (
+                Path(
+                    base_directory, 'book', book_id, 'pdf', 'metadata.json'
+                ).is_file()
+                if book.source_format == PDF_FORMAT
+                else Path(
+                    base_directory, 'book', book_id, 'content', 'metadata.json'
+                ).is_file()
             )
-            if has_content_cache:
+            if has_dynamic_cache:
                 try:
                     if book_relative_path == 'index.html':
                         markup = renderer.render_index(
@@ -3315,7 +3480,28 @@ window.location.assign(payload.redirect||'/');
 
     def authorized_chapter_snapshot(book_id, chapter_index):
         """Return cache-derived labels only after the caller has book access."""
-        renderer = ServerPageRenderer(base_directory, book_id)
+        book = store.book_by_id(book_id)
+        if book is None:
+            raise ServerPageError('Book content cache is invalid')
+        renderer = ServerPageRenderer(
+            base_directory,
+            book_id,
+            source_format=book.source_format,
+            metadata_overrides=store.managed_book_metadata(book_id),
+        )
+        if book.source_format == PDF_FORMAT:
+            _metadata, processor = renderer._pdf_processor()
+            if chapter_index >= len(processor.chapters):
+                raise ValueError('chapter index is outside the book')
+            chapter_label = processor.chapters[chapter_index].get('title')
+            if (
+                not isinstance(processor.book_title, str)
+                or not processor.book_title.strip()
+                or not isinstance(chapter_label, str)
+                or not chapter_label.strip()
+            ):
+                raise ServerPageError('PDF metadata cache is invalid')
+            return processor.book_title, chapter_label
         metadata = renderer._read_json(renderer.content_dir / 'metadata.json')
         if not isinstance(metadata, dict):
             raise ServerPageError('Book content cache is invalid')
@@ -3616,6 +3802,13 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/webhooks/{webhook_id}/rotate-secret', admin_webhook_rotate, methods=['POST']),
         Route('/api/admin/webhooks/{webhook_id}', admin_webhook, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
+        Route(
+            '/api/books/{book_id}/document',
+            pdf_document,
+            methods=[
+                'GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'TRACE',
+            ],
+        ),
         *public_api_routes(public_api_context),
         Route('/', library_index),
         Route('/index.html', library_index),

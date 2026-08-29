@@ -11,6 +11,7 @@ class BookMetadata:
     cover: Optional[str]
     language: str
     epub_identifier: Optional[str]
+    source_format: str = "epub"
 
 
 @dataclass(frozen=True)

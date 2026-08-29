@@ -16,9 +16,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
+from typing import Optional, TYPE_CHECKING
 
 from .asset_publisher import (
     AssetPublisher,
+    PublishedAssets,
     SERVER_ONLY_ASSET_PATHS,
     SERVER_ONLY_ASSET_PREFIXES,
     rewrite_asset_urls,
@@ -33,8 +35,12 @@ from .server_chrome import (
     SERVER_LOCALE_CONTROL,
     SERVER_LOCALE_SCRIPT,
 )
+from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs, rewrite_root_urls
-from .version import LATEST_RELEASE_API_URL, render_footer
+from .version import render_footer
+
+if TYPE_CHECKING:
+    from .pdf_processor import PDFMetadata
 
 # Server mode stores only EPUB-derived content. Reader HTML is rendered from
 # that cache for each request, so changes to UI, i18n, permissions, or hashed
@@ -561,6 +567,70 @@ class EPUBProcessor:
     """处理EPUB文件的类"""
 
     @classmethod
+    def from_pdf_metadata(
+        cls,
+        *,
+        book_id: str,
+        metadata: "PDFMetadata",
+        cover_path: Optional[str],
+        asset_manifest: PublishedAssets,
+        urls: SiteURLs,
+        deployment_mode: str,
+    ) -> "EPUBProcessor":
+        """Hydrate PDF pages into the state consumed by the shared templates."""
+        if deployment_mode not in {"ssg", "server"}:
+            raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
+
+        processor = cls.__new__(cls)
+        processor.epub_path = ""
+        processor.output_dir = None
+        processor.urls = urls or SiteURLs()
+        processor.reporter = Reporter(False)
+        processor.deployment_mode = deployment_mode
+        processor.source_format = PDF_FORMAT
+        processor._caller_supplied_book_id = True
+        processor.book_hash = str(book_id)
+        processor.temp_dir = ""
+        processor.extract_dir = ""
+        processor.web_dir = ""
+        processor.book_title = metadata.title or "PDF Book"
+        processor.authors = list(metadata.authors)
+        processor.tags = list(metadata.tags)
+        processor.description = None
+        processor.epub_identifier = None
+        processor.cover_info = (
+            {"full_path": cover_path, "web_path": cover_path}
+            if cover_path else None
+        )
+        processor.lang = metadata.language or "en"
+        processor.chapters = [
+            {
+                "title": f"Page {page.page_number}",
+                "path": f"chapter_{page.page_number - 1}.html",
+            }
+            for page in metadata.pages
+        ]
+        processor.toc = [
+            {
+                "title": f"Page {page.page_number}",
+                "level": 0,
+                "kind": "chapter",
+                "chapter_index": page.page_number - 1,
+                "chapter_file": f"chapter_{page.page_number - 1}.html",
+                "page_label": str(page.page_number),
+                "outline_labels": list(page.outline_labels),
+            }
+            for page in metadata.pages
+        ]
+        processor.resources_base = "resources"
+        processor._server_chapter_payloads = {}
+        processor.asset_manifest = asset_manifest
+        processor._pdf_pages = tuple(metadata.pages)
+        processor._pdf_encrypted = bool(metadata.encrypted)
+        processor._pdf_has_extractable_text = bool(metadata.has_extractable_text)
+        return processor
+
+    @classmethod
     def from_server_content_cache(
         cls,
         *,
@@ -591,6 +661,7 @@ class EPUBProcessor:
         processor.urls = urls or SiteURLs()
         processor.reporter = reporter or Reporter(False)
         processor.deployment_mode = "server"
+        processor.source_format = EPUB_FORMAT
         processor._caller_supplied_book_id = True
         processor.book_hash = str(book_id)
         processor.temp_dir = ""
@@ -627,6 +698,7 @@ class EPUBProcessor:
         if deployment_mode not in {"ssg", "server"}:
             raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
         self.deployment_mode = deployment_mode
+        self.source_format = EPUB_FORMAT
         self._caller_supplied_book_id = book_id is not None
         self.book_hash = book_id or base64.urlsafe_b64encode(
             hashlib.md5(self.epub_path.encode('utf-8')).digest()
@@ -1418,6 +1490,7 @@ class EPUBProcessor:
     
     def create_index_page(self, write=True, initial_book_review=None):
         """创建章节索引页面"""
+        is_pdf_book = getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -1434,28 +1507,20 @@ class EPUBProcessor:
                     <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
                 </button>
                 <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
-        if self.deployment_mode == "server":
-            safe_book_title = metadata_text(self.book_title)
-            book_title_text = html.escape(safe_book_title, quote=False)
-            book_title_attribute = html.escape(safe_book_title, quote=True)
-            book_id_attribute = html.escape(str(self.book_hash), quote=True)
-            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
-        else:
-            book_title_text = self.book_title
-            book_title_attribute = self.book_title
-            book_id_attribute = self.book_hash
-            book_id_url = self.book_hash
-        if self.authors and self.deployment_mode == "server":
+        safe_book_title = metadata_text(self.book_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        book_title_attribute = html.escape(safe_book_title, quote=True)
+        book_id_attribute = html.escape(str(self.book_hash), quote=True)
+        book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+        if self.authors:
             authors_text = " & ".join(
                 html.escape(metadata_text(author), quote=False)
                 for author in self.authors
             )
             authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{authors_text}</p>'
-        elif self.authors:
-            authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{" & ".join(self.authors)}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
-        ai_feature_assets = self._server_ai_feature_assets()
+        ai_feature_assets = "" if is_pdf_book else self._server_ai_feature_assets()
         book_feature_assets = json.dumps({
             "bookshelf": self.asset_manifest.url_for("bookshelf.js"),
             "annotationHubCss": self.asset_manifest.url_for("annotation-hub.css"),
@@ -1474,7 +1539,7 @@ class EPUBProcessor:
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         reading_insights_navigation = (
             '<button type="button" class="app-nav-link" data-reading-insights '
@@ -1484,17 +1549,17 @@ class EPUBProcessor:
         )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         ai_reading_script = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         ai_book_chat_button = (
             f'<button type="button" class="css-btn secondary" data-ai-book-chat '
             f'data-book-id="{book_id_attribute}"><i class="fas fa-comments" aria-hidden="true"></i>'
             '<span data-i18n="ai.askBook">Ask AI</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and not is_pdf_book else ""
         )
         ai_book_chat_script = ""
         book_review_assets = (
@@ -1578,6 +1643,11 @@ class EPUBProcessor:
             '<i class="fas fa-chart-column" aria-hidden="true"></i>'
             '<span data-book-reading-time-label></span></p>'
             if self.deployment_mode == "server" else ""
+        )
+        book_source_format = (
+            '<span class="book-source-format" aria-label="PDF" data-i18n-aria-label="pdf.formatBadge" '
+            'data-i18n="pdf.formatBadge">PDF</span>'
+            if is_pdf_book else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
         server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
@@ -1708,19 +1778,16 @@ class EPUBProcessor:
     <div class="book-info-card" data-id="book-info-card">
             <div class="book-info-cover-wrap">
                 <div class="book-info-cover">
-                    <img src="{html.escape(self.get_book_info()['cover'], quote=True) if self.deployment_mode == 'server' else self.get_book_info()['cover']}" alt="">
+                    <img src="{html.escape(self.get_book_info()['cover'], quote=True)}" alt="">
                 </div>
                 {book_reading_time}
+                {book_source_format}
             </div>
             <div class="book-info-content">
                 <h2 class="book-info-title" lang="{book_language}" dir="auto">{book_title_text}</h2>
                 {authors_html}"""
         if self.description:
-            description = (
-                sanitize_html_fragment(self.description)
-                if self.deployment_mode == "server"
-                else self.description
-            )
+            description = sanitize_html_fragment(self.description)
             index_html += f""" 
                 <div class="book-info-desc" lang="{book_language}" dir="auto">
                     {description}
@@ -1729,11 +1796,7 @@ class EPUBProcessor:
                 <div class="book-info-tags" lang="{book_language}" dir="auto">"""
         if self.tags:
             for tag in self.tags:
-                tag_text = (
-                    html.escape(metadata_text(tag), quote=False)
-                    if self.deployment_mode == "server"
-                    else tag
-                )
+                tag_text = html.escape(metadata_text(tag), quote=False)
                 index_html += """<span class="book-tag">{}</span>""".format(tag_text)
         index_html += f"""
                 </div>
@@ -1766,26 +1829,46 @@ class EPUBProcessor:
         # contributes titles, anchors and non-navigable grouping nodes.
         for toc_item in self._build_toc_data():
             level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
-            toc_title = (
-                html.escape(metadata_text(toc_item.get("title")), quote=False)
-                if self.deployment_mode == "server"
-                else toc_item["title"]
+            toc_title = html.escape(
+                metadata_text(toc_item.get("title")), quote=False
             )
+            toc_title_attributes = f' lang="{book_language}" dir="auto"'
+            if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('page_label'):
+                page_params = html.escape(
+                    json.dumps(
+                        {'number': toc_item['page_label']},
+                        separators=(',', ':'),
+                    ),
+                    quote=True,
+                )
+                toc_title_attributes += (
+                    f' data-i18n="pdf.page" data-i18n-params="{page_params}"'
+                )
+            outline_labels_html = ""
+            if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('outline_labels'):
+                outline_labels = " · ".join(
+                    html.escape(metadata_text(label), quote=False)
+                    for label in toc_item['outline_labels']
+                )
+                outline_labels_html = (
+                    f'<span class="chapter-outline-labels" lang="{book_language}" '
+                    f'dir="auto">{outline_labels}</span>'
+                )
             if toc_item.get('kind') == 'section':
                 index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
                 continue
 
             chapter_index = toc_item['chapter_index']
             chapter_anchor = toc_item.get('anchor')
+            chapter_title_group = (
+                f'<span class="chapter-title-with-sync"><span class="chapter-title"'
+                f'{toc_title_attributes}>{toc_title}</span>{outline_labels_html}</span>'
+            )
             if chapter_anchor is not None:
-                safe_anchor = (
-                    urllib.parse.quote(str(chapter_anchor), safe='')
-                    if self.deployment_mode == "server"
-                    else chapter_anchor
-                )
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}" dir="auto">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
             else:
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title" lang="{book_language}" dir="auto">{toc_title}</span><span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>
@@ -1866,7 +1949,7 @@ class EPUBProcessor:
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else LATEST_RELEASE_API_URL)}"""
+{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '')}"""
 
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
@@ -1985,6 +2068,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     
     def _build_toc_data(self):
         """Return the EPUB-derived table of contents for either publisher."""
+        if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT:
+            return [dict(item) for item in self.toc]
+
         toc_data = []
 
         def title_key(value):
@@ -2466,25 +2552,156 @@ document.addEventListener('DOMContentLoaded', function() {{
         
         return content
     
-    def create_chapter_template(self, content, style_links, chapter_index, chapter_title):
+    def create_pdf_chapter_template(self, chapter_index: int, document_url: str) -> str:
+        """Render one PDF page through the canonical chapter template."""
+        try:
+            page = self._pdf_pages[chapter_index]
+            chapter = self.chapters[chapter_index]
+        except (AttributeError, IndexError):
+            raise ValueError(f"PDF chapter index is out of range: {chapter_index}") from None
+        return self.create_chapter_template(
+            "",
+            "",
+            chapter_index,
+            chapter["title"],
+            pdf_page={
+                "document_url": document_url,
+                "page_number": page.page_number,
+                "width": page.width,
+                "height": page.height,
+                "encrypted": self._pdf_encrypted,
+                "has_extractable_text": self._pdf_has_extractable_text,
+            },
+        )
+
+    def create_chapter_template(
+        self,
+        content,
+        style_links,
+        chapter_index,
+        chapter_title,
+        pdf_page=None,
+    ):
         """创建章节页面模板"""
         if self.deployment_mode == "server":
             content = sanitize_html_fragment(content)
-            book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
-            book_id_attribute = html.escape(str(self.book_hash), quote=True)
-            safe_book_title = metadata_text(self.book_title)
-            safe_chapter_title = metadata_text(chapter_title)
-            book_title_text = html.escape(safe_book_title, quote=False)
-            book_title_attribute = html.escape(safe_book_title, quote=True)
-            chapter_title_text = html.escape(safe_chapter_title, quote=False)
-            chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
-        else:
-            book_id_url = self.book_hash
-            book_id_attribute = self.book_hash
-            book_title_text = self.book_title
-            book_title_attribute = self.book_title
-            chapter_title_text = chapter_title
-            chapter_title_attribute = chapter_title
+        book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
+        book_id_attribute = html.escape(str(self.book_hash), quote=True)
+        safe_book_title = metadata_text(self.book_title)
+        safe_chapter_title = metadata_text(chapter_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        book_title_attribute = html.escape(safe_book_title, quote=True)
+        chapter_title_text = html.escape(safe_chapter_title, quote=False)
+        chapter_title_attribute = html.escape(safe_chapter_title, quote=True)
+        pdf_config_script = ""
+        pdf_stylesheet = ""
+        pdf_chapter_script = ""
+        pdf_reader_controls = ""
+        pdf_mobile_controls = ""
+        pdf_search_drawer = ""
+        page_width_control_attribute = ""
+        page_width_slider_attributes = 'min="1" max="4" value="3" step="1"'
+        page_width_value_control = ""
+        page_width_scale = '''
+                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
+                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
+                            <span data-i18n="settings.pageWidthWide">Wide</span>
+                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>'''
+        if pdf_page is not None:
+            page_number = int(pdf_page["page_number"])
+            total_pages = len(self.chapters)
+            page_params = html.escape(
+                json.dumps(
+                    {"number": page_number, "total": total_pages},
+                    separators=(",", ":"),
+                ),
+                quote=True,
+            )
+            content = (
+                '<div class="pdf-page-content"'
+                f' data-pdf-page-number="{page_number}"'
+                f' data-pdf-page-width="{html.escape(str(pdf_page["width"]), quote=True)}"'
+                f' data-pdf-page-height="{html.escape(str(pdf_page["height"]), quote=True)}"'
+                f' data-pdf-encrypted="{str(bool(pdf_page["encrypted"])).lower()}"'
+                f' data-pdf-has-extractable-text="{str(bool(pdf_page["has_extractable_text"])).lower()}"'
+                ' data-pdf-loading-message-key="pdf.loadingPage"'
+                ' data-pdf-text-unavailable-message-key="pdf.textUnavailable"'
+                ' data-pdf-password-required-message-key="pdf.passwordRequired"'
+                f' aria-label="Page {page_number} of {total_pages}"'
+                ' data-i18n-aria-label="pdf.pageOf"'
+                f' data-i18n-params="{page_params}"></div>'
+            )
+            pdf_config = json.dumps(
+                {
+                    "documentUrl": str(pdf_page["document_url"]),
+                    "pdfjsModuleUrl": self.asset_manifest.url_for(
+                        "vendor/pdfjs/build/pdf.mjs"
+                    ),
+                    "pdfjsWorkerUrl": self.asset_manifest.url_for(
+                        "vendor/pdfjs/build/pdf.worker.mjs"
+                    ),
+                    "encrypted": bool(self._pdf_encrypted),
+                    "hasExtractableText": bool(self._pdf_has_extractable_text),
+                },
+                separators=(",", ":"),
+            )
+            pdf_config = (
+                pdf_config.replace("&", "\\u0026")
+                .replace("<", "\\u003c")
+                .replace(">", "\\u003e")
+            )
+            pdf_config_script = f"<script>window.EpubPDFConfig={pdf_config};</script>"
+            pdf_stylesheet = (
+                '<link rel="stylesheet" href="'
+                + self.asset_manifest.url_for("pdf-chapter.css")
+                + '">'
+            )
+            pdf_chapter_script = (
+                '<script src="'
+                + self.asset_manifest.url_for("pdf-chapter.js")
+                + '" defer></script>'
+            )
+            pdf_reader_controls = '''
+            <span class="pdf-chapter-actions" data-pdf-actions>
+                <button class="control-btn" id="pdfSearchToggle" type="button" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-controls="pdfSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.search">Search PDF</span></button>
+                <button class="control-btn" id="pdfZoomOut" type="button" aria-label="Zoom out" data-i18n-aria-label="pdf.zoomOut"><i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.zoomOut">Zoom out</span></button>
+                <button class="control-btn" id="pdfZoomIn" type="button" aria-label="Zoom in" data-i18n-aria-label="pdf.zoomIn"><i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.zoomIn">Zoom in</span></button>
+                <button class="control-btn" id="pdfFitWidth" type="button" aria-label="Fit width" data-i18n-aria-label="pdf.fitWidth" aria-pressed="false"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitWidth">Fit width</span></button>
+                <button class="control-btn" id="pdfFitPage" type="button" aria-label="Fit page" data-i18n-aria-label="pdf.fitPage" aria-pressed="false"><i class="fas fa-maximize" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.fitPage">Fit page</span></button>
+                <button class="control-btn" id="pdfRotate" type="button" aria-label="Rotate page" data-i18n-aria-label="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span class="control-name" data-i18n="pdf.rotate">Rotate page</span></button>
+            </span>'''
+            pdf_mobile_controls = '''
+        <button class="control-btn" id="mobilePdfSearchToggle" type="button" aria-label="Search PDF" title="Search PDF" data-i18n-aria-label="pdf.search" data-i18n-title="pdf.search" aria-controls="pdfSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span data-i18n="pdf.search">Search PDF</span></button>
+        <button class="control-btn" id="mobilePdfZoomOut" type="button" aria-label="Zoom out" title="Zoom out" data-i18n-aria-label="pdf.zoomOut" data-i18n-title="pdf.zoomOut"><i class="fas fa-magnifying-glass-minus" aria-hidden="true"></i><span data-i18n="pdf.zoomOut">Zoom out</span></button>
+        <button class="control-btn" id="mobilePdfZoomIn" type="button" aria-label="Zoom in" title="Zoom in" data-i18n-aria-label="pdf.zoomIn" data-i18n-title="pdf.zoomIn"><i class="fas fa-magnifying-glass-plus" aria-hidden="true"></i><span data-i18n="pdf.zoomIn">Zoom in</span></button>
+        <button class="control-btn" id="mobilePdfFitWidth" type="button" aria-label="Fit width" title="Fit width" data-i18n-aria-label="pdf.fitWidth" data-i18n-title="pdf.fitWidth" aria-pressed="false"><i class="fas fa-arrows-left-right" aria-hidden="true"></i><span data-i18n="pdf.fitWidth">Fit width</span></button>
+        <button class="control-btn" id="mobilePdfFitPage" type="button" aria-label="Fit page" title="Fit page" data-i18n-aria-label="pdf.fitPage" data-i18n-title="pdf.fitPage" aria-pressed="false"><i class="fas fa-maximize" aria-hidden="true"></i><span data-i18n="pdf.fitPage">Fit page</span></button>
+        <button class="control-btn" id="mobilePdfRotate" type="button" aria-label="Rotate page" title="Rotate page" data-i18n-aria-label="pdf.rotate" data-i18n-title="pdf.rotate"><i class="fas fa-rotate-right" aria-hidden="true"></i><span data-i18n="pdf.rotate">Rotate page</span></button>'''
+            pdf_search_drawer = '''
+    <nav class="toc-floating reader-drawer pdf-search-drawer" id="pdfSearchDrawer" aria-label="Search PDF" data-i18n-aria-label="pdf.search" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="pdf.search">Search PDF</h3>
+            <button class="toc-close" id="pdfSearchClose" type="button" aria-label="Close PDF search" data-i18n-aria-label="pdf.closeSearch"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
+        <form class="pdf-search-form" id="pdfSearchForm" role="search">
+            <label class="visually-hidden" for="pdfSearchInput" data-i18n="pdf.search">Search PDF</label>
+            <input id="pdfSearchInput" type="search" autocomplete="off" placeholder="Search PDF" data-i18n-placeholder="pdf.searchPlaceholder">
+            <button class="control-btn" type="submit" aria-label="Search PDF" data-i18n-aria-label="pdf.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
+        </form>
+        <ul class="toc-list pdf-search-results" id="pdfSearchResults" aria-live="polite"></ul>
+    </nav>'''
+            page_width_control_attribute = " data-pdf-zoom-control"
+            page_width_slider_attributes = 'min="25" max="400" value="100" step="1"'
+            page_width_value_control = '''
+                        <label class="pdf-zoom-value" for="pageWidthValue">
+                            <input id="pageWidthValue" type="number" min="25" max="400" value="100" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                            <span aria-hidden="true">%</span>
+                        </label>'''
+            page_width_scale = '''
+                            <span>25%</span>
+                            <span>100%</span>
+                            <span>200%</span>
+                            <span>400%</span>'''
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -2498,7 +2715,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.chapterRead">AI reading</span></button>'
-            if self.deployment_mode == "server"
+            if self.deployment_mode == "server" and pdf_page is None
             else ""
         )
         ai_followup_button = (
@@ -2507,16 +2724,19 @@ document.addEventListener('DOMContentLoaded', function() {{
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-comments" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.askChapter">Ask AI</span></button>'
-            if self.deployment_mode == "server"
+            if self.deployment_mode == "server" and pdf_page is None
             else ""
         )
-        ai_feature_assets = self._server_ai_feature_assets()
+        ai_feature_assets = (
+            self._server_ai_feature_assets()
+            if pdf_page is None else ""
+        )
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         reading_insights_navigation = (
             '<button type="button" class="app-nav-link" data-reading-insights '
@@ -2526,7 +2746,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         mobile_ai_reading_button = (
             '<button class="control-btn" id="mobileAIReadingBtn" type="button" '
@@ -2536,7 +2756,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             'data-i18n-aria-label="ai.chapterRead" data-i18n-title="ai.chapterRead">'
             '<i class="fas fa-wand-magic-sparkles"></i>'
             '<span data-i18n="ai.chapterRead">AI reading</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         mobile_ai_followup_button = (
             '<button class="control-btn" id="mobileAIChatBtn" type="button" '
@@ -2546,11 +2766,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             'data-i18n-aria-label="ai.askChapter" data-i18n-title="ai.askChapter">'
             '<i class="fas fa-comments" aria-hidden="true"></i>'
             '<span data-i18n="ai.askChapter">Ask AI</span></button>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         ai_chapter_scripts = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
-            if self.deployment_mode == "server" else ""
+            if self.deployment_mode == "server" and pdf_page is None else ""
         )
         dictionary_assets = (
             '<link rel="stylesheet" href="/assets/dictionary.css">\n'
@@ -2600,6 +2820,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     {reading_session_context}
     <script src="/assets/i18n.js"></script>
     <script>window.EpubBrowserI18n.init();</script>
+    {pdf_config_script}
     {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
@@ -2610,6 +2831,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=17">
+    {pdf_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="stylesheet" href="/assets/annotation.css">
@@ -2695,7 +2917,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 </head>
 """
         chapter_html +=f"""
-<body>
+<body{(' class="pdf-source"' if pdf_page is not None else '')}>
 
     <a class="skip-link" href="#eb-content" data-i18n="reader.skipToContent">Skip to reading content</a>
 
@@ -2734,6 +2956,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <!-- 动态生成的目录将放在这里 -->
         </ul>
     </nav>
+    {pdf_search_drawer}
 
     <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
 
@@ -2758,6 +2981,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
             <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            {pdf_reader_controls}
             {ai_chapter_button}
             {ai_followup_button}
         </div>
@@ -2886,14 +3110,14 @@ document.addEventListener('DOMContentLoaded', function() {{
                     </div>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
-                    <div class="page-width-control">
-                        <input type="range" id="pageWidthSlider" min="1" max="4" value="3" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                    <div class="settings-label-row">
+                        <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
+                        {page_width_value_control}
+                    </div>
+                    <div class="page-width-control"{page_width_control_attribute}>
+                        <input type="range" id="pageWidthSlider" {page_width_slider_attributes} aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
                         <div class="page-width-scale" aria-hidden="true">
-                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
-                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
-                            <span data-i18n="settings.pageWidthWide">Wide</span>
-                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
+                            {page_width_scale}
                         </div>
                     </div>
                 </div>
@@ -2996,6 +3220,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             <i class="fas fa-list"></i>
             <span data-i18n="reader.thisChapterContents">This chapter</span>
         </button>
+        {pdf_mobile_controls}
         {mobile_ai_reading_button}
         {mobile_ai_followup_button}
         {prev_link_mobile}
@@ -3090,7 +3315,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         </div>
     </div>
     {server_account_panel}
-    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else LATEST_RELEASE_API_URL)}
+    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '')}
 """
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
@@ -3138,6 +3363,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <script src="/assets/continuous-buffer.js" defer></script>
     <script src="/assets/reading-progress.js" defer></script>
     <script src="/assets/reader-layout.js" defer></script>
+    {pdf_chapter_script}
     <script src="/assets/chapter.js?v=17" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
@@ -3235,7 +3461,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     def get_book_info(self):
         """获取书籍信息"""
         cover_path = ""
-        if self.cover_info and self.cover_info['full_path']:
+        if self.cover_info and self.cover_info.get('web_path'):
+            cover_path = self.cover_info['web_path']
+        elif self.cover_info and self.cover_info['full_path']:
             cover_path = os.path.normpath(os.path.join(self.resources_base, self.cover_info["full_path"]))
         return {
             'title': self.book_title,
@@ -3251,7 +3479,9 @@ document.addEventListener('DOMContentLoaded', function() {{
     def get_metadata(self):
         """Return immutable metadata shared by SSG and Server publishers."""
         cover_path = None
-        if self.cover_info and self.cover_info.get('full_path'):
+        if self.cover_info and self.cover_info.get('web_path'):
+            cover_path = self.cover_info['web_path']
+        elif self.cover_info and self.cover_info.get('full_path'):
             cover_path = os.path.normpath(
                 os.path.join(self.resources_base, self.cover_info['full_path'])
             )
@@ -3262,6 +3492,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             cover=cover_path,
             language=self.lang or 'en',
             epub_identifier=self.epub_identifier,
+            source_format=self.source_format,
         )
     
     def cleanup(self):

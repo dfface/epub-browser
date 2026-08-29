@@ -78,6 +78,10 @@ function bookshelfCoverUrl(book) {
     return book && book.cover ? book.cover : null;
 }
 
+function bookshelfBookFormat(book) {
+    return book && book.format === 'pdf' ? 'pdf' : 'epub';
+}
+
 function bookshelfBookMatchesSearch(book, query, pinyinRuntime) {
     var searchTerm = String(query || '').trim().toLocaleLowerCase();
     var title = String(book && book.title || '').toLocaleLowerCase();
@@ -306,6 +310,7 @@ function initBookshelf() {
                     title: book.title,
                     author: authors,
                     cover: bookshelfCoverUrl(book),
+                    format: bookshelfBookFormat(book),
                     tags: book.tags || [],
                     rating: book.rating
                 };
@@ -1421,6 +1426,7 @@ if (typeof module === 'object' && module.exports) {
     module.exports = {
         metadataUrl: bookshelfMetadataUrl,
         coverUrl: bookshelfCoverUrl,
+        bookFormat: bookshelfBookFormat,
         bookMatchesSearch: bookshelfBookMatchesSearch,
         syncRequest: bookshelfSyncRequest
     };

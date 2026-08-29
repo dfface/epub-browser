@@ -6,15 +6,296 @@ import shutil
 import tempfile
 import unittest
 import zipfile
+from html.parser import HTMLParser
 from pathlib import Path
+from unittest.mock import patch
+
+from PIL import Image
+from pypdf import PdfWriter
 
 from epub_browser.cli import SSGConfig
 from epub_browser.epub_identity import read_embedded_book_id
+from epub_browser.reporting import Reporter
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.ssg import SSGBuildError, SSGPublisher, run_ssg
 
 
 class SSGPublicationTests(unittest.TestCase):
+    def test_discovery_accepts_epub_and_pdf_case_insensitively(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = root / "books"
+            sources.mkdir()
+            self._write_minimal_epub(
+                sources / "one.EPUB", identifier="urn:test:discovery"
+            )
+            (sources / "two.PDF").write_bytes(b"%PDF-1.4\n%%EOF\n")
+            (sources / "ignored.txt").write_text("ignored", encoding="utf-8")
+            publisher = SSGPublisher(
+                SSGConfig((sources,), root / "dist"), show_progress=False
+            )
+
+            discovered = publisher._discover_sources()
+
+            self.assertEqual(
+                {path.name for path in discovered}, {"one.EPUB", "two.PDF"}
+            )
+
+    def test_embedded_storage_reports_pdf_sidecar_fallback_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "one.pdf"
+            second = root / "two.PDF"
+            first.write_bytes(b"%PDF-1.4\none\n%%EOF\n")
+            second.write_bytes(b"%PDF-1.4\ntwo\n%%EOF\n")
+            publisher = SSGPublisher(
+                SSGConfig(
+                    (first, second),
+                    root / "dist",
+                    log=True,
+                    book_id_storage="embedded",
+                ),
+                reporter=Reporter(True),
+                show_progress=False,
+            )
+
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                publisher._discover_sources()
+
+            output = stderr.getvalue()
+            self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
+            self.assertIn("PDF identities use adjacent sidecars", output)
+
+    def test_pdf_ssg_writes_one_shared_chapter_per_page(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.PDF"
+            output = root / "dist"
+            self._write_pdf(source, pages=3)
+            before = source.read_bytes()
+
+            SSGPublisher(
+                SSGConfig((source,), output, "/reader/", book_id_storage="embedded"),
+                show_progress=False,
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book_id = metadata[0]["hash"]
+            book = output / "book" / book_id
+            toc = json.loads((book / "toc.json").read_text(encoding="utf-8"))
+            chapter_names = sorted(path.name for path in book.glob("chapter_*.html"))
+            chapter_html = (book / "chapter_0.html").read_text(encoding="utf-8")
+            index_html = (book / "index.html").read_text(encoding="utf-8")
+
+            self.assertEqual(source.read_bytes(), before)
+            self.assertEqual((book / "document.pdf").read_bytes(), before)
+            self.assertEqual(
+                chapter_names,
+                ["chapter_0.html", "chapter_1.html", "chapter_2.html"],
+            )
+            self.assertEqual(
+                [item["chapter_file"] for item in toc],
+                ["chapter_0.html", "chapter_1.html", "chapter_2.html"],
+            )
+            self.assertEqual([item["chapter_index"] for item in toc], [0, 1, 2])
+            self.assertFalse((book / "reader.html").exists())
+            self.assertTrue((book / "cover.png").is_file())
+            with Image.open(book / "cover.png") as image:
+                self.assertLessEqual(image.width, 600)
+                self.assertLessEqual(image.height, 900)
+            self.assertIn('href=/reader/book/{}/chapter_0.html'.format(book_id), index_html)
+            self.assertIn('"documentUrl":"/reader/book/{}/document.pdf"'.format(book_id), chapter_html)
+            self.assertNotIn("/api/", chapter_html)
+            self.assertNotIn("reading-sessions.js", chapter_html)
+            self.assertEqual(metadata[0]["format"], "pdf")
+            self.assertEqual(metadata[0]["cover"], "/reader/book/{}/cover.png".format(book_id))
+            sidecar = read_exact_sidecar(source)
+            self.assertIsNotNone(sidecar)
+            self.assertEqual(sidecar.book_id, book_id)
+
+    def test_failed_pdf_output_does_not_persist_identity_or_partial_book(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=2)
+            before = source.read_bytes()
+
+            with patch(
+                "epub_browser.ssg.render_pdf_cover",
+                side_effect=RuntimeError("cover exploded"),
+            ):
+                with self.assertRaisesRegex(SSGBuildError, "cover exploded"):
+                    SSGPublisher(
+                        SSGConfig((source,), output), show_progress=False
+                    ).build()
+
+            self.assertEqual(source.read_bytes(), before)
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertFalse(output.exists())
+            self.assertEqual(list(root.glob(".dist.staging-*")), [])
+
+    def test_failed_pdf_activation_removes_a_new_identity_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=1)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher, "_activate", side_effect=RuntimeError("activation exploded")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "activation exploded"):
+                    publisher.build()
+
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertFalse(output.exists())
+
+    def test_failed_pdf_activation_restores_an_adopted_orphan_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_source = root / "old.pdf"
+            source = root / "renamed.pdf"
+            output = root / "dist"
+            self._write_pdf(old_source, pages=1)
+            SSGPublisher(
+                SSGConfig((old_source,), root / "seed"), show_progress=False
+            ).build()
+            orphan = sidecar_path_for(old_source)
+            orphan_bytes = orphan.read_bytes()
+            old_source.rename(source)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher, "_activate", side_effect=RuntimeError("activation exploded")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "activation exploded"):
+                    publisher.build()
+
+            self.assertEqual(orphan.read_bytes(), orphan_bytes)
+            self.assertFalse(sidecar_path_for(source).exists())
+            self.assertFalse(output.exists())
+
+    def test_failed_pdf_activation_restores_an_existing_sidecar_exactly(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=1)
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+            original_output = (output / "index.html").read_bytes()
+            sidecar = sidecar_path_for(source)
+            original_sidecar = sidecar.read_bytes()
+            self._write_pdf(source, pages=2)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher, "_activate", side_effect=RuntimeError("activation exploded")
+            ):
+                with self.assertRaisesRegex(RuntimeError, "activation exploded"):
+                    publisher.build()
+
+            self.assertEqual(sidecar.read_bytes(), original_sidecar)
+            self.assertEqual((output / "index.html").read_bytes(), original_output)
+
+    def test_post_commit_cleanup_failure_keeps_new_output_and_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=1)
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+            original_sidecar = read_exact_sidecar(source)
+            self._write_pdf(source, pages=2)
+            publisher = SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            )
+
+            with patch.object(
+                publisher,
+                "_remove_path",
+                side_effect=OSError("previous cleanup exploded"),
+            ):
+                self.assertEqual(publisher.build(), output.resolve())
+
+            updated_sidecar = read_exact_sidecar(source)
+            toc = json.loads(
+                next((output / "book").iterdir()).joinpath("toc.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(len(toc), 2)
+            self.assertNotEqual(
+                updated_sidecar.source_fingerprint,
+                original_sidecar.source_fingerprint,
+            )
+            self.assertEqual(len(list(root.glob(".dist.previous-*"))), 1)
+
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+
+            self.assertEqual(list(root.glob(".dist.previous-*")), [])
+            self.assertEqual(read_exact_sidecar(source), updated_sidecar)
+
+    def test_pdf_ssg_escapes_hostile_document_metadata_in_shared_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "hostile.pdf"
+            output = root / "dist"
+            title = 'Title </title><script data-pdf-attack="title">boom</script>'
+            author = 'Author <img src=x onerror="pdfAttack()">'
+            tag = 'Tag <svg onload="pdfAttack()">'
+            self._write_pdf(
+                source,
+                pages=1,
+                metadata={
+                    "/Title": title,
+                    "/Author": author,
+                    "/Keywords": tag,
+                },
+            )
+
+            SSGPublisher(
+                SSGConfig((source,), output), show_progress=False
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book = output / "book" / metadata[0]["hash"]
+            for page_name in ("index.html", "chapter_0.html"):
+                page = (book / page_name).read_text(encoding="utf-8")
+                probe = _HTMLSafetyProbe()
+                probe.feed(page)
+                self.assertEqual(probe.attack_elements, [], page_name)
+                self.assertNotIn("onerror=", page.lower(), page_name)
+                self.assertNotIn("onload=", page.lower(), page_name)
+                self.assertIn("Title boom", probe.text, page_name)
+            library_page = (output / "index.html").read_text(encoding="utf-8")
+            library_probe = _HTMLSafetyProbe()
+            library_probe.feed(library_page)
+            self.assertEqual(library_probe.attack_elements, [])
+            self.assertNotIn("onload=", library_page.lower())
+            self.assertIn("Tag", library_probe.text)
+            index_probe = _HTMLSafetyProbe()
+            index_probe.feed((book / "index.html").read_text(encoding="utf-8"))
+            self.assertIn("Author", index_probe.text)
+            self.assertIn("Tag", index_probe.text)
+
     def test_sidecar_id_survives_package_metadata_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -115,6 +396,7 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertFalse((output / "data").exists())
             self.assertIn(str(output.resolve()), stdout.getvalue())
             self.assertTrue(metadata[0]["url"].startswith("/reader/book/"))
+            self.assertEqual(metadata[0]["format"], "epub")
             self.assertTrue(metadata[0]["cover"] is None or metadata[0]["cover"].startswith("/reader/"))
             self.assertNotIn(
                 str(source.resolve()),
@@ -429,6 +711,40 @@ class SSGPublicationTests(unittest.TestCase):
                         data = data.replace(before, after)
                     destination.writestr(info, data)
         temporary.replace(path)
+
+    @staticmethod
+    def _write_pdf(path, pages, metadata=None):
+        writer = PdfWriter()
+        for page_number in range(pages):
+            writer.add_blank_page(width=200 + page_number, height=400 + page_number)
+        writer.add_metadata(
+            metadata or {"/Title": "SSG PDF", "/Author": "PDF Author"}
+        )
+        with Path(path).open("wb") as stream:
+            writer.write(stream)
+
+
+class _HTMLSafetyProbe(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.attack_elements = []
+        self.text_parts = []
+
+    @property
+    def text(self):
+        return "".join(self.text_parts)
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if (
+            attributes.get("data-pdf-attack") is not None
+            or "onerror" in attributes
+            or "onload" in attributes
+        ):
+            self.attack_elements.append((tag, attributes))
+
+    def handle_data(self, data):
+        self.text_parts.append(data)
 
 
 if __name__ == "__main__":

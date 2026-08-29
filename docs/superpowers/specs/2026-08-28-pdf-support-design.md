@@ -204,14 +204,18 @@ shared library and Book page use their normal cover presentation.
 Server stores immutable PDF-derived data separately:
 
 ```text
+book/<book_id>/pdf/document.pdf
 book/<book_id>/pdf/metadata.json
 book/<book_id>/.server-pdf-revision
 ```
 
-It contains the page list, dimensions, outline markers, fingerprint, and
-capability flags, but no HTML, i18n, UI, permissions, user data, annotations,
-sessions, or compiled asset URLs. UI changes need only a Server restart. The
-EPUB `.server-content-revision` remains unchanged.
+`document.pdf` is an atomic byte-for-byte cache copy of the source; it is never
+split, rewritten, or used as an identity carrier. `metadata.json` contains the
+page list, dimensions, outline markers, source and cached-document
+fingerprints, and capability flags, but no HTML, i18n, UI, permissions, user
+data, annotations, sessions, or compiled asset URLs. UI changes need only a
+Server restart. A changed source invalidates and rebuilds the whole PDF cache.
+The EPUB `.server-content-revision` remains unchanged.
 
 The CLI retains `--book-id-storage sidecar|embedded`. In `sidecar`, both
 formats use adjacent sidecars. In `embedded`, EPUB keeps its OPF carrier while
@@ -230,14 +234,15 @@ contain no Session scripts, `/api/*`, synchronized annotation, dictionary, or
 encyclopedia dependencies.
 
 Server dynamically renders Book, TOC, and chapter pages from the PDF metadata
-cache. It delivers bytes through:
+cache. It delivers the cached immutable `pdf/document.pdf` bytes through:
 
 ```text
 GET|HEAD /api/books/<book_id>/document
 ```
 
-The route checks Session authentication, book visibility, format, and source
-fingerprint before bounded single-range responses. It provides ETag,
+The route checks Session authentication, book visibility, format, current
+source fingerprint, and cached-document fingerprint before bounded
+single-range responses. It provides ETag,
 `Accept-Ranges`, private caching, `nosniff`, inline PDF disposition, and no
 absolute path. It is not exposed to PATs.
 

@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const {
   applyPageWidth,
   allowsReaderNavigationEvent,
+  chapterNavigationPresentation,
+  continuousChapterPresentation,
   createNavigationBehaviorController,
   getPaginationPageWidth,
   getPaginationScrollLeft,
@@ -14,6 +16,34 @@ const {
   readingPreferenceEnabled,
   syncChapterTocAvailability,
 } = require('../epub_browser/assets/reader-layout.js');
+
+test('PDF chapter navigation localizes page labels and preserves outline markers', () => {
+  const translate = (key, params) => key === 'pdf.page' ? `第 ${params.number} 页` : key;
+  const presentation = chapterNavigationPresentation({
+    title: 'Page 2',
+    chapter_index: 1,
+    page_label: '2',
+    outline_labels: ['Part I', 'Opening'],
+  }, true, translate);
+
+  assert.deepEqual(presentation, {
+    title: '第 2 页',
+    outlineLabels: ['Part I', 'Opening'],
+  });
+});
+
+test('continuous PDF separators use page semantics while EPUB keeps chapter semantics', () => {
+  const translate = (key, params) => `${key}:${params.number}`;
+
+  assert.deepEqual(
+    continuousChapterPresentation('Page 3', 2, true, translate),
+    { title: 'pdf.page:3', index: 'pdf.page:3' },
+  );
+  assert.deepEqual(
+    continuousChapterPresentation('Chapter title', 2, false, translate),
+    { title: 'Chapter title', index: 'reader.chapterNumber:2' },
+  );
+});
 
 class FakeClassList {
   constructor() {
@@ -38,6 +68,7 @@ class FakeElement {
     this.attributes = new Map();
     this.classList = new FakeClassList();
     this.disabled = false;
+    this.hidden = false;
     this.listeners = new Map();
     this.style = {
       values: new Map(),
@@ -122,13 +153,14 @@ test('pagination refreshes only when the canvas width has materially settled', (
   assert.equal(paginationWidthChanged(787.1953125, 787.2), false);
 });
 
-test('continuous reading disables and closes both chapter-local TOC controls', () => {
+test('continuous reading hides and closes both chapter-local TOC controls', () => {
   const document = fakeDocument();
 
   syncChapterTocAvailability(document, true);
 
   for (const id of ['tocToggle', 'mobileTocBtn']) {
     assert.equal(document.elements[id].disabled, true);
+    assert.equal(document.elements[id].hidden, true);
     assert.equal(document.elements[id].getAttribute('aria-disabled'), 'true');
     assert.equal(document.elements[id].getAttribute('aria-expanded'), 'false');
     assert.equal(document.elements[id].classList.contains('active'), false);
@@ -139,7 +171,26 @@ test('continuous reading disables and closes both chapter-local TOC controls', (
   syncChapterTocAvailability(document, false);
   for (const id of ['tocToggle', 'mobileTocBtn']) {
     assert.equal(document.elements[id].disabled, false);
+    assert.equal(document.elements[id].hidden, false);
     assert.equal(document.elements[id].getAttribute('aria-disabled'), 'false');
+  }
+});
+
+test('PDF pages hide the empty chapter-local TOC in every reading mode without changing EPUB ordinary mode', () => {
+  const pdfDocument = fakeDocument();
+  syncChapterTocAvailability(pdfDocument, false, true);
+  for (const id of ['tocToggle', 'mobileTocBtn']) {
+    assert.equal(pdfDocument.elements[id].disabled, true);
+    assert.equal(pdfDocument.elements[id].hidden, true);
+    assert.equal(pdfDocument.elements[id].getAttribute('aria-disabled'), 'true');
+    assert.equal(pdfDocument.elements[id].getAttribute('aria-hidden'), 'true');
+  }
+
+  const epubDocument = fakeDocument();
+  syncChapterTocAvailability(epubDocument, false, false);
+  for (const id of ['tocToggle', 'mobileTocBtn']) {
+    assert.equal(epubDocument.elements[id].disabled, false);
+    assert.equal(epubDocument.elements[id].getAttribute('aria-disabled'), 'false');
   }
 });
 

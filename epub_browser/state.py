@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 18
+DB_SCHEMA_VERSION = 19
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -127,6 +127,7 @@ class BookRecord:
     source_fingerprint: str
     source_size: Optional[int]
     source_mtime_ns: Optional[int]
+    source_format: str
     metadata_json: str
     title: str
     authors_json: str
@@ -250,6 +251,14 @@ class StateStore:
                     f"this version supports {DB_SCHEMA_VERSION}"
                 )
             empty_database = not self._has_application_tables(connection)
+            existing_book_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(books)").fetchall()
+            }
+            repair_pdf_branch_v18_metadata = (
+                version == 18
+                and not {"title", "authors_json"}.issubset(existing_book_columns)
+            )
             self._create_compatible_schema(
                 connection,
                 latest=empty_database or version >= 11,
@@ -323,6 +332,12 @@ class StateStore:
                 self._migrate_schema_v17(connection, max(version, 16))
             if version < 18:
                 self._migrate_schema_v18(connection, max(version, 17))
+            if version < 19:
+                self._migrate_schema_v19(
+                    connection,
+                    max(version, 18),
+                    repair_managed_metadata=repair_pdf_branch_v18_metadata,
+                )
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -429,6 +444,8 @@ class StateStore:
                 source_fingerprint TEXT NOT NULL,
                 source_size INTEGER,
                 source_mtime_ns INTEGER,
+                source_format TEXT NOT NULL DEFAULT 'epub'
+                    CHECK(source_format IN ('epub', 'pdf')),
                 metadata_json TEXT NOT NULL,
                 visibility TEXT NOT NULL DEFAULT 'authenticated'
                     CHECK(visibility IN ('authenticated', 'restricted')),
@@ -437,6 +454,12 @@ class StateStore:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
+        )
+        self._add_column_if_missing(
+            connection,
+            "books",
+            "source_format",
+            "TEXT NOT NULL DEFAULT 'epub' CHECK(source_format IN ('epub', 'pdf'))",
         )
         if not latest:
             connection.execute(
@@ -1576,9 +1599,15 @@ class StateStore:
         connection.execute("PRAGMA user_version = 17")
 
     def _migrate_schema_v18(self, connection, source_version) -> None:
-        """Initialize Server-managed display metadata from the EPUB snapshot once."""
+        """Add source format and initialize Server-managed display metadata."""
         if source_version >= 18:
             return
+        self._add_column_if_missing(
+            connection,
+            "books",
+            "source_format",
+            "TEXT NOT NULL DEFAULT 'epub' CHECK(source_format IN ('epub', 'pdf'))",
+        )
         rows = connection.execute(
             "SELECT book_id, metadata_json FROM books ORDER BY book_id"
         ).fetchall()
@@ -1595,6 +1624,46 @@ class StateStore:
             self._import_book_tags(connection, row["book_id"], tags)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 18")
+
+    def _migrate_schema_v19(
+        self,
+        connection,
+        source_version,
+        *,
+        repair_managed_metadata=False,
+    ) -> None:
+        """Repair managed metadata for databases created by the PDF v18 branch.
+
+        The PDF work and managed-book-metadata work independently used schema
+        version 18.  The compatible-schema pass has already added the managed
+        columns, so only untouched placeholder values need backfilling here.
+        """
+        if source_version >= 19:
+            return
+        if repair_managed_metadata:
+            rows = connection.execute(
+                """
+                SELECT book_id, metadata_json
+                FROM books ORDER BY book_id
+                """
+            ).fetchall()
+            for row in rows:
+                title, authors, tags = self._admin_book_metadata(row["metadata_json"])
+                connection.execute(
+                    "UPDATE books SET title = ?, authors_json = ? WHERE book_id = ?",
+                    (
+                        title,
+                        json.dumps(
+                            authors,
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
+                        row["book_id"],
+                    ),
+                )
+                self._import_book_tags(connection, row["book_id"], tags)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 19")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:
@@ -3968,11 +4037,21 @@ class StateStore:
             ((book_id,) for book_id in unique_ids),
         )
         timestamp = self._timestamp()
+        formats = {
+            row["book_id"]: row["source_format"]
+            for row in connection.execute(
+                "SELECT book_id, source_format FROM books "
+                "WHERE book_id IN ({})".format(
+                    ",".join("?" for _ in unique_ids)
+                ),
+                unique_ids,
+            ).fetchall()
+        }
         for book_id in unique_ids:
             self._enqueue_webhook_event_connection(
                 connection,
                 "book.updated",
-                {"book_id": book_id},
+                {"book_id": book_id, "format": formats[book_id]},
                 timestamp,
             )
 
@@ -4186,6 +4265,7 @@ class StateStore:
         ]
         return {
             "id": book_row["book_id"],
+            "format": book_row["source_format"],
             "title": book_row["title"],
             "authors": authors,
             "tags": managed_tags,
@@ -4207,7 +4287,7 @@ class StateStore:
         with self._connection() as connection:
             books = connection.execute(
                 """
-                SELECT book_id, title, authors_json, visibility, created_at,
+                SELECT book_id, source_format, title, authors_json, visibility, created_at,
                        updated_at
                 FROM books
                 WHERE active = 1
@@ -4278,7 +4358,7 @@ class StateStore:
     def _active_admin_book_row(connection, book_id: str):
         row = connection.execute(
             """
-            SELECT book_id, title, authors_json, visibility, created_at,
+            SELECT book_id, source_format, title, authors_json, visibility, created_at,
                    updated_at
             FROM books
             WHERE book_id = ? AND active = 1
@@ -4337,6 +4417,7 @@ class StateStore:
     def _admin_book_summary_from_detail(detail: dict) -> dict:
         return {
             "id": detail["id"],
+            "format": detail["format"],
             "title": detail["title"],
             "authors": list(detail["authors"]),
             "tags": [dict(tag) for tag in detail["tags"]],
@@ -4409,7 +4490,7 @@ class StateStore:
             self._enqueue_webhook_event_connection(
                 connection,
                 "book.updated",
-                {"book_id": book_id},
+                {"book_id": book_id, "format": book_row["source_format"]},
                 self._timestamp(),
             )
             connection.execute("COMMIT")
@@ -5587,7 +5668,10 @@ class StateStore:
         source_mtime_ns: Optional[int] = None,
         preferred_book_id: Optional[str] = None,
         authoritative_book_id: Optional[str] = None,
+        source_format: str = "epub",
     ) -> BookRecord:
+        if source_format not in {"epub", "pdf"}:
+            raise ValueError(f"Unsupported source format: {source_format}")
         canonical_path = str(Path(source_path).expanduser().resolve())
         identifier = (epub_identifier or "").strip() or None
         authoritative_id = (authoritative_book_id or "").strip() or None
@@ -5611,6 +5695,7 @@ class StateStore:
                     """
                     UPDATE books SET
                         active = 1,
+                        source_format = ?,
                         epub_identifier = COALESCE(?, epub_identifier),
                         source_size = COALESCE(?, source_size),
                         source_mtime_ns = COALESCE(?, source_mtime_ns),
@@ -5618,13 +5703,25 @@ class StateStore:
                     WHERE book_id = ?
                     """,
                     (
+                        source_format,
                         identifier,
                         source_size,
                         source_mtime_ns,
                         row["book_id"],
                     ),
                 )
-                return self._get_book(connection, row["book_id"])
+                resolved = self._get_book(connection, row["book_id"])
+                if not row["active"]:
+                    self._enqueue_webhook_event_connection(
+                        connection,
+                        "book.updated",
+                        {
+                            "book_id": resolved.book_id,
+                            "format": resolved.source_format,
+                        },
+                        self._timestamp(),
+                    )
+                return resolved
 
             if authoritative_id:
                 identity_row = connection.execute(
@@ -5641,6 +5738,7 @@ class StateStore:
                         """
                         UPDATE books SET
                             source_path = ?,
+                            source_format = ?,
                             epub_identifier = COALESCE(?, epub_identifier),
                             source_fingerprint = ?,
                             metadata_json = ?,
@@ -5652,6 +5750,7 @@ class StateStore:
                         """,
                         (
                             canonical_path,
+                            source_format,
                             identifier,
                             source_fingerprint,
                             metadata_json,
@@ -5660,7 +5759,17 @@ class StateStore:
                             authoritative_id,
                         ),
                     )
-                    return self._get_book(connection, authoritative_id)
+                    resolved = self._get_book(connection, authoritative_id)
+                    self._enqueue_webhook_event_connection(
+                        connection,
+                        "book.updated",
+                        {
+                            "book_id": resolved.book_id,
+                            "format": resolved.source_format,
+                        },
+                        self._timestamp(),
+                    )
+                    return resolved
 
             move_matches = self._inactive_move_rows(
                 connection,
@@ -5673,6 +5782,7 @@ class StateStore:
                     """
                     UPDATE books SET
                         source_path = ?,
+                        source_format = ?,
                         metadata_json = ?,
                         source_size = ?,
                         source_mtime_ns = ?,
@@ -5682,13 +5792,24 @@ class StateStore:
                     """,
                     (
                         canonical_path,
+                        source_format,
                         metadata_json,
                         source_size,
                         source_mtime_ns,
                         book_id,
                     ),
                 )
-                return self._get_book(connection, book_id)
+                resolved = self._get_book(connection, book_id)
+                self._enqueue_webhook_event_connection(
+                    connection,
+                    "book.updated",
+                    {
+                        "book_id": resolved.book_id,
+                        "format": resolved.source_format,
+                    },
+                    self._timestamp(),
+                )
+                return resolved
             if len(move_matches) > 1:
                 raise ValueError(
                     "Multiple inactive books match the same EPUB identifier "
@@ -5713,9 +5834,9 @@ class StateStore:
                 """
                 INSERT INTO books (
                     book_id, source_path, epub_identifier, source_fingerprint,
-                    source_size, source_mtime_ns, metadata_json, title,
+                    source_size, source_mtime_ns, source_format, metadata_json, title,
                     authors_json, active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """,
                 (
                     book_id,
@@ -5724,6 +5845,7 @@ class StateStore:
                     source_fingerprint,
                     source_size,
                     source_mtime_ns,
+                    source_format,
                     metadata_json,
                     managed_title,
                     json.dumps(
@@ -5735,7 +5857,10 @@ class StateStore:
             )
             self._import_book_tags(connection, book_id, managed_tags)
             self._enqueue_webhook_event_connection(
-                connection, "book.created", {"book_id": book_id}, self._timestamp()
+                connection,
+                "book.created",
+                {"book_id": book_id, "format": source_format},
+                self._timestamp(),
             )
             return self._get_book(connection, book_id)
 
@@ -5776,7 +5901,10 @@ class StateStore:
         source_size: Optional[int] = None,
         source_mtime_ns: Optional[int] = None,
         epub_identifier: Optional[str] = None,
+        source_format: Optional[str] = None,
     ) -> BookRecord:
+        if source_format is not None and source_format not in {"epub", "pdf"}:
+            raise ValueError(f"Unsupported source format: {source_format}")
         metadata_json = self._metadata_json(metadata)
         with self._connection() as connection:
             cursor = connection.execute(
@@ -5786,6 +5914,7 @@ class StateStore:
                     metadata_json = ?,
                     source_size = ?,
                     source_mtime_ns = ?,
+                    source_format = COALESCE(?, source_format),
                     epub_identifier = COALESCE(?, epub_identifier),
                     active = 1,
                     updated_at = CURRENT_TIMESTAMP
@@ -5796,27 +5925,38 @@ class StateStore:
                     metadata_json,
                     source_size,
                     source_mtime_ns,
+                    source_format,
                     (epub_identifier or "").strip() or None,
                     book_id,
                 ),
             )
             if cursor.rowcount != 1:
                 raise KeyError(f"Unknown book ID: {book_id}")
+            updated = self._get_book(connection, book_id)
             self._enqueue_webhook_event_connection(
-                connection, "book.updated", {"book_id": book_id}, self._timestamp()
+                connection,
+                "book.updated",
+                {"book_id": book_id, "format": updated.source_format},
+                self._timestamp(),
             )
-            return self._get_book(connection, book_id)
+            return updated
 
     def mark_missing(self, book_id: str) -> None:
         with self._connection() as connection:
+            row = connection.execute(
+                "SELECT source_format FROM books WHERE book_id = ?", (book_id,)
+            ).fetchone()
             cursor = connection.execute(
                 "UPDATE books SET active = 0, updated_at = CURRENT_TIMESTAMP "
                 "WHERE book_id = ? AND active = 1",
                 (book_id,),
             )
-            if cursor.rowcount:
+            if cursor.rowcount and row is not None:
                 self._enqueue_webhook_event_connection(
-                    connection, "book.removed", {"book_id": book_id}, self._timestamp()
+                    connection,
+                    "book.removed",
+                    {"book_id": book_id, "format": row["source_format"]},
+                    self._timestamp(),
                 )
 
     def active_books(self) -> tuple[BookRecord, ...]:
@@ -6422,13 +6562,24 @@ class StateStore:
         return {row["book_id"]: row["rating"] for row in rows}
 
     @staticmethod
+    def _reading_session_book_title(row) -> str:
+        current_title = (
+            row["current_book_title"]
+            if "current_book_title" in row.keys()
+            else None
+        )
+        if isinstance(current_title, str) and current_title.strip():
+            return current_title.strip()
+        return row["book_title_snapshot"]
+
+    @staticmethod
     def _reading_session_data(row) -> dict:
         return {
             "id": row["id"],
             "user_id": row["user_id"],
             "book_id": row["book_id"],
             "chapter_index": row["chapter_index"],
-            "book_title": row["book_title_snapshot"],
+            "book_title": StateStore._reading_session_book_title(row),
             "chapter_label": row["chapter_label_snapshot"],
             "started_at": StateStore._utc_timestamp(row["started_at"]),
             "ended_at": StateStore._utc_timestamp(row["ended_at"]),
@@ -6442,8 +6593,11 @@ class StateStore:
             self._require_user(connection, user_id)
             rows = connection.execute(
                 """
-                SELECT * FROM reading_sessions WHERE user_id = ?
-                ORDER BY started_at DESC, id DESC
+                SELECT reading_sessions.*, books.title AS current_book_title
+                FROM reading_sessions
+                LEFT JOIN books ON books.book_id = reading_sessions.book_id
+                WHERE reading_sessions.user_id = ?
+                ORDER BY reading_sessions.started_at DESC, reading_sessions.id DESC
                 """,
                 (user_id,),
             ).fetchall()
@@ -6788,9 +6942,12 @@ class StateStore:
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
-                "SELECT * FROM reading_sessions WHERE user_id = ? "
-                "AND started_at < ? AND ended_at > ? "
-                "ORDER BY started_at DESC, id DESC",
+                "SELECT reading_sessions.*, books.title AS current_book_title "
+                "FROM reading_sessions "
+                "LEFT JOIN books ON books.book_id = reading_sessions.book_id "
+                "WHERE reading_sessions.user_id = ? "
+                "AND reading_sessions.started_at < ? AND reading_sessions.ended_at > ? "
+                "ORDER BY reading_sessions.started_at DESC, reading_sessions.id DESC",
                 (user_id, range_end, activity_start),
             ).fetchall()
 
@@ -6815,8 +6972,9 @@ class StateStore:
             }
             clipped_sessions.append(interval)
             book_id = row["book_id"]
+            book_title = self._reading_session_book_title(row)
             book_intervals.setdefault(book_id, []).append(interval)
-            book_titles.setdefault(book_id, row["book_title_snapshot"])
+            book_titles.setdefault(book_id, book_title)
 
             local_start_date = datetime.fromtimestamp(started_at, zone).date()
             local_end_date = datetime.fromtimestamp(ended_at - 0.000001, zone).date()
@@ -6848,7 +7006,7 @@ class StateStore:
                     "ended_at": day_end,
                     "active_seconds": active_seconds_for_day,
                     "book_id": row["book_id"],
-                    "book_title": row["book_title_snapshot"],
+                    "book_title": book_title,
                     "chapter_index": row["chapter_index"],
                     "chapter_label": row["chapter_label_snapshot"],
                     "client_id": row["client_id"],

@@ -223,6 +223,7 @@ function adminDataResponse(url) {
 function adminBook(overrides = {}) {
   return Object.assign({
     id: 'book-1',
+    format: 'epub',
     title: 'Book 01',
     authors: [],
     epub_tags: [],
@@ -235,6 +236,26 @@ function adminBook(overrides = {}) {
     updated_at: '2026-08-23T08:00:00Z',
   }, overrides);
 }
+
+test('book index identifies PDF records without changing EPUB rows', async () => {
+  const books = [
+    adminBook({ id: 'pdf-book', format: 'pdf', title: 'PDF Book' }),
+    adminBook({ id: 'epub-book', title: 'EPUB Book' }),
+  ];
+  const { root, elements } = bookUiHarness(url => url === '/api/admin/books/index'
+    ? Promise.resolve(response(200, { books }))
+    : Promise.resolve(response(404, {})));
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'admin', role: 'admin' }, csrf_token: 'token' });
+  await auth.init();
+  await auth.loadBookIndex();
+
+  const badges = descendants(elements.adminBookList).filter(
+    node => node.className === 'admin-book-format-badge'
+  );
+  assert.equal(badges.length, 1);
+  assert.equal(badges[0].textContent, '[pdf.formatBadge]');
+});
 
 function bookUiHarness(fetchImpl) {
   const localeListeners = [];

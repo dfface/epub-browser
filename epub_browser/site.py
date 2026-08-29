@@ -1,4 +1,5 @@
 import json
+import html
 import os
 import tempfile
 from dataclasses import dataclass
@@ -19,7 +20,9 @@ from .server_chrome import (
     SERVER_LOCALE_SCRIPT,
 )
 from .urls import SiteURLs, rewrite_root_urls
-from .version import LATEST_RELEASE_API_URL, render_footer
+from .version import render_footer
+from .source_format import EPUB_FORMAT
+from .processor import metadata_text
 
 
 @dataclass(frozen=True)
@@ -29,6 +32,7 @@ class LibraryBook:
     authors: Tuple[str, ...]
     tags: Tuple[str, ...]
     cover: Optional[str]
+    source_format: str = EPUB_FORMAT
 
 
 def render_library_shell(
@@ -295,7 +299,9 @@ if (isKindle) {
             <div class="tag-cloud-item" data-id="NoTag" data-i18n="library.noTag">No tag</div>
 """
     for tag in sorted(t for t in all_tags if isinstance(t, str) and t.strip()):
-        library_html += f"""<div class="tag-cloud-item" data-id="{tag}">{tag}</div>"""
+        tag_text = html.escape(metadata_text(tag), quote=False)
+        tag_attribute = html.escape(metadata_text(tag), quote=True)
+        library_html += f"""<div class="tag-cloud-item" data-id="{tag_attribute}">{tag_text}</div>"""
     library_html += """
         </div>
         <button type="button" class="tag-cloud-toggle" id="tagCloudToggle" hidden aria-expanded="false" data-i18n="library.showMoreTags">Show more</button>
@@ -387,7 +393,7 @@ if (isKindle) {
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year, release_api_url='/api/version' if deployment_mode == 'server' else LATEST_RELEASE_API_URL)}
+{render_footer(datetime.now().year, release_api_url='/api/version' if deployment_mode == 'server' else '')}
 """
     library_html += """
     <script src="/assets/cache-boundary.js" defer></script>
@@ -481,6 +487,7 @@ def publish_library_shell(
             "authors": list(book.authors),
             "tags": list(book.tags),
             "cover": urls.public(book.cover) if book.cover else None,
+            "format": book.source_format,
         }
         for book in ordered_books
     ]
