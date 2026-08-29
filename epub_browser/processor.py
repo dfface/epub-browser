@@ -1860,11 +1860,15 @@ class EPUBProcessor:
 
             chapter_index = toc_item['chapter_index']
             chapter_anchor = toc_item.get('anchor')
+            chapter_title_group = (
+                f'<span class="chapter-title-with-sync"><span class="chapter-title"'
+                f'{toc_title_attributes}>{toc_title}</span>{outline_labels_html}</span>'
+            )
             if chapter_anchor is not None:
                 safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}"><span class="chapter-title"{toc_title_attributes}>{toc_title}</span>{outline_labels_html}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
             else:
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}"><span class="chapter-title"{toc_title_attributes}>{toc_title}</span>{outline_labels_html}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
         
         index_html += f"""    </ul>
     </div>

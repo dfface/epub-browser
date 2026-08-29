@@ -302,6 +302,38 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(len(result["sessions"]), 1)
         self.assertEqual(result["sessions"][0]["active_seconds"], 13)
 
+    def test_reading_history_uses_the_current_managed_book_title_by_book_id(self):
+        self._reading_book()
+        self.store.record_reading_heartbeat(
+            user_id=self.owner.user_id,
+            book_id="book-1",
+            client_id="rename-tab",
+            client_sequence=1,
+            chapter_index=0,
+            active_seconds=15,
+            book_title="Imported title snapshot",
+            chapter_label="Chapter 1",
+            received_at=_utc("2026-08-15T08:00:15Z"),
+        )
+        self.store.update_admin_book_settings(
+            "book-1",
+            title="Renamed in book management",
+            authors=["Managed author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
+
+        insights = self.store.reading_insights(
+            self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai"
+        )
+        sessions = self.store.list_reading_sessions_for_user(self.owner.user_id)
+
+        self.assertEqual(insights["top_book"]["title"], "Renamed in book management")
+        self.assertEqual(insights["sessions"][0]["book_title"], "Renamed in book management")
+        self.assertEqual(sessions[0]["book_title"], "Renamed in book management")
+
     def test_insights_split_session_at_local_midnight_without_losing_seconds(self):
         self._reading_book()
         self.store.record_reading_heartbeat(

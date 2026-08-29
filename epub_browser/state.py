@@ -6531,13 +6531,24 @@ class StateStore:
         return {row["book_id"]: row["rating"] for row in rows}
 
     @staticmethod
+    def _reading_session_book_title(row) -> str:
+        current_title = (
+            row["current_book_title"]
+            if "current_book_title" in row.keys()
+            else None
+        )
+        if isinstance(current_title, str) and current_title.strip():
+            return current_title.strip()
+        return row["book_title_snapshot"]
+
+    @staticmethod
     def _reading_session_data(row) -> dict:
         return {
             "id": row["id"],
             "user_id": row["user_id"],
             "book_id": row["book_id"],
             "chapter_index": row["chapter_index"],
-            "book_title": row["book_title_snapshot"],
+            "book_title": StateStore._reading_session_book_title(row),
             "chapter_label": row["chapter_label_snapshot"],
             "started_at": StateStore._utc_timestamp(row["started_at"]),
             "ended_at": StateStore._utc_timestamp(row["ended_at"]),
@@ -6551,8 +6562,11 @@ class StateStore:
             self._require_user(connection, user_id)
             rows = connection.execute(
                 """
-                SELECT * FROM reading_sessions WHERE user_id = ?
-                ORDER BY started_at DESC, id DESC
+                SELECT reading_sessions.*, books.title AS current_book_title
+                FROM reading_sessions
+                LEFT JOIN books ON books.book_id = reading_sessions.book_id
+                WHERE reading_sessions.user_id = ?
+                ORDER BY reading_sessions.started_at DESC, reading_sessions.id DESC
                 """,
                 (user_id,),
             ).fetchall()
@@ -6897,9 +6911,12 @@ class StateStore:
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
-                "SELECT * FROM reading_sessions WHERE user_id = ? "
-                "AND started_at < ? AND ended_at > ? "
-                "ORDER BY started_at DESC, id DESC",
+                "SELECT reading_sessions.*, books.title AS current_book_title "
+                "FROM reading_sessions "
+                "LEFT JOIN books ON books.book_id = reading_sessions.book_id "
+                "WHERE reading_sessions.user_id = ? "
+                "AND reading_sessions.started_at < ? AND reading_sessions.ended_at > ? "
+                "ORDER BY reading_sessions.started_at DESC, reading_sessions.id DESC",
                 (user_id, range_end, activity_start),
             ).fetchall()
 
@@ -6924,8 +6941,9 @@ class StateStore:
             }
             clipped_sessions.append(interval)
             book_id = row["book_id"]
+            book_title = self._reading_session_book_title(row)
             book_intervals.setdefault(book_id, []).append(interval)
-            book_titles.setdefault(book_id, row["book_title_snapshot"])
+            book_titles.setdefault(book_id, book_title)
 
             local_start_date = datetime.fromtimestamp(started_at, zone).date()
             local_end_date = datetime.fromtimestamp(ended_at - 0.000001, zone).date()
@@ -6957,7 +6975,7 @@ class StateStore:
                     "ended_at": day_end,
                     "active_seconds": active_seconds_for_day,
                     "book_id": row["book_id"],
-                    "book_title": row["book_title_snapshot"],
+                    "book_title": book_title,
                     "chapter_index": row["chapter_index"],
                     "chapter_label": row["chapter_label_snapshot"],
                     "client_id": row["client_id"],

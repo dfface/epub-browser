@@ -83,6 +83,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertEqual(book_html.count('class=chapter-outline-labels'), 1)
             self.assertNotIn('— Opening', book_html)
             self.assertIn('>Opening · Part I</span>', book_html)
+            self.assertRegex(
+                book_html,
+                r'<span class=chapter-title-with-sync><span [^>]*class=chapter-title[^>]*>Page 2</span>'
+                r'<span class=chapter-outline-labels[^>]*>Opening · Part I</span></span>'
+                r'<span class=chapter-page>chapter_1\.html</span>',
+            )
             self.assertNotIn('data-ai-reading-hub', book_html)
             self.assertNotIn('data-ai-book-chat', book_html)
             self.assertNotIn('data-ai-reading-indicators', book_html)
@@ -3145,14 +3151,23 @@ assert.deepEqual(
         self.assertIn('height: auto;', cover_rule)
         self.assertNotRegex(css, r'\.book-cover\s*\{[^}]*height:\s*\d+px')
 
-    def test_library_cover_preserves_pdf_page_proportions_and_stacks_format_badges(self):
+    def test_library_cover_fills_the_card_and_stacks_pdf_format_badges(self):
         css = Path('epub_browser/assets/library.css').read_text(encoding='utf-8')
         cover_start = css.index('.book-cover {')
         cover_rule = css[cover_start:css.index('}', cover_start)]
 
-        self.assertIn('object-fit: contain;', cover_rule)
+        self.assertIn('object-fit: cover;', cover_rule)
+        self.assertNotIn('background: #fff;', cover_rule)
         self.assertIn('.book-format-badge', css)
         self.assertIn('.pdf-cover-frame .book-rating-badge', css)
+
+    def test_book_detail_cover_uses_the_same_full_bleed_crop_as_the_library(self):
+        css = Path('epub_browser/assets/book.css').read_text(encoding='utf-8')
+        cover_start = css.index('.book-info-cover img {')
+        cover_rule = css[cover_start:css.index('}', cover_start)]
+
+        self.assertIn('object-fit: cover;', cover_rule)
+        self.assertNotIn('background: #fff;', cover_rule)
 
     def test_pdf_reader_stage_follows_the_active_reader_theme(self):
         css = Path('epub_browser/assets/pdf-chapter.css').read_text(encoding='utf-8')
@@ -3515,6 +3530,7 @@ assert.deepEqual(
         self.assertIn("/api/books/" + "' + encodeURIComponent(book_hash) + '/metadata", book_script)
         self.assertIn('renderEffectiveBookTags', book_script)
         self.assertIn("titleWithSync.insertBefore(syncTag, aiBadge.nextSibling)", book_script)
+        self.assertIn("titleWithSync.insertBefore(syncTag, outlineLabels || null)", book_script)
         reading_hub_script = Path('epub_browser/assets/ai-reading-hub.js').read_text(encoding='utf-8')
         self.assertIn("function resultGroups(book)", reading_hub_script)
         self.assertIn("function resultTimestamp(result)", reading_hub_script)

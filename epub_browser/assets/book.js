@@ -465,8 +465,9 @@ function markReadingChapter(readKey, username) {
             // AI reading is a chapter state, so keep its label adjacent to the
             // title and put cloud synchronization after it.
             var aiBadge = titleWithSync.querySelector('.ai-reading-chapter-badge');
+            var outlineLabels = titleWithSync.querySelector('.chapter-outline-labels');
             if (aiBadge) titleWithSync.insertBefore(syncTag, aiBadge.nextSibling);
-            else titleWithSync.appendChild(syncTag);
+            else titleWithSync.insertBefore(syncTag, outlineLabels || null);
         } else {
             chapterElement.appendChild(syncTag);
         }

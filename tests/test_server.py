@@ -4234,6 +4234,15 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(again.json()["session"]["active_seconds"], 15)
 
     def test_pdf_reading_heartbeat_uses_page_chapter_snapshot(self):
+        self.store.update_admin_book_settings(
+            "pdf",
+            title="Managed PDF title",
+            authors=["Managed PDF author"],
+            visibility="authenticated",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
         heartbeat = self.client.post(
             "/api/reading-sessions/pdf/heartbeat",
             json={
@@ -4245,7 +4254,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
         )
 
         self.assertEqual(heartbeat.status_code, 200, heartbeat.text)
-        self.assertEqual(heartbeat.json()["session"]["book_title"], "PDF Book")
+        self.assertEqual(heartbeat.json()["session"]["book_title"], "Managed PDF title")
         self.assertEqual(heartbeat.json()["session"]["chapter_label"], "Page 2")
 
     def test_book_reading_time_summary_is_private_and_requires_book_access(self):

@@ -396,8 +396,7 @@ body {
     width: 100%;
     height: auto;
     aspect-ratio: 4 / 5;
-    object-fit: contain;
-    background: #fff;
+    object-fit: cover;
     display: block;
     border-bottom: 1px solid transparent;
 }
