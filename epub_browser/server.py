@@ -1463,10 +1463,11 @@ window.location.assign(payload.redirect||'/');
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
 <body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
-<header class="auth-card-header">{auth_brand_markup()}
+<header class="auth-card-header">{auth_brand_markup()}</header>
+<div class="auth-intro">
 <h1 data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])}</h1>
-<p class="auth-description" data-i18n="account.oidc.errorBody">{html.escape(copy['error_body'])}</p></header>
-<a class="auth-submit" href="/login" data-i18n="account.oidc.backToLogin">{html.escape(copy['back'])}</a>
+<p class="auth-description" data-i18n="account.oidc.errorBody">{html.escape(copy['error_body'])}</p></div>
+<div class="auth-form"><a class="auth-primary-button" href="/login" data-i18n="account.oidc.backToLogin">{html.escape(copy['back'])}</a></div>
 </section></main></body></html>'''
         return HTMLResponse(
             markup,
@@ -1505,17 +1506,18 @@ window.location.assign(payload.redirect||'/');
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
 <body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
-<header class="auth-card-header">{auth_brand_markup()}
+<header class="auth-card-header">{auth_brand_markup()}</header>
+<div class="auth-intro">
 <h1 data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])}</h1>
-<p class="auth-description" data-i18n="account.oidc.associateBody">{html.escape(copy['associate_body'])}</p></header>
+<p class="auth-description" data-i18n="account.oidc.associateBody">{html.escape(copy['associate_body'])}</p></div>
 <form class="auth-form" id="associationForm" method="post" action="/auth/oidc/associate">
 <input type="hidden" name="token" value="{html.escape(association_token, quote=True)}">
 <input type="hidden" name="auth_nonce" value="{html.escape(nonce, quote=True)}">
-<label><span data-i18n="account.username">{html.escape(login_copy['username'])}</span>
+<label class="auth-field"><span data-i18n="account.username">{html.escape(login_copy['username'])}</span>
 <input name="username" autocomplete="username" required maxlength="255"></label>
-<label><span data-i18n="account.password">{html.escape(login_copy['password'])}</span>
+<label class="auth-field"><span data-i18n="account.password">{html.escape(login_copy['password'])}</span>
 <input name="password" type="password" autocomplete="current-password" required maxlength="4096"></label>
-{error_markup}<button class="auth-submit" type="submit" data-i18n="account.oidc.associateSubmit">{html.escape(copy['submit'])}</button>
+{error_markup}<button class="auth-primary-button" type="submit" data-i18n="account.oidc.associateSubmit">{html.escape(copy['submit'])}</button>
 </form></section></main></body></html>'''
         page = HTMLResponse(
             markup,

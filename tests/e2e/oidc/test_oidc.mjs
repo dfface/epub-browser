@@ -121,6 +121,12 @@ async function launchBrowser() {
     connection.send('Runtime.enable'),
     connection.send('Network.enable'),
   ]);
+  await connection.send('Emulation.setDeviceMetricsOverride', {
+    width: 1440,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
   connection.lastNetworkError = '';
   connection.on('Network.loadingFailed', event => {
     if (event.type === 'Document') connection.lastNetworkError = event.errorText || 'document load failed';
@@ -211,6 +217,47 @@ async function jsonFetch(page, url, options = {}) {
 async function screenshot(page, name) {
   const result = await page.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
   fs.writeFileSync(path.join(artifactDir, name), Buffer.from(result.data, 'base64'));
+}
+
+async function setViewport(page, width, height, { dark = false, reducedMotion = false } = {}) {
+  await page.send('Emulation.setDeviceMetricsOverride', {
+    width,
+    height,
+    deviceScaleFactor: 1,
+    mobile: width <= 480,
+  });
+  await page.send('Emulation.setEmulatedMedia', {
+    features: [
+      { name: 'prefers-color-scheme', value: dark ? 'dark' : 'light' },
+      { name: 'prefers-reduced-motion', value: reducedMotion ? 'reduce' : 'no-preference' },
+    ],
+  });
+  await evaluate(page, `document.documentElement.setAttribute('data-theme', ${JSON.stringify(dark ? 'dark' : 'light')})`);
+  await new Promise(resolve => setTimeout(resolve, 100));
+}
+
+async function assertNoPageOverflow(page, label) {
+  const dimensions = await evaluate(page, `({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth,
+  })`);
+  assert.ok(dimensions.content <= dimensions.viewport + 1, `${label} has horizontal page overflow: ${JSON.stringify(dimensions)}`);
+}
+
+async function assertAssociationKeyboardPath(page) {
+  await evaluate(page, 'document.activeElement && document.activeElement.blur()');
+  const reached = new Set();
+  for (let index = 0; index < 8; index += 1) {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    reached.add(await evaluate(page, `(() => {
+      const node = document.activeElement;
+      return node ? [node.tagName, node.getAttribute('name') || '', node.getAttribute('type') || ''].join(':') : '';
+    })()`));
+  }
+  assert.ok(reached.has('INPUT:username:'), `keyboard did not reach username: ${Array.from(reached)}`);
+  assert.ok(reached.has('INPUT:password:password'), `keyboard did not reach password: ${Array.from(reached)}`);
+  assert.ok(reached.has('BUTTON::submit'), `keyboard did not reach submit: ${Array.from(reached)}`);
 }
 
 async function localLogin(page, username, password, expectSuccess = true) {
@@ -329,6 +376,12 @@ try {
 
   await configureOidc(page, { autoCreate: false, allowMemberPassword: true });
   await screenshot(page, 'admin-oidc-desktop.png');
+  await setViewport(page, 720, 900);
+  await assertNoPageOverflow(page, 'OIDC administration at 200% equivalent width');
+  await setViewport(page, 375, 812, { dark: true, reducedMotion: true });
+  await assertNoPageOverflow(page, 'OIDC administration mobile');
+  await screenshot(page, 'admin-oidc-mobile-dark.png');
+  await setViewport(page, 1440, 1000);
   await closeAdminAndLogout(page);
   assert.equal(await evaluate(page, 'Boolean(document.querySelector("#oidcLoginAction"))'), true);
 
@@ -338,6 +391,13 @@ try {
   await loginAtAuthelia(page, 'reader', 'reader-secret');
   await waitFor(page, 'location.pathname === "/auth/oidc/associate"', 'account association');
   await screenshot(page, 'oidc-association-desktop.png');
+  await assertAssociationKeyboardPath(page);
+  await setViewport(page, 375, 812, { dark: true, reducedMotion: true });
+  await assertNoPageOverflow(page, 'OIDC association mobile');
+  const associationTargets = await evaluate(page, `Array.from(document.querySelectorAll('#associationForm input:not([type="hidden"]), #associationForm button')).map(node => node.getBoundingClientRect().height)`);
+  assert.ok(associationTargets.every(height => height >= 44), `association touch target below 44px: ${associationTargets}`);
+  await screenshot(page, 'oidc-association-mobile-dark.png');
+  await setViewport(page, 1440, 1000);
   await fill(page, '#associationForm [name="username"]', 'reader');
   await fill(page, '#associationForm [name="password"]', 'reader-secret');
   await click(page, '#associationForm button[type="submit"]');
@@ -354,6 +414,10 @@ try {
   await click(page, '#accountMenu');
   await waitFor(page, 'document.querySelector("#accountOidcList").textContent.includes("Company SSO")', 'linked identity display');
   await screenshot(page, 'account-identity-desktop.png');
+  await setViewport(page, 375, 812, { dark: true, reducedMotion: true });
+  await assertNoPageOverflow(page, 'OIDC account identity mobile');
+  await screenshot(page, 'account-identity-mobile-dark.png');
+  await setViewport(page, 1440, 1000);
   await click(page, '#accountLogout');
   await waitFor(page, 'location.pathname === "/login" && Boolean(document.querySelector("#loginForm"))', 'reader logout');
 

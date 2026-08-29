@@ -216,6 +216,7 @@ body.auth-page {
     font: inherit;
     font-size: .9rem;
     font-weight: 700;
+    text-decoration: none;
     cursor: pointer;
     transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }

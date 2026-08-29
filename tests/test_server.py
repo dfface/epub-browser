@@ -949,6 +949,9 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             form = client.get(callback.headers["location"])
             self.assertEqual(form.status_code, 200)
             self.assertIn('id="associationForm"', form.text)
+            self.assertIn('<div class="auth-intro">', form.text)
+            self.assertIn('<label class="auth-field">', form.text)
+            self.assertIn('<button class="auth-primary-button"', form.text)
             nonce_match = re.search(r'name="auth_nonce" value="([^"]+)"', form.text)
             token_match = re.search(r'name="token" value="([^"]+)"', form.text)
             self.assertIsNotNone(nonce_match)
@@ -1062,6 +1065,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
                 "&error_description=client-secret-do-not-leak"
             )
             self.assertEqual(denied.status_code, 400)
+            self.assertIn('<div class="auth-intro">', denied.text)
             self.assertEqual(denied.headers["cache-control"], "no-store")
             self.assertNotIn("client-secret-do-not-leak", denied.text)
             self.assertNotIn("access_denied", denied.text)
