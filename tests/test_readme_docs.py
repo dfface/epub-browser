@@ -142,7 +142,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
             "ai-native-reading.md",
             "third-party-ai-renderers.md",
             "migration-v2.md",
-            "releases/v2.8.3.md",
+            "releases/v2.9.0.md",
             "../AGENTS.md",
             "../CONTEXT.md",
         ):

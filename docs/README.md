@@ -22,8 +22,8 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
-- [v2.8.3](releases/v2.8.3.md) — reliable PDF annotation restoration after a
-  chapter refresh, without false failure notices.
+- [v2.9.0](releases/v2.9.0.md) — generic OIDC single sign-on, safe account
+  linking and provisioning, and guarded administrator user deletion.
 - [All release notes](releases/) — versioned, immutable release documentation.
 
 ## Maintainers / 维护者
