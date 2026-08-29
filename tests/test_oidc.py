@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 from epub_browser.auth import BootstrapCredentials
-from epub_browser.oidc import OIDCError, OIDCService
+from epub_browser.oidc import OIDCConfiguration, OIDCError, OIDCService
 from epub_browser.state import StateStore
 
 
@@ -44,6 +44,7 @@ class OIDCServiceTests(unittest.IsolatedAsyncioTestCase):
             "authorization_endpoint": f"{ISSUER}/api/authorize",
             "token_endpoint": f"{ISSUER}/api/token",
             "jwks_uri": f"{ISSUER}/jwks.json",
+            "userinfo_endpoint": f"{ISSUER}/api/userinfo",
             "response_types_supported": ["code"],
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["RS256"],
@@ -94,6 +95,7 @@ class OIDCServiceTests(unittest.IsolatedAsyncioTestCase):
         cases = (
             (self._metadata(issuer=f"{ISSUER}/other"), "discovery_invalid"),
             (self._metadata(token_endpoint="http://identity.example.test/token"), "discovery_invalid"),
+            (self._metadata(userinfo_endpoint="http://identity.example.test/userinfo"), "discovery_invalid"),
             (self._metadata(code_challenge_methods_supported=["plain"]), "configuration_unsupported"),
             (self._metadata(response_types_supported=["id_token"]), "configuration_unsupported"),
             (self._metadata(id_token_signing_alg_values_supported=7), "discovery_invalid"),
@@ -202,12 +204,20 @@ class OIDCServiceTests(unittest.IsolatedAsyncioTestCase):
                     "nonce": start_holder["start"].nonce,
                     "iat": int(NOW),
                     "exp": int(NOW + 300),
-                    "preferred_username": "remote-reader",
-                    "name": "Remote Reader",
-                    "email": "reader@example.test",
                 }
                 token = jwt.encode({"alg": "RS256", "kid": "key-1"}, claims, private_pem)
                 return httpx.Response(200, json={"id_token": token.decode(), "access_token": "discard-me"})
+            if request.url.path == "/api/userinfo":
+                self.assertEqual(request.headers["authorization"], "Bearer discard-me")
+                return httpx.Response(
+                    200,
+                    json={
+                        "sub": "subject-123",
+                        "preferred_username": "remote-reader",
+                        "name": "Remote Reader",
+                        "email": "reader@example.test",
+                    },
+                )
             raise AssertionError(f"Unexpected request: {request.url}")
 
         service = self._service(handler)
@@ -227,6 +237,20 @@ class OIDCServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completion.claims.display_name, "Remote Reader")
         self.assertEqual(completion.claims.email, "reader@example.test")
         self.assertFalse(hasattr(completion, "access_token"))
+
+    def test_userinfo_subject_must_match_the_validated_id_token(self):
+        service = self._service(lambda request: httpx.Response(500))
+        configuration = OIDCConfiguration.from_settings(self.settings)
+        with self.assertRaises(OIDCError) as raised:
+            service._normalized_claims(
+                configuration,
+                {"sub": "signed-subject"},
+                supplemental_claims={
+                    "sub": "different-subject",
+                    "preferred_username": "attacker-controlled",
+                },
+            )
+        self.assertEqual(raised.exception.code, "invalid_id_token")
 
     async def test_callback_rejects_wrong_browser_before_token_exchange(self):
         token_calls = 0

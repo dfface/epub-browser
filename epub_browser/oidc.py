@@ -126,6 +126,7 @@ class OIDCProviderMetadata:
     authorization_endpoint: str
     token_endpoint: str
     jwks_uri: str
+    userinfo_endpoint: Optional[str]
     signing_algorithms: tuple[str, ...]
     token_auth_methods: tuple[str, ...]
 
@@ -323,8 +324,32 @@ class OIDCService:
         id_token = token_response.get("id_token")
         if not isinstance(id_token, str) or not id_token:
             raise OIDCError("token_exchange_failed")
-        claims = await self._validate_id_token(
+        id_token_claims = await self._validated_id_token_claims(
             configuration, metadata, transaction, id_token
+        )
+        supplemental_claims = None
+        username_claim = id_token_claims.get(configuration.username_claim)
+        if not isinstance(username_claim, str) or not username_claim.strip():
+            access_token = token_response.get("access_token")
+            token_type = token_response.get("token_type")
+            if (
+                metadata.userinfo_endpoint is None
+                or not isinstance(access_token, str)
+                or not access_token
+                or (token_type is not None and str(token_type).lower() != "bearer")
+                or len(access_token) > 16384
+                or any(ord(character) < 0x21 or ord(character) > 0x7E for character in access_token)
+            ):
+                raise OIDCError("invalid_id_token")
+            supplemental_claims = await self._fetch_json(
+                metadata.userinfo_endpoint,
+                headers={"Authorization": f"Bearer {access_token}"},
+                failure_code="invalid_id_token",
+            )
+        claims = self._normalized_claims(
+            configuration,
+            id_token_claims,
+            supplemental_claims=supplemental_claims,
         )
         return OIDCCompletion(transaction=transaction, claims=claims)
 
@@ -349,6 +374,14 @@ class OIDCService:
                 raise OIDCError("discovery_invalid")
             try:
                 _require_secure_url(endpoint)
+            except OIDCError as exc:
+                raise OIDCError("discovery_invalid") from exc
+        userinfo_endpoint = payload.get("userinfo_endpoint")
+        if userinfo_endpoint is not None:
+            if not isinstance(userinfo_endpoint, str):
+                raise OIDCError("discovery_invalid")
+            try:
+                _require_secure_url(userinfo_endpoint)
             except OIDCError as exc:
                 raise OIDCError("discovery_invalid") from exc
         challenge_methods = payload.get("code_challenge_methods_supported", ())
@@ -399,6 +432,7 @@ class OIDCService:
             authorization_endpoint=authorization_endpoint,
             token_endpoint=token_endpoint,
             jwks_uri=jwks_uri,
+            userinfo_endpoint=userinfo_endpoint,
             signing_algorithms=signing_algorithms,
             token_auth_methods=token_auth_methods,
         )
@@ -472,13 +506,13 @@ class OIDCService:
         self._jwks_cache[cache_key] = payload
         return payload
 
-    async def _validate_id_token(
+    async def _validated_id_token_claims(
         self,
         configuration: OIDCConfiguration,
         metadata: OIDCProviderMetadata,
         transaction: OIDCTransactionRecord,
         token: str,
-    ) -> OIDCClaims:
+    ) -> Mapping[str, Any]:
         header = _jwt_header(token)
         algorithm = header.get("alg")
         kid = header.get("kid")
@@ -495,6 +529,22 @@ class OIDCService:
         except (JoseError, ValueError, TypeError) as exc:
             raise OIDCError("invalid_id_token") from exc
         self._validate_claims(configuration, transaction, claims)
+        return claims
+
+    def _normalized_claims(
+        self,
+        configuration: OIDCConfiguration,
+        id_token_claims: Mapping[str, Any],
+        *,
+        supplemental_claims: Optional[Mapping[str, Any]] = None,
+    ) -> OIDCClaims:
+        claims = dict(id_token_claims)
+        if supplemental_claims is not None:
+            if supplemental_claims.get("sub") != id_token_claims.get("sub"):
+                raise OIDCError("invalid_id_token")
+            for name in (configuration.username_claim, "name", "email"):
+                if name in supplemental_claims:
+                    claims[name] = supplemental_claims[name]
         username = claims.get(configuration.username_claim)
         if not isinstance(username, str) or not username.strip() or len(username) > 255:
             raise OIDCError("invalid_id_token")
@@ -506,7 +556,7 @@ class OIDCService:
             email = None
         return OIDCClaims(
             issuer=configuration.issuer,
-            subject=claims["sub"],
+            subject=id_token_claims["sub"],
             username=username.strip(),
             display_name=display_name.strip()[:255],
             email=email.strip()[:320] if email else None,
@@ -557,6 +607,7 @@ class OIDCService:
         method: str = "GET",
         data: Optional[Mapping[str, str]] = None,
         auth: Optional[httpx.Auth] = None,
+        headers: Optional[Mapping[str, str]] = None,
         failure_code: str,
     ) -> Mapping[str, Any]:
         try:
@@ -567,7 +618,7 @@ class OIDCService:
                 auth=auth,
                 timeout=self._request_timeout,
                 follow_redirects=False,
-                headers={"Accept": "application/json"},
+                headers={"Accept": "application/json", **dict(headers or {})},
             ) as response:
                 if response.status_code < 200 or response.status_code >= 300:
                     raise OIDCError(failure_code)
