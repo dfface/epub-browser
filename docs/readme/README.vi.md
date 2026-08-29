@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> Dịch vụ đọc EPUB riêng tư và trình tạo trang tĩnh độc lập.
+> EPUB và PDF trong thư viện đọc riêng tư hoặc dưới dạng trang tĩnh độc lập.
 
 **README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
@@ -10,15 +10,20 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser cung cấp hai chế độ với trách nhiệm được phân tách rõ ràng:
+![Một trang PDF trong trình đọc dùng chung của EPUB Browser.](../releases/assets/v2.8.0-pdf-reader.png)
+
+EPUB Browser xử lý `.epub` và `.pdf` trong hai chế độ với trách nhiệm được phân tách rõ ràng:
 
 | | `ssg` | `server` |
 | --- | --- | --- |
+| EPUB và PDF | Có | Có |
 | Triển khai | Lưu trữ tĩnh, Pages, lưu trữ đối tượng, Nginx | Dịch vụ đọc riêng tư và lâu dài |
 | Tài khoản | Không có | Tài khoản cục bộ |
 | Tiến độ, chú thích, giá sách | Chỉ trong trình duyệt này | Dữ liệu tài khoản đã đăng nhập trong SQLite |
 | Cập nhật nguồn | Chạy lại `ssg` | Khởi động lại dịch vụ hoặc dùng `--watch` |
 | Cơ sở dữ liệu khi chạy | Không có | Bắt buộc |
+
+PDF là định dạng sách hạng nhất: trang 1 trở thành `chapter_0.html`, mọi trang đều xuất hiện trong mục lục và PDF.js cục bộ hiển thị chúng trong cùng thư viện, trang sách, giao diện đọc, tìm kiếm và quy trình chú thích. Các tính năng PDF chưa hỗ trợ như đọc bằng AI được ẩn rõ ràng và không cần CDN trong khi đọc.
 
 Dùng `ssg` khi cần xuất bản các tệp tĩnh thông thường. Dùng `server` khi cần tài khoản, dữ liệu xuyên thiết bị, kiểm soát quyền truy cập sách hoặc tự động theo dõi nguồn.
 
@@ -36,7 +41,7 @@ Kết quả được tạo bằng tác vụ nền, lưu trong SQLite và chia s�
 ## Yêu cầu và cài đặt
 
 - Python 3.9 trở lên
-- Một hoặc nhiều tệp `.epub`, thư mục lồng nhau chứa EPUB hoặc thư viện theo cấu trúc Calibre
+- Một hoặc nhiều tệp `.epub` hoặc `.pdf`, thư mục lồng nhau chứa sách hoặc thư viện theo cấu trúc Calibre
 
 Cài đặt từ PyPI hỗ trợ cả chế độ SSG và Server:
 
@@ -78,7 +83,7 @@ Mở `http://127.0.0.1:8000/`. Trong lần truy cập đầu tiên, hãy tạo q
 
 ## Dữ liệu, tài khoản và ranh giới truy cập
 
-Mỗi cuốn sách có một `book_id` ổn định. Theo mặc định, `--book-id-storage sidecar` lưu danh tính bên cạnh EPUB mà không thay đổi byte của tệp. `--book-id-storage embedded` ghi danh tính vào siêu dữ liệu OPF và yêu cầu nguồn có thể sửa đổi.
+Mỗi cuốn sách có một `book_id` ổn định. Theo mặc định, `--book-id-storage sidecar` lưu danh tính cạnh tệp nguồn mà không thay đổi byte của tệp. Với EPUB, `--book-id-storage embedded` ghi vào siêu dữ liệu OPF; với PDF, thiết lập này luôn dùng sidecar liền kề.
 
 Trong chế độ Server, `--server-dir` là nơi dữ liệu có thẩm quyền của SQLite, bộ nhớ đệm và bản sao lưu di chuyển. Tài khoản, giá sách, tiến độ đọc, chú thích, kết quả AI và tác vụ cũng được lưu tại đây. Quản trị viên quản lý người dùng, vai trò, phiên và quyền sách; thành viên chỉ sử dụng sách được phép và dữ liệu riêng của mình. Hãy bảo vệ quyền truy cập của thư mục này cùng các bản sao lưu.
 

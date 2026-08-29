@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> Un service privé de lecture EPUB et un générateur de site statique autonome.
+> EPUB et PDF dans une bibliothèque de lecture privée ou sous forme de site statique autonome.
 
 **README :** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
@@ -10,15 +10,20 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser propose deux modes aux responsabilités clairement séparées :
+![Une page PDF dans le lecteur commun d’EPUB Browser.](../releases/assets/v2.8.0-pdf-reader.png)
+
+EPUB Browser traite les fichiers `.epub` et `.pdf` dans deux modes aux responsabilités clairement séparées :
 
 | | `ssg` | `server` |
 | --- | --- | --- |
+| EPUB et PDF | Oui | Oui |
 | Déploiement | Hébergement statique, Pages, stockage objet, Nginx | Service privé de lecture persistant |
 | Comptes | Aucun | Comptes locaux |
 | Progression, annotations, bibliothèque | Ce navigateur uniquement | Données du compte authentifié dans SQLite |
 | Mise à jour des sources | Relancer `ssg` | Redémarrer le service ou utiliser `--watch` |
 | Base de données d’exécution | Aucune | Obligatoire |
+
+PDF est un format de livre de premier rang : la page 1 devient `chapter_0.html`, chaque page figure dans la table des matières et PDF.js l’affiche localement dans la même bibliothèque, fiche de livre, interface de lecture, recherche et chaîne d’annotation. Les fonctions PDF non prises en charge, comme la lecture par IA, sont explicitement masquées et aucun CDN n’est requis pendant la lecture.
 
 Utilisez `ssg` pour publier des fichiers statiques ordinaires. Utilisez `server` si vous avez besoin de comptes, de données partagées entre appareils, de contrôle d’accès aux livres ou d’une surveillance automatique des sources.
 
@@ -36,7 +41,7 @@ Les résultats sont produits par des tâches en arrière-plan, conservés dans S
 ## Prérequis et installation
 
 - Python 3.9 ou version ultérieure
-- Un ou plusieurs fichiers `.epub`, des dossiers imbriqués contenant des EPUB ou une bibliothèque de type Calibre
+- Un ou plusieurs fichiers `.epub` ou `.pdf`, des dossiers de livres imbriqués ou une bibliothèque de type Calibre
 
 L’installation depuis PyPI permet d’utiliser les modes SSG et Server :
 
@@ -78,7 +83,7 @@ Ouvrez `http://127.0.0.1:8000/`. La première visite permet de créer l’admini
 
 ## Données, comptes et limites d’accès
 
-Chaque livre possède un `book_id` stable. Par défaut, `--book-id-storage sidecar` enregistre cette identité à côté de l’EPUB sans modifier ses octets. `--book-id-storage embedded` l’inscrit dans les métadonnées OPF et nécessite une source modifiable.
+Chaque livre possède un `book_id` stable. Par défaut, `--book-id-storage sidecar` enregistre cette identité à côté du fichier source sans modifier ses octets. Pour EPUB, `--book-id-storage embedded` l’inscrit dans les métadonnées OPF et nécessite une source modifiable ; pour PDF, ce réglage utilise toujours le sidecar adjacent.
 
 En mode Server, `--server-dir` est l’emplacement de référence pour SQLite, les caches et les sauvegardes de migration. Les comptes, bibliothèques, progressions, annotations, résultats IA et tâches y sont également enregistrés. Les administrateurs gèrent les utilisateurs, rôles, sessions et autorisations d’accès aux livres ; les membres n’utilisent que les livres autorisés et leurs propres données privées. Protégez les permissions de ce dossier et de ses sauvegardes.
 

@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> 私人 EPUB 閱讀服務，以及自包含的靜態網站產生器。
+> 以同一套閱讀體驗閱讀 EPUB 與 PDF：既可建立自包含的靜態網站，也可執行私人閱讀服務。
 
 **README：** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
@@ -10,15 +10,20 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser 提供兩種明確分工的部署模式：
+![PDF 在 EPUB Browser 共用閱讀器中顯示。](../releases/assets/v2.8.0-pdf-reader.png)
+
+EPUB Browser 同時處理 `.epub` 與 `.pdf`，並提供兩種明確分工的部署模式：
 
 | | `ssg` | `server` |
 | --- | --- | --- |
+| EPUB 與 PDF | 支援 | 支援 |
 | 部署方式 | 靜態主機、Pages、物件儲存、Nginx | 持久化的私人閱讀服務 |
 | 帳戶 | 無 | 本機帳戶 |
 | 進度、標註、書架 | 僅目前瀏覽器 | SQLite 中已登入帳戶的資料 |
 | 更新來源 | 再次執行 `ssg` | 重啟服務或使用 `--watch` |
 | 執行期資料庫 | 無 | 必需 |
+
+PDF 是一等書籍格式：第 1 頁對應 `chapter_0.html`，每一頁都會出現在目錄中，並由本機 PDF.js 在相同的 Library、書籍頁、閱讀介面、搜尋與標註流程中顯示。PDF 不支援的 AI 閱讀等功能會明確隱藏，閱讀期間不會存取 CDN。
 
 需要可直接發布的普通靜態檔案時，請選擇 `ssg`；需要帳戶、跨裝置資料、書籍存取控制或自動監看來源時，請選擇 `server`。
 
@@ -36,7 +41,7 @@ AI 是 Server 專屬功能。管理員必須設定 OpenAI 相容供應商並逐�
 ## 需求與安裝
 
 - Python 3.9 或更新版本
-- 一個或多個 `.epub` 檔案、含 EPUB 的巢狀目錄，或 Calibre 風格的書庫目錄
+- 一個或多個 `.epub` 或 `.pdf` 檔案、含書籍的巢狀目錄，或 Calibre 風格的書庫目錄
 
 從 PyPI 安裝可使用 SSG 與 Server 兩種模式：
 
@@ -78,7 +83,7 @@ epub-browser server /path/to/books \
 
 ## 資料、帳戶與存取邊界
 
-每本書都有穩定的 `book_id`（網址與瀏覽器資料中亦稱 `book_hash`）。預設的 `--book-id-storage sidecar` 會在 EPUB 旁寫入可見的身分檔，不改動 EPUB 位元組；`--book-id-storage embedded` 則會寫入 OPF 中繼資料，來源必須可寫入且適合修改。
+每本書都有穩定的 `book_id`（網址與瀏覽器資料中亦稱 `book_hash`）。預設的 `--book-id-storage sidecar` 會在來源旁寫入身分檔且不改動原始位元組。EPUB 可用 `--book-id-storage embedded` 寫入 OPF 中繼資料；PDF 則一定回退到相鄰 sidecar。
 
 Server 的 `--server-dir` 是權威狀態位置，包含 SQLite、快取與遷移備份。帳戶、書架、閱讀進度、標註、AI 結果與工作都存放在此。管理員可管理帳戶、角色、登入工作階段與受限書籍的授權；一般成員只能使用獲授權的書籍與自己的私人資料。請保護此目錄及其備份的檔案權限。
 

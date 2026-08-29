@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> Un servicio privado de lectura EPUB y un generador de sitios estáticos autocontenido.
+> EPUB y PDF en una biblioteca de lectura privada o como sitio estático autocontenido.
 
 **README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
@@ -10,15 +10,20 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser ofrece dos modos con responsabilidades claramente separadas:
+![Una página PDF en el lector compartido de EPUB Browser.](../releases/assets/v2.8.0-pdf-reader.png)
+
+EPUB Browser procesa `.epub` y `.pdf` en dos modos con responsabilidades claramente separadas:
 
 | | `ssg` | `server` |
 | --- | --- | --- |
+| EPUB y PDF | Sí | Sí |
 | Despliegue | Hosting estático, Pages, almacenamiento de objetos, Nginx | Servicio privado de lectura persistente |
 | Cuentas | Ninguna | Cuentas locales |
 | Progreso, anotaciones y estantería | Solo en este navegador | Datos de la cuenta autenticada en SQLite |
 | Actualización de fuentes | Ejecutar `ssg` de nuevo | Reiniciar el servicio o usar `--watch` |
 | Base de datos en tiempo de ejecución | No | Obligatoria |
+
+PDF es un formato de libro de primera clase: la página 1 se convierte en `chapter_0.html`, todas las páginas aparecen en el índice y PDF.js las representa localmente en la misma biblioteca, ficha, interfaz de lectura, búsqueda y flujo de anotaciones. Las funciones no compatibles, como la lectura con IA para PDF, se ocultan de forma explícita y no se necesita ningún CDN durante la lectura.
 
 Usa `ssg` para publicar archivos estáticos normales. Usa `server` cuando necesites cuentas, datos entre dispositivos, control de acceso a libros o sincronización automática de las fuentes.
 
@@ -36,7 +41,7 @@ Los resultados se generan como tareas en segundo plano, se guardan en SQLite y s
 ## Requisitos e instalación
 
 - Python 3.9 o posterior
-- Uno o varios archivos `.epub`, un directorio anidado con EPUB o una biblioteca con estructura de Calibre
+- Uno o varios archivos `.epub` o `.pdf`, directorios anidados con libros o una biblioteca con estructura de Calibre
 
 La instalación desde PyPI permite usar los modos SSG y Server:
 
@@ -78,7 +83,7 @@ Abre `http://127.0.0.1:8000/`. En la primera visita se crea el administrador ini
 
 ## Datos, cuentas y límites de acceso
 
-Cada libro tiene un `book_id` estable. Por defecto, `--book-id-storage sidecar` guarda la identidad junto al EPUB sin modificar sus bytes; `--book-id-storage embedded` la escribe en los metadatos OPF y requiere una fuente modificable.
+Cada libro tiene un `book_id` estable. Por defecto, `--book-id-storage sidecar` guarda la identidad junto al archivo fuente sin modificar sus bytes. Para EPUB, `--book-id-storage embedded` la escribe en los metadatos OPF y requiere una fuente modificable; para PDF siempre recurre al sidecar adyacente.
 
 En modo Server, `--server-dir` es la ubicación autoritativa para SQLite, cachés y copias de migración. Allí también se guardan cuentas, estanterías, progreso, anotaciones, resultados de IA y tareas. Los administradores gestionan usuarios, roles, sesiones y permisos de libros; los miembros solo pueden usar los libros autorizados y sus propios datos privados. Protege los permisos de este directorio y de sus copias de seguridad.
 

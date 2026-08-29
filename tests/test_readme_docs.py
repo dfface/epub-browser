@@ -4,6 +4,25 @@ from pathlib import Path
 
 
 class ReadmeDocumentationTests(unittest.TestCase):
+    def test_every_localized_readme_presents_pdf_as_a_first_class_format(self):
+        localized_readmes = sorted(Path("docs/readme").glob("README.*.md"))
+        self.assertEqual(16, len(localized_readmes))
+
+        required = (
+            "PDF",
+            ".pdf",
+            "chapter_0.html",
+            "PDF.js",
+            "`ssg`",
+            "`server`",
+            "v2.8.0-pdf-reader.png",
+        )
+        for path in localized_readmes:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                for phrase in required:
+                    self.assertIn(phrase, text)
+
     def test_readmes_document_pdf_chapter_mapping(self):
         contracts = {
             Path("README.md"): (

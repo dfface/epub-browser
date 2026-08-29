@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> Layanan membaca EPUB pribadi dan generator situs statis yang mandiri.
+> EPUB dan PDF dalam perpustakaan baca pribadi atau sebagai situs statis mandiri.
 
 **README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
@@ -10,15 +10,20 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser menyediakan dua mode dengan tanggung jawab yang dipisahkan dengan jelas:
+![Halaman PDF dalam pembaca bersama EPUB Browser.](../releases/assets/v2.8.0-pdf-reader.png)
+
+EPUB Browser memproses `.epub` dan `.pdf` dalam dua mode dengan tanggung jawab yang dipisahkan dengan jelas:
 
 | | `ssg` | `server` |
 | --- | --- | --- |
+| EPUB dan PDF | Ya | Ya |
 | Penerapan | Hosting statis, Pages, penyimpanan objek, Nginx | Layanan membaca pribadi yang persisten |
 | Akun | Tidak ada | Akun lokal |
 | Kemajuan, anotasi, rak buku | Hanya di peramban ini | Data akun yang masuk di SQLite |
 | Pembaruan sumber | Jalankan `ssg` lagi | Mulai ulang layanan atau gunakan `--watch` |
 | Basis data runtime | Tidak ada | Wajib |
+
+PDF adalah format buku kelas utama: halaman 1 menjadi `chapter_0.html`, setiap halaman tercantum dalam daftar isi, dan PDF.js lokal merendernya dalam perpustakaan, halaman buku, antarmuka membaca, pencarian, serta alur anotasi yang sama. Fitur PDF yang tidak didukung seperti membaca dengan AI disembunyikan secara eksplisit, dan tidak ada CDN yang diperlukan saat membaca.
 
 Gunakan `ssg` untuk menerbitkan berkas statis biasa. Gunakan `server` bila Anda memerlukan akun, data lintas perangkat, kontrol akses buku, atau pemantauan sumber otomatis.
 
@@ -36,7 +41,7 @@ Hasil dibuat sebagai tugas latar belakang, disimpan di SQLite, dan dibagikan kep
 ## Persyaratan dan pemasangan
 
 - Python 3.9 atau yang lebih baru
-- Satu atau beberapa berkas `.epub`, direktori bertingkat yang berisi EPUB, atau perpustakaan bergaya Calibre
+- Satu atau beberapa berkas `.epub` atau `.pdf`, direktori buku bertingkat, atau perpustakaan bergaya Calibre
 
 Pemasangan dari PyPI mendukung mode SSG dan Server:
 
@@ -78,7 +83,7 @@ Buka `http://127.0.0.1:8000/`. Pada kunjungan pertama, buat administrator awal; 
 
 ## Data, akun, dan batas akses
 
-Setiap buku memiliki `book_id` yang stabil. Secara default, `--book-id-storage sidecar` menyimpan identitas di samping EPUB tanpa mengubah byte-nya. `--book-id-storage embedded` menuliskannya ke metadata OPF dan memerlukan sumber yang dapat diubah.
+Setiap buku memiliki `book_id` yang stabil. Secara default, `--book-id-storage sidecar` menyimpan identitas di samping berkas sumber tanpa mengubah byte-nya. Untuk EPUB, `--book-id-storage embedded` menuliskannya ke metadata OPF; untuk PDF pengaturan ini selalu kembali ke sidecar yang berdekatan.
 
 Dalam mode Server, `--server-dir` adalah lokasi otoritatif untuk SQLite, cache, dan cadangan migrasi. Akun, rak buku, kemajuan membaca, anotasi, hasil AI, dan tugas juga disimpan di sana. Administrator mengelola pengguna, peran, sesi, dan izin buku; anggota hanya menggunakan buku yang diizinkan dan data pribadi mereka sendiri. Lindungi izin direktori ini beserta cadangannya.
 

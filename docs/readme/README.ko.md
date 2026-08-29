@@ -1,6 +1,6 @@
 # EPUB Browser
 
-> 개인 EPUB 읽기 서비스이자 독립 실행형 정적 사이트 생성기입니다.
+> EPUB과 PDF를 개인 읽기 라이브러리 또는 독립 실행형 정적 사이트에서 제공합니다.
 
 **README:** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
@@ -10,15 +10,20 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser에는 역할이 분명히 구분된 두 가지 모드가 있습니다.
+![EPUB Browser 공용 리더에서 표시한 PDF 페이지.](../releases/assets/v2.8.0-pdf-reader.png)
+
+EPUB Browser는 `.epub`과 `.pdf`를 역할이 분명히 구분된 두 가지 모드로 처리합니다.
 
 | | `ssg` | `server` |
 | --- | --- | --- |
+| EPUB 및 PDF | 지원 | 지원 |
 | 배포 | 정적 호스팅, Pages, 오브젝트 스토리지, Nginx | 영속적인 개인 읽기 서비스 |
 | 계정 | 없음 | 로컬 계정 |
 | 진도, 주석, 책장 | 현재 브라우저에만 저장 | SQLite의 로그인 계정 데이터 |
 | 원본 갱신 | `ssg`를 다시 실행 | 서비스를 재시작하거나 `--watch` 사용 |
 | 런타임 데이터베이스 | 없음 | 필요 |
+
+PDF는 일급 도서 형식입니다. PDF의 첫 페이지는 `chapter_0.html`이 되고 모든 페이지가 목차에 표시되며, 로컬 PDF.js가 동일한 라이브러리, 도서 페이지, 읽기 화면, 검색, 주석 흐름에서 렌더링합니다. PDF에서 지원하지 않는 AI 읽기 같은 기능은 명시적으로 숨기며 읽는 동안 CDN에 접속하지 않습니다.
 
 일반 정적 파일을 배포하려면 `ssg`를, 계정·기기 간 데이터·도서 접근 제어·원본 자동 감시가 필요하면 `server`를 사용하세요.
 
@@ -36,7 +41,7 @@ AI 읽기는 책 옆에 일반적인 요약을 붙이는 기능이 아닙니다.
 ## 요구 사항 및 설치
 
 - Python 3.9 이상
-- 하나 이상의 `.epub` 파일, EPUB가 있는 중첩 디렉터리 또는 Calibre 형식의 라이브러리 디렉터리
+- 하나 이상의 `.epub` 또는 `.pdf` 파일, 도서가 있는 중첩 디렉터리 또는 Calibre 형식의 라이브러리 디렉터리
 
 PyPI 설치는 SSG와 Server 모드를 모두 지원합니다:
 
@@ -78,7 +83,7 @@ epub-browser server /path/to/books \
 
 ## 데이터, 계정, 접근 경계
 
-모든 도서에는 안정적인 `book_id`가 있으며 URL과 브라우저 데이터에서는 `book_hash`로도 표시됩니다. 기본값인 `--book-id-storage sidecar`는 EPUB 옆에 식별 파일을 만들고 EPUB 바이트는 변경하지 않습니다. `--book-id-storage embedded`는 OPF 메타데이터에 저장하므로 원본 파일이 쓰기 가능하고 수정해도 안전해야 합니다.
+모든 도서에는 안정적인 `book_id`가 있으며 URL과 브라우저 데이터에서는 `book_hash`로도 표시됩니다. 기본값인 `--book-id-storage sidecar`는 원본 옆에 식별 파일을 만들고 원본 바이트를 변경하지 않습니다. EPUB의 `--book-id-storage embedded`는 OPF 메타데이터에 저장하지만, PDF에서는 항상 인접한 sidecar로 대체됩니다.
 
 Server의 `--server-dir`은 SQLite, 캐시, 마이그레이션 백업을 포함하는 권한 있는 상태 디렉터리입니다. 계정, 책장, 읽기 진도, 주석, AI 결과와 작업도 이곳에 저장됩니다. 관리자는 사용자·역할·세션·제한 도서 권한을 관리하며, 일반 구성원은 권한이 있는 도서와 자신의 비공개 데이터만 이용할 수 있습니다. 이 디렉터리와 백업의 파일 권한을 보호하세요.
 
