@@ -2773,6 +2773,24 @@ assert.deepEqual(
         self.assertIn("window.EpubDialog.prompt({", script)
         self.assertIn("inputType: 'number'", script)
 
+    def test_mobile_pagination_centers_home_between_page_navigation(self):
+        html = self._chapter_html()
+        mobile_start = html.index('<div class="mobile-controls"')
+        mobile_end = html.index('<!-- 书架弹窗 -->', mobile_start)
+        mobile_controls = html[mobile_start:mobile_end]
+
+        ordered_controls = (
+            'id="mobileTocBtn"',
+            'id="mobilePageJumpBtn"',
+            'data-i18n-aria-label="reader.previous"',
+            '<i class="fas fa-home">',
+            'data-i18n-aria-label="reader.next"',
+            'id="mobileBookHomeBtn"',
+            'id="mobileSettingsBtn"',
+        )
+        positions = [mobile_controls.index(control) for control in ordered_controls]
+        self.assertEqual(positions, sorted(positions))
+
     def test_chapter_script_uses_an_immutable_content_addressed_url(self):
         self.assertRegex(self._chapter_html(), r'/assets/immutable/chapter\.[0-9a-f]{12}\.js')
 
