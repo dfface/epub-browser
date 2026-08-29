@@ -1,5 +1,5 @@
 .custom-css-notification {
-    --notification-accent: var(--notification-info, #4361ee);
+    --notification-accent: var(--primary, var(--button-bg, #4361ee));
     position: fixed;
     z-index: 10030;
     top: max(20px, env(safe-area-inset-top));
@@ -10,9 +10,8 @@
     width: max-content;
     max-width: min(520px, calc(100vw - 32px));
     box-sizing: border-box;
-    padding: 11px 16px 11px 14px;
+    padding: 11px 16px;
     border: 1px solid var(--toast-border, var(--border, #ddd));
-    border-inline-start: 4px solid var(--notification-accent);
     border-radius: 12px;
     transform: translateX(-50%);
     background: var(--toast-bg, var(--card-bg, #fff));
@@ -36,7 +35,7 @@
 }
 
 .custom-css-notification.success { --notification-accent: var(--notification-success, #27ae60); }
-.custom-css-notification.info { --notification-accent: var(--notification-info, #4361ee); }
+.custom-css-notification.info { --notification-accent: var(--primary, var(--button-bg, #4361ee)); }
 .custom-css-notification.warning { --notification-accent: var(--notification-warning, #f39c12); }
 .custom-css-notification.error { --notification-accent: var(--notification-error, #e74c3c); }
 

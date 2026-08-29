@@ -1525,21 +1525,16 @@ function initScript() {
         } else {
             isPureModeEnabled = getCookie('pureModeEnabled') === 'true';
         }
-        var cc = document.querySelector('.eb-content-container');
-        var eb = document.getElementById('eb-content');
-        if (isPureModeEnabled && isPaginationMode) {
-            var mc = document.querySelector('.mobile-controls');
-            if (mc) mc.style.display = 'none';
-            cc.style.marginTop = '0';
-            cc.style.marginBottom = '0';
-            eb.style.minHeight = 'calc(100vh - 80px)';
+        applyPureModeState(false);
+    }
+
+    function applyPureModeState(syncPagination) {
+        if (isMobile() && isPaginationMode && isPureModeEnabled) {
+            document.body.classList.add('pure-reading-mode');
         } else {
-            var mc = document.querySelector('.mobile-controls');
-            if (mc) mc.style.display = '';
-            cc.style.marginTop = '';
-            cc.style.marginBottom = '';
-            eb.style.minHeight = '';
+            document.body.classList.remove('pure-reading-mode');
         }
+        if (syncPagination && isPaginationMode) schedulePaginationCanvasSync();
     }
     
     function savePureModeState() {
@@ -1556,21 +1551,10 @@ function initScript() {
         }
         isPureModeEnabled = !isPureModeEnabled;
         savePureModeState();
-        var cc = document.querySelector('.eb-content-container');
-        var eb = document.getElementById('eb-content');
+        applyPureModeState(true);
         if (isPureModeEnabled) {
-            var mc = document.querySelector('.mobile-controls');
-            if (mc) mc.style.display = 'none';
-            cc.style.marginTop = '0';
-            cc.style.marginBottom = '0';
-            eb.style.minHeight = 'calc(100vh - 80px)';
             showNotification(i18n.t('reader.pureModeOn'), 'info');
         } else {
-            var mc = document.querySelector('.mobile-controls');
-            if (mc) mc.style.display = '';
-            cc.style.marginTop = '';
-            cc.style.marginBottom = '';
-            eb.style.minHeight = '';
             showNotification(i18n.t('reader.pureModeOff'), 'info');
         }
     }

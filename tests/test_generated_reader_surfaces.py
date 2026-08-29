@@ -1759,6 +1759,27 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             script,
         )
 
+    def test_mobile_pure_reading_reclaims_the_toolbar_space_before_repagination(self):
+        stylesheet = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn(
+            'body.pagination-mode.pure-reading-mode .container {',
+            stylesheet,
+        )
+        self.assertIn(
+            'body.pagination-mode.pure-reading-mode .mobile-controls {',
+            stylesheet,
+        )
+        start = script.index('function applyPureModeState(syncPagination) {')
+        end = script.index('\n    function savePureModeState()', start)
+        pure_state = script[start:end]
+        self.assertIn("document.body.classList.add('pure-reading-mode');", pure_state)
+        self.assertIn("document.body.classList.remove('pure-reading-mode');", pure_state)
+        self.assertIn('schedulePaginationCanvasSync();', pure_state)
+        self.assertNotIn("mc.style.display", script)
+        self.assertNotIn("eb.style.minHeight", script)
+
         create_pages_start = script.index('function createPages(')
         create_pages_end = script.index('\n    function scrollToPaginationTarget(', create_pages_start)
         create_pages = script[create_pages_start:create_pages_end]
@@ -2692,6 +2713,22 @@ assert.deepEqual(
         self.assertIn("if (e.key === 'Escape'", script)
         self.assertIn('pageJumpInput.focus();', script)
         self.assertIn("pageJumpToggle.setAttribute('aria-expanded', 'true');", script)
+
+    def test_pagination_page_status_never_enters_the_toolbar_layout(self):
+        html = self._chapter_html()
+        css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        toolbar_start = html.index('id="paginationInfo"')
+        toolbar_end = html.index('</div>', toolbar_start)
+        toolbar = html[toolbar_start:toolbar_end]
+
+        self.assertEqual(toolbar.count('class="pagination-page-status"'), 2)
+        start = css.index('.pagination-page-status {')
+        rule = css[start:css.index('}', start)]
+        self.assertIn('position: absolute !important;', rule)
+        self.assertIn('width: 1px !important;', rule)
+        self.assertIn('height: 1px !important;', rule)
+        self.assertIn('overflow: hidden !important;', rule)
+        self.assertIn('clip: rect(0, 0, 0, 0) !important;', rule)
 
     def test_reader_card_has_matching_top_and_bottom_spacing(self):
         css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')

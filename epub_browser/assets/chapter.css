@@ -744,6 +744,18 @@ body.reader-drawer-open {
     gap: 3px;
 }
 
+.pagination-page-status {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
 .reader-toolbar.top-controls a.control-btn:not([href]) {
     opacity: 0.42;
     color: var(--text-muted);
@@ -2045,6 +2057,14 @@ body.pagination-mode {
     .pagination-mode .container {
         box-sizing: border-box;
         padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+
+    body.pagination-mode.pure-reading-mode .container {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    body.pagination-mode.pure-reading-mode .mobile-controls {
+        display: none;
     }
 
     .nav-btn {

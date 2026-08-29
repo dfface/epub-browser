@@ -85,7 +85,11 @@ test('standard notification uses one neutral theme surface with restrained seman
   assert.match(css, /background:\s*var\(--toast-bg/);
   assert.match(css, /color:\s*var\(--toast-text/);
   assert.match(css, /border:\s*1px solid var\(--toast-border/);
-  assert.match(css, /border-inline-start:\s*4px solid var\(--notification-accent/);
+  assert.doesNotMatch(css, /border-inline-start:/);
+  assert.match(
+    css,
+    /\.custom-css-notification\.info\s*\{\s*--notification-accent:\s*var\(--primary/,
+  );
   assert.doesNotMatch(css, /\.custom-css-notification\.info\s*\{\s*background:/);
   assert.doesNotMatch(css, /\.custom-css-notification\.success\s*\{\s*background:/);
 });
