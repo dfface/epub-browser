@@ -29,6 +29,24 @@ Dùng `ssg` khi cần xuất bản các tệp tĩnh thông thường. Dùng `ser
 
 ## Tổng quan
 
+### Vì sao chọn EPUB Browser
+
+- **Trải nghiệm đọc AI-native bám sát nguyên văn:** trong chế độ Server và chỉ
+  dành cho EPUB, hướng dẫn chương, lời giải thích dựa trên bằng chứng, sơ đồ tư
+  duy, gợi ý suy ngẫm và các cuộc trò chuyện Ask AI riêng tư luôn nằm bên cạnh
+  văn bản gốc, thay vì biến cuốn sách thành một bản tóm tắt chung chung tách rời.
+- **Phân tích đọc sách riêng tư:** trong chế độ Server,
+  bạn có thể xem thời gian đọc chủ động, lịch hoạt động, xu hướng, các phiên đọc
+  và những cuốn sách được đọc nhiều nhất; chỉ tài khoản hiện tại nhìn thấy dữ liệu này.
+
+![Hướng dẫn chương bằng AI bên cạnh văn bản EPUB gốc và cuộc trò chuyện Ask AI riêng tư.](assets/ai-native-reading.png)
+
+*Hướng dẫn bằng AI và câu hỏi riêng tư luôn gắn với cuốn sách gốc.*
+
+![Phân tích đọc sách riêng tư với lịch hoạt động và xu hướng thời gian đọc.](assets/reading-insights.png)
+
+*Phân tích biến thời gian đọc chủ động thành lịch sử dễ hiểu và chỉ tài khoản hiện tại nhìn thấy.*
+
 ### Công nghệ sử dụng
 
 Giao diện dùng HTML ngữ nghĩa, CSS và Vanilla JavaScript, không dùng framework SPA. CLI và Server dựa trên Python 3.9+, Starlette, Uvicorn và SQLite; pypdf, pypdfium2 cùng PDF.js xử lý PDF cục bộ, không cần CDN khi chạy.

@@ -362,15 +362,8 @@ body.reader-drawer-open {
 .toc-level-2 { margin-left: 15px; font-size: 0.85em; }
 .toc-level-3 { margin-left: 30px; font-size: 0.8em; }
 
-/* Keep the book-level chapter list visible only when the original reader width still fits. */
+/* Keep the book-level chapter list as an overlay so opening it never moves the reading stage. */
 @media (min-width: 1360px) {
-    body.desktop-chapter-sidebar .container {
-        width: min(var(--reader-page-width, 1000px), calc(100vw - 360px));
-        max-width: var(--reader-page-width, 1000px);
-        margin-left: max(240px, calc((100vw - var(--reader-page-width, 1000px)) / 2 - 20px));
-        margin-right: 0;
-    }
-
     body.desktop-chapter-sidebar #bookHomeFloating {
         left: 20px;
         right: auto;

@@ -2702,6 +2702,22 @@ document.addEventListener('DOMContentLoaded', function() {{
                             <span>100%</span>
                             <span>200%</span>
                             <span>400%</span>'''
+        font_size_control = "" if pdf_page is not None else '''
+                <div class="settings-group">
+                    <label class="settings-label" for="fontSizeSlider" data-i18n="settings.fontSize">Font size</label>
+                    <div class="font-size-control">
+                        <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
+                        <div class="font-size-scale">
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                        </div>
+                    </div>
+                </div>'''
         sync_shelf_button = (
             ""
             if self.deployment_mode == "server"
@@ -3094,21 +3110,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             </button>
         </div>
                 </div>
-                <div class="settings-group">
-                    <label class="settings-label" data-i18n="settings.fontSize">Font size</label>
-                    <div class="font-size-control">
-                        <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
-                        <div class="font-size-scale">
-                            <span class="scale-mark major"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark major"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark major"></span>
-                        </div>
-                    </div>
-                </div>
+                {font_size_control}
                 <div class="settings-group">
                     <div class="settings-label-row">
                         <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>

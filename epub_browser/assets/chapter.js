@@ -2371,7 +2371,11 @@ function initScript() {
     function focusRequestedAnnotation(showWarning) {
         if (!pendingAnnotationId || !window.AnnotationModule) return Promise.resolve(false);
         var annotationId = pendingAnnotationId;
-        return window.AnnotationModule.focusAnnotation(annotationId).then(function(found) {
+        var focusOptions = window.EpubPDFConfig ? {
+            waitForContentReady: true,
+            chapterIndex: parseInt(chapter_index, 10)
+        } : undefined;
+        return window.AnnotationModule.focusAnnotation(annotationId, focusOptions).then(function(found) {
             if (found) {
                 pendingAnnotationId = '';
             } else if (showWarning) {

@@ -22,8 +22,8 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
-- [v2.8.0](releases/v2.8.0.md) — first-class PDF reading, documentation refresh, and
-  related compatibility work.
+- [v2.8.1](releases/v2.8.1.md) — reader polish, language-aware AI-reading indicators,
+  and reliable PDF annotation deep links.
 - [All release notes](releases/) — versioned, immutable release documentation.
 
 ## Maintainers / 维护者

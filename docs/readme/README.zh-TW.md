@@ -29,6 +29,22 @@ PDF 是一等書籍格式：第 1 頁對應 `chapter_0.html`，每一頁都會�
 
 ## 專案概覽
 
+### 為什麼選擇 EPUB Browser
+
+- **貼著原文的 AI 原生閱讀**：僅在 Server 模式且僅適用於 EPUB；章節導讀、
+  證據解釋、思維導圖、反思提示和私密 Ask AI 對話都留在原文旁邊，
+  而不是把整本書簡化成一份脫離原文的泛泛摘要。
+- **只屬於你的閱讀洞察**：Server 模式提供活躍閱讀時長、活動日曆、趨勢、
+  閱讀時段與最常閱讀的書；所有資料僅目前帳戶可見。
+
+![貼著 EPUB 原文顯示的章節導讀，以及保留閱讀脈絡的私密 Ask AI 對話。](assets/ai-native-reading.png)
+
+*AI 原生導讀與私密提問始終貼著原書內容。*
+
+![僅目前帳戶可見的閱讀洞察，包含活動日曆與閱讀時長趨勢。](assets/reading-insights.png)
+
+*閱讀洞察把活躍閱讀時長變成可理解、且僅自己可見的閱讀歷史。*
+
 ### 技術棧
 
 前端使用語義化 HTML、CSS 與 Vanilla JavaScript，不採用 SPA 框架。CLI 與 Server 建構於 Python 3.9+、Starlette、Uvicorn 和 SQLite；PDF 則由 pypdf、pypdfium2 與 PDF.js 在本機處理，執行期間不依賴 CDN。

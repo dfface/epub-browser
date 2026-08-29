@@ -29,6 +29,19 @@ Gunakan `ssg` untuk menerbitkan fail statik biasa. Gunakan `server` apabila anda
 
 ## Gambaran keseluruhan
 
+### Mengapa memilih EPUB Browser?
+
+- **Bacaan natif AI berasaskan teks asal (Server dan EPUB sahaja):** Dalam mod Server, panduan bab, penerangan yang dipautkan kepada bukti, peta minda, gesaan refleksi dan perbualan Ask AI peribadi kekal di sisi teks EPUB asal—bukan menjadi ringkasan umum yang terpisah.
+- **Cerapan bacaan peribadi (Server sahaja):** Lihat tempoh bacaan aktif, kalendar aktiviti, trend, sesi dan buku yang paling kerap dibaca. Semua cerapan hanya boleh dilihat oleh akaun yang sedang dilog masuk.
+
+![Panduan bab di sisi teks EPUB asal dengan panel Ask AI peribadi.](assets/ai-native-reading.png)
+
+*Panduan AI dan soalan peribadi kekal terikat pada teks asal.*
+
+![Paparan cerapan bacaan peribadi dengan kalendar aktiviti dan trend tempoh bacaan.](assets/reading-insights.png)
+
+*Cerapan bacaan mengubah masa bacaan aktif menjadi sejarah peribadi yang mudah difahami.*
+
 ### Tindanan teknologi
 
 Antara muka menggunakan HTML semantik, CSS dan Vanilla JavaScript tanpa rangka kerja SPA. CLI dan Server menggunakan Python 3.9+, Starlette, Uvicorn dan SQLite; pypdf, pypdfium2 serta PDF.js memproses PDF secara setempat tanpa CDN semasa runtime.

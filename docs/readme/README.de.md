@@ -29,6 +29,19 @@ Verwende `ssg`, wenn gewöhnliche statische Dateien veröffentlicht werden solle
 
 ## Überblick
 
+### Warum EPUB Browser?
+
+- **KI-natives Lesen, fest im Text verankert:** Im Server-Modus und nur für EPUB bleiben Kapitelbegleiter, evidenzgestützte Erklärungen, Mindmaps, Reflexionsimpulse und private Ask-AI-Unterhaltungen direkt neben dem Originaltext – statt in einer losgelösten allgemeinen Zusammenfassung.
+- **Private Leseeinblicke:** Im Server-Modus sind aktive Lesezeit, Aktivitätskalender, Trends, Sitzungen und meistgelesene Bücher ausschließlich für das aktuell angemeldete Konto sichtbar.
+
+![Eine KI-Kapitelführung neben dem ursprünglichen EPUB-Text mit einer privaten Ask-AI-Unterhaltung.](assets/ai-native-reading.png)
+
+*KI-Unterstützung und private Fragen bleiben mit dem Originalbuch verknüpft.*
+
+![Private Leseeinblicke mit Aktivitätskalender und Lesezeittrend.](assets/reading-insights.png)
+
+*Leseeinblicke machen aus aktiver Lesezeit einen verständlichen privaten Verlauf.*
+
 ### Technik-Stack
 
 Die Oberfläche verwendet semantisches HTML, CSS und Vanilla JavaScript ohne SPA-Framework. CLI und Server basieren auf Python 3.9+, Starlette, Uvicorn und SQLite; pypdf, pypdfium2 und PDF.js verarbeiten PDF lokal, ohne Laufzeit-CDN.

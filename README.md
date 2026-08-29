@@ -59,20 +59,35 @@ inside the existing reading experience.
 - **Three reading behaviors:** Scroll one chapter at a time, read continuously
   with a bounded rendering window, or turn pages. PDF adds fit-width, fit-page,
   and arbitrary zoom without leaving the reading stage.
+- **AI-native reading, grounded in the text:** In Server mode, chapter guides,
+  evidence-linked explanations, vocabulary help, mind maps, reflection prompts,
+  and private Ask AI conversations stay beside the EPUB text—not in a detached
+  generic summary.
 - **Annotations where you read:** Highlight text, add notes, browse or export
   annotations, and use Dictionary or Encyclopedia actions. Text-based PDFs
   reuse the same selection popup; image-only PDFs degrade explicitly.
+- **Private reading insights:** See active reading time, activity calendars,
+  trends, sessions, and most-read books. Server mode keeps every insight private
+  to the signed-in account.
 - **A real personal library:** Covers, metadata, tags, ratings, reviews,
-  nested shelves, search, reading sessions, and insights stay connected by a
-  stable book ID—even when a Server source temporarily leaves a watched folder.
-- **Private Server capabilities:** Accounts, permissions, synchronized reading
-  data, administration, OpenAPI, WebHooks, and EPUB AI reading are available
-  when a persistent service is wanted.
+  nested shelves, search, and reading history stay connected by a stable book
+  ID—even when a Server source temporarily leaves a watched folder.
+- **A private, governable Server:** Accounts, book permissions, per-member AI
+  access, synchronized reading data, administration, OpenAPI, and WebHooks are
+  available when a persistent service is wanted.
 - **Self-contained at runtime:** Application assets, fonts, icons, PDF.js, and
   rich-text renderers are served locally. Reading never depends on a CDN.
 - **17 interface languages:** English, 简体中文, 繁體中文, 日本語, 한국어,
   Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية,
   Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
+
+![A chapter guide embedded beside the original EPUB text, with a private Ask AI drawer.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/ai-native-reading.png)
+
+*AI-native guidance and private questions stay anchored to the original book.*
+
+![A private reading-insights view with an activity calendar and reading-time trend.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/reading-insights.png)
+
+*Reading insights turn active reading into a private history you can understand.*
 
 ### Technology stack
 

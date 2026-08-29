@@ -82,7 +82,6 @@ body.ai-chat-fullscreen .ai-chat-panel { width: 100vw; height: 100dvh; border: 0
   body.ai-chat-open:not(.pagination-mode):not(.ai-chat-fullscreen) .reading-progress-container { width: var(--ai-chat-workspace-width); transition: width 180ms ease-out; }
   body.ai-chat-open:not(.pagination-mode):not(.ai-chat-fullscreen) .eb-footer { width: var(--ai-chat-workspace-width); box-sizing: border-box; left: 0; margin-left: 0; margin-right: 0; transform: none; transition: width 180ms ease-out; }
   body.ai-chat-open:not(.pagination-mode):not(.ai-chat-fullscreen) .container { width: min(var(--reading-layout-width, 1180px), calc(var(--ai-chat-workspace-width) - 48px)); margin-left: max(18px, calc((var(--ai-chat-workspace-width) - min(var(--reading-layout-width, 1180px), calc(var(--ai-chat-workspace-width) - 48px))) / 2)); margin-right: auto; transition: width 180ms ease-out, margin-left 180ms ease-out; }
-  body.ai-chat-open.desktop-chapter-sidebar:not(.pagination-mode):not(.ai-chat-fullscreen) .container { width: min(var(--reader-page-width, 1000px), calc(var(--ai-chat-workspace-width) - 48px)); max-width: var(--reader-page-width, 1000px); margin-left: max(18px, calc((var(--ai-chat-workspace-width) - min(var(--reader-page-width, 1000px), calc(var(--ai-chat-workspace-width) - 48px))) / 2)); }
   body.ai-chat-open:not(.ai-chat-fullscreen) .app-nav { gap: 8px; width: min(calc(100% - 24px), 1180px); }
   body.ai-chat-open:not(.ai-chat-fullscreen) .app-nav-brand span,
   body.ai-chat-open:not(.ai-chat-fullscreen) .app-nav-action-label,

@@ -29,6 +29,24 @@ Use `ssg` para publicar arquivos estáticos comuns. Use `server` quando precisar
 
 ## Visão geral
 
+### Por que escolher o EPUB Browser
+
+- **Leitura nativa com IA, ancorada no texto:** no modo Server e somente para
+  EPUB, guias de capítulo, explicações baseadas em evidências, mapas mentais,
+  perguntas para reflexão e conversas privadas no Ask AI permanecem ao lado do
+  texto original, em vez de reduzir o livro a um resumo genérico.
+- **Estatísticas de leitura privadas:** no modo Server, acompanhe o tempo de leitura
+  ativa, o calendário de atividades, tendências, sessões e os livros mais lidos;
+  esses dados ficam visíveis apenas para a conta atual.
+
+![Um guia de capítulo com IA ao lado do texto EPUB original e uma conversa privada no Ask AI.](assets/ai-native-reading.png)
+
+*A orientação por IA e as perguntas privadas permanecem ancoradas no livro original.*
+
+![Estatísticas de leitura privadas com calendário de atividades e tendência do tempo de leitura.](assets/reading-insights.png)
+
+*As estatísticas transformam a leitura ativa em um histórico compreensível e visível apenas para a conta atual.*
+
 ### Tecnologias
 
 A interface usa HTML semântico, CSS e Vanilla JavaScript sem framework SPA. A CLI e o Server usam Python 3.9+, Starlette, Uvicorn e SQLite; pypdf, pypdfium2 e PDF.js processam PDFs localmente, sem CDN em tempo de execução.

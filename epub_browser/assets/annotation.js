@@ -87,8 +87,30 @@
     // Current book and chapter info (set by external code)
     var currentBookHash = '';
     var currentChapterIndex = -1;
-    var pendingContentRefresh = false;
+    var pendingContentRefreshDetails = [];
     var contentReadyListenerBound = false;
+    var contentReadyRefreshGeneration = 0;
+    var contentReadyRefreshes = Object.create(null);
+
+    function contentReadyRefreshKey(chapterIndex) {
+        var normalized = Number(chapterIndex);
+        return Number.isInteger(normalized) ? String(normalized) : '*';
+    }
+
+    function rememberContentReadyRefresh(detail, promise) {
+        var record = {
+            generation: ++contentReadyRefreshGeneration,
+            detail: detail || {},
+            promise: Promise.resolve(promise)
+        };
+        contentReadyRefreshes[contentReadyRefreshKey(detail && detail.chapterIndex)] = record;
+        return record;
+    }
+
+    function contentReadyRefreshFor(chapterIndex) {
+        return contentReadyRefreshes[contentReadyRefreshKey(chapterIndex)] ||
+            contentReadyRefreshes['*'] || null;
+    }
 
     function tr(key, params) {
         var i18n = window.EpubBrowserI18n;
@@ -2662,10 +2684,10 @@
                 var detail = event && event.detail;
                 if (!detail || !detail.root) return;
                 if (!self.initialized) {
-                    pendingContentRefresh = true;
+                    pendingContentRefreshDetails.push(detail);
                     return;
                 }
-                self.refresh();
+                rememberContentReadyRefresh(detail, self.refresh());
             });
         },
         
@@ -2697,9 +2719,14 @@
                 return HighlightInteraction.setContext(currentBookHash, currentChapterIndex);
             }).then(function() {
                 self.initialized = true;
-                if (pendingContentRefresh) {
-                    pendingContentRefresh = false;
-                    return self.refresh();
+                if (pendingContentRefreshDetails.length) {
+                    var details = pendingContentRefreshDetails.slice();
+                    pendingContentRefreshDetails = [];
+                    var refreshPromise = Promise.resolve(self.refresh());
+                    details.forEach(function(detail) {
+                        rememberContentReadyRefresh(detail, refreshPromise);
+                    });
+                    return refreshPromise;
                 }
             }).catch(function(err) {
                 console.error('Annotation module init failed:', err);
@@ -2739,17 +2766,54 @@
         getAnnotationCount: function() {
             return HighlightInteraction.annotations.length;
         },
-        focusAnnotation: function(id) {
+        focusAnnotation: function(id, options) {
+            options = options || {};
             return new Promise(function(resolve) {
                 var attempts = 0;
-                var focus = function() {
+                var settled = false;
+                var contentReadyListener = null;
+                var lastAttemptedGeneration = 0;
+                var waitForContentReady = options.waitForContentReady === true;
+                var requestedChapterIndex = Number(options.chapterIndex);
+
+                var cleanup = function() {
+                    if (contentReadyListener && typeof global.removeEventListener === 'function') {
+                        global.removeEventListener('epub-browser:annotation-content-ready', contentReadyListener);
+                    }
+                    contentReadyListener = null;
+                };
+                var finish = function(found) {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    resolve(found);
+                };
+                var matchesRequestedChapter = function(detail) {
+                    if (!Number.isInteger(requestedChapterIndex)) return true;
+                    var readyChapterIndex = Number(detail && detail.chapterIndex);
+                    return !Number.isInteger(readyChapterIndex) || readyChapterIndex === requestedChapterIndex;
+                };
+                var contentIsPending = function(detail) {
+                    var root = detail && detail.root;
+                    if (!root || typeof root.querySelectorAll !== 'function' || !Number.isInteger(requestedChapterIndex)) {
+                        return false;
+                    }
+                    var pages = root.querySelectorAll('[data-pdf-page-number]');
+                    for (var i = 0; i < pages.length; i++) {
+                        var pageNumber = Number(pages[i].getAttribute('data-pdf-page-number'));
+                        if (pageNumber - 1 !== requestedChapterIndex) continue;
+                        var state = pages[i].getAttribute('data-pdf-rendered');
+                        return state !== 'complete' && state !== 'error';
+                    }
+                    return false;
+                };
+                var focusNow = function() {
                     var nodes = HighlightInteraction.getHighlightNodesByAnnotationId(id);
                     if (nodes.length) {
                         nodes.forEach(function(node) { node.classList.add('annotation-focus-active'); });
                         nodes[0].scrollIntoView({ behavior: 'auto', block: 'center' });
                         setTimeout(function() { nodes.forEach(function(node) { node.classList.remove('annotation-focus-active'); }); }, 1800);
-                        resolve(true);
-                        return;
+                        return true;
                     }
                     var image = HighlightInteraction.imageForAnnotationId(id);
                     if (image) {
@@ -2758,14 +2822,75 @@
                         setTimeout(function() {
                             image.classList.remove('annotation-focus-active');
                         }, 1800);
-                        resolve(true);
+                        return true;
+                    }
+                    return false;
+                };
+                var focusWithRetries = function(onMissing) {
+                    if (settled) return;
+                    if (focusNow()) {
+                        finish(true);
                         return;
                     }
                     attempts++;
-                    if (attempts < 6) { requestAnimationFrame(focus); return; }
-                    resolve(false);
+                    if (attempts < 6) {
+                        requestAnimationFrame(function() { focusWithRetries(onMissing); });
+                        return;
+                    }
+                    onMissing();
                 };
-                focus();
+                var focusAfterContentRefresh = function(record) {
+                    if (
+                        settled || !record || record.generation <= lastAttemptedGeneration ||
+                        !matchesRequestedChapter(record.detail) || contentIsPending(record.detail)
+                    ) return;
+                    lastAttemptedGeneration = record.generation;
+                    Promise.resolve(record.promise).then(function() {
+                        if (settled) return;
+                        var latest = contentReadyRefreshFor(requestedChapterIndex);
+                        if (latest && latest.generation > record.generation) {
+                            focusAfterContentRefresh(latest);
+                            return;
+                        }
+                        if (contentIsPending(record.detail)) return;
+                        attempts = 0;
+                        focusWithRetries(function() {
+                            var current = contentReadyRefreshFor(requestedChapterIndex);
+                            if (current && current.generation > record.generation) {
+                                focusAfterContentRefresh(current);
+                                return;
+                            }
+                            if (!contentIsPending(record.detail)) finish(false);
+                        });
+                    }).catch(function() {
+                        finish(false);
+                    });
+                };
+
+                if (!waitForContentReady) {
+                    focusWithRetries(function() { finish(false); });
+                    return;
+                }
+
+                contentReadyListener = function(event) {
+                    var detail = event && event.detail;
+                    if (!matchesRequestedChapter(detail)) return;
+                    // The module's content-ready listener is registered first and
+                    // records the refresh promise synchronously. Read it in the
+                    // following microtask, then focus only after restoration ends.
+                    Promise.resolve().then(function() {
+                        focusAfterContentRefresh(contentReadyRefreshFor(requestedChapterIndex));
+                    });
+                };
+                if (typeof global.addEventListener === 'function') {
+                    global.addEventListener('epub-browser:annotation-content-ready', contentReadyListener);
+                }
+
+                if (focusNow()) {
+                    finish(true);
+                    return;
+                }
+                focusAfterContentRefresh(contentReadyRefreshFor(requestedChapterIndex));
             });
         }
     };

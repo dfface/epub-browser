@@ -206,7 +206,14 @@
   function open(opener) { if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiReadingHubCss'); var modal = ensure(); if (modal.hidden) { state.opener = opener || document.activeElement; state.scrollY = root.scrollY || 0; document.body.classList.add('ai-reading-hub-open'); document.body.style.top = '-' + state.scrollY + 'px'; modal.hidden = false; } state.contextualBookId = opener && opener.getAttribute('data-book-id') || ''; state.bookId = state.contextualBookId; state.language = locale(); state.back.hidden = !Boolean(state.bookId); load(); root.setTimeout(function() { state.close.focus(); }, 0); }
   function close() { if (!state.modal || state.modal.hidden) return; state.modal.hidden = true; document.body.classList.remove('ai-reading-hub-open'); document.body.style.top = ''; root.scrollTo(0, state.scrollY); if (state.opener && state.opener.focus) state.opener.focus(); }
   function addChapterBadge(link) {
-    if (link.querySelector('.ai-reading-chapter-badge')) return;
+    var existing = link.querySelector('.ai-reading-chapter-badge');
+    if (existing) {
+      existing.setAttribute('title', t('ai.library'));
+      existing.setAttribute('aria-label', t('ai.library'));
+      var existingLabel = existing.querySelector('.ai-reading-chapter-label');
+      if (existingLabel) existingLabel.textContent = t('ai.library');
+      return;
+    }
     var badge = el('span', 'ai-reading-chapter-badge'); badge.setAttribute('title', t('ai.library')); badge.setAttribute('aria-label', t('ai.library')); badge.setAttribute('data-ai-reading-chapter-badge', ''); var icon = el('i', 'fas fa-wand-magic-sparkles'); icon.setAttribute('aria-hidden', 'true'); var label = el('span', 'ai-reading-chapter-label', t('ai.library')); badge.appendChild(icon); badge.appendChild(label);
     // The book page has a title/sync grouping; the chapter drawer only has a
     // plain link.  Keep both layouts native to their own navigation surface.
@@ -220,48 +227,59 @@
     if (!container || !chapters) return;
     Array.prototype.forEach.call(container.querySelectorAll('[data-chapter-index]'), function(node) {
       var index = Number(node.getAttribute('data-chapter-index'));
-      if (!chapters[index]) return;
       var link = node.tagName === 'A' ? node : node.querySelector('a[data-chapter-index]');
-      if (link) addChapterBadge(link);
+      if (!link) return;
+      var badge = link.querySelector('.ai-reading-chapter-badge');
+      if (!chapters[index]) { if (badge) badge.remove(); return; }
+      addChapterBadge(link);
+    });
+  }
+  function chapterIndicatorKey(bookId, language) { return JSON.stringify([bookId, language]); }
+  function refreshIndicatorContainer(container) {
+    var bookId = container && container.getAttribute('data-book-id');
+    if (!bookId) return Promise.resolve();
+    var language = locale();
+    return loadChapterIndicators(bookId, language).then(function(chapters) {
+      if (language === locale()) applyChapterIndicators(container, chapters);
+      return chapters;
     });
   }
   function refreshChapterIndicators(node) {
     var container = node && node.closest ? node.closest('[data-ai-reading-indicators]') : null;
     if (!container) return;
-    var bookId = container.getAttribute('data-book-id');
-    applyChapterIndicators(container, state.chapterIndicators[bookId]);
+    refreshIndicatorContainer(container).catch(function() {});
   }
-  function loadChapterIndicators(bookId) {
-    if (state.chapterIndicators[bookId]) return Promise.resolve(state.chapterIndicators[bookId]);
-    if (!state.chapterIndicatorRequests[bookId]) {
-      state.chapterIndicatorRequests[bookId] = request(path('/api/ai/books/' + encodeURIComponent(bookId) + '/results')).then(function(data) {
+  function loadChapterIndicators(bookId, language) {
+    var key = chapterIndicatorKey(bookId, language);
+    if (state.chapterIndicators[key]) return Promise.resolve(state.chapterIndicators[key]);
+    if (!state.chapterIndicatorRequests[key]) {
+      state.chapterIndicatorRequests[key] = request(path('/api/ai/books/' + encodeURIComponent(bookId) + '/results') + '?language=' + encodeURIComponent(language)).then(function(data) {
         var chapters = {};
         (data.results || []).forEach(function(result) {
-          if (result.scope === 'chapter' && Number.isInteger(Number(result.chapter_index))) chapters[Number(result.chapter_index)] = true;
+          if (resultLanguage(result) === language && result.scope === 'chapter' && Number.isInteger(Number(result.chapter_index))) chapters[Number(result.chapter_index)] = true;
         });
-        state.chapterIndicators[bookId] = chapters;
+        state.chapterIndicators[key] = chapters;
         return chapters;
       }).catch(function(error) {
-        delete state.chapterIndicatorRequests[bookId];
+        delete state.chapterIndicatorRequests[key];
         throw error;
       });
     }
-    return state.chapterIndicatorRequests[bookId];
+    return state.chapterIndicatorRequests[key];
   }
   function markBookChapters() {
     var containers = document.querySelectorAll('[data-ai-reading-indicators]'); if (!containers.length || !root.EpubBrowserAuth || !root.EpubBrowserAuth.fetch) return;
     Array.prototype.forEach.call(containers, function(container) {
-      if (container.dataset.aiReadingIndicatorsBound) return;
-      container.dataset.aiReadingIndicatorsBound = 'true';
-      var bookId = container.getAttribute('data-book-id'); if (!bookId) return;
-      loadChapterIndicators(bookId).then(function(chapters) {
-        applyChapterIndicators(container, chapters);
+      if (!container.dataset.aiReadingIndicatorsBound) {
+        container.dataset.aiReadingIndicatorsBound = 'true';
         // The chapter TOC is filled from toc.json after this script loads.
         // Observe it so badges appear without relying on script timing.
-        if (root.MutationObserver) new root.MutationObserver(function() { applyChapterIndicators(container, chapters); }).observe(container, { childList: true, subtree: true });
-      }).catch(function() {});
+        if (root.MutationObserver) new root.MutationObserver(function() { refreshIndicatorContainer(container).catch(function() {}); }).observe(container, { childList: true, subtree: true });
+      }
+      refreshIndicatorContainer(container).catch(function() {});
     });
   }
+  function handleLocaleChange() { translate(); markBookChapters(); }
   function bind() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-ai-reading-hub]'), function(trigger) { if (trigger.dataset.aiReadingHubBound) return; trigger.dataset.aiReadingHubBound = 'true'; trigger.addEventListener('click', function(event) { event.preventDefault(); open(trigger); }); });
     markBookChapters();
@@ -271,7 +289,7 @@
         refreshChapterIndicators(event.detail && event.detail.container);
       });
     }
-    var i18n = root.EpubBrowserI18n; if (i18n && i18n.onLocaleChange && !document.documentElement.dataset.aiReadingHubI18nBound) { document.documentElement.dataset.aiReadingHubI18nBound = 'true'; i18n.onLocaleChange(translate); }
+    var i18n = root.EpubBrowserI18n; if (i18n && i18n.onLocaleChange && !document.documentElement.dataset.aiReadingHubI18nBound) { document.documentElement.dataset.aiReadingHubI18nBound = 'true'; i18n.onLocaleChange(handleLocaleChange); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
   root.EpubBrowserAIReadingHub = { open: open, close: close, bind: bind, refreshChapterIndicators: refreshChapterIndicators };

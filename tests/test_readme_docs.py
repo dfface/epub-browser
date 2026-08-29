@@ -4,6 +4,42 @@ from pathlib import Path
 
 
 class ReadmeDocumentationTests(unittest.TestCase):
+    def test_why_epub_browser_highlights_ai_native_reading_and_insights(self):
+        assets = (
+            Path("docs/readme/assets/ai-native-reading.png"),
+            Path("docs/readme/assets/reading-insights.png"),
+        )
+        for asset in assets:
+            with self.subTest(asset=asset):
+                self.assertTrue(asset.is_file())
+                self.assertGreater(asset.stat().st_size, 0)
+
+        readmes = {
+            Path("README.md"): (
+                "AI-native reading, grounded in the text",
+                "Private reading insights",
+                "docs/readme/assets/ai-native-reading.png",
+                "docs/readme/assets/reading-insights.png",
+            ),
+            Path("docs/readme/README.zh-CN.md"): (
+                "贴着原文的 AI 原生阅读",
+                "只属于你的阅读洞察",
+                "assets/ai-native-reading.png",
+                "assets/reading-insights.png",
+            ),
+        }
+        for path, required in readmes.items():
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                for phrase in required:
+                    self.assertIn(phrase, text)
+
+        for path in sorted(Path("docs/readme").glob("README.*.md")):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(localized_assets=path):
+                self.assertIn("assets/ai-native-reading.png", text)
+                self.assertIn("assets/reading-insights.png", text)
+
     def test_readmes_document_the_technology_stack(self):
         for path in (Path("README.md"), Path("docs/readme/README.zh-CN.md")):
             text = path.read_text(encoding="utf-8")
@@ -79,7 +115,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
             "ai-native-reading.md",
             "third-party-ai-renderers.md",
             "migration-v2.md",
-            "releases/v2.8.0.md",
+            "releases/v2.8.1.md",
             "../AGENTS.md",
             "../CONTEXT.md",
         ):

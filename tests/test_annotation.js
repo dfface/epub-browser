@@ -281,6 +281,145 @@ test('annotation refreshes through the format-neutral content-ready event once',
   assert.equal(refreshes, 1);
 });
 
+test('PDF deep-link focus waits for a late text-layer annotation instead of reporting failure', async () => {
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', undefined,
+    { exposeHighlightInteraction: true },
+  );
+  const interaction = window.__testHighlightInteraction;
+  let contentReady = false;
+  let releaseRefresh = null;
+  let scrolled = false;
+  let warningShown = false;
+  const node = {
+    classList: { add() {}, remove() {} },
+    scrollIntoView() { scrolled = true; },
+  };
+  interaction.getHighlightNodesByAnnotationId = () => contentReady ? [node] : [];
+  interaction.imageForAnnotationId = () => null;
+  window.AnnotationModule.initialized = true;
+  window.AnnotationModule.refresh = () => new Promise(resolve => {
+    releaseRefresh = () => {
+      contentReady = true;
+      resolve();
+    };
+  });
+  window.AnnotationModule.bindContentReadyRefresh();
+
+  const located = window.AnnotationModule.focusAnnotation('pdf-annotation', {
+    waitForContentReady: true,
+    chapterIndex: 2,
+  }).then(found => {
+    if (!found) warningShown = true;
+    return found;
+  });
+  await Promise.resolve();
+  window.dispatchEvent({
+    type: 'epub-browser:annotation-content-ready',
+    detail: { root: {}, chapterIndex: 2 },
+  });
+  await Promise.resolve();
+  assert.equal(typeof releaseRefresh, 'function');
+  assert.equal(warningShown, false);
+  releaseRefresh();
+
+  assert.equal(await located, true);
+  assert.equal(scrolled, true);
+  assert.equal(warningShown, false);
+});
+
+test('PDF deep-link focus reports a genuinely missing annotation only after restoration finishes', async () => {
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', undefined,
+    { exposeHighlightInteraction: true },
+  );
+  const interaction = window.__testHighlightInteraction;
+  let releaseRefresh = null;
+  let settled = false;
+  interaction.getHighlightNodesByAnnotationId = () => [];
+  interaction.imageForAnnotationId = () => null;
+  window.AnnotationModule.initialized = true;
+  window.AnnotationModule.refresh = () => new Promise(resolve => { releaseRefresh = resolve; });
+  window.AnnotationModule.bindContentReadyRefresh();
+
+  const located = window.AnnotationModule.focusAnnotation('missing-pdf-annotation', {
+    waitForContentReady: true,
+    chapterIndex: 2,
+  }).then(found => {
+    settled = true;
+    return found;
+  });
+  await Promise.resolve();
+  assert.equal(settled, false);
+
+  window.dispatchEvent({
+    type: 'epub-browser:annotation-content-ready',
+    detail: { root: {}, chapterIndex: 2 },
+  });
+  await Promise.resolve();
+  assert.equal(typeof releaseRefresh, 'function');
+  assert.equal(settled, false);
+  releaseRefresh();
+
+  assert.equal(await located, false);
+  assert.equal(settled, true);
+});
+
+test('PDF deep-link focus ignores a stale ready record while the same page rerenders', async () => {
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', undefined,
+    { exposeHighlightInteraction: true },
+  );
+  const interaction = window.__testHighlightInteraction;
+  let contentReady = false;
+  let renderState = 'complete';
+  let settled = false;
+  const node = {
+    classList: { add() {}, remove() {} },
+    scrollIntoView() {},
+  };
+  const page = {
+    getAttribute(name) {
+      if (name === 'data-pdf-page-number') return '3';
+      if (name === 'data-pdf-rendered') return renderState;
+      return null;
+    },
+  };
+  const root = { querySelectorAll() { return [page]; } };
+  interaction.getHighlightNodesByAnnotationId = () => contentReady ? [node] : [];
+  interaction.imageForAnnotationId = () => null;
+  window.AnnotationModule.initialized = true;
+  window.AnnotationModule.refresh = () => Promise.resolve();
+  window.AnnotationModule.bindContentReadyRefresh();
+
+  window.dispatchEvent({
+    type: 'epub-browser:annotation-content-ready',
+    detail: { root, chapterIndex: 2 },
+  });
+  await Promise.resolve();
+  renderState = 'pending';
+
+  const located = window.AnnotationModule.focusAnnotation('rerendered-pdf-annotation', {
+    waitForContentReady: true,
+    chapterIndex: 2,
+  }).then(found => {
+    settled = true;
+    return found;
+  });
+  await Promise.resolve();
+  assert.equal(settled, false);
+
+  contentReady = true;
+  renderState = 'complete';
+  window.dispatchEvent({
+    type: 'epub-browser:annotation-content-ready',
+    detail: { root, chapterIndex: 2 },
+  });
+
+  assert.equal(await located, true);
+  assert.equal(settled, true);
+});
+
 test('a page-local PDF selection uses the shared menu and dictionary action', () => {
   const document = createAnnotationDialogDocument();
   const window = loadAnnotationWindow(

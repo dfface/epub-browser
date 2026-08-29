@@ -199,6 +199,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 r'id="pageWidthValue"[^>]+type="number"[^>]+min="25"[^>]+max="400"',
             )
             self.assertIn('data-pdf-zoom-control', pdf_html)
+            self.assertNotIn('id="fontSizeSlider"', pdf_html)
+            self.assertIn('id="fontSizeSlider"', epub_html)
+            self.assertIn('for="fontSizeSlider"', epub_html)
             self.assertRegex(
                 epub_html,
                 r'id="pageWidthSlider"[^>]+min="1"[^>]+max="4"[^>]+step="1"',
@@ -1854,8 +1857,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertIn('generate(regenerate, context, state.contextVersion, true);', canvas_script)
 
-    def test_ai_reader_requests_are_opt_in_and_chapter_indicators_are_deduplicated(self):
-        """Opening a reader must not start AI work or duplicate the same result query."""
+    def test_ai_reader_requests_are_opt_in_and_chapter_indicator_assets_are_present(self):
+        """Opening a reader must not start AI work; indicators load only when needed."""
         canvas_script = Path('epub_browser/assets/ai-canvas.js').read_text(encoding='utf-8')
         hub_script = Path('epub_browser/assets/ai-reading-hub.js').read_text(encoding='utf-8')
         feature_loader = Path('epub_browser/assets/ai-feature-loader.js').read_text(encoding='utf-8')
@@ -1863,9 +1866,6 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         init = canvas_script[canvas_script.index('function init() {'):canvas_script.index('\n  root.EpubBrowserAICanvas', canvas_script.index('function init() {'))]
         self.assertIn('if (requestedResultId()) load(state.button, initial, state.contextVersion)', init)
-        self.assertIn('chapterIndicatorRequests: {}', hub_script)
-        self.assertIn('function loadChapterIndicators(bookId)', hub_script)
-        self.assertIn('return state.chapterIndicatorRequests[bookId];', hub_script)
         self.assertIn("name === 'aiChat'", feature_loader)
         self.assertIn("'aiChatCss'", feature_loader)
         self.assertIn("function loadReadingIndicators()", feature_loader)
@@ -2202,8 +2202,10 @@ assert.deepEqual(
         css = Path("epub_browser/assets/annotation.css").read_text(encoding="utf-8")
 
         self.assertIn("requestedAnnotationId()", script)
-        self.assertIn("focusAnnotation(annotationId)", script)
-        self.assertIn("focusAnnotation: function(id)", annotation_script)
+        self.assertIn("focusAnnotation(annotationId, focusOptions)", script)
+        self.assertIn("waitForContentReady: true", script)
+        self.assertIn("chapterIndex: parseInt(chapter_index, 10)", script)
+        self.assertIn("focusAnnotation: function(id, options)", annotation_script)
         self.assertIn("annotation-focus-active", css)
 
     def test_reader_annotation_edits_are_silent_when_successful(self):
@@ -2961,6 +2963,24 @@ assert.deepEqual(
         self.assertIn('updatePageWidth(pageWidthPreset, false);', Path(
             'epub_browser/assets/chapter.js'
         ).read_text(encoding='utf-8'))
+
+    def test_desktop_chapter_sidebar_overlays_without_repositioning_the_reader(self):
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        ai_chat_css = Path('epub_browser/assets/ai-chat.css').read_text(encoding='utf-8')
+
+        self.assertRegex(
+            chapter_css,
+            r'\.toc-floating\s*\{[^}]*position:\s*fixed;',
+        )
+        self.assertIn('body.desktop-chapter-sidebar #bookHomeFloating {', chapter_css)
+        self.assertNotRegex(
+            chapter_css,
+            r'body\.desktop-chapter-sidebar[^\{]*\.container\s*\{',
+        )
+        self.assertNotRegex(
+            ai_chat_css,
+            r'body\.ai-chat-open\.desktop-chapter-sidebar[^\{]*\.container\s*\{',
+        )
 
     def test_reader_settings_use_the_same_glass_slide_in_drawer_language(self):
         chapter = self._chapter_html()

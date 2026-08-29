@@ -208,14 +208,15 @@
     return null;
   }
 
-  function announceAnnotationContentReady(node) {
+  function announceAnnotationContentReady(node, annotationAvailable) {
     var rootNode = chapterRootFor(node);
     var pageNumber = Number(node.getAttribute('data-pdf-page-number'));
     if (!rootNode || !Number.isInteger(pageNumber) || pageNumber < 1 || !root.dispatchEvent) return;
     var detail = {
       root: rootNode,
       chapterIndex: pageNumber - 1,
-      chapterUrl: 'chapter_' + (pageNumber - 1) + '.html'
+      chapterUrl: 'chapter_' + (pageNumber - 1) + '.html',
+      annotationAvailable: annotationAvailable !== false
     };
     var event = typeof root.CustomEvent === 'function'
       ? new root.CustomEvent('epub-browser:annotation-content-ready', { detail: detail })
@@ -382,7 +383,6 @@
         textLayerNode.style.left = '0px';
         if (record.textLayer === textLayer) record.textLayer = null;
         if (record.disposed || generation !== record.generation) return;
-        announceAnnotationContentReady(node);
       } else {
         textLayerNode.setAttribute('aria-label', translate('pdf.textUnavailable'));
       }
@@ -390,11 +390,16 @@
       loadingStatus.remove();
       node.setAttribute('data-pdf-rendered', 'complete');
       node.setAttribute('aria-busy', 'false');
+      announceAnnotationContentReady(
+        node,
+        node.getAttribute('data-pdf-has-extractable-text') === 'true'
+      );
     } catch (error) {
       if (record.disposed || generation !== record.generation) return;
       node.setAttribute('data-pdf-rendered', 'error');
       node.setAttribute('aria-busy', 'false');
       statusNode(node, 'alert', 'reader.chapterLoadFailed');
+      announceAnnotationContentReady(node, false);
     }
   }
 

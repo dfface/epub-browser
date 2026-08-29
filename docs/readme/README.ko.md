@@ -29,6 +29,19 @@ PDF는 일급 도서 형식입니다. PDF의 첫 페이지는 `chapter_0.html`�
 
 ## 개요
 
+### EPUB Browser를 선택하는 이유
+
+- **원문에 근거한 AI 네이티브 읽기(Server·EPUB 전용):** Server 모드에서는 장별 가이드, 근거 구절과 연결된 설명, 마인드맵, 성찰 질문, 비공개 Ask AI 대화가 원본 EPUB 본문 옆에 머뭅니다. 책과 분리된 일반적인 요약으로 제공하지 않습니다.
+- **비공개 읽기 인사이트(Server 전용):** 실제 읽기 시간, 활동 캘린더, 추세, 세션, 가장 많이 읽은 책을 확인할 수 있습니다. 모든 인사이트는 현재 로그인한 계정에만 표시됩니다.
+
+![원본 EPUB 본문 옆에 표시된 장별 가이드와 비공개 Ask AI 패널.](assets/ai-native-reading.png)
+
+*AI 가이드와 비공개 질문은 원문에 연결된 채로 유지됩니다.*
+
+![활동 캘린더와 읽기 시간 추세를 보여 주는 비공개 읽기 인사이트 화면.](assets/reading-insights.png)
+
+*읽기 인사이트는 실제 읽기 시간을 나만의 이해하기 쉬운 기록으로 바꿉니다.*
+
 ### 기술 스택
 
 프런트엔드는 시맨틱 HTML, CSS, Vanilla JavaScript로 구성하며 SPA 프레임워크를 사용하지 않습니다. CLI와 Server는 Python 3.9+, Starlette, Uvicorn, SQLite를 사용하고 PDF는 pypdf, pypdfium2, PDF.js로 로컬 처리하므로 런타임 CDN이 필요하지 않습니다.
