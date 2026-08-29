@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 19
+DB_SCHEMA_VERSION = 20
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -166,6 +166,22 @@ class SessionRecord:
     created_at: float
     client_address: Optional[str]
     user_agent: Optional[str]
+
+
+@dataclass(frozen=True)
+class OIDCSettingsRecord:
+    enabled: bool
+    provider_name: str
+    issuer_url: str
+    client_id: str
+    redirect_uri: str
+    scopes: tuple[str, ...]
+    username_claim: str
+    auto_create_users: bool
+    allow_member_password_login: bool
+    config_revision: int
+    client_secret_configured: bool
+    updated_at: str
 
 
 @dataclass(frozen=True)
@@ -338,6 +354,11 @@ class StateStore:
                     max(version, 18),
                     repair_managed_metadata=repair_pdf_branch_v18_metadata,
                 )
+            if version < 20:
+                self._migrate_schema_v20(connection, max(version, 19))
+            else:
+                self._create_v20_oidc_schema(connection)
+                self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -358,6 +379,7 @@ class StateStore:
     def _create_compatible_schema(self, connection, *, latest: bool = False) -> None:
         self._migrate_historical_annotations(connection)
         self._create_account_schema(connection, latest=latest)
+        self._create_v20_oidc_schema(connection)
         self._create_v15_dictionary_schema(connection)
         self._add_column_if_missing(
             connection,
@@ -1664,6 +1686,42 @@ class StateStore:
                 self._import_book_tags(connection, row["book_id"], tags)
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 19")
+
+    @staticmethod
+    def _create_v20_oidc_schema(connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS oidc_settings (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0, 1)),
+                provider_name TEXT NOT NULL DEFAULT '',
+                issuer_url TEXT NOT NULL DEFAULT '',
+                client_id TEXT NOT NULL DEFAULT '',
+                client_secret TEXT NOT NULL DEFAULT '',
+                redirect_uri TEXT NOT NULL DEFAULT '',
+                scopes_json TEXT NOT NULL DEFAULT '["openid","profile","email"]',
+                username_claim TEXT NOT NULL DEFAULT 'preferred_username',
+                auto_create_users INTEGER NOT NULL DEFAULT 0
+                    CHECK(auto_create_users IN (0, 1)),
+                allow_member_password_login INTEGER NOT NULL DEFAULT 1
+                    CHECK(allow_member_password_login IN (0, 1)),
+                config_revision INTEGER NOT NULL DEFAULT 1
+                    CHECK(config_revision > 0),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO oidc_settings (singleton) VALUES (1) "
+            "ON CONFLICT(singleton) DO NOTHING"
+        )
+
+    def _migrate_schema_v20(self, connection, source_version) -> None:
+        if source_version >= 20:
+            return
+        self._create_v20_oidc_schema(connection)
+        self._require_foreign_key_integrity(connection)
+        connection.execute("PRAGMA user_version = 20")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:
@@ -3722,6 +3780,161 @@ class StateStore:
                 (book_id, user_id),
             ).fetchone()
         return grant is not None
+
+    @staticmethod
+    def _oidc_scopes(value: Sequence[str]) -> tuple[str, ...]:
+        if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+            raise ValueError("OIDC scopes must be a sequence of text values")
+        normalized = []
+        for scope in value:
+            if not isinstance(scope, str) or not scope.strip():
+                raise ValueError("OIDC scopes must be non-empty text values")
+            candidate = scope.strip()
+            if candidate not in normalized:
+                normalized.append(candidate)
+        if "openid" not in normalized:
+            raise ValueError("OIDC scopes must include openid")
+        return tuple(["openid"] + [scope for scope in normalized if scope != "openid"])
+
+    @staticmethod
+    def _oidc_settings_record(row) -> OIDCSettingsRecord:
+        scopes = json.loads(row["scopes_json"])
+        return OIDCSettingsRecord(
+            enabled=bool(row["enabled"]),
+            provider_name=row["provider_name"],
+            issuer_url=row["issuer_url"],
+            client_id=row["client_id"],
+            redirect_uri=row["redirect_uri"],
+            scopes=tuple(scopes),
+            username_claim=row["username_claim"],
+            auto_create_users=bool(row["auto_create_users"]),
+            allow_member_password_login=bool(row["allow_member_password_login"]),
+            config_revision=int(row["config_revision"]),
+            client_secret_configured=bool(row["client_secret"]),
+            updated_at=row["updated_at"],
+        )
+
+    def get_oidc_settings(self) -> OIDCSettingsRecord:
+        """Return the public OIDC configuration without the client secret."""
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM oidc_settings WHERE singleton = 1"
+            ).fetchone()
+        return self._oidc_settings_record(row)
+
+    def _get_oidc_provider_settings(self) -> dict:
+        """Return the private Provider configuration for server-side use."""
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM oidc_settings WHERE singleton = 1"
+            ).fetchone()
+        payload = dict(row)
+        payload["enabled"] = bool(payload["enabled"])
+        payload["auto_create_users"] = bool(payload["auto_create_users"])
+        payload["allow_member_password_login"] = bool(
+            payload["allow_member_password_login"]
+        )
+        payload["scopes"] = tuple(json.loads(payload.pop("scopes_json")))
+        payload.pop("singleton", None)
+        return payload
+
+    def replace_oidc_settings(
+        self,
+        *,
+        enabled: bool,
+        provider_name: str,
+        issuer_url: str,
+        client_id: str,
+        client_secret: Optional[str],
+        redirect_uri: str,
+        scopes: Sequence[str],
+        username_claim: str,
+        auto_create_users: bool,
+        allow_member_password_login: bool,
+        clear_client_secret: bool = False,
+    ) -> OIDCSettingsRecord:
+        boolean_values = (
+            enabled,
+            auto_create_users,
+            allow_member_password_login,
+            clear_client_secret,
+        )
+        if any(not isinstance(value, bool) for value in boolean_values):
+            raise ValueError("OIDC switches must be booleans")
+        text_values = (
+            provider_name,
+            issuer_url,
+            client_id,
+            redirect_uri,
+            username_claim,
+        )
+        if any(not isinstance(value, str) for value in text_values):
+            raise ValueError("OIDC settings must be text")
+        if client_secret is not None and not isinstance(client_secret, str):
+            raise ValueError("OIDC client secret must be text")
+        if clear_client_secret and client_secret is not None:
+            raise ValueError("OIDC client secret cannot be replaced and cleared")
+
+        provider_name = provider_name.strip()
+        issuer_url = issuer_url.strip()
+        client_id = client_id.strip()
+        redirect_uri = redirect_uri.strip()
+        username_claim = username_claim.strip()
+        normalized_scopes = self._oidc_scopes(scopes)
+        if not username_claim:
+            raise ValueError("OIDC username claim must not be empty")
+
+        with self._connection() as connection:
+            current = connection.execute(
+                "SELECT client_secret FROM oidc_settings WHERE singleton = 1"
+            ).fetchone()
+            stored_secret = (
+                ""
+                if clear_client_secret
+                else current["client_secret"]
+                if client_secret is None
+                else client_secret
+            )
+            if enabled and not all(
+                (
+                    provider_name,
+                    issuer_url,
+                    client_id,
+                    stored_secret,
+                    redirect_uri,
+                    username_claim,
+                )
+            ):
+                raise ValueError("Enabled OIDC settings must be complete")
+            connection.execute(
+                """
+                UPDATE oidc_settings
+                SET enabled = ?, provider_name = ?, issuer_url = ?,
+                    client_id = ?, client_secret = ?, redirect_uri = ?,
+                    scopes_json = ?, username_claim = ?,
+                    auto_create_users = ?, allow_member_password_login = ?,
+                    config_revision = config_revision + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE singleton = 1
+                """,
+                (
+                    int(enabled),
+                    provider_name,
+                    issuer_url,
+                    client_id,
+                    stored_secret,
+                    redirect_uri,
+                    json.dumps(
+                        normalized_scopes,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    username_claim,
+                    int(auto_create_users),
+                    int(allow_member_password_login),
+                ),
+            )
+        return self.get_oidc_settings()
 
     def get_ai_settings(self) -> dict:
         """Return the public administrator configuration without its API key."""

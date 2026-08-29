@@ -480,6 +480,113 @@ class StateStoreTests(unittest.TestCase):
             <= tables
         )
 
+    def test_oidc_settings_default_disabled_and_never_return_secret(self):
+        settings = self.store.get_oidc_settings()
+
+        self.assertFalse(settings.enabled)
+        self.assertEqual(settings.provider_name, "")
+        self.assertEqual(settings.scopes, ("openid", "profile", "email"))
+        self.assertEqual(settings.username_claim, "preferred_username")
+        self.assertFalse(settings.auto_create_users)
+        self.assertTrue(settings.allow_member_password_login)
+        self.assertEqual(settings.config_revision, 1)
+        self.assertFalse(settings.client_secret_configured)
+        self.assertFalse(hasattr(settings, "client_secret"))
+
+    def test_oidc_settings_replace_retains_or_clears_write_only_secret(self):
+        saved = self.store.replace_oidc_settings(
+            enabled=True,
+            provider_name="  Authelia  ",
+            issuer_url="https://auth.example.test",
+            client_id="epub-browser",
+            client_secret="first-secret",
+            redirect_uri="https://reader.example.test/auth/oidc/callback",
+            scopes=("email", "openid", "profile", "email"),
+            username_claim="preferred_username",
+            auto_create_users=False,
+            allow_member_password_login=False,
+        )
+
+        self.assertEqual(saved.provider_name, "Authelia")
+        self.assertEqual(saved.scopes, ("openid", "email", "profile"))
+        self.assertTrue(saved.client_secret_configured)
+        self.assertEqual(saved.config_revision, 2)
+
+        retained = self.store.replace_oidc_settings(
+            enabled=True,
+            provider_name="Authelia",
+            issuer_url="https://auth.example.test",
+            client_id="epub-browser",
+            client_secret=None,
+            redirect_uri="https://reader.example.test/auth/oidc/callback",
+            scopes=("openid", "profile", "email"),
+            username_claim="preferred_username",
+            auto_create_users=True,
+            allow_member_password_login=False,
+        )
+        self.assertTrue(retained.client_secret_configured)
+        self.assertEqual(retained.config_revision, 3)
+
+        cleared = self.store.replace_oidc_settings(
+            enabled=False,
+            provider_name="Authelia",
+            issuer_url="https://auth.example.test",
+            client_id="epub-browser",
+            client_secret=None,
+            redirect_uri="https://reader.example.test/auth/oidc/callback",
+            scopes=("openid",),
+            username_claim="preferred_username",
+            auto_create_users=False,
+            allow_member_password_login=True,
+            clear_client_secret=True,
+        )
+        self.assertFalse(cleared.client_secret_configured)
+        self.assertEqual(cleared.config_revision, 4)
+
+        with sqlite3.connect(self.database) as connection:
+            stored_secret = connection.execute(
+                "SELECT client_secret FROM oidc_settings WHERE singleton = 1"
+            ).fetchone()[0]
+        self.assertEqual(stored_secret, "")
+
+    def test_invalid_oidc_settings_leave_previous_configuration_unchanged(self):
+        original = self.store.get_oidc_settings()
+
+        with self.assertRaises(ValueError):
+            self.store.replace_oidc_settings(
+                enabled=True,
+                provider_name="Authelia",
+                issuer_url="https://auth.example.test",
+                client_id="epub-browser",
+                client_secret=None,
+                redirect_uri="https://reader.example.test/auth/oidc/callback",
+                scopes=("profile", "email"),
+                username_claim="preferred_username",
+                auto_create_users=False,
+                allow_member_password_login=True,
+            )
+
+        self.assertEqual(self.store.get_oidc_settings(), original)
+
+    def test_v19_migration_adds_oidc_settings_without_changing_users(self):
+        member = self.store.create_user("existing-member", hash_password("secret"))
+        with self.store._connection() as connection:
+            connection.execute("DROP TABLE IF EXISTS oidc_settings")
+            connection.execute("PRAGMA user_version = 19")
+
+        StateStore(self.database).initialize()
+
+        self.assertEqual(
+            self.store.get_user_by_username("existing-member").principal,
+            member,
+        )
+        self.assertFalse(self.store.get_oidc_settings().enabled)
+        with self.store._connection() as connection:
+            self.assertEqual(
+                connection.execute("PRAGMA user_version").fetchone()[0],
+                DB_SCHEMA_VERSION,
+            )
+
     def test_v16_personal_access_tokens_store_only_digest_and_authenticate(self):
         issued = self.store.create_personal_access_token(
             self.owner.user_id,
