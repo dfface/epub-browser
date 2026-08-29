@@ -185,6 +185,36 @@ class OIDCSettingsRecord:
 
 
 @dataclass(frozen=True)
+class OIDCIdentityRecord:
+    issuer: str
+    subject: str
+    user_id: str
+    username_claim: str
+    display_name: str
+    email: Optional[str]
+    created_at: float
+    last_login_at: float
+
+
+@dataclass(frozen=True)
+class OIDCTransactionRecord:
+    id: str
+    purpose: str
+    expected_user_id: Optional[str]
+    next_path: str
+    config_revision: int
+    nonce: str
+    pkce_verifier: str
+    issuer: Optional[str]
+    subject: Optional[str]
+    username_claim: Optional[str]
+    display_name: Optional[str]
+    email: Optional[str]
+    expires_at: float
+    created_at: float
+
+
+@dataclass(frozen=True)
 class DictionaryRecord:
     id: str
     display_name: str
@@ -1714,6 +1744,63 @@ class StateStore:
         connection.execute(
             "INSERT INTO oidc_settings (singleton) VALUES (1) "
             "ON CONFLICT(singleton) DO NOTHING"
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_identities (
+                issuer TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                username_claim TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                email TEXT,
+                created_at REAL NOT NULL,
+                last_login_at REAL NOT NULL,
+                PRIMARY KEY (issuer, subject),
+                UNIQUE (user_id, issuer),
+                CHECK(length(issuer) > 0),
+                CHECK(length(subject) > 0)
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_identities_user "
+            "ON user_identities(user_id, issuer)"
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS oidc_login_transactions (
+                id TEXT PRIMARY KEY,
+                token_digest TEXT NOT NULL UNIQUE,
+                browser_digest TEXT NOT NULL,
+                phase TEXT NOT NULL CHECK(phase IN ('authorization', 'association')),
+                purpose TEXT NOT NULL CHECK(purpose IN ('login', 'link', 'associate')),
+                expected_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+                next_path TEXT NOT NULL,
+                config_revision INTEGER NOT NULL CHECK(config_revision > 0),
+                nonce TEXT NOT NULL DEFAULT '',
+                pkce_verifier TEXT NOT NULL DEFAULT '',
+                issuer TEXT,
+                subject TEXT,
+                username_claim TEXT,
+                display_name TEXT,
+                email TEXT,
+                expires_at REAL NOT NULL,
+                created_at REAL NOT NULL,
+                CHECK(
+                    (phase = 'authorization' AND purpose IN ('login', 'link')
+                        AND length(nonce) > 0 AND length(pkce_verifier) > 0
+                        AND issuer IS NULL AND subject IS NULL)
+                    OR
+                    (phase = 'association' AND purpose = 'associate'
+                        AND length(issuer) > 0 AND length(subject) > 0)
+                )
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_oidc_transactions_expiry "
+            "ON oidc_login_transactions(expires_at, id)"
         )
 
     def _migrate_schema_v20(self, connection, source_version) -> None:
@@ -3795,6 +3882,553 @@ class StateStore:
         if "openid" not in normalized:
             raise ValueError("OIDC scopes must include openid")
         return tuple(["openid"] + [scope for scope in normalized if scope != "openid"])
+
+    @staticmethod
+    def _oidc_identity_key(value: str, name: str) -> str:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value) > 2048
+        ):
+            raise ValueError(f"OIDC {name} is invalid")
+        return value
+
+    @staticmethod
+    def _oidc_profile_value(
+        value: Optional[str],
+        name: str,
+        *,
+        allow_none: bool = False,
+    ) -> Optional[str]:
+        if value is None and allow_none:
+            return None
+        if not isinstance(value, str) or len(value) > 1024:
+            raise ValueError(f"OIDC {name} is invalid")
+        return value.strip()
+
+    @staticmethod
+    def _oidc_identity_record(row) -> OIDCIdentityRecord:
+        return OIDCIdentityRecord(
+            issuer=row["issuer"],
+            subject=row["subject"],
+            user_id=row["user_id"],
+            username_claim=row["username_claim"],
+            display_name=row["display_name"],
+            email=row["email"],
+            created_at=float(row["created_at"]),
+            last_login_at=float(row["last_login_at"]),
+        )
+
+    @staticmethod
+    def _oidc_transaction_record(row) -> OIDCTransactionRecord:
+        return OIDCTransactionRecord(
+            id=row["id"],
+            purpose=row["purpose"],
+            expected_user_id=row["expected_user_id"],
+            next_path=row["next_path"],
+            config_revision=int(row["config_revision"]),
+            nonce=row["nonce"],
+            pkce_verifier=row["pkce_verifier"],
+            issuer=row["issuer"],
+            subject=row["subject"],
+            username_claim=row["username_claim"],
+            display_name=row["display_name"],
+            email=row["email"],
+            expires_at=float(row["expires_at"]),
+            created_at=float(row["created_at"]),
+        )
+
+    def create_oidc_transaction(
+        self,
+        *,
+        state_token: str,
+        browser_token: str,
+        nonce: str,
+        pkce_verifier: str,
+        purpose: str,
+        next_path: str,
+        config_revision: int,
+        expires_at,
+        now=None,
+        expected_user_id: Optional[str] = None,
+    ) -> str:
+        if purpose not in {"login", "link"}:
+            raise ValueError("Unsupported OIDC transaction purpose")
+        for value, name in (
+            (state_token, "state"),
+            (browser_token, "browser token"),
+            (nonce, "nonce"),
+            (pkce_verifier, "PKCE verifier"),
+            (next_path, "return path"),
+        ):
+            if not isinstance(value, str) or not value or len(value) > 4096:
+                raise ValueError(f"OIDC {name} is invalid")
+        revision = int(config_revision)
+        if revision <= 0:
+            raise ValueError("OIDC configuration revision is invalid")
+        created_at = self._timestamp(now)
+        expiry = self._timestamp(expires_at)
+        if expiry <= created_at:
+            raise ValueError("OIDC transaction expiry must be in the future")
+        transaction_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            if expected_user_id is not None:
+                self._require_user(connection, expected_user_id)
+            connection.execute(
+                "DELETE FROM oidc_login_transactions WHERE expires_at <= ?",
+                (created_at,),
+            )
+            connection.execute(
+                """
+                INSERT INTO oidc_login_transactions (
+                    id, token_digest, browser_digest, phase, purpose,
+                    expected_user_id, next_path, config_revision, nonce,
+                    pkce_verifier, expires_at, created_at
+                ) VALUES (?, ?, ?, 'authorization', ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    transaction_id,
+                    token_digest(state_token),
+                    token_digest(browser_token),
+                    purpose,
+                    expected_user_id,
+                    next_path,
+                    revision,
+                    nonce,
+                    pkce_verifier,
+                    expiry,
+                    created_at,
+                ),
+            )
+        return transaction_id
+
+    def claim_oidc_transaction(
+        self,
+        state_token: str,
+        browser_token: str,
+        config_revision: int,
+        *,
+        now=None,
+    ) -> Optional[OIDCTransactionRecord]:
+        if not isinstance(state_token, str) or not isinstance(browser_token, str):
+            return None
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT * FROM oidc_login_transactions
+                WHERE token_digest = ? AND phase = 'authorization'
+                """,
+                (token_digest(state_token),),
+            ).fetchone()
+            if row is None:
+                return None
+            if (
+                float(row["expires_at"]) <= timestamp
+                or int(row["config_revision"]) != int(config_revision)
+            ):
+                connection.execute(
+                    "DELETE FROM oidc_login_transactions WHERE id = ?",
+                    (row["id"],),
+                )
+                return None
+            if not hmac.compare_digest(
+                row["browser_digest"], token_digest(browser_token)
+            ):
+                return None
+            connection.execute(
+                "DELETE FROM oidc_login_transactions WHERE id = ?",
+                (row["id"],),
+            )
+            return self._oidc_transaction_record(row)
+
+    def stage_oidc_association(
+        self,
+        *,
+        association_token: str,
+        browser_token: str,
+        issuer: str,
+        subject: str,
+        username_claim: str,
+        display_name: str,
+        email: Optional[str],
+        next_path: str,
+        config_revision: int,
+        expires_at,
+        now=None,
+    ) -> str:
+        issuer = self._oidc_identity_key(issuer, "issuer")
+        subject = self._oidc_identity_key(subject, "subject")
+        username_claim = self._oidc_profile_value(username_claim, "username claim")
+        display_name = self._oidc_profile_value(display_name, "display name")
+        email = self._oidc_profile_value(email, "email", allow_none=True)
+        for value, name in (
+            (association_token, "association token"),
+            (browser_token, "browser token"),
+            (next_path, "return path"),
+        ):
+            if not isinstance(value, str) or not value or len(value) > 4096:
+                raise ValueError(f"OIDC {name} is invalid")
+        created_at = self._timestamp(now)
+        expiry = self._timestamp(expires_at)
+        revision = int(config_revision)
+        if expiry <= created_at or revision <= 0:
+            raise ValueError("OIDC association lifetime is invalid")
+        transaction_id = uuid.uuid4().hex
+        with self._connection() as connection:
+            connection.execute(
+                "DELETE FROM oidc_login_transactions WHERE expires_at <= ?",
+                (created_at,),
+            )
+            connection.execute(
+                """
+                INSERT INTO oidc_login_transactions (
+                    id, token_digest, browser_digest, phase, purpose,
+                    next_path, config_revision, issuer, subject,
+                    username_claim, display_name, email, expires_at, created_at
+                ) VALUES (?, ?, ?, 'association', 'associate', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    transaction_id,
+                    token_digest(association_token),
+                    token_digest(browser_token),
+                    next_path,
+                    revision,
+                    issuer,
+                    subject,
+                    username_claim,
+                    display_name,
+                    email,
+                    expiry,
+                    created_at,
+                ),
+            )
+        return transaction_id
+
+    @staticmethod
+    def _valid_oidc_association_row(
+        connection,
+        association_token: str,
+        browser_token: str,
+        config_revision: int,
+        now: float,
+    ):
+        row = connection.execute(
+            """
+            SELECT * FROM oidc_login_transactions
+            WHERE token_digest = ? AND phase = 'association'
+            """,
+            (token_digest(association_token),),
+        ).fetchone()
+        if row is None:
+            return None
+        if (
+            float(row["expires_at"]) <= now
+            or int(row["config_revision"]) != int(config_revision)
+        ):
+            connection.execute(
+                "DELETE FROM oidc_login_transactions WHERE id = ?",
+                (row["id"],),
+            )
+            return None
+        if not hmac.compare_digest(
+            row["browser_digest"], token_digest(browser_token)
+        ):
+            return None
+        return row
+
+    def get_oidc_association(
+        self,
+        association_token: str,
+        browser_token: str,
+        config_revision: int,
+        *,
+        now=None,
+    ) -> Optional[OIDCTransactionRecord]:
+        if not isinstance(association_token, str) or not isinstance(browser_token, str):
+            return None
+        with self._connection() as connection:
+            row = self._valid_oidc_association_row(
+                connection,
+                association_token,
+                browser_token,
+                config_revision,
+                self._timestamp(now),
+            )
+            return self._oidc_transaction_record(row) if row is not None else None
+
+    def _link_oidc_identity(
+        self,
+        connection,
+        user_id: str,
+        *,
+        issuer: str,
+        subject: str,
+        username_claim: str,
+        display_name: str,
+        email: Optional[str],
+        now: float,
+    ) -> OIDCIdentityRecord:
+        user = self._get_user(connection, user_id)
+        if not user.enabled:
+            raise RuntimeError("OIDC identity cannot be linked to a disabled user")
+        existing = connection.execute(
+            "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
+            (issuer, subject),
+        ).fetchone()
+        if existing is not None and existing["user_id"] != user_id:
+            raise RuntimeError("OIDC identity is already linked")
+        other = connection.execute(
+            "SELECT subject FROM user_identities WHERE user_id = ? AND issuer = ?",
+            (user_id, issuer),
+        ).fetchone()
+        if other is not None and other["subject"] != subject:
+            raise RuntimeError("User already has an identity for this issuer")
+        if existing is None:
+            connection.execute(
+                """
+                INSERT INTO user_identities (
+                    issuer, subject, user_id, username_claim, display_name,
+                    email, created_at, last_login_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    issuer,
+                    subject,
+                    user_id,
+                    username_claim,
+                    display_name,
+                    email,
+                    now,
+                    now,
+                ),
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE user_identities
+                SET username_claim = ?, display_name = ?, email = ?,
+                    last_login_at = ?
+                WHERE issuer = ? AND subject = ?
+                """,
+                (username_claim, display_name, email, now, issuer, subject),
+            )
+        row = connection.execute(
+            "SELECT * FROM user_identities WHERE issuer = ? AND subject = ?",
+            (issuer, subject),
+        ).fetchone()
+        return self._oidc_identity_record(row)
+
+    def link_oidc_identity(
+        self,
+        user_id: str,
+        *,
+        issuer: str,
+        subject: str,
+        username_claim: str,
+        display_name: str,
+        email: Optional[str],
+        now=None,
+    ) -> OIDCIdentityRecord:
+        issuer = self._oidc_identity_key(issuer, "issuer")
+        subject = self._oidc_identity_key(subject, "subject")
+        username_claim = self._oidc_profile_value(username_claim, "username claim")
+        display_name = self._oidc_profile_value(display_name, "display name")
+        email = self._oidc_profile_value(email, "email", allow_none=True)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            return self._link_oidc_identity(
+                connection,
+                user_id,
+                issuer=issuer,
+                subject=subject,
+                username_claim=username_claim,
+                display_name=display_name,
+                email=email,
+                now=self._timestamp(now),
+            )
+
+    def complete_oidc_association(
+        self,
+        association_token: str,
+        browser_token: str,
+        config_revision: int,
+        user_id: str,
+        *,
+        now=None,
+    ) -> Optional[OIDCIdentityRecord]:
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = self._valid_oidc_association_row(
+                connection,
+                association_token,
+                browser_token,
+                config_revision,
+                timestamp,
+            )
+            if row is None:
+                return None
+            identity = self._link_oidc_identity(
+                connection,
+                user_id,
+                issuer=row["issuer"],
+                subject=row["subject"],
+                username_claim=row["username_claim"] or "",
+                display_name=row["display_name"] or "",
+                email=row["email"],
+                now=timestamp,
+            )
+            connection.execute(
+                "DELETE FROM oidc_login_transactions WHERE id = ?",
+                (row["id"],),
+            )
+            return identity
+
+    def principal_for_oidc_identity(
+        self,
+        issuer: str,
+        subject: str,
+    ) -> Optional[Principal]:
+        if not isinstance(issuer, str) or not isinstance(subject, str):
+            return None
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT users.id AS user_id, users.username, users.role,
+                       users.enabled, users.password_hash,
+                       users.created_at, users.updated_at
+                FROM user_identities
+                JOIN users ON users.id = user_identities.user_id
+                WHERE user_identities.issuer = ?
+                  AND user_identities.subject = ?
+                  AND users.enabled = 1
+                """,
+                (issuer, subject),
+            ).fetchone()
+        return self._user_record(row).principal if row is not None else None
+
+    def list_oidc_identities(self, user_id: str) -> tuple[OIDCIdentityRecord, ...]:
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                "SELECT * FROM user_identities WHERE user_id = ? ORDER BY issuer",
+                (user_id,),
+            ).fetchall()
+        return tuple(self._oidc_identity_record(row) for row in rows)
+
+    def provision_oidc_member(
+        self,
+        *,
+        issuer: str,
+        subject: str,
+        username_base: str,
+        username_claim: str,
+        display_name: str,
+        email: Optional[str],
+        now=None,
+    ) -> Principal:
+        issuer = self._oidc_identity_key(issuer, "issuer")
+        subject = self._oidc_identity_key(subject, "subject")
+        normalized_base = self._normalize_username(username_base)
+        username_claim = self._oidc_profile_value(username_claim, "username claim")
+        display_name = self._oidc_profile_value(display_name, "display name")
+        email = self._oidc_profile_value(email, "email", allow_none=True)
+        timestamp = self._timestamp(now)
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                """
+                SELECT users.id AS user_id, users.username, users.role,
+                       users.enabled, users.password_hash,
+                       users.created_at, users.updated_at
+                FROM user_identities
+                JOIN users ON users.id = user_identities.user_id
+                WHERE user_identities.issuer = ? AND user_identities.subject = ?
+                """,
+                (issuer, subject),
+            ).fetchone()
+            if existing is not None:
+                user = self._user_record(existing)
+                if not user.enabled:
+                    raise RuntimeError("OIDC identity belongs to a disabled user")
+                self._link_oidc_identity(
+                    connection,
+                    user.user_id,
+                    issuer=issuer,
+                    subject=subject,
+                    username_claim=username_claim,
+                    display_name=display_name,
+                    email=email,
+                    now=timestamp,
+                )
+                return user.principal
+
+            username = normalized_base
+            suffix = 2
+            while connection.execute(
+                "SELECT 1 FROM users WHERE username = ?", (username,)
+            ).fetchone() is not None:
+                username = f"{normalized_base}-{suffix}"
+                suffix += 1
+            user_id = uuid.uuid4().hex
+            connection.execute(
+                """
+                INSERT INTO users (id, username, role, enabled, password_hash)
+                VALUES (?, ?, 'member', 1, NULL)
+                """,
+                (user_id, username),
+            )
+            self._link_oidc_identity(
+                connection,
+                user_id,
+                issuer=issuer,
+                subject=subject,
+                username_claim=username_claim,
+                display_name=display_name,
+                email=email,
+                now=timestamp,
+            )
+            return self._get_user(connection, user_id).principal
+
+    def unlink_oidc_identity(
+        self,
+        user_id: str,
+        issuer: str,
+        *,
+        allow_member_password_login: bool,
+        force: bool = False,
+    ) -> bool:
+        if not isinstance(allow_member_password_login, bool) or not isinstance(
+            force, bool
+        ):
+            raise ValueError("OIDC unlink policy must be boolean")
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user = self._get_user(connection, user_id)
+            identity = connection.execute(
+                "SELECT 1 FROM user_identities WHERE user_id = ? AND issuer = ?",
+                (user_id, issuer),
+            ).fetchone()
+            if identity is None:
+                return False
+            if not force:
+                password_login = bool(user.password_hash) and (
+                    user.role == "admin" or allow_member_password_login
+                )
+                other_identity = connection.execute(
+                    "SELECT 1 FROM user_identities WHERE user_id = ? AND issuer != ?",
+                    (user_id, issuer),
+                ).fetchone()
+                if not password_login and other_identity is None:
+                    raise RuntimeError("Cannot remove the only usable login method")
+            connection.execute(
+                "DELETE FROM user_identities WHERE user_id = ? AND issuer = ?",
+                (user_id, issuer),
+            )
+            return True
 
     @staticmethod
     def _oidc_settings_record(row) -> OIDCSettingsRecord:

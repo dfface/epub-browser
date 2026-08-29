@@ -587,6 +587,245 @@ class StateStoreTests(unittest.TestCase):
                 DB_SCHEMA_VERSION,
             )
 
+    def test_oidc_authorization_transaction_is_browser_bound_and_single_use(self):
+        transaction_id = self.store.create_oidc_transaction(
+            state_token="raw-state-token",
+            browser_token="raw-browser-token",
+            nonce="nonce-value",
+            pkce_verifier="pkce-verifier",
+            purpose="login",
+            next_path="/account",
+            config_revision=3,
+            expires_at=1_600.0,
+            now=1_000.0,
+        )
+
+        with self.store._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM oidc_login_transactions WHERE id = ?",
+                (transaction_id,),
+            ).fetchone()
+        self.assertNotIn("raw-state-token", tuple(row))
+        self.assertNotIn("raw-browser-token", tuple(row))
+        self.assertIsNone(
+            self.store.claim_oidc_transaction(
+                "raw-state-token", "wrong-browser", 3, now=1_001.0
+            )
+        )
+
+        claimed = self.store.claim_oidc_transaction(
+            "raw-state-token", "raw-browser-token", 3, now=1_001.0
+        )
+
+        self.assertEqual(claimed.id, transaction_id)
+        self.assertEqual(claimed.nonce, "nonce-value")
+        self.assertEqual(claimed.pkce_verifier, "pkce-verifier")
+        self.assertEqual(claimed.next_path, "/account")
+        self.assertIsNone(
+            self.store.claim_oidc_transaction(
+                "raw-state-token", "raw-browser-token", 3, now=1_002.0
+            )
+        )
+
+    def test_oidc_transaction_rejects_expiry_revision_and_invalid_purpose(self):
+        with self.assertRaises(ValueError):
+            self.store.create_oidc_transaction(
+                state_token="state",
+                browser_token="browser",
+                nonce="nonce",
+                pkce_verifier="verifier",
+                purpose="delete-account",
+                next_path="/",
+                config_revision=1,
+                expires_at=2_000.0,
+                now=1_000.0,
+            )
+        self.store.create_oidc_transaction(
+            state_token="expired-state",
+            browser_token="browser",
+            nonce="nonce",
+            pkce_verifier="verifier",
+            purpose="link",
+            next_path="/account",
+            config_revision=4,
+            expires_at=1_010.0,
+            now=1_000.0,
+            expected_user_id=self.owner.user_id,
+        )
+        self.assertIsNone(
+            self.store.claim_oidc_transaction(
+                "expired-state", "browser", 4, now=1_011.0
+            )
+        )
+        self.store.create_oidc_transaction(
+            state_token="stale-state",
+            browser_token="browser",
+            nonce="nonce",
+            pkce_verifier="verifier",
+            purpose="login",
+            next_path="/",
+            config_revision=4,
+            expires_at=2_000.0,
+            now=1_000.0,
+        )
+        self.assertIsNone(
+            self.store.claim_oidc_transaction(
+                "stale-state", "browser", 5, now=1_001.0
+            )
+        )
+
+    def test_oidc_identity_uses_exact_issuer_subject_and_rejects_conflicts(self):
+        member = self.store.create_user("identity-member", hash_password("secret"))
+        other = self.store.create_user("identity-other", hash_password("secret"))
+        identity = self.store.link_oidc_identity(
+            member.user_id,
+            issuer="https://auth.example.test",
+            subject="stable-subject",
+            username_claim="remote-reader",
+            display_name="Remote Reader",
+            email="reader@example.test",
+            now=1_000.0,
+        )
+
+        self.assertEqual(identity.user_id, member.user_id)
+        self.assertEqual(
+            self.store.principal_for_oidc_identity(
+                "https://auth.example.test", "stable-subject"
+            ),
+            member,
+        )
+        self.assertIsNone(
+            self.store.principal_for_oidc_identity(
+                "https://AUTH.example.test", "stable-subject"
+            )
+        )
+        with self.assertRaises(RuntimeError):
+            self.store.link_oidc_identity(
+                other.user_id,
+                issuer="https://auth.example.test",
+                subject="stable-subject",
+                username_claim="other",
+                display_name="Other",
+                email=None,
+                now=1_001.0,
+            )
+
+    def test_oidc_member_provisioning_is_atomic_idempotent_and_unique(self):
+        self.store.create_user("remote-reader", hash_password("secret"))
+
+        provisioned = self.store.provision_oidc_member(
+            issuer="https://auth.example.test",
+            subject="provisioned-subject",
+            username_base="remote-reader",
+            username_claim="remote-reader",
+            display_name="Remote Reader",
+            email="reader@example.test",
+            now=1_000.0,
+        )
+        repeated = self.store.provision_oidc_member(
+            issuer="https://auth.example.test",
+            subject="provisioned-subject",
+            username_base="ignored-name",
+            username_claim="changed",
+            display_name="Changed Name",
+            email="changed@example.test",
+            now=1_001.0,
+        )
+
+        self.assertEqual(provisioned, repeated)
+        self.assertEqual(provisioned.username, "remote-reader-2")
+        user = self.store.get_user_by_username("remote-reader-2")
+        self.assertIsNone(user.password_hash)
+        self.assertEqual(user.role, "member")
+        self.assertEqual(
+            len([
+                candidate for candidate in self.store.list_users()
+                if candidate.username.startswith("remote-reader")
+            ]),
+            2,
+        )
+
+    def test_oidc_unlink_requires_an_alternate_login_method(self):
+        passwordless = self.store.provision_oidc_member(
+            issuer="https://auth.example.test",
+            subject="passwordless-subject",
+            username_base="passwordless",
+            username_claim="passwordless",
+            display_name="Passwordless",
+            email=None,
+            now=1_000.0,
+        )
+        with self.assertRaises(RuntimeError):
+            self.store.unlink_oidc_identity(
+                passwordless.user_id,
+                "https://auth.example.test",
+                allow_member_password_login=True,
+            )
+
+        password_user = self.store.create_user(
+            "password-user", hash_password("secret")
+        )
+        self.store.link_oidc_identity(
+            password_user.user_id,
+            issuer="https://auth.example.test",
+            subject="password-subject",
+            username_claim="password-user",
+            display_name="Password User",
+            email=None,
+            now=1_000.0,
+        )
+        with self.assertRaises(RuntimeError):
+            self.store.unlink_oidc_identity(
+                password_user.user_id,
+                "https://auth.example.test",
+                allow_member_password_login=False,
+            )
+        self.assertTrue(
+            self.store.unlink_oidc_identity(
+                password_user.user_id,
+                "https://auth.example.test",
+                allow_member_password_login=True,
+            )
+        )
+
+    def test_oidc_association_stays_browser_bound_until_atomic_link(self):
+        association_id = self.store.stage_oidc_association(
+            association_token="association-token",
+            browser_token="association-browser",
+            issuer="https://auth.example.test",
+            subject="association-subject",
+            username_claim="remote-owner",
+            display_name="Remote Owner",
+            email="owner@example.test",
+            next_path="/account",
+            config_revision=2,
+            expires_at=1_600.0,
+            now=1_000.0,
+        )
+
+        self.assertIsNone(
+            self.store.get_oidc_association(
+                "association-token", "wrong-browser", 2, now=1_001.0
+            )
+        )
+        staged = self.store.get_oidc_association(
+            "association-token", "association-browser", 2, now=1_001.0
+        )
+        self.assertEqual(staged.id, association_id)
+        linked = self.store.complete_oidc_association(
+            "association-token",
+            "association-browser",
+            2,
+            self.owner.user_id,
+            now=1_002.0,
+        )
+        self.assertEqual(linked.user_id, self.owner.user_id)
+        self.assertIsNone(
+            self.store.get_oidc_association(
+                "association-token", "association-browser", 2, now=1_003.0
+            )
+        )
+
     def test_v16_personal_access_tokens_store_only_digest_and_authenticate(self):
         issued = self.store.create_personal_access_token(
             self.owner.user_id,
