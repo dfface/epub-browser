@@ -1219,11 +1219,34 @@ class ServerLibraryManagerTests(unittest.TestCase):
             )["book_hash"],
             record.book_id,
         )
+        self.assertTrue(
+            any(
+                event["data"]["book_id"] == record.book_id
+                for event in self.store.list_webhook_events(
+                    event_type="book.removed"
+                )
+            )
+        )
+        created_before_restore = len(
+            self.store.list_webhook_events(event_type="book.created")
+        )
+        updated_before_restore = len(
+            self.store.list_webhook_events(event_type="book.updated")
+        )
 
         self._write_epub(self.source, "Original")
         restored = manager.reconcile().active_books[0]
 
         self.assertEqual(restored.book_id, record.book_id)
+        self.assertEqual(
+            len(self.store.list_webhook_events(event_type="book.created")),
+            created_before_restore,
+        )
+        restored_events = self.store.list_webhook_events(
+            event_type="book.updated"
+        )
+        self.assertEqual(len(restored_events), updated_before_restore + 1)
+        self.assertEqual(restored_events[0]["data"]["book_id"], record.book_id)
         manager.shutdown()
 
     def test_discovery_ignores_directory_symlink_outside_source_root(self):

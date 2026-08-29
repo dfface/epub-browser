@@ -401,6 +401,13 @@ def _request_expects_html(request):
 
 def unauthenticated_response(request):
     path = request.url.path
+    if path.startswith('/book/') and path.endswith('.html') and _request_expects_html(request):
+        target = quote(_request_relative_path(request), safe='')
+        return RedirectResponse(
+            '/login?next=' + target,
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
     if path == '/book' or path.startswith('/book/'):
         return JSONResponse(
             error_payload('forbidden', 'Forbidden'),

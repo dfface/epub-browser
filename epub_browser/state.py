@@ -5710,7 +5710,18 @@ class StateStore:
                         row["book_id"],
                     ),
                 )
-                return self._get_book(connection, row["book_id"])
+                resolved = self._get_book(connection, row["book_id"])
+                if not row["active"]:
+                    self._enqueue_webhook_event_connection(
+                        connection,
+                        "book.updated",
+                        {
+                            "book_id": resolved.book_id,
+                            "format": resolved.source_format,
+                        },
+                        self._timestamp(),
+                    )
+                return resolved
 
             if authoritative_id:
                 identity_row = connection.execute(
@@ -5748,7 +5759,17 @@ class StateStore:
                             authoritative_id,
                         ),
                     )
-                    return self._get_book(connection, authoritative_id)
+                    resolved = self._get_book(connection, authoritative_id)
+                    self._enqueue_webhook_event_connection(
+                        connection,
+                        "book.updated",
+                        {
+                            "book_id": resolved.book_id,
+                            "format": resolved.source_format,
+                        },
+                        self._timestamp(),
+                    )
+                    return resolved
 
             move_matches = self._inactive_move_rows(
                 connection,
@@ -5778,7 +5799,17 @@ class StateStore:
                         book_id,
                     ),
                 )
-                return self._get_book(connection, book_id)
+                resolved = self._get_book(connection, book_id)
+                self._enqueue_webhook_event_connection(
+                    connection,
+                    "book.updated",
+                    {
+                        "book_id": resolved.book_id,
+                        "format": resolved.source_format,
+                    },
+                    self._timestamp(),
+                )
+                return resolved
             if len(move_matches) > 1:
                 raise ValueError(
                     "Multiple inactive books match the same EPUB identifier "
