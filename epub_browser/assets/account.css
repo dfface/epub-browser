@@ -281,6 +281,10 @@ body.auth-page {
     background: color-mix(in srgb, var(--account-primary) 11%, var(--account-card));
 }
 
+.auth-provider-button strong {
+    font-weight: 750;
+}
+
 .auth-alert {
     display: flex;
     align-items: flex-start;
@@ -638,7 +642,7 @@ body.auth-page {
 
 .account-oidc-card {
     display: grid;
-    gap: 16px;
+    gap: 12px;
 }
 
 .account-oidc-card[hidden] {
@@ -647,6 +651,58 @@ body.auth-page {
 
 .account-oidc-list {
     margin: 0;
+}
+
+.account-oidc-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+}
+
+.account-oidc-identity {
+    min-height: 44px;
+    flex-wrap: nowrap;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+}
+
+.account-oidc-identity::before,
+.account-oidc-empty::before {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 50%;
+    font-family: "Font Awesome 5 Free";
+    font-size: .82rem;
+    font-weight: 900;
+}
+
+.account-oidc-identity::before {
+    background: color-mix(in srgb, var(--account-primary) 11%, var(--account-card));
+    color: var(--account-primary);
+    content: "\f0c1";
+}
+
+.account-oidc-empty {
+    min-height: 44px;
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: var(--account-muted);
+    font-size: .9rem;
+    line-height: 1.5;
+}
+
+.account-oidc-empty::before {
+    background: color-mix(in srgb, var(--account-muted) 10%, var(--account-card));
+    color: var(--account-muted);
+    content: "\f127";
 }
 
 .account-oidc-identity-copy {
@@ -668,6 +724,28 @@ body.auth-page {
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+.account-oidc-actions {
+    justify-content: flex-end;
+}
+
+.account-modal .account-oidc-actions .bookshelf-action-btn {
+    min-height: 44px;
+}
+
+.account-modal .account-oidc-actions .account-danger-action {
+    border-color: transparent;
+    background: transparent;
+}
+
+.account-modal .account-oidc-actions .account-danger-action:hover {
+    border-color: color-mix(in srgb, var(--account-danger) 18%, transparent);
+    background: color-mix(in srgb, var(--account-danger) 8%, var(--account-card));
+}
+
+.account-oidc-card .account-form-message:empty {
+    display: none;
 }
 
 .account-user-oidc-row {
@@ -2570,6 +2648,23 @@ body.auth-page {
     text-transform: uppercase;
 }
 
+.account-user-danger-zone {
+    border-color: color-mix(in srgb, var(--account-danger) 20%, var(--account-border));
+}
+
+.account-user-danger-help {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .78rem;
+    line-height: 1.5;
+}
+
+.account-user-danger-zone > .bookshelf-action-btn {
+    min-height: 44px;
+    justify-self: start;
+}
+
 .account-user-action-buttons,
 .account-user-password-controls {
     display: flex;
@@ -3060,6 +3155,10 @@ body.auth-page {
     .account-user-oidc-row {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .account-oidc-summary {
+        grid-template-columns: 1fr;
     }
 
     .account-oidc-actions .bookshelf-action-btn,

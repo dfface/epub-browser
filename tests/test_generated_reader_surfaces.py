@@ -553,8 +553,23 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             '.account-user-badge',
             '.account-user-details',
             '.account-danger-action',
+            '.account-oidc-summary',
         ):
             self.assertIn(selector, stylesheet)
+        self.assertIn('.account-oidc-card .account-form-message:empty', stylesheet)
+        self.assertIn('.account-oidc-empty {', stylesheet)
+        self.assertIn('border: 0;', stylesheet[
+            stylesheet.index('.account-oidc-empty {'):
+            stylesheet.index('}', stylesheet.index('.account-oidc-empty {'))
+        ])
+        identity_rule = stylesheet[
+            stylesheet.index('.account-oidc-identity {'):
+            stylesheet.index('}', stylesheet.index('.account-oidc-identity {'))
+        ]
+        self.assertIn('border: 0;', identity_rule)
+        self.assertIn('.account-oidc-actions .account-danger-action {', stylesheet)
+        self.assertIn('.account-user-danger-zone {', stylesheet)
+        self.assertIn('.account-user-danger-zone > .bookshelf-action-btn {', stylesheet)
         self.assertIn('@media (max-width: 560px)', stylesheet)
         self.assertIn('var(--button-bg, #4361ee)', stylesheet)
 

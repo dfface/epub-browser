@@ -60,3 +60,34 @@ test('destructive confirmation focuses Cancel and restores a temporarily disable
   assert.equal(document.activeElement, trigger);
 });
 
+test('typed destructive confirmation renders semantic details and requires an exact value', async () => {
+  const document = fakeDocument();
+  const dialog = loadDialog(document);
+  const pending = dialog.prompt({
+    title: 'Delete reader',
+    message: 'The following data will be deleted.',
+    details: ['2 sessions', '4 annotations'],
+    inputLabel: 'Type reader to confirm',
+    expectedValue: 'reader',
+    destructive: true,
+  });
+  const modal = document.body.children.at(-1);
+  const content = modal.children[1];
+  const details = content.children.find(node => node.tagName === 'UL');
+  const input = content.children.find(node => node.tagName === 'INPUT');
+  const footer = content.children.at(-1);
+  const confirm = footer.children[1];
+
+  assert.deepEqual(details.children.map(node => node.textContent), [
+    '2 sessions', '4 annotations'
+  ]);
+  assert.equal(confirm.disabled, true);
+  input.value = 'Reader';
+  input.listeners.input();
+  assert.equal(confirm.disabled, true);
+  input.value = 'reader';
+  input.listeners.input();
+  assert.equal(confirm.disabled, false);
+  confirm.listeners.click();
+  assert.equal(await pending, 'reader');
+});

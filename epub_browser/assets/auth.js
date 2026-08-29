@@ -1637,6 +1637,99 @@
       }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
+    function userDeletionDetails(impact) {
+      var runtime = i18n();
+      var details = [];
+      function count(value) {
+        return runtime && runtime.formatNumber
+          ? runtime.formatNumber(value)
+          : String(value);
+      }
+      (impact.deletions || []).forEach(function(item) {
+        details.push(t('admin.userDeleteData.' + item.kind, {
+          count: count(item.count)
+        }));
+      });
+      (impact.retained || []).forEach(function(item) {
+        details.push(t('admin.userDeleteRetained.' + item.kind, {
+          count: count(item.count)
+        }));
+      });
+      return details;
+    }
+
+    function requestUserDeletion(user, confirmation) {
+      var payload = {};
+      if (confirmation !== undefined) payload.confirmation = confirmation;
+      return authenticatedFetch('/api/admin/users/' + encodeURIComponent(user.username), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(response) {
+        if (response.ok) {
+          showStatus('admin.userDeleted', 'success');
+          return loadAdminData();
+        }
+        return readJson(response).then(function(error) {
+          if (
+            response.status === 409
+            && error
+            && error.code === 'user_deletion_confirmation_required'
+            && error.impact
+          ) {
+            return confirmUserDeletion(user, error.impact);
+          }
+          showStatus(messageKey('admin', error && error.code), 'error');
+          return null;
+        });
+      }).catch(function() {
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
+    function confirmUserDeletion(user, impact) {
+      if (!root.EpubDialog) return Promise.resolve(null);
+      if (!impact.requires_typed_confirmation) {
+        if (typeof root.EpubDialog.confirm !== 'function') return Promise.resolve(null);
+        return Promise.resolve(root.EpubDialog.confirm({
+          title: t('admin.deleteUser'),
+          message: t('admin.deleteUserSimpleConfirm', { username: user.username }),
+          confirmText: t('admin.deleteUser'),
+          destructive: true
+        })).then(function(confirmed) {
+          return confirmed ? requestUserDeletion(user) : null;
+        });
+      }
+      if (typeof root.EpubDialog.prompt !== 'function') return Promise.resolve(null);
+      return Promise.resolve(root.EpubDialog.prompt({
+        title: t('admin.deleteUser'),
+        message: t('admin.deleteUserImpactConfirm', { username: user.username }),
+        details: userDeletionDetails(impact),
+        inputLabel: t('admin.deleteUserConfirmationLabel', {
+          username: impact.confirmation_text || user.username
+        }),
+        expectedValue: impact.confirmation_text || user.username,
+        confirmText: t('admin.deleteUser'),
+        destructive: true
+      })).then(function(value) {
+        if (value !== (impact.confirmation_text || user.username)) return null;
+        return requestUserDeletion(user, value);
+      });
+    }
+
+    function beginUserDeletion(user) {
+      return authenticatedFetch(
+        '/api/admin/users/' + encodeURIComponent(user.username) + '/deletion-impact'
+      ).then(function(response) {
+        if (!response.ok) return showResponseError(response, 'admin');
+        return readJson(response).then(function(payload) {
+          return confirmUserDeletion(user, payload.impact || {});
+        });
+      }).catch(function() {
+        showStatus('admin.error.network', 'error');
+      });
+    }
+
     function renderUsers() {
       var list = element('adminUserList');
       if (!list) return;
@@ -1790,6 +1883,21 @@
 
         detailsBody.appendChild(accountActions);
         detailsBody.appendChild(securityActions);
+        if (!sessionState.user || user.id !== sessionState.user.id) {
+          var dangerActions = root.document.createElement('section');
+          var dangerHelp = createTextElement(
+            'p', 'account-user-danger-help', 'admin.deleteUserHelp'
+          );
+          dangerActions.className = 'account-user-action-group account-user-danger-zone';
+          dangerActions.appendChild(createTextElement(
+            'h5', 'account-user-action-title', 'admin.dangerZone'
+          ));
+          dangerActions.appendChild(dangerHelp);
+          dangerActions.appendChild(actionButton(
+            'admin.deleteUser', function() { return beginUserDeletion(user); }, 'danger'
+          ));
+          detailsBody.appendChild(dangerActions);
+        }
         details.appendChild(detailsSummary);
         details.appendChild(detailsBody);
         item.appendChild(details);

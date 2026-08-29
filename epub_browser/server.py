@@ -53,7 +53,7 @@ from .asset_publisher import WEB_MANIFEST_SOURCES, PublishedAssets, rewrite_asse
 from .dictionary_service import DictionaryService, DictionaryServiceError
 from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
-from .state import SetupAlreadyCompleteError, StateStore
+from .state import SetupAlreadyCompleteError, StateStore, UserDeletionError
 from .library_progress import LibraryProgressBroker
 from .locales import LOCALE_NATIVE_NAMES, SUPPORTED_LOCALE_SET, normalize_locale
 from .oidc import OIDCConfiguration, OIDCError, OIDCService
@@ -1355,6 +1355,13 @@ if(localeField)localeField.value=localeSelect.value;
         oidc_markup = ''
         if oidc_settings.enabled:
             provider_name = html.escape(oidc_settings.provider_name, quote=True)
+            provider_params = html.escape(
+                json.dumps(
+                    {'provider': oidc_settings.provider_name},
+                    ensure_ascii=False,
+                ),
+                quote=True,
+            )
             oidc_href = '/auth/oidc/start?next=' + quote(
                 _safe_relative_path(next_path),
                 safe='',
@@ -1362,7 +1369,7 @@ if(localeField)localeField.value=localeSelect.value;
             oidc_markup = f'''<div class="auth-divider" role="separator"><span data-i18n="account.oidc.or">or</span></div>
 <a class="auth-provider-button" id="oidcLoginAction" href="{oidc_href}">
 <i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>
-<span data-i18n="account.oidc.continueWith">Continue with</span> <strong>{provider_name}</strong>
+<span data-i18n="account.oidc.continueWith" data-i18n-params="{provider_params}" data-i18n-strong-param="provider">Continue with <strong>{provider_name}</strong></span>
 </a>'''
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1462,13 +1469,13 @@ window.location.assign(payload.redirect||'/');
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
-<body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
+<body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
 <header class="auth-card-header">{auth_brand_markup()}</header>
 <div class="auth-intro">
 <h1 data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])}</h1>
 <p class="auth-description" data-i18n="account.oidc.errorBody">{html.escape(copy['error_body'])}</p></div>
 <div class="auth-form"><a class="auth-primary-button" href="/login" data-i18n="account.oidc.backToLogin">{html.escape(copy['back'])}</a></div>
-</section></main></body></html>'''
+</section></div></main></body></html>'''
         return HTMLResponse(
             markup,
             status_code=status_code,
@@ -1505,7 +1512,7 @@ window.location.assign(payload.redirect||'/');
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 <script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
-<body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
+<body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
 <header class="auth-card-header">{auth_brand_markup()}</header>
 <div class="auth-intro">
 <h1 data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])}</h1>
@@ -1518,7 +1525,7 @@ window.location.assign(payload.redirect||'/');
 <label class="auth-field"><span data-i18n="account.password">{html.escape(login_copy['password'])}</span>
 <input name="password" type="password" autocomplete="current-password" required maxlength="4096"></label>
 {error_markup}<button class="auth-primary-button" type="submit" data-i18n="account.oidc.associateSubmit">{html.escape(copy['submit'])}</button>
-</form></section></main></body></html>'''
+</form></section></div></main></body></html>'''
         page = HTMLResponse(
             markup,
             status_code=status_code,
@@ -2283,8 +2290,26 @@ window.location.assign(payload.redirect||'/');
             201,
         )
 
+    async def admin_user_deletion_impact(request):
+        principal = require_admin(request)
+        try:
+            user = store.get_user_by_username(request.path_params['username'])
+        except ValueError:
+            user = None
+        if user is None:
+            return response(error_payload('not_found', 'User not found'), 404)
+        if user.user_id == principal.user_id:
+            return response(
+                error_payload(
+                    'self_deletion_forbidden',
+                    'The current administrator cannot delete their own account',
+                ),
+                409,
+            )
+        return response({'impact': store.user_deletion_impact(user.user_id)})
+
     async def admin_user(request):
-        require_admin(request)
+        principal = require_admin(request)
         username = request.path_params['username']
         try:
             user = store.get_user_by_username(username)
@@ -2295,6 +2320,24 @@ window.location.assign(payload.redirect||'/');
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        if request.method == 'DELETE':
+            confirmation = data.get('confirmation')
+            if confirmation is not None and not isinstance(confirmation, str):
+                return response(
+                    error_payload('invalid_user', 'Invalid user data'), 400
+                )
+            try:
+                store.delete_user(
+                    user.user_id,
+                    replacement_user_id=principal.user_id,
+                    confirmation=confirmation,
+                )
+            except UserDeletionError as error:
+                payload = error_payload(error.code, str(error))
+                if error.impact is not None:
+                    payload['impact'] = error.impact
+                return response(payload, 409)
+            return Response(status_code=204)
         supported = {'enabled', 'role', 'revoke_sessions'}
         if not supported.intersection(data):
             return response(error_payload('invalid_user', 'Invalid user data'), 400)
@@ -4445,13 +4488,18 @@ window.location.assign(payload.redirect||'/');
         Route('/api/account/oidc/identity', account_oidc_identity, methods=['DELETE']),
         Route('/api/admin/oidc/settings', admin_oidc_settings, methods=['GET', 'PUT']),
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
+        Route(
+            '/api/admin/users/{username}/deletion-impact',
+            admin_user_deletion_impact,
+            methods=['GET'],
+        ),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
         Route(
             '/api/admin/users/{username}/oidc/identity',
             admin_user_oidc_identity,
             methods=['DELETE'],
         ),
-        Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
+        Route('/api/admin/users/{username}', admin_user, methods=['PUT', 'DELETE']),
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/index', admin_book_index, methods=['GET']),
         Route('/api/admin/books/bulk', admin_bulk_books, methods=['POST']),

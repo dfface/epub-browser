@@ -93,6 +93,102 @@ test('all supported dictionaries have identical non-empty shapes and interpolati
   });
 });
 
+test('OIDC provider actions are complete natural sentences in every locale', () => {
+  const expected = {
+    en: 'Continue with Company SSO',
+    'zh-CN': '使用 Company SSO 继续',
+    'zh-TW': '使用 Company SSO 繼續',
+    ko: 'Company SSO로 계속',
+    ja: 'Company SSO で続行',
+    es: 'Continuar con Company SSO',
+    de: 'Mit Company SSO fortfahren',
+    fr: 'Continuer avec Company SSO',
+    ru: 'Продолжить с помощью Company SSO',
+    it: 'Continua con Company SSO',
+    'pt-BR': 'Continuar com Company SSO',
+    ar: 'المتابعة باستخدام Company SSO',
+    id: 'Lanjutkan dengan Company SSO',
+    hi: 'Company SSO से जारी रखें',
+    vi: 'Tiếp tục với Company SSO',
+    th: 'ดำเนินการต่อด้วย Company SSO',
+    ms: 'Teruskan dengan Company SSO',
+  };
+  Object.entries(expected).forEach(([locale, label]) => {
+    const i18n = createRuntime(fakeRoot(locale), dictionaries);
+    i18n.init();
+    assert.equal(i18n.t('account.oidc.continueWith', { provider: 'Company SSO' }), label, locale);
+  });
+});
+
+test('rich i18n parameters preserve locale word order and use safe strong text nodes', () => {
+  const attributes = {
+    'data-i18n': 'account.oidc.continueWith',
+    'data-i18n-params': JSON.stringify({ provider: '<Company SSO>' }),
+    'data-i18n-strong-param': 'provider',
+  };
+  const children = [];
+  const document = {
+    documentElement: {},
+    createTextNode(value) { return { nodeType: 3, textContent: String(value) }; },
+    createElement(tagName) {
+      return { tagName: String(tagName).toUpperCase(), textContent: '' };
+    },
+    querySelectorAll() { return [node]; },
+  };
+  const node = {
+    ownerDocument: document,
+    getAttribute(name) { return attributes[name] || null; },
+    hasAttribute(name) { return Object.prototype.hasOwnProperty.call(attributes, name); },
+    appendChild(child) { children.push(child); return child; },
+  };
+  Object.defineProperty(node, 'textContent', {
+    get() { return children.map(child => child.textContent).join(''); },
+    set(value) {
+      children.length = 0;
+      if (value) children.push(document.createTextNode(value));
+    },
+  });
+  const root = fakeRoot('zh-CN');
+  root.EpubBrowserDisableManifest = true;
+  root.document = document;
+  const i18n = createRuntime(root, dictionaries);
+
+  i18n.setLocale('zh-CN');
+
+  assert.equal(node.textContent, '使用 <Company SSO> 继续');
+  assert.deepEqual(children.map(child => child.tagName || '#text'), [
+    '#text', 'STRONG', '#text'
+  ]);
+  assert.equal(children[1].textContent, '<Company SSO>');
+});
+
+test('user deletion warnings are complete in every supported locale', () => {
+  const locales = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
+  const keys = [
+    'admin.dangerZone', 'admin.deleteUser', 'admin.deleteUserHelp',
+    'admin.deleteUserSimpleConfirm', 'admin.deleteUserImpactConfirm',
+    'admin.deleteUserConfirmationLabel', 'admin.userDeleted',
+    'admin.userDeleteData.authentication', 'admin.userDeleteData.library',
+    'admin.userDeleteData.ai', 'admin.userDeleteData.dictionary_history',
+    'admin.userDeleteRetained.dictionary_attribution',
+    'admin.userDeleteRetained.ai_retry_attribution',
+    'admin.error.user_deletion_confirmation_required',
+    'admin.error.self_deletion_forbidden',
+  ];
+  locales.forEach(locale => keys.forEach(key => {
+    assert.equal(typeof dictionaries[locale][key], 'string', `${locale}:${key}`);
+    assert.notEqual(dictionaries[locale][key], '', `${locale}:${key}`);
+  }));
+  assert.equal(
+    dictionaries['zh-CN']['admin.deleteUserConfirmationLabel'],
+    '输入 {username} 以确认'
+  );
+  assert.match(
+    dictionaries['zh-CN']['admin.userDeleteRetained.dictionary_attribution'],
+    /保留并转交/
+  );
+});
+
 test('all locales present one unified tag vocabulary without AI or EPUB variants', () => {
   const labels = {
     en: 'Tags', 'zh-CN': '标签', 'zh-TW': '標籤', ko: '태그', ja: 'タグ',

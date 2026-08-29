@@ -1234,6 +1234,127 @@ test('account settings and administration open as separate surfaces', async () =
   ]);
 });
 
+function userDeletionHarness(impact) {
+  const requests = [];
+  const dialogs = { confirm: [], prompt: [] };
+  const elements = {
+    adminMenu: fakeElement('button'),
+    adminPanel: fakeElement('section'),
+    adminUserList: fakeElement('ul'),
+  };
+  const users = [
+    { id: 'admin', username: 'owner', role: 'admin', enabled: true, oidc_identities: [] },
+    { id: 'reader-id', username: 'reader', role: 'member', enabled: true, oidc_identities: [] },
+  ];
+  const root = rootWithFetch((url, options) => {
+    if (url === '/api/admin/users') return Promise.resolve(response(200, { users }));
+    if (url === '/api/admin/users/reader/deletion-impact') {
+      return Promise.resolve(response(200, { impact }));
+    }
+    if (url === '/api/admin/users/reader' && options && options.method === 'DELETE') {
+      requests.push(JSON.parse(options.body));
+      return Promise.resolve(response(204, {}));
+    }
+    const common = adminDataResponse(url);
+    if (common) return Promise.resolve(common);
+    if (url === '/api/admin/ai/jobs?page=1&page_size=20') {
+      return Promise.resolve(response(200, aiJobsPayload([], 1, 0, 0)));
+    }
+    if (url === '/api/admin/webhooks') return Promise.resolve(response(200, { endpoints: [] }));
+    if (url === '/api/admin/webhooks/deliveries') return Promise.resolve(response(200, { deliveries: [] }));
+    return Promise.resolve(response(200, {}));
+  });
+  root.document = {
+    hidden: false,
+    createElement: fakeElement,
+    getElementById(id) { return elements[id] || null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  root.EpubBrowserI18n = {
+    t(key, params) {
+      if (key === 'admin.userDeleteData.authentication') return `${params.count} authentication records`;
+      if (key === 'admin.userDeleteData.library') return `${params.count} library records`;
+      if (key === 'admin.userDeleteRetained.dictionary_attribution') return `${params.count} dictionary attributions retained`;
+      return `[${key}]`;
+    },
+    formatNumber(value) { return String(value); },
+    onLocaleChange() {},
+  };
+  root.EpubDialog = {
+    confirm(options) { dialogs.confirm.push(options); return Promise.resolve(true); },
+    prompt(options) { dialogs.prompt.push(options); return Promise.resolve('reader'); },
+  };
+  return { root, elements, dialogs, requests };
+}
+
+test('administrator deletion lists associated data and requires the exact username', async () => {
+  const impact = {
+    username: 'reader',
+    requires_typed_confirmation: true,
+    confirmation_text: 'reader',
+    deletions: [
+      { kind: 'authentication', count: 2 },
+      { kind: 'library', count: 4 },
+    ],
+    retained: [{ kind: 'dictionary_attribution', count: 1 }],
+  };
+  const { root, elements, dialogs, requests } = userDeletionHarness(impact);
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token'
+  });
+  await auth.init();
+  elements.adminMenu.click();
+  await tick();
+  await tick();
+  const deleteButton = descendants(elements.adminUserList).find(node =>
+    node.tagName === 'BUTTON' && node.textContent === '[admin.deleteUser]'
+  );
+
+  assert.ok(deleteButton);
+  deleteButton.click();
+  await tick();
+  await tick();
+
+  assert.equal(dialogs.confirm.length, 0);
+  assert.equal(dialogs.prompt.length, 1);
+  assert.deepEqual(dialogs.prompt[0].details, [
+    '2 authentication records',
+    '4 library records',
+    '1 dictionary attributions retained',
+  ]);
+  assert.equal(dialogs.prompt[0].expectedValue, 'reader');
+  assert.equal(dialogs.prompt[0].destructive, true);
+  assert.deepEqual(requests, [{ confirmation: 'reader' }]);
+});
+
+test('administrator deletion uses a normal confirmation for an empty user', async () => {
+  const impact = {
+    username: 'reader', requires_typed_confirmation: false,
+    confirmation_text: null, deletions: [], retained: [],
+  };
+  const { root, elements, dialogs, requests } = userDeletionHarness(impact);
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin' }, csrf_token: 'token'
+  });
+  await auth.init();
+  elements.adminMenu.click();
+  await tick();
+  await tick();
+  const deleteButton = descendants(elements.adminUserList).find(node =>
+    node.tagName === 'BUTTON' && node.textContent === '[admin.deleteUser]'
+  );
+  deleteButton.click();
+  await tick();
+  await tick();
+
+  assert.equal(dialogs.confirm.length, 1);
+  assert.equal(dialogs.prompt.length, 0);
+  assert.deepEqual(requests, [{}]);
+});
+
 test('OIDC client helpers normalize scopes and reject unsafe provider URLs', () => {
   const auth = AuthModule.create(rootWithFetch(() => Promise.resolve(response(404, {}))));
 

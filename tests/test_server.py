@@ -834,6 +834,9 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(enabled.status_code, 200)
         self.assertIn('id="oidcLoginAction"', enabled.text)
         self.assertIn('data-i18n="account.oidc.continueWith"', enabled.text)
+        self.assertIn('data-i18n-strong-param="provider"', enabled.text)
+        self.assertIn('data-i18n-params="{&quot;provider&quot;: &quot;Company SSO&quot;}"', enabled.text)
+        self.assertIn('Continue with <strong>Company SSO</strong>', enabled.text)
         self.assertIn('Company SSO', enabled.text)
         self.assertIn(
             '/auth/oidc/start?next=%2Fbook%2Fid%2Findex.html',
@@ -949,6 +952,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             form = client.get(callback.headers["location"])
             self.assertEqual(form.status_code, 200)
             self.assertIn('id="associationForm"', form.text)
+            self.assertIn('<div class="auth-stack"><section class="auth-card login-card">', form.text)
             self.assertIn('<div class="auth-intro">', form.text)
             self.assertIn('<label class="auth-field">', form.text)
             self.assertIn('<button class="auth-primary-button"', form.text)
@@ -1938,6 +1942,76 @@ class AdminAccountTests(unittest.TestCase):
         self.assertTrue(self.store.get_user_by_username("admin").enabled)
         self.assertEqual(self.store.get_user_by_username("admin").role, "admin")
 
+    def test_admin_deletes_empty_user_after_preflight(self):
+        empty = self.store.create_user("empty", hash_password("empty-secret"))
+
+        impact = self.admin_client.get(
+            "/api/admin/users/empty/deletion-impact"
+        )
+        deleted = self.admin_client.request(
+            "DELETE", "/api/admin/users/empty", json={}
+        )
+
+        self.assertEqual(impact.status_code, 200)
+        self.assertFalse(impact.json()["impact"]["requires_typed_confirmation"])
+        self.assertEqual(deleted.status_code, 204)
+        self.assertIsNone(self.store.get_user_by_username(empty.username))
+
+    def test_admin_user_deletion_rechecks_impact_and_requires_username(self):
+        impact = self.admin_client.get(
+            "/api/admin/users/member/deletion-impact"
+        )
+        missing = self.admin_client.request(
+            "DELETE", "/api/admin/users/member", json={}
+        )
+        wrong = self.admin_client.request(
+            "DELETE", "/api/admin/users/member", json={"confirmation": "Member"}
+        )
+        deleted = self.admin_client.request(
+            "DELETE", "/api/admin/users/member", json={"confirmation": "member"}
+        )
+
+        self.assertEqual(impact.status_code, 200)
+        self.assertTrue(impact.json()["impact"]["requires_typed_confirmation"])
+        self.assertIn(
+            "authentication",
+            {item["kind"] for item in impact.json()["impact"]["deletions"]},
+        )
+        for response in (missing, wrong):
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(
+                response.json()["code"],
+                "user_deletion_confirmation_required",
+            )
+            self.assertEqual(
+                response.json()["impact"]["confirmation_text"], "member"
+            )
+        self.assertEqual(deleted.status_code, 204)
+        self.assertIsNone(self.store.get_user_by_username("member"))
+        self.assertEqual(self.member_client.get("/api/session").status_code, 401)
+
+    def test_user_deletion_protects_current_admin_and_administrator_routes(self):
+        self_delete = self.admin_client.request(
+            "DELETE", "/api/admin/users/admin", json={}
+        )
+        self_impact = self.admin_client.get(
+            "/api/admin/users/admin/deletion-impact"
+        )
+        member_impact = self.member_client.get(
+            "/api/admin/users/admin/deletion-impact"
+        )
+        member_delete = self.member_client.request(
+            "DELETE", "/api/admin/users/admin", json={}
+        )
+
+        self.assertEqual(self_delete.status_code, 409)
+        self.assertEqual(self_delete.json()["code"], "self_deletion_forbidden")
+        self.assertEqual(self_impact.status_code, 409)
+        self.assertEqual(self_impact.json()["code"], "self_deletion_forbidden")
+        self.assertEqual(member_impact.status_code, 403)
+        self.assertEqual(member_delete.status_code, 403)
+        self.assertIsNotNone(self.store.get_user_by_username("admin"))
+
     def test_member_cannot_call_administrator_routes(self):
         for method, path, body in (
             ("get", "/api/admin/users", None),
@@ -1947,6 +2021,7 @@ class AdminAccountTests(unittest.TestCase):
                 {"username": "other", "password": "secret"},
             ),
             ("put", "/api/admin/users/member", {"enabled": False}),
+            ("delete", "/api/admin/users/member", {}),
             (
                 "put",
                 "/api/admin/users/member/password",
@@ -1956,6 +2031,10 @@ class AdminAccountTests(unittest.TestCase):
             with self.subTest(method=method, path=path):
                 if body is None:
                     response = getattr(self.member_client, method)(path)
+                elif method == "delete":
+                    response = self.member_client.request(
+                        "DELETE", path, json=body
+                    )
                 else:
                     response = getattr(self.member_client, method)(path, json=body)
                 self.assertEqual(response.status_code, 403)

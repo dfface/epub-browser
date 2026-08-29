@@ -115,6 +115,13 @@ class SetupAlreadyCompleteError(RuntimeError):
     pass
 
 
+class UserDeletionError(RuntimeError):
+    def __init__(self, code: str, impact: Optional[dict] = None):
+        super().__init__(code)
+        self.code = code
+        self.impact = impact
+
+
 class _AIRetrySnapshotChanged(RuntimeError):
     """Signal that retry preparation no longer matches transactional state."""
 
@@ -2936,6 +2943,191 @@ class StateStore:
                 """
             ).fetchall()
         return tuple(self._user_record(row) for row in rows)
+
+    @staticmethod
+    def _user_deletion_impact(connection, user: UserRecord) -> dict:
+        deletion_groups = (
+            (
+                "authentication",
+                (
+                    ("sessions", "user_id"),
+                    ("personal_access_tokens", "user_id"),
+                    ("user_identities", "user_id"),
+                    ("oidc_login_transactions", "expected_user_id"),
+                ),
+            ),
+            (
+                "library",
+                (
+                    ("book_access", "user_id"),
+                    ("bookshelves", "user_id"),
+                    ("reading_progress", "user_id"),
+                    ("annotations", "user_id"),
+                    ("book_reviews", "user_id"),
+                    ("reading_sessions", "user_id"),
+                ),
+            ),
+            (
+                "ai",
+                (
+                    ("ai_user_access", "user_id"),
+                    ("ai_usage", "user_id"),
+                    ("ai_reading_jobs", "owner_user_id"),
+                    ("ai_reading_results", "created_by_user_id"),
+                    ("ai_reading_followups", "owner_user_id"),
+                    ("ai_book_chat_turns", "owner_user_id"),
+                    ("ai_book_chat_summaries", "owner_user_id"),
+                ),
+            ),
+            (
+                "dictionary_history",
+                (("dictionary_import_jobs", "requested_by_user_id"),),
+            ),
+        )
+        known_user_references = {
+            source
+            for _kind, sources in deletion_groups
+            for source in sources
+        }
+        known_user_references.update({
+            ("dictionaries", "created_by_user_id"),
+            ("dictionary_defaults", "updated_by_user_id"),
+            ("ai_reading_jobs", "retried_by_user_id"),
+        })
+        tables = connection.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        discovered_user_references = {
+            (row["name"], foreign_key["from"])
+            for row in tables
+            for foreign_key in connection.execute(
+                f'PRAGMA foreign_key_list("{row["name"]}")'
+            ).fetchall()
+            if foreign_key["table"] == "users"
+        }
+        unhandled = discovered_user_references - known_user_references
+        if unhandled:
+            raise RuntimeError(
+                "User deletion impact is missing foreign-key references: "
+                + ", ".join(
+                    f"{table}.{column}" for table, column in sorted(unhandled)
+                )
+            )
+
+        def count(table, column, extra="", parameters=()):
+            row = connection.execute(
+                f'SELECT COUNT(*) FROM "{table}" WHERE "{column}" = ?{extra}',
+                (user.user_id, *parameters),
+            ).fetchone()
+            return int(row[0])
+
+        deletions = []
+        for kind, sources in deletion_groups:
+            amount = sum(count(table, column) for table, column in sources)
+            if amount:
+                deletions.append({"kind": kind, "count": amount})
+
+        dictionary_attribution = count(
+            "dictionaries", "created_by_user_id"
+        ) + count("dictionary_defaults", "updated_by_user_id")
+        retry_attribution = count(
+            "ai_reading_jobs",
+            "retried_by_user_id",
+            " AND owner_user_id != ?",
+            (user.user_id,),
+        )
+        retained = []
+        if dictionary_attribution:
+            retained.append({
+                "kind": "dictionary_attribution",
+                "count": dictionary_attribution,
+            })
+        if retry_attribution:
+            retained.append({
+                "kind": "ai_retry_attribution",
+                "count": retry_attribution,
+            })
+        requires_typed_confirmation = bool(deletions or retained)
+        return {
+            "username": user.username,
+            "requires_typed_confirmation": requires_typed_confirmation,
+            "confirmation_text": (
+                user.username if requires_typed_confirmation else None
+            ),
+            "deletions": deletions,
+            "retained": retained,
+        }
+
+    def user_deletion_impact(self, user_id: str) -> dict:
+        with self._connection() as connection:
+            user = self._get_user(connection, user_id)
+            return self._user_deletion_impact(connection, user)
+
+    def delete_user(
+        self,
+        user_id: str,
+        *,
+        replacement_user_id: str,
+        confirmation: Optional[str] = None,
+    ) -> dict:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            user = self._get_user(connection, user_id)
+            replacement = self._get_user(connection, replacement_user_id)
+            if user.user_id == replacement.user_id:
+                raise UserDeletionError("self_deletion_forbidden")
+            if user.enabled and user.role == "admin":
+                other_enabled_admin = connection.execute(
+                    """
+                    SELECT 1 FROM users
+                    WHERE id != ? AND role = 'admin' AND enabled = 1
+                    LIMIT 1
+                    """,
+                    (user.user_id,),
+                ).fetchone()
+                if other_enabled_admin is None:
+                    raise UserDeletionError("last_enabled_admin")
+
+            impact = self._user_deletion_impact(connection, user)
+            if impact["requires_typed_confirmation"] and (
+                not isinstance(confirmation, str)
+                or not hmac.compare_digest(confirmation, user.username)
+            ):
+                raise UserDeletionError(
+                    "user_deletion_confirmation_required", impact
+                )
+
+            connection.execute(
+                "DELETE FROM dictionary_import_jobs "
+                "WHERE requested_by_user_id = ?",
+                (user.user_id,),
+            )
+            connection.execute(
+                "UPDATE dictionaries SET created_by_user_id = ? "
+                "WHERE created_by_user_id = ?",
+                (replacement.user_id, user.user_id),
+            )
+            connection.execute(
+                "UPDATE dictionary_defaults SET updated_by_user_id = ? "
+                "WHERE updated_by_user_id = ?",
+                (replacement.user_id, user.user_id),
+            )
+            connection.execute(
+                "UPDATE ai_reading_jobs SET retried_by_user_id = NULL "
+                "WHERE retried_by_user_id = ?",
+                (user.user_id,),
+            )
+            cursor = connection.execute(
+                "DELETE FROM users WHERE id = ?", (user.user_id,)
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(f"Unknown user ID: {user.user_id}")
+            if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                raise sqlite3.IntegrityError(
+                    "User deletion left invalid foreign-key references"
+                )
+            return impact
 
     @staticmethod
     def _timestamp(value=None) -> float:

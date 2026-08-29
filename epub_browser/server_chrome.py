@@ -55,10 +55,12 @@ SERVER_ACCOUNT_PANEL = '''
     <div class="account-section-heading">
         <div><h3 id="accountOidcTitle" data-i18n="account.oidc.title">Connected identity</h3><p class="account-help" data-i18n="account.oidc.description">Connect your account to the configured sign-in provider.</p></div>
     </div>
-    <ul class="account-list account-oidc-list" id="accountOidcList"></ul>
-    <div class="account-oidc-actions">
-        <button type="button" id="accountOidcLink" class="bookshelf-action-btn account-primary-action" data-i18n="account.oidc.link">Connect identity</button>
-        <button type="button" id="accountOidcUnlink" class="bookshelf-action-btn account-danger-action" data-i18n="account.oidc.unlink" hidden>Disconnect identity</button>
+    <div class="account-oidc-summary">
+        <ul class="account-list account-oidc-list" id="accountOidcList"></ul>
+        <div class="account-oidc-actions">
+            <button type="button" id="accountOidcLink" class="bookshelf-action-btn account-primary-action" data-i18n="account.oidc.link">Connect identity</button>
+            <button type="button" id="accountOidcUnlink" class="bookshelf-action-btn account-danger-action" data-i18n="account.oidc.unlink" hidden>Disconnect identity</button>
+        </div>
     </div>
     <p id="accountOidcLive" class="account-form-message" role="status" aria-live="polite" aria-atomic="true"></p>
 </section>

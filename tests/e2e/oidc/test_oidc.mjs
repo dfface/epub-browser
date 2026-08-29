@@ -351,6 +351,26 @@ async function createExistingMember(page) {
   await waitFor(page, 'document.querySelector("#adminUserList").textContent.includes("reader")', 'existing member creation');
 }
 
+async function clickUserAction(page, username, key) {
+  const clicked = await evaluate(page, `(() => {
+    const item = Array.from(document.querySelectorAll('#adminUserList .account-user-item'))
+      .find(node => node.querySelector('.account-user-name')?.textContent === ${JSON.stringify(username)});
+    if (!item) return false;
+    const details = item.querySelector('details');
+    if (details) details.open = true;
+    const button = item.querySelector('button[data-i18n=${JSON.stringify(key)}]');
+    if (!button || button.disabled) return false;
+    button.click();
+    return true;
+  })()`);
+  assert.equal(clicked, true, `missing ${key} action for ${username}`);
+}
+
+async function waitForUser(page, username, present = true) {
+  const expression = `Array.from(document.querySelectorAll('#adminUserList .account-user-name')).some(node => node.textContent === ${JSON.stringify(username)})`;
+  await waitFor(page, present ? expression : `!(${expression})`, `${username} user ${present ? 'presence' : 'removal'}`);
+}
+
 async function closeAdminAndLogout(page) {
   await click(page, '#adminClose');
   await waitFor(page, '!document.querySelector("#adminPanel").classList.contains("active")', 'administration close');
@@ -386,10 +406,16 @@ try {
   assert.equal(await evaluate(page, 'Boolean(document.querySelector("#oidcLoginAction"))'), true);
 
   await runtime.page.send('Network.clearBrowserCookies');
-  await navigate(page, `${baseURL}/login`);
+  await navigate(page, `${baseURL}/login?lang=zh-CN`);
+  await waitFor(page, 'document.querySelector("#oidcLoginAction").textContent.trim() === "使用 Company SSO 继续"', 'localized OIDC action');
+  await waitFor(page, 'document.querySelector("#oidcLoginAction strong")?.textContent === "Company SSO"', 'emphasized OIDC provider');
+  await screenshot(page, 'login-oidc-zh-CN-desktop.png');
   await click(page, '#oidcLoginAction');
   await loginAtAuthelia(page, 'reader', 'reader-secret');
   await waitFor(page, 'location.pathname === "/auth/oidc/associate"', 'account association');
+  await waitFor(page, 'document.querySelector(".auth-card")', 'account association card');
+  const associationCardWidth = await evaluate(page, 'document.querySelector(".auth-card").getBoundingClientRect().width');
+  assert.ok(associationCardWidth <= 500, `association card is wider than the login measure: ${associationCardWidth}`);
   await screenshot(page, 'oidc-association-desktop.png');
   await assertAssociationKeyboardPath(page);
   await setViewport(page, 375, 812, { dark: true, reducedMotion: true });
@@ -413,6 +439,13 @@ try {
   await navigate(page, `${baseURL}/`);
   await click(page, '#accountMenu');
   await waitFor(page, 'document.querySelector("#accountOidcList").textContent.includes("Company SSO")', 'linked identity display');
+  const oidcCardGeometry = await evaluate(page, `(() => {
+    const card = document.querySelector('#accountOidcCard').getBoundingClientRect();
+    const button = document.querySelector('#accountOidcUnlink').getBoundingClientRect();
+    return { height: card.height, buttonHeight: button.height };
+  })()`);
+  assert.ok(oidcCardGeometry.height <= 300, `OIDC account card is too sparse: ${JSON.stringify(oidcCardGeometry)}`);
+  assert.ok(oidcCardGeometry.buttonHeight >= 44, `OIDC account action is below 44px: ${JSON.stringify(oidcCardGeometry)}`);
   await screenshot(page, 'account-identity-desktop.png');
   await setViewport(page, 375, 812, { dark: true, reducedMotion: true });
   await assertNoPageOverflow(page, 'OIDC account identity mobile');
@@ -448,6 +481,46 @@ try {
   await localLogin(page, 'owner', 'owner-secret');
 
   const adminSession = await jsonFetch(page, '/api/session');
+  const emptyUser = await jsonFetch(page, '/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': adminSession.body.csrf_token },
+    body: JSON.stringify({ username: 'empty-delete', password: 'empty-secret', role: 'member' }),
+  });
+  assert.equal(emptyUser.status, 201);
+  await click(page, '#adminMenu');
+  await waitFor(page, 'document.querySelector("#adminPanel").classList.contains("active")', 'administration panel for user deletion');
+  await click(page, '#adminSectionUsersTab');
+  await waitForUser(page, 'empty-delete');
+  await clickUserAction(page, 'empty-delete', 'admin.deleteUser');
+  await waitFor(page, 'Boolean(document.querySelector(".app-dialog-confirm"))', 'empty user confirmation');
+  assert.equal(await evaluate(page, 'Boolean(document.querySelector(".app-dialog-input"))'), false);
+  await click(page, '.app-dialog-confirm');
+  await waitForUser(page, 'empty-delete', false);
+
+  await clickUserAction(page, 'reader', 'admin.deleteUser');
+  await waitFor(page, 'Boolean(document.querySelector(".app-dialog-input"))', 'associated user typed confirmation');
+  const deletionDialog = await evaluate(page, `(() => ({
+    detailCount: document.querySelectorAll('.app-dialog-details li').length,
+    confirmDisabled: document.querySelector('.app-dialog-confirm').disabled,
+    inputHeight: document.querySelector('.app-dialog-input').getBoundingClientRect().height,
+    cancelHeight: document.querySelector('.app-dialog-cancel').getBoundingClientRect().height,
+    confirmHeight: document.querySelector('.app-dialog-confirm').getBoundingClientRect().height
+  }))()`);
+  assert.ok(deletionDialog.detailCount >= 1, `associated data was not listed: ${JSON.stringify(deletionDialog)}`);
+  assert.equal(deletionDialog.confirmDisabled, true);
+  assert.ok(
+    deletionDialog.inputHeight >= 44 && deletionDialog.cancelHeight >= 44 && deletionDialog.confirmHeight >= 44,
+    `deletion dialog touch targets are too small: ${JSON.stringify(deletionDialog)}`
+  );
+  await fill(page, '.app-dialog-input', 'Reader');
+  assert.equal(await evaluate(page, 'document.querySelector(".app-dialog-confirm").disabled'), true);
+  await fill(page, '.app-dialog-input', 'reader');
+  assert.equal(await evaluate(page, 'document.querySelector(".app-dialog-confirm").disabled'), false);
+  await screenshot(page, 'admin-user-delete-associated.png');
+  await click(page, '.app-dialog-confirm');
+  await waitForUser(page, 'reader', false);
+  assert.equal((await jsonFetch(page, '/api/admin/users')).body.users.some(user => user.username === 'reader'), false);
+
   const disabled = await jsonFetch(page, '/api/admin/oidc/settings', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': adminSession.body.csrf_token },

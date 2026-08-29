@@ -17,6 +17,7 @@
             var header = document.createElement('div');
             var title = document.createElement('h2');
             var message = document.createElement('p');
+            var details = null;
             var footer = document.createElement('div');
             var cancel = document.createElement('button');
             var confirm = document.createElement('button');
@@ -32,6 +33,7 @@
             title.id = 'appDialogTitle';
             title.textContent = text(options.title, localized('title'));
             message.className = 'app-dialog-message';
+            message.id = 'appDialogMessage';
             message.textContent = options.message || '';
             footer.className = 'app-dialog-footer';
             cancel.type = 'button';
@@ -43,7 +45,25 @@
 
             header.appendChild(title);
             dialog.appendChild(header);
-            if (options.message) dialog.appendChild(message);
+            if (options.message) {
+                dialog.appendChild(message);
+                modal.setAttribute('aria-describedby', message.id);
+            }
+            if (Array.isArray(options.details) && options.details.length) {
+                details = document.createElement('ul');
+                details.className = 'app-dialog-details';
+                details.id = 'appDialogDetails';
+                options.details.forEach(function(value) {
+                    var item = document.createElement('li');
+                    item.textContent = String(value);
+                    details.appendChild(item);
+                });
+                dialog.appendChild(details);
+                modal.setAttribute(
+                    'aria-describedby',
+                    (options.message ? message.id + ' ' : '') + details.id
+                );
+            }
             if (options.input) {
                 var label = document.createElement('label');
                 input = document.createElement('input');
@@ -57,6 +77,12 @@
                 input.autocomplete = 'off';
                 dialog.appendChild(label);
                 dialog.appendChild(input);
+                if (options.expectedValue !== undefined) {
+                    confirm.disabled = input.value !== String(options.expectedValue);
+                    input.addEventListener('input', function() {
+                        confirm.disabled = input.value !== String(options.expectedValue);
+                    });
+                }
             }
             footer.appendChild(cancel);
             footer.appendChild(confirm);
@@ -78,6 +104,7 @@
             }
 
             function submit() {
+                if (confirm.disabled) return;
                 close(input ? input.value : true);
             }
 

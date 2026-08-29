@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.locales import SUPPORTED_LOCALES
-from epub_browser.state import DB_SCHEMA_VERSION, StateStore
+from epub_browser.state import DB_SCHEMA_VERSION, StateStore, UserDeletionError
 
 
 def _utc(value):
@@ -74,6 +74,109 @@ class StateStoreTests(unittest.TestCase):
             {},
             authoritative_book_id=book_id,
         )
+
+    def test_user_deletion_requires_typed_confirmation_and_cleans_owned_data(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        book = self._reading_book()
+        self.store.grant_book_access(book.book_id, member.user_id)
+        self.store.create_session(
+            token_digest("reader-session"), member.user_id, 2000, now=1000
+        )
+        self.store.create_bookshelf(member.user_id, 1, {"books": []})
+        self.store.link_oidc_identity(
+            member.user_id,
+            issuer="https://identity.example.test",
+            subject="reader-subject",
+            username_claim="reader",
+            display_name="Reader",
+            email="reader@example.test",
+        )
+        self.store.create_dictionary(
+            dictionary_id="reader-dictionary",
+            display_name="Reader dictionary",
+            source_language="und",
+            target_language="und",
+            entry_count=1,
+            content_sha256="a" * 64,
+            attribution="",
+            created_by_user_id=member.user_id,
+        )
+        self.store.set_global_dictionary_default(
+            "reader-dictionary", member.user_id
+        )
+        self.store.create_dictionary_import_job(
+            job_id="reader-import",
+            original_filename="reader.zip",
+            content_sha256=None,
+            requested_by_user_id=member.user_id,
+        )
+
+        impact = self.store.user_deletion_impact(member.user_id)
+
+        self.assertTrue(impact["requires_typed_confirmation"])
+        self.assertEqual(impact["confirmation_text"], "reader")
+        self.assertEqual(
+            {item["kind"] for item in impact["deletions"]},
+            {"authentication", "library", "dictionary_history"},
+        )
+        self.assertEqual(
+            impact["retained"],
+            [{"kind": "dictionary_attribution", "count": 2}],
+        )
+        with self.assertRaisesRegex(
+            UserDeletionError, "user_deletion_confirmation_required"
+        ):
+            self.store.delete_user(
+                member.user_id,
+                replacement_user_id=self.owner.user_id,
+                confirmation="wrong",
+            )
+
+        deleted = self.store.delete_user(
+            member.user_id,
+            replacement_user_id=self.owner.user_id,
+            confirmation="reader",
+        )
+
+        self.assertEqual(deleted["username"], "reader")
+        self.assertIsNone(self.store.get_user_by_username("reader"))
+        self.assertEqual(
+            self.store.get_dictionary("reader-dictionary").created_by_user_id,
+            self.owner.user_id,
+        )
+        with self.store._connection() as connection:
+            self.assertEqual(
+                connection.execute(
+                    "SELECT updated_by_user_id FROM dictionary_defaults "
+                    "WHERE dictionary_id = 'reader-dictionary'"
+                ).fetchone()[0],
+                self.owner.user_id,
+            )
+            self.assertIsNone(connection.execute(
+                "SELECT 1 FROM dictionary_import_jobs WHERE id = 'reader-import'"
+            ).fetchone())
+            self.assertEqual(connection.execute(
+                "PRAGMA foreign_key_check"
+            ).fetchall(), [])
+
+    def test_empty_user_deletion_needs_no_typed_confirmation_and_protects_admins(self):
+        member = self.store.create_user("empty", "hash", role="member")
+        impact = self.store.user_deletion_impact(member.user_id)
+
+        self.assertFalse(impact["requires_typed_confirmation"])
+        self.assertEqual(impact["deletions"], [])
+        self.assertEqual(impact["retained"], [])
+        self.store.delete_user(
+            member.user_id,
+            replacement_user_id=self.owner.user_id,
+        )
+        self.assertIsNone(self.store.get_user_by_username("empty"))
+
+        with self.assertRaisesRegex(UserDeletionError, "self_deletion_forbidden"):
+            self.store.delete_user(
+                self.owner.user_id,
+                replacement_user_id=self.owner.user_id,
+            )
 
     def test_existing_book_rows_migrate_to_epub_source_format(self):
         legacy_database = Path(self.temporary.name, "legacy-v17.db")
