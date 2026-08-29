@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  applyDesktopChapterSidebarAutoHide,
+  applyDesktopToolbarAutoHide,
   applyPageWidth,
   allowsReaderNavigationEvent,
   chapterNavigationPresentation,
@@ -58,10 +60,71 @@ class FakeClassList {
     values.forEach(value => this.values.delete(value));
   }
 
+  toggle(value, force) {
+    if (force === true) {
+      this.values.add(value);
+      return true;
+    }
+    if (force === false) {
+      this.values.delete(value);
+      return false;
+    }
+    if (this.values.has(value)) {
+      this.values.delete(value);
+      return false;
+    }
+    this.values.add(value);
+    return true;
+  }
+
   contains(value) {
     return this.values.has(value);
   }
 }
+
+test('desktop toolbar auto-hide preference changes only the toolbar presentation state', () => {
+  const body = new FakeElement();
+  const toolbar = new FakeElement();
+  toolbar.setAttribute('aria-hidden', 'false');
+  const documentObject = {
+    body,
+    querySelector(selector) {
+      return selector === '.reader-toolbar.top-controls' ? toolbar : null;
+    },
+  };
+
+  assert.equal(applyDesktopToolbarAutoHide(documentObject, true), true);
+  assert.equal(body.classList.contains('desktop-toolbar-auto-hide'), true);
+  assert.equal(toolbar.getAttribute('aria-hidden'), 'false');
+
+  assert.equal(applyDesktopToolbarAutoHide(documentObject, false), false);
+  assert.equal(body.classList.contains('desktop-toolbar-auto-hide'), false);
+  assert.equal(toolbar.getAttribute('aria-hidden'), 'false');
+});
+
+test('chapter sidebar auto-hide only activates while the desktop sidebar is shown', () => {
+  const body = new FakeElement();
+  const toggle = new FakeElement();
+  const documentObject = {
+    body,
+    getElementById(id) {
+      return id === 'autoHideDesktopChapterSidebarToggle' ? toggle : null;
+    },
+  };
+
+  assert.equal(applyDesktopChapterSidebarAutoHide(documentObject, false, true), false);
+  assert.equal(body.classList.contains('desktop-chapter-sidebar-auto-hide'), false);
+  assert.equal(toggle.disabled, true);
+  assert.equal(toggle.getAttribute('aria-disabled'), 'true');
+
+  assert.equal(applyDesktopChapterSidebarAutoHide(documentObject, true, true), true);
+  assert.equal(body.classList.contains('desktop-chapter-sidebar-auto-hide'), true);
+  assert.equal(toggle.disabled, false);
+  assert.equal(toggle.getAttribute('aria-disabled'), 'false');
+
+  assert.equal(applyDesktopChapterSidebarAutoHide(documentObject, true, false), false);
+  assert.equal(body.classList.contains('desktop-chapter-sidebar-auto-hide'), false);
+});
 
 class FakeElement {
   constructor() {

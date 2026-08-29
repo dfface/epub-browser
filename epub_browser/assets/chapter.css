@@ -377,6 +377,11 @@ body.reader-drawer-open {
         visibility: visible;
         pointer-events: auto;
         transform: none;
+        border-color: var(--border);
+        background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
     }
 
     body.desktop-chapter-sidebar #bookHomeFloating .toc-header {
@@ -397,6 +402,27 @@ body.reader-drawer-open {
     body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
         background: var(--hover);
         box-shadow: none;
+    }
+
+    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating,
+    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating {
+        left: 0;
+        border-radius: 0 14px 14px 0;
+        opacity: .58;
+        transform: translateX(calc(-100% + var(--reader-edge-peek)));
+        transition: transform 180ms ease-out, opacity 160ms ease;
+        transition-delay: 320ms;
+        will-change: transform, opacity;
+    }
+
+    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating:hover,
+    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating:focus-within,
+    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:hover,
+    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:focus-within {
+        opacity: 1;
+        transform: translateX(0);
+        box-shadow: var(--shadow-md);
+        transition-delay: 0ms;
     }
 }
 
@@ -1102,6 +1128,66 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     padding: 16px 0 0;
     border: 0;
     border-top: 1px solid var(--border);
+}
+
+.desktop-layout-settings {
+    min-width: 0;
+    margin: 0;
+    padding: 16px 0 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+}
+
+.desktop-layout-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.desktop-layout-option {
+    margin: 0;
+}
+
+.settings-option-with-tip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-option-with-tip .settings-switch {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.desktop-layout-option.settings-option-with-tip:focus-within {
+    outline: none;
+}
+
+.desktop-layout-option:focus-within {
+    outline: 3px solid color-mix(in srgb, var(--button-bg) 34%, transparent);
+    outline-offset: 2px;
+}
+
+.desktop-layout-settings .settings-section-description {
+    margin-top: 0;
+}
+
+.desktop-layout-option:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating,
+    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating {
+        transition: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .desktop-layout-settings {
+        display: none;
+    }
 }
 
 .keyboard-navigation-options {

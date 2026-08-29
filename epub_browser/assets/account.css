@@ -18,7 +18,6 @@
     color-scheme: light;
 }
 
-.app-nav-locale .sr-only,
 .account-modal .sr-only,
 .account-modal .visually-hidden {
     position: absolute !important;

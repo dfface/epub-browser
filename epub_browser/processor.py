@@ -1650,10 +1650,11 @@ class EPUBProcessor:
             if is_pdf_book else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
-        server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
+        # Locale selection is shared navigation chrome in both SSG and Server.
+        server_locale_control = SERVER_LOCALE_CONTROL
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
         server_account_panel = SERVER_ACCOUNT_PANEL if self.deployment_mode == "server" else ""
-        server_locale_script = SERVER_LOCALE_SCRIPT if self.deployment_mode == "server" else ""
+        server_locale_script = SERVER_LOCALE_SCRIPT
         index_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2803,10 +2804,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             if self.deployment_mode == "server" else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
-        server_locale_control = SERVER_LOCALE_CONTROL if self.deployment_mode == "server" else ""
+        # Locale selection is shared navigation chrome in both SSG and Server.
+        server_locale_control = SERVER_LOCALE_CONTROL
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
         server_account_panel = SERVER_ACCOUNT_PANEL if self.deployment_mode == "server" else ""
-        server_locale_script = SERVER_LOCALE_SCRIPT if self.deployment_mode == "server" else ""
+        server_locale_script = SERVER_LOCALE_SCRIPT
         prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} aria-label="Previous chapter" data-i18n-aria-label="reader.previous" class="prev-chapter"> <div class="control-btn"> <i class="fas fa-arrow-left"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></div></a>'
@@ -3167,20 +3169,45 @@ document.addEventListener('DOMContentLoaded', function() {{
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
                     </label>
-                    <label class="settings-switch desktop-setting-only">
-                        <input type="checkbox" id="desktopChapterSidebarToggle">
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar on desktop</span>
-                    </label>
                     <label class="settings-switch">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
-                        <span class="continuous-scroll-tip" id="continuousScrollTip" data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip">
-                            <i class="fas fa-info-circle"></i>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" tabindex="0" data-settings-tip data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip" aria-label="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-aria-label="settings.continuousScrollTip">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
                         </span>
                     </label>
                 </div>
+                <fieldset class="settings-group desktop-layout-settings">
+                    <legend class="settings-section-title" data-i18n="settings.desktopLayout">Desktop layout</legend>
+                    <div class="desktop-layout-options">
+                        <label class="settings-switch desktop-layout-option desktop-setting-only">
+                            <input type="checkbox" id="desktopChapterSidebarToggle">
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar</span>
+                        </label>
+                        <div class="desktop-layout-option settings-option-with-tip desktop-setting-only">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="autoHideDesktopChapterSidebarToggle" disabled aria-disabled="true">
+                                <span class="switch-slider"></span>
+                                <span class="switch-text" data-i18n="settings.autoHideDesktopChapterSidebar">Auto-hide chapter sidebar</span>
+                            </label>
+                            <button type="button" class="settings-info-tip" data-settings-tip data-tip="Move the pointer to the left edge, or use Tab, to show the chapter sidebar." data-i18n-data-tip="settings.autoHideDesktopChapterSidebarHelp" aria-label="Move the pointer to the left edge, or use Tab, to show the chapter sidebar." data-i18n-aria-label="settings.autoHideDesktopChapterSidebarHelp">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="desktop-layout-option settings-option-with-tip">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="autoHideDesktopToolbarToggle">
+                                <span class="switch-slider"></span>
+                                <span class="switch-text" data-i18n="settings.autoHideDesktopToolbar">Auto-hide reading toolbar</span>
+                            </label>
+                            <button type="button" class="settings-info-tip" data-settings-tip data-tip="Move the pointer to the right edge, or use Tab, to show the toolbar." data-i18n-data-tip="settings.autoHideDesktopToolbarHelp" aria-label="Move the pointer to the right edge, or use Tab, to show the toolbar." data-i18n-aria-label="settings.autoHideDesktopToolbarHelp">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </fieldset>
                 <fieldset class="settings-group keyboard-navigation-settings">
                     <legend class="settings-section-title" data-i18n="settings.keyboardNavigation">Keyboard navigation</legend>
                     <div class="keyboard-navigation-options">

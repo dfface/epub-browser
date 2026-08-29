@@ -307,6 +307,12 @@ test('new locale packs translate every Library, Book, Chapter, and API Docs mess
 
 test('localizes every navigation behavior choice and its helper copy', () => {
   const keys = [
+    'settings.desktopLayout',
+    'settings.desktopChapterSidebar',
+    'settings.autoHideDesktopChapterSidebar',
+    'settings.autoHideDesktopChapterSidebarHelp',
+    'settings.autoHideDesktopToolbar',
+    'settings.autoHideDesktopToolbarHelp',
     'settings.navigationBehavior',
     'settings.navigationBehaviorHelp',
     'settings.navigationBehavior.normal',

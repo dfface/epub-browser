@@ -22,8 +22,8 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
-- [v2.8.1](releases/v2.8.1.md) — reader polish, language-aware AI-reading indicators,
-  and reliable PDF annotation deep links.
+- [v2.8.2](releases/v2.8.2.md) — focused desktop reading controls, balanced edge
+  reveals, and consistent SSG language navigation.
 - [All release notes](releases/) — versioned, immutable release documentation.
 
 ## Maintainers / 维护者

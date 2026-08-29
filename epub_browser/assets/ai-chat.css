@@ -93,13 +93,6 @@ body.ai-chat-fullscreen .ai-chat-panel { width: 100vw; height: 100dvh; border: 0
   body.ai-chat-open:not(.ai-chat-fullscreen) .app-nav #adminMenu,
   body.ai-chat-open:not(.ai-chat-fullscreen) .app-nav #accountMenu { width: 44px; padding: 0; }
 }
-@media (min-width: 1360px) {
-  /* With chat open, the book TOC becomes a deliberate edge reveal.  It remains
-     keyboard-accessible via :focus-within, while no longer competing for width. */
-  body.ai-chat-open.desktop-chapter-sidebar:not(.ai-chat-fullscreen) #bookHomeFloating { left: 0; transform: translateX(calc(-100% + 18px)); border-radius: 0 14px 14px 0; transition: transform 180ms ease-out, box-shadow 180ms ease-out; }
-  body.ai-chat-open.desktop-chapter-sidebar:not(.ai-chat-fullscreen) #bookHomeFloating:hover,
-  body.ai-chat-open.desktop-chapter-sidebar:not(.ai-chat-fullscreen) #bookHomeFloating:focus-within { transform: translateX(0); box-shadow: var(--shadow-lg); }
-}
 @media (max-width: 960px) {
   :root { --ai-chat-drawer-width: 100vw; }
   .ai-chat-overlay { align-items: flex-end; }
@@ -108,7 +101,7 @@ body.ai-chat-fullscreen .ai-chat-panel { width: 100vw; height: 100dvh; border: 0
   .ai-chat-body { padding: 10px 16px 0; }
   .ai-chat-composer { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
 }
-@media (prefers-reduced-motion: reduce) { .ai-chat-overlay, body.ai-chat-open:not(.pagination-mode) .container, body.ai-chat-open:not(.pagination-mode) .app-header, body.ai-chat-open:not(.pagination-mode) .reading-progress-container, body.ai-chat-open:not(.pagination-mode) .eb-footer, body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ai-chat-overlay, body.ai-chat-open:not(.pagination-mode) .container, body.ai-chat-open:not(.pagination-mode) .app-header, body.ai-chat-open:not(.pagination-mode) .reading-progress-container, body.ai-chat-open:not(.pagination-mode) .eb-footer { transition: none; } }
 
 /* The chat is a reading aid, not a separately themed application. */
 .ai-chat-overlay { background: transparent; }

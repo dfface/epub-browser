@@ -361,6 +361,8 @@ function initScript() {
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
         : getReadingPreference('showReadingProgressBar') !== 'false';
     var showDesktopChapterSidebar = getReadingPreference('desktopChapterSidebar') === 'true';
+    var autoHideDesktopChapterSidebar = getReadingPreference('autoHideDesktopChapterSidebar') === 'true';
+    var autoHideDesktopToolbar = getReadingPreference('autoHideDesktopToolbar') === 'true';
     var arrowKeyNavigationEnabled = window.EpubReaderLayout
         ? window.EpubReaderLayout.readingPreferenceEnabled(getReadingPreference('arrowKeyNavigation'))
         : getReadingPreference('arrowKeyNavigation') !== 'false';
@@ -369,9 +371,31 @@ function initScript() {
         : getReadingPreference('spaceKeyNavigation') !== 'false';
     applyReadingProgressBarVisibility(showReadingProgressBar);
 
+    function applyDesktopToolbarPreference() {
+        if (window.EpubReaderLayout && window.EpubReaderLayout.applyDesktopToolbarAutoHide) {
+            window.EpubReaderLayout.applyDesktopToolbarAutoHide(document, autoHideDesktopToolbar);
+            return;
+        }
+        document.body.classList.toggle('desktop-toolbar-auto-hide', autoHideDesktopToolbar);
+    }
+
+    applyDesktopToolbarPreference();
+
     function applyDesktopChapterSidebar() {
         var isVisible = showDesktopChapterSidebar && !isPaginationMode && !isKindleMode();
         document.body.classList.toggle('desktop-chapter-sidebar', isVisible);
+        if (window.EpubReaderLayout && window.EpubReaderLayout.applyDesktopChapterSidebarAutoHide) {
+            window.EpubReaderLayout.applyDesktopChapterSidebarAutoHide(
+                document,
+                isVisible,
+                autoHideDesktopChapterSidebar
+            );
+        } else {
+            document.body.classList.toggle(
+                'desktop-chapter-sidebar-auto-hide',
+                isVisible && autoHideDesktopChapterSidebar
+            );
+        }
         var persistentDrawer = document.getElementById('bookHomeFloating');
         if (persistentDrawer && !persistentDrawer.classList.contains('active')) {
             persistentDrawer.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
@@ -2841,6 +2865,8 @@ function initScript() {
     var continuousScrollTip = document.getElementById('continuousScrollTip');
     var showReadingProgressBarToggle = document.getElementById('showReadingProgressBarToggle');
     var desktopChapterSidebarToggle = document.getElementById('desktopChapterSidebarToggle');
+    var autoHideDesktopChapterSidebarToggle = document.getElementById('autoHideDesktopChapterSidebarToggle');
+    var autoHideDesktopToolbarToggle = document.getElementById('autoHideDesktopToolbarToggle');
     var arrowKeyNavigationToggle = document.getElementById('arrowKeyNavigationToggle');
     var spaceKeyNavigationToggle = document.getElementById('spaceKeyNavigationToggle');
     if (arrowKeyNavigationToggle) {
@@ -2875,6 +2901,28 @@ function initScript() {
             );
             applyDesktopChapterSidebar();
             if (showDesktopChapterSidebar) setBookTocActiveChapter(visibleChapterIndex, true);
+        });
+    }
+    if (autoHideDesktopChapterSidebarToggle) {
+        autoHideDesktopChapterSidebarToggle.checked = autoHideDesktopChapterSidebar;
+        autoHideDesktopChapterSidebarToggle.addEventListener('change', function() {
+            autoHideDesktopChapterSidebar = this.checked;
+            setReadingPreference(
+                'autoHideDesktopChapterSidebar',
+                autoHideDesktopChapterSidebar ? 'true' : 'false'
+            );
+            applyDesktopChapterSidebar();
+        });
+    }
+    if (autoHideDesktopToolbarToggle) {
+        autoHideDesktopToolbarToggle.checked = autoHideDesktopToolbar;
+        autoHideDesktopToolbarToggle.addEventListener('change', function() {
+            autoHideDesktopToolbar = this.checked;
+            setReadingPreference(
+                'autoHideDesktopToolbar',
+                autoHideDesktopToolbar ? 'true' : 'false'
+            );
+            applyDesktopToolbarPreference();
         });
     }
     if (continuousScrollToggle) {
@@ -2923,30 +2971,54 @@ function initScript() {
         });
     }
     
-    // 连续滚动开关的 hint tooltip（JS 动态创建 append 到 body，避免被 settings-content 的 overflow 裁剪）
-    if (continuousScrollTip) {
-        var tipTooltip = null;
-        continuousScrollTip.addEventListener('mouseenter', function() {
-            var tipText = continuousScrollTip.getAttribute('data-tip');
-            if (!tipText) return;
-            
-            tipTooltip = document.createElement('div');
-            tipTooltip.className = 'continuous-scroll-tooltip';
-            tipTooltip.textContent = tipText;
-            document.body.appendChild(tipTooltip);
-            
-            var iconRect = continuousScrollTip.getBoundingClientRect();
-            tipTooltip.style.left = (iconRect.left + iconRect.width / 2) + 'px';
-            tipTooltip.style.transform = 'translateX(-50%)';
-            tipTooltip.style.bottom = (window.innerHeight - iconRect.top + 8) + 'px';
-        });
-        continuousScrollTip.addEventListener('mouseleave', function() {
-            if (tipTooltip) {
-                tipTooltip.remove();
-                tipTooltip = null;
+    // 设置项的 hint tooltip（动态挂到 body，避免被 settings-content 的 overflow 裁剪）
+    var settingsTips = document.querySelectorAll('[data-settings-tip]');
+    var settingsTipTooltip = null;
+    var settingsTipOwner = null;
+
+    function hideSettingsTip(owner) {
+        if (owner && owner !== settingsTipOwner) return;
+        if (settingsTipTooltip) settingsTipTooltip.remove();
+        settingsTipTooltip = null;
+        settingsTipOwner = null;
+    }
+
+    function showSettingsTip(owner) {
+        var tipText = owner.getAttribute('data-tip');
+        if (!tipText) return;
+        hideSettingsTip();
+
+        settingsTipTooltip = document.createElement('div');
+        settingsTipTooltip.className = 'settings-info-tooltip';
+        settingsTipTooltip.setAttribute('role', 'tooltip');
+        settingsTipTooltip.textContent = tipText;
+        document.body.appendChild(settingsTipTooltip);
+        settingsTipOwner = owner;
+
+        var iconRect = owner.getBoundingClientRect();
+        var tooltipRect = settingsTipTooltip.getBoundingClientRect();
+        var tooltipCenter = iconRect.left + iconRect.width / 2;
+        var viewportPadding = 20;
+        var halfWidth = tooltipRect.width / 2;
+        tooltipCenter = Math.max(viewportPadding + halfWidth, tooltipCenter);
+        tooltipCenter = Math.min(window.innerWidth - viewportPadding - halfWidth, tooltipCenter);
+        settingsTipTooltip.style.left = tooltipCenter + 'px';
+        settingsTipTooltip.style.transform = 'translateX(-50%)';
+        settingsTipTooltip.style.bottom = (window.innerHeight - iconRect.top + 8) + 'px';
+    }
+
+    settingsTips.forEach(function(settingsTip) {
+        settingsTip.addEventListener('mouseenter', function() { showSettingsTip(settingsTip); });
+        settingsTip.addEventListener('mouseleave', function() { hideSettingsTip(settingsTip); });
+        settingsTip.addEventListener('focus', function() { showSettingsTip(settingsTip); });
+        settingsTip.addEventListener('blur', function() { hideSettingsTip(settingsTip); });
+        settingsTip.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                hideSettingsTip(settingsTip);
+                settingsTip.blur();
             }
         });
-    }
+    });
 }
 
 window.initScriptChapter = initScript;

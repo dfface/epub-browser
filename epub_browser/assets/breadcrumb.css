@@ -235,6 +235,23 @@ html {
     border-radius: 10px;
 }
 
+.app-nav-locale .sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    min-width: 1px !important;
+    max-width: 1px !important;
+    height: 1px !important;
+    min-height: 1px !important;
+    max-height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
 .app-nav .app-nav-locale-toggle {
     width: 44px;
     height: 44px;
@@ -274,11 +291,43 @@ html {
     -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
+    body.desktop-toolbar-auto-hide:not(.reader-drawer-open) .reader-toolbar.top-controls {
+        right: var(--reader-edge-peek);
+        opacity: .58;
+        transform: translate(100%, -50%);
+        transition-delay: 320ms;
+        will-change: transform, opacity;
+    }
+
+    body.desktop-toolbar-auto-hide:not(.reader-drawer-open) .reader-toolbar.top-controls::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -20px;
+        width: 28px;
+    }
+
+    body.desktop-toolbar-auto-hide:not(.reader-drawer-open) .reader-toolbar.top-controls:hover,
+    body.desktop-toolbar-auto-hide:not(.reader-drawer-open) .reader-toolbar.top-controls:focus-within {
+        opacity: 1;
+        transform: translate(0, -50%);
+        transition-delay: 0ms;
+    }
+}
+
 body.reader-drawer-open .reader-toolbar.top-controls {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
     transform: translate(10px, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.desktop-toolbar-auto-hide .reader-toolbar.top-controls {
+        transition: none;
+    }
 }
 
 .reader-toolbar.top-controls .control-btn {

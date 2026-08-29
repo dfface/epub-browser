@@ -7030,6 +7030,147 @@
   Object.keys(finalLocaleCorrections).forEach(function(code) {
     Object.assign(dictionaries[code], finalLocaleCorrections[code]);
   });
+  var desktopLayoutLocaleAdditions = {
+    en: {
+      'settings.desktopLayout': 'Desktop layout',
+      'settings.desktopChapterSidebar': 'Show chapter sidebar',
+      'settings.autoHideDesktopChapterSidebar': 'Auto-hide chapter sidebar',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Move the pointer to the left edge, or use Tab, to show the chapter sidebar.',
+      'settings.autoHideDesktopToolbar': 'Auto-hide reading toolbar',
+      'settings.autoHideDesktopToolbarHelp': 'Move the pointer to the right edge, or use Tab, to show the toolbar.'
+    },
+    'zh-CN': {
+      'settings.desktopLayout': '桌面端布局',
+      'settings.desktopChapterSidebar': '显示章节侧栏',
+      'settings.autoHideDesktopChapterSidebar': '自动隐藏章节侧栏',
+      'settings.autoHideDesktopChapterSidebarHelp': '将指针移到左侧边缘，或使用 Tab 键，即可显示章节侧栏。',
+      'settings.autoHideDesktopToolbar': '自动隐藏阅读工具栏',
+      'settings.autoHideDesktopToolbarHelp': '将指针移到右侧边缘，或使用 Tab 键，即可显示工具栏。'
+    },
+    'zh-TW': {
+      'settings.desktopLayout': '桌面版面',
+      'settings.desktopChapterSidebar': '顯示章節側邊欄',
+      'settings.autoHideDesktopChapterSidebar': '自動隱藏章節側邊欄',
+      'settings.autoHideDesktopChapterSidebarHelp': '將指標移至左側邊緣，或使用 Tab 鍵，即可顯示章節側邊欄。',
+      'settings.autoHideDesktopToolbar': '自動隱藏閱讀工具列',
+      'settings.autoHideDesktopToolbarHelp': '將指標移至右側邊緣，或使用 Tab 鍵，即可顯示工具列。'
+    },
+    ko: {
+      'settings.desktopLayout': '데스크톱 레이아웃',
+      'settings.desktopChapterSidebar': '챕터 사이드바 표시',
+      'settings.autoHideDesktopChapterSidebar': '챕터 사이드바 자동 숨기기',
+      'settings.autoHideDesktopChapterSidebarHelp': '포인터를 왼쪽 가장자리로 이동하거나 Tab 키를 누르면 챕터 사이드바가 표시됩니다.',
+      'settings.autoHideDesktopToolbar': '읽기 도구 모음 자동 숨기기',
+      'settings.autoHideDesktopToolbarHelp': '포인터를 오른쪽 가장자리로 이동하거나 Tab 키를 누르면 도구 모음이 표시됩니다.'
+    },
+    ja: {
+      'settings.desktopLayout': 'デスクトップレイアウト',
+      'settings.desktopChapterSidebar': '章サイドバーを表示',
+      'settings.autoHideDesktopChapterSidebar': '章サイドバーを自動的に隠す',
+      'settings.autoHideDesktopChapterSidebarHelp': 'ポインターを左端に移動するか、Tab キーを使うと章サイドバーが表示されます。',
+      'settings.autoHideDesktopToolbar': '読書ツールバーを自動的に隠す',
+      'settings.autoHideDesktopToolbarHelp': 'ポインターを右端に移動するか、Tab キーを使うとツールバーが表示されます。'
+    },
+    es: {
+      'settings.desktopLayout': 'Diseño de escritorio',
+      'settings.desktopChapterSidebar': 'Mostrar la barra lateral de capítulos',
+      'settings.autoHideDesktopChapterSidebar': 'Ocultar automáticamente la barra lateral de capítulos',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Mueve el puntero al borde izquierdo o usa Tab para mostrar la barra lateral de capítulos.',
+      'settings.autoHideDesktopToolbar': 'Ocultar automáticamente la barra de lectura',
+      'settings.autoHideDesktopToolbarHelp': 'Mueve el puntero al borde derecho o usa Tab para mostrar la barra de herramientas.'
+    },
+    de: {
+      'settings.desktopLayout': 'Desktop-Layout',
+      'settings.desktopChapterSidebar': 'Kapitel-Seitenleiste anzeigen',
+      'settings.autoHideDesktopChapterSidebar': 'Kapitel-Seitenleiste automatisch ausblenden',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Bewege den Zeiger an den linken Rand oder verwende Tab, um die Kapitel-Seitenleiste einzublenden.',
+      'settings.autoHideDesktopToolbar': 'Lesewerkzeugleiste automatisch ausblenden',
+      'settings.autoHideDesktopToolbarHelp': 'Bewege den Zeiger an den rechten Rand oder verwende Tab, um die Werkzeugleiste einzublenden.'
+    },
+    fr: {
+      'settings.desktopLayout': 'Mise en page du bureau',
+      'settings.desktopChapterSidebar': 'Afficher la barre latérale des chapitres',
+      'settings.autoHideDesktopChapterSidebar': 'Masquer automatiquement la barre latérale des chapitres',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Placez le pointeur sur le bord gauche ou utilisez Tab pour afficher la barre latérale des chapitres.',
+      'settings.autoHideDesktopToolbar': 'Masquer automatiquement la barre d’outils de lecture',
+      'settings.autoHideDesktopToolbarHelp': 'Placez le pointeur sur le bord droit ou utilisez Tab pour afficher la barre d’outils.'
+    },
+    ru: {
+      'settings.desktopLayout': 'Компоновка для компьютера',
+      'settings.desktopChapterSidebar': 'Показывать боковую панель глав',
+      'settings.autoHideDesktopChapterSidebar': 'Автоматически скрывать боковую панель глав',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Подведите указатель к левому краю или нажмите Tab, чтобы показать боковую панель глав.',
+      'settings.autoHideDesktopToolbar': 'Автоматически скрывать панель инструментов чтения',
+      'settings.autoHideDesktopToolbarHelp': 'Подведите указатель к правому краю или нажмите Tab, чтобы показать панель инструментов.'
+    },
+    it: {
+      'settings.desktopLayout': 'Layout desktop',
+      'settings.desktopChapterSidebar': 'Mostra la barra laterale dei capitoli',
+      'settings.autoHideDesktopChapterSidebar': 'Nascondi automaticamente la barra laterale dei capitoli',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Sposta il puntatore sul bordo sinistro o usa Tab per mostrare la barra laterale dei capitoli.',
+      'settings.autoHideDesktopToolbar': 'Nascondi automaticamente la barra degli strumenti di lettura',
+      'settings.autoHideDesktopToolbarHelp': 'Sposta il puntatore sul bordo destro o usa Tab per mostrare la barra degli strumenti.'
+    },
+    'pt-BR': {
+      'settings.desktopLayout': 'Layout para desktop',
+      'settings.desktopChapterSidebar': 'Mostrar a barra lateral de capítulos',
+      'settings.autoHideDesktopChapterSidebar': 'Ocultar automaticamente a barra lateral de capítulos',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Mova o ponteiro até a borda esquerda ou use Tab para mostrar a barra lateral de capítulos.',
+      'settings.autoHideDesktopToolbar': 'Ocultar automaticamente a barra de leitura',
+      'settings.autoHideDesktopToolbarHelp': 'Mova o ponteiro até a borda direita ou use Tab para mostrar a barra de ferramentas.'
+    },
+    ar: {
+      'settings.desktopLayout': 'تخطيط سطح المكتب',
+      'settings.desktopChapterSidebar': 'إظهار الشريط الجانبي للفصول',
+      'settings.autoHideDesktopChapterSidebar': 'إخفاء الشريط الجانبي للفصول تلقائيًا',
+      'settings.autoHideDesktopChapterSidebarHelp': 'حرّك المؤشر إلى الحافة اليسرى أو استخدم Tab لإظهار الشريط الجانبي للفصول.',
+      'settings.autoHideDesktopToolbar': 'إخفاء شريط أدوات القراءة تلقائيًا',
+      'settings.autoHideDesktopToolbarHelp': 'حرّك المؤشر إلى الحافة اليمنى أو استخدم Tab لإظهار شريط الأدوات.'
+    },
+    id: {
+      'settings.desktopLayout': 'Tata letak desktop',
+      'settings.desktopChapterSidebar': 'Tampilkan bilah sisi bab',
+      'settings.autoHideDesktopChapterSidebar': 'Sembunyikan otomatis bilah sisi bab',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Gerakkan penunjuk ke tepi kiri atau gunakan Tab untuk menampilkan bilah sisi bab.',
+      'settings.autoHideDesktopToolbar': 'Sembunyikan otomatis bilah alat membaca',
+      'settings.autoHideDesktopToolbarHelp': 'Gerakkan penunjuk ke tepi kanan atau gunakan Tab untuk menampilkan bilah alat.'
+    },
+    hi: {
+      'settings.desktopLayout': 'डेस्कटॉप लेआउट',
+      'settings.desktopChapterSidebar': 'अध्याय साइडबार दिखाएँ',
+      'settings.autoHideDesktopChapterSidebar': 'अध्याय साइडबार अपने आप छिपाएँ',
+      'settings.autoHideDesktopChapterSidebarHelp': 'अध्याय साइडबार दिखाने के लिए पॉइंटर को बाएँ किनारे पर ले जाएँ या Tab का उपयोग करें।',
+      'settings.autoHideDesktopToolbar': 'पठन टूलबार अपने आप छिपाएँ',
+      'settings.autoHideDesktopToolbarHelp': 'टूलबार दिखाने के लिए पॉइंटर को दाएँ किनारे पर ले जाएँ या Tab का उपयोग करें।'
+    },
+    vi: {
+      'settings.desktopLayout': 'Bố cục máy tính',
+      'settings.desktopChapterSidebar': 'Hiện thanh bên chương',
+      'settings.autoHideDesktopChapterSidebar': 'Tự động ẩn thanh bên chương',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Di chuyển con trỏ đến cạnh trái hoặc dùng Tab để hiện thanh bên chương.',
+      'settings.autoHideDesktopToolbar': 'Tự động ẩn thanh công cụ đọc',
+      'settings.autoHideDesktopToolbarHelp': 'Di chuyển con trỏ đến cạnh phải hoặc dùng Tab để hiện thanh công cụ.'
+    },
+    th: {
+      'settings.desktopLayout': 'เค้าโครงเดสก์ท็อป',
+      'settings.desktopChapterSidebar': 'แสดงแถบด้านข้างของบท',
+      'settings.autoHideDesktopChapterSidebar': 'ซ่อนแถบด้านข้างของบทอัตโนมัติ',
+      'settings.autoHideDesktopChapterSidebarHelp': 'เลื่อนตัวชี้ไปที่ขอบซ้ายหรือใช้ Tab เพื่อแสดงแถบด้านข้างของบท',
+      'settings.autoHideDesktopToolbar': 'ซ่อนแถบเครื่องมือการอ่านอัตโนมัติ',
+      'settings.autoHideDesktopToolbarHelp': 'เลื่อนตัวชี้ไปที่ขอบขวาหรือใช้ Tab เพื่อแสดงแถบเครื่องมือ'
+    },
+    ms: {
+      'settings.desktopLayout': 'Reka letak desktop',
+      'settings.desktopChapterSidebar': 'Tunjukkan bar sisi bab',
+      'settings.autoHideDesktopChapterSidebar': 'Sembunyikan bar sisi bab secara automatik',
+      'settings.autoHideDesktopChapterSidebarHelp': 'Gerakkan penuding ke tepi kiri atau gunakan Tab untuk menunjukkan bar sisi bab.',
+      'settings.autoHideDesktopToolbar': 'Sembunyikan bar alat bacaan secara automatik',
+      'settings.autoHideDesktopToolbarHelp': 'Gerakkan penuding ke tepi kanan atau gunakan Tab untuk menunjukkan bar alat.'
+    }
+  };
+  Object.keys(desktopLayoutLocaleAdditions).forEach(function(code) {
+    Object.assign(dictionaries[code], desktopLayoutLocaleAdditions[code]);
+  });
   Object.keys(dictionaries).forEach(function(code) {
     Object.keys(localeNativeNames).forEach(function(localeCode) { dictionaries[code]['locale.name.' + localeCode] = localeNativeNames[localeCode]; });
   });
