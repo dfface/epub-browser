@@ -2736,6 +2736,7 @@ window.location.assign(payload.redirect||'/');
             or not isinstance(data.get('enabled'), bool)
             or (
                 'daily_limit' in data
+                and limit is not None
                 and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0)
             )
         ):

@@ -2070,6 +2070,34 @@ class AdminAccountTests(unittest.TestCase):
             403,
         )
 
+    def test_admin_can_clear_a_member_ai_daily_limit(self):
+        cleared = self.admin_client.put(
+            "/api/admin/ai/users/" + self.member.user_id,
+            json={"enabled": True, "daily_limit": None},
+        )
+
+        self.assertEqual(cleared.status_code, 200)
+        self.assertEqual(
+            cleared.json()["access"],
+            {"enabled": True, "daily_limit": None},
+        )
+        self.assertEqual(
+            self.admin_client.get(
+                "/api/admin/ai/users/" + self.member.user_id
+            ).json()["access"],
+            {"enabled": True, "daily_limit": None},
+        )
+
+    def test_admin_rejects_invalid_member_ai_daily_limits(self):
+        for daily_limit in (True, -1, "unlimited"):
+            with self.subTest(daily_limit=daily_limit):
+                rejected = self.admin_client.put(
+                    "/api/admin/ai/users/" + self.member.user_id,
+                    json={"enabled": True, "daily_limit": daily_limit},
+                )
+                self.assertEqual(rejected.status_code, 400)
+                self.assertEqual(rejected.json()["code"], "invalid_ai_access")
+
     def test_ai_reading_library_lists_retained_shared_results_for_visible_books(self):
         visible = self.store.resolve_book(
             Path(self.directory.name) / "visible.epub", "urn:test:visible", "visible-fingerprint",
