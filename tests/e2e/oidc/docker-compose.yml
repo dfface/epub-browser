@@ -1,0 +1,67 @@
+services:
+  authelia:
+    image: authelia/authelia:4.39.13
+    environment:
+      X_AUTHELIA_CONFIG_FILTERS: template
+    volumes:
+      - ./authelia/configuration.yml:/config/configuration.yml:ro
+      - ./authelia/users.yml:/config/users.yml:ro
+      - ./authelia/private.pem:/config/private.pem:ro
+      - authelia-data:/data
+    healthcheck:
+      test: [CMD, /app/healthcheck.sh]
+      interval: 2s
+      timeout: 2s
+      retries: 45
+      start_period: 5s
+
+  epub-browser:
+    build:
+      context: ../../..
+      dockerfile: Dockerfile
+    environment:
+      EPUB_BROWSER_ADMIN_USERNAME: owner
+      EPUB_BROWSER_ADMIN_PASSWORD: owner-secret
+      SSL_CERT_FILE: /certs/ca.crt
+    network_mode: service:gateway
+    command:
+      - epub-browser
+      - server
+      - /app/Library
+      - --book-id-storage=sidecar
+      - --server-dir=/app/EpubBrowserFiles
+      - --host=0.0.0.0
+      - --port=80
+      - --cookie-secure
+      - --no-browser
+    volumes:
+      - epub-browser-data:/app/EpubBrowserFiles
+      - ${OIDC_E2E_CERT_DIR:?run through run.sh}/ca.crt:/certs/ca.crt:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:80/login', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+      start_period: 5s
+
+  gateway:
+    image: nginx:1.29-alpine
+    depends_on:
+      authelia:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:18443:18443
+      - 127.0.0.1:18444:18444
+    volumes:
+      - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${OIDC_E2E_CERT_DIR:?run through run.sh}:/certs:ro
+    healthcheck:
+      test: [CMD, wget, --no-check-certificate, --spider, https://127.0.0.1:18443/]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 2s
+
+volumes:
+  authelia-data:
+  epub-browser-data:

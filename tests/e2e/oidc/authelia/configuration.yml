@@ -1,0 +1,61 @@
+server:
+  address: tcp://0.0.0.0:9091/
+
+log:
+  level: info
+
+identity_validation:
+  reset_password:
+    jwt_secret: oidc-e2e-reset-password-secret-only-not-for-production
+
+authentication_backend:
+  file:
+    path: /config/users.yml
+    watch: false
+
+access_control:
+  default_policy: one_factor
+
+session:
+  secret: oidc-e2e-session-secret-only-not-for-production-0123456789abcdef
+  cookies:
+    - domain: 127.0.0.1
+      authelia_url: https://127.0.0.1:18444
+
+storage:
+  encryption_key: oidc-e2e-storage-key-only-not-for-production-0123456789abcdef
+  local:
+    path: /data/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /data/notification.txt
+
+identity_providers:
+  oidc:
+    hmac_secret: oidc-e2e-hmac-secret-only-not-for-production-0123456789abcdef
+    jwks:
+      - key_id: oidc-e2e
+        algorithm: RS256
+        use: sig
+        key: {{ secret "/config/private.pem" | mindent 10 "|" | msquote }}
+    clients:
+      - client_id: epub-browser-e2e
+        client_name: EPUB Browser E2E
+        client_secret: $pbkdf2-sha512$310000$c8p78n7pUMln0jzvd4aK4Q$JNRBzwAo0ek5qKn50cFzzvE9RXV88h1wJn5KGiHrD0YKtZaR/nCb2CJPOsKaPK0hjf.9yHxzQGZziziccp6Yng
+        public: false
+        authorization_policy: one_factor
+        require_pkce: true
+        pkce_challenge_method: S256
+        redirect_uris:
+          - https://127.0.0.1:18443/auth/oidc/callback
+        scopes:
+          - openid
+          - profile
+          - email
+        response_types:
+          - code
+        grant_types:
+          - authorization_code
+        token_endpoint_auth_method: client_secret_basic
+        consent_mode: implicit

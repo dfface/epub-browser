@@ -1,0 +1,15 @@
+users:
+  reader:
+    disabled: false
+    displayname: Existing Reader
+    password: $argon2id$v=19$m=65536,t=3,p=4$qrBQ4EGW4MBbuR3kaKnMcQ$pBnPcO9MtrW0mgLXBMbAVd1ecAXUE+C3FIPPErMwOac
+    email: reader@example.test
+    groups:
+      - readers
+  newcomer:
+    disabled: false
+    displayname: New Reader
+    password: $argon2id$v=19$m=65536,t=3,p=4$rBLkAeEDrpC0FSwlAIEbKA$IyM3T4DeCRT1xUTxdjuB/g6BihwOd48V1SOrOegrdXg
+    email: newcomer@example.test
+    groups:
+      - readers
