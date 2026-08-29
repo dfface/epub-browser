@@ -2067,6 +2067,22 @@
         }
     };
     
+    var AnnotationSettingsMarkup = {
+        colorHeader: function() {
+            return '\
+                <span class="color-header-label">\
+                    <span data-i18n="annotations.colors">' + tr('colors') + '</span>\
+                    <span class="color-tip-reorder" data-tooltip="' + tr('colorReorderTip') + '" aria-label="' + tr('colorReorderTip') + '" data-i18n-data-tip="annotations.colorReorderTip" data-i18n-aria-label="annotations.colorReorderTip"><i class="fas fa-info-circle"></i></span>\
+                </span>\
+                <button class="color-add-btn" title="' + tr('addColor') + '" aria-label="' + tr('addColor') + '" data-i18n-title="annotations.addColor" data-i18n-aria-label="annotations.addColor"><i class="fas fa-plus"></i></button>';
+        },
+        colorDeleteButton: function(color, selected) {
+            return '\
+                <button class="color-option' + (selected ? ' selected' : '') + '" style="background-color: ' + color + '"></button>\
+                <button class="color-delete-btn" title="' + tr('deleteColor') + '" aria-label="' + tr('deleteColor') + '" data-i18n-title="annotations.deleteColor" data-i18n-aria-label="annotations.deleteColor"><i class="fas fa-times"></i></button>';
+        }
+    };
+
     // ========== Settings Tab Module ==========
     var SettingsTab = {
         initialized: false,
@@ -2080,7 +2096,7 @@
             var tabBtn = document.createElement('button');
             tabBtn.className = 'settings-tab';
             tabBtn.setAttribute('data-tab', 'annotation');
-            tabBtn.innerHTML = '<i class="fas fa-highlighter"></i><span>' + tr('tab') + '</span>';
+            tabBtn.innerHTML = '<i class="fas fa-highlighter"></i><span data-i18n="annotations.tab">' + tr('tab') + '</span>';
             
             // Create tab panel
             var tabPanel = document.createElement('div');
@@ -2091,24 +2107,24 @@
                     <label class="settings-switch">\
                         <input type="checkbox" id="annotationEnabled" ' + (Settings.enabled ? 'checked' : '') + '>\
                         <span class="switch-slider"></span>\
-                        <span class="switch-text">' + tr('enabled') + '</span>\
+                        <span class="switch-text" data-i18n="annotations.enabled">' + tr('enabled') + '</span>\
                     </label>\
                 </div>\
                 <div class="settings-group">\
                     <label class="settings-label">\
-                        ' + tr('defaultColor') + '\
-                        <span class="color-tip-default" data-tooltip="' + tr('defaultColorTip') + '" aria-label="' + tr('defaultColorTip') + '"><i class="fas fa-info-circle"></i></span>\
+                        <span data-i18n="annotations.defaultColor">' + tr('defaultColor') + '</span>\
+                        <span class="color-tip-default" data-tooltip="' + tr('defaultColorTip') + '" aria-label="' + tr('defaultColorTip') + '" data-i18n-data-tip="annotations.defaultColorTip" data-i18n-aria-label="annotations.defaultColorTip"><i class="fas fa-info-circle"></i></span>\
                     </label>\
                     <div class="color-picker-default"></div>\
                 </div>\
                 <div class="settings-group">\
-                    <label class="settings-label">' + tr('exportData') + '</label>\
+                    <label class="settings-label" data-i18n="annotations.exportData">' + tr('exportData') + '</label>\
                     <div class="export-buttons">\
                         <button class="annotation-btn annotation-btn-secondary" id="exportBookBtn">\
-                            <i class="fas fa-download"></i> ' + tr('exportBook') + '\
+                            <i class="fas fa-download"></i> <span data-i18n="annotations.exportBook">' + tr('exportBook') + '</span>\
                         </button>\
                         <button class="annotation-btn annotation-btn-secondary" id="exportAllBtn">\
-                            <i class="fas fa-download"></i> ' + tr('exportAll') + '\
+                            <i class="fas fa-download"></i> <span data-i18n="annotations.exportAll">' + tr('exportAll') + '</span>\
                         </button>\
                     </div>\
                 </div>';
@@ -2219,12 +2235,7 @@
             // Create header with info and add button
             var header = document.createElement('div');
             header.className = 'color-picker-header';
-            header.innerHTML = '\
-                <span class="color-header-label">\
-                    ' + tr('colors') + '\
-                    <span class="color-tip-reorder" data-tooltip="' + tr('colorReorderTip') + '" aria-label="' + tr('colorReorderTip') + '"><i class="fas fa-info-circle"></i></span>\
-                </span>\
-                <button class="color-add-btn" title="' + tr('addColor') + '"><i class="fas fa-plus"></i></button>';
+            header.innerHTML = AnnotationSettingsMarkup.colorHeader();
             picker.appendChild(header);
             
             // Create colors container
@@ -2244,9 +2255,10 @@
                     btn.className = 'color-option-wrapper';
                     btn.setAttribute('draggable', 'true');
                     btn.setAttribute('data-color', color);
-                    btn.innerHTML = '\
-                        <button class="color-option' + (color === Settings.defaultColor ? ' selected' : '') + '" style="background-color: ' + color + '"></button>\
-                        <button class="color-delete-btn" title="' + tr('deleteColor') + '"><i class="fas fa-times"></i></button>';
+                    btn.innerHTML = AnnotationSettingsMarkup.colorDeleteButton(
+                        color,
+                        color === Settings.defaultColor
+                    );
                     
                     var colorBtn = btn.querySelector('.color-option');
                     colorBtn.addEventListener('click', function(e) {
@@ -2795,6 +2807,7 @@
                 return HighlightInteraction.resolveLegacyPointMeta(meta, chapterRoot);
             }
         };
+        global.__testAnnotationSettingsMarkup = AnnotationSettingsMarkup;
     }
     
 })(window);

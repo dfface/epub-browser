@@ -425,6 +425,76 @@ test('annotation settings do not render a storage selector', async () => {
   assert.equal(panel.innerHTML.includes('id="annotationEnabled"'), true);
 });
 
+test('annotation settings remain bound to live locale changes', async () => {
+  const createdElements = [];
+  const document = {
+    cookie: '',
+    documentElement: { querySelectorAll() { return []; } },
+    getElementById() { return null; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    createElement(tagName) {
+      const element = {
+        tagName,
+        className: '',
+        id: '',
+        innerHTML: '',
+        setAttribute() {},
+      };
+      createdElements.push(element);
+      return element;
+    },
+  };
+  function Highlighter() {
+    return { on() {}, run() {}, stop() {}, removeAll() {} };
+  }
+  Highlighter.event = { CREATE: 'create', CLICK: 'click' };
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) },
+    'server',
+    document,
+    { annotationStorageType: 'backend', Highlighter },
+  );
+
+  await window.AnnotationModule.init({ bookHash: 'book', chapterIndex: 0 });
+
+  const tab = createdElements.find(element => element.className === 'settings-tab');
+  const panel = createdElements.find(element => element.id === 'annotation-tab');
+  assert.ok(tab);
+  assert.ok(panel);
+  assert.match(tab.innerHTML, /data-i18n="annotations\.tab"/);
+  for (const key of [
+    'annotations.enabled',
+    'annotations.defaultColor',
+    'annotations.defaultColorTip',
+    'annotations.exportData',
+    'annotations.exportBook',
+    'annotations.exportAll',
+  ]) {
+    assert.equal(
+      panel.innerHTML.includes(key),
+      true,
+      `${key} must remain connected to the document locale`,
+    );
+  }
+});
+
+test('annotation color controls remain bound to live locale changes', () => {
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) },
+    'server',
+  );
+
+  const markup = window.__testAnnotationSettingsMarkup.colorHeader();
+  assert.match(markup, /data-i18n="annotations\.colors"/);
+  assert.match(markup, /data-i18n-data-tip="annotations\.colorReorderTip"/);
+  assert.match(markup, /data-i18n-title="annotations\.addColor"/);
+  assert.match(markup, /data-i18n-aria-label="annotations\.addColor"/);
+  const deleteMarkup = window.__testAnnotationSettingsMarkup.colorDeleteButton('#FFEB3B', true);
+  assert.match(deleteMarkup, /data-i18n-title="annotations\.deleteColor"/);
+  assert.match(deleteMarkup, /data-i18n-aria-label="annotations\.deleteColor"/);
+});
+
 test('maps a non-2xx annotation API payload code to localized, non-server error text', async () => {
   const storage = loadBackendStorage({
     status: 404,

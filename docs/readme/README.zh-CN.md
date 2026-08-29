@@ -1,28 +1,78 @@
 # EPUB Browser
 
-> 私有 EPUB 阅读服务，以及自包含的静态站点生成器。
+> 用同一套精致的 Web 阅读体验阅读 EPUB 和 PDF：既可以生成完全自包含的
+> 静态站点，也可以运行带账户和同步能力的私有阅读服务。
 
 **README：** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 
 **界面语言（17 种）：** 英语、简体中文、繁体中文、日语、韩语、西班牙语、德语、法语、俄语、意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语。
 
 <p align="center">
-  <img src="https://github.com/dfface/epub-browser/blob/aff1def01252481f74c25ebf5b17d142b7db3c5e/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser 标志" width="520">
+  <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser 标志" width="520">
 </p>
 
 [![PyPI version](https://img.shields.io/pypi/v/epub-browser)](https://pypi.org/project/epub-browser/)
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](../../License.txt)
 
-EPUB Browser 提供两个职责清晰的模式：
+![PDF 在 EPUB Browser 共用阅读器中渲染，保留原始页面、导航、主题与阅读工具。](../releases/assets/v2.8.0-pdf-reader.png)
 
-| | `ssg` | `server` |
+EPUB Browser 现在同时接受 `.epub` 和 `.pdf`。两种格式共用 Library、书籍详情、
+目录、阅读模式、主题、阅读进度和标注流程。PDF 不会被交给浏览器下载或另开一套预览器；
+每一页都会成为阅读器中的一个章节，由本地 PDF.js 在现有阅读界面内渲染。
+
+## 目录
+
+- [为什么选择 EPUB Browser](#为什么选择-epub-browser)
+- [选择 SSG 或 Server](#选择-ssg-或-server)
+- [演示站点](#演示站点)
+- [AI 原生阅读](#ai-原生阅读仅-server-模式)
+- [选择安装方式](#选择安装方式)
+- [快速开始](#快速开始)
+- [输入源与稳定书籍身份](#输入源与稳定书籍身份)
+- [PDF 阅读：一页就是一个章节](#pdf-阅读一页就是一个章节)
+- [SSG 模式详解](#ssg-模式详解)
+- [Server 模式详解](#server-模式详解)
+- [Docker](#docker)
+- [完整命令参考](#完整命令参考)
+- [阅读数据与功能归属](#阅读数据与功能归属)
+- [OpenAPI 与 WebHook](#server-api-与-webhook)
+- [开发与贡献](#参与贡献)
+- [许可证](#许可证)
+
+## 为什么选择 EPUB Browser
+
+- **EPUB 与 PDF 共用一个阅读器**：EPUB 章节和 PDF 页面使用同一套导航、响应式布局、
+  主题、全屏、搜索、书架、进度、阅读时长和书籍详情。
+- **三种阅读行为**：可以按章节滚动、使用有界渲染窗口连续阅读，或者翻页阅读。
+  PDF 还支持适合宽度、适合页面和任意比例缩放，页面始终留在阅读舞台中。
+- **在原文上完成标注与查阅**：高亮、笔记、标注汇总与导出、词典和百科都在阅读现场完成。
+  带文本层的 PDF 直接复用同一个选择弹窗；纯图片 PDF 会明确降级，不伪装成可选文字。
+- **真正的个人书库**：封面、元数据、标签、评分、书评、嵌套书架、搜索、阅读时段和洞察
+  都依靠稳定书籍 ID 关联；Server 监控目录中的源文件暂时移走后再放回，也会恢复原记录。
+- **私有 Server 能力**：需要时可以启用账户、权限、跨设备阅读数据、管理后台、OpenAPI、
+  WebHook 和 EPUB AI 阅读。
+- **运行时完全自包含**：应用脚本、样式、字体、图标、PDF.js 和富文本渲染器都从本地提供，
+  阅读过程不依赖 CDN。
+- **17 种界面语言**：英语、简体中文、繁体中文、日语、韩语、西班牙语、德语、法语、
+  俄语、意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语。
+
+## 选择 SSG 或 Server
+
+两种模式复用同一套内容处理与页面模板。选择依据是阅读数据需要存在哪里，而不是书籍格式：
+
+| 能力 | `ssg` | `server` |
 | --- | --- | --- |
-| 部署方式 | 静态托管、Pages、对象存储、Nginx | 持久化的私有阅读服务 |
-| 账户 | 无 | 本地账户 |
-| 进度、标注、书架 | 仅当前浏览器 | SQLite 中的已登录账户数据 |
-| 源文件更新 | 重新运行 `ssg` | 重启服务或使用 `--watch` |
-| 运行时数据库 | 无 | 必需 |
+| EPUB 与 PDF | 支持 | 支持 |
+| 交付方式 | 原子生成静态 HTML/资源，可部署到 Pages、对象存储或 Nginx | 动态返回已鉴权页面，内容来自可重建缓存 |
+| 账户与访问控制 | 无 | 管理员/成员、受限书籍授权、Session 与 CSRF 保护 |
+| 进度、标注、书架 | 当前浏览器本地保存 | 按已登录账户同步到 SQLite |
+| 评分、书评、阅读时段 | 不生成 | 每个账户私有保存，并进入阅读洞察 |
+| 源文件更新 | 重新运行 `ssg` | 重启、重新扫描或使用 `--watch` |
+| 管理后台、标签、OpenAPI、WebHook | 不包含 | 包含 |
+| AI 阅读与 Ask AI | 不包含 | 配置并授权后用于 EPUB；PDF 中隐藏 |
+| 运行时数据库 | 无 | 持久化模式必需 |
+| 适用场景 | 公共/静态托管、离线站点、简单个人发布 | 私有书库、多设备或多人阅读、自动化与访问治理 |
 
 如果产物必须是普通静态文件，请使用 `ssg`；如果需要账户、跨设备数据、书籍访问控制或自动监听源文件，请使用 `server`。
 
@@ -149,7 +199,8 @@ epub-browser server /path/to/books \
 
 ## 输入源与稳定书籍身份
 
-每个位置参数 `SOURCE` 都可以是 EPUB 文件或目录；目录会递归搜索。一个命令可传入多个来源：
+每个位置参数 `SOURCE` 都可以是 EPUB 文件、PDF 文件或目录；目录会递归搜索。
+一个命令可传入多个来源：
 
 ```bash
 epub-browser server book.epub /srv/library /srv/periodicals \
@@ -175,7 +226,7 @@ Embedded 模式可能重建 EPUB ZIP，因此源文件必须可写且适合修�
 
 切换存储方式时，既有 ID 会复制到所选载体，另一个有效载体不会被删除。从 v2.0.4 升级时，既有 embedded ID 会复制到默认 sidecar，不会重写 EPUB。对于 PDF，`--book-id-storage embedded` 必须回退到相邻的 sidecar（例如 `BOOK.pdf.epub-browser.json`）：PDF 是不可变文档，EPUB Browser 不能把 ID 写进 PDF 字节。这一回退只适用于 PDF，现有 EPUB 的 embedded/sidecar 语义保持不变。
 
-## PDF 支持：一页就是一个章节
+## PDF 阅读：一页就是一个章节
 
 两种部署模式都支持 PDF。阅读器把 PDF 的每一页当作普通的 EPUB Browser
 章节，因此继续复用同一套书籍页、章节导航、目录、翻页、连续阅读、进度、阅读时段、
@@ -377,13 +428,13 @@ docker run -d \
 
 ### Docker Compose
 
-仓库提供了 [docker-compose.yml](../../docker-compose.yml)，供偏好 Compose 的用户使用。在仓库目录下创建 `Library/` 并放入 EPUB 后，执行：
+仓库提供了 [docker-compose.yml](../../docker-compose.yml)，供偏好 Compose 的用户使用。在仓库目录下创建 `Library/` 并放入 EPUB 或 PDF 后，执行：
 
 ```bash
 docker compose up -d --build
 ```
 
-示例只发布到 `127.0.0.1:8080`，源 EPUB 放在 `./Library`，Server 状态持久化到 `./EpubBrowserFiles`。文件中显式写出了完整的 Server `command`，可直接在此追加部署专用参数，而无需覆盖镜像的隐式默认值。请访问 `http://127.0.0.1:8080/setup` 完成一次性初始化。远程访问时，应保留 loopback 绑定，并在前方部署带认证的 TLS 反向代理。
+示例只发布到 `127.0.0.1:8080`，源 EPUB/PDF 图书放在 `./Library`，Server 状态持久化到 `./EpubBrowserFiles`。文件中显式写出了完整的 Server `command`，可直接在此追加部署专用参数，而无需覆盖镜像的隐式默认值。请访问 `http://127.0.0.1:8080/setup` 完成一次性初始化。远程访问时，应保留 loopback 绑定，并在前方部署带认证的 TLS 反向代理。
 
 无人值守设置示例：
 
@@ -453,7 +504,7 @@ docker run -d \
 
 旧版专用 `--keep-files` 会保留临时 Server 目录；持久化 Server 目录本来就不会删除。指定 `--log` 时，兼容适配器会打印等价 v2 命令，否则保持安静。
 
-## 阅读功能与数据位置
+## 阅读数据与功能归属
 
 - 递归发现 EPUB 和 Calibre 书库、元数据标签、搜索与拼音搜索
 - 响应式 Library、书籍详情和章节阅读界面
@@ -492,7 +543,7 @@ OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本
 
 ## 数据安全与迁移
 
-升级持久化 Server 前，请备份源 EPUB 和 `<server-dir>/data`。替换容器时必须继续挂载同一个持久化状态目录。
+升级持久化 Server 前，请备份源 EPUB/PDF 图书和 `<server-dir>/data`。替换容器时必须继续挂载同一个持久化状态目录。
 
 启动迁移会自动执行，并可在中断后安全继续。它会验证旧数据库、创建备份、升级副本、把合格的旧书架/进度/标注数据归属给待创建的初始管理员，并只在成功检查点之后清退可重新生成的旧公开资源。普通请求不会扫描旧同步目录。数据库损坏、密码哈希无效、旧数据库含义不明确和 ID 冲突都会停止启动，而不是猜测或覆盖。
 
@@ -524,7 +575,19 @@ OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本
 
 ## 参与贡献
 
-欢迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。一份有效的问题报告应包含准确命令、浏览器/设备、复现步骤、相关日志，以及在法律和版权允许时附上的 EPUB。
+欢迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。一份有效的问题报告应包含准确命令、浏览器/设备、复现步骤、相关日志，以及在法律和版权允许时附上的 EPUB 或 PDF。
+
+### 开发维护约束
+
+修改内容处理、页面模板、缓存、权限、资源或部署行为之前，请先阅读
+[AGENTS.md](../../AGENTS.md)。其中定义了 EPUB/PDF 格式边界、SSG/Server 职责、
+独立缓存修订、动态 i18n、安全检查和提交前验证要求。*reader chapter*、
+*reading window*、*reading stage*、*content cache* 等统一术语见
+[CONTEXT.md](../../CONTEXT.md)。
+
+简要原则是：只维护一套阅读器 UI；Server 专属数据不能进入 SSG；EPUB/PDF 派生缓存
+必须与 SQLite 用户数据分离；运行时不能新增 CDN 依赖。改动共享界面时，应在适用范围内
+同时覆盖两种格式与两种部署模式。
 
 ### 从源码仓库开发
 

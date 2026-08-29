@@ -1,6 +1,7 @@
 # EPUB Browser
 
-> A private EPUB reading service and a self-contained static-site generator.
+> Read EPUB and PDF in one polished web library—either as a self-contained
+> static site or as a private, multi-user reading service.
 
 **README:** [English](README.md) | [简体中文](docs/readme/README.zh-CN.md) | [繁體中文](docs/readme/README.zh-TW.md) | [日本語](docs/readme/README.ja.md) | [한국어](docs/readme/README.ko.md) | [Español](docs/readme/README.es.md) | [Deutsch](docs/readme/README.de.md) | [Français](docs/readme/README.fr.md) | [Русский](docs/readme/README.ru.md) | [Italiano](docs/readme/README.it.md) | [Português (Brasil)](docs/readme/README.pt-BR.md) | [العربية](docs/readme/README.ar.md) | [Bahasa Indonesia](docs/readme/README.id.md) | [हिन्दी](docs/readme/README.hi.md) | [Tiếng Việt](docs/readme/README.vi.md) | [ไทย](docs/readme/README.th.md) | [Bahasa Melayu](docs/readme/README.ms.md)
 
@@ -14,15 +15,73 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/epub-browser)](https://pypi.org/project/epub-browser/)
 [![License](https://img.shields.io/github/license/dfface/epub-browser)](License.txt)
 
-EPUB Browser has two explicit modes:
+![A PDF rendered in the shared EPUB Browser reader, with the original page, navigation, themes, and reading tools.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.8.0-pdf-reader.png)
 
-| | `ssg` | `server` |
+EPUB Browser accepts `.epub` and `.pdf` books. It gives both formats the same
+Library, book page, table of contents, reading modes, themes, progress tracking,
+and annotation workflow. PDF is not opened in a separate download or browser
+preview: every PDF page becomes a reader chapter, rendered locally by PDF.js
+inside the existing reading experience.
+
+## Contents
+
+- [Why EPUB Browser](#why-epub-browser)
+- [Choose SSG or Server](#choose-ssg-or-server)
+- [Live demos](#live-demos)
+- [AI-native reading](#ai-native-reading-server-only)
+- [Choose an installation](#choose-an-installation)
+- [Quick start](#quick-start)
+- [Sources and stable book identity](#sources-and-stable-book-identity)
+- [PDF reading: one page, one chapter](#pdf-reading-one-page-one-chapter)
+- [SSG mode](#ssg-mode)
+- [Server mode](#server-mode)
+- [Docker](#docker)
+- [Complete command reference](#complete-command-reference)
+- [Reading data and feature placement](#reading-data-and-feature-placement)
+- [OpenAPI and WebHooks](#server-api-and-webhooks)
+- [Development and contributing](#contributing)
+- [License](#license)
+
+## Why EPUB Browser
+
+- **EPUB and PDF, one reader:** EPUB chapters and PDF pages use the same
+  navigation, responsive layout, themes, fullscreen mode, search, bookshelf,
+  progress, reading time, and book-detail surfaces.
+- **Three reading behaviors:** Scroll one chapter at a time, read continuously
+  with a bounded rendering window, or turn pages. PDF adds fit-width, fit-page,
+  and arbitrary zoom without leaving the reading stage.
+- **Annotations where you read:** Highlight text, add notes, browse or export
+  annotations, and use Dictionary or Encyclopedia actions. Text-based PDFs
+  reuse the same selection popup; image-only PDFs degrade explicitly.
+- **A real personal library:** Covers, metadata, tags, ratings, reviews,
+  nested shelves, search, reading sessions, and insights stay connected by a
+  stable book ID—even when a Server source temporarily leaves a watched folder.
+- **Private Server capabilities:** Accounts, permissions, synchronized reading
+  data, administration, OpenAPI, WebHooks, and EPUB AI reading are available
+  when a persistent service is wanted.
+- **Self-contained at runtime:** Application assets, fonts, icons, PDF.js, and
+  rich-text renderers are served locally. Reading never depends on a CDN.
+- **17 interface languages:** English, 简体中文, 繁體中文, 日本語, 한국어,
+  Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية,
+  Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
+
+## Choose SSG or Server
+
+The same source processing and page templates power two explicit deployment
+modes. Choose by where reading data should live, not by book format:
+
+| Capability | `ssg` | `server` |
 | --- | --- | --- |
-| Deployment | Static hosting, Pages, object storage, Nginx | A persistent private reading service |
-| Accounts | None | Local accounts |
-| Progress, annotations, bookshelf | This browser only | Authenticated account in SQLite |
-| Source updates | Run `ssg` again | Restart or use `--watch` |
-| Runtime database | None | Required |
+| EPUB and PDF | Yes | Yes |
+| Delivery | Atomic static HTML/assets for Pages, object storage, or Nginx | Dynamic authenticated pages backed by a replaceable content cache |
+| Accounts and access control | None | Administrator/member accounts, restricted-book grants, sessions, and CSRF protection |
+| Progress, annotations, shelf | Stored in the current browser | Synchronized per authenticated account in SQLite |
+| Ratings, reviews, reading sessions | Not emitted | Private per-account records and reading insights |
+| Source updates | Run `ssg` again | Restart, rescan, or use `--watch` |
+| Administration, tags, OpenAPI, WebHooks | Not included | Included |
+| AI reading and Ask AI | Not included | Available for EPUB when configured and explicitly permitted; hidden for PDF |
+| Runtime database | None | Required for persistent mode |
+| Best fit | Public/static hosting, offline bundles, simple personal publishing | A private library, multiple devices or readers, automation, and managed access |
 
 Use `ssg` when the result must be ordinary static files. Use `server` when readers need accounts, cross-device data, access control, or automatic source reconciliation.
 
@@ -162,7 +221,8 @@ If you chose Docker, skip the Python command above and continue with the
 
 ## Sources and stable book identity
 
-Every positional `SOURCE` may be an EPUB file or a directory. Directories are searched recursively. Multiple sources can be passed to one command:
+Every positional `SOURCE` may be an EPUB file, a PDF file, or a directory.
+Directories are searched recursively. Multiple sources can be passed to one command:
 
 ```bash
 epub-browser server book.epub /srv/library /srv/periodicals \
@@ -188,7 +248,7 @@ Embedded mode can rebuild the EPUB ZIP, so the source must be writable and safe 
 
 When migrating storage modes, the existing ID is copied to the selected carrier; the other valid carrier is retained. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB. For PDF, `--book-id-storage embedded` always falls back to the adjacent sidecar (for example, `BOOK.pdf.epub-browser.json`): a PDF is an immutable document and EPUB Browser cannot write an ID into its bytes. This fallback applies only to PDF; existing EPUB embedded/sidecar semantics are unchanged.
 
-## PDF support: page-as-chapter
+## PDF reading: one page, one chapter
 
 PDF is supported by both deployment modes. The reader treats each PDF page as
 an ordinary EPUB Browser chapter, so the existing Book page, chapter
@@ -411,13 +471,13 @@ Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy ru
 
 ### Docker Compose
 
-The repository includes a [docker-compose.yml](docker-compose.yml) for users who prefer Compose. From a checkout, create `Library/`, put EPUB files there, then run:
+The repository includes a [docker-compose.yml](docker-compose.yml) for users who prefer Compose. From a checkout, create `Library/`, put EPUB or PDF books there, then run:
 
 ```bash
 docker compose up -d --build
 ```
 
-It publishes only `127.0.0.1:8080`, keeps source EPUBs in `./Library`, and persists Server state in `./EpubBrowserFiles`. The complete Server `command` is intentionally visible in the file, so deployment-specific flags can be added without replacing an implicit image default. Complete the one-time setup at `http://127.0.0.1:8080/setup`. For remote access, keep this loopback binding and place an authenticated TLS reverse proxy in front of it.
+It publishes only `127.0.0.1:8080`, keeps source EPUB/PDF books in `./Library`, and persists Server state in `./EpubBrowserFiles`. The complete Server `command` is intentionally visible in the file, so deployment-specific flags can be added without replacing an implicit image default. Complete the one-time setup at `http://127.0.0.1:8080/setup`. For remote access, keep this loopback binding and place an authenticated TLS reverse proxy in front of it.
 
 For unattended setup:
 
@@ -487,9 +547,9 @@ Legacy syntax is supported throughout the v2 major line:
 
 Legacy-only `--keep-files` retains a temporary Server directory. Persistent Server directories are already permanent. With `--log`, the compatibility adapter prints the equivalent v2 command; otherwise it remains quiet.
 
-## Reading features and data placement
+## Reading data and feature placement
 
-- Recursive EPUB and Calibre-library discovery, metadata tags, search, and pinyin search
+- Recursive EPUB/PDF and Calibre-library discovery, metadata tags, search, and pinyin search
 - Responsive Library, book detail, and chapter-reading interfaces
 - Scrolling, page turning, continuous reading, adjustable content width, fonts, custom CSS, themes, and pure reading mode
 - Highlights, notes, annotation browsing, nested bookshelf groups, tags, and JSON Import/Export
@@ -527,7 +587,7 @@ Administrators manage WebHook endpoints in Administration. Secrets are shown onl
 
 ## Data safety and migration
 
-Before upgrading persistent Server installations, back up the source EPUBs and `<server-dir>/data`. Keep the same persistent state volume during container replacement.
+Before upgrading persistent Server installations, back up the source EPUB/PDF books and `<server-dir>/data`. Keep the same persistent state volume during container replacement.
 
 Startup migration is automatic and restart-safe. It verifies legacy databases, creates a backup, upgrades a copy, imports eligible legacy bookshelf/progress/annotation data into the pending initial administrator, and retires only replaceable legacy public artifacts after successful checkpoints. Ordinary requests never scan legacy sync directories. Corrupt databases, invalid password hashes, ambiguous legacy databases, and conflicting IDs fail closed instead of being guessed or overwritten.
 
@@ -559,7 +619,21 @@ Read the first logged migration or validation error, preserve the data and sourc
 
 ## Contributing
 
-Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the exact command, browser/device, reproduction steps, relevant logs, and the EPUB when it can be shared legally.
+Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the exact command, browser/device, reproduction steps, relevant logs, and the EPUB or PDF when it can be shared legally.
+
+### Maintainer architecture contract
+
+Read [AGENTS.md](AGENTS.md) before changing content processing, page templates,
+caches, permissions, assets, or deployment behavior. It defines the EPUB/PDF
+format boundary, SSG/Server ownership, independent cache revisions, runtime
+i18n requirements, security checks, and required verification. Shared product
+terms such as *reader chapter*, *reading window*, *reading stage*, and *content
+cache* are defined in [CONTEXT.md](CONTEXT.md).
+
+The short version is: keep one reader UI, keep Server-only data out of SSG,
+keep EPUB and PDF derived caches separate from SQLite user data, and never add
+a runtime CDN dependency. A change that affects a shared surface must be tested
+with both formats and both deployment modes where applicable.
 
 ### Development from a source checkout
 
