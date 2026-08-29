@@ -214,6 +214,21 @@ test('server annotations use shared Cookie and CSRF authentication without a use
   assert.equal(received.options.headers['X-Username'], undefined);
 });
 
+test('server annotation summaries request only the compact all-books view', async () => {
+  const response = {
+    status: 200,
+    body: JSON.stringify({ data: [{ book_hash: 'book', count: 3, latest_at: '2026-08-30' }] }),
+  };
+  const window = loadAnnotationWindow(response);
+
+  const result = await window.AnnotationBackendStorage.getSummary();
+
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [
+    { book_hash: 'book', count: 3, latest_at: '2026-08-30' },
+  ]);
+  assert.equal(window.authenticatedRequests[0].url, '/api/annotations?view=summary');
+});
+
 test('clicking a draft highlight reopens its selection actions instead of reading annotation detail', () => {
   const Highlighter = { event: { CREATE: 'create', CLICK: 'click' } };
   const window = loadAnnotationWindow(

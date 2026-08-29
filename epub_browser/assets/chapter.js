@@ -2869,6 +2869,27 @@ function initScript() {
     var autoHideDesktopToolbarToggle = document.getElementById('autoHideDesktopToolbarToggle');
     var arrowKeyNavigationToggle = document.getElementById('arrowKeyNavigationToggle');
     var spaceKeyNavigationToggle = document.getElementById('spaceKeyNavigationToggle');
+    var navigationBehaviorSettings = document.querySelector('.navigation-behavior-settings');
+
+    function syncPaginationSettingsAvailability() {
+        if (desktopChapterSidebarToggle) {
+            desktopChapterSidebarToggle.disabled = isPaginationMode;
+            desktopChapterSidebarToggle.setAttribute('aria-disabled', isPaginationMode ? 'true' : 'false');
+        }
+        if (autoHideDesktopChapterSidebarToggle) {
+            autoHideDesktopChapterSidebarToggle.disabled = isPaginationMode || !showDesktopChapterSidebar;
+            autoHideDesktopChapterSidebarToggle.setAttribute(
+                'aria-disabled',
+                autoHideDesktopChapterSidebarToggle.disabled ? 'true' : 'false'
+            );
+        }
+        if (navigationBehaviorSettings) {
+            navigationBehaviorSettings.disabled = isPaginationMode;
+            navigationBehaviorSettings.setAttribute('aria-disabled', isPaginationMode ? 'true' : 'false');
+        }
+    }
+
+    syncPaginationSettingsAvailability();
     if (arrowKeyNavigationToggle) {
         arrowKeyNavigationToggle.checked = arrowKeyNavigationEnabled;
         arrowKeyNavigationToggle.addEventListener('change', function() {
@@ -2900,6 +2921,7 @@ function initScript() {
                 showDesktopChapterSidebar ? 'true' : 'false'
             );
             applyDesktopChapterSidebar();
+            syncPaginationSettingsAvailability();
             if (showDesktopChapterSidebar) setBookTocActiveChapter(visibleChapterIndex, true);
         });
     }
@@ -2929,12 +2951,14 @@ function initScript() {
         // 翻页模式下禁用该开关
         if (isPaginationMode) {
             continuousScrollToggle.disabled = true;
+            continuousScrollToggle.setAttribute('aria-disabled', 'true');
             continuousScrollToggle.checked = false;
             if (continuousScrollTip) {
                 continuousScrollTip.setAttribute('data-tip', i18n.t('settings.continuousScrollUnavailable'));
             }
         } else {
             continuousScrollToggle.disabled = false;
+            continuousScrollToggle.setAttribute('aria-disabled', 'false');
             continuousScrollToggle.checked = isContinuousScroll;
             if (continuousScrollTip) {
                 continuousScrollTip.setAttribute('data-tip', i18n.t('settings.continuousScrollTip'));

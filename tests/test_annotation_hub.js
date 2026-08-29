@@ -83,6 +83,15 @@ test('aggregates only annotated books and sorts them by their latest annotation'
   assert.equal(books[0].title, 'Alpha');
 });
 
+test('aggregates compact server summary rows without annotation content', () => {
+  const books = Hub.aggregateBooks([
+    { book_hash: 'a', count: 12, latest_at: '2026-08-30T10:00:00Z' },
+    { book_hash: 'b', count: 2, latest_at: '2026-08-29T10:00:00Z' },
+  ], [{ hash: 'a', title: 'Alpha' }, { hash: 'b', title: 'Beta' }]);
+
+  assert.deepEqual(books.map(book => [book.hash, book.count]), [['a', 12], ['b', 2]]);
+});
+
 test('groups one book in reading order and combines the zero-based chapter number with its title', () => {
   withI18n(englishI18n, () => {
     const groups = Hub.groupByChapter([

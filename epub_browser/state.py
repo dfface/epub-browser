@@ -6505,6 +6505,50 @@ class StateStore:
             rows = connection.execute(statement, tuple(parameters)).fetchall()
         return tuple(dict(row) for row in rows)
 
+    def list_ai_reading_library_summaries(
+        self,
+        book_id: str,
+    ) -> tuple[dict, ...]:
+        """List only the retained-result fields rendered by the library hub."""
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, chapter_index, scope, language, config_revision,
+                       template_version, created_by_user_id, created_at,
+                       json_extract(content_json, '$.quick.title') AS quick_title,
+                       json_extract(content_json, '$.quick.summary') AS quick_summary
+                FROM ai_reading_results
+                WHERE book_id = ?
+                ORDER BY created_at DESC, id DESC
+                """,
+                (book_id,),
+            ).fetchall()
+        results = []
+        for row in rows:
+            item = dict(row)
+            title = item.pop("quick_title", None)
+            summary = item.pop("quick_summary", None)
+            item["content"] = {
+                "quick": {
+                    "title": title,
+                    "summary": summary,
+                },
+            }
+            results.append(item)
+        return tuple(results)
+
+    def ai_reading_result_counts(self) -> dict[str, int]:
+        """Count retained shared results by book without reading their content."""
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT book_id, COUNT(*) AS result_count
+                FROM ai_reading_results
+                GROUP BY book_id
+                """
+            ).fetchall()
+        return {row["book_id"]: int(row["result_count"]) for row in rows}
+
     def list_current_ai_reading_results(self, book_id: str) -> tuple[dict, ...]:
         """Return one current shared learning layer for each cache key of a book."""
         with self._connection() as connection:
@@ -7483,6 +7527,22 @@ class StateStore:
                 values,
             ).fetchall()
         return [self._annotation_data(row) for row in rows]
+
+    def list_annotation_summaries(self, *, user_id: str):
+        """Aggregate the fields needed by the all-books annotation hub."""
+        with self._connection() as connection:
+            self._require_user(connection, user_id)
+            rows = connection.execute(
+                """
+                SELECT book_hash, COUNT(*) AS count, MAX(updated_at) AS latest_at
+                FROM annotations
+                WHERE user_id = ?
+                GROUP BY book_hash
+                ORDER BY latest_at DESC, book_hash ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def upsert_annotation(
         self,

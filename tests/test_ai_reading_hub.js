@@ -257,3 +257,10 @@ test('deduplicates one language-scoped result request across multiple TOCs', asy
     true,
   );
 });
+
+test('loads the AI reading library through its compact summary view', () => {
+  const source = fs.readFileSync('epub_browser/assets/ai-reading-hub.js', 'utf8');
+  assert.match(source, /\/api\/ai\/library\?view=summary/);
+  assert.match(source, /\/api\/ai\/books\/' \+ encodeURIComponent\(book\.book_id\) \+ '\/results\?view=summary/);
+  assert.doesNotMatch(source, /request\(path\('\/api\/ai\/library'\)\)/);
+});

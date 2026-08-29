@@ -1161,6 +1161,14 @@ def create_app(
         except TypeError:
             return False
 
+    def authenticated_login_retry(request):
+        return (
+            request.method == 'POST'
+            and request.url.path == '/login'
+            and bool(request.headers.get(AUTH_NONCE_HEADER))
+            and valid_same_origin_request_source(request)
+        )
+
     def invalid_setup_request():
         return response(
             error_payload('invalid_setup_request', 'Invalid setup request'),
@@ -1469,7 +1477,13 @@ if(localeField)localeField.value=localeSelect.value;
 }}
 var loginForm=document.getElementById('loginForm');
 var loginError=document.getElementById('loginError');
-function setLoginError(visible,key,params){{
+var loginSubmit=loginForm&&loginForm.querySelector('button[type="submit"]');
+var loginPending=false;
+function setLoginBusy(busy){{
+loginPending=busy;
+if(loginSubmit){{loginSubmit.disabled=busy;loginSubmit.setAttribute('aria-busy',String(busy));}}
+}}
+function setLoginError(visible,key,params,invalidCredentials){{
 if(loginError&&visible&&key){{
 loginError.setAttribute('data-i18n',key);
 loginError.setAttribute('data-i18n-params',JSON.stringify(params||{{}}));
@@ -1477,11 +1491,13 @@ if(i18n&&i18n.t)loginError.textContent=i18n.t(key,params||{{}});
 }}
 if(loginError)loginError.hidden=!visible;
 if(loginForm)Array.prototype.forEach.call(loginForm.querySelectorAll('input[name="username"],input[name="password"]'),function(field){{
-if(visible)field.setAttribute('aria-invalid','true');else field.removeAttribute('aria-invalid');
+if(visible&&invalidCredentials)field.setAttribute('aria-invalid','true');else field.removeAttribute('aria-invalid');
 }});
 }}
 if(loginForm)loginForm.addEventListener('submit',function(event){{
 event.preventDefault();
+if(loginPending)return;
+setLoginBusy(true);
 setLoginError(false);
 var username=loginForm.elements.username.value;
 var password=loginForm.elements.password.value;
@@ -1494,13 +1510,16 @@ body:JSON.stringify({{username:username,password:password,next:next,locale:local
 }}).then(function(response){{
 return response.json().catch(function(){{return {{}};}}).then(function(payload){{
 if(!response.ok){{
+setLoginBusy(false);
 var retryAfter=Number(payload.retry_after_seconds||0);
-var errorKey=payload.code==='login_throttled'?'account.error.login_throttled':'account.error.invalid_credentials';
-setLoginError(true,errorKey,{{count:Math.max(1,Math.ceil(retryAfter/60))}});return;
+var errorKey=payload.code==='login_throttled'?'account.error.login_throttled':
+payload.code==='invalid_credentials'?'account.error.invalid_credentials':
+(payload.code==='invalid_auth_request'||payload.code==='csrf_required')?'account.error.csrf_required':'account.error.unknown';
+setLoginError(true,errorKey,{{count:Math.max(1,Math.ceil(retryAfter/60))}},payload.code==='invalid_credentials');return;
 }}
 window.location.assign(payload.redirect||'/');
 }});
-}}).catch(function(){{setLoginError(true);}});
+}}).catch(function(){{setLoginBusy(false);setLoginError(true,'account.error.network');}});
 }});
 }}());</script></body></html>'''
         page = HTMLResponse(
@@ -1842,6 +1861,14 @@ window.location.assign(payload.redirect||'/');
                 existing_auth_nonce_cookie=request.cookies.get(AUTH_NONCE_COOKIE),
             )
         current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+        if current_principal is not None and authenticated_login_retry(request):
+            data, parse_error = await bounded_public_json_object(request)
+            if parse_error is not None:
+                return public_json_error(parse_error)
+            return response(
+                {'redirect': _safe_relative_path(data.get('next') or requested_next)},
+                cache_control='no-store',
+            )
         if current_principal is None and not valid_anonymous_auth_request(request):
             return invalid_auth_request()
         data, parse_error = await bounded_public_json_object(request)
@@ -3329,6 +3356,29 @@ window.location.assign(payload.redirect||'/');
             'result': _public_ai_result(result),
         })
 
+    def ai_reading_chapter_titles(book_id):
+        chapter_titles = {}
+        try:
+            book_output = Path(base_directory, 'book', book_id)
+            toc_path = book_output / 'content' / 'toc.json'
+            if not toc_path.is_file():
+                # Compatibility with pre-content-cache Server outputs.
+                toc_path = book_output / 'toc.json'
+            toc_items = json.loads(toc_path.read_text(encoding='utf-8'))
+            if isinstance(toc_items, list):
+                for toc_item in toc_items:
+                    if not isinstance(toc_item, dict):
+                        continue
+                    chapter_index = toc_item.get('chapter_index')
+                    chapter_title = toc_item.get('title')
+                    if isinstance(chapter_index, int) and isinstance(chapter_title, str):
+                        chapter_titles[chapter_index] = chapter_title
+        except (OSError, TypeError, ValueError):
+            # The generated TOC is an optional presentation enhancement.
+            # AI results remain readable when a book is being regenerated.
+            pass
+        return chapter_titles
+
     async def ai_book_results(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
@@ -3345,6 +3395,21 @@ window.location.assign(payload.redirect||'/');
                     book_id, language=language
                 )),
             })
+        if view == 'summary':
+            chapter_titles = ai_reading_chapter_titles(book_id)
+            results = []
+            for result in store.list_ai_reading_library_summaries(book_id):
+                item = dict(result)
+                item['can_delete'] = (
+                    principal.role == 'admin'
+                    or item.get('created_by_user_id') == principal.user_id
+                )
+                item.pop('created_by_user_id', None)
+                chapter_index = item.get('chapter_index')
+                if isinstance(chapter_index, int) and chapter_index in chapter_titles:
+                    item['chapter_title'] = chapter_titles[chapter_index]
+                results.append(item)
+            return response({'results': results})
         if view is not None:
             return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
         chapter_index = None
@@ -3367,38 +3432,43 @@ window.location.assign(payload.redirect||'/');
     async def ai_reading_library(request):
         """Return every readable book's retained shared AI layers, never private chats."""
         principal = require_principal(request)
+        view = request.query_params.get('view')
+        if (
+            view not in {None, 'summary'}
+            or request.query_params.get('book_id') is not None
+        ):
+            return response(
+                error_payload('invalid_ai_reading_request', 'Invalid AI reading request'),
+                400,
+            )
+        visible_books = list(store.visible_books(principal))
+        result_counts = (
+            store.ai_reading_result_counts()
+            if view == 'summary'
+            else {}
+        )
         books = []
-        for book in store.visible_books(principal):
+        for book in visible_books:
             # A shared layer belongs to the book rather than to the user who
             # generated it.  Retain historic results here too: a newer model
             # configuration must not make an earlier, still-useful reading
             # disappear from the user's AI-reading library.
-            results = list(store.list_ai_reading_results(book.book_id))
-            if not results:
+            result_count = result_counts.get(book.book_id, 0)
+            if view == 'summary':
+                results = None
+            else:
+                results = list(store.list_ai_reading_results(book.book_id))
+                result_count = len(results)
+            if not result_count:
                 continue
             metadata = store.managed_book_metadata(book.book_id)
-            chapter_titles = {}
-            try:
-                book_output = Path(base_directory, 'book', book.book_id)
-                toc_path = book_output / 'content' / 'toc.json'
-                if not toc_path.is_file():
-                    # Compatibility with pre-content-cache Server outputs.
-                    toc_path = book_output / 'toc.json'
-                toc_items = json.loads(toc_path.read_text(encoding='utf-8'))
-                if isinstance(toc_items, list):
-                    for toc_item in toc_items:
-                        if not isinstance(toc_item, dict):
-                            continue
-                        chapter_index = toc_item.get('chapter_index')
-                        chapter_title = toc_item.get('title')
-                        if isinstance(chapter_index, int) and isinstance(chapter_title, str):
-                            chapter_titles[chapter_index] = chapter_title
-            except (OSError, TypeError, ValueError):
-                # The generated TOC is an optional presentation enhancement.
-                # AI results remain readable when a book is being regenerated.
-                pass
+            chapter_titles = (
+                ai_reading_chapter_titles(book.book_id)
+                if results is not None
+                else {}
+            )
             enriched_results = []
-            for result in results:
+            for result in results or ():
                 enriched_result = dict(result)
                 enriched_result['can_delete'] = (
                     principal.role == 'admin'
@@ -3412,7 +3482,7 @@ window.location.assign(payload.redirect||'/');
                     enriched_result['chapter_title'] = chapter_titles[chapter_index]
                 enriched_results.append(enriched_result)
             cover = metadata.get('cover')
-            books.append({
+            book_payload = {
                 'book_id': book.book_id,
                 'title': str(metadata.get('title') or book.book_id),
                 'authors': list(metadata.get('authors') or []),
@@ -3420,8 +3490,12 @@ window.location.assign(payload.redirect||'/');
                     f"/book/{book.book_id}/{cover.lstrip('/')}"
                     if isinstance(cover, str) and cover.strip() else None
                 ),
-                'results': enriched_results,
-            })
+            }
+            if results is None:
+                book_payload['result_count'] = result_count
+            else:
+                book_payload['results'] = enriched_results
+            books.append(book_payload)
         return response({'books': books})
 
     async def ai_result(request):
@@ -3995,6 +4069,23 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('not_ready', 'Server is not ready'), 503)
         try:
             if request.method == 'GET':
+                view = request.query_params.get('view')
+                if view is not None:
+                    if view != 'summary' or tail:
+                        return response(
+                            error_payload(
+                                'invalid_annotation_view',
+                                'Invalid annotation view',
+                            ),
+                            400,
+                        )
+                    rows = [
+                        row for row in store.list_annotation_summaries(
+                            user_id=principal.user_id,
+                        )
+                        if not book_access_denied(principal, row.get('book_hash'))
+                    ]
+                    return response({'data': rows})
                 if tail[:1] == ['batch']:
                     return response(
                         error_payload('batch_requires_post', 'Batch requires POST'),
@@ -4713,7 +4804,10 @@ window.location.assign(payload.redirect||'/');
             ):
                 return await call_next(request)
             return unauthenticated_response(request)
-        if request.method not in SAFE_METHODS:
+        if (
+            request.method not in SAFE_METHODS
+            and not authenticated_login_retry(request)
+        ):
             if not auth_service.verify_csrf(request, principal):
                 denied = response(
                     error_payload('csrf_required', 'Valid CSRF token required'),

@@ -758,6 +758,13 @@
                 return res.data || [];
             });
         },
+
+        // 获取汇总页所需的按书统计，不下载标注正文和定位数据
+        getSummary: function() {
+            return this._request('GET', '/annotations?view=summary').then(function(res) {
+                return res.data || [];
+            });
+        },
         
         // 批量创建
         batchCreate: function(annotations) {
@@ -903,6 +910,13 @@
         
         getAll: function() {
             return this.getAdapter().getAll();
+        },
+
+        getSummary: function() {
+            var adapter = this.getAdapter();
+            return typeof adapter.getSummary === 'function'
+                ? adapter.getSummary()
+                : adapter.getAll();
         }
     };
     
@@ -2914,6 +2928,9 @@
         },
         getAll: function() {
             return StorageManager.getAll();
+        },
+        getSummary: function() {
+            return StorageManager.getSummary();
         },
         getByBook: function(bookHash) {
             return StorageManager.getByBook(bookHash);

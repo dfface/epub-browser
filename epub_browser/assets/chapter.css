@@ -816,6 +816,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     display: none !important;
 }
 
+body.pagination-mode [data-ai-learning-canvas],
+body.pagination-mode [data-ai-followup-drawer] {
+    display: none !important;
+}
+
 .theme-toggle:focus-visible,
 .reading-controls .control-btn:focus-visible,
 .top-controls .control-btn:focus-visible {
@@ -1224,6 +1229,11 @@ body:not(.pagination-mode) .navigation a:focus-visible {
     color: var(--text-secondary);
     cursor: pointer;
     line-height: 1.35;
+}
+
+.navigation-behavior-settings:disabled .navigation-behavior-option {
+    cursor: not-allowed;
+    opacity: .5;
 }
 
 .navigation-behavior-option:has(input:checked) {

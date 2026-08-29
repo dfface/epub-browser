@@ -44,8 +44,13 @@
                     cover: metadataEntry.cover || '', count: 0, latestAt: 0
                 };
             }
-            current.count++;
-            current.latestAt = Math.max(current.latestAt, annotationTime(annotation));
+            var summaryCount = Number(annotation.count);
+            current.count += Number.isFinite(summaryCount) && summaryCount >= 0 ? summaryCount : 1;
+            var summaryTime = annotation.latest_at ? Date.parse(annotation.latest_at) : 0;
+            current.latestAt = Math.max(
+                current.latestAt,
+                isNaN(summaryTime) ? annotationTime(annotation) : summaryTime
+            );
         });
         return Object.keys(aggregate).map(function(hash) { return aggregate[hash]; }).sort(function(a, b) {
             return b.latestAt - a.latestAt || a.title.localeCompare(b.title);
@@ -536,7 +541,10 @@
             });
         }).then(function() {
             if (loadVersion !== modalState.loadVersion) return null;
-            return Promise.all([root.AnnotationStorage.getAll(), requestJson(publicPath('/book-metadata.json'))]);
+            var annotations = modalState.bookHash
+                ? root.AnnotationStorage.getByBook(modalState.bookHash)
+                : root.AnnotationStorage.getSummary();
+            return Promise.all([annotations, requestJson(publicPath('/book-metadata.json'))]);
         }).then(function(data) {
             if (!data || loadVersion !== modalState.loadVersion || modalState.bookHash !== (bookHash || '')) return;
             modalState.data = { annotations: data[0] || [], metadata: data[1] || [], toc: [] };

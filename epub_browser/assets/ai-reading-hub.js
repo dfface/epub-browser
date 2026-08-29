@@ -18,7 +18,7 @@
       });
     });
   }
-  function resultCount(book) { return (book.results || []).length; }
+  function resultCount(book) { return Array.isArray(book.results) ? book.results.length : Number(book.result_count || 0); }
   function resultTitle(result) { return result && result.content && result.content.quick && result.content.quick.title || t('ai.chapterRead'); }
   function resultSummary(result) { return result && result.content && result.content.quick && result.content.quick.summary || ''; }
   function chapterLabel(result) {
@@ -111,7 +111,16 @@
       return false;
     });
   }
-  function openBook(book) { state.bookId = book.book_id; state.back.hidden = false; render(); }
+  function loadBook(book) {
+    var version = ++state.version; renderLoading();
+    request(path('/api/ai/books/' + encodeURIComponent(book.book_id) + '/results?view=summary')).then(function(data) {
+      if (version !== state.version || state.bookId !== book.book_id) return;
+      book.results = data.results || [];
+      book.result_count = resultCount(book);
+      render();
+    }).catch(function() { if (version === state.version) renderEmpty(t('ai.libraryLoadFailed'), t('ai.libraryLoadFailedDetail'), true); });
+  }
+  function openBook(book) { state.bookId = book.book_id; state.back.hidden = false; if (Array.isArray(book.results)) render(); else loadBook(book); }
   function renderEmpty(title, detail, retry) {
     clear(state.container); var box = el('section', 'ai-reading-hub-state');
     var heading = el('h1', 'ai-reading-hub-title', title); heading.id = 'aiReadingHubTitle'; box.appendChild(heading);
@@ -198,11 +207,11 @@
     var modal = el('div', 'ai-reading-hub-modal'); modal.hidden = true; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'aiReadingHubTitle');
     modal.innerHTML = '<div class="ai-reading-hub-backdrop" data-ai-reading-hub-close></div><section class="ai-reading-hub-dialog"><header class="ai-reading-hub-header"><button type="button" class="ai-reading-hub-back" hidden><i class="fas fa-arrow-left" aria-hidden="true"></i><span></span></button><span class="ai-reading-hub-header-label"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span></span></span><button type="button" class="ai-reading-hub-close"><i class="fas fa-times" aria-hidden="true"></i></button></header><main class="ai-reading-hub-container" tabindex="-1" aria-live="polite"></main></section>';
     document.body.appendChild(modal); state.modal = modal; state.container = modal.querySelector('.ai-reading-hub-container'); state.close = modal.querySelector('.ai-reading-hub-close'); state.back = modal.querySelector('.ai-reading-hub-back');
-    state.close.addEventListener('click', close); state.back.addEventListener('click', function() { state.bookId = ''; state.back.hidden = true; render(); }); modal.querySelector('[data-ai-reading-hub-close]').addEventListener('click', close); modal.addEventListener('keydown', trapFocus); translate(); return modal;
+    state.close.addEventListener('click', close); state.back.addEventListener('click', function() { state.version++; state.bookId = ''; state.back.hidden = true; render(); }); modal.querySelector('[data-ai-reading-hub-close]').addEventListener('click', close); modal.addEventListener('keydown', trapFocus); translate(); return modal;
   }
   // The library itself is already the all-books view, so it has no back link.
   // A book or chapter opens a contextual view and must offer a way back to it.
-  function load() { var version = ++state.version; renderLoading(); request(path('/api/ai/library')).then(function(data) { if (version !== state.version) return; state.books = data.books || []; state.bookId = state.contextualBookId || ''; state.back.hidden = !Boolean(state.bookId); render(); }).catch(function() { if (version === state.version) renderEmpty(t('ai.libraryLoadFailed'), t('ai.libraryLoadFailedDetail'), true); }); }
+  function load() { var version = ++state.version; renderLoading(); request(path('/api/ai/library?view=summary')).then(function(data) { if (version !== state.version) return; state.books = data.books || []; state.bookId = state.contextualBookId || ''; state.back.hidden = !Boolean(state.bookId); var book = state.books.filter(function(item) { return item.book_id === state.bookId; })[0]; if (book) loadBook(book); else render(); }).catch(function() { if (version === state.version) renderEmpty(t('ai.libraryLoadFailed'), t('ai.libraryLoadFailedDetail'), true); }); }
   function open(opener) { if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiReadingHubCss'); var modal = ensure(); if (modal.hidden) { state.opener = opener || document.activeElement; state.scrollY = root.scrollY || 0; document.body.classList.add('ai-reading-hub-open'); document.body.style.top = '-' + state.scrollY + 'px'; modal.hidden = false; } state.contextualBookId = opener && opener.getAttribute('data-book-id') || ''; state.bookId = state.contextualBookId; state.language = locale(); state.back.hidden = !Boolean(state.bookId); load(); root.setTimeout(function() { state.close.focus(); }, 0); }
   function close() { if (!state.modal || state.modal.hidden) return; state.modal.hidden = true; document.body.classList.remove('ai-reading-hub-open'); document.body.style.top = ''; root.scrollTo(0, state.scrollY); if (state.opener && state.opener.focus) state.opener.focus(); }
   function addChapterBadge(link) {

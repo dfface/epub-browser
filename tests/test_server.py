@@ -1337,7 +1337,19 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             english.text.index('id="loginForm"'),
         )
         self.assertIn('id="loginError" role="alert" data-i18n="account.error.invalid_credentials" hidden', english.text)
-        self.assertIn("setLoginError(true)", english.text)
+        self.assertIn('if(loginPending)return;', english.text)
+        self.assertIn('loginSubmit.disabled=busy', english.text)
+        self.assertIn(
+            "payload.code==='invalid_credentials'?'account.error.invalid_credentials'",
+            english.text,
+        )
+        self.assertIn(
+            "(payload.code==='invalid_auth_request'||payload.code==='csrf_required')?"
+            "'account.error.csrf_required'",
+            english.text,
+        )
+        self.assertIn("setLoginError(true,'account.error.network')", english.text)
+        self.assertIn('visible&&invalidCredentials', english.text)
         self.assertIn(
             'name="next" value="/book/id/chapter_0.html"',
             chinese.text,
@@ -1452,6 +1464,32 @@ class ServerAuthBoundaryTests(unittest.TestCase):
                 replaced_client.get("/api/session").status_code,
                 401,
             )
+
+    def test_authenticated_repeat_of_anonymous_login_returns_its_redirect(self):
+        first_login = _json_login(self, self.client, "alice", "secret")
+        self.assertEqual(first_login.status_code, 200)
+        original_session = self.client.cookies.get("epub_browser_session")
+
+        repeated = self.client.post(
+            "/login",
+            json={
+                "username": "alice",
+                "password": "secret",
+                "next": "/book/id/index.html",
+            },
+            headers={
+                "X-EPUB-Browser-Auth-Nonce": "stale-login-page-nonce",
+                "Origin": str(self.client.base_url).rstrip("/"),
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+
+        self.assertEqual(repeated.status_code, 200)
+        self.assertEqual(repeated.json(), {"redirect": "/book/id/index.html"})
+        self.assertEqual(
+            self.client.cookies.get("epub_browser_session"),
+            original_session,
+        )
 
     def test_concurrent_anonymous_login_pages_keep_both_nonces_valid(self):
         library_nonce = _anonymous_auth_nonce(
@@ -2223,6 +2261,7 @@ class AdminAccountTests(unittest.TestCase):
 
         member = self.member_client.get("/api/ai/library")
         admin = self.admin_client.get("/api/ai/library")
+        summary = self.member_client.get("/api/ai/library?view=summary")
 
         self.assertEqual(member.status_code, 200)
         self.assertEqual([book["book_id"] for book in member.json()["books"]], [visible.book_id])
@@ -2233,6 +2272,44 @@ class AdminAccountTests(unittest.TestCase):
         self.assertEqual(
             {book["book_id"] for book in admin.json()["books"]},
             {visible.book_id, restricted.book_id},
+        )
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(
+            summary.json()["books"][0]["result_count"],
+            2,
+        )
+        self.assertNotIn("results", summary.json()["books"][0])
+        detail = self.member_client.get(
+            "/api/ai/books/" + visible.book_id + "/results?view=summary",
+        )
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(len(detail.json()["results"]), 2)
+        summary_result = detail.json()["results"][0]
+        self.assertEqual(
+            set(summary_result),
+            {
+                "id", "chapter_index", "scope", "language", "config_revision",
+                "template_version", "created_at", "content", "can_delete",
+                "chapter_title",
+            },
+        )
+        self.assertEqual(
+            set(summary_result["content"]),
+            {"quick"},
+        )
+        self.assertEqual(
+            set(summary_result["content"]["quick"]),
+            {"title", "summary"},
+        )
+        self.assertEqual(
+            self.member_client.get("/api/ai/library?view=unknown").status_code,
+            400,
+        )
+        self.assertEqual(
+            self.member_client.get(
+                "/api/ai/library?book_id=" + visible.book_id,
+            ).status_code,
+            400,
         )
 
     def test_ai_reading_result_deletion_is_admin_or_generator_only(self):
@@ -4410,6 +4487,49 @@ class ServerCacheTests(unittest.TestCase):
 
         self.assertEqual(created.status_code, 201)
         self.assertEqual(fetched.json()["data"][0]["id"], "a1")
+
+    def test_annotation_summary_omits_highlight_content_and_position_data(self):
+        for annotation in (
+            {
+                "id": "a1", "book_hash": "book", "chapter_index": 1,
+                "text": "a large highlighted passage", "note": "private note",
+                "startMeta": {"xpath": "/p[1]"}, "endMeta": {"xpath": "/p[2]"},
+                "color": "#fff", "created_at": "2026-01-01",
+                "updated_at": "2026-01-02",
+            },
+            {
+                "id": "a2", "book_hash": "book", "chapter_index": 2,
+                "text": "another large highlighted passage", "note": "another note",
+                "color": "#fff", "created_at": "2026-01-03",
+                "updated_at": "2026-01-04",
+            },
+        ):
+            self.assertEqual(
+                self.client.post("/api/annotations", json=annotation).status_code,
+                201,
+            )
+
+        summary = self.client.get("/api/annotations?view=summary")
+
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(
+            summary.json(),
+            {
+                "data": [{
+                    "book_hash": "book",
+                    "count": 2,
+                    "latest_at": "2026-01-04",
+                }],
+            },
+        )
+        self.assertEqual(
+            self.client.get("/api/annotations/book?view=summary").status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.get("/api/annotations?view=unknown").status_code,
+            400,
+        )
 
     def test_annotation_delete_accepts_an_empty_json_request_body(self):
         annotation = {

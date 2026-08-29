@@ -22,6 +22,8 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.3](releases/v2.9.3.md) — reliable sign-in under slow networks,
+  accurate login errors, and lightweight AI/annotation summaries.
 - [v2.9.2](releases/v2.9.2.md) — urgent EPUB book-page freeze fix,
   lightweight AI chapter indicators, and reliable concurrent sign-in.
 - [v2.9.1](releases/v2.9.1.md) — reliable OIDC account linking, automatic

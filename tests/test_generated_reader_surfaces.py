@@ -2576,6 +2576,44 @@ assert.deepEqual(
 
         self.assertNotIn('document.querySelector(".custom-css-panel").style', script)
 
+    def test_pagination_hides_desktop_and_mobile_ai_controls(self):
+        html = self._server_chapter_html()
+        css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
+
+        self.assertIn('data-ai-learning-canvas', html)
+        self.assertIn('data-ai-followup-drawer', html)
+        self.assertIn('id="mobileAIReadingBtn"', html)
+        self.assertIn('id="mobileAIChatBtn"', html)
+        self.assertIn(
+            'body.pagination-mode [data-ai-learning-canvas]',
+            css,
+        )
+        self.assertIn(
+            'body.pagination-mode [data-ai-followup-drawer]',
+            css,
+        )
+
+    def test_pagination_disables_only_incompatible_reading_settings(self):
+        script = Path("epub_browser/assets/chapter.js").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'desktopChapterSidebarToggle.disabled = isPaginationMode;',
+            script,
+        )
+        self.assertIn(
+            'autoHideDesktopChapterSidebarToggle.disabled = '
+            'isPaginationMode || !showDesktopChapterSidebar;',
+            script,
+        )
+        self.assertIn(
+            'navigationBehaviorSettings.disabled = isPaginationMode;',
+            script,
+        )
+        self.assertNotIn(
+            'autoHideDesktopToolbarToggle.disabled = isPaginationMode;',
+            script,
+        )
+
     def test_chapter_script_uses_an_immutable_content_addressed_url(self):
         self.assertRegex(self._chapter_html(), r'/assets/immutable/chapter\.[0-9a-f]{12}\.js')
 
