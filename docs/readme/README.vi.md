@@ -19,6 +19,7 @@ EPUB Browser xử lý `.epub` và `.pdf` trong hai chế độ với trách nhi�
 | EPUB và PDF | Có | Có |
 | Triển khai | Lưu trữ tĩnh, Pages, lưu trữ đối tượng, Nginx | Dịch vụ đọc riêng tư và lâu dài |
 | Tài khoản | Không có | Tài khoản cục bộ |
+| Đăng nhập một lần OIDC | Không bao gồm | Provider chung, liên kết tài khoản hiện có và tùy chọn tự tạo thành viên |
 | Tiến độ, chú thích, giá sách | Chỉ trong trình duyệt này | Dữ liệu tài khoản đã đăng nhập trong SQLite |
 | Cập nhật nguồn | Chạy lại `ssg` | Khởi động lại dịch vụ hoặc dùng `--watch` |
 | Cơ sở dữ liệu khi chạy | Không có | Bắt buộc |

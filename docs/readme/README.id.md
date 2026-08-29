@@ -19,6 +19,7 @@ EPUB Browser memproses `.epub` dan `.pdf` dalam dua mode dengan tanggung jawab y
 | EPUB dan PDF | Ya | Ya |
 | Penerapan | Hosting statis, Pages, penyimpanan objek, Nginx | Layanan membaca pribadi yang persisten |
 | Akun | Tidak ada | Akun lokal |
+| Login tunggal OIDC | Tidak disertakan | Provider generik, penautan akun yang ada, dan pembuatan anggota opsional |
 | Kemajuan, anotasi, rak buku | Hanya di peramban ini | Data akun yang masuk di SQLite |
 | Pembaruan sumber | Jalankan `ssg` lagi | Mulai ulang layanan atau gunakan `--watch` |
 | Basis data runtime | Tidak ada | Wajib |

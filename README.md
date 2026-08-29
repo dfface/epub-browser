@@ -75,6 +75,9 @@ inside the existing reading experience.
 - **A private, governable Server:** Accounts, book permissions, per-member AI
   access, synchronized reading data, administration, OpenAPI, and WebHooks are
   available when a persistent service is wanted.
+- **Bring your own single sign-on:** Server mode connects to a generic OIDC
+  Provider such as Authelia, Authentik, or Keycloak. Readers can safely link an
+  existing account or be provisioned as members without duplicating reading data.
 - **Self-contained at runtime:** Application assets, fonts, icons, PDF.js, and
   rich-text renderers are served locally. Reading never depends on a CDN.
 - **17 interface languages:** English, 简体中文, 繁體中文, 日本語, 한국어,
@@ -117,6 +120,7 @@ modes. Choose by where reading data should live, not by book format:
 | EPUB and PDF | Yes | Yes |
 | Delivery | Atomic static HTML/assets for Pages, object storage, or Nginx | Dynamic authenticated pages backed by a replaceable content cache |
 | Accounts and access control | None | Administrator/member accounts, restricted-book grants, sessions, and CSRF protection |
+| OIDC single sign-on | Not included | Generic Provider, existing-account linking, and optional member provisioning |
 | Progress, annotations, shelf | Stored in the current browser | Synchronized per authenticated account in SQLite |
 | Ratings, reviews, reading sessions | Not emitted | Private per-account records and reading insights |
 | Source updates | Run `ssg` again | Restart, rescan, or use `--watch` |

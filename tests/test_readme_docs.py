@@ -168,6 +168,17 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 for phrase in required:
                     self.assertIn(phrase, text)
 
+    def test_every_readme_presents_oidc_as_a_server_capability(self):
+        readmes = [Path("README.md")]
+        readmes.extend(sorted(Path("docs/readme").glob("README.*.md")))
+        self.assertEqual(17, len(readmes))
+
+        for path in readmes:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                self.assertIn("OIDC", text)
+                self.assertIn("Provider", text)
+
     def test_readmes_document_pdf_chapter_mapping(self):
         contracts = {
             Path("README.md"): (

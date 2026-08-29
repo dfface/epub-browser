@@ -19,6 +19,7 @@ EPUB Browser gestisce `.epub` e `.pdf` in due modalità con responsabilità chia
 | EPUB e PDF | Sì | Sì |
 | Distribuzione | Hosting statico, Pages, object storage, Nginx | Servizio privato di lettura persistente |
 | Account | Nessuno | Account locali |
+| Single sign-on OIDC | Non incluso | Provider generico, collegamento di account esistenti e creazione facoltativa dei membri |
 | Avanzamento, annotazioni, libreria | Solo in questo browser | Dati dell’account autenticato in SQLite |
 | Aggiornamento delle fonti | Eseguire di nuovo `ssg` | Riavviare il servizio o usare `--watch` |
 | Database a runtime | Nessuno | Obbligatorio |

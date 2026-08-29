@@ -19,6 +19,7 @@ O EPUB Browser processa `.epub` e `.pdf` em dois modos com responsabilidades cla
 | EPUB e PDF | Sim | Sim |
 | Implantação | Hospedagem estática, Pages, armazenamento de objetos, Nginx | Serviço privado de leitura persistente |
 | Contas | Nenhuma | Contas locais |
+| Login único OIDC | Não incluído | Provider genérico, vínculo de contas existentes e criação opcional de membros |
 | Progresso, anotações e estante | Somente neste navegador | Dados da conta autenticada no SQLite |
 | Atualização das fontes | Executar `ssg` novamente | Reiniciar o serviço ou usar `--watch` |
 | Banco de dados em execução | Nenhum | Obrigatório |

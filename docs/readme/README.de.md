@@ -19,6 +19,7 @@ EPUB Browser verarbeitet `.epub` und `.pdf` in zwei klar getrennten Betriebsarte
 | EPUB und PDF | Ja | Ja |
 | Bereitstellung | Statisches Hosting, Pages, Objektspeicher, Nginx | Dauerhafter privater Lesedienst |
 | Konten | Keine | Lokale Konten |
+| OIDC Single Sign-on | Nicht enthalten | Generischer Provider, Verknüpfung vorhandener Konten und optionale Mitgliederbereitstellung |
 | Fortschritt, Anmerkungen, Bücherregal | Nur in diesem Browser | Daten des angemeldeten Kontos in SQLite |
 | Quellen aktualisieren | `ssg` erneut ausführen | Dienst neu starten oder `--watch` verwenden |
 | Laufzeitdatenbank | Keine | Erforderlich |

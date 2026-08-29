@@ -19,6 +19,7 @@ EPUB Browser traite les fichiers `.epub` et `.pdf` dans deux modes aux responsab
 | EPUB et PDF | Oui | Oui |
 | Déploiement | Hébergement statique, Pages, stockage objet, Nginx | Service privé de lecture persistant |
 | Comptes | Aucun | Comptes locaux |
+| Authentification unique OIDC | Non incluse | Provider générique, liaison de comptes existants et création facultative de membres |
 | Progression, annotations, bibliothèque | Ce navigateur uniquement | Données du compte authentifié dans SQLite |
 | Mise à jour des sources | Relancer `ssg` | Redémarrer le service ou utiliser `--watch` |
 | Base de données d’exécution | Aucune | Obligatoire |

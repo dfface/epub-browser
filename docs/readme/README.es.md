@@ -19,6 +19,7 @@ EPUB Browser procesa `.epub` y `.pdf` en dos modos con responsabilidades clarame
 | EPUB y PDF | Sí | Sí |
 | Despliegue | Hosting estático, Pages, almacenamiento de objetos, Nginx | Servicio privado de lectura persistente |
 | Cuentas | Ninguna | Cuentas locales |
+| Inicio de sesión único OIDC | No incluido | Provider genérico, vinculación de cuentas existentes y alta opcional de miembros |
 | Progreso, anotaciones y estantería | Solo en este navegador | Datos de la cuenta autenticada en SQLite |
 | Actualización de fuentes | Ejecutar `ssg` de nuevo | Reiniciar el servicio o usar `--watch` |
 | Base de datos en tiempo de ejecución | No | Obligatoria |
