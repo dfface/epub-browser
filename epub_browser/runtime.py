@@ -294,7 +294,7 @@ def run_server(
     browser_opener: Callable = webbrowser.open,
     ephemeral_root_factory: Optional[Callable[[], Path]] = None,
 ) -> int:
-    active_reporter = reporter or Reporter(config.log)
+    active_reporter = reporter or Reporter(config.log_level)
     status = RuntimeStatus()
     manager = None
     watcher_thread = None
@@ -458,8 +458,8 @@ def run_server(
             app,
             host=config.host,
             port=config.port,
-            log_level="info" if config.log else "warning",
-            access_log=config.log,
+            log_level=config.log_level,
+            access_log=config.log_level in {"debug", "info"},
             proxy_headers=False,
         )
         server = server_factory(uvicorn_config)
@@ -473,7 +473,7 @@ def run_server(
                 if availability_reported.is_set():
                     return
                 message = f"Server available at: {local_url}"
-                if config.log:
+                if config.log_level in {"debug", "info"}:
                     active_reporter.notice(message)
                 elif sys.stdout.isatty():
                     active_reporter.result(message)

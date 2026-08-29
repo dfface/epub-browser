@@ -16,6 +16,17 @@ from epub_browser.main import main
 
 
 class NewCommandTests(unittest.TestCase):
+    def test_log_level_controls_verbosity_and_log_remains_an_info_alias(self):
+        quiet = parse_cli(["ssg", "books", "--output-dir", "dist"])
+        debug = parse_cli(
+            ["ssg", "books", "--output-dir", "dist", "--log-level", "debug"]
+        )
+        legacy_log = parse_cli(["ssg", "books", "--output-dir", "dist", "--log"])
+
+        self.assertEqual(quiet.log_level, "warning")
+        self.assertEqual(debug.log_level, "debug")
+        self.assertEqual(legacy_log.log_level, "info")
+
     def test_book_id_storage_defaults_to_sidecar_in_both_modes(self):
         ssg = parse_cli(["ssg", "books", "--output-dir", "dist"])
         server = parse_cli(["server", "books", "--server-dir", "state"])

@@ -401,7 +401,7 @@ epub-browser server /path/to/books \
 
 默认情况下，Server 在 HTTP 监听器启动后，会尝试打开操作系统的默认浏览器。`--no-browser` 只阻止这次本机启动动作，**不会关闭 Web 界面，也不会禁止浏览器访问**；它只是跳过本机的 `webbrowser.open(...)` 调用。Docker、systemd、SSH、无图形界面的主机和脚本中都建议使用它。
 
-未指定 `--log` 时，CLI 会避免输出日常信息，以免破坏终端进度展示。交互式终端只打印一次监听 URL；Docker 和服务等非交互环境保持安静。`--log` 会开启运行日志和 HTTP 访问日志。
+默认使用 `--log-level warning`，CLI 会避免输出日常信息，以免破坏终端进度展示。交互式终端只打印一次监听 URL；Docker 和服务等非交互环境保持安静。使用 `--log-level info` 开启运行日志和 HTTP 访问日志，使用 `--log-level debug` 获取最详细的信息。`--log` 保留为 `--log-level info` 的兼容别名。
 
 首次扫描和监听扫描的进度显示在 Web 页面，而不是终端 `tqdm`。全部成功时摘要会自动关闭；有失败时会保留到用户手动关闭。使用 `--watch` 时，修复或替换源文件就会触发下一次扫描，无需手动 Retry。
 
@@ -533,7 +533,8 @@ docker run -d \
 | `--output-dir DIR`, `-o DIR` | 必填；原子静态快照的目标目录。 |
 | `--base-path PATH` | 公开 URL 前缀，默认 `/`；必须以 `/` 开头和结尾。 |
 | `--book-id-storage sidecar\|embedded` | 本次命令中所有源文件的稳定身份载体，默认 `sidecar`。 |
-| `--log` | 打印转换细节；未指定时日常输出保持安静。 |
+| `--log` | `--log-level info` 的兼容别名。 |
+| `--log-level debug\|info\|warning\|error` | 运行日志详细程度；默认 `warning`，日常转换输出保持安静。 |
 
 #### `epub-browser server SOURCE [SOURCE ...]`
 
@@ -547,7 +548,8 @@ docker run -d \
 | `--host ADDRESS` | 监听地址，默认 `127.0.0.1`。 |
 | `--port PORT`, `-p PORT` | 监听端口，默认 `8000`。 |
 | `--no-browser` | 不启动本机默认浏览器；Web 界面仍可访问。 |
-| `--log` | 开启运行日志和 HTTP 访问日志。 |
+| `--log` | `--log-level info` 的兼容别名。 |
+| `--log-level debug\|info\|warning\|error` | 运行日志详细程度；默认 `warning`。`info` 和 `debug` 会开启 HTTP 访问日志。 |
 | `--legacy-sync-dir DIR` | 启动迁移时读取旧书架 JSON。 |
 | `--book-id-storage sidecar\|embedded` | 本次命令中所有源文件的稳定身份载体，默认 `sidecar`。 |
 | `--admin-username NAME` | 无人值守的初始管理员；后备为 `EPUB_BROWSER_ADMIN_USERNAME`。 |

@@ -11,6 +11,8 @@ from .book_identity import (
 )
 from .urls import normalize_base_path
 
+LOG_LEVELS = ("debug", "info", "warning", "error")
+
 
 @dataclass(frozen=True)
 class SSGConfig:
@@ -20,7 +22,12 @@ class SSGConfig:
     legacy_invocation: bool = False
     legacy_temporary_output: bool = False
     log: bool = False
+    log_level: str = "warning"
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
+
+    def __post_init__(self) -> None:
+        if self.log and self.log_level == "warning":
+            object.__setattr__(self, "log_level", "info")
 
 
 @dataclass(frozen=True)
@@ -33,11 +40,16 @@ class ServerConfig:
     port: int = 8000
     no_browser: bool = False
     log: bool = False
+    log_level: str = "warning"
     legacy_sync_dir: Optional[Path] = None
     retain_legacy_temporary_dir: bool = False
     legacy_invocation: bool = False
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
     auth: ServerAuthOptions = ServerAuthOptions()
+
+    def __post_init__(self) -> None:
+        if self.log and self.log_level == "warning":
+            object.__setattr__(self, "log_level", "info")
 
 
 CommandConfig = Union[SSGConfig, ServerConfig]
@@ -62,6 +74,29 @@ def _add_book_id_storage(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_logging_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Compatibility alias for --log-level info",
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=LOG_LEVELS,
+        help="Operational log verbosity; default: warning",
+    )
+
+
+def _log_level(values: argparse.Namespace) -> str:
+    if values.log_level is not None:
+        return values.log_level
+    return "info" if values.log else "warning"
+
+
+def _uses_log_alias(values: argparse.Namespace) -> bool:
+    return values.log and values.log_level is None
+
+
 def _new_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="epub-browser",
@@ -73,7 +108,7 @@ def _new_parser() -> argparse.ArgumentParser:
     ssg.add_argument("sources", nargs="+", metavar="SOURCE")
     ssg.add_argument("--output-dir", "-o", required=True)
     ssg.add_argument("--base-path", default="/", type=_parse_base_path)
-    ssg.add_argument("--log", action="store_true")
+    _add_logging_options(ssg)
     _add_book_id_storage(ssg)
 
     server = modes.add_parser("server", help="Run the stateful reading server")
@@ -85,7 +120,7 @@ def _new_parser() -> argparse.ArgumentParser:
     server.add_argument("--host", default="127.0.0.1")
     server.add_argument("--port", "-p", type=int, default=8000)
     server.add_argument("--no-browser", action="store_true")
-    server.add_argument("--log", action="store_true")
+    _add_logging_options(server)
     server.add_argument("--legacy-sync-dir")
     _add_book_id_storage(server)
     server.add_argument(
@@ -118,7 +153,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--output-dir", "-o")
     parser.add_argument("--keep-files", action="store_true")
-    parser.add_argument("--log", action="store_true")
+    _add_logging_options(parser)
     parser.add_argument("--no-server", action="store_true")
     parser.add_argument("--watch", "-w", action="store_true")
     parser.add_argument("--sync-dir")
@@ -137,7 +172,8 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
                 sources=sources,
                 output_dir=Path(values.output_dir),
                 base_path=values.base_path,
-                log=values.log,
+                log=_uses_log_alias(values),
+                log_level=_log_level(values),
                 book_id_storage=values.book_id_storage,
             )
         try:
@@ -152,7 +188,8 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
             host=values.host,
             port=values.port,
             no_browser=values.no_browser,
-            log=values.log,
+            log=_uses_log_alias(values),
+            log_level=_log_level(values),
             legacy_sync_dir=(
                 Path(values.legacy_sync_dir) if values.legacy_sync_dir else None
             ),
@@ -168,7 +205,8 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
             output_dir=Path(values.output_dir) if values.output_dir else None,
             legacy_invocation=True,
             legacy_temporary_output=not bool(values.output_dir),
-            log=values.log,
+            log=_uses_log_alias(values),
+            log_level=_log_level(values),
             book_id_storage=values.book_id_storage,
         )
     return ServerConfig(
@@ -178,7 +216,8 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
         watch=values.watch,
         port=values.port,
         no_browser=values.no_browser,
-        log=values.log,
+        log=_uses_log_alias(values),
+        log_level=_log_level(values),
         legacy_sync_dir=Path(values.sync_dir) if values.sync_dir else None,
         retain_legacy_temporary_dir=bool(values.keep_files and not values.output_dir),
         legacy_invocation=True,
@@ -215,6 +254,8 @@ def format_legacy_migration_hint(config: CommandConfig) -> Optional[str]:
             command.extend(["--base-path", config.base_path])
         if config.log:
             command.append("--log")
+        elif config.log_level != "warning":
+            command.extend(["--log-level", config.log_level])
     else:
         command.extend(["server", *(str(path) for path in config.sources)])
         if config.server_dir is not None:
@@ -231,6 +272,8 @@ def format_legacy_migration_hint(config: CommandConfig) -> Optional[str]:
             command.append("--no-browser")
         if config.log:
             command.append("--log")
+        elif config.log_level != "warning":
+            command.extend(["--log-level", config.log_level])
         if config.legacy_sync_dir is not None:
             command.extend(["--legacy-sync-dir", str(config.legacy_sync_dir)])
 

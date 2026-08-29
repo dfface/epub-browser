@@ -80,7 +80,7 @@ class SSGPublisher:
         self.config = config
         self.output_dir = Path(config.output_dir).expanduser().resolve()
         self.urls = SiteURLs(config.base_path)
-        self.reporter = reporter or Reporter(config.log)
+        self.reporter = reporter or Reporter(config.log_level)
         self.converter_factory = converter_factory
         self.show_progress = sys.stderr.isatty() if show_progress is None else show_progress
 
@@ -688,7 +688,7 @@ class SSGPublisher:
 
 
 def run_ssg(config: SSGConfig, reporter: Optional[Reporter] = None) -> int:
-    active_reporter = reporter or Reporter(config.log)
+    active_reporter = reporter or Reporter(config.log_level)
     active_config = config
     if config.output_dir is None:
         temporary_output = Path(tempfile.mkdtemp(prefix="epub-browser-ssg-"))

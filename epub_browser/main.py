@@ -10,7 +10,7 @@ from .ssg import run_ssg
 
 def main(argv=None):
     config = parse_cli(sys.argv[1:] if argv is None else argv)
-    reporter = Reporter(config.log)
+    reporter = Reporter(config.log_level)
     hint = format_legacy_migration_hint(config)
     if hint:
         reporter.notice(hint)

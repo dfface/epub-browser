@@ -45,4 +45,4 @@ VOLUME ["/app/EpubBrowserFiles"]
 
 EXPOSE 80
 
-CMD ["epub-browser", "server", "/app/Library", "--book-id-storage=embedded", "--server-dir=/app/EpubBrowserFiles", "--legacy-sync-dir=/app/SyncData", "--watch", "--host=0.0.0.0", "--no-browser", "--port=80"]
+CMD ["epub-browser", "server", "/app/Library", "--book-id-storage=embedded", "--server-dir=/app/EpubBrowserFiles", "--legacy-sync-dir=/app/SyncData", "--watch", "--host=0.0.0.0", "--no-browser", "--port=80", "--log-level=info"]

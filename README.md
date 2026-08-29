@@ -447,7 +447,7 @@ Environment equivalents are `EPUB_BROWSER_ADMIN_USERNAME` and `EPUB_BROWSER_ADMI
 
 By default, Server tries to open the operating system's default browser after the HTTP listener has started. `--no-browser` prevents that local launch. It **does not disable the web interface or browser access**; it only suppresses the local `webbrowser.open(...)` call. Use it for Docker, systemd, SSH sessions, headless machines, and scripts.
 
-Without `--log`, the CLI avoids routine output so terminal progress displays are not corrupted. An interactive terminal prints the bound URL once; non-interactive Docker and service runs remain quiet. `--log` enables operational and HTTP access logging.
+By default (`--log-level warning`), the CLI avoids routine output so terminal progress displays are not corrupted. An interactive terminal prints the bound URL once; non-interactive Docker and service runs remain quiet. Use `--log-level info` for operational and HTTP access logging, or `--log-level debug` for the most detail. `--log` remains a compatibility alias for `--log-level info`.
 
 Initial and watch scans appear in the web interface rather than terminal `tqdm`. A successful summary closes automatically; failures stay visible until dismissed. With `--watch`, fixing or replacing a source starts another scan without a manual retry action.
 
@@ -579,7 +579,8 @@ The loopback published port in the examples keeps the container behind the host 
 | `--output-dir DIR`, `-o DIR` | Required destination for the atomic static snapshot. |
 | `--base-path PATH` | Public URL prefix; default `/`. It must begin and end with `/`. |
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
-| `--log` | Print conversion detail. Without it, routine output stays quiet. |
+| `--log` | Compatibility alias for `--log-level info`. |
+| `--log-level debug\|info\|warning\|error` | Operational log verbosity; default `warning`, which keeps routine conversion output quiet. |
 
 #### `epub-browser server SOURCE [SOURCE ...]`
 
@@ -593,7 +594,8 @@ Exactly one of `--server-dir` and `--ephemeral` is required.
 | `--host ADDRESS` | Bind address; default `127.0.0.1`. |
 | `--port PORT`, `-p PORT` | Bind port; default `8000`. |
 | `--no-browser` | Do not launch the local default browser. The web UI remains available. |
-| `--log` | Enable operational and HTTP access logs. |
+| `--log` | Compatibility alias for `--log-level info`. |
+| `--log-level debug\|info\|warning\|error` | Operational log verbosity; default `warning`. HTTP access logs are enabled at `info` and `debug`. |
 | `--legacy-sync-dir DIR` | Read legacy bookshelf JSON during startup migration. |
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
 | `--admin-username NAME` | Initial unattended administrator; fallback `EPUB_BROWSER_ADMIN_USERNAME`. |
