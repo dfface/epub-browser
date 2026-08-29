@@ -32,6 +32,10 @@ body.pdf-source .eb-content-container {
     overscroll-behavior-inline: contain;
 }
 
+.dark-mode body.pdf-source .eb-content-container {
+    background: var(--reader-canvas, var(--background));
+}
+
 body.pdf-source #eb-content {
     width: max-content;
     min-width: 100%;
@@ -123,6 +127,11 @@ body.pdf-source .continuous-chapter + .continuous-chapter {
     white-space: pre;
     cursor: text;
     transform-origin: 0 0;
+}
+
+.dark-mode body.pdf-source #eb-content .pdf-page-text-layer span,
+.dark-mode body.pdf-source #eb-content .pdf-page-text-layer br {
+    color: transparent !important;
 }
 
 .pdf-page-content .pdf-page-text-layer span {

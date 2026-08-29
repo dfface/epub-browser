@@ -2,7 +2,86 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const childProcess = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const createAdapter = require('../epub_browser/assets/pdf-chapter.js');
+
+function layoutBrowser() {
+  return [
+    process.env.EPUB_BROWSER_TEST_BROWSER,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ].find(candidate => candidate && fs.existsSync(candidate));
+}
+
+let darkPdfThemeInspection = null;
+
+function inspectDarkPdfTheme() {
+  if (darkPdfThemeInspection) return darkPdfThemeInspection;
+  const assetDirectory = path.join(__dirname, '..', 'epub_browser', 'assets');
+  const styles = ['theme.css', 'chapter.css', 'pdf-chapter.css']
+    .map(filename => fs.readFileSync(path.join(assetDirectory, filename), 'utf8'))
+    .join('\n');
+  const html = '<!doctype html><html class="dark-mode"><head><style>' + styles + '</style></head>' +
+    '<body class="pdf-source"><div id="reader-canvas-probe" style="background:var(--reader-canvas)"></div>' +
+    '<div class="eb-content-container" id="pdf-stage">' +
+    '<main id="eb-content"><div class="pdf-page-content"><div class="pdf-page-text-layer">' +
+    '<span id="pdf-text">Selectable PDF text</span></div></div></main></div>' +
+    '<script>' +
+      'document.body.dataset.pdfTextColor=getComputedStyle(document.getElementById("pdf-text")).color;' +
+      'document.body.dataset.pdfStageBackground=getComputedStyle(document.getElementById("pdf-stage")).backgroundColor;' +
+      'document.body.dataset.readerCanvasBackground=getComputedStyle(document.getElementById("reader-canvas-probe")).backgroundColor;' +
+    '</script></body></html>';
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'epub-browser-pdf-theme-'));
+  const fixture = path.join(directory, 'index.html');
+  fs.writeFileSync(fixture, html);
+  try {
+    const result = childProcess.spawnSync(layoutBrowser(), [
+      '--headless=new',
+      '--disable-gpu',
+      '--no-sandbox',
+      '--dump-dom',
+      `file://${fixture}`,
+    ], { encoding: 'utf8', timeout: 10000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const textColor = result.stdout.match(/data-pdf-text-color="([^"]+)"/);
+    const stageBackground = result.stdout.match(/data-pdf-stage-background="([^"]+)"/);
+    const readerCanvasBackground = result.stdout.match(/data-reader-canvas-background="([^"]+)"/);
+    assert.ok(textColor, 'browser did not report the PDF text layer color');
+    assert.ok(stageBackground, 'browser did not report the PDF stage background');
+    assert.ok(readerCanvasBackground, 'browser did not report the reader canvas background');
+    darkPdfThemeInspection = {
+      textColor: textColor[1],
+      stageBackground: stageBackground[1],
+      readerCanvasBackground: readerCanvasBackground[1],
+    };
+    return darkPdfThemeInspection;
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+const browser = layoutBrowser();
+
+test('dark PDF text layer remains transparent above the rendered paper', {
+  skip: browser ? false : 'Chrome, Edge, or Chromium is required for the PDF theme assertion',
+}, () => {
+  assert.equal(inspectDarkPdfTheme().textColor, 'rgba(0, 0, 0, 0)');
+});
+
+test('dark PDF stage uses the reader canvas without lifting it toward the text color', {
+  skip: browser ? false : 'Chrome, Edge, or Chromium is required for the PDF theme assertion',
+}, () => {
+  const inspection = inspectDarkPdfTheme();
+  assert.equal(inspection.stageBackground, inspection.readerCanvasBackground);
+});
 
 class Element {
   constructor(tagName = 'div', ownerDocument = null) {
