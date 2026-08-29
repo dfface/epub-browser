@@ -823,6 +823,39 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(unavailable.headers["cache-control"], "no-store")
         self.assertNotIn("identity.example", unavailable.text)
 
+    def test_login_page_only_offers_the_configured_oidc_provider_when_enabled(self):
+        disabled = self.client.get("/login?next=%2Fbook%2Fid%2Findex.html")
+        self.assertEqual(disabled.status_code, 200)
+        self.assertNotIn('id="oidcLoginAction"', disabled.text)
+
+        _enable_oidc(self.store)
+        enabled = self.client.get("/login?next=%2Fbook%2Fid%2Findex.html")
+
+        self.assertEqual(enabled.status_code, 200)
+        self.assertIn('id="oidcLoginAction"', enabled.text)
+        self.assertIn('data-i18n="account.oidc.continueWith"', enabled.text)
+        self.assertIn('Company SSO', enabled.text)
+        self.assertIn(
+            '/auth/oidc/start?next=%2Fbook%2Fid%2Findex.html',
+            enabled.text,
+        )
+        self.assertNotIn('client-secret', enabled.text)
+
+    def test_session_exposes_only_safe_oidc_availability_metadata(self):
+        _enable_oidc(self.store)
+        logged_in = _json_login(self, self.client, "alice", "secret")
+        self.assertEqual(logged_in.status_code, 200)
+
+        payload = self.client.get("/api/session").json()
+
+        self.assertEqual(
+            payload["oidc"],
+            {"enabled": True, "provider_name": "Company SSO", "linked": False},
+        )
+        serialized = json.dumps(payload)
+        self.assertNotIn("client-secret", serialized)
+        self.assertNotIn("identity.example.test", serialized)
+
     def test_oidc_linked_login_issues_local_session(self):
         _enable_oidc(self.store)
         member = self.store.create_user("oidc-reader", hash_password("local-secret"))

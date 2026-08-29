@@ -1351,6 +1351,19 @@ if(localeField)localeField.value=localeSelect.value;
         language_options = locale_options(locale)
         footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
         brand_markup = auth_brand_markup()
+        oidc_settings = store.get_oidc_settings()
+        oidc_markup = ''
+        if oidc_settings.enabled:
+            provider_name = html.escape(oidc_settings.provider_name, quote=True)
+            oidc_href = '/auth/oidc/start?next=' + quote(
+                _safe_relative_path(next_path),
+                safe='',
+            )
+            oidc_markup = f'''<div class="auth-divider" role="separator"><span data-i18n="account.oidc.or">or</span></div>
+<a class="auth-provider-button" id="oidcLoginAction" href="{oidc_href}">
+<i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>
+<span data-i18n="account.oidc.continueWith">Continue with</span> <strong>{provider_name}</strong>
+</a>'''
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -1378,7 +1391,7 @@ if(localeField)localeField.value=localeSelect.value;
 <label class="auth-field"><span data-i18n="account.username">{copy['username']}</span><input name="username" autocomplete="username" required></label>
 <label class="auth-field"><span data-i18n="account.password">{copy['password']}</span><input name="password" type="password" autocomplete="current-password" required></label>
 <button class="auth-primary-button" type="submit" data-i18n="account.signIn">{copy['sign_in']}</button>
-</form></section>{footer_markup}</div></main>
+</form>{oidc_markup}</section>{footer_markup}</div></main>
 <script>(function() {{
 var i18n=window.EpubBrowserI18n;
 var localeSelect=document.getElementById('loginLocaleSelect');
@@ -1443,10 +1456,12 @@ window.location.assign(payload.redirect||'/');
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>{html.escape(copy['error_title'])} · EPUB Browser</title>
+<title data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])} · EPUB Browser</title>
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
-<script src="/assets/theme-bootstrap.js"></script></head>
+<script src="/assets/theme-bootstrap.js"></script>
+<script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
+<script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
 <body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
 <header class="auth-card-header">{auth_brand_markup()}
 <h1 data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])}</h1>
@@ -1483,10 +1498,12 @@ window.location.assign(payload.redirect||'/');
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>{html.escape(copy['associate_title'])} · EPUB Browser</title>
+<title data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])} · EPUB Browser</title>
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
-<script src="/assets/theme-bootstrap.js"></script></head>
+<script src="/assets/theme-bootstrap.js"></script>
+<script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
+<script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
 <body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
 <header class="auth-card-header">{auth_brand_markup()}
 <h1 data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])}</h1>
@@ -1827,18 +1844,30 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         raw_session = request_session_token(request)
         user = store.get_user(principal.user_id)
+        oidc_settings = store.get_oidc_settings()
+        oidc_identities = user_oidc_identities(user)
         return response(
             {
                 'user': {
                     'id': principal.user_id,
                     'username': principal.username,
                     'role': principal.role,
-                    'oidc_identities': user_oidc_identities(user),
+                    'oidc_identities': oidc_identities,
                 },
                 'csrf_token': auth_service.issue_csrf_token(
                     principal,
                     raw_session,
                 ),
+                'oidc': {
+                    'enabled': oidc_settings.enabled,
+                    'provider_name': (
+                        oidc_settings.provider_name if oidc_settings.enabled else ''
+                    ),
+                    'linked': any(
+                        identity['issuer'] == oidc_settings.issuer_url
+                        for identity in oidc_identities
+                    ) if oidc_settings.enabled else False,
+                },
             },
             cache_control='no-store',
         )

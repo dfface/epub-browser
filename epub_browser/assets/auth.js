@@ -13,6 +13,8 @@
     var users = [];
     var books = [];
     var aiSettings = null;
+    var oidcSettings = null;
+    var oidcSaveRequest = null;
     var aiTags = [];
     var aiTagSearchQuery = '';
     var aiTagEditingId = '';
@@ -260,6 +262,14 @@
         dictionary_has_no_entries: true,
         invalid_dictionary_update: true,
         invalid_dictionary_name: true,
+        invalid_oidc_settings: true,
+        oidc_configuration_invalid: true,
+        oidc_configuration_unsupported: true,
+        oidc_discovery_invalid: true,
+        oidc_provider_unavailable: true,
+        oidc_identity_conflict: true,
+        oidc_identity_not_found: true,
+        last_login_method: true,
         network: true
       } : {
         authentication_required: true,
@@ -268,6 +278,8 @@
         invalid_credentials: true,
         login_throttled: true,
         invalid_password: true,
+        oidc_identity_not_found: true,
+        last_login_method: true,
         not_found: true,
         network: true
       };
@@ -954,7 +966,7 @@
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
+      return ['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
         ? section : '';
     }
 
@@ -962,7 +974,7 @@
 
     function setActiveAdminSection(section) {
       var activeTab = null;
-      if (['overview', 'users', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) === -1) return;
+      if (['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
@@ -978,6 +990,21 @@
       });
       if (activeTab && typeof activeTab.scrollIntoView === 'function') {
         activeTab.scrollIntoView({ block: 'nearest', inline: 'center' });
+      }
+      if (adminPanelIsActive() && root.history && typeof root.history.replaceState === 'function') {
+        root.history.replaceState(null, '', '#admin=' + encodeURIComponent(section));
+      }
+    }
+
+    function adminSectionFromHash() {
+      var match = String(root.location && root.location.hash || '').match(/(?:^#|&)admin=([^&]+)/);
+      if (!match) return '';
+      try {
+        var section = decodeURIComponent(match[1]);
+        return ['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
+          ? section : '';
+      } catch (error) {
+        return '';
       }
     }
 
@@ -1250,6 +1277,65 @@
       if (adminMenu) adminMenu.hidden = sessionState.user.role !== 'admin';
       var patAdminScopeLabel = element('patAdminScopeLabel');
       if (patAdminScopeLabel) patAdminScopeLabel.hidden = sessionState.user.role !== 'admin';
+      renderAccountOidc();
+    }
+
+    function setTextMessage(target, key, type) {
+      if (!target) return;
+      target.textContent = key ? t(key) : '';
+      target.className = 'account-form-message' + (type ? ' is-' + type : '');
+    }
+
+    function oidcCurrentPath() {
+      var location = root.location || {};
+      var path = String(location.pathname || '/');
+      if (path.charAt(0) !== '/' || path.indexOf('//') === 0) path = '/';
+      return path + String(location.search || '');
+    }
+
+    function renderAccountOidc() {
+      var card = element('accountOidcCard');
+      if (!card || !sessionState || !sessionState.user) return;
+      var identities = Array.isArray(sessionState.user.oidc_identities)
+        ? sessionState.user.oidc_identities : [];
+      var available = Boolean(sessionState.oidc && sessionState.oidc.enabled);
+      var list = element('accountOidcList');
+      var link = element('accountOidcLink');
+      var unlink = element('accountOidcUnlink');
+      card.hidden = !available && identities.length === 0;
+      if (list) {
+        list.textContent = '';
+        if (!identities.length) {
+          list.appendChild(createTextElement(
+            'li', 'account-list-item account-oidc-empty', 'account.oidc.noIdentity'
+          ));
+        }
+        identities.forEach(function(identity) {
+          var item = root.document.createElement('li');
+          var details = root.document.createElement('span');
+          var provider = root.document.createElement('strong');
+          var account = root.document.createElement('span');
+          item.className = 'account-list-item account-oidc-identity';
+          details.className = 'account-oidc-identity-copy';
+          provider.textContent = identity.provider_name || t('admin.oidc.provider');
+          account.textContent = identity.display_name || identity.username || identity.email || '';
+          details.appendChild(provider);
+          details.appendChild(account);
+          item.appendChild(details);
+          list.appendChild(item);
+        });
+      }
+      if (link) {
+        link.hidden = !available || Boolean(sessionState.oidc.linked);
+        link.textContent = t('account.oidc.linkWith', {
+          provider: sessionState.oidc && sessionState.oidc.provider_name || ''
+        });
+      }
+      if (unlink) {
+        unlink.hidden = identities.length === 0;
+        unlink.disabled = Boolean(identities.length && !identities[0].can_unlink);
+        unlink.setAttribute('aria-disabled', String(unlink.disabled));
+      }
     }
 
     function describeSessionDevice(userAgent) {
@@ -1661,6 +1747,47 @@
           });
         }, 'danger'));
 
+        var oidcIdentities = Array.isArray(user.oidc_identities) ? user.oidc_identities : [];
+        if (oidcIdentities.length) {
+          var oidcActions = root.document.createElement('section');
+          oidcActions.className = 'account-user-action-group account-user-oidc-group';
+          oidcActions.appendChild(createTextElement(
+            'h5', 'account-user-action-title', 'admin.oidc.connectedIdentity'
+          ));
+          oidcIdentities.forEach(function(oidcIdentity) {
+            var identityRow = root.document.createElement('div');
+            var identityCopy = root.document.createElement('span');
+            var remove = actionButton('admin.oidc.removeIdentity', function() {
+              return confirmAdminAction('admin.oidc.removeIdentityConfirm', {
+                username: user.username,
+                provider: oidcIdentity.provider_name || ''
+              }, {
+                titleKey: 'admin.oidc.removeIdentity',
+                confirmTextKey: 'admin.oidc.removeIdentity'
+              }).then(function(confirmed) {
+                if (!confirmed) return null;
+                return authenticatedFetch(
+                  '/api/admin/users/' + encodeURIComponent(user.username) + '/oidc/identity?issuer=' +
+                    encodeURIComponent(oidcIdentity.issuer || ''),
+                  { method: 'DELETE' }
+                ).then(function(response) {
+                  if (!response.ok) return showResponseError(response, 'admin');
+                  return loadAdminData();
+                });
+              });
+            }, 'danger');
+            identityRow.className = 'account-user-oidc-row';
+            identityCopy.textContent = [
+              oidcIdentity.provider_name,
+              oidcIdentity.display_name || oidcIdentity.username || oidcIdentity.email
+            ].filter(Boolean).join(' · ');
+            identityRow.appendChild(identityCopy);
+            identityRow.appendChild(remove);
+            oidcActions.appendChild(identityRow);
+          });
+          detailsBody.appendChild(oidcActions);
+        }
+
         detailsBody.appendChild(accountActions);
         detailsBody.appendChild(securityActions);
         details.appendChild(detailsSummary);
@@ -1668,6 +1795,152 @@
         item.appendChild(details);
         list.appendChild(item);
       });
+    }
+
+    function renderOidcSettings() {
+      var form = element('adminOidcForm');
+      if (!form || !oidcSettings || !form.elements) return;
+      var fields = form.elements;
+      fields.enabled.checked = Boolean(oidcSettings.enabled);
+      fields.provider_name.value = oidcSettings.provider_name || '';
+      fields.issuer_url.value = oidcSettings.issuer_url || '';
+      fields.client_id.value = oidcSettings.client_id || '';
+      fields.client_secret.value = '';
+      fields.client_secret.placeholder = oidcSettings.client_secret_configured
+        ? t('admin.oidc.secretConfigured') : t('admin.oidc.secretPlaceholder');
+      fields.clear_client_secret.checked = false;
+      fields.redirect_uri.value = oidcSettings.redirect_uri || '';
+      fields.scopes.value = (oidcSettings.scopes || ['openid', 'profile', 'email']).join(' ');
+      fields.username_claim.value = oidcSettings.username_claim || 'preferred_username';
+      fields.auto_create_users.checked = Boolean(oidcSettings.auto_create_users);
+      fields.allow_member_password_login.checked = oidcSettings.allow_member_password_login !== false;
+      setTextMessage(
+        element('adminOidcMessage'),
+        oidcSettings.enabled ? 'admin.oidc.statusConfigured' : 'admin.oidc.statusDisabled',
+        oidcSettings.enabled ? 'success' : ''
+      );
+    }
+
+    function oidcScopes(value) {
+      var seen = Object.create(null);
+      return String(value || '').split(/[\s,]+/).map(function(scope) {
+        return scope.trim();
+      }).filter(function(scope) {
+        if (!scope || seen[scope]) return false;
+        seen[scope] = true;
+        return true;
+      });
+    }
+
+    function oidcUrlIsValid(value, callback) {
+      try {
+        var parsed = new URL(String(value || ''));
+        var loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+        if (parsed.protocol !== 'https:' && !(loopback && parsed.protocol === 'http:')) return false;
+        if (parsed.username || parsed.password || parsed.hash) return false;
+        if (callback) return !parsed.search && parsed.pathname === '/auth/oidc/callback';
+        return !parsed.search && (parsed.pathname === '' || parsed.pathname === '/' || parsed.pathname.slice(-1) !== '/');
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function validateOidcForm(form) {
+      var fields = form.elements;
+      var invalid = null;
+      Array.prototype.forEach.call(form.querySelectorAll ? form.querySelectorAll('[aria-invalid="true"]') : [], function(field) {
+        if (field.removeAttribute) field.removeAttribute('aria-invalid');
+      });
+      function reject(field) {
+        if (!invalid) invalid = field;
+        if (field && field.setAttribute) field.setAttribute('aria-invalid', 'true');
+      }
+      if (!formValue(form, 'username_claim').trim()) reject(fields.username_claim);
+      if (fields.enabled.checked) {
+        ['provider_name', 'issuer_url', 'client_id', 'redirect_uri'].forEach(function(name) {
+          if (!formValue(form, name).trim()) reject(fields[name]);
+        });
+        if (!(oidcSettings && oidcSettings.client_secret_configured) && !formValue(form, 'client_secret').trim()) {
+          reject(fields.client_secret);
+        }
+        if (fields.clear_client_secret.checked) reject(fields.client_secret);
+        if (!oidcUrlIsValid(formValue(form, 'issuer_url'), false)) reject(fields.issuer_url);
+        if (!oidcUrlIsValid(formValue(form, 'redirect_uri'), true)) reject(fields.redirect_uri);
+        if (oidcScopes(formValue(form, 'scopes')).indexOf('openid') === -1) reject(fields.scopes);
+      }
+      if (invalid) {
+        setTextMessage(element('adminOidcMessage'), 'admin.oidc.validationError', 'error');
+        if (typeof invalid.focus === 'function') invalid.focus();
+        return false;
+      }
+      return true;
+    }
+
+    function setOidcFormBusy(form, busy) {
+      if (!form) return;
+      form.setAttribute('aria-busy', String(busy));
+      Array.prototype.forEach.call(
+        form.querySelectorAll ? form.querySelectorAll('input, button, select') : [],
+        function(control) { control.disabled = busy; }
+      );
+    }
+
+    function saveOidcSettings(form) {
+      if (oidcSaveRequest || !validateOidcForm(form)) return oidcSaveRequest || Promise.resolve(null);
+      var fields = form.elements;
+      var payload = {
+        enabled: Boolean(fields.enabled.checked),
+        provider_name: formValue(form, 'provider_name').trim(),
+        issuer_url: formValue(form, 'issuer_url').trim(),
+        client_id: formValue(form, 'client_id').trim(),
+        redirect_uri: formValue(form, 'redirect_uri').trim(),
+        scopes: oidcScopes(formValue(form, 'scopes')),
+        username_claim: formValue(form, 'username_claim').trim(),
+        auto_create_users: Boolean(fields.auto_create_users.checked),
+        allow_member_password_login: Boolean(fields.allow_member_password_login.checked),
+        clear_client_secret: Boolean(fields.clear_client_secret.checked)
+      };
+      var secret = formValue(form, 'client_secret');
+      if (secret) payload.client_secret = secret;
+      setOidcFormBusy(form, true);
+      setTextMessage(element('adminOidcMessage'), 'admin.oidc.saving', '');
+      oidcSaveRequest = authenticatedFetch('/api/admin/oidc/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(response) {
+        if (!response.ok) {
+          return readJson(response).then(function(errorPayload) {
+            var code = errorPayload && errorPayload.code;
+            var known = ['invalid_oidc_settings', 'oidc_configuration_invalid', 'oidc_configuration_unsupported', 'oidc_discovery_invalid', 'oidc_provider_unavailable'];
+            setTextMessage(
+              element('adminOidcMessage'),
+              known.indexOf(code) !== -1 ? 'admin.error.' + code : 'admin.oidc.validationError',
+              'error'
+            );
+            return null;
+          });
+        }
+        return readJson(response).then(function(result) {
+          oidcSettings = result.settings || oidcSettings;
+          renderOidcSettings();
+          clearAdminDirty();
+          setTextMessage(element('adminOidcMessage'), 'admin.oidc.saved', 'success');
+          return oidcSettings;
+        });
+      }).catch(function() {
+        setTextMessage(element('adminOidcMessage'), 'admin.oidc.networkError', 'error');
+        return null;
+      }).then(function(result) {
+        oidcSaveRequest = null;
+        setOidcFormBusy(form, false);
+        return result;
+      }, function(error) {
+        oidcSaveRequest = null;
+        setOidcFormBusy(form, false);
+        throw error;
+      });
+      return oidcSaveRequest;
     }
 
     function renderAiSettings() {
@@ -3074,7 +3347,8 @@
         authenticatedFetch('/api/admin/users'),
         authenticatedFetch('/api/admin/books/index'),
         authenticatedFetch('/api/admin/ai/settings'),
-        authenticatedFetch('/api/admin/ai/tags')
+        authenticatedFetch('/api/admin/ai/tags'),
+        authenticatedFetch('/api/admin/oidc/settings')
       ];
       return Promise.all(requests).then(function(responses) {
         if (!responses[0].ok) return showResponseError(responses[0], 'admin');
@@ -3085,17 +3359,25 @@
           readJson(responses[0]),
           readJson(responses[1]),
           readJson(responses[2]),
-          readJson(responses[3])
+          readJson(responses[3]),
+          responses[4].ok
+            ? readJson(responses[4])
+            : showResponseError(responses[4], 'admin').then(function() { return {}; })
         ];
         return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
           applyAdminBookIndex(bookIndexGeneration, payloads[1]);
           aiSettings = payloads[2].settings || null;
           aiTags = payloads[3].tags || [];
+          oidcSettings = payloads[4].settings || null;
+          if (oidcSettings) {
+            oidcSettings.redirect_uri_suggestion = payloads[4].suggested_redirect_uri || '';
+          }
           renderUsers();
           renderAiSettings();
           renderAiUserAccess();
           renderAiTags();
+          renderOidcSettings();
           renderAdminOverview();
           if (element('adminDictionaryList')) return loadDictionaries();
         });
@@ -3115,6 +3397,7 @@
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
       setSurfaceLoading('accountPanel', 'accountPanelLoading', true);
+      renderAccountOidc();
       Promise.all([loadSessions(), loadPersonalAccessTokens()]).then(function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
       }, function() {
@@ -3138,6 +3421,7 @@
       panel.hidden = false;
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
+      activeAdminSection = adminSectionFromHash() || activeAdminSection;
       setActiveAdminSection(activeAdminSection);
       setSurfaceLoading('adminPanel', 'adminPanelLoading', true);
       loadAdminData().then(function() {
@@ -3173,6 +3457,8 @@
       var adminClose = element('adminClose');
       var adminBookEditorClose = element('adminBookEditorClose');
       var logoutButton = element('accountLogout');
+      var oidcLink = element('accountOidcLink');
+      var oidcUnlink = element('accountOidcUnlink');
       var passwordForm = element('accountPasswordForm');
       var patCreateForm = element('patCreateForm');
       var patCreateSubmit = element('patCreateSubmit');
@@ -3183,6 +3469,8 @@
       var webhookCancelEdit = element('adminWebhookCancelEdit');
       var createUserForm = element('adminUserForm');
       var createUserSubmit = element('adminUserSubmit');
+      var oidcForm = element('adminOidcForm');
+      var oidcUseSuggestion = element('adminOidcUseSuggestion');
       var aiSettingsForm = element('adminAiSettingsForm');
       var aiSettingsSubmit = element('adminAiSettingsSubmit');
       var aiTagForm = element('adminAiTagForm');
@@ -3211,7 +3499,7 @@
       var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
-      [createUserForm, aiSettingsForm, aiTagForm, dictionaryForm, webhookForm].forEach(function(form) {
+      [createUserForm, oidcForm, aiSettingsForm, aiTagForm, dictionaryForm, webhookForm].forEach(function(form) {
         if (!form) return;
         form.addEventListener('input', markAdminDirty);
         form.addEventListener('change', markAdminDirty);
@@ -3257,6 +3545,60 @@
       });
       if (logoutButton) logoutButton.addEventListener('click', function() {
         logout().catch(function() { showStatus('account.error.network', 'error'); });
+      });
+      if (oidcLink) oidcLink.addEventListener('click', function() {
+        if (oidcLink.disabled) return;
+        oidcLink.disabled = true;
+        authenticatedFetch('/api/account/oidc/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ next: oidcCurrentPath() })
+        }).then(function(response) {
+          if (!response.ok) return showResponseError(response, 'account');
+          return readJson(response).then(function(payload) {
+            if (payload && typeof payload.redirect === 'string' && payload.redirect.charAt(0) === '/') {
+              root.location.assign(payload.redirect);
+            }
+          });
+        }).catch(function() {
+          setTextMessage(element('accountOidcLive'), 'account.error.network', 'error');
+        }).then(function() { oidcLink.disabled = false; });
+      });
+      if (oidcUnlink) oidcUnlink.addEventListener('click', function() {
+        var identities = sessionState && sessionState.user && sessionState.user.oidc_identities || [];
+        var identity = identities[0];
+        if (!identity || !identity.can_unlink || oidcUnlink.disabled) return;
+        confirmAdminAction('account.oidc.unlinkConfirm', {
+          provider: identity.provider_name || ''
+        }, {
+          titleKey: 'account.oidc.unlink',
+          confirmTextKey: 'account.oidc.unlink'
+        }).then(function(confirmed) {
+          if (!confirmed) return null;
+          oidcUnlink.disabled = true;
+          return authenticatedFetch(
+            '/api/account/oidc/identity?issuer=' + encodeURIComponent(identity.issuer || ''),
+            { method: 'DELETE' }
+          ).then(function(response) {
+            if (!response.ok) return showResponseError(response, 'account');
+            return loadSession(true).then(function() {
+              renderAccountOidc();
+              setTextMessage(element('accountOidcLive'), 'account.oidc.unlinked', 'success');
+            });
+          }).catch(function() {
+            setTextMessage(element('accountOidcLive'), 'account.error.network', 'error');
+          }).then(function() { oidcUnlink.disabled = false; });
+        });
+      });
+      if (oidcUseSuggestion) oidcUseSuggestion.addEventListener('click', function() {
+        if (!oidcForm || !oidcSettings) return;
+        oidcForm.elements.redirect_uri.value = oidcSettings.redirect_uri_suggestion || '';
+        markAdminDirty();
+        if (oidcForm.elements.redirect_uri.focus) oidcForm.elements.redirect_uri.focus();
+      });
+      if (oidcForm) oidcForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        saveOidcSettings(oidcForm);
       });
       if (passwordForm) passwordForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -3664,6 +4006,8 @@
           renderSessions([]);
           renderUsers();
           renderAiSettings();
+          renderOidcSettings();
+          renderAccountOidc();
           renderAiUserAccess();
           renderAiTags();
           renderAdminBooks();
@@ -3700,6 +4044,8 @@
       openBookEditor: openAdminBookEditor,
       saveBookSettings: saveAdminBookSettings,
       clearBookResults: clearAdminBookResults,
+      normalizeOidcScopes: oidcScopes,
+      isOidcUrlValid: oidcUrlIsValid,
       init: init,
       setSession: setSession,
       getSession: function() { return sessionState; }

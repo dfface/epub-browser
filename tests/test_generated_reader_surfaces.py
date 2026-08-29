@@ -484,6 +484,22 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'<span\b(?=[^>]*id=(?:["\'])?localeCurrentLabel)'
             r'(?=[^>]*class=(?:["\'])?sr-only)',
         )
+
+    def test_server_account_chrome_has_accessible_oidc_account_and_admin_surfaces(self):
+        server_html = self._server_html()
+
+        for attribute, value in (
+            ('id', 'accountOidcCard'), ('id', 'accountOidcList'),
+            ('id', 'accountOidcLink'), ('id', 'accountOidcUnlink'),
+            ('id', 'adminSectionOidcTab'), ('aria-controls', 'adminOidcSection'),
+            ('id', 'adminOidcSection'), ('data-admin-panel', 'oidc'),
+            ('id', 'adminOidcForm'), ('id', 'adminOidcMessage'),
+            ('aria-live', 'polite'),
+        ):
+            self.assertRegex(
+                server_html,
+                rf'{re.escape(attribute)}=(?:["\'])?{re.escape(value)}',
+            )
         self.assertRegex(
             server_html,
             r'<select\b(?=[^>]*id=(?:["\'])?localeSelect)'

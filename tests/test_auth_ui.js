@@ -217,6 +217,19 @@ function adminDataResponse(url) {
   if (url === '/api/admin/books/index') return response(200, { books: [] });
   if (url === '/api/admin/ai/settings') return response(200, { settings: null });
   if (url === '/api/admin/ai/tags') return response(200, { tags: [] });
+  if (url === '/api/admin/oidc/settings') return response(200, { settings: {
+    enabled: false,
+    provider_name: '',
+    issuer_url: '',
+    client_id: '',
+    client_secret_configured: false,
+    redirect_uri: '',
+    redirect_uri_suggestion: 'http://localhost/auth/oidc/callback',
+    scopes: ['openid', 'profile', 'email'],
+    username_claim: 'preferred_username',
+    auto_create_users: false,
+    allow_member_password_login: true,
+  } });
   return null;
 }
 
@@ -428,6 +441,7 @@ test('book bulk actions retain a page selection and add member grants without re
     if (url === '/api/admin/books/index') return Promise.resolve(response(200, { books }));
     if (url === '/api/admin/ai/settings') return Promise.resolve(response(200, { settings: null }));
     if (url === '/api/admin/ai/tags') return Promise.resolve(response(200, { tags: [] }));
+    if (url === '/api/admin/oidc/settings') return Promise.resolve(adminDataResponse(url));
     if (url === '/api/admin/books/bulk') {
       requests.push(JSON.parse(options.body));
       return Promise.resolve(response(200, {
@@ -1213,10 +1227,108 @@ test('account settings and administration open as separate surfaces', async () =
     '/api/admin/books/index',
     '/api/admin/ai/settings',
     '/api/admin/ai/tags',
+    '/api/admin/oidc/settings',
     '/api/admin/ai/jobs?page=1&page_size=20',
     '/api/admin/webhooks',
     '/api/admin/webhooks/deliveries',
   ]);
+});
+
+test('OIDC client helpers normalize scopes and reject unsafe provider URLs', () => {
+  const auth = AuthModule.create(rootWithFetch(() => Promise.resolve(response(404, {}))));
+
+  assert.deepEqual(auth.normalizeOidcScopes('openid profile,profile email'), [
+    'openid', 'profile', 'email',
+  ]);
+  assert.equal(auth.isOidcUrlValid('https://id.example.test/tenant', false), true);
+  assert.equal(auth.isOidcUrlValid('https://id.example.test/tenant/', false), false);
+  assert.equal(auth.isOidcUrlValid('https://id.example.test?tenant=a', false), false);
+  assert.equal(auth.isOidcUrlValid('http://id.example.test', false), false);
+  assert.equal(auth.isOidcUrlValid('http://localhost:9091', false), true);
+  assert.equal(auth.isOidcUrlValid('https://reader.test/auth/oidc/callback', true), true);
+  assert.equal(auth.isOidcUrlValid('https://reader.test/auth/oidc/callback?x=1', true), false);
+  assert.equal(auth.isOidcUrlValid('https://reader.test/not-the-callback', true), false);
+});
+
+test('OIDC settings retain a masked secret and lock the whole form during one save', async () => {
+  const saved = deferred();
+  const putBodies = [];
+  const fields = {};
+  [
+    'enabled', 'provider_name', 'issuer_url', 'client_id', 'client_secret',
+    'clear_client_secret', 'redirect_uri', 'scopes', 'username_claim',
+    'auto_create_users', 'allow_member_password_login',
+  ].forEach(name => { fields[name] = fakeElement('input'); });
+  const submit = fakeElement('button');
+  const form = fakeElement('form');
+  const controls = Object.values(fields).concat([submit]);
+  form.elements = fields;
+  form.querySelectorAll = selector => selector === 'input, button, select' ? controls : [];
+  const adminMenu = fakeElement('button');
+  const adminPanel = fakeElement('section');
+  adminPanel.hidden = true;
+  const message = fakeElement('p');
+  const elements = {
+    adminMenu,
+    adminPanel,
+    adminOidcForm: form,
+    adminOidcSubmit: submit,
+    adminOidcMessage: message,
+  };
+  const root = rootWithFetch((url, options) => {
+    if (url === '/api/admin/oidc/settings' && options && options.method === 'PUT') {
+      putBodies.push(JSON.parse(options.body));
+      return saved.promise;
+    }
+    const common = adminDataResponse(url);
+    if (common) return Promise.resolve(common);
+    return Promise.resolve(response(200, {}));
+  });
+  root.document = {
+    createElement: fakeElement,
+    getElementById(id) { return elements[id] || null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const auth = AuthModule.create(root);
+  auth.setSession({
+    user: { id: 'admin', username: 'owner', role: 'admin', oidc_identities: [] },
+    oidc: { enabled: false, provider_name: '', linked: false },
+    csrf_token: 'csrf',
+  });
+  await auth.init();
+  adminMenu.click();
+  await tick();
+  await tick();
+
+  fields.enabled.checked = true;
+  fields.provider_name.value = 'Company SSO';
+  fields.issuer_url.value = 'https://identity.example.test';
+  fields.client_id.value = 'reader';
+  fields.client_secret.value = 'new-secret';
+  fields.redirect_uri.value = 'https://reader.test/auth/oidc/callback';
+  fields.scopes.value = 'openid profile profile email';
+  fields.username_claim.value = 'preferred_username';
+  fields.allow_member_password_login.checked = true;
+  form.listeners.submit({ preventDefault() {} });
+  form.listeners.submit({ preventDefault() {} });
+  await tick();
+
+  assert.equal(putBodies.length, 1);
+  assert.deepEqual(putBodies[0].scopes, ['openid', 'profile', 'email']);
+  assert.equal(putBodies[0].client_secret, 'new-secret');
+  assert.ok(controls.every(control => control.disabled));
+  assert.equal(form.attributes['aria-busy'], 'true');
+
+  saved.resolve(response(200, { settings: Object.assign({}, putBodies[0], {
+    client_secret_configured: true,
+  }) }));
+  await tick();
+  await tick();
+
+  assert.ok(controls.every(control => !control.disabled));
+  assert.equal(fields.client_secret.value, '');
+  assert.doesNotMatch(JSON.stringify(auth.getSession()), /new-secret/);
 });
 
 test('account and administration surfaces announce loading while their initial data is pending', async () => {

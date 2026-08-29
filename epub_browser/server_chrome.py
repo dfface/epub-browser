@@ -51,6 +51,17 @@ SERVER_ACCOUNT_PANEL = '''
     <h3 id="accountProfileTitle" data-i18n="account.profile">Profile</h3>
     <p id="accountIdentity"></p>
 </section>
+<section class="account-card account-card-wide account-oidc-card" id="accountOidcCard" aria-labelledby="accountOidcTitle" hidden>
+    <div class="account-section-heading">
+        <div><h3 id="accountOidcTitle" data-i18n="account.oidc.title">Connected identity</h3><p class="account-help" data-i18n="account.oidc.description">Connect your account to the configured sign-in provider.</p></div>
+    </div>
+    <ul class="account-list account-oidc-list" id="accountOidcList"></ul>
+    <div class="account-oidc-actions">
+        <button type="button" id="accountOidcLink" class="bookshelf-action-btn account-primary-action" data-i18n="account.oidc.link">Connect identity</button>
+        <button type="button" id="accountOidcUnlink" class="bookshelf-action-btn account-danger-action" data-i18n="account.oidc.unlink" hidden>Disconnect identity</button>
+    </div>
+    <p id="accountOidcLive" class="account-form-message" role="status" aria-live="polite" aria-atomic="true"></p>
+</section>
 <div class="account-grid">
 <section class="account-card" aria-labelledby="accountPasswordTitle">
     <h3 id="accountPasswordTitle" data-i18n="account.changePassword">Change password</h3>
@@ -118,6 +129,7 @@ SERVER_ACCOUNT_PANEL = '''
     <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
         <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
         <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
+        <button type="button" class="admin-section-tab" id="adminSectionOidcTab" role="tab" aria-selected="false" aria-controls="adminOidcSection" data-admin-section="oidc" data-i18n="admin.oidc.title">OIDC login</button>
         <button type="button" class="admin-section-tab" id="adminSectionDictionariesTab" role="tab" aria-selected="false" aria-controls="adminDictionariesSection" data-admin-section="dictionaries" data-i18n="admin.dictionaries">Dictionaries</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiConfigurationTab" role="tab" aria-selected="false" aria-controls="adminAiConfigurationSection" data-admin-section="ai-configuration" data-i18n="admin.ai.configuration">AI configuration</button>
         <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions" data-i18n="admin.ai.permissions">AI permissions</button>
@@ -152,6 +164,34 @@ SERVER_ACCOUNT_PANEL = '''
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminUserSubmit" data-i18n="admin.createUser">Create user</button>
         </form>
         <ul class="account-list" id="adminUserList"></ul>
+    </section>
+    <section class="account-admin-section account-card-wide admin-oidc-section" id="adminOidcSection" role="tabpanel" aria-labelledby="adminSectionOidcTab" data-admin-panel="oidc" hidden>
+        <h4 data-i18n="admin.oidc.title">OIDC login</h4>
+        <p class="account-section-copy" data-i18n="admin.oidc.description">Configure one standards-based OpenID Connect provider for Server sign-in and account linking.</p>
+        <form class="account-form admin-oidc-form" id="adminOidcForm" novalidate>
+            <fieldset class="admin-oidc-group">
+                <legend data-i18n="admin.oidc.provider">Provider</legend>
+                <label class="admin-oidc-check"><input type="checkbox" name="enabled"><span data-i18n="admin.oidc.enabled">Enable OIDC login</span></label>
+                <label for="adminOidcProviderName"><span data-i18n="admin.oidc.providerName">Provider name</span><input id="adminOidcProviderName" name="provider_name" maxlength="80" autocomplete="off" required></label>
+                <label for="adminOidcIssuerUrl"><span data-i18n="admin.oidc.issuerUrl">Issuer URL</span><input id="adminOidcIssuerUrl" name="issuer_url" type="url" inputmode="url" autocomplete="off" placeholder="https://auth.example.com" required></label><!-- i18n-allow-literal: URL/protocol value -->
+                <label for="adminOidcClientId"><span data-i18n="admin.oidc.clientId">Client ID</span><input id="adminOidcClientId" name="client_id" autocomplete="off" required></label>
+                <label for="adminOidcClientSecret"><span data-i18n="admin.oidc.clientSecret">Client secret</span><input id="adminOidcClientSecret" name="client_secret" type="password" autocomplete="new-password" data-i18n-placeholder="admin.oidc.secretPlaceholder" placeholder="Leave blank to keep the configured secret"></label>
+                <label class="admin-oidc-check"><input type="checkbox" name="clear_client_secret"><span data-i18n="admin.oidc.clearSecret">Clear stored client secret</span></label>
+            </fieldset>
+            <fieldset class="admin-oidc-group">
+                <legend data-i18n="admin.oidc.callback">Callback and claims</legend>
+                <div class="admin-oidc-field"><label for="adminOidcRedirectUri"><span data-i18n="admin.oidc.redirectUri">Redirect URI</span><input id="adminOidcRedirectUri" name="redirect_uri" type="url" inputmode="url" autocomplete="off" required aria-describedby="adminOidcRedirectHelp"></label><p class="account-help" id="adminOidcRedirectHelp" data-i18n="admin.oidc.redirectHelp">Register this exact URI with the provider. Its path must be /auth/oidc/callback.</p><button type="button" class="bookshelf-action-btn account-inline-action" id="adminOidcUseSuggestion" data-i18n="admin.oidc.useSuggestion">Use suggested URI</button></div>
+                <div class="admin-oidc-field"><label for="adminOidcScopes"><span data-i18n="admin.oidc.scopes">Scopes</span><input id="adminOidcScopes" name="scopes" autocomplete="off" value="openid profile email" required aria-describedby="adminOidcScopesHelp"></label><p class="account-help" id="adminOidcScopesHelp" data-i18n="admin.oidc.scopesHelp">Separate scopes with spaces. openid is required.</p></div>
+                <label for="adminOidcUsernameClaim"><span data-i18n="admin.oidc.usernameClaim">Username claim</span><input id="adminOidcUsernameClaim" name="username_claim" autocomplete="off" value="preferred_username" required></label>
+            </fieldset>
+            <fieldset class="admin-oidc-group">
+                <legend data-i18n="admin.oidc.provisioning">Account policy</legend>
+                <label class="admin-oidc-check"><input type="checkbox" name="auto_create_users"><span><strong data-i18n="admin.oidc.autoCreate">Automatically create members</strong><small data-i18n="admin.oidc.autoCreateHelp">Unknown identities receive a member account. Administrator roles are never imported.</small></span></label>
+                <label class="admin-oidc-check"><input type="checkbox" name="allow_member_password_login" checked><span><strong data-i18n="admin.oidc.allowMemberPassword">Allow local password login for members</strong><small data-i18n="admin.oidc.adminFallbackHelp">Local administrator password login always remains available.</small></span></label>
+            </fieldset>
+            <p id="adminOidcMessage" class="account-form-message" role="status" aria-live="polite" aria-atomic="true"></p>
+            <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminOidcSubmit" data-i18n="admin.oidc.save">Save OIDC settings</button>
+        </form>
     </section>
     <section class="account-admin-section account-card-wide" id="adminDictionariesSection" role="tabpanel" aria-labelledby="adminSectionDictionariesTab" data-admin-panel="dictionaries" hidden>
         <h4 data-i18n="admin.dictionaries">Dictionaries</h4>

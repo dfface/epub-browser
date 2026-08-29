@@ -234,10 +234,50 @@ body.auth-page {
 }
 
 .auth-primary-button:focus-visible,
+.auth-provider-button:focus-visible,
 .account-modal button:focus-visible,
 .account-modal summary:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--account-primary) 42%, transparent);
     outline-offset: 3px;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 14px;
+    color: var(--account-muted);
+    font-size: .78rem;
+    text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    height: 1px;
+    flex: 1;
+    background: var(--account-border);
+    content: "";
+}
+
+.auth-provider-button {
+    display: flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+    padding: 10px 16px;
+    border: 1px solid color-mix(in srgb, var(--account-primary) 40%, var(--account-border));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--account-primary) 6%, var(--account-card));
+    color: var(--account-primary);
+    font-size: .9rem;
+    text-decoration: none;
+}
+
+.auth-provider-button:hover {
+    border-color: var(--account-primary);
+    background: color-mix(in srgb, var(--account-primary) 11%, var(--account-card));
 }
 
 .auth-alert {
@@ -593,6 +633,141 @@ body.auth-page {
 
 .account-form .account-primary-action {
     justify-self: start;
+}
+
+.account-oidc-card {
+    display: grid;
+    gap: 16px;
+}
+
+.account-oidc-card[hidden] {
+    display: none;
+}
+
+.account-oidc-list {
+    margin: 0;
+}
+
+.account-oidc-identity-copy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.account-oidc-identity-copy span,
+.account-user-oidc-row span {
+    overflow-wrap: anywhere;
+    color: var(--account-muted);
+    font-size: .82rem;
+}
+
+.account-oidc-actions,
+.account-user-oidc-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.account-user-oidc-row {
+    justify-content: space-between;
+}
+
+.account-form-message {
+    min-height: 1.4em;
+    margin: 0;
+    color: var(--account-muted);
+    font-size: .82rem;
+    line-height: 1.5;
+}
+
+.account-form-message.is-success {
+    color: var(--account-success);
+}
+
+.account-form-message.is-error {
+    color: var(--account-danger);
+}
+
+.admin-oidc-form {
+    max-width: 900px;
+}
+
+.admin-oidc-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    min-width: 0;
+    margin: 0;
+    padding: 18px;
+    border: 1px solid var(--account-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--account-primary) 2%, var(--account-card));
+}
+
+.admin-oidc-group legend {
+    padding: 0 6px;
+    color: var(--account-text);
+    font-size: .82rem;
+    font-weight: 750;
+}
+
+.admin-oidc-field {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    min-width: 0;
+}
+
+.admin-oidc-field > label {
+    display: grid;
+    gap: 7px;
+}
+
+.admin-oidc-field .account-inline-action {
+    min-height: 44px;
+    justify-self: start;
+}
+
+.admin-oidc-check {
+    display: flex !important;
+    min-height: 44px;
+    align-items: flex-start;
+    grid-column: 1 / -1;
+    gap: 10px !important;
+}
+
+.admin-oidc-check input[type="checkbox"] {
+    width: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    margin-top: 1px;
+}
+
+.admin-oidc-check span {
+    display: grid;
+    gap: 4px;
+}
+
+.admin-oidc-check small,
+.admin-oidc-group .account-help {
+    color: var(--account-muted);
+    font-size: .78rem;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.admin-oidc-group .account-help {
+    margin: -8px 0 0;
+}
+
+.admin-oidc-form[aria-busy="true"] {
+    opacity: .72;
+}
+
+.admin-oidc-form [aria-invalid="true"] {
+    border-color: var(--account-danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--account-danger) 16%, transparent);
 }
 
 .dictionary-install-form {
@@ -2765,7 +2940,8 @@ body.auth-page {
     }
 
     .admin-ai-settings-form,
-    .admin-ai-settings-group {
+    .admin-ai-settings-group,
+    .admin-oidc-group {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -2869,12 +3045,24 @@ body.auth-page {
 
     #adminUserForm,
     .admin-ai-settings-form,
-    .admin-ai-settings-group {
+    .admin-ai-settings-group,
+    .admin-oidc-group {
         grid-template-columns: 1fr;
     }
 
     .account-form .account-primary-action,
     .account-modal .account-primary-action {
+        width: 100%;
+    }
+
+    .account-oidc-actions,
+    .account-user-oidc-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .account-oidc-actions .bookshelf-action-btn,
+    .account-user-oidc-row .bookshelf-action-btn {
         width: 100%;
     }
 
