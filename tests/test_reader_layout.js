@@ -176,12 +176,14 @@ test('continuous reading hides and closes both chapter-local TOC controls', () =
   }
 });
 
-test('PDF pages disable the empty chapter-local TOC without changing EPUB ordinary mode', () => {
+test('PDF pages hide the empty chapter-local TOC in every reading mode without changing EPUB ordinary mode', () => {
   const pdfDocument = fakeDocument();
   syncChapterTocAvailability(pdfDocument, false, true);
   for (const id of ['tocToggle', 'mobileTocBtn']) {
     assert.equal(pdfDocument.elements[id].disabled, true);
+    assert.equal(pdfDocument.elements[id].hidden, true);
     assert.equal(pdfDocument.elements[id].getAttribute('aria-disabled'), 'true');
+    assert.equal(pdfDocument.elements[id].getAttribute('aria-hidden'), 'true');
   }
 
   const epubDocument = fakeDocument();

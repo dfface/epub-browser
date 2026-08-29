@@ -336,8 +336,8 @@
         controls.forEach(function(control) {
             setDisabled(control, disabled);
             if (!control) return;
-            control.hidden = Boolean(continuous);
-            control.setAttribute('aria-hidden', continuous ? 'true' : 'false');
+            control.hidden = disabled;
+            control.setAttribute('aria-hidden', disabled ? 'true' : 'false');
         });
 
         if (disabled) {
