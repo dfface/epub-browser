@@ -56,7 +56,7 @@ from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
 from .locales import LOCALE_NATIVE_NAMES, SUPPORTED_LOCALE_SET, normalize_locale
-from .oidc import OIDCError, OIDCService
+from .oidc import OIDCConfiguration, OIDCError, OIDCService
 from .processor import (
     SERVER_OUTPUT_REVISION,
     SERVER_OUTPUT_REVISION_FILE,
@@ -894,16 +894,63 @@ def create_app(
             return None
         return data if isinstance(data, dict) else None
 
+    def oidc_identity_data(user, identity, all_identities, settings):
+        password_login = bool(user.password_hash) and (
+            user.role == 'admin'
+            or not settings.enabled
+            or settings.allow_member_password_login
+        )
+        can_unlink = password_login or len(all_identities) > 1
+        return {
+            'issuer': identity.issuer,
+            'provider_name': (
+                settings.provider_name
+                if identity.issuer == settings.issuer_url and settings.provider_name
+                else identity.issuer
+            ),
+            'username': identity.username_claim,
+            'display_name': identity.display_name,
+            'email': identity.email,
+            'created_at': identity.created_at,
+            'last_login_at': identity.last_login_at,
+            'can_unlink': can_unlink,
+        }
+
+    def user_oidc_identities(user):
+        identities = store.list_oidc_identities(user.user_id)
+        settings = store.get_oidc_settings()
+        return [
+            oidc_identity_data(user, identity, identities, settings)
+            for identity in identities
+        ]
+
     def user_data(user):
         payload = {
             'id': user.user_id,
             'username': user.username,
             'role': user.role,
             'enabled': user.enabled,
+            'oidc_identities': user_oidc_identities(user),
         }
         if user.role == 'member':
             payload['ai_access'] = store.get_ai_user_access(user.user_id)
         return payload
+
+    def oidc_settings_data(settings):
+        return {
+            'enabled': settings.enabled,
+            'provider_name': settings.provider_name,
+            'issuer_url': settings.issuer_url,
+            'client_id': settings.client_id,
+            'redirect_uri': settings.redirect_uri,
+            'scopes': list(settings.scopes),
+            'username_claim': settings.username_claim,
+            'auto_create_users': settings.auto_create_users,
+            'allow_member_password_login': settings.allow_member_password_login,
+            'config_revision': settings.config_revision,
+            'client_secret_configured': settings.client_secret_configured,
+            'updated_at': settings.updated_at,
+        }
 
     def admin_book_data(book):
         metadata = store.managed_book_metadata(book.book_id)
@@ -1779,12 +1826,14 @@ window.location.assign(payload.redirect||'/');
     async def session(request):
         principal = require_principal(request)
         raw_session = request_session_token(request)
+        user = store.get_user(principal.user_id)
         return response(
             {
                 'user': {
                     'id': principal.user_id,
                     'username': principal.username,
                     'role': principal.role,
+                    'oidc_identities': user_oidc_identities(user),
                 },
                 'csrf_token': auth_service.issue_csrf_token(
                     principal,
@@ -1959,6 +2008,209 @@ window.location.assign(payload.redirect||'/');
             request.path_params['token_id'],
         ):
             return response(error_payload('not_found', 'Personal access token not found'), 404)
+        return Response(status_code=204)
+
+    async def admin_oidc_settings(request):
+        require_admin(request)
+        if request.method == 'GET':
+            settings = store.get_oidc_settings()
+            suggestion = str(request.base_url).rstrip('/') + '/auth/oidc/callback'
+            return response(
+                {
+                    'settings': oidc_settings_data(settings),
+                    'callback_path': '/auth/oidc/callback',
+                    'suggested_redirect_uri': suggestion,
+                },
+                cache_control='private, no-store',
+            )
+        data = await bounded_unique_json_object(request, maximum_size=16 * 1024)
+        required = {
+            'enabled',
+            'provider_name',
+            'issuer_url',
+            'client_id',
+            'redirect_uri',
+            'scopes',
+            'username_claim',
+            'auto_create_users',
+            'allow_member_password_login',
+        }
+        optional = {'client_secret', 'clear_client_secret'}
+        if data is None or not required.issubset(data) or not set(data) <= required | optional:
+            return response(
+                error_payload('invalid_oidc_settings', 'Invalid OIDC settings'),
+                400,
+                'private, no-store',
+            )
+        clear_secret = data.get('clear_client_secret', False)
+        supplied_secret = data.get('client_secret') if 'client_secret' in data else None
+        scopes = data.get('scopes')
+        if (
+            not isinstance(data.get('enabled'), bool)
+            or not isinstance(data.get('provider_name'), str)
+            or not isinstance(data.get('issuer_url'), str)
+            or not isinstance(data.get('client_id'), str)
+            or not isinstance(data.get('redirect_uri'), str)
+            or not isinstance(scopes, list)
+            or not scopes
+            or any(not isinstance(scope, str) or not scope.strip() for scope in scopes)
+            or not isinstance(data.get('username_claim'), str)
+            or not isinstance(data.get('auto_create_users'), bool)
+            or not isinstance(data.get('allow_member_password_login'), bool)
+            or not isinstance(clear_secret, bool)
+            or (
+                'client_secret' in data
+                and supplied_secret is not None
+                and not isinstance(supplied_secret, str)
+            )
+            or (supplied_secret is None and 'client_secret' in data and not clear_secret)
+            or (clear_secret and isinstance(supplied_secret, str))
+        ):
+            return response(
+                error_payload('invalid_oidc_settings', 'Invalid OIDC settings'),
+                400,
+                'private, no-store',
+            )
+        current = store._get_oidc_provider_settings()
+        candidate_secret = (
+            ''
+            if clear_secret
+            else supplied_secret
+            if isinstance(supplied_secret, str)
+            else current['client_secret']
+        )
+        candidate_values = {
+            **data,
+            'enabled': True,
+            'client_secret': candidate_secret,
+            'config_revision': int(current['config_revision']) + 1,
+        }
+        try:
+            candidate = None
+            if any(
+                str(data.get(name, '')).strip()
+                for name in ('issuer_url', 'redirect_uri', 'client_id', 'provider_name')
+            ):
+                candidate = OIDCConfiguration.from_settings(candidate_values)
+            if data['enabled']:
+                if not candidate_secret or candidate is None:
+                    raise OIDCError('configuration_invalid')
+                await oidc_service.validate_configuration(candidate)
+            saved = store.replace_oidc_settings(
+                enabled=data['enabled'],
+                provider_name=data['provider_name'],
+                issuer_url=data['issuer_url'],
+                client_id=data['client_id'],
+                client_secret=(
+                    supplied_secret if isinstance(supplied_secret, str) else None
+                ),
+                redirect_uri=data['redirect_uri'],
+                scopes=scopes,
+                username_claim=data['username_claim'],
+                auto_create_users=data['auto_create_users'],
+                allow_member_password_login=data['allow_member_password_login'],
+                clear_client_secret=clear_secret,
+            )
+        except OIDCError as error:
+            return response(
+                error_payload('oidc_' + error.code, 'OIDC settings could not be validated'),
+                400,
+                'private, no-store',
+            )
+        except (ValueError, sqlite3.IntegrityError):
+            return response(
+                error_payload('invalid_oidc_settings', 'Invalid OIDC settings'),
+                400,
+                'private, no-store',
+            )
+        return response(
+            {'settings': oidc_settings_data(saved)},
+            cache_control='private, no-store',
+        )
+
+    async def account_oidc_link(request):
+        principal = require_principal(request)
+        data = await bounded_unique_json_object(request, maximum_size=2048)
+        if data is None or not set(data) <= {'next'}:
+            return response(error_payload('invalid_oidc_link', 'Invalid OIDC link request'), 400)
+        next_path = _safe_relative_path(data.get('next', '/account'), '/account')
+        settings = store.get_oidc_settings()
+        if not settings.enabled:
+            return response(error_payload('oidc_disabled', 'OIDC is disabled'), 409)
+        if any(
+            identity.issuer == settings.issuer_url
+            for identity in store.list_oidc_identities(principal.user_id)
+        ):
+            return response(error_payload('oidc_already_linked', 'OIDC identity is already linked'), 409)
+        target = (
+            '/auth/oidc/start?purpose=link&next='
+            + quote(next_path, safe='')
+        )
+        return response({'redirect': target}, cache_control='private, no-store')
+
+    def selected_identity_issuer(user_id, settings, requested_issuer=None):
+        identities = store.list_oidc_identities(user_id)
+        if requested_issuer:
+            return next(
+                (item.issuer for item in identities if item.issuer == requested_issuer),
+                None,
+            )
+        current = next(
+            (item.issuer for item in identities if item.issuer == settings.issuer_url),
+            None,
+        )
+        if current is not None:
+            return current
+        return identities[0].issuer if len(identities) == 1 else None
+
+    async def account_oidc_identity(request):
+        principal = require_principal(request)
+        settings = store.get_oidc_settings()
+        issuer = selected_identity_issuer(
+            principal.user_id,
+            settings,
+            request.query_params.get('issuer'),
+        )
+        if issuer is None:
+            return response(error_payload('oidc_identity_not_found', 'OIDC identity not found'), 404)
+        try:
+            removed = store.unlink_oidc_identity(
+                principal.user_id,
+                issuer,
+                allow_member_password_login=(
+                    not settings.enabled or settings.allow_member_password_login
+                ),
+            )
+        except RuntimeError:
+            return response(
+                error_payload('oidc_last_login_method', 'Cannot remove the only login method'),
+                409,
+            )
+        if not removed:
+            return response(error_payload('oidc_identity_not_found', 'OIDC identity not found'), 404)
+        return Response(status_code=204)
+
+    async def admin_user_oidc_identity(request):
+        require_admin(request)
+        try:
+            user = store.get_user_by_username(request.path_params['username'])
+        except ValueError:
+            user = None
+        if user is None:
+            return response(error_payload('not_found', 'User not found'), 404)
+        settings = store.get_oidc_settings()
+        issuer = selected_identity_issuer(
+            user.user_id,
+            settings,
+            request.query_params.get('issuer'),
+        )
+        if issuer is None or not store.unlink_oidc_identity(
+            user.user_id,
+            issuer,
+            allow_member_password_login=True,
+            force=True,
+        ):
+            return response(error_payload('oidc_identity_not_found', 'OIDC identity not found'), 404)
         return Response(status_code=204)
 
     async def admin_users(request):
@@ -4158,8 +4410,16 @@ window.location.assign(payload.redirect||'/');
         Route('/api/account/sessions/{session_id}', revoke_own_session, methods=['DELETE']),
         Route('/api/account/pats', own_personal_access_tokens, methods=['GET', 'POST']),
         Route('/api/account/pats/{token_id}', revoke_own_personal_access_token, methods=['DELETE']),
+        Route('/api/account/oidc/link', account_oidc_link, methods=['POST']),
+        Route('/api/account/oidc/identity', account_oidc_identity, methods=['DELETE']),
+        Route('/api/admin/oidc/settings', admin_oidc_settings, methods=['GET', 'PUT']),
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route('/api/admin/users/{username}/password', admin_reset_password, methods=['PUT']),
+        Route(
+            '/api/admin/users/{username}/oidc/identity',
+            admin_user_oidc_identity,
+            methods=['DELETE'],
+        ),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT']),
         Route('/api/admin/books', admin_books, methods=['GET']),
         Route('/api/admin/books/index', admin_book_index, methods=['GET']),

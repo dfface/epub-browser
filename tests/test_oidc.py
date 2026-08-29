@@ -95,6 +95,8 @@ class OIDCServiceTests(unittest.IsolatedAsyncioTestCase):
             (self._metadata(issuer=f"{ISSUER}/other"), "discovery_invalid"),
             (self._metadata(token_endpoint="http://identity.example.test/token"), "discovery_invalid"),
             (self._metadata(code_challenge_methods_supported=["plain"]), "configuration_unsupported"),
+            (self._metadata(response_types_supported=["id_token"]), "configuration_unsupported"),
+            (self._metadata(id_token_signing_alg_values_supported=7), "discovery_invalid"),
             ({"issuer": ISSUER}, "discovery_invalid"),
         )
         for metadata, expected_code in cases:
@@ -108,6 +110,26 @@ class OIDCServiceTests(unittest.IsolatedAsyncioTestCase):
                         expected_user_id=None,
                     )
                 self.assertEqual(raised.exception.code, expected_code)
+                await self.client.aclose()
+                self.client = None
+
+    async def test_redirect_uri_must_use_the_exact_callback_path(self):
+        for redirect_uri in (
+            "https://reader.example.test/not-the-callback",
+            "https://reader.example.test/auth/oidc/callback?tenant=one",
+        ):
+            with self.subTest(redirect_uri=redirect_uri):
+                service = self._service(
+                    lambda request: httpx.Response(200, json=self._metadata())
+                )
+                with self.assertRaises(OIDCError) as raised:
+                    await service.begin(
+                        dict(self.settings, redirect_uri=redirect_uri),
+                        purpose="login",
+                        next_path="/",
+                        expected_user_id=None,
+                    )
+                self.assertEqual(raised.exception.code, "configuration_invalid")
                 await self.client.aclose()
                 self.client = None
 

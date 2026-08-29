@@ -8,6 +8,7 @@ S256 and signed ID Tokens.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 import math
@@ -114,6 +115,9 @@ class OIDCConfiguration:
             raise OIDCError("configuration_invalid")
         _require_secure_url(self.issuer, issuer=True)
         _require_secure_url(self.redirect_uri)
+        redirect = urlparse(self.redirect_uri)
+        if redirect.path != "/auth/oidc/callback" or redirect.query:
+            raise OIDCError("configuration_invalid")
 
 
 @dataclass(frozen=True)
@@ -194,7 +198,13 @@ def _jwt_header(token: str) -> Mapping[str, Any]:
         encoded = token.split(".", 1)[0]
         encoded += "=" * (-len(encoded) % 4)
         value = json.loads(base64.urlsafe_b64decode(encoded).decode("utf-8"))
-    except (ValueError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
+    except (
+        ValueError,
+        TypeError,
+        UnicodeError,
+        json.JSONDecodeError,
+        binascii.Error,
+    ) as exc:
         raise OIDCError("invalid_id_token") from exc
     if not isinstance(value, dict):
         raise OIDCError("invalid_id_token")
@@ -242,7 +252,7 @@ class OIDCService:
         expected_user_id: Optional[str],
     ) -> OIDCStart:
         configuration = OIDCConfiguration.from_settings(settings)
-        metadata = await self.discover(configuration)
+        metadata = await self.validate_configuration(configuration)
         state_token = _token()
         browser_token = _token()
         nonce = _token()
@@ -342,11 +352,27 @@ class OIDCService:
             except OIDCError as exc:
                 raise OIDCError("discovery_invalid") from exc
         challenge_methods = payload.get("code_challenge_methods_supported", ())
+        if not isinstance(challenge_methods, list) or any(
+            not isinstance(method, str) for method in challenge_methods
+        ):
+            raise OIDCError("discovery_invalid")
         if "S256" not in challenge_methods:
             raise OIDCError("configuration_unsupported")
+        response_types = payload.get("response_types_supported")
+        if response_types is not None:
+            if not isinstance(response_types, list) or any(
+                not isinstance(response_type, str) for response_type in response_types
+            ):
+                raise OIDCError("discovery_invalid")
+            if "code" not in response_types:
+                raise OIDCError("configuration_unsupported")
         advertised_algorithms = payload.get(
             "id_token_signing_alg_values_supported", _ALLOWED_SIGNING_ALGORITHMS
         )
+        if not isinstance(advertised_algorithms, (list, tuple)) or any(
+            not isinstance(algorithm, str) for algorithm in advertised_algorithms
+        ):
+            raise OIDCError("discovery_invalid")
         signing_algorithms = tuple(
             algorithm
             for algorithm in advertised_algorithms
@@ -354,11 +380,16 @@ class OIDCService:
         )
         if not signing_algorithms:
             raise OIDCError("configuration_unsupported")
+        advertised_auth_methods = payload.get(
+            "token_endpoint_auth_methods_supported", ["client_secret_basic"]
+        )
+        if not isinstance(advertised_auth_methods, list) or any(
+            not isinstance(method, str) for method in advertised_auth_methods
+        ):
+            raise OIDCError("discovery_invalid")
         token_auth_methods = tuple(
             method
-            for method in payload.get(
-                "token_endpoint_auth_methods_supported", ("client_secret_basic",)
-            )
+            for method in advertised_auth_methods
             if method in {"client_secret_basic", "client_secret_post", "none"}
         )
         if not token_auth_methods:
@@ -372,6 +403,22 @@ class OIDCService:
             token_auth_methods=token_auth_methods,
         )
         self._metadata_cache[cache_key] = metadata
+        return metadata
+
+    async def validate_configuration(self, settings: Any) -> OIDCProviderMetadata:
+        """Validate local settings and live Provider metadata without persisting."""
+        configuration = (
+            settings
+            if isinstance(settings, OIDCConfiguration)
+            else OIDCConfiguration.from_settings(settings)
+        )
+        metadata = await self.discover(configuration)
+        if configuration.client_secret:
+            supported = {"client_secret_basic", "client_secret_post"}
+            if not supported.intersection(metadata.token_auth_methods):
+                raise OIDCError("configuration_unsupported")
+        elif "none" not in metadata.token_auth_methods:
+            raise OIDCError("configuration_unsupported")
         return metadata
 
     async def _exchange_code(

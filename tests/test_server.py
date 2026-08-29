@@ -80,6 +80,14 @@ class _ScriptedOIDCService:
         )
         self.transactions = {}
         self.closed = False
+        self.validation_error = None
+        self.validated_configurations = []
+
+    async def validate_configuration(self, configuration):
+        self.validated_configurations.append(configuration)
+        if self.validation_error is not None:
+            raise self.validation_error
+        return configuration
 
     async def begin(self, settings, *, purpose, next_path, expected_user_id):
         index = len(self.transactions) + 1
@@ -1429,10 +1437,12 @@ class AdminAccountTests(unittest.TestCase):
             hash_password("member-secret"),
         )
         config = AuthConfig.from_values([])
+        self.oidc_service = _ScriptedOIDCService()
         self.app = create_app(
             public,
             state_store=self.store,
             auth_service=AuthService(self.store, config),
+            oidc_service=self.oidc_service,
         )
         self.admin_client = self._login("admin", "admin-secret")
         self.member_client = self._login("member", "member-secret")
@@ -1480,6 +1490,183 @@ class AdminAccountTests(unittest.TestCase):
             self.store.finish_ai_job(job_id, error_code="ai_generation_failed")
         )
         return book, job_id
+
+    def _oidc_payload(self, **updates):
+        payload = {
+            "enabled": True,
+            "provider_name": "Company SSO",
+            "issuer_url": "https://identity.example.test",
+            "client_id": "epub-browser",
+            "client_secret": "never-return-this-secret",
+            "redirect_uri": "https://reader.example.test/auth/oidc/callback",
+            "scopes": ["openid", "profile", "email"],
+            "username_claim": "preferred_username",
+            "auto_create_users": False,
+            "allow_member_password_login": True,
+            "clear_client_secret": False,
+        }
+        payload.update(updates)
+        return payload
+
+    def test_admin_oidc_settings_are_masked_validated_and_atomic(self):
+        initial = self.admin_client.get("/api/admin/oidc/settings")
+        member_denied = self.member_client.get("/api/admin/oidc/settings")
+        missing_csrf_client = self._login("admin", "admin-secret")
+        missing_csrf_client.headers.pop("X-CSRF-Token")
+        csrf_denied = missing_csrf_client.put(
+            "/api/admin/oidc/settings", json=self._oidc_payload()
+        )
+
+        saved = self.admin_client.put(
+            "/api/admin/oidc/settings", json=self._oidc_payload()
+        )
+
+        self.assertEqual(initial.status_code, 200)
+        self.assertFalse(initial.json()["settings"]["enabled"])
+        self.assertFalse(initial.json()["settings"]["client_secret_configured"])
+        self.assertEqual(
+            initial.json()["callback_path"], "/auth/oidc/callback"
+        )
+        self.assertNotIn('"client_secret":', initial.text)
+        self.assertEqual(member_denied.status_code, 403)
+        self.assertEqual(csrf_denied.status_code, 403)
+        self.assertEqual(saved.status_code, 200)
+        self.assertTrue(saved.json()["settings"]["client_secret_configured"])
+        self.assertNotIn("never-return-this-secret", saved.text)
+        self.assertEqual(len(self.oidc_service.validated_configurations), 1)
+        self.assertEqual(
+            self.oidc_service.validated_configurations[0].client_secret,
+            "never-return-this-secret",
+        )
+        saved_revision = saved.json()["settings"]["config_revision"]
+
+        retained_payload = self._oidc_payload(provider_name="Renamed SSO")
+        retained_payload.pop("client_secret")
+        retained = self.admin_client.put(
+            "/api/admin/oidc/settings", json=retained_payload
+        )
+        self.assertEqual(retained.status_code, 200)
+        self.assertTrue(retained.json()["settings"]["client_secret_configured"])
+        self.assertGreater(
+            retained.json()["settings"]["config_revision"], saved_revision
+        )
+        self.assertEqual(
+            self.oidc_service.validated_configurations[-1].client_secret,
+            "never-return-this-secret",
+        )
+
+        before_failure = self.store.get_oidc_settings()
+        self.oidc_service.validation_error = OIDCError("discovery_invalid")
+        rejected = self.admin_client.put(
+            "/api/admin/oidc/settings",
+            json=self._oidc_payload(provider_name="Must Roll Back"),
+        )
+        after_failure = self.store.get_oidc_settings()
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(rejected.json()["code"], "oidc_discovery_invalid")
+        self.assertEqual(after_failure, before_failure)
+        self.assertNotIn("never-return-this-secret", rejected.text)
+
+    def test_admin_oidc_settings_enforce_callback_path_and_secret_clear_semantics(self):
+        valid = self.admin_client.put(
+            "/api/admin/oidc/settings", json=self._oidc_payload()
+        )
+        self.assertEqual(valid.status_code, 200)
+
+        bad_redirect = self.admin_client.put(
+            "/api/admin/oidc/settings",
+            json=self._oidc_payload(
+                redirect_uri="https://reader.example.test/not-the-callback"
+            ),
+        )
+        clear_enabled = self.admin_client.put(
+            "/api/admin/oidc/settings",
+            json=self._oidc_payload(
+                client_secret=None,
+                clear_client_secret=True,
+            ),
+        )
+        disabled_and_cleared = self.admin_client.put(
+            "/api/admin/oidc/settings",
+            json=self._oidc_payload(
+                enabled=False,
+                client_secret=None,
+                clear_client_secret=True,
+            ),
+        )
+
+        self.assertEqual(bad_redirect.status_code, 400)
+        self.assertEqual(clear_enabled.status_code, 400)
+        self.assertEqual(disabled_and_cleared.status_code, 200)
+        self.assertFalse(
+            disabled_and_cleared.json()["settings"]["client_secret_configured"]
+        )
+
+    def test_account_oidc_link_and_unlink_enforce_current_user_and_safe_fallback(self):
+        _enable_oidc(self.store, allow_member_password_login=False)
+        self.store.link_oidc_identity(
+            self.member.user_id,
+            issuer="https://identity.example.test",
+            subject="member-subject",
+            username_claim="member",
+            display_name="Member Reader",
+            email="member@example.test",
+        )
+        session = self.member_client.get("/api/session")
+        linked = self.member_client.post(
+            "/api/account/oidc/link",
+            json={"next": "/account", "user_id": self.admin.user_id},
+        )
+        protected = self.member_client.delete("/api/account/oidc/identity")
+
+        self.assertEqual(session.status_code, 200)
+        self.assertEqual(len(session.json()["user"]["oidc_identities"]), 1)
+        self.assertFalse(session.json()["user"]["oidc_identities"][0]["can_unlink"])
+        self.assertNotIn("member-subject", session.text)
+        self.assertEqual(linked.status_code, 400)
+        self.assertEqual(protected.status_code, 409)
+        self.assertEqual(len(self.store.list_oidc_identities(self.member.user_id)), 1)
+
+        _enable_oidc(self.store, allow_member_password_login=True)
+        removed = self.member_client.delete("/api/account/oidc/identity")
+        allowed_link = self.member_client.post(
+            "/api/account/oidc/link", json={"next": "/account"}
+        )
+        self.assertEqual(allowed_link.status_code, 200)
+        self.assertEqual(
+            allowed_link.json()["redirect"],
+            "/auth/oidc/start?purpose=link&next=%2Faccount",
+        )
+        self.assertEqual(removed.status_code, 204)
+        self.assertEqual(self.store.list_oidc_identities(self.member.user_id), ())
+
+    def test_admin_user_payload_inspects_and_can_remove_oidc_identity(self):
+        _enable_oidc(self.store)
+        self.store.link_oidc_identity(
+            self.member.user_id,
+            issuer="https://identity.example.test",
+            subject="member-subject",
+            username_claim="remote-member",
+            display_name="Remote Member",
+            email="remote@example.test",
+        )
+
+        listed = self.admin_client.get("/api/admin/users")
+        member_payload = next(
+            user for user in listed.json()["users"] if user["username"] == "member"
+        )
+        removed = self.admin_client.delete(
+            "/api/admin/users/member/oidc/identity"
+        )
+
+        self.assertEqual(len(member_payload["oidc_identities"]), 1)
+        self.assertEqual(
+            member_payload["oidc_identities"][0]["provider_name"], "Company SSO"
+        )
+        self.assertNotIn("member-subject", listed.text)
+        self.assertNotIn('"client_secret":', listed.text)
+        self.assertEqual(removed.status_code, 204)
+        self.assertEqual(self.store.list_oidc_identities(self.member.user_id), ())
 
     def test_admin_lists_paginated_ai_jobs_without_private_payload(self):
         book, _job_id = self._create_failed_ai_job()
