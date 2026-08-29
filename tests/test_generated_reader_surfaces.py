@@ -1712,7 +1712,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
         for declaration in (
             'margin: 0 !important;',
-            'padding: 0 !important;',
+            'padding-block: clamp(28px, 4vh, 48px) !important;',
+            'padding-inline: 0 !important;',
             'border: 0;',
             'border-radius: 0;',
             'background: transparent;',
@@ -1815,6 +1816,38 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         next_handler = script[next_handler_start:next_handler_end]
         self.assertIn('navigateReaderChapter(next, { history: true });', next_handler)
         self.assertNotIn('location.href=next', next_handler)
+
+        nav_start = script.index('function updateNavButtons() {')
+        nav_end = script.index('\n    }', nav_start)
+        nav_buttons = script[nav_start:nav_end]
+        self.assertIn(
+            "currentPage === 0 && !readerChapterHref('.prev-chapter')",
+            nav_buttons,
+        )
+        self.assertIn(
+            "currentPage === totalPages - 1 && !readerChapterHref('.next-chapter')",
+            nav_buttons,
+        )
+
+    def test_reader_tap_gesture_does_not_conflict_with_text_selection(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        start = script.index('function beginReaderTapGesture(e) {')
+        end = script.index('\n    function initClickPageState()', start)
+        gesture = script[start:end]
+
+        self.assertIn("addEventListener('pointerdown', beginReaderTapGesture", script)
+        self.assertIn("addEventListener('pointermove', moveReaderTapGesture", script)
+        self.assertIn("addEventListener('pointerup', endReaderTapGesture", script)
+        self.assertIn("addEventListener('pointercancel', cancelReaderTapGesture", script)
+        self.assertIn('readerTapGesture.moved', gesture)
+        self.assertIn('gesture.duration > 450', gesture)
+        self.assertIn('selection && !selection.isCollapsed', gesture)
+        self.assertIn('cancelPendingReaderTap();', gesture)
+        self.assertIn("e.type === 'dblclick'", gesture)
+        self.assertNotIn(
+            "document.getElementById('eb-content').addEventListener('click'",
+            script,
+        )
 
     def test_pagination_click_paths_notify_the_active_reading_tracker(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
@@ -2634,12 +2667,60 @@ assert.deepEqual(
         )
         positions = [pagination_toolbar.index(f'id="{control_id}"') for control_id in control_ids]
         self.assertEqual(positions, sorted(positions))
+        self.assertIn('id="pageJumpToggle"', pagination_toolbar)
+        self.assertIn('aria-controls="paginationPageJumpPopover"', pagination_toolbar)
+        self.assertIn('aria-expanded="false"', pagination_toolbar)
+        self.assertIn('id="paginationPageJumpPopover"', pagination_toolbar)
+        self.assertIn('role="dialog"', pagination_toolbar)
+        self.assertIn('aria-hidden="true"', pagination_toolbar)
         self.assertIn('id="pageJumpInput"', pagination_toolbar)
         self.assertIn('id="goToPage"', pagination_toolbar)
         self.assertNotIn('id="exitPaginationMode"', html)
         self.assertNotIn('id="togglePureMode"', html)
         self.assertNotIn('data-id="navigation"', html)
         self.assertNotIn('id="navigationHomeBtn"', html)
+
+    def test_desktop_page_jump_uses_an_anchored_accessible_popover(self):
+        css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+
+        self.assertIn('.pagination-page-jump-popover {', css)
+        self.assertIn('right: calc(100% + 12px);', css)
+        self.assertIn('.pagination-page-jump-popover.is-open {', css)
+        self.assertIn('function openPageJumpPopover()', script)
+        self.assertIn('function closePageJumpPopover(restoreFocus)', script)
+        self.assertIn("if (e.key === 'Escape'", script)
+        self.assertIn('pageJumpInput.focus();', script)
+        self.assertIn("pageJumpToggle.setAttribute('aria-expanded', 'true');", script)
+
+    def test_reader_card_has_matching_top_and_bottom_spacing(self):
+        css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        start = css.index('.eb-content-container {')
+        rule = css[start:css.index('}', start)]
+
+        self.assertIn('margin-top: 18px;', rule)
+        self.assertIn('margin-bottom: 18px;', rule)
+
+    def test_pagination_defaults_click_to_turn_on_without_overriding_a_saved_choice(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        start = script.index('function initClickPageState()')
+        end = script.index('\n    function saveClickPageState()', start)
+        init_state = script[start:end]
+
+        self.assertIn("savedClickPageState = localStorage.getItem('clickPageEnabled');", init_state)
+        self.assertIn('if (savedClickPageState === null && isPaginationMode)', init_state)
+        self.assertIn("isClickPageEnabled = savedClickPageState === 'true';", init_state)
+        self.assertIn('saveClickPageState();', init_state)
+
+    def test_click_to_turn_setting_explains_its_three_tap_zones(self):
+        html = self._chapter_html()
+
+        start = html.index('id="clickPageToggle"')
+        setting = html[start:html.index('</div>', start)]
+        self.assertIn('class="settings-info-tip"', setting)
+        self.assertIn('data-settings-tip', setting)
+        self.assertIn('data-i18n-data-tip="settings.clickPageHelp"', setting)
+        self.assertIn('data-i18n-aria-label="settings.clickPageHelp"', setting)
 
     def test_mobile_pagination_exposes_an_accessible_page_jump_action(self):
         html = self._chapter_html()

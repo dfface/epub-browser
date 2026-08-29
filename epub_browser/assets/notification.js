@@ -42,7 +42,7 @@
 
         var normalizedType = allowedTypes[type] ? type : 'info';
         var notification = root.document.createElement('div');
-        notification.className = 'custom-css-notification ' + normalizedType;
+        notification.className = 'app-notification custom-css-notification ' + normalizedType;
         notification.setAttribute('data-epub-browser-notification', '');
         notification.setAttribute('role', normalizedType === 'error' ? 'alert' : 'status');
         notification.setAttribute('aria-live', normalizedType === 'error' ? 'assertive' : 'polite');

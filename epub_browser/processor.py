@@ -3005,14 +3005,18 @@ document.addEventListener('DOMContentLoaded', function() {{
                 <button class="control-btn" id="reloadPages" type="button" aria-label="Reload pages" data-i18n-aria-label="reader.reloadPages" data-pagination-toolbar-control hidden><i class="fas fa-rotate-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.reloadPages">Reload pages</span></button>
                 <button class="control-btn" id="nextPage" type="button" aria-label="Next page" data-i18n-aria-label="reader.nextPage" data-pagination-toolbar-control hidden><i class="fas fa-chevron-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.nextPage">Next page</span></button>
                 {next_link}
-                <div class="pagination-page-jump" role="group" aria-label="Jump" data-i18n-aria-label="reader.jump" data-pagination-toolbar-control hidden>
-                    <label class="sr-only" for="pageJumpInput" data-i18n="reader.currentPage">Current page</label>
-                    <span class="sr-only" id="currentPage" aria-live="polite">1</span>
-                    <input type="number" id="pageJumpInput" min="1" max="1" value="1" inputmode="numeric" aria-label="Current page" data-i18n-aria-label="reader.currentPage">
-                    <span class="pagination-page-total-separator" aria-hidden="true">/</span>
-                    <span id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
-                    <button class="pagination-jump-submit" id="goToPage" type="button" aria-label="Jump" data-i18n-aria-label="reader.jump"><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i></button>
-                </div>
+                <span class="sr-only" id="currentPage" aria-live="polite">1</span>
+                <span class="sr-only" id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
+                <button class="control-btn" id="pageJumpToggle" type="button" aria-label="Jump" data-i18n-aria-label="reader.jump" aria-controls="paginationPageJumpPopover" aria-expanded="false" data-pagination-toolbar-control hidden><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i><span class="control-name" data-i18n="reader.jump">Jump</span></button>
+                <section class="pagination-page-jump-popover" id="paginationPageJumpPopover" role="dialog" aria-modal="false" aria-labelledby="paginationPageJumpTitle" aria-describedby="paginationPageJumpRange" aria-hidden="true" hidden>
+                    <strong class="pagination-page-jump-title" id="paginationPageJumpTitle" data-i18n="reader.jump">Jump</strong>
+                    <p class="pagination-page-jump-range" id="paginationPageJumpRange"></p>
+                    <label class="pagination-page-jump-label" for="pageJumpInput" data-i18n="reader.currentPage">Current page</label>
+                    <div class="pagination-page-jump-form">
+                        <input type="number" id="pageJumpInput" min="1" max="1" value="1" inputmode="numeric" aria-label="Current page" data-i18n-aria-label="reader.currentPage">
+                        <button class="pagination-jump-submit" id="goToPage" type="button" aria-label="Jump" data-i18n-aria-label="reader.jump"><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i></button>
+                    </div>
+                </section>
             </div>
             {pdf_reader_controls}
             {ai_chapter_button}
@@ -3126,11 +3130,16 @@ document.addEventListener('DOMContentLoaded', function() {{
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
                     </label>
-                    <label class="settings-switch">
-                        <input type="checkbox" id="clickPageToggle" disabled aria-disabled="true">
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="reader.clickToTurn">Click to turn page</span>
-                    </label>
+                    <div class="settings-option-with-tip">
+                        <label class="settings-switch">
+                            <input type="checkbox" id="clickPageToggle" disabled aria-disabled="true">
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="reader.clickToTurn">Click to turn page</span>
+                        </label>
+                        <button type="button" class="settings-info-tip" data-settings-tip data-tip="In page-turning mode, click or tap the left and right sides to turn pages. On mobile, tap the center to show or hide the reading controls. Selecting text, dragging, and long-pressing will not trigger these actions." data-i18n-data-tip="settings.clickPageHelp" aria-label="In page-turning mode, click or tap the left and right sides to turn pages. On mobile, tap the center to show or hide the reading controls. Selecting text, dragging, and long-pressing will not trigger these actions." data-i18n-aria-label="settings.clickPageHelp">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
                     <label class="settings-switch pagination-incompatible-setting">
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>

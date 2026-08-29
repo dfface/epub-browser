@@ -501,6 +501,7 @@ body.reader-drawer-open {
 
 .eb-content-container {
     margin-top: 18px;
+    margin-bottom: 18px;
     background: var(--reader-page, var(--card-bg));
     border: 1px solid var(--reader-border, var(--border));
     border-radius: 16px;
@@ -736,6 +737,7 @@ body.reader-drawer-open {
 }
 
 .pagination-toolbar-controls {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -749,28 +751,63 @@ body.reader-drawer-open {
     pointer-events: none;
 }
 
-.pagination-page-jump {
+.pagination-page-jump-popover {
+    position: absolute;
+    right: calc(100% + 12px);
+    bottom: 0;
     box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    min-height: 42px;
-    padding: 4px;
+    width: 216px;
+    padding: 14px;
     border: 1px solid var(--reader-border, var(--border));
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--reader-page, var(--card-bg)) 96%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--reader-page, var(--card-bg)) 98%, transparent);
     color: var(--reader-ink, var(--text));
-    font-size: .78rem;
-    font-weight: 600;
+    box-shadow: 0 16px 42px color-mix(in srgb, var(--text) 18%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(10px);
+    transition: opacity 160ms ease, transform 180ms ease;
 }
 
-.pagination-page-jump[hidden] {
+.pagination-page-jump-popover[hidden] {
     display: none !important;
 }
 
+.pagination-page-jump-popover.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.pagination-page-jump-title {
+    display: block;
+    font-size: .92rem;
+    line-height: 1.25;
+}
+
+.pagination-page-jump-range {
+    margin: 3px 0 12px;
+    color: var(--text-secondary);
+    font-size: .76rem;
+}
+
+.pagination-page-jump-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: .76rem;
+    font-weight: 650;
+}
+
+.pagination-page-jump-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 38px;
+    gap: 8px;
+}
+
 .pagination-jump-submit {
-    width: 32px;
-    height: 32px;
+    width: 38px;
+    height: 38px;
     padding: 0;
     border: 0;
     border-radius: 7px;
@@ -1598,6 +1635,7 @@ body.pagination-mode .desktop-setting-only {
     .theme-toggle,
     .reading-controls .control-btn,
     .top-controls .control-btn,
+    .pagination-page-jump-popover,
     .skip-link {
         transition: none;
     }
@@ -1654,11 +1692,11 @@ body.pagination-mode .desktop-setting-only {
 
 /* 页面跳转输入框 */
 #pageJumpInput {
-    width: 44px;
-    height: 32px;
-    text-align: center;
+    width: 100%;
+    height: 38px;
+    padding: 0 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--background);
     color: var(--text);
     font-weight: 600;
@@ -1701,7 +1739,8 @@ body.pagination-mode {
 /* CSS Column 分页样式 - 使用 CSS Column 实现分页 */
 .pagination-mode #eb-content {
     height: 100%;
-    padding: 0 !important;
+    padding-block: clamp(28px, 4vh, 48px) !important;
+    padding-inline: 0 !important;
     margin: 0 !important;
     border: 0;
     border-radius: 0;

@@ -301,6 +301,9 @@ function initScript() {
     var nextPageBtn = document.getElementById('nextPage');
     var contentContainer = document.querySelector('.eb-content-container');
     var content = document.getElementById('eb-content');
+    var pageJumpToggle = document.getElementById('pageJumpToggle');
+    var pageJumpPopover = document.getElementById('paginationPageJumpPopover');
+    var pageJumpRange = document.getElementById('paginationPageJumpRange');
     var pageJumpInput = document.getElementById('pageJumpInput');
     var goToPageBtn = document.getElementById('goToPage');
     var progressFill = document.getElementById('progressBar');
@@ -322,6 +325,9 @@ function initScript() {
     var paginationResizeObserver = null;
     var paginationWindowResizeBound = false;
     var paginationWidthSyncPending = false;
+    var pageJumpCloseTimer = null;
+    var readerTapGesture = null;
+    var pendingReaderTapTimer = null;
     var isClickPageEnabled = false;
     var loadedChapters = {};  // 记录已加载的章节 {chapterIndex: true}
     var isLoadingChapter = false;  // 防止重复加载
@@ -772,6 +778,7 @@ function initScript() {
         var raw = sw / pageWidth;
         totalPages = Math.max(1, Math.ceil(raw - 0.1));
         totalPagesEl.textContent = totalPages;
+        pageJumpRange.textContent = i18n.t('reader.pageRange', { total: totalPages });
         currentPageEl.textContent = currentPage+1;
         pageJumpInput.value = currentPage+1;
     }
@@ -798,8 +805,13 @@ function initScript() {
     }
     
     function updateNavButtons() {
-        prevPageBtn.disabled = currentPage === 0;
-        nextPageBtn.disabled = currentPage === totalPages-1;
+        prevPageBtn.disabled = currentPage === 0 && !readerChapterHref('.prev-chapter');
+        nextPageBtn.disabled = currentPage === totalPages - 1 && !readerChapterHref('.next-chapter');
+    }
+
+    function readerChapterHref(selector) {
+        var link = document.querySelector(selector);
+        return link ? link.getAttribute('href') : null;
     }
 
     function updateProgressIndicator() {
@@ -808,6 +820,7 @@ function initScript() {
     }
     
     async function restoreOriginalContent() {
+        closePageJumpPopover(false);
         document.body.classList.remove('pagination-mode');
         contentContainer.classList.remove('pagination-mode');
         content.style.height = '';
@@ -913,11 +926,62 @@ function initScript() {
         }
     }
 
+    function openPageJumpPopover() {
+        if (!isPaginationMode || !pageJumpPopover || !pageJumpToggle) return;
+        if (pageJumpCloseTimer) {
+            clearTimeout(pageJumpCloseTimer);
+            pageJumpCloseTimer = null;
+        }
+        pageJumpRange.textContent = i18n.t('reader.pageRange', { total: totalPages });
+        pageJumpInput.value = currentPage + 1;
+        pageJumpPopover.hidden = false;
+        pageJumpPopover.setAttribute('aria-hidden', 'false');
+        pageJumpToggle.setAttribute('aria-expanded', 'true');
+        pageJumpPopover.offsetWidth;
+        pageJumpPopover.classList.add('is-open');
+        window.requestAnimationFrame(function() {
+            pageJumpInput.focus();
+            pageJumpInput.select();
+        });
+    }
+
+    function closePageJumpPopover(restoreFocus) {
+        if (!pageJumpPopover || !pageJumpToggle || pageJumpPopover.hidden) return;
+        pageJumpPopover.classList.remove('is-open');
+        pageJumpPopover.setAttribute('aria-hidden', 'true');
+        pageJumpToggle.setAttribute('aria-expanded', 'false');
+        if (pageJumpCloseTimer) clearTimeout(pageJumpCloseTimer);
+        pageJumpCloseTimer = setTimeout(function() {
+            pageJumpPopover.hidden = true;
+            pageJumpCloseTimer = null;
+        }, 180);
+        if (restoreFocus) pageJumpToggle.focus();
+    }
+
+    pageJumpToggle.addEventListener('click', function() {
+        if (pageJumpPopover.hidden) openPageJumpPopover();
+        else closePageJumpPopover(false);
+    });
+
     goToPageBtn.addEventListener('click', function() {
-        jumpToPage(pageJumpInput.value);
+        if (jumpToPage(pageJumpInput.value)) closePageJumpPopover(true);
+    });
+
+    document.addEventListener('pointerdown', function(e) {
+        if (pageJumpPopover.hidden) return;
+        if (!pageJumpPopover.contains(e.target) && !pageJumpToggle.contains(e.target)) {
+            closePageJumpPopover(false);
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !pageJumpPopover.hidden) {
+            e.preventDefault();
+            closePageJumpPopover(true);
+        }
     });
     
-    pageJumpInput.addEventListener('keypress', function(e) {
+    pageJumpInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             goToPageBtn.click();
@@ -1285,53 +1349,138 @@ function initScript() {
         }
     });
 
-    function handleClickPage(e) {
-        if (!isClickPageEnabled || !isPaginationMode) return;
-        var t = e.target;
-        var interactive = false;
+    function cancelPendingReaderTap() {
+        if (!pendingReaderTapTimer) return;
+        clearTimeout(pendingReaderTapTimer);
+        pendingReaderTapTimer = null;
+    }
+
+    function beginReaderTapGesture(e) {
+        if (e.isPrimary === false) return;
+        cancelPendingReaderTap();
+        readerTapGesture = {
+            pointerId: e.pointerId,
+            pointerType: e.pointerType || 'mouse',
+            startX: e.clientX,
+            startY: e.clientY,
+            startedAt: Date.now(),
+            duration: 0,
+            moved: false,
+            cancelled: false
+        };
+    }
+
+    function moveReaderTapGesture(e) {
+        if (!readerTapGesture || e.pointerId !== readerTapGesture.pointerId) return;
+        if (Math.hypot(e.clientX - readerTapGesture.startX, e.clientY - readerTapGesture.startY) > 10) {
+            readerTapGesture.moved = true;
+            cancelPendingReaderTap();
+        }
+    }
+
+    function endReaderTapGesture(e) {
+        if (!readerTapGesture || e.pointerId !== readerTapGesture.pointerId) return;
+        moveReaderTapGesture(e);
+        readerTapGesture.duration = Date.now() - readerTapGesture.startedAt;
+        readerTapGesture.endedAt = Date.now();
+    }
+
+    function cancelReaderTapGesture(e) {
+        if (readerTapGesture && (!e || e.pointerId === readerTapGesture.pointerId)) {
+            readerTapGesture.cancelled = true;
+        }
+        cancelPendingReaderTap();
+    }
+
+    function readerTapTargetIsInteractive(t) {
+        if (!t || !t.tagName) return true;
         var tn = t.tagName.toLowerCase();
-        if (tn === 'a' || tn === 'button' || tn === 'input' || tn === 'textarea' || tn === 'select' || tn === 'img') interactive = true;
-        else if (t.closest('a') || t.closest('button') || t.closest('input') || t.closest('textarea') || t.closest('select')) interactive = true;
-        else if (t.closest('.settings-modal') || t.closest('.reading-controls') || t.closest('.toc-container') || t.closest('.fancybox__container') || t.closest('.top-controls') || t.closest('.mobile-controls')) interactive = true;
-        if (interactive) return;
-        
+        if (tn === 'a' || tn === 'button' || tn === 'input' || tn === 'textarea' || tn === 'select' || tn === 'img') return true;
+        return !!(
+            t.closest('a, button, input, textarea, select, img') ||
+            t.closest('.settings-modal, .reading-controls, .toc-container, .fancybox__container, .top-controls, .mobile-controls')
+        );
+    }
+
+    function readerTapCanActivate(e) {
+        var gesture = readerTapGesture;
+        readerTapGesture = null;
+        if (!gesture || gesture.cancelled || gesture.moved || gesture.duration > 450) return false;
+        if (!gesture.endedAt || Date.now() - gesture.endedAt > 800) return false;
+        if (readerTapTargetIsInteractive(e.target)) return false;
+        var selection = window.getSelection ? window.getSelection() : null;
+        if (selection && !selection.isCollapsed) {
+            cancelPendingReaderTap();
+            return false;
+        }
+        return true;
+    }
+
+    function runReaderTapAction(action, pointerType) {
+        var activate = function() {
+            pendingReaderTapTimer = null;
+            var selection = window.getSelection ? window.getSelection() : null;
+            if (selection && !selection.isCollapsed) return;
+            action();
+        };
+        if (pointerType === 'mouse') {
+            pendingReaderTapTimer = setTimeout(activate, 240);
+        } else {
+            activate();
+        }
+    }
+
+    function handleClickPage(e) {
+        if (!isPaginationMode) return;
+        if (e.type === 'dblclick' || e.detail > 1) {
+            cancelPendingReaderTap();
+            return;
+        }
+        var pointerType = readerTapGesture ? readerTapGesture.pointerType : 'mouse';
+        if (!readerTapCanActivate(e)) return;
+        var t = e.target;
         var w = window.innerWidth;
         var l = w*0.3;
         var r = w*0.7;
-        if (e.clientX < l) {
+        if (isClickPageEnabled && e.clientX < l) {
             e.preventDefault();
-            prevPageBtn.click();
-        } else if (e.clientX > r) {
+            runReaderTapAction(function() { prevPageBtn.click(); }, pointerType);
+        } else if (isClickPageEnabled && e.clientX > r) {
             e.preventDefault();
-            nextPageBtn.click();
+            runReaderTapAction(function() { nextPageBtn.click(); }, pointerType);
+        } else if (isMobile() && content.contains(t)) {
+            var rect = content.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var centerWidth = rect.width * 0.3;
+            var centerHeight = rect.height * 0.3;
+            if (Math.abs(e.clientX - cx) < centerWidth && Math.abs(e.clientY - cy) < centerHeight) {
+                runReaderTapAction(togglePureMode, pointerType);
+            }
         }
     }
     
     function initClickPageState() {
+        var savedClickPageState = null;
         if (!isKindleMode()) {
-            if (window.epubBrowserCache && window.epubBrowserCache.clickPageEnabled) {
-                isClickPageEnabled = window.epubBrowserCache.clickPageEnabled === 'true';
+            if (window.epubBrowserCache && typeof window.epubBrowserCache.clickPageEnabled === 'string') {
+                savedClickPageState = window.epubBrowserCache.clickPageEnabled;
             } else {
-                isClickPageEnabled = localStorage.getItem('clickPageEnabled') === 'true';
-                if (localStorage.getItem('clickPageEnabled')) {
+                savedClickPageState = localStorage.getItem('clickPageEnabled');
+                if (savedClickPageState !== null) {
                     if (!window.epubBrowserCache) window.epubBrowserCache = {};
-                    window.epubBrowserCache.clickPageEnabled = localStorage.getItem('clickPageEnabled');
+                    window.epubBrowserCache.clickPageEnabled = savedClickPageState;
                 }
             }
         } else {
-            isClickPageEnabled = getCookie('clickPageEnabled') === 'true';
+            savedClickPageState = getCookie('clickPageEnabled');
+        }
+        isClickPageEnabled = savedClickPageState === 'true';
+        if (savedClickPageState === null && isPaginationMode) {
+            isClickPageEnabled = true;
+            saveClickPageState();
         }
         updateClickPageButton();
-        if (isKindleMode() && getCookie('clickPageEnabled') === null) {
-            isClickPageEnabled = true;
-            saveClickPageState();
-            updateClickPageButton();
-        }
-        if (isMobile() && localStorage.getItem('clickPageEnabled') === null) {
-            isClickPageEnabled = true;
-            saveClickPageState();
-            updateClickPageButton();
-        }
     }
     
     function saveClickPageState() {
@@ -1349,7 +1498,16 @@ function initScript() {
     }
     
     initClickPageState();
+    document.body.addEventListener('pointerdown', beginReaderTapGesture, true);
+    document.body.addEventListener('pointermove', moveReaderTapGesture, true);
+    document.body.addEventListener('pointerup', endReaderTapGesture, true);
+    document.body.addEventListener('pointercancel', cancelReaderTapGesture, true);
     document.body.addEventListener('click', handleClickPage);
+    document.body.addEventListener('dblclick', handleClickPage);
+    document.addEventListener('selectionchange', function() {
+        var selection = window.getSelection ? window.getSelection() : null;
+        if (selection && !selection.isCollapsed) cancelPendingReaderTap();
+    });
     
     var isPureModeEnabled = false;
     function initPureModeState() {
@@ -1420,22 +1578,6 @@ function initScript() {
     function isMobile() {
         return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
-    
-    document.getElementById('eb-content').addEventListener('click', function(e) {
-        var t = e.target;
-        var img = t.tagName.toLowerCase() === 'img' || t.closest('img') || t.closest('.fancybox__container');
-        if (img) return;
-        var rect = e.currentTarget.getBoundingClientRect();
-        var cx = rect.left + rect.width/2;
-        var cy = rect.top + rect.height/2;
-        var w = rect.width*0.3;
-        var h = rect.height*0.3;
-        if (Math.abs(e.clientX - cx) < w && Math.abs(e.clientY - cy) < h) {
-            if (isPaginationMode) {
-                if (isMobile()) togglePureMode();
-            }
-        }
-    });
     
     var reloadPagesBtn = document.getElementById('reloadPages');
     if (reloadPagesBtn) {

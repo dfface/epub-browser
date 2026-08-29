@@ -7171,6 +7171,28 @@
   Object.keys(desktopLayoutLocaleAdditions).forEach(function(code) {
     Object.assign(dictionaries[code], desktopLayoutLocaleAdditions[code]);
   });
+  var clickPageHelpLocaleAdditions = {
+    en: 'In page-turning mode, click or tap the left and right sides to turn pages. On mobile, tap the center to show or hide the reading controls. Selecting text, dragging, and long-pressing will not trigger these actions.',
+    'zh-CN': '翻页模式下，点击或轻触左右两侧可翻页；移动端轻触中间区域可显示或隐藏阅读工具栏。选择文本、拖动和长按不会触发这些操作。',
+    'zh-TW': '翻頁模式下，點擊或輕觸左右兩側可翻頁；行動裝置輕觸中間區域可顯示或隱藏閱讀工具列。選取文字、拖動和長按不會觸發這些操作。',
+    ko: '페이지 넘김 모드에서는 왼쪽이나 오른쪽을 클릭 또는 탭하여 페이지를 넘깁니다. 모바일에서는 가운데를 탭하여 읽기 도구 모음을 표시하거나 숨깁니다. 텍스트 선택, 드래그, 길게 누르기는 이 동작을 실행하지 않습니다.',
+    ja: 'ページめくりモードでは、左右をクリックまたはタップしてページを移動します。モバイルでは中央をタップして読書ツールバーを表示・非表示にします。テキスト選択、ドラッグ、長押しではこれらの操作は実行されません。',
+    es: 'En el modo de paginación, haz clic o toca los lados izquierdo y derecho para pasar de página. En el móvil, toca el centro para mostrar u ocultar los controles de lectura. Seleccionar texto, arrastrar y mantener pulsado no activa estas acciones.',
+    de: 'Im Seitenmodus blätterst du durch Klicken oder Tippen auf die linke bzw. rechte Seite. Auf Mobilgeräten blendet ein Tippen in die Mitte die Lesesteuerung ein oder aus. Textauswahl, Ziehen und langes Drücken lösen diese Aktionen nicht aus.',
+    fr: 'En mode pagination, cliquez ou touchez les côtés gauche et droit pour changer de page. Sur mobile, touchez le centre pour afficher ou masquer les commandes de lecture. La sélection de texte, le glissement et l’appui prolongé ne déclenchent pas ces actions.',
+    ru: 'В постраничном режиме нажимайте слева или справа, чтобы листать страницы. На мобильном устройстве нажмите по центру, чтобы показать или скрыть элементы управления чтением. Выделение текста, перетаскивание и долгое нажатие не запускают эти действия.',
+    it: 'In modalità paginazione, fai clic o tocca i lati sinistro e destro per cambiare pagina. Su dispositivo mobile, tocca il centro per mostrare o nascondere i controlli di lettura. La selezione del testo, il trascinamento e la pressione prolungata non attivano queste azioni.',
+    'pt-BR': 'No modo de paginação, clique ou toque nos lados esquerdo e direito para virar as páginas. No celular, toque no centro para mostrar ou ocultar os controles de leitura. Selecionar texto, arrastar e manter pressionado não aciona essas ações.',
+    ar: 'في وضع تقليب الصفحات، انقر أو المس الجانبين الأيسر والأيمن للتنقل بين الصفحات. على الهاتف، المس المنتصف لإظهار أدوات القراءة أو إخفائها. لا يؤدي تحديد النص أو السحب أو الضغط المطول إلى تشغيل هذه الإجراءات.',
+    id: 'Dalam mode halaman, klik atau ketuk sisi kiri dan kanan untuk membalik halaman. Di perangkat seluler, ketuk bagian tengah untuk menampilkan atau menyembunyikan kontrol membaca. Memilih teks, menyeret, dan menekan lama tidak memicu tindakan ini.',
+    hi: 'पृष्ठ पलटने के मोड में पृष्ठ बदलने के लिए बाएँ या दाएँ हिस्से पर क्लिक या टैप करें। मोबाइल पर पठन नियंत्रण दिखाने या छिपाने के लिए बीच में टैप करें। टेक्स्ट चुनने, खींचने और देर तक दबाने से ये क्रियाएँ शुरू नहीं होंगी।',
+    vi: 'Trong chế độ lật trang, hãy nhấp hoặc chạm vào hai bên trái và phải để chuyển trang. Trên thiết bị di động, chạm vào giữa để hiện hoặc ẩn thanh công cụ đọc. Chọn văn bản, kéo và nhấn giữ sẽ không kích hoạt các thao tác này.',
+    th: 'ในโหมดพลิกหน้า ให้คลิกหรือแตะด้านซ้ายและขวาเพื่อเปลี่ยนหน้า บนอุปกรณ์เคลื่อนที่ ให้แตะตรงกลางเพื่อแสดงหรือซ่อนเครื่องมือการอ่าน การเลือกข้อความ การลาก และการกดค้างจะไม่เรียกใช้การทำงานเหล่านี้',
+    ms: 'Dalam mod selak halaman, klik atau ketik bahagian kiri dan kanan untuk menukar halaman. Pada peranti mudah alih, ketik bahagian tengah untuk menunjukkan atau menyembunyikan kawalan bacaan. Memilih teks, menyeret dan menekan lama tidak mencetuskan tindakan ini.'
+  };
+  Object.keys(clickPageHelpLocaleAdditions).forEach(function(code) {
+    dictionaries[code]['settings.clickPageHelp'] = clickPageHelpLocaleAdditions[code];
+  });
   Object.keys(dictionaries).forEach(function(code) {
     Object.keys(localeNativeNames).forEach(function(localeCode) { dictionaries[code]['locale.name.' + localeCode] = localeNativeNames[localeCode]; });
   });
