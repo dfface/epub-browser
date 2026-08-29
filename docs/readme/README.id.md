@@ -29,6 +29,10 @@ Gunakan `ssg` untuk menerbitkan berkas statis biasa. Gunakan `server` bila Anda 
 
 ## Ikhtisar
 
+### Tumpukan teknologi
+
+Antarmuka menggunakan HTML semantik, CSS, dan Vanilla JavaScript tanpa framework SPA. CLI dan Server memakai Python 3.9+, Starlette, Uvicorn, dan SQLite; pypdf, pypdfium2, serta PDF.js memproses PDF secara lokal tanpa CDN saat runtime.
+
 ### Demo
 
 - **Mode SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

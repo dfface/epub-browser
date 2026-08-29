@@ -29,6 +29,10 @@
 
 ## نظرة عامة
 
+### المكدس التقني
+
+تستخدم الواجهة HTML دلالية وCSS وVanilla JavaScript بلا إطار SPA. تعتمد أداة CLI وServer على Python 3.9+ وStarlette وUvicorn وSQLite، بينما تتولى pypdf وpypdfium2 وPDF.js معالجة PDF محلياً؛ ولا يحتاج التشغيل إلى CDN.
+
 ### مواقع تجريبية
 
 - **وضع SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

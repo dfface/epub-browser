@@ -29,6 +29,10 @@ Gunakan `ssg` untuk menerbitkan fail statik biasa. Gunakan `server` apabila anda
 
 ## Gambaran keseluruhan
 
+### Tindanan teknologi
+
+Antara muka menggunakan HTML semantik, CSS dan Vanilla JavaScript tanpa rangka kerja SPA. CLI dan Server menggunakan Python 3.9+, Starlette, Uvicorn dan SQLite; pypdf, pypdfium2 serta PDF.js memproses PDF secara setempat tanpa CDN semasa runtime.
+
 ### Demo
 
 - **Mod SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

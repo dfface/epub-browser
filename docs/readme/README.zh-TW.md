@@ -29,6 +29,10 @@ PDF 是一等書籍格式：第 1 頁對應 `chapter_0.html`，每一頁都會�
 
 ## 專案概覽
 
+### 技術棧
+
+前端使用語義化 HTML、CSS 與 Vanilla JavaScript，不採用 SPA 框架。CLI 與 Server 建構於 Python 3.9+、Starlette、Uvicorn 和 SQLite；PDF 則由 pypdf、pypdfium2 與 PDF.js 在本機處理，執行期間不依賴 CDN。
+
 ### 示範站台
 
 - **SSG 模式**：[epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

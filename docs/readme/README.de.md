@@ -29,6 +29,10 @@ Verwende `ssg`, wenn gewöhnliche statische Dateien veröffentlicht werden solle
 
 ## Überblick
 
+### Technik-Stack
+
+Die Oberfläche verwendet semantisches HTML, CSS und Vanilla JavaScript ohne SPA-Framework. CLI und Server basieren auf Python 3.9+, Starlette, Uvicorn und SQLite; pypdf, pypdfium2 und PDF.js verarbeiten PDF lokal, ohne Laufzeit-CDN.
+
 ### Demos
 
 - **SSG-Modus**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

@@ -29,6 +29,10 @@ PDF は第一級の書籍形式です。PDF の 1 ページ目は `chapter_0.htm
 
 ## 概要
 
+### 技術スタック
+
+フロントエンドはセマンティック HTML、CSS、Vanilla JavaScript で構成し、SPA フレームワークは使用しません。CLI と Server は Python 3.9+、Starlette、Uvicorn、SQLite を使い、PDF は pypdf、pypdfium2、PDF.js でローカル処理するため、実行時 CDN は不要です。
+
 ### デモ
 
 - **SSG モード**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

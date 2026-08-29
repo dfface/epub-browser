@@ -29,6 +29,10 @@ PDF — полноценный формат книги: страница 1 ст�
 
 ## Обзор
 
+### Технологический стек
+
+Интерфейс использует семантический HTML, CSS и Vanilla JavaScript без SPA-фреймворка. CLI и Server работают на Python 3.9+, Starlette, Uvicorn и SQLite; pypdf, pypdfium2 и PDF.js обрабатывают PDF локально, без CDN во время выполнения.
+
 ### Демонстрационные сайты
 
 - **Режим SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

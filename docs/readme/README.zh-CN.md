@@ -25,6 +25,7 @@ EPUB Browser 现在同时接受 `.epub` 和 `.pdf`。两种格式共用 Library�
 
 - [项目概览](#项目概览)
   - [为什么选择 EPUB Browser](#为什么选择-epub-browser)
+  - [技术栈](#技术栈)
   - [选择 SSG 或 Server](#选择-ssg-或-server)
   - [演示站点](#演示站点)
   - [AI 原生阅读](#ai-原生阅读仅-server-模式)
@@ -64,6 +65,23 @@ EPUB Browser 现在同时接受 `.epub` 和 `.pdf`。两种格式共用 Library�
   阅读过程不依赖 CDN。
 - **17 种界面语言**：英语、简体中文、繁体中文、日语、韩语、西班牙语、德语、法语、
   俄语、意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语。
+
+### 技术栈
+
+EPUB Browser 有意保持一套精简的服务端渲染 Web 技术栈。安装后的应用不使用 SPA
+框架，也不要求 Node.js 运行时：
+
+| 层次 | 技术 | 职责 |
+| --- | --- | --- |
+| 前端 | 语义化 HTML、CSS、基于 ES modules 和浏览器 API 的 **Vanilla JavaScript** | SSG 与 Server 共用同一套响应式界面 |
+| CLI 与 Server | Python 3.9+、Starlette、Uvicorn | 转换命令、鉴权页面、API 与后台任务 |
+| 数据 | SQLite 与可重建的 JSON 内容缓存 | 用户状态与 EPUB/PDF 派生内容彼此分离 |
+| 书籍格式 | 项目内 EPUB 处理管线、pypdf、pypdfium2、PDF.js | EPUB 提取、PDF 元数据/封面和浏览器本地渲染 |
+| 离线与资源 | Service Worker、带 hash 的不可变资源、锁定的 vendor 依赖 | 运行时不依赖 CDN 的自包含交付 |
+| 发布 | PyPI、Docker、普通静态托管 | 同一份代码既可生成 SSG，也可运行持久化 Server |
+| 可选 AI | OpenAI-compatible API，以及本地渲染的 Markdown、KaTeX、Mermaid | 仅 Server 模式下的 EPUB 学习层 |
+
+Node.js 只供维护者运行浏览器侧测试，不属于读者侧的生产运行时。
 
 ### 选择 SSG 或 Server
 

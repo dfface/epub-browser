@@ -29,6 +29,10 @@ Dùng `ssg` khi cần xuất bản các tệp tĩnh thông thường. Dùng `ser
 
 ## Tổng quan
 
+### Công nghệ sử dụng
+
+Giao diện dùng HTML ngữ nghĩa, CSS và Vanilla JavaScript, không dùng framework SPA. CLI và Server dựa trên Python 3.9+, Starlette, Uvicorn và SQLite; pypdf, pypdfium2 cùng PDF.js xử lý PDF cục bộ, không cần CDN khi chạy.
+
 ### Bản dùng thử
 
 - **Chế độ SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

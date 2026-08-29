@@ -29,6 +29,10 @@ PDF प्रथम-श्रेणी पुस्तक प्रारूप 
 
 ## अवलोकन
 
+### तकनीकी स्टैक
+
+इंटरफ़ेस semantic HTML, CSS और Vanilla JavaScript का उपयोग करता है, किसी SPA framework का नहीं। CLI और Server Python 3.9+, Starlette, Uvicorn और SQLite पर चलते हैं; pypdf, pypdfium2 और PDF.js PDF को स्थानीय रूप से संभालते हैं और runtime CDN की आवश्यकता नहीं होती।
+
 ### डेमो
 
 - **SSG मोड**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

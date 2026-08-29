@@ -29,6 +29,10 @@ PDF는 일급 도서 형식입니다. PDF의 첫 페이지는 `chapter_0.html`�
 
 ## 개요
 
+### 기술 스택
+
+프런트엔드는 시맨틱 HTML, CSS, Vanilla JavaScript로 구성하며 SPA 프레임워크를 사용하지 않습니다. CLI와 Server는 Python 3.9+, Starlette, Uvicorn, SQLite를 사용하고 PDF는 pypdf, pypdfium2, PDF.js로 로컬 처리하므로 런타임 CDN이 필요하지 않습니다.
+
 ### 데모
 
 - **SSG 모드**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

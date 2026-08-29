@@ -27,6 +27,7 @@ inside the existing reading experience.
 
 - [Project overview](#project-overview)
   - [Why EPUB Browser](#why-epub-browser)
+  - [Technology stack](#technology-stack)
   - [Choose SSG or Server](#choose-ssg-or-server)
   - [Live demos](#live-demos)
   - [AI-native reading](#ai-native-reading-server-only)
@@ -72,6 +73,24 @@ inside the existing reading experience.
 - **17 interface languages:** English, 简体中文, 繁體中文, 日本語, 한국어,
   Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية,
   Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
+
+### Technology stack
+
+EPUB Browser deliberately uses a small, server-rendered web stack. The installed
+application has no SPA framework and does not require a Node.js runtime:
+
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Frontend | Semantic HTML, CSS, **Vanilla JavaScript** with ES modules and browser APIs | One shared responsive UI for SSG and Server |
+| CLI and Server | Python 3.9+, Starlette, Uvicorn | Conversion commands, authenticated pages, APIs, and background work |
+| Data | SQLite plus rebuildable JSON content caches | User state remains separate from derived EPUB/PDF content |
+| Book formats | Project EPUB pipeline, pypdf, pypdfium2, PDF.js | EPUB extraction, PDF metadata/covers, and local browser rendering |
+| Offline and assets | Service Worker, hashed immutable assets, locked vendored dependencies | Self-contained delivery without a runtime CDN |
+| Distribution | PyPI, Docker, ordinary static hosting | The same codebase ships as SSG or a persistent Server |
+| Optional AI | OpenAI-compatible APIs with locally rendered Markdown, KaTeX, and Mermaid | EPUB learning layers in Server mode only |
+
+Node.js is used only by maintainers for browser-side tests; it is not part of
+the reader's production runtime.
 
 ### Choose SSG or Server
 

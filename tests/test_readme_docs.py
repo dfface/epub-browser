@@ -4,6 +4,29 @@ from pathlib import Path
 
 
 class ReadmeDocumentationTests(unittest.TestCase):
+    def test_readmes_document_the_technology_stack(self):
+        for path in (Path("README.md"), Path("docs/readme/README.zh-CN.md")):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                for technology in (
+                    "Vanilla JavaScript",
+                    "Starlette",
+                    "Uvicorn",
+                    "SQLite",
+                    "PDF.js",
+                    "pypdf",
+                    "pypdfium2",
+                    "Service Worker",
+                ):
+                    self.assertIn(technology, text)
+
+        for path in sorted(Path("docs/readme").glob("README.*.md")):
+            with self.subTest(path=path):
+                self.assertIn(
+                    "Vanilla JavaScript",
+                    path.read_text(encoding="utf-8"),
+                )
+
     def test_readme_information_architecture_stays_reader_focused(self):
         expected_top_level = {
             Path("README.md"): (

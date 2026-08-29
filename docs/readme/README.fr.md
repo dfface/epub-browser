@@ -29,6 +29,10 @@ Utilisez `ssg` pour publier des fichiers statiques ordinaires. Utilisez `server`
 
 ## Vue d’ensemble
 
+### Pile technique
+
+L’interface utilise du HTML sémantique, du CSS et du Vanilla JavaScript, sans framework SPA. La CLI et le Server reposent sur Python 3.9+, Starlette, Uvicorn et SQLite ; pypdf, pypdfium2 et PDF.js traitent les PDF localement, sans CDN à l’exécution.
+
 ### Démonstrations
 
 - **Mode SSG** : [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)

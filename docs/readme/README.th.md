@@ -29,6 +29,10 @@ PDF เป็นรูปแบบหนังสือหลักอย่า�
 
 ## ภาพรวม
 
+### เทคโนโลยีที่ใช้
+
+ส่วนติดต่อใช้ semantic HTML, CSS และ Vanilla JavaScript โดยไม่มี SPA framework ส่วน CLI และ Server ใช้ Python 3.9+, Starlette, Uvicorn และ SQLite ขณะที่ pypdf, pypdfium2 และ PDF.js ประมวลผล PDF ภายในเครื่องโดยไม่พึ่ง CDN ขณะทำงาน
+
 ### เว็บไซต์สาธิต
 
 - **โหมด SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
