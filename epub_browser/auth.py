@@ -298,7 +298,11 @@ class AuthService:
         username: str,
         password: str,
         client_key: str,
+        *,
+        allow_member: bool = True,
     ) -> Optional[Principal]:
+        if not isinstance(allow_member, bool):
+            raise TypeError("Member login policy must be boolean")
         now = self._now()
         normalized = self._normalize_login_username(username)
         key = self._login_key(client_key, normalized)
@@ -321,6 +325,7 @@ class AuthService:
             and user.enabled
             and user.password_hash
             and password_matches
+            and (allow_member or user.role == "admin")
         ):
             with self._throttle_lock:
                 self._purge_login_failures(self._now())

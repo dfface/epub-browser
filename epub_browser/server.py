@@ -56,6 +56,7 @@ from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore
 from .library_progress import LibraryProgressBroker
 from .locales import LOCALE_NATIVE_NAMES, SUPPORTED_LOCALE_SET, normalize_locale
+from .oidc import OIDCError, OIDCService
 from .processor import (
     SERVER_OUTPUT_REVISION,
     SERVER_OUTPUT_REVISION_FILE,
@@ -100,6 +101,7 @@ SESSION_TOKEN_SCOPE_KEY = 'epub_browser.session_token'
 SETUP_NONCE_COOKIE = 'epub_browser_setup_nonce'
 AUTH_NONCE_COOKIE = 'epub_browser_auth_nonce'
 AUTH_NONCE_HEADER = 'X-EPUB-Browser-Auth-Nonce'
+OIDC_BROWSER_COOKIE = 'epub_browser_oidc'
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
 ADMIN_AI_JOB_STATUSES = frozenset({
     'queued', 'running', 'complete', 'failed', 'interrupted',
@@ -110,6 +112,9 @@ PUBLIC_UNAUTHENTICATED_ENDPOINTS = frozenset({
     '/setup',
     '/login',
     '/logout',
+    '/auth/oidc/start',
+    '/auth/oidc/callback',
+    '/auth/oidc/associate',
     '/sw.js',
     '/openapi.json',
     '/api-docs',
@@ -117,7 +122,14 @@ PUBLIC_UNAUTHENTICATED_ENDPOINTS = frozenset({
     '/api/ready',
     '/api/version',
 })
-PUBLIC_SESSION_AWARE_ENDPOINTS = frozenset({'/setup', '/login', '/logout'})
+PUBLIC_SESSION_AWARE_ENDPOINTS = frozenset({
+    '/setup',
+    '/login',
+    '/logout',
+    '/auth/oidc/start',
+    '/auth/oidc/callback',
+    '/auth/oidc/associate',
+})
 PUBLIC_STATELESS_ENDPOINTS = (
     PUBLIC_UNAUTHENTICATED_ENDPOINTS - PUBLIC_SESSION_AWARE_ENDPOINTS
 )
@@ -258,6 +270,48 @@ LOGIN_COPY = {
         'invalid_credentials': 'ユーザー名またはパスワードが正しくありません。',
         'login_throttled': 'ログイン試行回数が多すぎます。{minutes} 分後にもう一度お試しください。',
         'language': '言語',
+    },
+}
+OIDC_COPY = {
+    'en': {
+        'error_title': 'Sign-in could not be completed',
+        'error_body': 'Return to sign in and try again. If the problem continues, contact your administrator.',
+        'back': 'Return to sign in',
+        'associate_title': 'Connect your existing account',
+        'associate_body': 'Enter your existing EPUB Browser username and password once to connect this identity.',
+        'submit': 'Connect and sign in',
+    },
+    'zh-CN': {
+        'error_title': '无法完成登录',
+        'error_body': '请返回登录页重试。如果问题持续存在，请联系管理员。',
+        'back': '返回登录',
+        'associate_title': '绑定现有账户',
+        'associate_body': '请输入一次现有 EPUB Browser 用户名和密码，以绑定此身份。',
+        'submit': '绑定并登录',
+    },
+    'zh-TW': {
+        'error_title': '無法完成登入',
+        'error_body': '請返回登入頁重試。如果問題持續發生，請聯絡管理員。',
+        'back': '返回登入',
+        'associate_title': '連結現有帳戶',
+        'associate_body': '請輸入一次現有 EPUB Browser 使用者名稱和密碼，以連結此身分。',
+        'submit': '連結並登入',
+    },
+    'ko': {
+        'error_title': '로그인을 완료할 수 없습니다',
+        'error_body': '로그인 화면으로 돌아가 다시 시도하세요. 문제가 계속되면 관리자에게 문의하세요.',
+        'back': '로그인으로 돌아가기',
+        'associate_title': '기존 계정 연결',
+        'associate_body': '이 ID를 연결하려면 기존 EPUB Browser 사용자 이름과 비밀번호를 한 번 입력하세요.',
+        'submit': '연결하고 로그인',
+    },
+    'ja': {
+        'error_title': 'ログインを完了できませんでした',
+        'error_body': 'ログイン画面に戻って再試行してください。問題が続く場合は管理者に連絡してください。',
+        'back': 'ログインに戻る',
+        'associate_title': '既存のアカウントを接続',
+        'associate_body': 'この ID を接続するため、既存の EPUB Browser のユーザー名とパスワードを一度入力してください。',
+        'submit': '接続してログイン',
     },
 }
 
@@ -617,6 +671,7 @@ def create_app(
     progress_broker: Optional[LibraryProgressBroker] = None,
     library_event_heartbeat_seconds: float = 15.0,
     auth_service: Optional[AuthService] = None,
+    oidc_service: Optional[OIDCService] = None,
     release_lookup: Optional[ReleaseLookup] = None,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
@@ -624,6 +679,7 @@ def create_app(
     if state_store is None or auth_service is None:
         raise RuntimeError('An initialized StateStore and AuthService are required')
     store = state_store
+    oidc_service = oidc_service or OIDCService(store)
     runtime_status = status or _CompatibilityRuntimeStatus()
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     release_lookup = release_lookup or ReleaseLookup()
@@ -739,6 +795,26 @@ def create_app(
             secure=auth_service.config.cookie_secure,
             httponly=True,
             samesite='strict',
+        )
+
+    def set_oidc_browser_cookie(target_response, browser_token):
+        target_response.set_cookie(
+            OIDC_BROWSER_COOKIE,
+            browser_token,
+            max_age=600,
+            path='/auth/oidc',
+            secure=auth_service.config.cookie_secure,
+            httponly=True,
+            samesite='lax',
+        )
+
+    def delete_oidc_browser_cookie(target_response):
+        target_response.delete_cookie(
+            OIDC_BROWSER_COOKIE,
+            path='/auth/oidc',
+            secure=auth_service.config.cookie_secure,
+            httponly=True,
+            samesite='lax',
         )
 
     async def json_object(request):
@@ -1311,6 +1387,307 @@ window.location.assign(payload.redirect||'/');
         set_auth_nonce_cookie(page, nonce)
         return page
 
+    def oidc_error_page(request, *, status_code=400):
+        locale = normalize_login_locale(
+            request.query_params.get('lang'),
+            request.headers.get('accept-language', ''),
+        )
+        copy = OIDC_COPY.get(locale, OIDC_COPY['en'])
+        markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{html.escape(copy['error_title'])} · EPUB Browser</title>
+<link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/account.css">
+<script src="/assets/theme-bootstrap.js"></script></head>
+<body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
+<header class="auth-card-header">{auth_brand_markup()}
+<h1 data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])}</h1>
+<p class="auth-description" data-i18n="account.oidc.errorBody">{html.escape(copy['error_body'])}</p></header>
+<a class="auth-submit" href="/login" data-i18n="account.oidc.backToLogin">{html.escape(copy['back'])}</a>
+</section></main></body></html>'''
+        return HTMLResponse(
+            markup,
+            status_code=status_code,
+            headers={'Cache-Control': 'no-store'},
+        )
+
+    def oidc_association_form(
+        request,
+        association_token,
+        *,
+        error=False,
+        status_code=200,
+    ):
+        locale = normalize_login_locale(
+            request.query_params.get('lang'),
+            request.headers.get('accept-language', ''),
+        )
+        copy = OIDC_COPY.get(locale, OIDC_COPY['en'])
+        login_copy = LOGIN_COPY.get(locale, LOGIN_COPY['en'])
+        nonce = secrets.token_urlsafe(32)
+        error_markup = (
+            '<p class="auth-alert" role="alert" '
+            'data-i18n="account.error.invalid_credentials">{}</p>'.format(
+                html.escape(login_copy['invalid_credentials'])
+            )
+            if error else ''
+        )
+        markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{html.escape(copy['associate_title'])} · EPUB Browser</title>
+<link rel="stylesheet" href="/assets/theme.css">
+<link rel="stylesheet" href="/assets/account.css">
+<script src="/assets/theme-bootstrap.js"></script></head>
+<body class="auth-page"><main class="auth-shell"><section class="auth-card login-card">
+<header class="auth-card-header">{auth_brand_markup()}
+<h1 data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])}</h1>
+<p class="auth-description" data-i18n="account.oidc.associateBody">{html.escape(copy['associate_body'])}</p></header>
+<form class="auth-form" id="associationForm" method="post" action="/auth/oidc/associate">
+<input type="hidden" name="token" value="{html.escape(association_token, quote=True)}">
+<input type="hidden" name="auth_nonce" value="{html.escape(nonce, quote=True)}">
+<label><span data-i18n="account.username">{html.escape(login_copy['username'])}</span>
+<input name="username" autocomplete="username" required maxlength="255"></label>
+<label><span data-i18n="account.password">{html.escape(login_copy['password'])}</span>
+<input name="password" type="password" autocomplete="current-password" required maxlength="4096"></label>
+{error_markup}<button class="auth-submit" type="submit" data-i18n="account.oidc.associateSubmit">{html.escape(copy['submit'])}</button>
+</form></section></main></body></html>'''
+        page = HTMLResponse(
+            markup,
+            status_code=status_code,
+            headers={'Cache-Control': 'no-store'},
+        )
+        set_auth_nonce_cookie(page, nonce)
+        return page
+
+    def oidc_settings():
+        settings = store._get_oidc_provider_settings()
+        if not settings.get('enabled'):
+            raise OIDCError('configuration_invalid')
+        return settings
+
+    def complete_local_session(request, principal, next_path):
+        current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+        current_session = request_session_token(request)
+        if current_principal is not None and current_session:
+            raw_session, _ = auth_service.replace_session(
+                principal,
+                current_session,
+                **session_client_metadata(request),
+            )
+        else:
+            raw_session, _ = auth_service.create_session(
+                principal,
+                **session_client_metadata(request),
+            )
+        completed = RedirectResponse(
+            next_path,
+            status_code=303,
+            headers={'Cache-Control': 'no-store'},
+        )
+        set_session_cookie(completed, raw_session)
+        delete_oidc_browser_cookie(completed)
+        delete_auth_nonce_cookie(completed)
+        return completed
+
+    async def oidc_start(request):
+        try:
+            settings = oidc_settings()
+        except OIDCError:
+            return oidc_error_page(request, status_code=404)
+        next_path = _safe_relative_path(request.query_params.get('next', '/'))
+        purpose = request.query_params.get('purpose', 'login')
+        current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+        if purpose == 'link':
+            if current_principal is None:
+                return oidc_error_page(request, status_code=401)
+            expected_user_id = current_principal.user_id
+        elif purpose == 'login':
+            expected_user_id = None
+        else:
+            return oidc_error_page(request, status_code=400)
+        try:
+            started = await oidc_service.begin(
+                settings,
+                purpose=purpose,
+                next_path=next_path,
+                expected_user_id=expected_user_id,
+            )
+        except OIDCError as error:
+            status_code = 502 if error.code == 'provider_unavailable' else 400
+            return oidc_error_page(request, status_code=status_code)
+        redirect = RedirectResponse(
+            started.authorization_url,
+            status_code=307,
+            headers={'Cache-Control': 'no-store'},
+        )
+        set_oidc_browser_cookie(redirect, started.browser_token)
+        return redirect
+
+    async def oidc_callback(request):
+        values = {
+            name: request.query_params.get(name)
+            for name in ('state', 'code', 'error', 'error_description')
+        }
+        if (
+            not isinstance(values['state'], str)
+            or not values['state']
+            or any(isinstance(value, str) and len(value) > 8192 for value in values.values())
+        ):
+            failed = oidc_error_page(request, status_code=400)
+            delete_oidc_browser_cookie(failed)
+            return failed
+        try:
+            settings = oidc_settings()
+            completion = await oidc_service.complete(
+                settings,
+                state=values['state'],
+                browser_token=request.cookies.get(OIDC_BROWSER_COOKIE, ''),
+                code=values['code'],
+                error=values['error'],
+                error_description=values['error_description'],
+            )
+        except OIDCError as error:
+            status_code = 502 if error.code == 'provider_unavailable' else 400
+            failed = oidc_error_page(request, status_code=status_code)
+            delete_oidc_browser_cookie(failed)
+            return failed
+
+        claims = completion.claims
+        transaction = completion.transaction
+        current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
+        try:
+            if transaction.purpose == 'link':
+                if (
+                    current_principal is None
+                    or current_principal.user_id != transaction.expected_user_id
+                ):
+                    raise RuntimeError('OIDC link session changed')
+                store.link_oidc_identity(
+                    current_principal.user_id,
+                    issuer=claims.issuer,
+                    subject=claims.subject,
+                    username_claim=claims.username,
+                    display_name=claims.display_name,
+                    email=claims.email,
+                )
+                principal = current_principal
+            else:
+                principal = store.principal_for_oidc_identity(
+                    claims.issuer,
+                    claims.subject,
+                )
+                if principal is not None:
+                    store.link_oidc_identity(
+                        principal.user_id,
+                        issuer=claims.issuer,
+                        subject=claims.subject,
+                        username_claim=claims.username,
+                        display_name=claims.display_name,
+                        email=claims.email,
+                    )
+                elif settings['auto_create_users']:
+                    principal = store.provision_oidc_member(
+                        issuer=claims.issuer,
+                        subject=claims.subject,
+                        username_base=claims.username,
+                        username_claim=claims.username,
+                        display_name=claims.display_name,
+                        email=claims.email,
+                    )
+                else:
+                    association_token = secrets.token_urlsafe(32)
+                    store.stage_oidc_association(
+                        association_token=association_token,
+                        browser_token=request.cookies.get(OIDC_BROWSER_COOKIE, ''),
+                        issuer=claims.issuer,
+                        subject=claims.subject,
+                        username_claim=claims.username,
+                        display_name=claims.display_name,
+                        email=claims.email,
+                        next_path=transaction.next_path,
+                        config_revision=settings['config_revision'],
+                        expires_at=time.time() + 600,
+                    )
+                    return RedirectResponse(
+                        '/auth/oidc/associate?token=' + quote(association_token, safe=''),
+                        status_code=303,
+                        headers={'Cache-Control': 'no-store'},
+                    )
+        except (RuntimeError, ValueError, sqlite3.IntegrityError):
+            failed = oidc_error_page(request, status_code=403)
+            delete_oidc_browser_cookie(failed)
+            return failed
+        return complete_local_session(request, principal, transaction.next_path)
+
+    async def oidc_associate(request):
+        try:
+            settings = oidc_settings()
+        except OIDCError:
+            return oidc_error_page(request, status_code=404)
+        browser_token = request.cookies.get(OIDC_BROWSER_COOKIE, '')
+        if request.method == 'GET':
+            association_token = request.query_params.get('token', '')
+            transaction = store.get_oidc_association(
+                association_token,
+                browser_token,
+                settings['config_revision'],
+            )
+            if transaction is None:
+                return oidc_error_page(request, status_code=400)
+            return oidc_association_form(request, association_token)
+        try:
+            data = await form_data(request, maximum_size=16 * 1024)
+        except (ValueError, UnicodeDecodeError):
+            return oidc_error_page(request, status_code=400)
+        association_token = data.get('token', '')
+        supplied_nonce = data.get('auth_nonce', '')
+        cookie_nonce = request.cookies.get(AUTH_NONCE_COOKIE, '')
+        if (
+            not valid_same_origin_request_source(request)
+            or not supplied_nonce
+            or not cookie_nonce
+            or not secrets.compare_digest(supplied_nonce, cookie_nonce)
+        ):
+            return oidc_error_page(request, status_code=403)
+        transaction = store.get_oidc_association(
+            association_token,
+            browser_token,
+            settings['config_revision'],
+        )
+        if transaction is None:
+            return oidc_error_page(request, status_code=400)
+        client_key = request.client.host if request.client is not None else 'unknown'
+        principal = auth_service.authenticate_password(
+            data.get('username', ''),
+            data.get('password', ''),
+            client_key,
+            allow_member=True,
+        )
+        if principal is None:
+            status_code = 429 if auth_service.login_retry_after_seconds(
+                client_key, data.get('username', '')
+            ) else 401
+            return oidc_association_form(
+                request,
+                association_token,
+                error=True,
+                status_code=status_code,
+            )
+        try:
+            identity = store.complete_oidc_association(
+                association_token,
+                browser_token,
+                settings['config_revision'],
+                principal.user_id,
+            )
+        except (RuntimeError, ValueError, sqlite3.IntegrityError):
+            return oidc_error_page(request, status_code=409)
+        if identity is None:
+            return oidc_error_page(request, status_code=400)
+        return complete_local_session(request, principal, transaction.next_path)
+
     async def login(request):
         requested_next = _safe_relative_path(request.query_params.get('next', '/'))
         requested_locale = normalize_login_locale(
@@ -1334,10 +1711,15 @@ window.location.assign(payload.redirect||'/');
             return public_json_error(parse_error)
         next_path = _safe_relative_path(data.get('next') or requested_next)
         client_key = request.client.host if request.client is not None else 'unknown'
+        current_oidc_settings = store.get_oidc_settings()
         principal = auth_service.authenticate_password(
             data.get('username', ''),
             data.get('password', ''),
             client_key,
+            allow_member=(
+                not current_oidc_settings.enabled
+                or current_oidc_settings.allow_member_password_login
+            ),
         )
         if principal is None:
             retry_after_seconds = auth_service.login_retry_after_seconds(
@@ -3765,6 +4147,9 @@ window.location.assign(payload.redirect||'/');
         Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
         Route('/logout', logout, methods=['POST']),
+        Route('/auth/oidc/start', oidc_start, methods=['GET']),
+        Route('/auth/oidc/callback', oidc_callback, methods=['GET']),
+        Route('/auth/oidc/associate', oidc_associate, methods=['GET', 'POST']),
         Route('/sw.js', service_worker_tombstone, methods=['GET']),
         Route('/api/session', session, methods=['GET']),
         Route('/api/csrf', csrf, methods=['GET']),
@@ -3858,6 +4243,7 @@ window.location.assign(payload.redirect||'/');
         finally:
             await webhook_service.stop_worker()
             await ai_reading.stop_worker()
+            await oidc_service.aclose()
 
     app = Starlette(
         routes=routes,
@@ -3917,6 +4303,9 @@ window.location.assign(payload.redirect||'/');
         authorized = await call_next(request)
         if new_proxy_session is not None:
             set_session_cookie(authorized, new_proxy_session)
+        if path.startswith('/auth/oidc/'):
+            authorized.headers['Cache-Control'] = 'no-store'
+            return authorized
         # Lookup text is sensitive reading data.  Its handlers deliberately
         # request no-store; preserve that stronger policy instead of replacing
         # it with the authenticated page default.

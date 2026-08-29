@@ -28,6 +28,7 @@ from .auth import AuthConfig, AuthService, BootstrapCredentials
 from .cli import ServerConfig
 from .library_progress import LibraryProgressBroker
 from .migration import MigrationError, MigrationManager
+from .oidc import OIDCService
 from .reporting import Reporter
 from .server import create_app
 from .server_library import ReconcileSummary, ServerLibraryManager
@@ -448,6 +449,7 @@ def run_server(
             manager.public_dir,
             state_store=state_store,
             auth_service=AuthService(state_store, auth_config),
+            oidc_service=OIDCService(state_store),
             status=status,
             sync_dir=config.legacy_sync_dir or server_dir,
             progress_broker=progress_broker,

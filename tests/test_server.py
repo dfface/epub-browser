@@ -26,10 +26,16 @@ from epub_browser.auth import (
 from epub_browser.ai_reading import AIReadingError, AIReadingService
 from epub_browser.library_progress import LibraryProgressBroker
 from epub_browser.locales import SUPPORTED_LOCALES
+from epub_browser.oidc import (
+    OIDCClaims,
+    OIDCCompletion,
+    OIDCError,
+    OIDCStart,
+)
 from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import CachedStaticFiles, create_app, migrate_legacy_database
-from epub_browser.state import StateStore
+from epub_browser.state import OIDCTransactionRecord, StateStore
 from epub_browser.version import LATEST_RELEASE_API_URL, ReleaseLookup
 
 
@@ -60,6 +66,86 @@ def _json_login(testcase, client, username, password, *, next_path="/"):
             "Origin": str(client.base_url).rstrip("/"),
             "Sec-Fetch-Site": "same-origin",
         },
+    )
+
+
+class _ScriptedOIDCService:
+    def __init__(self, claims=None):
+        self.claims = claims or OIDCClaims(
+            issuer="https://identity.example.test",
+            subject="remote-subject",
+            username="oidc-reader",
+            display_name="OIDC Reader",
+            email="reader@example.test",
+        )
+        self.transactions = {}
+        self.closed = False
+
+    async def begin(self, settings, *, purpose, next_path, expected_user_id):
+        index = len(self.transactions) + 1
+        state = f"state-{index}"
+        start = OIDCStart(
+            authorization_url=f"https://identity.example.test/authorize?state={state}",
+            state=state,
+            browser_token=f"browser-{index}",
+            nonce=f"nonce-{index}",
+            pkce_verifier=f"verifier-{index}",
+            expires_at=2_000_000_000,
+        )
+        self.transactions[state] = OIDCTransactionRecord(
+            id=f"transaction-{index}",
+            purpose=purpose,
+            expected_user_id=expected_user_id,
+            next_path=next_path,
+            config_revision=settings["config_revision"],
+            nonce=start.nonce,
+            pkce_verifier=start.pkce_verifier,
+            issuer=None,
+            subject=None,
+            username_claim=None,
+            display_name=None,
+            email=None,
+            expires_at=start.expires_at,
+            created_at=1_999_999_000,
+        )
+        return start
+
+    async def complete(
+        self,
+        settings,
+        *,
+        state,
+        browser_token,
+        code=None,
+        error=None,
+        error_description=None,
+    ):
+        transaction = self.transactions.pop(state, None)
+        expected_browser = state.replace("state-", "browser-")
+        if transaction is None or browser_token != expected_browser:
+            raise OIDCError("invalid_callback")
+        if error:
+            raise OIDCError("provider_denied")
+        if code != "provider-code":
+            raise OIDCError("invalid_callback")
+        return OIDCCompletion(transaction=transaction, claims=self.claims)
+
+    async def aclose(self):
+        self.closed = True
+
+
+def _enable_oidc(store, *, auto_create_users=False, allow_member_password_login=True):
+    return store.replace_oidc_settings(
+        enabled=True,
+        provider_name="Company SSO",
+        issuer_url="https://identity.example.test",
+        client_id="epub-browser",
+        client_secret="client-secret",
+        redirect_uri="https://testserver/auth/oidc/callback",
+        scopes=("openid", "profile", "email"),
+        username_claim="preferred_username",
+        auto_create_users=auto_create_users,
+        allow_member_password_login=allow_member_password_login,
     )
 
 
@@ -721,6 +807,265 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(self.client.get("/assets/reader.js").status_code, 403)
         self.assertEqual(self.client.get("/assets/auth.js").status_code, 200)
         self.assertEqual(self.client.get("/api/library-events").status_code, 401)
+
+    def test_oidc_start_is_not_available_while_provider_is_disabled(self):
+        unavailable = self.client.get("/auth/oidc/start")
+
+        self.assertEqual(unavailable.status_code, 404)
+        self.assertEqual(unavailable.headers["cache-control"], "no-store")
+        self.assertNotIn("identity.example", unavailable.text)
+
+    def test_oidc_linked_login_issues_local_session(self):
+        _enable_oidc(self.store)
+        member = self.store.create_user("oidc-reader", hash_password("local-secret"))
+        self.store.link_oidc_identity(
+            member.user_id,
+            issuer="https://identity.example.test",
+            subject="remote-subject",
+            username_claim="oidc-reader",
+            display_name="OIDC Reader",
+            email="reader@example.test",
+        )
+        oidc_service = _ScriptedOIDCService()
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=oidc_service,
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            started = client.get("/auth/oidc/start?next=%2Faccount")
+            self.assertEqual(started.status_code, 307)
+            self.assertEqual(
+                started.headers["location"],
+                "https://identity.example.test/authorize?state=state-1",
+            )
+            self.assertIn("epub_browser_oidc=browser-1", started.headers["set-cookie"])
+            self.assertIn("HttpOnly", started.headers["set-cookie"])
+            self.assertIn("SameSite=lax", started.headers["set-cookie"])
+
+            callback = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            self.assertEqual(callback.status_code, 303)
+            self.assertEqual(callback.headers["location"], "/account")
+            self.assertEqual(callback.headers["cache-control"], "no-store")
+            self.assertNotIn("browser-1", callback.headers.get("set-cookie", ""))
+            session = client.get("/api/session")
+            self.assertEqual(session.status_code, 200)
+            self.assertEqual(session.json()["user"]["username"], "oidc-reader")
+            self.assertEqual(session.json()["user"]["role"], "member")
+
+            replay = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            self.assertEqual(replay.status_code, 400)
+            self.assertEqual(replay.headers["cache-control"], "no-store")
+        self.assertTrue(oidc_service.closed)
+
+    def test_oidc_login_can_automatically_provision_a_passwordless_member(self):
+        _enable_oidc(self.store, auto_create_users=True)
+        oidc_service = _ScriptedOIDCService()
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=oidc_service,
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            client.get("/auth/oidc/start")
+            callback = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            self.assertEqual(callback.status_code, 303)
+            session = client.get("/api/session").json()
+
+        self.assertEqual(session["user"]["username"], "oidc-reader")
+        self.assertEqual(session["user"]["role"], "member")
+        user = self.store.get_user_by_username("oidc-reader")
+        self.assertIsNone(user.password_hash)
+        self.assertEqual(len(self.store.list_oidc_identities(user.user_id)), 1)
+
+    def test_unknown_oidc_identity_can_bind_an_existing_user_with_password_proof(self):
+        _enable_oidc(self.store, auto_create_users=False)
+        member = self.store.create_user("existing-reader", hash_password("member-secret"))
+        oidc_service = _ScriptedOIDCService()
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=oidc_service,
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            client.get("/auth/oidc/start?next=%2Fbook%2Fid%2Fchapter_0.html")
+            callback = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            self.assertEqual(callback.status_code, 303)
+            self.assertTrue(
+                callback.headers["location"].startswith("/auth/oidc/associate?token=")
+            )
+            form = client.get(callback.headers["location"])
+            self.assertEqual(form.status_code, 200)
+            self.assertIn('id="associationForm"', form.text)
+            nonce_match = re.search(r'name="auth_nonce" value="([^"]+)"', form.text)
+            token_match = re.search(r'name="token" value="([^"]+)"', form.text)
+            self.assertIsNotNone(nonce_match)
+            self.assertIsNotNone(token_match)
+
+            associated = client.post(
+                "/auth/oidc/associate",
+                data={
+                    "token": token_match.group(1),
+                    "auth_nonce": nonce_match.group(1),
+                    "username": "existing-reader",
+                    "password": "member-secret",
+                },
+                headers={
+                    "Origin": "http://testserver",
+                    "Sec-Fetch-Site": "same-origin",
+                },
+            )
+            self.assertEqual(associated.status_code, 303)
+            self.assertEqual(
+                associated.headers["location"],
+                "/book/id/chapter_0.html",
+            )
+            self.assertEqual(
+                client.get("/api/session").json()["user"]["username"],
+                "existing-reader",
+            )
+
+        identities = self.store.list_oidc_identities(member.user_id)
+        self.assertEqual(len(identities), 1)
+        self.assertEqual(identities[0].subject, "remote-subject")
+
+    def test_oidc_association_password_failures_use_login_throttling(self):
+        _enable_oidc(self.store, auto_create_users=False)
+        self.store.create_user("existing-reader", hash_password("member-secret"))
+        oidc_service = _ScriptedOIDCService()
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=oidc_service,
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            client.get("/auth/oidc/start")
+            callback = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            form_url = callback.headers["location"]
+            statuses = []
+            for _ in range(5):
+                form = client.get(form_url)
+                nonce = re.search(r'name="auth_nonce" value="([^"]+)"', form.text).group(1)
+                token = re.search(r'name="token" value="([^"]+)"', form.text).group(1)
+                failed = client.post(
+                    "/auth/oidc/associate",
+                    data={
+                        "token": token,
+                        "auth_nonce": nonce,
+                        "username": "existing-reader",
+                        "password": "wrong",
+                    },
+                    headers={
+                        "Origin": "http://testserver",
+                        "Sec-Fetch-Site": "same-origin",
+                    },
+                )
+                statuses.append(failed.status_code)
+            self.assertEqual(statuses[:4], [401, 401, 401, 401])
+            self.assertEqual(statuses[-1], 429)
+
+    def test_disabled_oidc_identity_is_denied_without_creating_a_replacement(self):
+        _enable_oidc(self.store, auto_create_users=True)
+        member = self.store.create_user("disabled-reader", None)
+        self.store.link_oidc_identity(
+            member.user_id,
+            issuer="https://identity.example.test",
+            subject="remote-subject",
+            username_claim="disabled-reader",
+            display_name="Disabled Reader",
+            email=None,
+        )
+        self.store.set_user_enabled(member.user_id, False)
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=_ScriptedOIDCService(),
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            client.get("/auth/oidc/start")
+            denied = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            self.assertEqual(denied.status_code, 403)
+            self.assertEqual(client.get("/api/session").status_code, 401)
+        self.assertIsNone(self.store.get_user_by_username("oidc-reader"))
+
+    def test_oidc_provider_errors_and_unsafe_return_paths_are_generic(self):
+        _enable_oidc(self.store)
+        oidc_service = _ScriptedOIDCService()
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=oidc_service,
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            client.get("/auth/oidc/start?next=https%3A%2F%2Fevil.example")
+            denied = client.get(
+                "/auth/oidc/callback?state=state-1&error=access_denied"
+                "&error_description=client-secret-do-not-leak"
+            )
+            self.assertEqual(denied.status_code, 400)
+            self.assertEqual(denied.headers["cache-control"], "no-store")
+            self.assertNotIn("client-secret-do-not-leak", denied.text)
+            self.assertNotIn("access_denied", denied.text)
+
+        linked = self.store.create_user("oidc-reader", None)
+        self.store.link_oidc_identity(
+            linked.user_id,
+            issuer="https://identity.example.test",
+            subject="remote-subject",
+            username_claim="oidc-reader",
+            display_name="OIDC Reader",
+            email=None,
+        )
+        second_service = _ScriptedOIDCService()
+        second_app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=second_service,
+        )
+        with TestClient(second_app, follow_redirects=False) as client:
+            client.get("/auth/oidc/start?next=%2F%2Fevil.example")
+            completed = client.get(
+                "/auth/oidc/callback?state=state-1&code=provider-code"
+            )
+            self.assertEqual(completed.headers["location"], "/")
+
+    def test_member_password_login_can_be_disabled_without_blocking_admin(self):
+        _enable_oidc(self.store, allow_member_password_login=False)
+        self.store.create_user("member", hash_password("member-secret"))
+        app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=self.auth_service,
+            oidc_service=_ScriptedOIDCService(),
+        )
+        with TestClient(app, follow_redirects=False) as client:
+            member_login = _json_login(self, client, "member", "member-secret")
+            self.assertEqual(member_login.status_code, 401)
+            admin_login = _json_login(self, client, "alice", "secret")
+            self.assertEqual(admin_login.status_code, 200)
+            self.assertEqual(
+                client.get("/api/session").json()["user"]["role"],
+                "admin",
+            )
 
     def test_health_and_readiness_are_public_after_setup(self):
         health = self.client.get(

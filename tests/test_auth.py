@@ -151,6 +151,28 @@ class SessionAndProxyTests(unittest.TestCase):
 
         self.assertIsNone(self.service.principal_from_session(token))
 
+    def test_member_local_login_policy_keeps_admin_fallback_and_association_proof(self):
+        admin = self.store.get_user_by_username("owner").principal
+        member = self._principal("member", "member-secret")
+
+        self.assertIsNone(
+            self.service.authenticate_password(
+                "member", "member-secret", "member-client", allow_member=False
+            )
+        )
+        self.assertEqual(
+            self.service.authenticate_password(
+                "owner", "secret", "admin-client", allow_member=False
+            ),
+            admin,
+        )
+        self.assertEqual(
+            self.service.authenticate_password(
+                "member", "member-secret", "association-client", allow_member=True
+            ),
+            member,
+        )
+
     def test_csrf_token_is_bound_to_both_principal_and_session(self):
         alice = self._principal("alice")
         bob = self._principal("bob")

@@ -208,6 +208,13 @@ class ModeIntegrationTests(unittest.TestCase):
 
         for forbidden in ("data", "cache", "epub-browser.db", "migration-state.json"):
             self.assertFalse((ssg_output / forbidden).exists())
+        static_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in ssg_output.rglob("*")
+            if path.is_file() and path.suffix in {".html", ".js", ".css", ".json"}
+        )
+        self.assertNotIn("/auth/oidc", static_text)
+        self.assertNotIn("epub_browser_oidc", static_text)
         for public_artifact in ("index.html", "book-metadata.json", "assets", "book", "sw.js"):
             self.assertFalse((server_dir / public_artifact).exists())
         self.assertTrue((server_dir / "data" / "epub-browser.db").is_file())
