@@ -1039,6 +1039,16 @@
             return null;
         },
 
+        hasPendingPdfAnnotationContent: function() {
+            if (!global.EpubPDFConfig) return false;
+            var pages = this.getContentRoot().querySelectorAll('[data-pdf-page-number]');
+            for (var i = 0; i < pages.length; i++) {
+                var state = pages[i].getAttribute('data-pdf-rendered');
+                if (state !== 'complete' && state !== 'error') return true;
+            }
+            return false;
+        },
+
         pdfPageForNode: function(node) {
             var current = node;
             while (current) {
@@ -2067,6 +2077,7 @@
                     }
                 });
                 if (!failedToRestore) return;
+                if (self.hasPendingPdfAnnotationContent()) return;
                 if (!isRetry) {
                     requestAnimationFrame(function() {
                         requestAnimationFrame(function() {

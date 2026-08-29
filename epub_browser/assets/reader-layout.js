@@ -56,6 +56,29 @@
         return value !== 'false';
     }
 
+    function applyDesktopToolbarAutoHide(documentObject, enabled) {
+        var active = Boolean(enabled);
+        if (documentObject && documentObject.body && documentObject.body.classList) {
+            documentObject.body.classList.toggle('desktop-toolbar-auto-hide', active);
+        }
+        return active;
+    }
+
+    function applyDesktopChapterSidebarAutoHide(documentObject, sidebarVisible, enabled) {
+        var active = Boolean(sidebarVisible && enabled);
+        if (documentObject && documentObject.body && documentObject.body.classList) {
+            documentObject.body.classList.toggle('desktop-chapter-sidebar-auto-hide', active);
+        }
+        var toggle = documentObject && typeof documentObject.getElementById === 'function'
+            ? documentObject.getElementById('autoHideDesktopChapterSidebarToggle')
+            : null;
+        if (toggle) {
+            toggle.disabled = !sidebarVisible;
+            toggle.setAttribute('aria-disabled', sidebarVisible ? 'false' : 'true');
+        }
+        return active;
+    }
+
     function chapterNavigationPresentation(item, pdf, translate) {
         item = item || {};
         var outlineLabels = Array.isArray(item.outline_labels)
@@ -352,6 +375,8 @@
     return {
         PAGE_WIDTHS: PAGE_WIDTHS,
         allowsReaderNavigationEvent: allowsReaderNavigationEvent,
+        applyDesktopChapterSidebarAutoHide: applyDesktopChapterSidebarAutoHide,
+        applyDesktopToolbarAutoHide: applyDesktopToolbarAutoHide,
         applyPageWidth: applyPageWidth,
         chapterNavigationPresentation: chapterNavigationPresentation,
         continuousChapterPresentation: continuousChapterPresentation,

@@ -92,6 +92,7 @@ function loadAnnotationWindow(response, mode = 'server', documentOverride, optio
     source = source.replace(
       /\}\)\(window\);\s*$/,
       'window.__testHighlightInteraction = HighlightInteraction;\n' +
+      'window.__testAnnotationStorageManager = StorageManager;\n' +
       'window.__testAnnotationSettings = Settings;\n' +
       'window.__testAnnotationConfig = CONFIG;\n' +
       '})(window);',
@@ -279,6 +280,71 @@ test('annotation refreshes through the format-neutral content-ready event once',
   });
 
   assert.equal(refreshes, 1);
+});
+
+test('PDF annotation restoration failure waits until its text layer settles', async () => {
+  let renderState = 'pending';
+  const page = {
+    getAttribute(name) {
+      if (name === 'data-pdf-page-number') return '3';
+      if (name === 'data-pdf-rendered') return renderState;
+      return null;
+    },
+  };
+  const contentRoot = {
+    querySelectorAll(selector) {
+      if (selector === '[data-pdf-page-number]') return [page];
+      return [];
+    },
+  };
+  const document = {
+    cookie: '',
+    documentElement: contentRoot,
+    getElementById(id) { return id === 'eb-content' ? contentRoot : null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  function Highlighter() {
+    this.on = () => {};
+    this.run = () => {};
+    this.stop = () => {};
+    this.removeAll = () => {};
+  }
+  Highlighter.event = { CREATE: 'create', CLICK: 'click' };
+  const annotation = {
+    id: 'pdf-highlight',
+    book_hash: 'demo',
+    chapter_index: 2,
+    text: 'Alice',
+    startMeta: { parentTagName: 'SPAN', parentIndex: 0, textOffset: 0 },
+    endMeta: { parentTagName: 'SPAN', parentIndex: 0, textOffset: 5 },
+  };
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [annotation] }) },
+    'server',
+    document,
+    { Highlighter, exposeHighlightInteraction: true },
+  );
+  const notifications = [];
+  window.showNotification = (message, type) => notifications.push({ message, type });
+  window.EpubPDFConfig = {};
+  const interaction = window.__testHighlightInteraction;
+  await window.__testAnnotationStorageManager.init();
+  interaction.init();
+  interaction.renderHighlight = () => false;
+
+  await interaction.setContext('demo', 2);
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(notifications, []);
+
+  renderState = 'complete';
+  await interaction.setContext('demo', 2);
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(notifications, [
+    { message: 'annotations.restoreFailed', type: 'error' },
+  ]);
 });
 
 test('PDF deep-link focus waits for a late text-layer annotation instead of reporting failure', async () => {

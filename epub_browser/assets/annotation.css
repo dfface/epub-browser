@@ -695,7 +695,8 @@
 .color-info-tip,
 .color-tip-default,
 .color-tip-reorder,
-.continuous-scroll-tip {
+.continuous-scroll-tip,
+.settings-info-tip {
     cursor: help;
     color: var(--text-secondary);
     font-size: 0.8rem;
@@ -709,8 +710,28 @@
 .color-info-tip:hover,
 .color-tip-default:hover,
 .color-tip-reorder:hover,
-.continuous-scroll-tip:hover {
+.continuous-scroll-tip:hover,
+.continuous-scroll-tip:focus-visible,
+.settings-info-tip:hover,
+.settings-info-tip:focus-visible {
     opacity: 1;
+}
+
+.settings-info-tip {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+}
+
+.settings-info-tip:focus-visible,
+.continuous-scroll-tip:focus-visible {
+    outline: 2px solid var(--button-bg);
+    outline-offset: 2px;
 }
 
 .color-tip-default:hover::after,
@@ -749,7 +770,7 @@
     content: attr(data-tooltip);
 }
 
-.continuous-scroll-tooltip {
+.settings-info-tooltip {
     position: fixed;
     background: var(--text);
     color: var(--background);
@@ -767,7 +788,7 @@
     pointer-events: none;
 }
 
-.continuous-scroll-tooltip::after {
+.settings-info-tooltip::after {
     content: '';
     position: absolute;
     top: 100%;

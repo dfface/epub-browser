@@ -459,13 +459,12 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'\.admin-books-table-scroll\s*\{[^}]*overflow-x:\s*auto;',
         )
 
-    def test_shared_server_chrome_clips_accessibility_text_without_removing_it(self):
-        server_html = self._server_html()
-        stylesheet = Path('epub_browser/assets/account.css').read_text(
+    def test_shared_locale_navigation_clips_accessibility_text_without_removing_it(self):
+        stylesheet = Path('epub_browser/assets/breadcrumb.css').read_text(
             encoding='utf-8'
         )
 
-        rule_start = stylesheet.find('.app-nav-locale .sr-only,')
+        rule_start = stylesheet.find('.app-nav-locale .sr-only {')
         self.assertNotEqual(rule_start, -1)
         hidden_rule = stylesheet[rule_start:stylesheet.index('}', rule_start)]
         for declaration in (
@@ -479,11 +478,21 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn(declaration, hidden_rule)
         self.assertNotIn('display: none', hidden_rule)
         self.assertNotIn('visibility: hidden', hidden_rule)
-        self.assertRegex(
-            server_html,
-            r'<span\b(?=[^>]*id=(?:["\'])?localeCurrentLabel)'
-            r'(?=[^>]*class=(?:["\'])?sr-only)',
-        )
+        for surface, html in (
+            ('book', self._book_html()),
+            ('chapter', self._chapter_html()),
+        ):
+            with self.subTest(surface=surface):
+                self.assertRegex(
+                    html,
+                    r'<span\b(?=[^>]*id=(?:["\'])?localeCurrentLabel)'
+                    r'(?=[^>]*class=(?:["\'])?sr-only)',
+                )
+                self.assertRegex(
+                    html,
+                    r'<select\b(?=[^>]*id=(?:["\'])?localeSelect)'
+                    r'(?=[^>]*class=(?:["\'])?sr-only)',
+                )
 
     def test_server_account_chrome_has_accessible_oidc_account_and_admin_surfaces(self):
         server_html = self._server_html()
@@ -2798,21 +2807,43 @@ assert.deepEqual(
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-info', html)
 
-    def test_locale_selector_uses_the_shared_library_navigation_asset(self):
-        library = self._library_html()
-        self.assertEqual(len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', library)), 1)
-        breadcrumb = library[library.index('<nav'):library.index('</nav>')]
-        self.assertRegex(breadcrumb, r'\bid=(?:["\'])?localeToggle(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\baria-haspopup=(?:["\'])?menu(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\baria-expanded=(?:["\'])?false(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-CN(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?zh-TW(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?ko(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?ja(?:["\' >])')
-        self.assertRegex(breadcrumb, r'\bvalue=(?:["\'])?en(?:["\' >])')
-        self.assertNotRegex(self._book_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
-        self.assertNotRegex(self._chapter_html(), r'\bid=(?:["\'])?localeSelect(?:["\' >])')
-        self.assertRegex(library, r'/assets/immutable/locale-nav\.[0-9a-f]{12}\.js')
+    def test_ssg_pages_share_the_locale_navigation_control(self):
+        for surface, page in (
+            ('library', self._library_html()),
+            ('book', self._book_html()),
+            ('chapter', self._chapter_html()),
+        ):
+            with self.subTest(surface=surface):
+                self.assertEqual(
+                    len(re.findall(r'\bid=(?:["\'])?localeSelect(?:["\' >])', page)),
+                    1,
+                )
+                navigation = next(
+                    nav
+                    for nav in re.findall(r'<nav\b[^>]*>.*?</nav>', page, re.S)
+                    if 'app-nav-actions' in nav
+                )
+                self.assertRegex(
+                    navigation,
+                    r'\bid=(?:["\'])?localeToggle(?:["\' >])',
+                )
+                self.assertRegex(
+                    navigation,
+                    r'\baria-haspopup=(?:["\'])?menu(?:["\' >])',
+                )
+                self.assertRegex(
+                    navigation,
+                    r'\baria-expanded=(?:["\'])?false(?:["\' >])',
+                )
+                for locale in ('en', 'zh-CN', 'zh-TW', 'ko', 'ja'):
+                    self.assertRegex(
+                        navigation,
+                        rf'\bvalue=(?:["\'])?{locale}(?:["\' >])',
+                    )
+                self.assertRegex(
+                    page,
+                    r'/assets/immutable/locale-nav\.[0-9a-f]{12}\.js',
+                )
 
     def test_locale_action_is_a_compact_icon_control(self):
         library = self._library_html()
@@ -3004,6 +3035,12 @@ assert.deepEqual(
             r'\.toc-floating\s*\{[^}]*position:\s*fixed;',
         )
         self.assertIn('body.desktop-chapter-sidebar #bookHomeFloating {', chapter_css)
+        persistent_sidebar = chapter_css[
+            chapter_css.index('body.desktop-chapter-sidebar #bookHomeFloating {'):
+            chapter_css.index('}', chapter_css.index('body.desktop-chapter-sidebar #bookHomeFloating {'))
+        ]
+        self.assertIn('box-shadow: var(--shadow-md);', persistent_sidebar)
+        self.assertNotIn('var(--text)', persistent_sidebar)
         self.assertNotRegex(
             chapter_css,
             r'body\.desktop-chapter-sidebar[^\{]*\.container\s*\{',
@@ -3011,6 +3048,88 @@ assert.deepEqual(
         self.assertNotRegex(
             ai_chat_css,
             r'body\.ai-chat-open\.desktop-chapter-sidebar[^\{]*\.container\s*\{',
+        )
+
+    def test_reader_settings_group_desktop_layout_preferences(self):
+        chapter = self._chapter_html()
+        desktop_layout = re.search(
+            r'<fieldset\b[^>]*class="[^"]*desktop-layout-settings[^"]*"[^>]*>(.*?)</fieldset>',
+            chapter,
+            re.S,
+        )
+
+        self.assertIsNotNone(desktop_layout)
+        markup = desktop_layout.group(1)
+        self.assertIn('data-i18n="settings.desktopLayout"', markup)
+        self.assertIn('id="desktopChapterSidebarToggle"', markup)
+        self.assertIn('data-i18n="settings.desktopChapterSidebar"', markup)
+        self.assertIn('id="autoHideDesktopChapterSidebarToggle"', markup)
+        self.assertIn('data-i18n="settings.autoHideDesktopChapterSidebar"', markup)
+        self.assertIn('id="autoHideDesktopToolbarToggle"', markup)
+        self.assertIn('data-i18n="settings.autoHideDesktopToolbar"', markup)
+        self.assertNotIn('class="settings-section-description desktop-layout-help', markup)
+        self.assertEqual(markup.count('class="settings-info-tip"'), 2)
+        for help_key in (
+            'settings.autoHideDesktopChapterSidebarHelp',
+            'settings.autoHideDesktopToolbarHelp',
+        ):
+            self.assertIn(f'data-i18n-data-tip="{help_key}"', markup)
+            self.assertIn(f'data-i18n-aria-label="{help_key}"', markup)
+        self.assertEqual(markup.count('type="button" class="settings-info-tip"'), 2)
+
+        chapter_css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
+        self.assertIn('body.desktop-toolbar-auto-hide:not(.reader-drawer-open)', chapter_css)
+        self.assertIn('right: var(--reader-edge-peek);', chapter_css)
+        self.assertIn('.reader-toolbar.top-controls:hover', chapter_css)
+        self.assertIn('.reader-toolbar.top-controls:focus-within', chapter_css)
+        self.assertIn('(hover: hover) and (pointer: fine)', chapter_css)
+        self.assertIn('@media (prefers-reduced-motion: reduce)', chapter_css)
+
+        sidebar_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        self.assertIn('body.desktop-chapter-sidebar-auto-hide #bookHomeFloating', sidebar_css)
+        self.assertIn(
+            'transform: translateX(calc(-100% + var(--reader-edge-peek)));',
+            sidebar_css,
+        )
+        self.assertIn('opacity: .58;', sidebar_css)
+        self.assertIn('#bookHomeFloating:hover', sidebar_css)
+        self.assertIn('#bookHomeFloating:focus-within', sidebar_css)
+
+        theme_css = Path('epub_browser/assets/theme.css').read_text(encoding='utf-8')
+        self.assertIn('--reader-edge-peek: 14px;', theme_css)
+
+        annotation_css = Path('epub_browser/assets/annotation.css').read_text(encoding='utf-8')
+        self.assertIn('.settings-info-tip', annotation_css)
+        self.assertIn('.settings-info-tip:focus-visible', annotation_css)
+
+        chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        self.assertIn("querySelectorAll('[data-settings-tip]')", chapter_js)
+        self.assertIn("addEventListener('focus'", chapter_js)
+        self.assertIn("addEventListener('blur'", chapter_js)
+
+    def test_ai_chat_reuses_shared_chapter_sidebar_edge_reveal(self):
+        chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
+        ai_chat_css = Path('epub_browser/assets/ai-chat.css').read_text(encoding='utf-8')
+        shared_rule = re.search(
+            r'body\.desktop-chapter-sidebar-auto-hide #bookHomeFloating,\s*'
+            r'body\.ai-chat-open\.desktop-chapter-sidebar #bookHomeFloating\s*'
+            r'\{([^}]*)\}',
+            chapter_css,
+            re.S,
+        )
+
+        self.assertIsNotNone(shared_rule)
+        declarations = shared_rule.group(1)
+        self.assertIn('opacity: .58;', declarations)
+        self.assertIn(
+            'transform: translateX(calc(-100% + var(--reader-edge-peek)));',
+            declarations,
+        )
+        self.assertIn('transition-delay: 320ms;', declarations)
+        self.assertNotIn(':not(.ai-chat-fullscreen)', shared_rule.group(0))
+        self.assertNotRegex(
+            ai_chat_css,
+            r'body\.ai-chat-open\.desktop-chapter-sidebar[^\{]*#bookHomeFloating',
         )
 
     def test_reader_settings_use_the_same_glass_slide_in_drawer_language(self):
@@ -3406,7 +3525,7 @@ assert.deepEqual(
             )
             self.assertIn(f'data-i18n="{key}"', reading)
         self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
-        self.assertEqual(reading.count('class="switch-slider"'), 6)
+        self.assertEqual(reading.count('class="switch-slider"'), 8)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'
@@ -3421,8 +3540,8 @@ assert.deepEqual(
             self.assertRegex(html, r'/assets/immutable/reader-layout\.[0-9a-f]{12}\.js')
             self.assertNotIn('/api/', html)
             for server_only in (
-                'localeToggle', 'localeSelect', 'accountMenu', 'accountPanel',
-                'adminMenu', 'adminPanel', 'auth.js', 'account.css', 'locale-nav.js',
+                'accountMenu', 'accountPanel', 'adminMenu', 'adminPanel',
+                'auth.js', 'account.css',
             ):
                 self.assertNotIn(server_only, html)
 
