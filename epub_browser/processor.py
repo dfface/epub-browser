@@ -3220,9 +3220,9 @@ document.addEventListener('DOMContentLoaded', function() {{
             <i class="fas fa-list"></i>
             <span data-i18n="reader.thisChapterContents">This chapter</span>
         </button>
-        <button class="control-btn" id="mobilePageJumpBtn" type="button" aria-label="Jump" title="Jump" data-i18n-aria-label="reader.jump" data-i18n-title="reader.jump">
-            <i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>
-            <span data-i18n="reader.jump">Jump</span>
+        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
+            <i class="fas fa-book"></i>
+            <span data-i18n="reader.bookChapters">Chapters</span>
         </button>
         {pdf_mobile_controls}
         {mobile_ai_reading_button}
@@ -3235,9 +3235,9 @@ document.addEventListener('DOMContentLoaded', function() {{
             </div>
         </a>
         {next_link_mobile}
-        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
-            <i class="fas fa-book"></i>
-            <span data-i18n="reader.bookChapters">Chapters</span>
+        <button class="control-btn" id="mobilePageJumpBtn" type="button" aria-label="Jump" title="Jump" data-i18n-aria-label="reader.jump" data-i18n-title="reader.jump">
+            <i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>
+            <span data-i18n="reader.jump">Jump</span>
         </button>
         <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" title="Settings" data-i18n-aria-label="reader.settings" data-i18n-title="reader.settings" aria-controls="settingsModal" aria-expanded="false">
             <i class="fas fa-cog"></i>
