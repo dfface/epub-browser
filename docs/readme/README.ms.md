@@ -27,18 +27,22 @@ PDF ialah format buku kelas pertama: halaman 1 menjadi `chapter_0.html`, setiap 
 
 Gunakan `ssg` untuk menerbitkan fail statik biasa. Gunakan `server` apabila anda memerlukan akaun, data merentas peranti, kawalan akses buku atau pemantauan sumber secara automatik.
 
-## Demo
+## Gambaran keseluruhan
+
+### Demo
 
 - **Mod SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Mod Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — nama pengguna dan kata laluan: `demo`.
 
-## Membaca natif dengan AI (Server sahaja)
+### Membaca natif dengan AI (Server sahaja)
 
 Pembacaan AI membina lapisan pembelajaran bersama yang boleh disemak terus pada teks asal, bukan meletakkan ringkasan umum di sebelah buku. Ia merangkumi laluan sebelum membaca, gambaran keseluruhan bab apabila diperlukan, penerangan yang dipautkan kepada petikan, nota tentang peranan perenggan, penjelasan kosa kata, penerangan ringkas di penghujung dan soalan untuk pemikiran lanjut.
 
 Hasil dijana sebagai tugas latar belakang, disimpan dalam SQLite dan dikongsi oleh pembaca yang boleh mengakses buku tersebut. Perbualan susulan kekal peribadi bagi setiap akaun. Pentadbir perlu mengkonfigurasi penyedia yang serasi dengan OpenAI dan memberi kebenaran kepada setiap ahli. Teks EPUB yang dipilih dihantar kepada penyedia itu, jadi aktifkan ciri ini hanya dengan persetujuan pembaca. Output SSG tidak pernah mengandungi akaun, kawalan AI, tugas atau konfigurasi penyedia.
 
-## Keperluan dan pemasangan
+## Bermula
+
+### Keperluan dan pemasangan
 
 - Python 3.9 atau lebih baharu
 - Satu atau lebih fail `.epub` atau `.pdf`, direktori buku bersarang atau perpustakaan gaya Calibre
@@ -60,9 +64,9 @@ Untuk Server berterusan dengan Docker, gunakan imej yang diterbitkan; hos tidak 
 docker pull dfface/epub-browser:latest
 ```
 
-## Mula pantas
+### Mula pantas
 
-### Jana laman statik
+#### Jana laman statik
 
 ```bash
 epub-browser ssg /path/to/books \
@@ -71,7 +75,7 @@ epub-browser ssg /path/to/books \
 
 Sediakan `dist/` melalui HTTP; jangan buka halaman yang dijana secara terus menggunakan `file://`. Untuk penggunaan di bawah sublaluan, tambah `--base-path /repositori-saya/`; pilihan ini mengubah URL yang dijana, bukan direktori output.
 
-### Jalankan perpustakaan Server berterusan
+#### Jalankan perpustakaan Server berterusan
 
 ```bash
 epub-browser server /path/to/books \
@@ -81,18 +85,22 @@ epub-browser server /path/to/books \
 
 Buka `http://127.0.0.1:8000/`. Pada lawatan pertama, cipta pentadbir awal; perpustakaan tidak akan diimbas atau diterbitkan sebelum persediaan selesai. `--no-browser` hanya menghalang perkhidmatan daripada membuka pelayar setempat secara automatik.
 
-## Data, akaun dan sempadan akses
+## Data dan operasi
+
+### Data, akaun dan sempadan akses
 
 Setiap buku mempunyai `book_id` yang stabil. Secara lalai, `--book-id-storage sidecar` menyimpan identiti di sebelah fail sumber tanpa mengubah baitnya. Untuk EPUB, `--book-id-storage embedded` menulisnya ke metadata OPF; untuk PDF tetapan ini sentiasa kembali kepada sidecar bersebelahan.
 
 Dalam mod Server, `--server-dir` ialah lokasi berwibawa bagi SQLite, cache dan sandaran migrasi. Akaun, rak buku, kemajuan membaca, anotasi, hasil AI dan tugas juga disimpan di situ. Pentadbir mengurus pengguna, peranan, sesi dan kebenaran buku; ahli hanya menggunakan buku yang dibenarkan dan data peribadi mereka sendiri. Lindungi kebenaran direktori ini serta sandarannya.
 
-## Docker, proksi songsang dan dokumentasi penuh
+### Docker, proksi songsang dan dokumentasi penuh
 
 Dalam kontena, lekapkan buku sebagai baca sahaja dan `--server-dir` pada volum berterusan. Terima pengepala proksi hanya daripada proksi yang dipercayai dan gunakan HTTPS bagi penggunaan awam.
 
 Untuk Docker Compose, semua pilihan CLI, migrasi, LAN, proksi songsang dan penyelesaian masalah, lihat [README penuh dalam bahasa Inggeris](../../README.md) atau [README penuh dalam bahasa Cina Ringkas](README.zh-CN.md). Tingkah laku kedua-dua mod adalah sama dalam semua bahasa.
 
-## Sumbangan dan lesen
+## Pembangunan dan lesen
+
+### Sumbangan dan lesen
 
 Issues dan Pull Requests dialu-alukan. Lihat [License.txt](../../License.txt) untuk lesen.

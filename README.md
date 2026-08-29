@@ -25,24 +25,32 @@ inside the existing reading experience.
 
 ## Contents
 
-- [Why EPUB Browser](#why-epub-browser)
-- [Choose SSG or Server](#choose-ssg-or-server)
-- [Live demos](#live-demos)
-- [AI-native reading](#ai-native-reading-server-only)
-- [Choose an installation](#choose-an-installation)
-- [Quick start](#quick-start)
-- [Sources and stable book identity](#sources-and-stable-book-identity)
-- [PDF reading: one page, one chapter](#pdf-reading-one-page-one-chapter)
-- [SSG mode](#ssg-mode)
-- [Server mode](#server-mode)
-- [Docker](#docker)
-- [Complete command reference](#complete-command-reference)
-- [Reading data and feature placement](#reading-data-and-feature-placement)
-- [OpenAPI and WebHooks](#server-api-and-webhooks)
-- [Development and contributing](#contributing)
-- [License](#license)
+- [Project overview](#project-overview)
+  - [Why EPUB Browser](#why-epub-browser)
+  - [Choose SSG or Server](#choose-ssg-or-server)
+  - [Live demos](#live-demos)
+  - [AI-native reading](#ai-native-reading-server-only)
+- [Get started](#get-started)
+  - [Choose an installation](#choose-an-installation)
+  - [Quick start](#quick-start)
+- [Formats and reading](#formats-and-reading)
+  - [Sources and stable book identity](#sources-and-stable-book-identity)
+  - [PDF: one page, one chapter](#pdf-one-page-one-chapter)
+- [Deployment](#deployment)
+  - [SSG](#ssg)
+  - [Server](#server)
+  - [Docker](#docker)
+- [Reference and operations](#reference-and-operations)
+  - [Command reference](#command-reference)
+  - [Reading data and feature placement](#reading-data-and-feature-placement)
+  - [Server API and WebHooks](#server-api-and-webhooks)
+  - [Data safety and troubleshooting](#data-safety-and-migration)
+- [Development and license](#development-and-license)
+- [Documentation hub](docs/README.md)
 
-## Why EPUB Browser
+## Project overview
+
+### Why EPUB Browser
 
 - **EPUB and PDF, one reader:** EPUB chapters and PDF pages use the same
   navigation, responsive layout, themes, fullscreen mode, search, bookshelf,
@@ -65,7 +73,7 @@ inside the existing reading experience.
   Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية,
   Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
 
-## Choose SSG or Server
+### Choose SSG or Server
 
 The same source processing and page templates power two explicit deployment
 modes. Choose by where reading data should live, not by book format:
@@ -85,68 +93,27 @@ modes. Choose by where reading data should live, not by book format:
 
 Use `ssg` when the result must be ordinary static files. Use `server` when readers need accounts, cross-device data, access control, or automatic source reconciliation.
 
-## Live demos
+### Live demos
 
 - **SSG mode**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Server mode**: [epub.yuhan.tech](https://epub.yuhan.tech/) — sign in with username `demo` and password `demo`.
 
-## AI-native reading (Server only)
+### AI-native reading (Server only)
 
-**Turn an EPUB library into a source-aware learning workspace.** AI reading is
-not a generic summary bolted beside a book. It builds a shared, reviewable
-learning layer *on the original chapter*: a reading route before the text,
-explanations exactly where evidence appears, a chapter mind map, and questions
-that help the reader carry the argument forward.
+For EPUB books, Server mode can add chapter guides, evidence-linked
+explanations, mind maps, reflective questions, and a private Ask AI drawer
+without taking the reader away from the original text. Results remain governed
+by book permissions; members must be explicitly authorized, and SSG contains
+none of the AI controls, jobs, account data, or provider configuration. PDF
+intentionally hides AI reading and Ask AI.
 
-![A chapter guide stays with the original text while Ask AI remains available in a private drawer.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-chapter-guide-ask-ai.png)
+See the [AI-native reading guide](docs/ai-native-reading.md) for the complete
+interaction model and the [local rich-text renderer notes](docs/third-party-ai-renderers.md)
+for the rendering and network-safety boundary.
 
-### Read with the text, not away from it
+## Get started
 
-- **Chapter guide and mind map**: Start with the chapter's central question,
-  key claims, and a Mermaid mind map. The map opens only when wanted, so the
-  book remains the primary surface.
-- **Evidence-aware AI annotations**: AI highlights precisely quoted sentences.
-  Select one to open a focused Markdown explanation below the passage rather
-  than losing your place in a detached report.
-- **Paragraph-role notes**: A compact, colour-coded `!` beside a paragraph
-  explains why that paragraph matters to the chapter's reasoning or story.
-- **Think further**: Finish with a small set of chapter-end prompts that turn
-  passive reading into reflection.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-inline-claim.png" alt="An AI explanation opens from a highlighted claim" width="48%">
-  <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-paragraph-note.png" alt="A paragraph-role note remains tied to its original text" width="48%">
-</p>
-
-### Ask AI, without losing the book
-
-The **Ask AI** drawer is a persistent private conversation for the current
-chapter or the whole book. It keeps the reader's own history, retains exact
-chapter scope, can use the book's shared learning layer as context, and renders
-safe Markdown, KaTeX mathematics, and Mermaid diagrams locally. It is designed
-for the moment a reader wants to challenge a claim, compare chapters, or follow
-a thread—without navigating away from the page.
-
-### Shared learning, governed by the library
-
-Generated chapter layers are shared by readers who can access the book, cached
-in SQLite, and processed as durable background tasks. The **AI readings** hub
-collects those results by book, chapter, language, generated time, template, and
-configuration version. Administrators can manage model access and results;
-members can only manage their own eligible output. Every AI capability respects
-the existing book-access rules.
-
-![The AI readings hub groups shared learning layers by book and chapter.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.2.0-ai-reading-library.png)
-
-AI reading is intentionally a **Server-mode feature**. Configure an
-OpenAI-compatible provider and explicitly grant member access before enabling
-it. SSG stays fully static and contains none of the AI controls, background
-jobs, account data, or provider configuration. See the
-[AI-native reading design](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/ai-native-reading.md) and
-[local rich-text renderer notes](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/third-party-ai-renderers.md) for the
-interaction model and safety boundary.
-
-## Choose an installation
+### Choose an installation
 
 EPUB Browser supports two installation paths. Both accept one or more `.epub`
 or `.pdf` files, nested directories, or a Calibre-style library directory.
@@ -156,7 +123,7 @@ or `.pdf` files, nested directories, or a Calibre-style library directory.
 | PyPI | SSG or Server mode | Python 3.9 or newer |
 | Docker | Persistent Server mode | Docker Engine; Python is included in the image |
 
-### PyPI (SSG or Server)
+#### PyPI (SSG or Server)
 
 Install the command-line application:
 
@@ -172,7 +139,7 @@ epub-browser ssg --help
 epub-browser server --help
 ```
 
-### Docker (Server)
+#### Docker (Server)
 
 The published [`dfface/epub-browser`](https://hub.docker.com/r/dfface/epub-browser)
 image runs Server mode and does not require Python on the host:
@@ -185,9 +152,9 @@ Use `latest` to evaluate the current release; pin a numbered release tag for a
 repeatable production deployment. See [Docker](#docker) for the required book
 and state mounts, a Compose quick start, first-run setup, and network guidance.
 
-## Quick start
+### Quick start
 
-### Generate a static site
+#### Generate a static site
 
 ```bash
 epub-browser ssg /path/to/books \
@@ -206,7 +173,7 @@ epub-browser ssg /path/to/books \
 
 `--base-path` changes generated URLs, not where files are written. With `/my-repository/`, links, icons, manifests, book metadata, and Service Worker entries all use that prefix while the files remain directly inside `dist/`.
 
-### Run a persistent Server library
+#### Run a persistent Server library
 
 ```bash
 epub-browser server /path/to/books \
@@ -219,7 +186,9 @@ Open `http://127.0.0.1:8000/`. On first access, EPUB Browser prompts you to crea
 If you chose Docker, skip the Python command above and continue with the
 [Docker Compose quick start](#docker-compose).
 
-## Sources and stable book identity
+## Formats and reading
+
+### Sources and stable book identity
 
 Every positional `SOURCE` may be an EPUB file, a PDF file, or a directory.
 Directories are searched recursively. Multiple sources can be passed to one command:
@@ -248,7 +217,7 @@ Embedded mode can rebuild the EPUB ZIP, so the source must be writable and safe 
 
 When migrating storage modes, the existing ID is copied to the selected carrier; the other valid carrier is retained. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB. For PDF, `--book-id-storage embedded` always falls back to the adjacent sidecar (for example, `BOOK.pdf.epub-browser.json`): a PDF is an immutable document and EPUB Browser cannot write an ID into its bytes. This fallback applies only to PDF; existing EPUB embedded/sidecar semantics are unchanged.
 
-## PDF reading: one page, one chapter
+### PDF: one page, one chapter
 
 PDF is supported by both deployment modes. The reader treats each PDF page as
 an ordinary EPUB Browser chapter, so the existing Book page, chapter
@@ -312,7 +281,9 @@ GLightbox dependency; Fancyapps/Fancybox is not a runtime or redistributed
 dependency. See [third_party/README.md](third_party/README.md) for the locked
 asset and release workflow.
 
-## SSG mode
+## Deployment
+
+### SSG
 
 SSG builds a complete snapshot in a sibling staging directory, validates it, and then replaces the destination. If any conversion fails, the previous destination remains unchanged. Generated output contains no Server database, migration state, account page, or runtime cache metadata.
 
@@ -326,9 +297,9 @@ SSG behavior is intentionally local and account-free:
 
 All required application JavaScript, CSS, fonts, and icons are included in the output. See [Self-contained and network behavior](#self-contained-and-network-behavior) for the only optional network request.
 
-## Server mode
+### Server
 
-### Initial setup, accounts, and permissions
+#### Initial setup, accounts, and permissions
 
 On a fresh persistent state directory, normal pages redirect to `/setup`. APIs, event streams, generated assets, and books return a setup-required response until the initial administrator is created. Complete setup over loopback or another trusted private path before exposing the port: the first successful setup submission claims the administrator account.
 
@@ -343,7 +314,7 @@ After setup:
 - Administrators can manage users, roles, passwords, sessions, and book grants.
 - Sessions use an HttpOnly cookie, CSRF protection, and a 30-day sliding lifetime.
 
-### Configure and govern AI reading
+#### Configure and govern AI reading
 
 Administrators configure AI reading in **Administration**, immediately after
 user management and before book management. The page stores an
@@ -378,7 +349,7 @@ The password file should be mode `0600`. EPUB Browser removes one trailing newli
 
 Environment equivalents are `EPUB_BROWSER_ADMIN_USERNAME` and `EPUB_BROWSER_ADMIN_PASSWORD_FILE`. `EPUB_BROWSER_ADMIN_PASSWORD` is a plaintext fallback only when no password file is configured. A CLI password-file path has priority over environment password sources.
 
-### Browser launch and logging
+#### Browser launch and logging
 
 By default, Server tries to open the operating system's default browser after the HTTP listener has started. `--no-browser` prevents that local launch. It **does not disable the web interface or browser access**; it only suppresses the local `webbrowser.open(...)` call. Use it for Docker, systemd, SSH sessions, headless machines, and scripts.
 
@@ -386,7 +357,7 @@ Without `--log`, the CLI avoids routine output so terminal progress displays are
 
 Initial and watch scans appear in the web interface rather than terminal `tqdm`. A successful summary closes automatically; failures stay visible until dismissed. With `--watch`, fixing or replacing a source starts another scan without a manual retry action.
 
-### Persistent and ephemeral state
+#### Persistent and ephemeral state
 
 Persistent Server mode requires `--server-dir`. For a disposable run, use `--ephemeral` instead:
 
@@ -415,7 +386,7 @@ Only `data/` is authoritative. `cache/` may be deleted and will be rebuilt. Pres
 
 Store persistent `data/epub-browser.db` on a local filesystem. Shared or network filesystems are unsupported for WAL concurrency. Verified backups remain under `data/backups/` and include all committed WAL data.
 
-### LAN and reverse proxy
+#### LAN and reverse proxy
 
 Server binds to `127.0.0.1:8000` by default. For a trusted LAN:
 
@@ -445,7 +416,7 @@ epub-browser server /path/to/books \
 
 Repeat `--trusted-proxy-cidr` once for each direct proxy address or network. Only requests whose direct peer belongs to one of these CIDRs can supply `X-Forwarded-For`; all other peers record only their direct address. Uvicorn forwarded-address processing is disabled, so `Forwarded` and `FORWARDED_ALLOW_IPS` cannot expand this trust boundary. Use `--cookie-secure` only when the browser reaches the service through HTTPS.
 
-## Docker
+### Docker
 
 The image runs persistent Server mode with these defaults:
 
@@ -469,7 +440,7 @@ docker run -d \
 
 Visit `http://127.0.0.1:8080/setup` before changing the port binding or proxy rules.
 
-### Docker Compose
+#### Docker Compose
 
 The repository includes a [docker-compose.yml](docker-compose.yml) for users who prefer Compose. From a checkout, create `Library/`, put EPUB or PDF books there, then run:
 
@@ -503,9 +474,11 @@ Mount `/app/SyncData:ro` only while importing legacy bookshelf JSON:
 
 The loopback published port in the examples keeps the container behind the host boundary. For remote access, use a TLS reverse proxy, configure its actual container-network CIDR, and add `--cookie-secure`.
 
-## Complete command reference
+## Reference and operations
 
-### `epub-browser ssg SOURCE [SOURCE ...]`
+### Command reference
+
+#### `epub-browser ssg SOURCE [SOURCE ...]`
 
 | Option | Meaning |
 | --- | --- |
@@ -514,7 +487,7 @@ The loopback published port in the examples keeps the container behind the host 
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
 | `--log` | Print conversion detail. Without it, routine output stays quiet. |
 
-### `epub-browser server SOURCE [SOURCE ...]`
+#### `epub-browser server SOURCE [SOURCE ...]`
 
 Exactly one of `--server-dir` and `--ephemeral` is required.
 
@@ -534,7 +507,7 @@ Exactly one of `--server-dir` and `--ephemeral` is required.
 | `--trusted-proxy-cidr CIDR` | Repeatable direct-proxy network trust boundary for safe `X-Forwarded-For` client-IP parsing. |
 | `--cookie-secure` | Send the session cookie only over browser-facing HTTPS. |
 
-### Legacy v1 syntax
+#### Legacy v1 syntax
 
 Legacy syntax is supported throughout the v2 major line:
 
@@ -547,7 +520,7 @@ Legacy syntax is supported throughout the v2 major line:
 
 Legacy-only `--keep-files` retains a temporary Server directory. Persistent Server directories are already permanent. With `--log`, the compatibility adapter prints the equivalent v2 command; otherwise it remains quiet.
 
-## Reading data and feature placement
+### Reading data and feature placement
 
 - Recursive EPUB/PDF and Calibre-library discovery, metadata tags, search, and pinyin search
 - Responsive Library, book detail, and chapter-reading interfaces
@@ -569,7 +542,7 @@ Legacy-only `--keep-files` retains a temporary Server directory. Persistent Serv
 
 Server does not offer a local/cloud storage selector: authenticated reading data is always stored on the Server. Detailed private reading-session history is never emitted by SSG. SSG never probes Server APIs and always uses the current browser origin's local storage.
 
-## Self-contained and network behavior
+### Self-contained and network behavior
 
 The application is self-contained for reading: required JavaScript, CSS, fonts, icons, manifests, and converted EPUB resources are served locally. There are no CDN runtime dependencies. Blocking outbound internet access does not prevent setup, login, browsing, reading, annotations, progress, bookshelf use, administration, or source conversion.
 
@@ -577,7 +550,7 @@ The footer may make an optional request to the GitHub Releases API to discover a
 
 SSG publishes a static Service Worker. Server deliberately disables and retires the origin-wide Service Worker so one account cannot receive another account's cached protected content.
 
-## Server API and WebHooks
+### Server API and WebHooks
 
 Server accounts can create scoped personal access tokens in Account settings. External clients use `Authorization: Bearer <PAT>` with the versioned `/api/v1/*` API; browser cookies do not authenticate these routes. The API covers visible books and chapter content, the token owner's bookshelf, progress, annotations and reviews, plus read-only cross-user data for administrator PATs with `admin:data:read`.
 
@@ -585,7 +558,7 @@ The OpenAPI 3.1 document is available at `/openapi.json`; signed-in users can br
 
 Administrators manage WebHook endpoints in Administration. Secrets are shown only on creation or rotation. Deliveries are signed, durable, retried for non-2xx responses, and book-review events contain IDs and action timestamps but never rating or review text.
 
-## Data safety and migration
+### Data safety and migration
 
 Before upgrading persistent Server installations, back up the source EPUB/PDF books and `<server-dir>/data`. Keep the same persistent state volume during container replacement.
 
@@ -595,33 +568,35 @@ A migrated root `epub-browser.db` or `annotations.db` is retained as a sensitive
 
 If both `epub-browser.db` and `annotations.db` exist at a legacy root, startup stops and leaves them untouched. See [Migrating to v2](docs/migration-v2.md) for backup, rollback, cache rebuilding, and conflict recovery.
 
-## Troubleshooting
+### Troubleshooting
 
-### The command started, but no browser opened
+#### The command started, but no browser opened
 
 Remove `--no-browser` when running on a graphical local machine, or open the printed/bound URL manually. In Docker, systemd, SSH, and non-interactive sessions, opening the URL yourself is expected.
 
-### The CLI appears quiet
+#### The CLI appears quiet
 
 Quiet operation is intentional without `--log`, especially in non-interactive environments. Add `--log` for operational and access detail. Server scan progress is shown in the web interface.
 
-### Docker cannot write a stable ID
+#### Docker cannot write a stable ID
 
 The image defaults to embedded identity. Mount `/app/Library` read-write or pre-embed valid matching IDs. Use a custom command with `--book-id-storage sidecar` only if a writable sidecar carrier is preferable.
 
-### A generated SSG site has broken links below a subpath
+#### A generated SSG site has broken links below a subpath
 
 Regenerate it with a normalized `--base-path`, such as `/reader/`, and configure the static host to serve the output at that same prefix.
 
-### Server refuses to start after an upgrade
+#### Server refuses to start after an upgrade
 
 Read the first logged migration or validation error, preserve the data and source files, and consult [docs/migration-v2.md](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/migration-v2.md). Do not delete the authoritative `data/` directory to work around an error.
 
-## Contributing
+## Development and license
+
+### Contributing
 
 Issues and pull requests are welcome at [dfface/epub-browser](https://github.com/dfface/epub-browser). A useful report includes the exact command, browser/device, reproduction steps, relevant logs, and the EPUB or PDF when it can be shared legally.
 
-### Maintainer architecture contract
+#### Maintainer architecture contract
 
 Read [AGENTS.md](AGENTS.md) before changing content processing, page templates,
 caches, permissions, assets, or deployment behavior. It defines the EPUB/PDF
@@ -635,7 +610,7 @@ keep EPUB and PDF derived caches separate from SQLite user data, and never add
 a runtime CDN dependency. A change that affects a shared surface must be tested
 with both formats and both deployment modes where applicable.
 
-### Development from a source checkout
+#### Development from a source checkout
 
 Third-party browser files are generated build inputs, not project source, so
 `epub_browser/assets/vendor/` is intentionally absent from Git. Hydrate the
@@ -661,6 +636,6 @@ Docker images, and generated SSG sites contain the verified files and have no
 runtime CDN dependency. See [third_party/README.md](third_party/README.md) for
 the update, release, and repository-hygiene workflow.
 
-## License
+### License
 
 [MIT](License.txt)

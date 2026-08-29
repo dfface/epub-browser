@@ -27,18 +27,22 @@ PDF adalah format buku kelas utama: halaman 1 menjadi `chapter_0.html`, setiap h
 
 Gunakan `ssg` untuk menerbitkan berkas statis biasa. Gunakan `server` bila Anda memerlukan akun, data lintas perangkat, kontrol akses buku, atau pemantauan sumber otomatis.
 
-## Demo
+## Ikhtisar
+
+### Demo
 
 - **Mode SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Mode Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — nama pengguna dan kata sandi: `demo`.
 
-## Membaca dengan AI secara native (khusus Server)
+### Membaca dengan AI secara native (khusus Server)
 
 Fitur membaca dengan AI membangun lapisan pembelajaran bersama yang dapat ditinjau langsung di atas teks asli, bukan menempatkan ringkasan umum di samping buku. Lapisan ini mencakup rute sebelum membaca, ikhtisar bab sesuai kebutuhan, penjelasan yang terhubung ke kutipan, catatan tentang peran paragraf, penjelasan kosakata, uraian sederhana di akhir, dan pertanyaan untuk pemikiran lanjutan.
 
 Hasil dibuat sebagai tugas latar belakang, disimpan di SQLite, dan dibagikan kepada pembaca yang dapat mengakses buku. Percakapan lanjutan tetap pribadi untuk setiap akun. Administrator harus mengatur penyedia yang kompatibel dengan OpenAI dan memberi izin kepada setiap anggota. Teks EPUB yang dipilih dikirim ke penyedia tersebut, jadi aktifkan fitur ini hanya dengan persetujuan pembaca. Keluaran SSG tidak pernah menyertakan akun, kontrol AI, tugas, atau konfigurasi penyedia.
 
-## Persyaratan dan pemasangan
+## Memulai
+
+### Persyaratan dan pemasangan
 
 - Python 3.9 atau yang lebih baru
 - Satu atau beberapa berkas `.epub` atau `.pdf`, direktori buku bertingkat, atau perpustakaan bergaya Calibre
@@ -60,9 +64,9 @@ Untuk Server persisten dengan Docker, gunakan image yang diterbitkan; host tidak
 docker pull dfface/epub-browser:latest
 ```
 
-## Mulai cepat
+### Mulai cepat
 
-### Membuat situs statis
+#### Membuat situs statis
 
 ```bash
 epub-browser ssg /path/to/books \
@@ -71,7 +75,7 @@ epub-browser ssg /path/to/books \
 
 Sajikan `dist/` melalui HTTP; jangan buka halaman yang dihasilkan secara langsung dengan `file://`. Untuk menerapkan di bawah subjalur, tambahkan `--base-path /repositori-saya/`; opsi ini mengubah URL yang dihasilkan, bukan direktori keluaran.
 
-### Menjalankan perpustakaan Server persisten
+#### Menjalankan perpustakaan Server persisten
 
 ```bash
 epub-browser server /path/to/books \
@@ -81,18 +85,22 @@ epub-browser server /path/to/books \
 
 Buka `http://127.0.0.1:8000/`. Pada kunjungan pertama, buat administrator awal; perpustakaan tidak dipindai atau diterbitkan sebelum penyiapan selesai. `--no-browser` hanya mencegah layanan membuka peramban lokal secara otomatis.
 
-## Data, akun, dan batas akses
+## Data dan operasi
+
+### Data, akun, dan batas akses
 
 Setiap buku memiliki `book_id` yang stabil. Secara default, `--book-id-storage sidecar` menyimpan identitas di samping berkas sumber tanpa mengubah byte-nya. Untuk EPUB, `--book-id-storage embedded` menuliskannya ke metadata OPF; untuk PDF pengaturan ini selalu kembali ke sidecar yang berdekatan.
 
 Dalam mode Server, `--server-dir` adalah lokasi otoritatif untuk SQLite, cache, dan cadangan migrasi. Akun, rak buku, kemajuan membaca, anotasi, hasil AI, dan tugas juga disimpan di sana. Administrator mengelola pengguna, peran, sesi, dan izin buku; anggota hanya menggunakan buku yang diizinkan dan data pribadi mereka sendiri. Lindungi izin direktori ini beserta cadangannya.
 
-## Docker, proksi terbalik, dan dokumentasi lengkap
+### Docker, proksi terbalik, dan dokumentasi lengkap
 
 Dalam kontainer, pasang buku sebagai hanya-baca dan `--server-dir` pada volume persisten. Terima header proksi hanya dari proksi tepercaya dan gunakan HTTPS untuk penerapan publik.
 
 Untuk Docker Compose, semua opsi CLI, migrasi, LAN, proksi terbalik, dan pemecahan masalah, lihat [README lengkap berbahasa Inggris](../../README.md) atau [README lengkap berbahasa Tionghoa Sederhana](README.zh-CN.md). Perilaku kedua mode sama dalam semua bahasa.
 
-## Kontribusi dan lisensi
+## Pengembangan dan lisensi
+
+### Kontribusi dan lisensi
 
 Issues dan Pull Requests dipersilakan. Lihat [License.txt](../../License.txt) untuk lisensi.

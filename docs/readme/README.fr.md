@@ -27,18 +27,22 @@ PDF est un format de livre de premier rang : la page 1 devient `chapter_0.html`,
 
 Utilisez `ssg` pour publier des fichiers statiques ordinaires. Utilisez `server` si vous avez besoin de comptes, de données partagées entre appareils, de contrôle d’accès aux livres ou d’une surveillance automatique des sources.
 
-## Démonstrations
+## Vue d’ensemble
+
+### Démonstrations
 
 - **Mode SSG** : [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Mode Server** : [epub.yuhan.tech](https://epub.yuhan.tech/) — identifiant et mot de passe : `demo`.
 
-## Lecture native avec l’IA (Server uniquement)
+### Lecture native avec l’IA (Server uniquement)
 
 La lecture avec l’IA construit sur le texte original une couche d’apprentissage partagée et vérifiable, plutôt qu’un résumé générique détaché du livre. Elle comprend un parcours avant la lecture, une vue d’ensemble du chapitre à la demande, des explications reliées aux citations, des indications sur le rôle des paragraphes, des éclaircissements de vocabulaire, une explication simple en fin de chapitre et des questions pour approfondir.
 
 Les résultats sont produits par des tâches en arrière-plan, conservés dans SQLite et partagés entre les lecteurs autorisés à consulter le livre. Les conversations de suivi restent privées pour chaque compte. L’administrateur doit configurer un fournisseur compatible avec OpenAI et autoriser chaque membre. Le texte EPUB sélectionné est envoyé à ce fournisseur ; n’activez donc cette fonction qu’avec l’accord des lecteurs. Une sortie SSG ne contient jamais de comptes, de contrôles IA, de tâches ni de configuration de fournisseur.
 
-## Prérequis et installation
+## Bien démarrer
+
+### Prérequis et installation
 
 - Python 3.9 ou version ultérieure
 - Un ou plusieurs fichiers `.epub` ou `.pdf`, des dossiers de livres imbriqués ou une bibliothèque de type Calibre
@@ -60,9 +64,9 @@ Pour un Server persistant avec Docker, utilisez l’image publiée ; Python n’
 docker pull dfface/epub-browser:latest
 ```
 
-## Démarrage rapide
+### Démarrage rapide
 
-### Générer un site statique
+#### Générer un site statique
 
 ```bash
 epub-browser ssg /chemin/vers/livres \
@@ -71,7 +75,7 @@ epub-browser ssg /chemin/vers/livres \
 
 Servez `dist/` en HTTP ; n’ouvrez pas directement les pages générées avec `file://`. Pour un déploiement sous un sous-chemin, ajoutez `--base-path /mon-depot/` ; cette option modifie les URL générées, pas le dossier de sortie.
 
-### Lancer une bibliothèque Server persistante
+#### Lancer une bibliothèque Server persistante
 
 ```bash
 epub-browser server /chemin/vers/livres \
@@ -81,18 +85,22 @@ epub-browser server /chemin/vers/livres \
 
 Ouvrez `http://127.0.0.1:8000/`. La première visite permet de créer l’administrateur initial ; la bibliothèque n’est ni analysée ni publiée avant la fin de cette configuration. `--no-browser` empêche seulement l’ouverture automatique du navigateur local.
 
-## Données, comptes et limites d’accès
+## Données et exploitation
+
+### Données, comptes et limites d’accès
 
 Chaque livre possède un `book_id` stable. Par défaut, `--book-id-storage sidecar` enregistre cette identité à côté du fichier source sans modifier ses octets. Pour EPUB, `--book-id-storage embedded` l’inscrit dans les métadonnées OPF et nécessite une source modifiable ; pour PDF, ce réglage utilise toujours le sidecar adjacent.
 
 En mode Server, `--server-dir` est l’emplacement de référence pour SQLite, les caches et les sauvegardes de migration. Les comptes, bibliothèques, progressions, annotations, résultats IA et tâches y sont également enregistrés. Les administrateurs gèrent les utilisateurs, rôles, sessions et autorisations d’accès aux livres ; les membres n’utilisent que les livres autorisés et leurs propres données privées. Protégez les permissions de ce dossier et de ses sauvegardes.
 
-## Docker, proxy inverse et documentation complète
+### Docker, proxy inverse et documentation complète
 
 Dans un conteneur, montez les livres en lecture seule et `--server-dir` sur un volume persistant. N’acceptez les en-têtes de proxy que depuis des proxys de confiance et utilisez HTTPS pour les déploiements publics.
 
 Pour Docker Compose, l’ensemble des options CLI, les migrations, le réseau local, le proxy inverse et le dépannage, consultez le [README anglais complet](../../README.md) ou le [README complet en chinois simplifié](README.zh-CN.md). Le comportement des deux modes est identique dans toutes les langues.
 
-## Contribution et licence
+## Développement et licence
+
+### Contribution et licence
 
 Les Issues et Pull Requests sont les bienvenus. Consultez [License.txt](../../License.txt) pour la licence.

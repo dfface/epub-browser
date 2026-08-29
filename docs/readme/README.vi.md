@@ -27,18 +27,22 @@ PDF là định dạng sách hạng nhất: trang 1 trở thành `chapter_0.html
 
 Dùng `ssg` khi cần xuất bản các tệp tĩnh thông thường. Dùng `server` khi cần tài khoản, dữ liệu xuyên thiết bị, kiểm soát quyền truy cập sách hoặc tự động theo dõi nguồn.
 
-## Bản dùng thử
+## Tổng quan
+
+### Bản dùng thử
 
 - **Chế độ SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Chế độ Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — tên đăng nhập và mật khẩu: `demo`.
 
-## Đọc sách tích hợp AI (chỉ Server)
+### Đọc sách tích hợp AI (chỉ Server)
 
 Tính năng đọc với AI xây dựng một lớp học tập dùng chung và có thể kiểm chứng ngay trên văn bản gốc, thay vì đặt một bản tóm tắt chung chung bên cạnh cuốn sách. Lớp này gồm lộ trình trước khi đọc, tổng quan chương theo yêu cầu, giải thích gắn với trích dẫn, ghi chú về vai trò của đoạn văn, giải nghĩa từ vựng, phần diễn giải đơn giản ở cuối và các câu hỏi để suy nghĩ tiếp.
 
 Kết quả được tạo bằng tác vụ nền, lưu trong SQLite và chia sẻ cho những người đọc có quyền truy cập cuốn sách. Các cuộc trò chuyện tiếp theo vẫn riêng tư cho từng tài khoản. Quản trị viên phải cấu hình nhà cung cấp tương thích OpenAI và cấp quyền riêng cho từng thành viên. Văn bản EPUB được chọn sẽ gửi đến nhà cung cấp đó, vì vậy chỉ bật tính năng khi người đọc đồng ý. Đầu ra SSG không bao giờ chứa tài khoản, điều khiển AI, tác vụ hay cấu hình nhà cung cấp.
 
-## Yêu cầu và cài đặt
+## Bắt đầu
+
+### Yêu cầu và cài đặt
 
 - Python 3.9 trở lên
 - Một hoặc nhiều tệp `.epub` hoặc `.pdf`, thư mục lồng nhau chứa sách hoặc thư viện theo cấu trúc Calibre
@@ -60,9 +64,9 @@ epub-browser server --help
 docker pull dfface/epub-browser:latest
 ```
 
-## Bắt đầu nhanh
+### Bắt đầu nhanh
 
-### Tạo trang tĩnh
+#### Tạo trang tĩnh
 
 ```bash
 epub-browser ssg /path/to/books \
@@ -71,7 +75,7 @@ epub-browser ssg /path/to/books \
 
 Phục vụ `dist/` qua HTTP; không mở trực tiếp các trang đã tạo bằng `file://`. Để triển khai dưới một đường dẫn con, thêm `--base-path /my-repository/`; tùy chọn này thay đổi URL được tạo chứ không thay đổi thư mục đầu ra.
 
-### Chạy thư viện Server lâu dài
+#### Chạy thư viện Server lâu dài
 
 ```bash
 epub-browser server /path/to/books \
@@ -81,18 +85,22 @@ epub-browser server /path/to/books \
 
 Mở `http://127.0.0.1:8000/`. Trong lần truy cập đầu tiên, hãy tạo quản trị viên ban đầu; thư viện sẽ không được quét hoặc công bố trước khi hoàn tất bước này. `--no-browser` chỉ ngăn dịch vụ tự động mở trình duyệt cục bộ.
 
-## Dữ liệu, tài khoản và ranh giới truy cập
+## Dữ liệu và vận hành
+
+### Dữ liệu, tài khoản và ranh giới truy cập
 
 Mỗi cuốn sách có một `book_id` ổn định. Theo mặc định, `--book-id-storage sidecar` lưu danh tính cạnh tệp nguồn mà không thay đổi byte của tệp. Với EPUB, `--book-id-storage embedded` ghi vào siêu dữ liệu OPF; với PDF, thiết lập này luôn dùng sidecar liền kề.
 
 Trong chế độ Server, `--server-dir` là nơi dữ liệu có thẩm quyền của SQLite, bộ nhớ đệm và bản sao lưu di chuyển. Tài khoản, giá sách, tiến độ đọc, chú thích, kết quả AI và tác vụ cũng được lưu tại đây. Quản trị viên quản lý người dùng, vai trò, phiên và quyền sách; thành viên chỉ sử dụng sách được phép và dữ liệu riêng của mình. Hãy bảo vệ quyền truy cập của thư mục này cùng các bản sao lưu.
 
-## Docker, proxy ngược và tài liệu đầy đủ
+### Docker, proxy ngược và tài liệu đầy đủ
 
 Trong container, gắn sách ở chế độ chỉ đọc và gắn `--server-dir` vào ổ đĩa lâu dài. Chỉ chấp nhận tiêu đề proxy từ proxy đáng tin cậy và dùng HTTPS cho triển khai công khai.
 
 Để xem Docker Compose, toàn bộ tùy chọn CLI, di chuyển dữ liệu, LAN, proxy ngược và khắc phục sự cố, hãy đọc [README tiếng Anh đầy đủ](../../README.md) hoặc [README tiếng Trung giản thể đầy đủ](README.zh-CN.md). Hai chế độ hoạt động giống nhau trong mọi ngôn ngữ.
 
-## Đóng góp và giấy phép
+## Phát triển và giấy phép
+
+### Đóng góp và giấy phép
 
 Chúng tôi hoan nghênh Issues và Pull Requests. Xem [License.txt](../../License.txt) để biết giấy phép.

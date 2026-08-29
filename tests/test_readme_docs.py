@@ -4,6 +4,65 @@ from pathlib import Path
 
 
 class ReadmeDocumentationTests(unittest.TestCase):
+    def test_readme_information_architecture_stays_reader_focused(self):
+        expected_top_level = {
+            Path("README.md"): (
+                "Contents",
+                "Project overview",
+                "Get started",
+                "Formats and reading",
+                "Deployment",
+                "Reference and operations",
+                "Development and license",
+            ),
+            Path("docs/readme/README.zh-CN.md"): (
+                "目录",
+                "项目概览",
+                "开始使用",
+                "格式与阅读体验",
+                "部署",
+                "参考与运维",
+                "开发与许可证",
+            ),
+        }
+        for path, expected in expected_top_level.items():
+            headings = tuple(
+                line[3:].strip()
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.startswith("## ")
+            )
+            with self.subTest(path=path):
+                self.assertEqual(expected, headings)
+
+        compact_readmes = [
+            path
+            for path in sorted(Path("docs/readme").glob("README.*.md"))
+            if path.name not in {"README.zh-CN.md"}
+        ]
+        for path in compact_readmes:
+            lines = path.read_text(encoding="utf-8").splitlines()
+            with self.subTest(path=path):
+                self.assertEqual(4, sum(line.startswith("## ") for line in lines))
+                self.assertGreaterEqual(
+                    sum(line.startswith("### ") for line in lines),
+                    7,
+                )
+
+    def test_documentation_hub_links_the_stable_entry_points(self):
+        hub = Path("docs/README.md").read_text(encoding="utf-8")
+        for target in (
+            "../README.md",
+            "readme/README.zh-CN.md",
+            "ai-native-reading.md",
+            "third-party-ai-renderers.md",
+            "migration-v2.md",
+            "releases/v2.8.0.md",
+            "../AGENTS.md",
+            "../CONTEXT.md",
+        ):
+            with self.subTest(target=target):
+                self.assertIn(target, hub)
+
     def test_every_localized_readme_presents_pdf_as_a_first_class_format(self):
         localized_readmes = sorted(Path("docs/readme").glob("README.*.md"))
         self.assertEqual(16, len(localized_readmes))

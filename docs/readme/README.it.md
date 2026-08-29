@@ -27,18 +27,22 @@ PDF è un formato librario di prima classe: la pagina 1 diventa `chapter_0.html`
 
 Usa `ssg` per pubblicare normali file statici. Usa `server` quando servono account, dati tra dispositivi, controllo dell’accesso ai libri o monitoraggio automatico delle fonti.
 
-## Demo
+## Panoramica
+
+### Demo
 
 - **Modalità SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Modalità Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — nome utente e password: `demo`.
 
-## Lettura nativa con IA (solo Server)
+### Lettura nativa con IA (solo Server)
 
 La lettura con IA crea sul testo originale un livello di apprendimento condiviso e verificabile, invece di affiancare al libro un riassunto generico. Comprende un percorso prima della lettura, una panoramica del capitolo su richiesta, spiegazioni collegate alle citazioni, note sul ruolo dei paragrafi, chiarimenti del lessico, una spiegazione semplice conclusiva e domande per approfondire.
 
 I risultati vengono prodotti da attività in background, salvati in SQLite e condivisi tra i lettori che possono accedere al libro. Le conversazioni successive restano private per ciascun account. L’amministratore deve configurare un provider compatibile con OpenAI e autorizzare ogni membro. Il testo EPUB selezionato viene inviato al provider, quindi la funzione va attivata solo con il consenso dei lettori. L’output SSG non include mai account, controlli IA, attività o configurazioni del provider.
 
-## Requisiti e installazione
+## Per iniziare
+
+### Requisiti e installazione
 
 - Python 3.9 o successivo
 - Uno o più file `.epub` o `.pdf`, cartelle annidate con libri o una libreria in stile Calibre
@@ -60,9 +64,9 @@ Per un Server persistente con Docker, usa l’immagine pubblicata; Python non è
 docker pull dfface/epub-browser:latest
 ```
 
-## Avvio rapido
+### Avvio rapido
 
-### Generare un sito statico
+#### Generare un sito statico
 
 ```bash
 epub-browser ssg /percorso/dei/libri \
@@ -71,7 +75,7 @@ epub-browser ssg /percorso/dei/libri \
 
 Pubblica `dist/` tramite HTTP; non aprire direttamente le pagine generate con `file://`. Per distribuire sotto un percorso secondario, aggiungi `--base-path /mio-repository/`; l’opzione modifica gli URL generati, non la cartella di output.
 
-### Avviare una libreria Server persistente
+#### Avviare una libreria Server persistente
 
 ```bash
 epub-browser server /percorso/dei/libri \
@@ -81,18 +85,22 @@ epub-browser server /percorso/dei/libri \
 
 Apri `http://127.0.0.1:8000/`. Alla prima visita viene creato l’amministratore iniziale; prima di completare la configurazione, la libreria non viene analizzata né pubblicata. `--no-browser` impedisce soltanto l’apertura automatica del browser locale.
 
-## Dati, account e limiti di accesso
+## Dati e operazioni
+
+### Dati, account e limiti di accesso
 
 Ogni libro possiede un `book_id` stabile. Per impostazione predefinita, `--book-id-storage sidecar` salva l’identità accanto al file sorgente senza modificarne i byte. Per EPUB, `--book-id-storage embedded` la scrive nei metadati OPF e richiede una fonte modificabile; per PDF usa sempre il sidecar adiacente.
 
 In modalità Server, `--server-dir` è la posizione autorevole per SQLite, cache e backup delle migrazioni. Qui vengono conservati anche account, librerie, avanzamento, annotazioni, risultati IA e attività. Gli amministratori gestiscono utenti, ruoli, sessioni e permessi sui libri; i membri usano solo i libri autorizzati e i propri dati privati. Proteggi i permessi di questa cartella e dei relativi backup.
 
-## Docker, reverse proxy e documentazione completa
+### Docker, reverse proxy e documentazione completa
 
 Nei container monta i libri in sola lettura e `--server-dir` come volume persistente. Accetta le intestazioni proxy solo da proxy attendibili e usa HTTPS nelle distribuzioni pubbliche.
 
 Per Docker Compose, tutte le opzioni CLI, le migrazioni, la LAN, il reverse proxy e la risoluzione dei problemi, consulta il [README inglese completo](../../README.md) o il [README completo in cinese semplificato](README.zh-CN.md). Il comportamento delle due modalità è uguale in tutte le lingue.
 
-## Contributi e licenza
+## Sviluppo e licenza
+
+### Contributi e licenza
 
 Issues e Pull Requests sono benvenuti. Consulta [License.txt](../../License.txt) per la licenza.
