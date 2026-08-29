@@ -705,6 +705,12 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             api.json(),
             {"code": "authentication_required", "message": "Authentication required"},
         )
+        book_index = self.client.get("/book/id/index.html")
+        self.assertEqual(book_index.status_code, 303)
+        self.assertEqual(
+            book_index.headers["location"],
+            "/login?next=%2Fbook%2Fid%2Findex.html",
+        )
         book_page = self.client.get("/book/id/chapter_0.html?view=reader")
         self.assertEqual(book_page.status_code, 303)
         self.assertEqual(

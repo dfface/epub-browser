@@ -8,6 +8,10 @@ from epub_browser.sidecar_identity import read_exact_sidecar
 
 class ExampleIdentityTests(unittest.TestCase):
     EXPECTED = {
+        "Alice_in_Wonderland.pdf": (
+            "IGEQPI0RQ7isVooE7xGLIg",
+            "1c0c562156d0cc0d61f42e5c3c05585399b1507c5a65fcec7949b298385f8715",
+        ),
         "Mao Ze Dong Xuan Ji - Mao Ze Dong.epub": (
             "6QrgU-nfQSm_M6lmKAuBRg",
             "ee41f0b9a38ca691490e4e0e957cf40b4eaaa86c490c7b0417d33e1a77d8b50e",
@@ -31,7 +35,8 @@ class ExampleIdentityTests(unittest.TestCase):
                 self.assertEqual(source_sha256(source), fingerprint)
                 self.assertEqual(sidecar.book_id, book_id)
                 self.assertEqual(sidecar.source_fingerprint, fingerprint)
-                self.assertIsNone(read_embedded_book_id(source))
+                if source.suffix.lower() == ".epub":
+                    self.assertIsNone(read_embedded_book_id(source))
 
 
 if __name__ == "__main__":

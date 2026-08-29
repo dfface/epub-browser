@@ -401,7 +401,11 @@ def _request_expects_html(request):
 
 def unauthenticated_response(request):
     path = request.url.path
-    if path.startswith('/book/') and path.endswith('.html') and _request_expects_html(request):
+    if (
+        path.startswith('/book/')
+        and path.endswith('.html')
+        and _request_expects_html(request)
+    ):
         target = quote(_request_relative_path(request), safe='')
         return RedirectResponse(
             '/login?next=' + target,
