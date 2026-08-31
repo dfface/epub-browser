@@ -96,7 +96,7 @@ from .server_library import (
 from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT
-from .site import render_library_shell
+from .site import LibraryBook, render_kindle_library_page, render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
 from .webhooks import WEBHOOK_EVENT_TYPES, WebhookService
@@ -691,6 +691,7 @@ def create_app(
     release_lookup: Optional[ReleaseLookup] = None,
     log_errors: bool = False,
     server_directory=None,
+    kindle: bool = False,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
@@ -1469,6 +1470,7 @@ if(localeField)localeField.value=localeSelect.value;
 <div class="auth-intro"><h1 data-i18n="account.signIn">{copy['sign_in']}</h1>
 <p class="auth-description" data-i18n="account.loginDescription">{copy['description']}</p></div>
 <form class="auth-form" id="loginForm" method="post" action="/login">
+<input type="hidden" name="auth_nonce" value="{nonce}">
 <input type="hidden" name="next" value="{safe_next}">
 <input type="hidden" name="locale" value="{locale}">
 {error_markup}
@@ -1507,6 +1509,7 @@ if(visible&&invalidCredentials)field.setAttribute('aria-invalid','true');else fi
 }});
 }}
 if(loginForm)loginForm.addEventListener('submit',function(event){{
+if(!window.fetch)return; /* legacy Kindle WebKit: plain form POST fallback */
 event.preventDefault();
 if(loginPending)return;
 setLoginBusy(true);
@@ -1882,10 +1885,31 @@ window.location.assign(payload.redirect||'/');
                 cache_control='no-store',
             )
         if current_principal is None and not valid_anonymous_auth_request(request):
-            return invalid_auth_request()
-        data, parse_error = await bounded_public_json_object(request)
-        if parse_error is not None:
-            return public_json_error(parse_error)
+            # No-JavaScript fallback for legacy e-Ink Kindle WebKit: the form
+            # posts application/x-www-form-urlencoded and proves the auth
+            # nonce from the cookie through a hidden field, exactly like the
+            # OIDC association form.
+            try:
+                form = await form_data(request, maximum_size=16 * 1024)
+            except (UnicodeDecodeError, ValueError):
+                return invalid_auth_request()
+            supplied_nonce = form.get('auth_nonce', '')
+            if (
+                not supplied_nonce
+                or not valid_same_origin_request_source(request)
+                or not any(
+                    secrets.compare_digest(supplied_nonce, cookie_nonce)
+                    for cookie_nonce in auth_nonce_cookie_values(
+                        request.cookies.get(AUTH_NONCE_COOKIE)
+                    )
+                )
+            ):
+                return invalid_auth_request()
+            data = dict(form)
+        else:
+            data, parse_error = await bounded_public_json_object(request)
+            if parse_error is not None:
+                return public_json_error(parse_error)
         next_path = _safe_relative_path(data.get('next') or requested_next)
         client_key = request.client.host if request.client is not None else 'unknown'
         current_oidc_settings = store.get_oidc_settings()
@@ -3693,7 +3717,8 @@ window.location.assign(payload.redirect||'/');
         # where no manifest has been published yet.
         try:
             markup = render_library_shell(
-                (), current_published_assets(), SiteURLs(), deployment_mode='server'
+                (), current_published_assets(), SiteURLs(),
+                deployment_mode='server', kindle=kindle,
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
@@ -3707,6 +3732,43 @@ window.location.assign(payload.redirect||'/');
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
         return apply_reader_security_headers(response, index_path)
+
+    def kindle_library_books(principal):
+        """Project visible book records onto the read-only minimal shelf."""
+        books = []
+        for record in store.visible_books(principal):
+            try:
+                metadata = json.loads(record.metadata_json)
+            except (TypeError, json.JSONDecodeError):
+                metadata = {}
+            try:
+                authors = tuple(json.loads(record.authors_json))
+            except (TypeError, json.JSONDecodeError):
+                authors = ()
+            tags = metadata.get("tags")
+            books.append(
+                LibraryBook(
+                    book_id=record.book_id,
+                    title=record.title,
+                    authors=authors,
+                    tags=tuple(tags) if isinstance(tags, (list, tuple)) else (),
+                    cover=metadata.get("cover"),
+                    source_format=record.source_format,
+                )
+            )
+        return books
+
+    async def kindle_library_page(request):
+        # Authenticated, read-only minimal shelf: the rendered list never
+        # carries management actions, and the Kindle surfaces keep progress
+        # read-write while heartbeats stay report-only; nothing here displays
+        # insights back or mutates the shelf.
+        principal = require_principal(request)
+        markup = render_kindle_library_page(
+            kindle_library_books(principal), SiteURLs()
+        )
+        target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
+        return apply_reader_security_headers(target, markup=markup)
 
     async def openapi_schema(request):
         return response(openapi_document(), cache_control='public, max-age=300')
@@ -3882,9 +3944,19 @@ window.location.assign(payload.redirect||'/');
                 and recorded_cover == book_relative_path
                 and recorded_cover == 'cover.png'
             )
+            kindle_page_allowed = (
+                kindle
+                and book.source_format == EPUB_FORMAT
+                and re.fullmatch(
+                    r'kindle(?:\.html|_chapter_[0-9]+\.html)',
+                    book_relative_path,
+                    re.IGNORECASE,
+                )
+            )
             if not (
                 server_book_public_path_allowed(book_relative_path)
                 or pdf_cover_allowed
+                or kindle_page_allowed
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
             renderer = ServerPageRenderer(
@@ -3892,6 +3964,7 @@ window.location.assign(payload.redirect||'/');
                 book_id,
                 source_format=book.source_format,
                 metadata_overrides=store.managed_book_metadata(book_id),
+                kindle=kindle,
             )
             # Retain a narrow compatibility path for manually-created test
             # fixtures and legacy caches that still have an accepted marker.
@@ -3938,6 +4011,34 @@ window.location.assign(payload.redirect||'/');
                             dynamic_response,
                             markup=markup,
                         )
+                    if kindle_page_allowed:
+                        if book_relative_path == 'kindle.html':
+                            markup = renderer.render_kindle_index()
+                            dynamic_response = HTMLResponse(
+                                markup,
+                                headers={'Cache-Control': 'no-cache'},
+                            )
+                            return apply_reader_security_headers(
+                                dynamic_response,
+                                markup=markup,
+                            )
+                        kindle_chapter_match = re.fullmatch(
+                            r'kindle_chapter_([0-9]+)\.html',
+                            book_relative_path,
+                            re.IGNORECASE,
+                        )
+                        if kindle_chapter_match:
+                            markup = renderer.render_kindle_chapter(
+                                int(kindle_chapter_match.group(1))
+                            )
+                            dynamic_response = HTMLResponse(
+                                markup,
+                                headers={'Cache-Control': 'no-cache'},
+                            )
+                            return apply_reader_security_headers(
+                                dynamic_response,
+                                markup=markup,
+                            )
                     if book_relative_path == 'toc.json':
                         return Response(
                             renderer.toc_bytes(),
@@ -4747,6 +4848,17 @@ window.location.assign(payload.redirect||'/');
         *public_api_routes(public_api_context),
         Route('/', library_index),
         Route('/index.html', library_index),
+        *(
+            [
+                Route(
+                    '/kindle-library.html',
+                    kindle_library_page,
+                    methods=['GET'],
+                )
+            ]
+            if kindle
+            else []
+        ),
         Route('/reading-insights', reading_insights_page, methods=['GET']),
         Route('/book-metadata.json', filtered_library_metadata, methods=['GET']),
         Route('/openapi.json', openapi_schema, methods=['GET']),

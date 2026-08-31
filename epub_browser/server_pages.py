@@ -33,17 +33,37 @@ class ServerPageRenderer:
         urls=None,
         source_format=EPUB_FORMAT,
         metadata_overrides=None,
+        kindle=False,
     ):
         self.public_dir = Path(public_dir)
         self.book_id = str(book_id)
         self.urls = urls or SiteURLs()
         self.source_format = source_format
         self.metadata_overrides = dict(metadata_overrides or {})
+        self.kindle = bool(kindle)
         if self.source_format not in {EPUB_FORMAT, PDF_FORMAT}:
             raise ServerPageError("Unsupported book format")
         self.book_dir = self.public_dir / "book" / self.book_id
         self.content_dir = self.public_dir / "book" / self.book_id / "content"
         self.pdf_dir = self.book_dir / "pdf"
+
+    def render_kindle_index(self) -> str:
+        """Render the dependency-free minimal reader index (EPUB only)."""
+        if self.source_format != EPUB_FORMAT:
+            raise ServerPageError("Kindle minimal pages are EPUB-only")
+        return self._processor().create_kindle_index_page()
+
+    def render_kindle_chapter(self, chapter_index: int) -> str:
+        """Render the dependency-free minimal reader chapter (EPUB only)."""
+        if self.source_format != EPUB_FORMAT:
+            raise ServerPageError("Kindle minimal pages are EPUB-only")
+        payload = self.chapter_content(chapter_index)
+        return self._processor().create_kindle_chapter_page(
+            payload["content"],
+            payload["style_links"],
+            chapter_index,
+            payload["title"],
+        )
 
     def render_index(self, initial_book_review=None) -> str:
         return self._active_processor().create_index_page(
@@ -118,6 +138,7 @@ class ServerPageRenderer:
                 metadata=metadata,
                 asset_manifest=PublishedAssets(self._asset_manifest()),
                 urls=self.urls,
+                kindle_support=self.kindle,
             )
         except ValueError as error:
             raise ServerPageError("Book content cache is invalid") from error

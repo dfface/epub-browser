@@ -318,6 +318,108 @@ _KINDLE_READER_I18N_SCRIPT = """\
 """
 
 
+# Server-only addition to the minimal reader: reading progress is read-write
+# on the minimal surface.  The page fetches a CSRF token, loads the saved
+# position (mirrored into the cookie so the index can resume it), then records
+# the current chapter; heartbeats stay report-only.  The Kindle surface never
+# displays insights and never mutates the shelf, and the script stays ES5:
+# XMLHttpRequest only, no localStorage/Promise/fetch/classList.
+_KINDLE_READER_SERVER_REPORT_JS = """\
+(function () {
+  var bookHash = %(book_hash)s;
+  var chapterIndex = %(chapter_index)s;
+  var clientId = 'kindle-' + Math.floor(Math.random() * 1e9).toString(36);
+  var sequence = 0;
+  var csrfToken = '';
+  function kXhr(method, url, body, onDone) {
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open(method, url, true);
+      if (body || method === 'PUT' || method === 'POST') {
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (csrfToken) {
+          xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+        }
+      }
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200 && onDone) {
+          onDone(xhr.responseText);
+        }
+      };
+      xhr.send(body);
+    } catch (e) {}
+  }
+  function kReadProgress() {
+    kXhr('GET', '/api/reading-progress/' + encodeURIComponent(bookHash), null, function (text) {
+      try {
+        var progress = JSON.parse(text);
+        if (progress && progress.chapter_index !== undefined &&
+            progress.chapter_index !== null &&
+            progress.chapter_index !== chapterIndex) {
+          setCookie(bookHash, 'chapter_' + progress.chapter_index + '.html', 365);
+        }
+      } catch (e) {}
+    });
+  }
+  function kSync() {
+    // Reading progress is read-write: load the saved position, then record
+    // the current chapter. Heartbeats below stay report-only.
+    kReadProgress();
+    kXhr(
+      'PUT',
+      '/api/reading-progress/' + encodeURIComponent(bookHash),
+      '{"chapter_index":' + chapterIndex + '}'
+    );
+  }
+  function kHeartbeat() {
+    sequence = sequence + 1;
+    kXhr(
+      'POST',
+      '/api/reading-sessions/' + encodeURIComponent(bookHash) + '/heartbeat',
+      '{"client_id":"' + clientId + '","client_sequence":' + sequence +
+        ',"chapter_index":' + chapterIndex + ',"active_seconds":15}'
+    );
+  }
+  kXhr('GET', '/api/csrf', null, function (text) {
+    try {
+      csrfToken = JSON.parse(text).csrf_token || '';
+    } catch (e) {}
+    kSync();
+  });
+  kHeartbeat();
+  setInterval(kHeartbeat, 60000);
+})();
+"""
+
+# Server-only addition to the minimal index: resolve "Continue reading" from
+# the authenticated reading-progress API (read-only) instead of relying only
+# on the local cookie, so progress follows the user across devices. Stays ES5.
+_KINDLE_READER_SERVER_RESUME_JS = """\
+(function () {
+  var bookHash = %(book_hash)s;
+  var resume = document.getElementById('kResume');
+  if (!resume) { return; }
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/reading-progress/' + encodeURIComponent(bookHash), true);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState === 4 && xhr.status === 200) {
+        try {
+          var progress = JSON.parse(xhr.responseText);
+          if (progress && progress.chapter_index !== undefined &&
+              progress.chapter_index !== null) {
+            resume.href = 'kindle_chapter_' + progress.chapter_index + '.html';
+            resume.style.display = 'block';
+          }
+        } catch (e) {}
+      }
+    };
+    xhr.send(null);
+  } catch (e) {}
+})();
+"""
+
+
 def _kindle_i18n_messages(language):
     """Resolve the Kindle minimal-page strings for a book language."""
     dictionary = _KINDLE_READER_I18N.get(language or "")
@@ -939,6 +1041,7 @@ class EPUBProcessor:
         asset_manifest,
         urls=None,
         reporter=None,
+        kindle_support=False,
     ):
         """Restore the minimal render state for a Server content cache.
 
@@ -961,7 +1064,7 @@ class EPUBProcessor:
         processor.urls = urls or SiteURLs()
         processor.reporter = reporter or Reporter(False)
         processor.deployment_mode = "server"
-        processor.kindle_support = False
+        processor.kindle_support = bool(kindle_support)
         processor.source_format = EPUB_FORMAT
         processor._caller_supplied_book_id = True
         processor.book_hash = str(book_id)
@@ -2516,16 +2619,16 @@ document.addEventListener('DOMContentLoaded', function() {{
                 future.result()
 
     def _kindle_entry_script(self, target_url):
-        """Legacy Kindle WebKit entry script (SSG only).
+        """Legacy Kindle WebKit entry script (SSG and Server, opt-in).
 
         Real e-Ink Kindles (UA contains ``kindle`` but not Silk) are sent to
         the dependency-free minimal page; Kindle Fire (Silk) and ``?full=1``
         keep the full reader, which must never be a redirect loop.  Server
-        renders the minimal pages at request time, so nothing is emitted
-        there.  PDF books have no minimal pages and must not use this.  The
-        minimal pages themselves are opt-in via ``kindle_support``.
+        renders the minimal pages at request time from the same templates.
+        PDF books have no minimal pages and must not use this.  The minimal
+        pages themselves are opt-in via ``kindle_support``.
         """
-        if not self.kindle_support or self.deployment_mode == "server":
+        if not self.kindle_support:
             return ""
         return f"""
 <script>
@@ -2625,6 +2728,23 @@ document.addEventListener('DOMContentLoaded', function() {{
   }}
 }})();
 """
+        # Server mode additionally resolves "Continue reading" from the
+        # authenticated reading-progress API (read-only); the cookie is the
+        # SSG/local fallback.  The index never mutates anything.
+        kindle_server_resume_script = ""
+        if self.deployment_mode == "server":
+            kindle_server_resume_script = _KINDLE_READER_SERVER_RESUME_JS % {
+                "book_hash": json.dumps(str(self.book_hash)),
+            }
+        # The book title links back to the minimal library: a relative link in
+        # SSG (both files share the output root), the absolute route in Server
+        # (the minimal library lives at the site root, not under /book/<id>/).
+        # The footer's "Open full reader" link is kept as-is.
+        library_href = (
+            self.urls.public("/kindle-library.html")
+            if self.deployment_mode == "server"
+            else "kindle-library.html"
+        )
         return f"""<!DOCTYPE html>
 <html lang="{book_language}">
 <head>
@@ -2637,7 +2757,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 </head>
 <body class="light">
 <header class="k-header">
-    <a href="index.html?full=1">{book_title_text}</a>
+    <a href="{library_href}">{book_title_text}</a>
 </header>
 {authors_html}
 <a id="kResume" class="k-resume" href="kindle_chapter_0.html" style="display:none" accesskey="c" data-i18n="continueReading">Continue reading</a>
@@ -2650,7 +2770,8 @@ document.addEventListener('DOMContentLoaded', function() {{
 <script>
 {_kindle_i18n_script(self.lang)}
 {_KINDLE_READER_JS}
-{resume_script}</script>
+{resume_script}
+{kindle_server_resume_script}</script>
 </body>
 </html>
 """
@@ -2680,6 +2801,16 @@ document.addEventListener('DOMContentLoaded', function() {{
         progress_script = (
             f"setCookie({book_hash_js}, 'chapter_{chapter_index}.html', 365);\n"
         )
+        # Server mode keeps the Kindle surface read-write for progress
+        # (load the saved position, then record the current chapter) while
+        # heartbeats stay report-only; the page never displays insights or
+        # touches the shelf.  SSG stays fully local (cookies only).
+        kindle_server_report_script = ""
+        if self.deployment_mode == "server":
+            kindle_server_report_script = _KINDLE_READER_SERVER_REPORT_JS % {
+                "book_hash": json.dumps(str(self.book_hash)),
+                "chapter_index": json.dumps(chapter_index),
+            }
         return f"""<!DOCTYPE html>
 <html lang="{book_language}">
 <head>
@@ -2712,7 +2843,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 <script>
 {_kindle_i18n_script(self.lang)}
 {_KINDLE_READER_JS}
-{progress_script}</script>
+{kindle_server_report_script}{progress_script}</script>
 </body>
 </html>
 """

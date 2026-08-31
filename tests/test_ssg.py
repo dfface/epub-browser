@@ -669,6 +669,8 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertIn("SSG Book", index)
             self.assertIn('href="kindle_chapter_0.html"', index)
             self.assertIn('id="kResume"', index)
+            # the minimal book home links back to the minimal library
+            self.assertIn('href="kindle-library.html"', index)
             self.assertIn("Continue reading", index)
 
             chapter = (book / "kindle_chapter_0.html").read_text(encoding="utf-8")

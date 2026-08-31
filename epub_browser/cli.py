@@ -46,6 +46,7 @@ class ServerConfig:
     retain_legacy_temporary_dir: bool = False
     legacy_invocation: bool = False
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
+    kindle: bool = False
     auth: ServerAuthOptions = ServerAuthOptions()
 
     def __post_init__(self) -> None:
@@ -149,6 +150,15 @@ def _new_parser() -> argparse.ArgumentParser:
     )
     server.add_argument("--trusted-proxy-cidr", action="append", default=[])
     server.add_argument("--cookie-secure", action="store_true", default=None)
+    server.add_argument(
+        "--kindle",
+        action="store_true",
+        help=(
+            "Serve dependency-free minimal pages for legacy e-Ink Kindles and "
+            "redirect Kindle WebKit browsers to them; Kindle surfaces only "
+            "report progress/heartbeats and expose a read-only shelf"
+        ),
+    )
     return parser
 
 
@@ -167,6 +177,14 @@ def _legacy_parser() -> argparse.ArgumentParser:
     parser.add_argument("--watch", "-w", action="store_true")
     parser.add_argument("--sync-dir")
     _add_book_id_storage(parser)
+    parser.add_argument(
+        "--kindle",
+        action="store_true",
+        help=(
+            "Serve dependency-free minimal pages for legacy e-Ink Kindles and "
+            "redirect Kindle WebKit browsers to them"
+        ),
+    )
     return parser
 
 
@@ -204,6 +222,7 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
                 Path(values.legacy_sync_dir) if values.legacy_sync_dir else None
             ),
             book_id_storage=values.book_id_storage,
+            kindle=values.kindle,
             auth=auth,
         )
 
@@ -232,6 +251,7 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
         retain_legacy_temporary_dir=bool(values.keep_files and not values.output_dir),
         legacy_invocation=True,
         book_id_storage=values.book_id_storage,
+        kindle=values.kindle,
     )
 
 

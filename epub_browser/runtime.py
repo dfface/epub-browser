@@ -480,6 +480,7 @@ def run_server(
             progress_broker=progress_broker,
             log_errors=True,
             server_directory=server_dir,
+            kindle=config.kindle,
         )
         uvicorn_config = uvicorn.Config(
             app,

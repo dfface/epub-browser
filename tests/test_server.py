@@ -1219,10 +1219,15 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             "next": "/book/id/chapter_0.html",
         }
 
+        # a plain form POST without the hidden auth_nonce field is rejected
+        # (the header nonce is only accepted for JSON requests)
         form = self.client.post(
             "/login",
             data={"username": "alice", "password": "secret"},
-            headers={"X-EPUB-Browser-Auth-Nonce": nonce},
+            headers={
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
         )
         cross_site = self.client.post(
             "/login",
@@ -1252,7 +1257,8 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(form.status_code, 415)
+        self.assertEqual(form.status_code, 403)
+        self.assertEqual(form.json()["code"], "invalid_auth_request")
         self.assertEqual(cross_site.status_code, 403)
         self.assertEqual(cross_site.json()["code"], "invalid_auth_request")
         self.assertEqual(missing_nonce.status_code, 403)
@@ -5504,3 +5510,270 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(review.json()["code"], "not_ready")
         self.assertEqual(heartbeat.status_code, 503)
         self.assertEqual(heartbeat.json()["code"], "not_ready")
+
+
+class ServerKindleTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        public = Path(self.directory.name)
+        (public / "index.html").write_text("library", encoding="utf-8")
+        self._write_server_content_cache(public, "book", "Book", "Opening chapter")
+        self._write_server_pdf_cache(public, "pdf")
+        self.store = StateStore(public / "epub-browser.db")
+        self.alice = self.store.initialize(
+            BootstrapCredentials("alice", "alice-secret")
+        )
+        self.store.resolve_book(
+            public / "book.epub",
+            None,
+            "book-fingerprint",
+            {"title": "Book"},
+            preferred_book_id="book",
+        )
+        self.store.resolve_book(
+            public / "pdf.pdf",
+            None,
+            "pdf-fingerprint",
+            {"title": "PDF Book", "format": "pdf"},
+            preferred_book_id="pdf",
+            source_format="pdf",
+        )
+        self.app = create_app(
+            public,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+            kindle=True,
+        )
+        self.client = self._login("alice", "alice-secret")
+
+    def _write_server_content_cache(self, public, book_id, title, chapter_title):
+        content = public / "book" / book_id / "content"
+        content.mkdir(parents=True)
+        (content.parent / SERVER_OUTPUT_REVISION_FILE).write_text(
+            SERVER_OUTPUT_REVISION + "\n", encoding="utf-8"
+        )
+        assets = public / "assets"
+        assets.mkdir(exist_ok=True)
+        manifest = {
+            name: "/assets/immutable/" + name
+            for name in (
+                    "ai-canvas.css", "ai-canvas.js", "ai-reading-hub.css",
+                    "ai-reading-hub.js", "ai-chat.css", "ai-chat.js",
+                    "ai-rich-text.css", "ai-rich-text.js",
+                    "vendor/markdown-it/markdown-it.min.js",
+                    "vendor/katex/katex.min.css", "vendor/katex/katex.min.js",
+                    "vendor/mermaid/mermaid.min.js",
+                    "vendor/pinyin-pro/pinyin-pro.min.js",
+                    "bookshelf.js", "annotation-hub.css", "annotation.js",
+                    "annotation-hub.js", "vendor/sortablejs/sortable.min.js", "book-reviews.css",
+                    "book-reviews.js",
+                )
+        }
+        manifest.update({
+            "reading-sessions.js": "/assets/immutable/reading-sessions.0123456789ab.js",
+            "reading-insights.css": "/assets/immutable/reading-insights.0123456789ab.css",
+            "reading-insights.js": "/assets/immutable/reading-insights.0123456789ab.js",
+        })
+        (assets / "asset-manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        (content / "metadata.json").write_text(
+            json.dumps({
+                "title": title,
+                "authors": [],
+                "tags": [],
+                "chapters": [{"title": chapter_title, "path": "chapter.xhtml"}],
+                "toc": [],
+            }),
+            encoding="utf-8",
+        )
+        (content / "chapter_0.json").write_text(
+            json.dumps({
+                "index": 0,
+                "title": chapter_title,
+                "content": "<p>Cached chapter.</p>",
+                "style_links": "",
+            }),
+            encoding="utf-8",
+        )
+
+    def _write_server_pdf_cache(self, public, book_id):
+        pdf = public / "book" / book_id / "pdf"
+        pdf.mkdir(parents=True)
+        (pdf / "metadata.json").write_text(
+            json.dumps({
+                "title": None,
+                "authors": [],
+                "tags": [],
+                "language": None,
+                "page_count": 1,
+                "pages": [
+                    {
+                        "page_number": 1,
+                        "width": 612.0,
+                        "height": 792.0,
+                        "outline_labels": [],
+                    },
+                ],
+                "encrypted": False,
+                "has_extractable_text": True,
+                "cover": None,
+            }),
+            encoding="utf-8",
+        )
+
+    def _login(self, username, password):
+        client = TestClient(self.app)
+        self.addCleanup(client.close)
+        self.assertEqual(_json_login(self, client, username, password).status_code, 200)
+        session = client.get("/api/session")
+        client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
+        return client
+
+    def test_kindle_surfaces_are_served_and_minimal(self):
+        index = self.client.get("/")
+        self.assertEqual(index.status_code, 200)
+        self.assertIn("kindle-library.html", index.text)
+
+        shelf = self.client.get("/kindle-library.html")
+        self.assertEqual(shelf.status_code, 200)
+        self.assertIn("Book", shelf.text)
+        self.assertNotIn("bookshelfBtn", shelf.text)
+
+        kindle_index = self.client.get("/book/book/kindle.html")
+        self.assertEqual(kindle_index.status_code, 200)
+        self.assertIn("Continue reading", kindle_index.text)
+        self.assertIn('data-i18n="continueReading"', kindle_index.text)
+        # the book title links back to the minimal library (absolute route in
+        # Server mode), while the footer still offers the full reader
+        self.assertIn('href="/kindle-library.html"', kindle_index.text)
+        self.assertIn("index.html?full=1", kindle_index.text)
+        # the minimal index reads the saved server progress to resume reading
+        self.assertIn("api/reading-progress/", kindle_index.text)
+
+        chapter = self.client.get("/book/book/kindle_chapter_0.html")
+        self.assertEqual(chapter.status_code, 200)
+        self.assertIn("Opening chapter", chapter.text)
+        self.assertNotIn("fetch(", chapter.text)
+        self.assertNotIn("localStorage", chapter.text)
+        self.assertNotIn("classList", chapter.text)
+        self.assertNotIn("=>", chapter.text)
+        self.assertNotIn("addEventListener", chapter.text)
+
+    def test_kindle_chapters_read_and_write_progress(self):
+        chapter = self.client.get("/book/book/kindle_chapter_0.html")
+        self.assertEqual(chapter.status_code, 200)
+        # reading-progress is read-write: fetch a CSRF token first (non-safe
+        # methods require one), GET the saved position, then PUT the current
+        # chapter; heartbeats stay report-only POSTs
+        self.assertIn("'/api/csrf'", chapter.text)
+        self.assertIn("X-CSRF-Token", chapter.text)
+        self.assertIn("'GET'", chapter.text)
+        self.assertIn("'/api/reading-progress/'", chapter.text)
+        self.assertIn("'PUT'", chapter.text)
+        self.assertIn("'/api/reading-sessions/'", chapter.text)
+        self.assertIn("/heartbeat", chapter.text)
+        # the minimal surface never displays insights back, never touches the
+        # shelf, and never deletes progress
+        self.assertNotIn("reading-insights", chapter.text)
+        self.assertNotIn("bookshelf", chapter.text)
+        self.assertNotIn("DELETE", chapter.text)
+
+    def test_kindle_progress_is_read_write_through_the_api(self):
+        progress_url = "/api/reading-progress/book"
+        # a fresh user has no saved progress: GET is a read that 404s
+        self.assertEqual(self.client.get(progress_url).status_code, 404)
+        # PUT without a CSRF token is rejected (the page script must fetch
+        # /api/csrf first, as it does)
+        logged_in = TestClient(self.app)
+        self.addCleanup(logged_in.close)
+        self.assertEqual(
+            _json_login(self, logged_in, "alice", "alice-secret").status_code, 200
+        )
+        denied = logged_in.put(progress_url, json={"chapter_index": 3})
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.json()["code"], "csrf_required")
+        # with the token the write succeeds and the read returns it
+        csrf = logged_in.get("/api/csrf").json()["csrf_token"]
+        logged_in.headers["X-CSRF-Token"] = csrf
+        saved = logged_in.put(progress_url, json={"chapter_index": 3})
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["chapter_index"], 3)
+        self.assertEqual(logged_in.get(progress_url).json()["chapter_index"], 3)
+
+    def test_kindle_pages_require_authentication_and_pdf_has_none(self):
+        anonymous = TestClient(self.app)
+        self.addCleanup(anonymous.close)
+        self.assertEqual(
+            anonymous.get("/kindle-library.html", follow_redirects=False).status_code,
+            303,
+        )
+        self.assertEqual(
+            anonymous.get("/book/book/kindle.html", follow_redirects=False).status_code,
+            303,
+        )
+        self.assertEqual(self.client.get("/book/pdf/kindle.html").status_code, 404)
+
+    def test_kindle_signs_in_without_javascript_form_fallback(self):
+        # A legacy e-Ink Kindle has no fetch, so the login page must fall back
+        # to a plain form POST carrying the auth nonce as a hidden field.
+        anonymous = TestClient(self.app)
+        self.addCleanup(anonymous.close)
+        self.assertEqual(
+            anonymous.get(
+                "/kindle-library.html", follow_redirects=False
+            ).headers["location"],
+            "/login?next=%2Fkindle-library.html",
+        )
+        page = anonymous.get("/login?next=%2Fkindle-library.html")
+        self.assertEqual(page.status_code, 200)
+        nonce_match = re.search(r'name="auth_nonce" value="([^"]+)"', page.text)
+        self.assertIsNotNone(nonce_match)
+        # the submit handler lets browsers without fetch use the plain form
+        self.assertIn("if(!window.fetch)return;", page.text)
+        self.assertIn(
+            "epub_browser_auth_nonce=", page.headers["set-cookie"]
+        )
+        logged_in = anonymous.post(
+            "/login",
+            data={
+                "auth_nonce": nonce_match.group(1),
+                "next": "/kindle-library.html",
+                "locale": "en",
+                "username": "alice",
+                "password": "alice-secret",
+            },
+            headers={
+                "Origin": "http://testserver",
+                "Sec-Fetch-Site": "same-origin",
+            },
+        )
+        self.assertEqual(logged_in.status_code, 200)
+        self.assertEqual(
+            logged_in.json()["redirect"], "/kindle-library.html"
+        )
+        # the session cookie from the form login now unlocks the minimal shelf
+        shelf = anonymous.get("/kindle-library.html")
+        self.assertEqual(shelf.status_code, 200)
+        self.assertIn("Book", shelf.text)
+
+    def test_kindle_is_opt_in(self):
+        plain_app = create_app(
+            self.directory.name,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+        )
+        plain_client = TestClient(plain_app)
+        self.addCleanup(plain_client.close)
+        self.assertEqual(
+            _json_login(self, plain_client, "alice", "alice-secret").status_code, 200
+        )
+        plain_client.headers["X-CSRF-Token"] = plain_client.get(
+            "/api/session"
+        ).json()["csrf_token"]
+        self.assertEqual(plain_client.get("/kindle-library.html").status_code, 404)
+        self.assertEqual(plain_client.get("/book/book/kindle.html").status_code, 404)
+        self.assertEqual(
+            plain_client.get("/book/book/kindle_chapter_0.html").status_code, 404
+        )

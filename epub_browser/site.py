@@ -154,10 +154,11 @@ def render_library_shell(
             <button type="button" class="app-nav-link" id="pwa-install-btn" style="display: none;">
                 <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="library.install">Install</span>
             </button>""" if deployment_mode == "ssg" else ""
-    # Legacy Kindle WebKit entry (SSG, opt-in via --kindle): steer real
-    # e-Ink Kindles to the dependency-free minimal library instead of the
-    # full SPA; Kindle Fire (Silk) and ?full=1 keep the full UI. Runs
-    # before the SPA loads.
+    # Legacy Kindle WebKit entry (opt-in via --kindle, SSG and Server): steer
+    # real e-Ink Kindles to the dependency-free minimal library instead of the
+    # full SPA; Kindle Fire (Silk) and ?full=1 keep the full UI. Runs before
+    # the SPA loads. SSG writes kindle-library.html beside the shell; Server
+    # renders it at /kindle-library.html.
     kindle_entry_script = """
 <script>
 (function () {
@@ -167,7 +168,7 @@ def render_library_shell(
   if (location.search.indexOf('full=1') !== -1) return;
   location.replace('kindle-library.html');
 })();
-</script>""" if (deployment_mode == "ssg" and kindle) else ""
+</script>""" if kindle else ""
     server_account_control = ""
     server_account_panel = ""
     server_account_stylesheet = ""
