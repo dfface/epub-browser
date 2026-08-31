@@ -119,19 +119,40 @@ class SessionAndProxyTests(unittest.TestCase):
         self.assertEqual(self._session_row(token)[1], token_digest(token))
         self.assertTrue(self.service.verify_csrf_token(principal, token, csrf))
 
-    def test_session_expiry_slides_only_while_session_is_valid(self):
+    def test_session_expiry_slides_only_after_the_touch_window(self):
         principal = self._principal("alice")
         token, _ = self.service.create_session(principal)
         original_expiry = float(self._session_row(token)[3])
 
+        # Touches inside the window are throttled: no sliding renewal yet.
         self.clock.advance(60)
         self.assertEqual(self.service.principal_from_session(token), principal)
+        self.assertEqual(float(self._session_row(token)[3]), original_expiry)
+
+        # Once the touch window elapses the session renews again.
+        self.clock.advance(241)
+        self.assertEqual(self.service.principal_from_session(token), principal)
         extended_expiry = float(self._session_row(token)[3])
-        self.assertEqual(extended_expiry, original_expiry + 60)
+        self.assertEqual(extended_expiry, original_expiry + 301)
 
         self.clock.advance(self.config.session_ttl_seconds + 1)
         self.assertIsNone(self.service.principal_from_session(token))
         self.assertEqual(float(self._session_row(token)[3]), extended_expiry)
+
+    def test_session_touch_writes_are_throttled_within_the_touch_window(self):
+        principal = self._principal("alice")
+        token, _ = self.service.create_session(principal)
+        original = self._session_row(token)
+
+        self.store.principal_from_session(token, now=self.clock() + 60)
+        within_window = self._session_row(token)
+        self.assertEqual(within_window[4], original[4])  # last_used_at unchanged
+        self.assertEqual(within_window[3], original[3])  # expires_at unchanged
+
+        self.store.principal_from_session(token, now=self.clock() + 301)
+        touched = self._session_row(token)
+        self.assertNotEqual(touched[4], original[4])
+        self.assertEqual(float(touched[3]), float(original[3]) + 301)
 
     def test_revoked_session_and_revoke_all_are_invalid_immediately(self):
         principal = self._principal("alice")

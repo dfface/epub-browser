@@ -105,7 +105,7 @@ class SSGPublicationTests(unittest.TestCase):
             with Image.open(book / "cover.png") as image:
                 self.assertLessEqual(image.width, 600)
                 self.assertLessEqual(image.height, 900)
-            self.assertIn('href=/reader/book/{}/chapter_0.html'.format(book_id), index_html)
+            self.assertIn('href="/reader/book/{}/chapter_0.html"'.format(book_id), index_html)
             self.assertIn('"documentUrl":"/reader/book/{}/document.pdf"'.format(book_id), chapter_html)
             self.assertNotIn("/api/", chapter_html)
             self.assertNotIn("reading-sessions.js", chapter_html)

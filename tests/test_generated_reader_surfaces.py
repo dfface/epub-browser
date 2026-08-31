@@ -75,26 +75,26 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             ])
 
             book_html = processor.create_index_page(write=False)
-            self.assertIn('data-id=toc-container', book_html)
-            self.assertEqual(book_html.count('class=chapter-link'), 3)
-            self.assertIn('data-i18n=pdf.page', book_html)
+            self.assertIn('data-id="toc-container"', book_html)
+            self.assertEqual(book_html.count('class="chapter-link"'), 3)
+            self.assertIn('data-i18n="pdf.page"', book_html)
             self.assertEqual(book_html.count('Opening'), 1)
             self.assertEqual(book_html.count('Part I'), 1)
-            self.assertEqual(book_html.count('class=chapter-outline-labels'), 1)
+            self.assertEqual(book_html.count('class="chapter-outline-labels"'), 1)
             self.assertNotIn('— Opening', book_html)
             self.assertIn('>Opening · Part I</span>', book_html)
             self.assertRegex(
                 book_html,
-                r'<span class=chapter-title-with-sync><span [^>]*class=chapter-title[^>]*>Page 2</span>'
-                r'<span class=chapter-outline-labels[^>]*>Opening · Part I</span></span>'
-                r'<span class=chapter-page>chapter_1\.html</span>',
+                r'<span class="chapter-title-with-sync"><span [^>]*class="chapter-title"[^>]*>Page 2</span>'
+                r'<span class="chapter-outline-labels"[^>]*>Opening · Part I</span></span>'
+                r'<span class="chapter-page">chapter_1\.html</span>',
             )
             self.assertNotIn('data-ai-reading-hub', book_html)
             self.assertNotIn('data-ai-book-chat', book_html)
             self.assertNotIn('data-ai-reading-indicators', book_html)
             self.assertIn('data-reading-insights', book_html)
-            self.assertIn('class=book-source-format data-i18n=pdf.formatBadge', book_html)
-            self.assertIn('aria-label=PDF', book_html)
+            self.assertRegex(book_html, r'class="book-source-format"[^>]*data-i18n="pdf.formatBadge"')
+            self.assertIn('aria-label="PDF"', book_html)
 
     def test_pdf_page_adds_only_a_scoped_descriptor_to_the_shared_reader(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -293,8 +293,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertRegex(server_html, r'data-i18n=(?:["\'])?account\.pats\.title(?:["\' >])')
         self.assertRegex(server_html, r'data-i18n=(?:["\'])?account\.pats\.neverExpiresWarning(?:["\' >])')
         self.assertLess(
-            server_html.index('id=adminSectionBooksTab'),
-            server_html.index('id=adminSectionWebhooksTab'),
+            server_html.index('id="adminSectionBooksTab"'),
+            server_html.index('id="adminSectionWebhooksTab"'),
         )
 
     def test_server_admin_books_surface_is_semantic_and_localized(self):
@@ -306,8 +306,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'<section\b[^>]*aria-labelledby=(?:["\'])?adminSectionBooksTab',
         )
         for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'sortLabel', 'pageSize', 'refresh'):
-            self.assertIn('data-i18n=admin.books.' + key, server_html)
-        self.assertIn('data-i18n-placeholder=admin.books.searchPlaceholder', server_html)
+            self.assertIn('data-i18n="admin.books.' + key + '"', server_html)
+        self.assertIn('data-i18n-placeholder="admin.books.searchPlaceholder"', server_html)
         self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
         self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
         self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*class=(?:["\'])?admin-books-workspace)')
@@ -331,7 +331,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'(?=[^>]*data-i18n-aria-label=(?:["\'])?admin.books.closeEditor)',
         )
         for key in ('book', 'access', 'profile', 'results', 'updated', 'action'):
-            self.assertIn('data-i18n=admin.books.header.' + key, server_html)
+            self.assertIn('data-i18n="admin.books.header.' + key + '"', server_html)
         for value in ('10', '20', '50', '100'):
             self.assertRegex(server_html, r'<option\b[^>]*value=(?:["\'])?' + value + r'(?:["\' >])')
         self.assertRegex(server_html, r'<option\b(?=[^>]*value=(?:["\'])?20)(?=[^>]*selected)')
@@ -365,8 +365,8 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("var setDictionaryFormat = function() {};", auth_js)
         self.assertIn("setDictionaryFormat = function(format) {", auth_js)
         self.assertRegex(server_html, r'<section\b[^>]*id=(?:["\'])?adminSystemLimits')
-        self.assertIn('data-i18n=admin.systemLimits', server_html)
-        self.assertIn('data-i18n=admin.systemLimitsDescription', server_html)
+        self.assertIn('data-i18n="admin.systemLimits"', server_html)
+        self.assertIn('data-i18n="admin.systemLimitsDescription"', server_html)
         self.assertIn('no built-in capacity, count, or concurrency limit', server_html)
         self.assertNotIn('512 MB', server_html)
         self.assertNotIn('500,000 entries', server_html)
@@ -390,7 +390,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 server_html,
                 rf'<(?:section|h4)\b[^>]*(?:id=(?:["\'])?{panel_id}|aria-labelledby=(?:["\'])?{panel_id})',
             )
-            self.assertIn('data-i18n=' + key, server_html)
+            self.assertIn('data-i18n="' + key + '"', server_html)
         self.assertRegex(
             server_html,
             r'<section\b[^>]*(?:id=(?:["\'])?adminAiConfigurationSection|'
@@ -402,9 +402,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'aria-labelledby=(?:["\'])?adminSectionAiPermissionsTab)',
         )
         self.assertRegex(server_html, r'<section\b[^>]*aria-labelledby=(?:["\'])?adminSectionAiJobsTab')
-        self.assertIn('data-i18n=admin.ai.jobs.statusFilter', server_html)
-        self.assertIn('data-i18n=admin.ai.jobs.pageSize', server_html)
-        self.assertIn('data-i18n=admin.ai.jobs.refresh', server_html)
+        self.assertIn('data-i18n="admin.ai.jobs.statusFilter"', server_html)
+        self.assertIn('data-i18n="admin.ai.jobs.pageSize"', server_html)
+        self.assertIn('data-i18n="admin.ai.jobs.refresh"', server_html)
         self.assertRegex(server_html, r'<table\b[^>]*class=(?:["\'])?account-admin-table')
         self.assertIn('<thead>', server_html)
         self.assertRegex(server_html, r'<tbody\b[^>]*id=(?:["\'])?adminAiJobsBody')
@@ -414,7 +414,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             r'<p\b(?=[^>]*id=(?:["\'])?adminAiJobsLive)(?=[^>]*aria-live=(?:["\'])?polite)',
         )
         for status in ('all', 'queued', 'running', 'complete', 'failed', 'interrupted'):
-            self.assertIn('data-i18n=admin.ai.jobs.status.' + status, server_html)
+            self.assertIn('data-i18n="admin.ai.jobs.status.' + status + '"', server_html)
         for page_size in ('10', '20', '50', '100'):
             self.assertRegex(
                 server_html,
@@ -2417,7 +2417,7 @@ assert.deepEqual(
         self.assertNotIn('data-book-reading-time', html)
         self.assertIn('data-book-reading-time', server_html)
         self.assertIn('data-book-reading-time-label', server_html)
-        self.assertLess(server_html.index('class=book-info-cover'), server_html.index('data-book-reading-time'))
+        self.assertLess(server_html.index('class="book-info-cover"'), server_html.index('data-book-reading-time'))
         self.assertIn("'/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary'", script)
         self.assertIn("bookT('book.readingTime'", script)
         self.assertIn("renderBookReadingTime(readingTime.dataset.activeSeconds)", script)
@@ -3013,12 +3013,12 @@ assert.deepEqual(
         self.assertIn('app-nav-brand-mark', breadcrumb)
         self.assertIn('app-nav-links', breadcrumb)
         self.assertIn('app-nav-theme', breadcrumb)
-        self.assertIn('id=bookshelfBtn', breadcrumb)
-        self.assertIn('id=annotationsBtn', breadcrumb)
+        self.assertIn('id="bookshelfBtn"', breadcrumb)
+        self.assertIn('id="annotationsBtn"', breadcrumb)
         self.assertNotIn('id=libraryBookCount', breadcrumb)
         self.assertNotIn('id=libraryTagCount', breadcrumb)
-        self.assertIn('class=library-overview', html)
-        self.assertIn('class=library-summary', html)
+        self.assertIn('class="library-overview"', html)
+        self.assertIn('class="library-summary"', html)
         self.assertNotRegex(breadcrumb, r'\bid=(?:["\'])?loginCard(?:["\'])?')
         self.assertNotIn('library-info', html)
 
@@ -3446,7 +3446,7 @@ assert.deepEqual(
     def test_ssg_install_action_is_part_of_navigation_not_floating_controls(self):
         html = self._library_html()
         nav = html[html.index('<nav'):html.index('</nav>')]
-        self.assertIn('id=pwa-install-btn', nav)
+        self.assertIn('id="pwa-install-btn"', nav)
         script = Path('epub_browser/assets/library.js').read_text(encoding='utf-8')
         self.assertIn("getElementById('pwa-install-btn')", script)
         self.assertNotIn('readingControls.appendChild(installBtn)', script)
@@ -3459,7 +3459,7 @@ assert.deepEqual(
         self.assertRegex(library_html, r'\bid=(?:["\'])?annotationsBtn')
         self.assertRegex(library_html, r'\bdata-annotation-hub')
         self.assertNotRegex(library_html, r'\bdata-ai-reading-hub')
-        self.assertIn('aria-haspopup=dialog', library_html)
+        self.assertIn('aria-haspopup="dialog"', library_html)
         self.assertIn('window.EpubBrowserLibraryFeatureAssets=', library_html)
         self.assertRegex(library_html, r'<script\b[^>]+/assets/immutable/library-feature-loader\.[0-9a-f]{12}\.js[^>]*>')
         self.assertNotRegex(library_html, r'<script\b[^>]+/assets/immutable/(?:annotation|annotation-hub|bookshelf|sortable|pinyin-pro\.min)\.[0-9a-f]{12}\.js[^>]*>')
@@ -3469,7 +3469,7 @@ assert.deepEqual(
         self.assertNotIn('/annotations/index.html', library_html)
         self.assertRegex(book_html, r'\bid=(?:["\'])?bookAnnotationsBtn')
         self.assertRegex(book_html, r'\bdata-book-hash=')
-        self.assertIn('aria-haspopup=dialog', book_html)
+        self.assertIn('aria-haspopup="dialog"', book_html)
         self.assertRegex(book_html, r'annotation-hub\.[0-9a-f]{12}\.css')
         self.assertRegex(chapter_html, r'\bid=(?:["\'])?chapterAnnotationsBtn')
         self.assertRegex(chapter_html, r'\bdata-book-hash=')
@@ -4087,7 +4087,7 @@ assert.deepEqual(
         server_index = self._server_book_html()
         review_script = Path('epub_browser/assets/book-reviews.js').read_text(encoding='utf-8')
         review_styles = Path('epub_browser/assets/book-reviews.css').read_text(encoding='utf-8')
-        self.assertRegex(server_index, r'<section[^>]*data-book-id=[^>]*data-book-reviews')
+        self.assertRegex(server_index, r'<section\b[^>]*\bdata-book-reviews\b[^>]*\bdata-book-id=')
         self.assertIn('data-book-review-display', server_index)
         self.assertRegex(server_index, r'data-i18n=(?:["\'])?bookReviews\.write')
         self.assertRegex(server_index, r'data-i18n-aria-label=(?:["\'])?bookReviews\.write')
@@ -4138,7 +4138,7 @@ assert.deepEqual(
             )
 
         self.assertIn('data-book-review-initial', server_index)
-        self.assertIn('&lt;private review>', server_index)
+        self.assertIn('&lt;private review&gt;', server_index)
         self.assertIn('\\u003cprivate review\\u003e', server_index)
         self.assertNotIn('book-review-display-private', server_index)
         self.assertNotIn('Only visible to your account', server_index)

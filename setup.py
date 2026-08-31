@@ -49,10 +49,12 @@ setup(
     license_files=["License.txt", "THIRD_PARTY_NOTICES.md"],
     python_requires='>=3.9',  # Path and type syntax used by the v2 runtime
     install_requires=[  # 项目依赖的第三方包
-        # 例如 "requests", 如果您的工具没有额外依赖，可以留空列表 []
-        "tqdm",
-        "minify_html",
-        "watchdog",
+        # 版本约束须守住 python_requires=">=3.9" 的承诺。下面两个包在 PyPI 上
+        # 不声明 Requires-Python（或声明得比实际宽松），不设上限的话，
+        # pip 在 Python 3.9 上可能装上要求更高解释器的未来版本。
+        # 下限取有 cp39 wheel（或纯 Python）且满足本仓库所用 API 的版本。
+        "tqdm>=4.62,<5.0",
+        "watchdog>=3.0,<7.0",
         "starlette>=0.37,<1.0",
         "uvicorn[standard]>=0.30,<1.0",
         "argon2-cffi>=23.1,<26.0",
@@ -62,6 +64,8 @@ setup(
         "pypdf>=6.0,<7.0",
         "pypdfium2>=5.0,<6.0",
         "Pillow>=10.0,<12.0",
+        # Unified EPUB XML/XHTML parser: strict-first, recovery fallback.
+        "lxml>=5.0,<7.0",
     ],
     entry_points={  # 创建命令行可执行脚本的关键！
         'console_scripts': [

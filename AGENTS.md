@@ -17,8 +17,11 @@ Server 专属功能必须由服务端配置、权限或 API 显式保护，不�
 
 ### 单一事实来源
 
-- EPUB 解析与清洗位于 `epub_browser/processor.py`；PDF 检查、页元数据和封面提取位于
-  `epub_browser/pdf_processor.py`。
+- EPUB 解析位于 `epub_browser/epub_parsing.py`（统一的 lxml 管线：严格优先、
+  失败才恢复、最后回退到 HTML 解析器；禁用外部实体与 DTD，执行结构校验）；
+  EPUB 清洗与页面模板位于 `epub_browser/processor.py`；PDF 检查、页元数据和封面
+  提取位于 `epub_browser/pdf_processor.py`。`epub_identity.py` 是唯一例外，它用
+  Expat 的 `CurrentByteIndex` 精确定位 OPF 字节，保持独立实现。
 - `epub_browser/source_format.py` 是格式识别入口；不要在各调用方重复以扩展名判断格式。
 - Library、Book、目录和章节页面模板仍由 `epub_browser/processor.py` 统一提供。
 - SSG 直接调用这些模板并写入 HTML 文件。
@@ -107,6 +110,7 @@ PDF 修订；CSS、PDF.js 交互、缩放、主题、loading 或工具栏变化�
 ## 关键文件
 
 - `epub_browser/source_format.py`：EPUB/PDF 格式识别与能力常量。
+- `epub_browser/epub_parsing.py`：统一 lxml 解析（container/OPF/NCX/nav/XHTML/SVG）。
 - `epub_browser/processor.py`：EPUB 内容处理、共享页面模板、EPUB Server 内容缓存写入。
 - `epub_browser/pdf_processor.py`：PDF 元数据、页尺寸、outline、文本层能力和封面提取。
 - `epub_browser/pdf_delivery.py`：Server PDF 文档鉴权、Range 与响应安全边界。

@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import hashlib
+from collections import OrderedDict
 import html
 import ipaddress
 import json
@@ -51,7 +52,11 @@ from .ai_reading import (
     validate_reading_request,
 )
 from .asset_publisher import WEB_MANIFEST_SOURCES, PublishedAssets, rewrite_asset_urls
-from .dictionary_service import DictionaryService, DictionaryServiceError
+from .dictionary_service import (
+    DictionaryService,
+    DictionaryServiceError,
+    migrate_legacy_dictionary_directory,
+)
 from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
 from .state import SetupAlreadyCompleteError, StateStore, UserDeletionError
@@ -684,6 +689,7 @@ def create_app(
     oidc_service: Optional[OIDCService] = None,
     release_lookup: Optional[ReleaseLookup] = None,
     log_errors: bool = False,
+    server_directory=None,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
@@ -694,9 +700,14 @@ def create_app(
     runtime_status = status or _CompatibilityRuntimeStatus()
     public_files = CachedStaticFiles(directory=base_directory, html=False)
     release_lookup = release_lookup or ReleaseLookup()
+    # Dictionary databases are runtime user data; they must live under the
+    # server directory, not inside the published cache tree.  Migrate any
+    # databases earlier builds wrote under ``cache/public/data``.
+    data_directory = Path(server_directory) if server_directory else Path(base_directory)
+    migrate_legacy_dictionary_directory(base_directory, data_directory)
     ai_reading = AIReadingService(store, base_directory)
     webhook_service = WebhookService(store)
-    dictionary_service = DictionaryService(store, base_directory)
+    dictionary_service = DictionaryService(store, data_directory)
     encyclopedia = WikimediaEncyclopedia()
     heartbeat_attempts = {}
     store.requeue_running_ai_jobs()
@@ -4364,8 +4375,16 @@ window.location.assign(payload.redirect||'/');
         store.delete_reading_progress(principal.user_id, book_hash)
         return response({'message': 'Deleted'})
 
-    def authorized_chapter_snapshot(book_id, chapter_index):
-        """Return cache-derived labels only after the caller has book access."""
+    chapter_snapshot_cache: OrderedDict = OrderedDict()
+    chapter_snapshot_cache_ttl_seconds = 60.0
+    chapter_snapshot_cache_max_entries = 1024
+
+    def load_authorized_chapter_snapshot(book_id, chapter_index):
+        """Return cache-derived labels only after the caller has book access.
+
+        A lightweight projection: only book title and chapter label are read,
+        never the rendered chapter markup.
+        """
         book = store.book_by_id(book_id)
         if book is None:
             raise ServerPageError('Book content cache is invalid')
@@ -4405,18 +4424,31 @@ window.location.assign(payload.redirect||'/');
             raise ServerPageError('Book content cache is invalid')
         if chapter_index >= len(chapters):
             raise ValueError('chapter index is outside the book')
-        renderer.render_chapter(chapter_index)
-        chapter = renderer._read_json(
-            renderer.content_dir / f'chapter_{chapter_index}.json'
-        )
+        # metadata.chapters[index].title and chapter_<n>.json's title are the
+        # same EPUB-derived value; no full render or chapter read is needed.
         book_title = store.managed_book_metadata(book_id).get('title')
-        chapter_label = chapter.get('title')
+        chapter_label = chapters[chapter_index]['title']
         if (
             not isinstance(book_title, str) or not book_title.strip()
             or not isinstance(chapter_label, str) or not chapter_label.strip()
         ):
             raise ServerPageError('Book content cache is invalid')
         return book_title, chapter_label
+
+    def authorized_chapter_snapshot(book_id, chapter_index):
+        """Return cache-derived labels, rate limited by an LRU with TTL."""
+        key = (book_id, chapter_index)
+        now = time.monotonic()
+        cached = chapter_snapshot_cache.get(key)
+        if cached is not None and now - cached[2] < chapter_snapshot_cache_ttl_seconds:
+            chapter_snapshot_cache.move_to_end(key)
+            return cached[0], cached[1]
+        labels = load_authorized_chapter_snapshot(book_id, chapter_index)
+        chapter_snapshot_cache[key] = (labels[0], labels[1], now)
+        chapter_snapshot_cache.move_to_end(key)
+        if len(chapter_snapshot_cache) > chapter_snapshot_cache_max_entries:
+            chapter_snapshot_cache.popitem(last=False)
+        return labels
 
     async def book_review(request):
         principal = require_principal(request)
@@ -4793,7 +4825,11 @@ window.location.assign(payload.redirect||'/');
             authorized.headers['Cache-Control'] = 'private, no-store'
             return authorized
         raw_session = request.cookies.get(SESSION_COOKIE)
-        session_principal = auth_service.principal_from_session(raw_session)
+        # Session validation touches SQLite; keep it off the ASGI loop so a
+        # burst of asset requests cannot serialize on one write transaction.
+        session_principal = await asyncio.to_thread(
+            auth_service.principal_from_session, raw_session
+        )
         principal = session_principal
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session

@@ -8,8 +8,6 @@ from pathlib import Path
 from typing import Optional, Sequence, Tuple
 from types import SimpleNamespace
 
-import minify_html
-
 from .asset_publisher import PublishedAssets, rewrite_asset_urls
 from .server_chrome import (
     SERVER_ACCOUNT_CONTROL,
@@ -448,7 +446,9 @@ if (isKindle) {
         '<script>window.EpubBrowserI18n.init();</script>',
         1,
     )
-    return minify_html.minify(library_html, minify_css=True, minify_js=True)
+    # 不压缩 HTML：模板紧凑，实测 minify_html 对这类输出无收益，
+    # 且 CSS/JS 压缩可能与 kindle 兼容性冲突，压缩依赖已移除。
+    return library_html
 
 
 def _atomic_write_text(path: Path, contents: str) -> None:

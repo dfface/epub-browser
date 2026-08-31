@@ -102,7 +102,7 @@ application has no SPA framework and does not require a Node.js runtime:
 | Frontend | Semantic HTML, CSS, **Vanilla JavaScript** with ES modules and browser APIs | One shared responsive UI for SSG and Server |
 | CLI and Server | Python 3.9+, Starlette, Uvicorn | Conversion commands, authenticated pages, APIs, and background work |
 | Data | SQLite plus rebuildable JSON content caches | User state remains separate from derived EPUB/PDF content |
-| Book formats | Project EPUB pipeline, pypdf, pypdfium2, PDF.js | EPUB extraction, PDF metadata/covers, and local browser rendering |
+| Book formats | lxml, pypdf, pypdfium2, PDF.js | Unified strict-first EPUB parsing/sanitisation, PDF metadata/covers, local browser rendering |
 | Offline and assets | Service Worker, hashed immutable assets, locked vendored dependencies | Self-contained delivery without a runtime CDN |
 | Distribution | PyPI, Docker, ordinary static hosting | The same codebase ships as SSG or a persistent Server |
 | Optional AI | OpenAI-compatible APIs with locally rendered Markdown, KaTeX, and Mermaid | EPUB learning layers in Server mode only |

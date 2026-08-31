@@ -9,7 +9,11 @@ import zipfile
 from pathlib import Path
 
 from epub_browser.auth import BootstrapCredentials
-from epub_browser.dictionary_service import DictionaryService, DictionaryServiceError
+from epub_browser.dictionary_service import (
+    DictionaryService,
+    DictionaryServiceError,
+    migrate_legacy_dictionary_directory,
+)
 from epub_browser.state import StateStore
 
 
@@ -296,6 +300,45 @@ class DictionaryServiceTests(unittest.TestCase):
             self.assertIsNotNone(store.get_dictionary(dictionary_id))
             self.assertTrue((dictionary_directory / (dictionary_id + ".sqlite")).exists())
             self.assertTrue(service.lookup(dictionary_id, "run").found)
+
+    def test_legacy_cache_dictionaries_migrate_out_of_the_cache_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            server_dir = root / "server"
+            public_dir = server_dir / "cache" / "public"
+            legacy = public_dir / "data" / "dictionaries"
+            legacy.mkdir(parents=True)
+            (legacy / "abc.sqlite").write_bytes(b"dictionary data")
+            (legacy / ".upload-staging").write_bytes(b"staging")
+
+            migrate_legacy_dictionary_directory(public_dir, server_dir)
+
+            self.assertEqual(
+                (server_dir / "data" / "dictionaries" / "abc.sqlite").read_bytes(),
+                b"dictionary data",
+            )
+            self.assertFalse(legacy.exists())
+
+    def test_legacy_cache_migration_is_idempotent_and_skips_same_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            server_dir = root / "server"
+            public_dir = server_dir / "cache" / "public"
+            legacy = public_dir / "data" / "dictionaries"
+            legacy.mkdir(parents=True)
+            (legacy / "abc.sqlite").write_bytes(b"dictionary data")
+
+            migrate_legacy_dictionary_directory(public_dir, server_dir)
+            migrate_legacy_dictionary_directory(public_dir, server_dir)
+
+            self.assertTrue(
+                (server_dir / "data" / "dictionaries" / "abc.sqlite").is_file()
+            )
+            # A caller that passes the same root twice must not delete anything.
+            legacy.mkdir(parents=True)
+            (legacy / "abc.sqlite").write_bytes(b"same-root")
+            migrate_legacy_dictionary_directory(public_dir, public_dir)
+            self.assertEqual((legacy / "abc.sqlite").read_bytes(), b"same-root")
 
 
 if __name__ == "__main__":

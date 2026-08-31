@@ -144,6 +144,44 @@ class RuntimeStatusTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_reading_heartbeat_uses_lightweight_labels_without_rendering(self):
+        from epub_browser.server_pages import ServerPageRenderer
+
+        status = RuntimeStatus()
+        status.mark_ready()
+        content_dir = self.public / "book" / "book" / "content"
+        content_dir.mkdir(parents=True)
+        (content_dir / "metadata.json").write_text(
+            json.dumps(
+                {
+                    "title": "Book",
+                    "chapters": [
+                        {"title": "Chapter 1", "path": "chapter_0.html"},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        client = self._client(status)
+        with mock.patch.object(
+            ServerPageRenderer,
+            "render_chapter",
+            side_effect=AssertionError("render_chapter must not run for a heartbeat"),
+        ):
+            response = client.post(
+                "/api/reading-sessions/book/heartbeat",
+                json={
+                    "client_id": "tab-a",
+                    "client_sequence": 1,
+                    "chapter_index": 0,
+                    "active_seconds": 15,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        session = response.json()["session"]
+        self.assertEqual(session["book_title"], "Book")
+        self.assertEqual(session["chapter_label"], "Chapter 1")
+
 
 class ServerBootstrapTests(unittest.TestCase):
     def setUp(self):

@@ -962,7 +962,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(index.status_code, 200)
         self.assertIn('window.EpubBrowserMode="server"', index.text)
         self.assertIn('window.initScriptLibrary', index.text)
-        self.assertIn('data-id=book-grid', index.text)
+        self.assertIn('data-id="book-grid"', index.text)
         manager.shutdown()
 
     def test_generated_server_cache_does_not_publish_a_service_worker(self):

@@ -22,6 +22,8 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.4](releases/v2.9.4.md) — unified strict-first EPUB parsing,
+  removal of the HTML-minifier dependency, and server performance tuning.
 - [v2.9.3](releases/v2.9.3.md) — reliable sign-in under slow networks,
   accurate login errors, and lightweight AI/annotation summaries.
 - [v2.9.2](releases/v2.9.2.md) — urgent EPUB book-page freeze fix,

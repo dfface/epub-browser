@@ -3337,19 +3337,23 @@ class StateStore:
         *,
         now=None,
         ttl_seconds: int = 30 * 24 * 60 * 60,
+        touch_interval_seconds: float = 300,
     ) -> Optional[Principal]:
         if not isinstance(raw_token, str) or not raw_token:
             return None
         if ttl_seconds <= 0:
             raise ValueError("Session TTL must be positive")
+        if touch_interval_seconds < 0:
+            raise ValueError("Session touch interval must be non-negative")
         digest = token_digest(raw_token)
         used_at = self._timestamp(now)
         with self._connection() as connection:
             row = connection.execute(
                 """
                 SELECT sessions.token_digest, sessions.expires_at,
-                       sessions.revoked_at, users.id AS user_id,
-                       users.username, users.role, users.enabled
+                       sessions.last_used_at, sessions.revoked_at,
+                       users.id AS user_id, users.username, users.role,
+                       users.enabled
                 FROM sessions
                 JOIN users ON users.id = sessions.user_id
                 WHERE sessions.token_digest = ?
@@ -3364,15 +3368,22 @@ class StateStore:
                 or float(row["expires_at"]) <= used_at
             ):
                 return None
-            connection.execute(
-                """
-                UPDATE sessions
-                SET expires_at = ?, last_used_at = ?
-                WHERE token_digest = ?
-                  AND revoked_at IS NULL
-                """,
-                (used_at + ttl_seconds, used_at, digest),
-            )
+            # Sliding expiry is refreshed only after the touch window elapses:
+            # active sessions keep an expires_at at least ttl_seconds ahead, and
+            # page loads with dozens of asset requests stop hammering SQLite.
+            if (
+                float(row["last_used_at"])
+                <= used_at - touch_interval_seconds
+            ):
+                connection.execute(
+                    """
+                    UPDATE sessions
+                    SET expires_at = ?, last_used_at = ?
+                    WHERE token_digest = ?
+                      AND revoked_at IS NULL
+                    """,
+                    (used_at + ttl_seconds, used_at, digest),
+                )
         return Principal(row["user_id"], row["username"], row["role"])
 
     def revoke_session(self, session_id: str, *, revoked_at=None) -> bool:

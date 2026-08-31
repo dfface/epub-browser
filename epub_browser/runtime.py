@@ -479,6 +479,7 @@ def run_server(
             sync_dir=config.legacy_sync_dir or server_dir,
             progress_broker=progress_broker,
             log_errors=True,
+            server_directory=server_dir,
         )
         uvicorn_config = uvicorn.Config(
             app,

@@ -4,19 +4,19 @@ import posixpath
 import zipfile
 import tempfile
 import shutil
-import xml.etree.ElementTree as ET
 import re
 import hashlib
 import base64
 import html
 import json
 import urllib.parse
-import minify_html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from typing import Optional, TYPE_CHECKING
+
+from lxml import etree
 
 from .asset_publisher import (
     AssetPublisher,
@@ -24,6 +24,23 @@ from .asset_publisher import (
     SERVER_ONLY_ASSET_PATHS,
     SERVER_ONLY_ASSET_PREFIXES,
     rewrite_asset_urls,
+)
+from .epub_parsing import (
+    EPUBParseError,
+    allowed_entity_name,
+    entity_reference_name,
+    find_descendant_local,
+    find_local,
+    findall_local,
+    iter_local,
+    local_name,
+    parse_xhtml_document,
+    parse_xhtml_fragment,
+    parse_xml_bytes,
+    parse_xml_document,
+    require_single_rootfile,
+    validate_manifest_ids,
+    validate_spine_references,
 )
 from .models import BookMetadata, ConvertedBook
 from .reporting import Reporter
@@ -48,7 +65,9 @@ if TYPE_CHECKING:
 SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 # Bump whenever the EPUB-derived server cache schema or chapter semantics change.
 # Server reader chrome and assets are deliberately outside this revision.
-SERVER_OUTPUT_REVISION = "server-content-v9"
+# v10: chapters are parsed and sanitized through the unified lxml pipeline, so
+# stored chapter HTML differs from earlier revisions and must be regenerated.
+SERVER_OUTPUT_REVISION = "server-content-v10"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpe", "jfif", "jpeg",
@@ -196,85 +215,81 @@ def _safe_html_url(tag, attribute, value):
     return None
 
 
-class _EPUBHTMLSanitizer(HTMLParser):
-    """Serialize a conservative, inert fragment from untrusted EPUB markup."""
+# An ``html`` or ``body`` root is a wrapper, never chapter content: the HTML
+# parser adds one when a fragment has several siblings, and a real XHTML
+# chapter carries its own.  Only the wrapper's contents are rendered.
+_HTML_WRAPPER_TAGS = frozenset({"html", "body"})
 
-    def __init__(self):
-        super().__init__(convert_charrefs=False)
-        self.output = []
-        self._suppressed = []
 
-    @staticmethod
-    def _tag_name(tag):
-        return str(tag or "").casefold().rsplit(":", 1)[-1]
+def _append_sanitized_text(output, value):
+    if not value:
+        return
+    output.append(html.escape(value, quote=False))
 
-    def handle_starttag(self, tag, attrs):
-        name = self._tag_name(tag)
-        if self._suppressed:
-            if name in _DROP_HTML_CONTENT_TAGS:
-                self._suppressed.append(name)
-            return
-        if name in _DROP_HTML_CONTENT_TAGS:
-            self._suppressed.append(name)
-            return
-        if name not in _SAFE_HTML_TAGS:
-            return
-        allowed = _TAG_HTML_ATTRIBUTES.get(name, frozenset())
-        serialized = []
-        for raw_name, raw_value in attrs:
-            attribute = str(raw_name or "").casefold()
-            if attribute.startswith("on") or attribute in {"srcdoc", "formaction"}:
+
+def _sanitized_attributes(element, name):
+    """Serialize the attributes one element is allowed to keep."""
+    allowed = _TAG_HTML_ATTRIBUTES.get(name, frozenset())
+    serialized = []
+    for raw_name, raw_value in element.attrib.items():
+        attribute = local_name(raw_name).casefold()
+        if attribute.startswith("on") or attribute in {"srcdoc", "formaction"}:
+            continue
+        if attribute == "style":
+            safe_style = sanitize_css_declarations(raw_value)
+            if safe_style:
+                serialized.append(
+                    " style=\"{}\"".format(html.escape(safe_style, quote=True))
+                )
+            continue
+        if not (
+            attribute in _GLOBAL_HTML_ATTRIBUTES
+            or attribute in allowed
+            or attribute.startswith("aria-")
+            or attribute.startswith("data-")
+        ):
+            continue
+        value = str(raw_value)
+        if attribute in _URL_HTML_ATTRIBUTES:
+            value = _safe_html_url(name, attribute, value)
+            if value is None:
                 continue
-            if attribute == "style":
-                safe_style = sanitize_css_declarations(raw_value)
-                if safe_style:
-                    serialized.append(
-                        " style=\"{}\"".format(html.escape(safe_style, quote=True))
-                    )
-                continue
-            if not (
-                attribute in _GLOBAL_HTML_ATTRIBUTES
-                or attribute in allowed
-                or attribute.startswith("aria-")
-                or attribute.startswith("data-")
-            ):
-                continue
-            value = attribute if raw_value is None else str(raw_value)
-            if attribute in _URL_HTML_ATTRIBUTES:
-                value = _safe_html_url(name, attribute, value)
-                if value is None:
-                    continue
-            serialized.append(
-                " {}=\"{}\"".format(attribute, html.escape(value, quote=True))
-            )
-        self.output.append("<{}{}>".format(name, "".join(serialized)))
+        serialized.append(
+            " {}=\"{}\"".format(attribute, html.escape(value, quote=True))
+        )
+    return "".join(serialized)
 
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
 
-    def handle_endtag(self, tag):
-        name = self._tag_name(tag)
-        if self._suppressed:
-            if name == self._suppressed[-1]:
-                self._suppressed.pop()
-            return
-        if name in _SAFE_HTML_TAGS and name not in _VOID_HTML_TAGS:
-            self.output.append("</{}>".format(name))
+def _render_sanitized(node, output):
+    """Serialize one parsed node with the shared EPUB allowlist.
 
-    def handle_data(self, data):
-        if not self._suppressed:
-            self.output.append(html.escape(data, quote=False))
-
-    def handle_entityref(self, name):
-        if not self._suppressed:
-            self.output.append("&{};".format(name))
-
-    def handle_charref(self, name):
-        if not self._suppressed:
-            self.output.append("&#{};".format(name))
-
-    def fragment(self):
-        return "".join(self.output)
+    Unknown elements keep their children but lose their own tags, so a
+    publisher's wrapper element never hides a paragraph from the reader.
+    """
+    entity_name = entity_reference_name(node)
+    if entity_name is not None:
+        # A locally declared entity (an XXE carrier) is dropped outright;
+        # only entities the HTML vocabulary already defines survive.
+        if allowed_entity_name(entity_name):
+            output.append("&{};".format(entity_name))
+        _append_sanitized_text(output, node.tail)
+        return
+    if not isinstance(node.tag, str):
+        # Comments and processing instructions carry no reader content.
+        _append_sanitized_text(output, node.tail)
+        return
+    name = local_name(node.tag).casefold()
+    dropped = name in _DROP_HTML_CONTENT_TAGS
+    kept = name in _SAFE_HTML_TAGS
+    if kept and not dropped:
+        output.append("<{}{}>".format(name, _sanitized_attributes(node, name)))
+    if not dropped:
+        _append_sanitized_text(output, node.text)
+        for child in node:
+            _render_sanitized(child, output)
+    if kept and not dropped and name not in _VOID_HTML_TAGS:
+        output.append("</{}>".format(name))
+    _append_sanitized_text(output, node.tail)
 
 
 class _MetadataTextParser(HTMLParser):
@@ -296,10 +311,37 @@ def metadata_text(value):
 
 
 def sanitize_html_fragment(content):
-    sanitizer = _EPUBHTMLSanitizer()
-    sanitizer.feed(str(content or ""))
-    sanitizer.close()
-    return sanitizer.fragment()
+    """Serialize a conservative, inert fragment from untrusted EPUB markup.
+
+    The fragment is parsed once, through the shared lxml pipeline, so malformed
+    EPUB 2 markup, XHTML and legacy HTML all reach the same allowlist.
+    """
+    markup = str(content or "")
+    if not markup.strip():
+        return ""
+    try:
+        nodes = parse_xhtml_fragment(markup)
+    except EPUBParseError:
+        # Nothing could be trusted as structure; emit the text inertly.
+        return html.escape(markup, quote=False)
+    output = []
+    for node in nodes:
+        if isinstance(node, str):
+            _append_sanitized_text(output, node)
+            continue
+        if local_name(node.tag).casefold() == "html":
+            # Descend to ``body`` first so a chapter's ``head`` never leaks
+            # its title or metadata into the rendered text.
+            body = find_local(node, "body")
+            if body is not None:
+                node = body
+        if local_name(node.tag).casefold() in _HTML_WRAPPER_TAGS:
+            _append_sanitized_text(output, node.text)
+            for child in node:
+                _render_sanitized(child, output)
+            continue
+        _render_sanitized(node, output)
+    return "".join(output)
 
 
 def _decode_css_escapes(content):
@@ -521,25 +563,21 @@ def sanitize_css_text(content):
     return _sanitize_css_stylesheet(candidate)
 
 
-def _xml_local_name(name):
-    return str(name).rsplit("}", 1)[-1].rsplit(":", 1)[-1]
-
-
 def sanitize_svg_content(content):
     try:
-        source_root = ET.fromstring(content)
-    except ET.ParseError as error:
+        source_root = parse_xml_bytes(content)
+    except EPUBParseError as error:
         raise ValueError("Unsafe or malformed SVG resource") from error
-    if _xml_local_name(source_root.tag) != "svg":
+    if local_name(source_root.tag) != "svg":
         raise ValueError("Unsafe SVG resource root")
 
     def clean(source):
-        name = _xml_local_name(source.tag)
+        name = local_name(source.tag)
         if name not in _SAFE_SVG_TAGS:
             return None
-        target = ET.Element("{{{}}}{}".format(_SVG_NAMESPACE, name))
+        target = etree.Element("{{{}}}{}".format(_SVG_NAMESPACE, name))
         for raw_name, raw_value in source.attrib.items():
-            attribute = _xml_local_name(raw_name)
+            attribute = local_name(raw_name)
             if attribute not in _SAFE_SVG_ATTRIBUTES:
                 continue
             value = str(raw_value).strip()
@@ -559,8 +597,11 @@ def sanitize_svg_content(content):
                     cleaned.tail = child.tail
         return target
 
-    ET.register_namespace("", _SVG_NAMESPACE)
-    return ET.tostring(clean(source_root), encoding="unicode")
+    cleaned_root = clean(source_root)
+    if cleaned_root is None:
+        raise ValueError("Unsafe SVG resource root")
+    etree.cleanup_namespaces(cleaned_root, top_nsmap={None: _SVG_NAMESPACE})
+    return etree.tostring(cleaned_root, encoding="unicode")
 
 
 class EPUBProcessor:
@@ -970,34 +1011,40 @@ class EPUBProcessor:
             return None
             
         try:
-            tree = ET.parse(container_path)
-            root = tree.getroot()
-            # 查找rootfile元素
-            ns = {'ns': 'urn:oasis:names:tc:opendocument:xmlns:container'}
-            rootfile = root.find('.//ns:rootfile', ns)
-            if rootfile is not None:
-                return self._resolve_internal_path(rootfile.get('full-path'))
+            root = parse_xml_document(container_path)
         except ValueError:
             raise
-        except Exception as e:
-            self.reporter.detail(f"Failed to parse container.xml: {e}")
-            
-        return None
+        except EPUBParseError as error:
+            self.reporter.detail(f"Failed to parse container.xml: {error}")
+            return None
+
+        try:
+            full_path = require_single_rootfile(root)
+        except EPUBParseError as error:
+            self.reporter.detail(f"Failed to parse container.xml: {error}")
+            return None
+        # ``_resolve_internal_path`` raises on an escaping reference, which is
+        # the structural "safe path" check for the package document.
+        return self._resolve_internal_path(full_path)
     
-    def find_cover_info(self, opf_tree, namespaces):
+    def find_cover_info(self, opf_tree):
         """
         在 OPF 文件中查找封面信息
         """
         # 方法1: 查找 meta 标签中声明的封面
         cover_id = None
-        meta_elements = opf_tree.findall('.//opf:metadata/opf:meta', namespaces)
-        for meta in meta_elements:
-            if meta.get('name') in ['cover', 'cover-image']:
-                cover_id = meta.get('content')
-                break
-        
+        metadata = find_descendant_local(opf_tree, 'metadata')
+        if metadata is not None:
+            for meta in findall_local(metadata, 'meta'):
+                if meta.get('name') in ['cover', 'cover-image']:
+                    cover_id = meta.get('content')
+                    break
+
         # 方法2: 查找 manifest 中的封面项
-        manifest_items = opf_tree.findall('.//opf:manifest/opf:item', namespaces)
+        manifest = find_descendant_local(opf_tree, 'manifest')
+        manifest_items = (
+            findall_local(manifest, 'item') if manifest is not None else []
+        )
         
         # 优先使用 meta 标签中指定的封面
         if cover_id:
@@ -1037,28 +1084,20 @@ class EPUBProcessor:
         
         return None
 
-    def find_ncx_file(self, opf_path, manifest):
+    def find_ncx_file(self, opf_root, opf_path, manifest):
         """查找NCX文件路径"""
         opf_dir = posixpath.dirname(opf_path)
-        
-        # 首先查找OPF中明确指定的toc
-        try:
-            tree = ET.parse(self._internal_file(opf_path))
-            root = tree.getroot()
-            ns = {'opf': 'http://www.idpf.org/2007/opf'}
-            
-            spine = root.find('.//opf:spine', ns)
-            if spine is not None:
-                toc_id = spine.get('toc')
-                if toc_id and toc_id in manifest:
-                    ncx_path = manifest[toc_id]['full_path']
-                    if ncx_path and self._internal_file(ncx_path).is_file():
-                        return ncx_path
-        except ValueError:
-            raise
-        except Exception as e:
-            self.reporter.detail(f"Failed to find toc attribute: {e}")
-        
+
+        # 首先查找OPF中明确指定的toc。  The already-parsed package document is
+        # reused instead of re-reading and re-parsing the OPF.
+        spine = find_descendant_local(opf_root, 'spine')
+        if spine is not None:
+            toc_id = spine.get('toc')
+            if toc_id and toc_id in manifest:
+                ncx_path = manifest[toc_id]['full_path']
+                if ncx_path and self._internal_file(ncx_path).is_file():
+                    return ncx_path
+
         # 如果没有明确指定，查找media-type为application/x-dtbncx+xml的文件
         for item_id, item in manifest.items():
             if item['media_type'] == 'application/x-dtbncx+xml':
@@ -1094,16 +1133,13 @@ class EPUBProcessor:
             return []
 
         try:
-            root = ET.parse(nav_full_path).getroot()
+            root = parse_xhtml_document(nav_full_path)
             epub_type = '{http://www.idpf.org/2007/ops}type'
-
-            def local_name(element):
-                return element.tag.rsplit('}', 1)[-1]
 
             toc_nav = next(
                 (
                     element for element in root.iter()
-                    if local_name(element) == 'nav'
+                    if local_name(element.tag) == 'nav'
                     and 'toc' in element.get(epub_type, element.get('type', '')).split()
                 ),
                 None,
@@ -1112,13 +1148,11 @@ class EPUBProcessor:
                 return []
 
             def direct_child(element, name):
-                return next(
-                    (child for child in element if local_name(child) == name), None
-                )
+                return find_local(element, name)
 
             def item_label(item):
                 for child in item:
-                    if local_name(child) in {'a', 'span'}:
+                    if local_name(child.tag) in {'a', 'span'}:
                         label = ' '.join(''.join(child.itertext()).split())
                         if label:
                             return html.unescape(label), child
@@ -1130,7 +1164,7 @@ class EPUBProcessor:
 
             def process_list(list_element, level=0):
                 for item in list_element:
-                    if local_name(item) != 'li':
+                    if local_name(item.tag) != 'li':
                         continue
                     title, link = item_label(item)
                     child_list = direct_child(item, 'ol')
@@ -1175,25 +1209,15 @@ class EPUBProcessor:
             return []
             
         try:
-            # 注册命名空间
-            ET.register_namespace('', 'http://www.daisy.org/z3986/2005/ncx/')
-            
-            tree = ET.parse(ncx_full_path)
-            root = tree.getroot()
-            
-            # 获取书籍标题（这一步应该在 opf 文件解析那里做）
-            # doc_title = root.find('.//{http://www.daisy.org/z3986/2005/ncx/}docTitle/{http://www.daisy.org/z3986/2005/ncx/}text')
-            # if doc_title is not None and doc_title.text:
-            #     self.book_title = doc_title.text
-            
+            root = parse_xml_document(ncx_full_path)
+
             # 解析目录
-            nav_map = root.find('.//{http://www.daisy.org/z3986/2005/ncx/}navMap')
+            nav_map = find_descendant_local(root, 'navMap')
             if nav_map is None:
                 return []
             
             toc = []
             
-            ncx_namespace = 'http://www.daisy.org/z3986/2005/ncx/'
             ncx_dir = posixpath.dirname(ncx_path)
 
             def navpoint_target(navpoint):
@@ -1204,7 +1228,7 @@ class EPUBProcessor:
                 a group look like a chapter and consumes a public chapter
                 index that belongs to the OPF spine.
                 """
-                content = navpoint.find(f'{{{ncx_namespace}}}content')
+                content = find_local(navpoint, 'content')
                 if content is None or not content.get('src'):
                     return None
                 source, anchor = urllib.parse.urldefrag(content.get('src'))
@@ -1219,7 +1243,7 @@ class EPUBProcessor:
             # 递归处理navPoint
             def process_navpoint(navpoint, level=0):
                 # 处理子navPoint
-                child_navpoints = navpoint.findall(f'{{{ncx_namespace}}}navPoint')
+                child_navpoints = findall_local(navpoint, 'navPoint')
                 target = navpoint_target(navpoint)
                 child_targets = [navpoint_target(child) for child in child_navpoints]
                 # Publishers often use a parent navPoint as a section label
@@ -1231,8 +1255,10 @@ class EPUBProcessor:
                     and child_target[1] == target[1]
                     for child_target in child_targets
                 )
-                nav_label = navpoint.find(
-                    f'{{{ncx_namespace}}}navLabel/{{{ncx_namespace}}}text'
+                nav_label_element = find_local(navpoint, 'navLabel')
+                nav_label = (
+                    find_local(nav_label_element, 'text')
+                    if nav_label_element is not None else None
                 )
 
                 if nav_label is not None and nav_label.text and target is not None:
@@ -1252,7 +1278,7 @@ class EPUBProcessor:
                     process_navpoint(child, level + 1)
             
             # 处理所有顶级navPoint
-            top_navpoints = nav_map.findall('{http://www.daisy.org/z3986/2005/ncx/}navPoint')
+            top_navpoints = findall_local(nav_map, 'navPoint')
             for navpoint in top_navpoints:
                 process_navpoint(navpoint, 0)
             
@@ -1273,51 +1299,55 @@ class EPUBProcessor:
             return False
             
         try:
-            tree = ET.parse(opf_full_path)
-            root = tree.getroot()
-            
-            # 获取命名空间
-            ns = {'opf': 'http://www.idpf.org/2007/opf',
-                  'dc': 'http://purl.org/dc/elements/1.1/'}
-            
+            root = parse_xml_document(opf_full_path)
+
             # 获取书名
-            title_elem = root.find('.//dc:title', ns)
+            title_elem = find_descendant_local(root, 'title')
             if title_elem is not None and title_elem.text:
                 self.book_title = title_elem.text
 
-            identifier_elem = root.find('.//dc:identifier', ns)
+            identifier_elem = find_descendant_local(root, 'identifier')
             if identifier_elem is not None and identifier_elem.text:
                 self.epub_identifier = identifier_elem.text.strip() or None
             
             # 获取作者名
-            authors = tree.findall('.//dc:creator', ns)
+            authors = list(iter_local(root, 'creator'))
             self.authors = [author.text for author in authors] if authors else None
 
             # 获取标签
-            tags = tree.findall('.//dc:subject', ns)
+            tags = list(iter_local(root, 'subject'))
             self.tags = [tag.text for tag in tags] if tags else None
 
             # 获取描述
-            description = tree.find('.//dc:description', ns)
+            description = find_descendant_local(root, 'description')
             self.description = description.text if description is not None and description.text else None
 
             # 获取语言
-            lang = root.find('.//dc:language', ns)
+            lang = find_descendant_local(root, 'language')
             self.lang = lang.text.strip() if lang is not None and lang.text and lang.text.strip() else 'en'
                 
             # 获取manifest（所有资源）
             manifest = {}
             opf_dir = posixpath.dirname(opf_path)
             # 获取封面
-            cover_info = self.find_cover_info(tree, ns)
+            cover_info = self.find_cover_info(root)
             if cover_info:
                 href = cover_info["href"]
                 cover_info["full_path"] = (
                     self._resolve_internal_path(href, opf_dir) if href else None
                 )
             self.cover_info = cover_info
+            # Structural validation: every manifest item needs a unique id,
+            # otherwise a spine idref could silently bind to the wrong resource.
+            manifest_element = find_descendant_local(root, 'manifest')
+            manifest_items = (
+                findall_local(manifest_element, 'item')
+                if manifest_element is not None
+                else list(iter_local(root, 'item'))
+            )
+            validate_manifest_ids(manifest_items)
             # 获取其他资源 xhtml、font、css 等
-            for item in root.findall('.//opf:item', ns):
+            for item in manifest_items:
                 item_id = item.get('id')
                 href = item.get('href')
                 media_type = item.get('media-type', '')
@@ -1338,14 +1368,21 @@ class EPUBProcessor:
             if nav_path:
                 self.toc = self.parse_nav(nav_path)
             if not self.toc:
-                ncx_path = self.find_ncx_file(opf_path, manifest)
+                ncx_path = self.find_ncx_file(root, opf_path, manifest)
                 if ncx_path:
                     self.toc = self.parse_ncx(ncx_path)
             
             # 获取spine（阅读顺序）
-            spine = root.find('.//opf:spine', ns)
+            spine = find_descendant_local(root, 'spine')
             if spine is not None:
-                for itemref in spine.findall('opf:itemref', ns):
+                itemrefs = findall_local(spine, 'itemref')
+                # A spine pointing at an undeclared id would produce a book
+                # whose chapter sequence silently disagrees with its manifest.
+                validate_spine_references(
+                    [itemref.get('idref') for itemref in itemrefs],
+                    set(manifest),
+                )
+                for itemref in itemrefs:
                     idref = itemref.get('idref')
                     if idref in manifest:
                         item = manifest[idref]
@@ -1449,24 +1486,23 @@ class EPUBProcessor:
         map that parent label to the correct, distinct chapter index.
         """
         try:
-            content = self._internal_file(chapter_path).read_text(
-                encoding="utf-8", errors="ignore"
-            )
-        except (OSError, ValueError):
+            root = parse_xhtml_document(self._internal_file(chapter_path))
+        except (OSError, EPUBParseError):
             return None
+        except ValueError:
+            raise
 
-        match = re.search(
-            r"<(?P<tag>h[1-6]|div|p)\b(?=[^>]*\bclass\s*=\s*"  # i18n-allow-literal: CSS/HTML syntax
-            r"(?:['\"])[^'\"]*\bsection_index_title\b[^'\"]*"
-            r"(?:['\"]))[^>]*>(?P<content>.*?)</(?P=tag)\s*>",
-            content,
-            flags=re.IGNORECASE | re.DOTALL | re.VERBOSE,
-        )
-        if not match:
-            return None
-        title = re.sub(r"<[^>]+>", " ", match.group("content"))
-        title = " ".join(metadata_text(html.unescape(title)).split())
-        return title or None
+        for element in root.iter():
+            if local_name(element.tag) not in {"h1", "h2", "h3", "h4", "h5", "h6", "div", "p"}:
+                continue
+            classes = str(element.get("class") or "").split()
+            if "section_index_title" not in classes:
+                continue
+            title = " ".join(
+                metadata_text("".join(element.itertext())).split()
+            )
+            return title or None
+        return None
     
     def create_web_interface(self):
         """创建网页界面"""
@@ -2009,8 +2045,8 @@ document.addEventListener('DOMContentLoaded', function() {{
         index_html = rewrite_asset_urls(index_html, self.asset_manifest)
         index_html = self._inject_deployment_mode(index_html)
         index_html = rewrite_root_urls(index_html, self.urls)
-        # kindle 支持，不能压缩 css 和 js
-        index_html = minify_html.minify(index_html, minify_css=False, minify_js=False)
+        # 不再压缩 HTML：模板本身紧凑，实测 minify_html 对这类输出无收益
+        # （CSS/JS 因 kindle 兼容不能压），且章节页曾因压缩丢失标签而禁用
         if write:
             with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
                 f.write(index_html)

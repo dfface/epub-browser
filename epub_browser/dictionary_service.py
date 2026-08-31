@@ -27,6 +27,40 @@ class DictionaryServiceError(ValueError):
         self.code = code
 
 
+def migrate_legacy_dictionary_directory(public_dir, server_directory):
+    """Move dictionary databases that earlier versions wrote inside the cache.
+
+    Older Server builds passed the published directory (``<server-dir>/cache/
+    public``) to ``DictionaryService``, so installed dictionaries landed under
+    ``cache/public/data/dictionaries``.  Dictionary databases are runtime user
+    data and belong under the server directory, outside the cache tree.
+    """
+    legacy = Path(public_dir) / "data" / "dictionaries"
+    target = Path(server_directory) / "data" / "dictionaries"
+    if not legacy.is_dir() or legacy.resolve() == target.resolve():
+        return
+    target.mkdir(parents=True, exist_ok=True)
+    for item in sorted(legacy.iterdir()):
+        if (
+            item.is_file()
+            and item.name.endswith(".sqlite")
+            and not item.name.startswith(".")
+        ):
+            destination = target / item.name
+            if not destination.exists():
+                shutil.move(str(item), str(destination))
+    # Remove leftover staging/tmp entries and the now-empty legacy tree.
+    for item in list(legacy.iterdir()):
+        if item.is_dir():
+            shutil.rmtree(item, ignore_errors=True)
+        else:
+            item.unlink(missing_ok=True)
+    try:
+        legacy.rmdir()
+    except OSError:
+        pass
+
+
 @dataclass(frozen=True)
 class DictionaryLookup:
     found: bool
