@@ -22,6 +22,10 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.10](releases/v2.9.10.md) — Kindle minimal-reader chapter page gains
+  tap-to-turn: tap the left/right third of the reading area to advance one
+  viewport-aligned screen, with a `Tap to turn` toggle (on by default,
+  cookie-persisted) and full i18n.
 - [v2.9.9](releases/v2.9.9.md) — Server-mode Kindle surfaces now allow
   inline scripts so theme, font size, and i18n work on legacy e-ink Kindles
   (the strict sha256 CSP was blocking them).
