@@ -677,6 +677,10 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertIn("<h1>One</h1>", chapter)
             self.assertIn("Text", chapter)
             self.assertIn('href="kindle.html"', chapter)
+            # Tap-to-turn toggle is part of the minimal reader output.
+            self.assertIn('id="kClickScroll"', chapter)
+            self.assertIn('kToggleClickScroll', chapter)
+            self.assertIn('data-i18n="tapTurn"', chapter)
             # First (and only) chapter has neither a prev nor a next link.
             self.assertNotIn('class="prev"', chapter)
             self.assertNotIn('class="next"', chapter)

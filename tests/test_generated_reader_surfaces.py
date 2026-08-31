@@ -264,6 +264,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('href="kindle_chapter_0.html"', middle)
             self.assertIn('href="kindle_chapter_2.html"', middle)
             self.assertIn("chapter_1.html", middle)
+            # Tap-to-turn toggle lives on chapter pages and stays ES5/cookie-driven.
+            self.assertIn('id="kClickScroll"', middle)
+            self.assertIn('kToggleClickScroll', middle)
+            self.assertIn('data-i18n="tapTurn"', middle)
+            self.assertIn("kindle_click_scroll", middle)
 
             first = processor.create_kindle_chapter_page('<p>One</p>', '', 0, 'One')
             last = processor.create_kindle_chapter_page('<p>Three</p>', '', 2, 'Three')

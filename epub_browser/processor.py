@@ -108,6 +108,8 @@ body.sepia .k-nav,body.dark .k-nav{border-color:#666}
 body.sepia .k-bar,body.dark .k-bar{border-color:#666}
 .k-controls{padding:8px 14px 10px;text-align:center}
 .k-bar button,.k-controls button{background:none;border:1px solid #666;color:inherit;padding:7px 16px;margin:0 4px;font-size:14px;font-family:inherit}
+.k-controls button.k-on{background:#666;color:#fff;font-weight:bold}
+body.sepia .k-controls button.k-on,body.dark .k-controls button.k-on{background:#bbb;color:#111}
 .k-meta{padding:0 16px;color:#666;font-size:14px}
 body.dark .k-meta{color:#9a9a9a}
 .k-resume{display:block;margin:14px 16px;padding:10px;border:1px solid #666;text-align:center;text-decoration:none;color:inherit;font-size:15px}
@@ -176,6 +178,63 @@ function kFont(delta) {
   if (isNaN(size)) { size = 3; }
   applyFont(size);
 })();
+// Tap-to-turn: a tap on the left/right third of the reading area moves to the
+// previous/next screen (snap-aligned). Stays ES5 and cookie-based; the header
+// toggle (kClickScroll) switches it off for readers who prefer plain scroll.
+function kClickScrollOn() {
+  var v = getCookie('kindle_click_scroll');
+  return v === null || v === 'on';
+}
+function kToggleClickScroll() {
+  setCookie('kindle_click_scroll', kClickScrollOn() ? 'off' : 'on', 365);
+  kSyncClickScrollToggle();
+}
+function kSyncClickScrollToggle() {
+  var btn = document.getElementById('kClickScroll');
+  if (!btn) return;
+  var on = kClickScrollOn();
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.className = on ? 'k-on' : '';
+}
+function kScrollPage(dir) {
+  var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  if (vh <= 0) return;
+  var st = window.pageYOffset || document.documentElement.scrollTop || 0;
+  var top = dir > 0
+    ? Math.max(0, Math.floor(st / vh) * vh + vh)
+    : Math.max(0, Math.ceil(st / vh) * vh - vh);
+  window.scrollTo(0, top);
+}
+function kIsTurnNode(node) {
+  while (node && node !== document.body) {
+    var tag = String(node.tagName || '').toUpperCase();
+    if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+function kClickTurn(e) {
+  if (!kClickScrollOn()) return;
+  var ev = e || window.event;
+  if (!ev) return;
+  var target = ev.target || ev.srcElement;
+  if (!target) return;
+  var node = target;
+  var inside = false;
+  while (node && node !== document.body) {
+    if (node.className && String(node.className).indexOf('k-content') !== -1) { inside = true; break; }
+    node = node.parentNode;
+  }
+  if (!inside || kIsTurnNode(target)) return;
+  var w = window.innerWidth || document.documentElement.clientWidth || 0;
+  if (w <= 0) return;
+  if (ev.clientX < w / 3) { if (ev.preventDefault) ev.preventDefault(); kScrollPage(-1); }
+  else if (ev.clientX > (w * 2) / 3) { if (ev.preventDefault) ev.preventDefault(); kScrollPage(1); }
+}
+(function () {
+  kSyncClickScrollToggle();
+  document.onclick = kClickTurn;
+})();
 """
 
 
@@ -190,6 +249,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Prev",
         "next": "Next \u203a",
         "theme": "Theme",
+        "tapTurn": "Tap to turn",
     },
     "zh": {
         "continueReading": "继续阅读",
@@ -197,6 +257,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 上一章",
         "next": "下一章 \u203a",
         "theme": "主题",
+        "tapTurn": "点击翻页",
     },
     "zh-CN": {
         "continueReading": "继续阅读",
@@ -204,6 +265,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 上一章",
         "next": "下一章 \u203a",
         "theme": "主题",
+        "tapTurn": "点击翻页",
     },
     "zh-TW": {
         "continueReading": "繼續閱讀",
@@ -211,6 +273,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 上一章",
         "next": "下一章 \u203a",
         "theme": "主題",
+        "tapTurn": "點擊翻頁",
     },
     "ja": {
         "continueReading": "続きを読む",
@@ -218,6 +281,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 前へ",
         "next": "次へ \u203a",
         "theme": "テーマ",
+        "tapTurn": "タップでめくる",
     },
     "ko": {
         "continueReading": "계속 읽기",
@@ -225,6 +289,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 이전",
         "next": "다음 \u203a",
         "theme": "테마",
+        "tapTurn": "탭으로 넘기기",
     },
     "es": {
         "continueReading": "Continuar leyendo",
@@ -232,6 +297,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Anterior",
         "next": "Siguiente \u203a",
         "theme": "Tema",
+        "tapTurn": "Tocar para pasar",
     },
     "de": {
         "continueReading": "Weiterlesen",
@@ -239,6 +305,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Zurück",
         "next": "Weiter \u203a",
         "theme": "Design",
+        "tapTurn": "Tippen zum Blättern",
     },
     "fr": {
         "continueReading": "Reprendre la lecture",
@@ -246,6 +313,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Précédent",
         "next": "Suivant \u203a",
         "theme": "Thème",
+        "tapTurn": "Toucher pour tourner",
     },
     "ru": {
         "continueReading": "Продолжить чтение",
@@ -253,6 +321,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Назад",
         "next": "Далее \u203a",
         "theme": "Тема",
+        "tapTurn": "Нажмите, чтобы листать",
     },
     "it": {
         "continueReading": "Continua a leggere",
@@ -260,6 +329,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Precedente",
         "next": "Successivo \u203a",
         "theme": "Tema",
+        "tapTurn": "Tocca per girare",
     },
     "pt-BR": {
         "continueReading": "Continuar lendo",
@@ -267,6 +337,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Anterior",
         "next": "Próximo \u203a",
         "theme": "Tema",
+        "tapTurn": "Toque para virar",
     },
     "ar": {
         "continueReading": "متابعة القراءة",
@@ -274,6 +345,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 السابق",
         "next": "التالي \u203a",
         "theme": "السمة",
+        "tapTurn": "انقر للتقليب",
     },
     "id": {
         "continueReading": "Lanjutkan membaca",
@@ -281,6 +353,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Sebelumnya",
         "next": "Berikutnya \u203a",
         "theme": "Tema",
+        "tapTurn": "Ketuk untuk membalik",
     },
     "hi": {
         "continueReading": "पढ़ना जारी रखें",
@@ -288,6 +361,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 पिछला",
         "next": "अगला \u203a",
         "theme": "थीम",
+        "tapTurn": "टैप करें",
     },
     "vi": {
         "continueReading": "Đọc tiếp",
@@ -295,6 +369,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Trước",
         "next": "Tiếp \u203a",
         "theme": "Chủ đề",
+        "tapTurn": "Chạm để lật",
     },
     "th": {
         "continueReading": "อ่านต่อ",
@@ -302,6 +377,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 ก่อนหน้า",
         "next": "ถัดไป \u203a",
         "theme": "ธีม",
+        "tapTurn": "แตะเพื่อพลิก",
     },
     "ms": {
         "continueReading": "Teruskan membaca",
@@ -309,6 +385,7 @@ _KINDLE_READER_I18N = {
         "previous": "\u2039 Sebelum",
         "next": "Seterusnya \u203a",
         "theme": "Tema",
+        "tapTurn": "Ketuk untuk membalik",
     },
 }
 
@@ -2848,6 +2925,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
         <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
         <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+        <button type="button" id="kClickScroll" onclick="kToggleClickScroll()" aria-pressed="true" data-i18n="tapTurn">Tap to turn</button>
     </div>
 </header>
 <div class="k-content">

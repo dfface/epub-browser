@@ -5655,6 +5655,9 @@ class ServerKindleTests(unittest.TestCase):
         chapter = self.client.get("/book/book/kindle_chapter_0.html")
         self.assertEqual(chapter.status_code, 200)
         self.assertIn("Opening chapter", chapter.text)
+        # the tap-to-turn toggle ships in the dynamically rendered chapter page
+        self.assertIn('id="kClickScroll"', chapter.text)
+        self.assertIn('data-i18n="tapTurn"', chapter.text)
         self.assertNotIn("fetch(", chapter.text)
         self.assertNotIn("localStorage", chapter.text)
         self.assertNotIn("classList", chapter.text)
