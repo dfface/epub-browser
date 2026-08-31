@@ -40,9 +40,78 @@ class LibraryBook:
     source_format: str = EPUB_FORMAT
 
 
+def _kindle_book_row(book: LibraryBook, urls: SiteURLs) -> str:
+    """One read-only Kindle book row linking into the minimal reader."""
+    href = urls.public(f"/book/{book.book_id}/kindle.html")
+    title = html.escape(metadata_text(book.title), quote=False)
+    authors = " & ".join(
+        html.escape(metadata_text(author), quote=False)
+        for author in book.authors
+    )
+    if authors:
+        return (
+            f'<li><a href="{href}"><span class="k-lib-title">{title}</span>'
+            f'<span class="k-lib-authors">{authors}</span></a></li>'
+        )
+    return f'<li><a href="{href}">{title}</a></li>'
+
+
+def _kindle_group_html(group, books_by_id, urls: SiteURLs) -> str:
+    """Render one bookshelf group as a read-only nested Kindle list.
+
+    The bookshelf document stores each group as ``{"name", "items",
+    "groups", "order"}``; nested groups are rendered recursively with plain
+    ``ul/li`` markup so legacy Kindle WebKit stays happy.  The surface is
+    read-only: group names are static text and only book rows are links.
+    """
+    if not isinstance(group, dict):
+        return ""
+    name = html.escape(metadata_text(group.get("name") or ""), quote=False)
+    if not name:
+        return ""
+    items = group.get("items")
+    sub_groups = group.get("groups")
+    items = items if isinstance(items, list) else []
+    sub_groups = sub_groups if isinstance(sub_groups, dict) else {}
+    order = group.get("order")
+    if not isinstance(order, list):
+        order = list(items) + list(sub_groups)
+    rows = []
+    for entry in order:
+        if entry in sub_groups:
+            rows.append(_kindle_group_html(sub_groups[entry], books_by_id, urls))
+        elif entry in books_by_id:
+            rows.append(_kindle_book_row(books_by_id[entry], urls))
+    return (
+        f'<li class="k-shelf-group"><span class="k-lib-title k-shelf-group-name">'
+        f'{name}</span><ul>{"".join(rows)}</ul></li>'
+    )
+
+
+def _kindle_shelf_html(books_by_id, shelf, urls: SiteURLs) -> str:
+    """Render the user bookshelf (groups plus loose books) read-only."""
+    if not isinstance(shelf, dict):
+        return ""
+    items = shelf.get("items")
+    groups = shelf.get("groups")
+    items = items if isinstance(items, list) else []
+    groups = groups if isinstance(groups, dict) else {}
+    order = shelf.get("order")
+    if not isinstance(order, list):
+        order = list(items) + list(groups)
+    rows = []
+    for entry in order:
+        if entry in groups:
+            rows.append(_kindle_group_html(groups[entry], books_by_id, urls))
+        elif entry in books_by_id:
+            rows.append(_kindle_book_row(books_by_id[entry], urls))
+    return "".join(rows)
+
+
 def render_kindle_library_page(
     books: Sequence[LibraryBook],
     urls: SiteURLs,
+    shelf=None,
 ) -> str:
     """Render the dependency-free Kindle minimal library page.
 
@@ -51,23 +120,30 @@ def render_kindle_library_page(
     Kindle pages so legacy Kindle WebKit browsers get one consistent, ES5,
     no-/assets/ surface.  SSG writes this page next to ``index.html``; Server
     mode renders it at request time from the authenticated catalogue.
+
+    ``shelf`` is the optional read-only bookshelf document (``items`` /
+    ``groups`` / ``order``).  When present, the user's groups render first as
+    plain nested lists, followed by the full book catalogue; group names are
+    static text and nothing here mutates the shelf.  SSG passes no shelf
+    because bookshelves are per-user Server data.
     """
-    rows = []
-    for book in sorted(books, key=lambda book: book.book_id):
-        href = urls.public(f"/book/{book.book_id}/kindle.html")
-        title = html.escape(metadata_text(book.title), quote=False)
-        authors = " & ".join(
-            html.escape(metadata_text(author), quote=False)
-            for author in book.authors
-        )
-        if authors:
-            rows.append(
-                f'<li><a href="{href}"><span class="k-lib-title">{title}</span>'
-                f'<span class="k-lib-authors">{authors}</span></a></li>'
-            )
-        else:
-            rows.append(f'<li><a href="{href}">{title}</a></li>')
-    list_html = "\n".join(rows) if rows else '<li class="k-lib-empty">No books</li>'
+    books_by_id = {book.book_id: book for book in books}
+    shelf_html = (
+        _kindle_shelf_html(books_by_id, shelf, urls) if shelf is not None else ""
+    )
+    all_rows = [
+        _kindle_book_row(book, urls)
+        for book in sorted(books, key=lambda book: book.book_id)
+    ]
+    all_list_html = (
+        "\n".join(all_rows) if all_rows else '<li class="k-lib-empty">No books</li>'
+    )
+    if shelf_html:
+        shelf_section = f'<p class="sec">Bookshelf</p>\n<ul>\n{shelf_html}\n</ul>'
+        all_section = f'<p class="sec">All books</p>\n<ul>\n{all_list_html}\n</ul>'
+    else:
+        shelf_section = ""
+        all_section = f'<ul>\n{all_list_html}\n</ul>'
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -80,21 +156,23 @@ def render_kindle_library_page(
 .k-lib-authors{{display:block;color:#666;font-size:14px;font-weight:normal}}
 body.dark .k-lib-authors{{color:#9a9a9a}}
 .k-lib-empty{{padding:8px 0;color:#666}}
+.k-shelf-group-name{{display:block;font-weight:bold;margin:8px 0 2px}}
 </style>
 </head>
 <body class="light">
-<header class="k-header"><a href="index.html?full=1">Library</a></header>
-<div class="k-toc">
-    <ul>
-{list_html}
-    </ul>
-</div>
-<p class="k-footer"><a href="index.html?full=1">Open full library</a></p>
-<div class="k-bar">
+<header class="k-header">
+<a href="index.html?full=1">Library</a>
+<div class="k-controls">
     <button type="button" onclick="kTheme()" accesskey="t">Theme</button>
     <button type="button" onclick="kFont(-1)">A-</button>
     <button type="button" onclick="kFont(1)">A+</button>
 </div>
+</header>
+<div class="k-toc">
+{shelf_section}
+{all_section}
+</div>
+<p class="k-footer"><a href="index.html?full=1">Open full library</a></p>
 <script>
 {_KINDLE_READER_JS}
 </script>

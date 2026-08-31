@@ -1023,6 +1023,51 @@ test('auth wrapper does not redirect for a successful response', async () => {
   assert.deepEqual(root.navigations, []);
 });
 
+test('account sessions label Kindle user agents without misreporting Safari/Android', async () => {
+  const sessionList = fakeElement('ul');
+  const accountMenu = fakeElement('button');
+  const accountPanel = fakeElement('section');
+  const kindleEink = 'Mozilla/5.0 (Linux; U; en-US) AppleWebKit/537.36 (KHTML, like Gecko) Kindle/4.0 Chrome/53.0.2785.143 Safari/537.36';
+  const kindleArora = 'Mozilla/5.0 (Linux; U; en-US) AppleWebKit/527+ (KHTML, like Gecko, Safari/419.3) Arora/0.8.0';
+  const kindleFire = 'Mozilla/5.0 (Linux; U; en-US) AppleWebKit/533.11 (KHTML, like Gecko) Silk/1.0 like Chrome Safari/533.11';
+  const androidChrome = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+  const root = rootWithFetch((url) => {
+    if (url === '/api/account/sessions') {
+      return Promise.resolve(response(200, {
+        sessions: [
+          { id: 'k1', current: true, user_agent: kindleEink, client_address: '10.0.0.1' },
+          { id: 'k2', current: true, user_agent: kindleArora, client_address: '10.0.0.2' },
+          { id: 'k3', current: true, user_agent: kindleFire, client_address: '10.0.0.3' },
+          { id: 'c1', current: true, user_agent: androidChrome, client_address: '10.0.0.4' },
+        ],
+      }));
+    }
+    if (url === '/api/account/pats') return Promise.resolve(response(200, { personal_access_tokens: [] }));
+    return Promise.resolve(response(404, {}));
+  });
+  root.document = {
+    getElementById(id) {
+      return ({ accountMenu, accountPanel, sessionList })[id] || null;
+    },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+    createElement: fakeElement,
+  };
+  root.EpubBrowserI18n = { t(key) { return key; } };
+  const auth = AuthModule.create(root);
+  auth.setSession({ user: { id: 'u', username: 'reader', role: 'member' }, csrf_token: 'token' });
+
+  await auth.init();
+  accountMenu.click();
+  await tick();
+
+  const devices = sessionList.children.map(item => item.children[0].children[0]);
+  assert.deepEqual(devices.map(node => node.textContent), [
+    'Kindle', 'Kindle', 'Kindle Fire', 'Chrome · Android',
+  ]);
+  assert.equal(devices[0].title, kindleEink);
+});
+
 test('wrong current password stays signed in and shows the localized form error', async () => {
   const status = { textContent: '', className: '', hidden: true };
   const passwordFields = [

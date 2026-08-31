@@ -3762,10 +3762,19 @@ window.location.assign(payload.redirect||'/');
         # Authenticated, read-only minimal shelf: the rendered list never
         # carries management actions, and the Kindle surfaces keep progress
         # read-write while heartbeats stay report-only; nothing here displays
-        # insights back or mutates the shelf.
+        # insights back or mutates the shelf.  The user's bookshelf groups
+        # render as plain nested lists, read-only, from the authenticated
+        # SQLite document (never from client input).
         principal = require_principal(request)
+        shelf = None
+        row = store.get_bookshelf(principal.user_id)
+        if row is not None:
+            try:
+                shelf = json.loads(row[1])
+            except (TypeError, json.JSONDecodeError):
+                shelf = None
         markup = render_kindle_library_page(
-            kindle_library_books(principal), SiteURLs()
+            kindle_library_books(principal), SiteURLs(), shelf=shelf
         )
         target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
         return apply_reader_security_headers(target, markup=markup)

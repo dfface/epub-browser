@@ -5702,6 +5702,48 @@ class ServerKindleTests(unittest.TestCase):
         self.assertEqual(saved.json()["chapter_index"], 3)
         self.assertEqual(logged_in.get(progress_url).json()["chapter_index"], 3)
 
+    def test_kindle_shelf_renders_read_only_groups(self):
+        # Alice's bookshelf: one loose book plus a group with a nested group.
+        self.store.create_bookshelf(
+            self.alice.user_id,
+            1,
+            {
+                "items": ["book"],
+                "groups": {
+                    "g1": {
+                        "id": "g1",
+                        "name": "Reading list",
+                        "items": ["book"],
+                        "groups": {
+                            "g2": {
+                                "id": "g2",
+                                "name": "Nested shelf",
+                                "items": ["book"],
+                                "groups": {},
+                                "order": ["book"],
+                            }
+                        },
+                        "order": ["g2", "book"],
+                    }
+                },
+                "order": ["g1", "book"],
+            },
+        )
+        shelf = self.client.get("/kindle-library.html")
+        self.assertEqual(shelf.status_code, 200)
+        # the user's groups render read-only on the minimal page
+        self.assertIn("Bookshelf", shelf.text)
+        self.assertIn("Reading list", shelf.text)
+        self.assertIn("Nested shelf", shelf.text)
+        self.assertIn("All books", shelf.text)
+        # every rendered book links straight into the minimal reader
+        self.assertIn('href="/book/book/kindle.html"', shelf.text)
+        self.assertIn('class="k-shelf-group"', shelf.text)
+        # read-only surface: no editing controls, no bookshelf.js, no /assets/
+        self.assertNotIn("addShelf", shelf.text)
+        self.assertNotIn("bookshelf.js", shelf.text)
+        self.assertNotIn("/assets/", shelf.text)
+
     def test_kindle_pages_require_authentication_and_pdf_has_none(self):
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
@@ -5714,6 +5756,34 @@ class ServerKindleTests(unittest.TestCase):
             303,
         )
         self.assertEqual(self.client.get("/book/pdf/kindle.html").status_code, 404)
+
+    def test_kindle_surfaces_respect_restricted_visibility(self):
+        # Grant the EPUB only to alice; Bob must be refused on every Kindle
+        # surface: the minimal shelf omits the book, the book's Kindle pages
+        # return 403, and the progress API refuses before touching storage.
+        self.store.update_admin_book_settings(
+            "book",
+            title="Book",
+            authors=[],
+            visibility="restricted",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
+        bob = self.store.create_user("bob", hash_password("bob-secret"))
+        bob_client = self._login("bob", "bob-secret")
+        shelf = bob_client.get("/kindle-library.html")
+        self.assertEqual(shelf.status_code, 200)
+        self.assertNotIn('href="/book/book/kindle.html"', shelf.text)
+        self.assertEqual(bob_client.get("/book/book/kindle.html").status_code, 403)
+        self.assertEqual(
+            bob_client.get("/book/book/kindle_chapter_0.html").status_code, 403
+        )
+        self.assertEqual(
+            bob_client.get("/api/reading-progress/book").status_code, 403
+        )
+        # the granted reader still gets the minimal surfaces
+        self.assertEqual(self.client.get("/book/book/kindle.html").status_code, 200)
 
     def test_kindle_signs_in_without_javascript_form_fallback(self):
         # A legacy e-Ink Kindle has no fetch, so the login page must fall back

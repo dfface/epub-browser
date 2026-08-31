@@ -85,15 +85,17 @@ _GENERATED_READER_PAGE = re.compile(r"^(?:index|chapter_[0-9]+)\.html$")
 # variables, box shadows, or rounded corners. Keep this minimal on purpose:
 # it is a fallback, not a second full-featured reader.
 _KINDLE_READER_CSS = """\
-body{margin:0;padding:0;background:#fff;color:#111;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
-body.sepia{background:#f3e9d2;color:#3c2f1a}
-body.dark{background:#161616;color:#c9c9c9}
+body{margin:0;padding:0;background-color:#fff!important;color:#111!important;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
+body.sepia{background-color:#f3e9d2!important;color:#3c2f1a!important}
+body.dark{background-color:#161616!important;color:#c9c9c9!important}
 .k-header{padding:10px 14px;border-bottom:1px solid #999;line-height:1.4}
 body.sepia .k-header,body.dark .k-header{border-color:#666}
 .k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
 .k-chapter{display:block;margin-top:2px;color:#666;font-size:14px;font-weight:normal}
 body.dark .k-chapter{color:#9a9a9a}
 .k-content{padding:18px 16px 36px;max-width:640px;margin:0 auto;word-wrap:break-word}
+body.sepia .k-content{color:#3c2f1a!important}
+body.dark .k-content{color:#c9c9c9!important}
 .k-content img{max-width:100%;height:auto}
 .k-content a{color:#0b57d0}
 body.dark .k-content a{color:#8ab4f8}
@@ -104,7 +106,8 @@ body.sepia .k-nav,body.dark .k-nav{border-color:#666}
 .k-nav .next{float:right}
 .k-bar{border-top:1px solid #999;padding:12px 14px;text-align:center}
 body.sepia .k-bar,body.dark .k-bar{border-color:#666}
-.k-bar button{background:none;border:1px solid #666;color:inherit;padding:6px 14px;margin:0 4px;font-size:14px;font-family:inherit}
+.k-controls{padding:8px 14px 10px;text-align:center}
+.k-bar button,.k-controls button{background:none;border:1px solid #666;color:inherit;padding:7px 16px;margin:0 4px;font-size:14px;font-family:inherit}
 .k-meta{padding:0 16px;color:#666;font-size:14px}
 body.dark .k-meta{color:#9a9a9a}
 .k-resume{display:block;margin:14px 16px;padding:10px;border:1px solid #666;text-align:center;text-decoration:none;color:inherit;font-size:15px}
@@ -151,7 +154,10 @@ function applyFont(size) {
 }
 function kTheme() {
   var current = getCookie('kindle_theme') || 'light';
-  var index = K_THEMES.indexOf(current);
+  var index = -1;
+  for (var i = 0; i < K_THEMES.length; i++) {
+    if (K_THEMES[i] === current) { index = i; break; }
+  }
   if (index < 0) { index = 0; }
   var next = K_THEMES[(index + 1) % K_THEMES.length];
   setCookie('kindle_theme', next, 365);
@@ -371,13 +377,19 @@ _KINDLE_READER_SERVER_REPORT_JS = """\
       '{"chapter_index":' + chapterIndex + '}'
     );
   }
+  var lastBeat = new Date().getTime();
   function kHeartbeat() {
+    // Report the wall-clock seconds since the last beat (capped like the
+    // desktop tracker) so the 15s cadence maps to real reading time.
+    var now = new Date().getTime();
+    var elapsed = Math.max(1, Math.min(20, Math.round((now - lastBeat) / 1000)));
+    lastBeat = now;
     sequence = sequence + 1;
     kXhr(
       'POST',
       '/api/reading-sessions/' + encodeURIComponent(bookHash) + '/heartbeat',
       '{"client_id":"' + clientId + '","client_sequence":' + sequence +
-        ',"chapter_index":' + chapterIndex + ',"active_seconds":15}'
+        ',"chapter_index":' + chapterIndex + ',"active_seconds":' + elapsed + '}'
     );
   }
   kXhr('GET', '/api/csrf', null, function (text) {
@@ -385,9 +397,9 @@ _KINDLE_READER_SERVER_REPORT_JS = """\
       csrfToken = JSON.parse(text).csrf_token || '';
     } catch (e) {}
     kSync();
+    kHeartbeat();
   });
-  kHeartbeat();
-  setInterval(kHeartbeat, 60000);
+  setInterval(kHeartbeat, 15000);
 })();
 """
 
@@ -2758,6 +2770,11 @@ document.addEventListener('DOMContentLoaded', function() {{
 <body class="light">
 <header class="k-header">
     <a href="{library_href}">{book_title_text}</a>
+    <div class="k-controls">
+        <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
+        <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
+        <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+    </div>
 </header>
 {authors_html}
 <a id="kResume" class="k-resume" href="kindle_chapter_0.html" style="display:none" accesskey="c" data-i18n="continueReading">Continue reading</a>
@@ -2827,6 +2844,11 @@ document.addEventListener('DOMContentLoaded', function() {{
 <header class="k-header">
     <a href="kindle.html">{book_title_text}</a>
     <span class="k-chapter">{chapter_title_text}</span>
+    <div class="k-controls">
+        <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
+        <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
+        <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+    </div>
 </header>
 <div class="k-content">
 {body_content}

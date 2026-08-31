@@ -22,6 +22,10 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.8](releases/v2.9.8.md) — Kindle minimal-reader theme/font fixes,
+  read-only bookshelf groups on the minimal shelf, real reading-time
+  heartbeat reporting, Kindle session-device labels, and restricted-book
+  hardening on every Kindle surface.
 - [v2.9.7](releases/v2.9.7.md) — Kindle minimal mode for SSG and Server
   (`--kindle`) with read-write reading progress and a no-JavaScript login
   fallback.

@@ -1340,6 +1340,13 @@
 
     function describeSessionDevice(userAgent) {
       var agent = String(userAgent || '');
+      // Legacy e-Ink Kindles (WebKit/Arora) and Fire tablets (Silk) carry
+      // a "Safari/" WebKit tail and often a "like Android" hint; recognize
+      // them before the generic browser/platform matching misreports the
+      // device as "Safari · Android".
+      if (/Kindle|Arora|Silk\//i.test(agent)) {
+        return /Silk\//i.test(agent) ? 'Kindle Fire' : 'Kindle';
+      }
       var browser = '';
       var platform = '';
       if (/Edg\//.test(agent)) browser = 'Edge';
