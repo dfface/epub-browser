@@ -22,6 +22,8 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.6](releases/v2.9.6.md) — tag drag sorting, unified tag-bar
+  styling, and more tolerant EPUB parsing.
 - [v2.9.5](releases/v2.9.5.md) — gzip-compressed server responses,
   immutable-asset cache fixes, and an HTML-fallback encoding fix.
 - [v2.9.4](releases/v2.9.4.md) — unified strict-first EPUB parsing,

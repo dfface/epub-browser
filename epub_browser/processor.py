@@ -28,6 +28,7 @@ from .asset_publisher import (
 from .epub_parsing import (
     EPUBParseError,
     allowed_entity_name,
+    decode_html_bytes,
     entity_reference_name,
     find_descendant_local,
     find_local,
@@ -1337,18 +1338,27 @@ class EPUBProcessor:
                     self._resolve_internal_path(href, opf_dir) if href else None
                 )
             self.cover_info = cover_info
-            # Structural validation: every manifest item needs a unique id,
-            # otherwise a spine idref could silently bind to the wrong resource.
+            # Structural validation: manifest items without an id are skipped
+            # (nothing can address them), duplicate ids keep their first
+            # occurrence (the repeated declaration usually points at the same
+            # href), so every manifest entry is uniquely addressable.
             manifest_element = find_descendant_local(root, 'manifest')
             manifest_items = (
                 findall_local(manifest_element, 'item')
                 if manifest_element is not None
                 else list(iter_local(root, 'item'))
             )
-            validate_manifest_ids(manifest_items)
+            valid_manifest_ids = validate_manifest_ids(manifest_items)
             # 获取其他资源 xhtml、font、css 等
             for item in manifest_items:
                 item_id = item.get('id')
+                if (
+                    item_id not in valid_manifest_ids
+                    or item_id in manifest
+                ):
+                    # Id-less or duplicate declaration: keep the first
+                    # occurrence so a spine idref binds deterministically.
+                    continue
                 href = item.get('href')
                 media_type = item.get('media-type', '')
                 # 构建相对于EPUB根目录的完整路径
@@ -1376,15 +1386,18 @@ class EPUBProcessor:
             spine = find_descendant_local(root, 'spine')
             if spine is not None:
                 itemrefs = findall_local(spine, 'itemref')
-                # A spine pointing at an undeclared id would produce a book
-                # whose chapter sequence silently disagrees with its manifest.
-                validate_spine_references(
+                # A spine itemref for an id the manifest never declared cannot
+                # bind to any resource.  Real-world EPUBs ship such dangling
+                # references (often a leftover "toc" entry); the remaining,
+                # resolvable idrefs still form a consistent reading sequence,
+                # so they are kept and the dangling ones dropped.
+                declared_idrefs = validate_spine_references(
                     [itemref.get('idref') for itemref in itemrefs],
                     set(manifest),
                 )
                 for itemref in itemrefs:
                     idref = itemref.get('idref')
-                    if idref in manifest:
+                    if idref in declared_idrefs:
                         item = manifest[idref]
                         # 只处理HTML/XHTML内容
                         if item['media_type'] in ['application/xhtml+xml', 'text/html']:
@@ -2217,35 +2230,44 @@ document.addEventListener('DOMContentLoaded', function() {{
     def create_chapter_pages(self, write=True):
         """创建章节页面"""
         def create_chapter_page(chapter_path, chapter, i):
+            body_content = ""
+            style_links = []
             try:
-                # 读取章节内容
-                with open(chapter_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # 读取章节内容。  EPUB mandates UTF-8, but sloppy real-world
+                # chapters are often GB18030/GBK; decode_html_bytes never fails
+                # and keeps the content readable instead of blanking the page.
+                with open(chapter_path, 'rb') as f:
+                    content = decode_html_bytes(f.read())
                 
                 # 处理HTML内容，修复资源链接并提取样式
                 body_content, style_links = self.process_html_content(content, chapter['path'])
-                
-                if self.deployment_mode == "server":
-                    self._server_chapter_payloads[i] = {
-                        "index": i,
-                        "title": chapter['title'],
-                        "content": body_content,
-                        "style_links": style_links,
-                    }
-                if write:
-                    # Static builds remain self-contained and write their
-                    # complete reader page during EPUB conversion.
-                    chapter_html = self.create_chapter_template(
-                        body_content, style_links, i, chapter['title']
-                    )
-                    with open(os.path.join(self.web_dir, f'chapter_{i}.html'), 'w', encoding='utf-8') as f:
-                        f.write(chapter_html)
-                    
-            except Exception as e:
-                self.reporter.detail(
-                    f"Failed to process chapter {chapter['path']}: {e}"
-                )
+            except ValueError:
+                # A path escaping the archive is a security boundary, not a
+                # tolerance question: never silently degrade it.
                 raise
+            except Exception as e:
+                # One broken chapter must not sink the whole book: keep its
+                # index (chapters and TOC stay aligned) and render a blank
+                # placeholder so the reader still sees a complete sequence.
+                self.reporter.detail(
+                    f"Failed to process chapter {chapter['path']}; "
+                    f"rendering an empty placeholder: {e}"
+                )
+            if self.deployment_mode == "server":
+                self._server_chapter_payloads[i] = {
+                    "index": i,
+                    "title": chapter['title'],
+                    "content": body_content,
+                    "style_links": style_links,
+                }
+            if write:
+                # Static builds remain self-contained and write their
+                # complete reader page during EPUB conversion.
+                chapter_html = self.create_chapter_template(
+                    body_content, style_links, i, chapter['title']
+                )
+                with open(os.path.join(self.web_dir, f'chapter_{i}.html'), 'w', encoding='utf-8') as f:
+                    f.write(chapter_html)
         
         # 创建并启动线程
         with ThreadPoolExecutor(max_workers=10) as executor:  # 限制最大10个并发线程

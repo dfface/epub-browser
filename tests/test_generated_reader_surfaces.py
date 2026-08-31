@@ -3516,13 +3516,14 @@ assert.deepEqual(
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         self.assertNotIn('Sortable.create(', chapter_script)
 
-    def test_drag_sorting_is_limited_to_library_books_and_bookshelf_contents(self):
+    def test_drag_sorting_is_limited_to_library_books_tags_and_bookshelf_contents(self):
         library_script = Path('epub_browser/assets/library.js').read_text(encoding='utf-8')
         bookshelf_script = Path('epub_browser/assets/bookshelf.js').read_text(encoding='utf-8')
 
         self.assertIn("document.querySelector('.book-grid')", library_script)
-        self.assertNotIn('storageKeySortableTag', library_script)
+        self.assertIn('storageKeySortableTag', library_script)
         self.assertNotIn('storageKeySortableContainer', library_script)
+        self.assertIn("document.querySelector('.tag-cloud')", library_script)
         self.assertNotIn("document.querySelector('.tag-cloud'),", library_script)
         self.assertIn('new Sortable(bookshelfBody, {', bookshelf_script)
         self.assertIn('new Sortable(groupBody, {', bookshelf_script)

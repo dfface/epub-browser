@@ -308,6 +308,7 @@ function initScript() {
         var tagItems;
         if (!tagCloud) return 0;
 
+        markTagCloudFixed(tagCloud);
         tagItems = Array.prototype.slice.call(tagCloud.querySelectorAll('.tag-cloud-item'));
         tagItems.forEach(function(tagItem) {
             var id = tagItem.getAttribute('data-id');
@@ -440,6 +441,7 @@ function initScript() {
                 'empty'
             );
             restoreOrder(storageKeySortableBook, 'book-grid');
+            restoreTagCloudOrder();
             updateTagCloudCollapse();
             applyLibraryFilters();
             return;
@@ -447,6 +449,7 @@ function initScript() {
 
         appendBookCardsInBatches(bookGrid, cards, generation, function() {
             restoreOrder(storageKeySortableBook, 'book-grid');
+            restoreTagCloudOrder();
             updateTagCloudCollapse();
             applyLibraryFilters();
         });
@@ -478,6 +481,47 @@ function initScript() {
         });
     }
 
+    // All/NoTag 是固定项，始终保持在标签云最前且不可拖拽
+    function markTagCloudFixed(tagCloud) {
+        if (!tagCloud) return;
+        var items = tagCloud.querySelectorAll('.tag-cloud-item');
+        Array.prototype.forEach.call(items, function(item) {
+            var id = item.getAttribute('data-id');
+            if (id === 'All' || id === 'NoTag') item.classList.add('tag-cloud-item--fixed');
+        });
+    }
+
+    function pinTagCloudFixedItems(tagCloud) {
+        var fixed = { All: null, NoTag: null };
+        var movable = [];
+        var items;
+        if (!tagCloud) return;
+        items = tagCloud.querySelectorAll('.tag-cloud-item');
+        Array.prototype.forEach.call(items, function(item) {
+            var id = item.getAttribute('data-id');
+            if (id === 'All' || id === 'NoTag') fixed[id] = item;
+            else movable.push(item);
+        });
+        // 先重排固定项到最前，再按当前顺序追加其余标签
+        if (fixed.All) tagCloud.appendChild(fixed.All);
+        if (fixed.NoTag) tagCloud.appendChild(fixed.NoTag);
+        movable.forEach(function(item) {
+            tagCloud.appendChild(item);
+        });
+    }
+
+    function restoreTagCloudOrder() {
+        restoreOrder(storageKeySortableTag, 'tag-cloud');
+        pinTagCloudFixedItems(document.querySelector('.tag-cloud'));
+    }
+
+    function suppressTagClick() {
+        window.__epubBrowserTagDragSuppressClick = true;
+        setTimeout(function() {
+            window.__epubBrowserTagDragSuppressClick = false;
+        }, 150);
+    }
+
     function updateFontFamily(fontFamily, fontFamilyInput) {
         if (fontFamily === "ebook-default") {
             document.body.style.fontFamily = '';
@@ -500,6 +544,7 @@ function initScript() {
     }
 
     var storageKeySortableBook = 'book-grid-sortable-order';
+    var storageKeySortableTag = 'tag-cloud-sortable-order';
 
     if (isKindleMode()) {
         document.documentElement.classList.remove("kindle-mode");
@@ -510,6 +555,7 @@ function initScript() {
         if (isKindleMode() || !window.Sortable || window.__epubBrowserLibrarySortable) return;
         window.__epubBrowserLibrarySortable = true;
         var elBook = document.querySelector('.book-grid');
+        var elTag = document.querySelector('.tag-cloud');
         if (!isKindleMode()) {
             Sortable.create(elBook, {
                 delay: 300,
@@ -521,6 +567,22 @@ function initScript() {
                     localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
                 }
             });
+            if (elTag) {
+                markTagCloudFixed(elTag);
+                Sortable.create(elTag, {
+                    delay: 300,
+                    delayOnTouchOnly: true,
+                    filter: '.tag-cloud-item--fixed',
+                    onEnd: function(evt) {
+                        pinTagCloudFixedItems(elTag);
+                        var itemIds = Array.from(evt.from.children).map(function(child) {
+                            return child.dataset.id;
+                        });
+                        localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
+                        if (evt.oldIndex !== evt.newIndex) suppressTagClick();
+                    }
+                });
+            }
         }
     }
 
@@ -533,7 +595,10 @@ function initScript() {
     }
 
     function enableSortableOnInteraction() {
-        var targets = [document.querySelector('.book-grid')];
+        var targets = [
+            document.querySelector('.book-grid'),
+            document.querySelector('.tag-cloud')
+        ];
         targets.forEach(function(target) {
             if (!target || target.getAttribute('data-library-sortable-loader') === 'true') return;
             target.setAttribute('data-library-sortable-loader', 'true');
@@ -657,6 +722,7 @@ function initScript() {
     if (tagCloud && tagCloud.getAttribute('data-library-filter-listener') !== 'true') {
         tagCloud.setAttribute('data-library-filter-listener', 'true');
         tagCloud.addEventListener('click', function(event) {
+            if (window.__epubBrowserTagDragSuppressClick) return;
             var tag = event.target;
             if (tag && tag.classList.contains('tag-cloud-item')) activateTag(tag.getAttribute('data-id'));
         });

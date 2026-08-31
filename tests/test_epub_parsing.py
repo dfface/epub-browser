@@ -79,10 +79,11 @@ class RequireSingleRootfileTests(unittest.TestCase):
         with self.assertRaises(EPUBParseError):
             require_single_rootfile(root)
 
-    def test_ambiguous_multiple_rootfiles_are_rejected(self):
+    def test_multiple_rootfiles_use_the_first_declared(self):
+        # Some real-world containers repeat a rendition declaration; readers
+        # take the first usable one instead of rejecting the book.
         root = self._container(["OEBPS/a.opf", "OEBPS/b.opf"])
-        with self.assertRaisesRegex(EPUBParseError, "multiple rootfiles"):
-            require_single_rootfile(root)
+        self.assertEqual(require_single_rootfile(root), "OEBPS/a.opf")
 
     def test_rootfile_escaping_the_archive_is_rejected(self):
         root = self._container(["../outside.opf"])
@@ -98,17 +99,29 @@ class ManifestAndSpineValidationTests(unittest.TestCase):
             element.set("id", item_id)
         return element
 
-    def test_missing_manifest_id_is_rejected(self):
-        with self.assertRaisesRegex(EPUBParseError, "missing its id"):
-            validate_manifest_ids([self._item("a"), self._item(None)])
+    def test_missing_manifest_id_is_skipped(self):
+        # An id-less item can never be addressed by a spine idref; skipping it
+        # keeps the rest of the book instead of rejecting the whole thing.
+        self.assertEqual(
+            validate_manifest_ids([self._item("a"), self._item(None), self._item("b")]),
+            ["a", "b"],
+        )
 
-    def test_duplicate_manifest_id_is_rejected(self):
-        with self.assertRaisesRegex(EPUBParseError, "duplicate id"):
-            validate_manifest_ids([self._item("a"), self._item("a")])
+    def test_duplicate_manifest_id_keeps_first_occurrence(self):
+        # Real-world EPUBs repeat manifest declarations; the first one wins
+        # so a spine idref still binds to a single, deterministic resource.
+        self.assertEqual(
+            validate_manifest_ids([self._item("a"), self._item("b"), self._item("a")]),
+            ["a", "b"],
+        )
 
-    def test_spine_reference_to_undeclared_id_is_rejected(self):
-        with self.assertRaisesRegex(EPUBParseError, "undeclared manifest ids"):
-            validate_spine_references(["a", "ghost", "b"], {"a", "b"})
+    def test_undeclared_spine_reference_is_dropped(self):
+        # A dangling idref (often a leftover "toc" entry) cannot bind to any
+        # resource and is skipped instead of rejecting the whole book.
+        self.assertEqual(
+            validate_spine_references(["a", "ghost", "b"], {"a", "b"}),
+            ("a", "b"),
+        )
 
     def test_valid_spine_references_pass_through_in_order(self):
         self.assertEqual(

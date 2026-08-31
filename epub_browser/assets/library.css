@@ -664,7 +664,7 @@ body {
 
 .tag-cloud {
     --tag-cloud-gap: 10px;
-    --tag-cloud-row-height: calc(1.44rem + 16px);
+    --tag-cloud-row-height: calc(1.35rem + 14px);
     display: flex;
     flex-wrap: wrap;
     gap: var(--tag-cloud-gap);
@@ -682,20 +682,83 @@ body {
 }
 
 .tag-cloud-item {
-    background: var(--card-bg);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: var(--transition);
-    box-shadow: var(--shadow-md);
-    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 5px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    font-size: 0.875rem;
+    line-height: 1.4;
     white-space: nowrap;
+    cursor: grab;
+    transition: var(--transition);
 }
 
-.tag-cloud-item:hover, .tag-cloud-item.active {
+.tag-cloud-item:hover {
+    background: var(--tag-hover);
+    border-color: var(--button-bg);
+    color: var(--tag-text);
+}
+
+.tag-cloud-item.active {
     background: var(--button-bg);
-    color: white;
+    border-color: var(--button-bg);
+    color: var(--button-text);
+    box-shadow: var(--shadow-md);
+}
+
+.tag-cloud-item:focus-visible {
+    outline: 2px solid var(--button-bg);
+    outline-offset: 2px;
+}
+
+.tag-cloud-item:active {
+    cursor: grabbing;
+}
+
+/* 固定项（All / NoTag）不可拖拽，弱化视觉以便与可排序的真实标签区分 */
+.tag-cloud-item--fixed {
+    background: transparent;
+    border-style: dashed;
+    color: var(--text-secondary);
+    cursor: default;
+    box-shadow: none;
+}
+
+.tag-cloud-item--fixed:hover {
+    background: var(--tag-bg);
+    border-color: var(--border);
+    color: var(--text-secondary);
+}
+
+.tag-cloud-item--fixed.active {
+    background: var(--button-bg);
+    border-color: var(--button-bg);
+    color: var(--button-text);
+}
+
+.tag-cloud-item--fixed.active:hover {
+    background: var(--button-bg);
+    border-color: var(--button-bg);
+    color: var(--button-text);
+}
+
+/* 拖拽过程中的占位与选中反馈 */
+.tag-cloud-item.sortable-ghost {
+    opacity: 0.45;
+    background: var(--tag-hover);
+}
+
+.tag-cloud-item.sortable-chosen {
+    box-shadow: var(--shadow-lg);
+    border-color: var(--button-bg);
+}
+
+.tag-cloud-item.sortable-drag {
+    cursor: grabbing;
 }
 
 .tag-cloud-toggle {
@@ -780,6 +843,7 @@ body {
 .kindle-mode .eb-header, .kindle-mode .tag-cloud-item, .kindle-mode .book-cover, .kindle-mode .book-card, .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .search-box {
     box-shadow: none;
     border-radius: inherit;
+    border-color: transparent;
 }
 
 .kindle-mode .container {

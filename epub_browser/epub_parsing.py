@@ -38,6 +38,7 @@ __all__ = [
     "element_text",
     "entity_reference_name",
     "allowed_entity_name",
+    "decode_html_bytes",
     "require_single_rootfile",
     "validate_manifest_ids",
     "validate_spine_references",
@@ -93,14 +94,18 @@ def _strip_xml_declaration(text):
     return text
 
 
-def _decode_html_bytes(data):
-    """Decode bytes into str for the HTML fallback parser.
+def decode_html_bytes(data):
+    """Decode bytes into str for HTML content, never failing.
 
     lxml's HTML parser decodes input whose encoding it cannot detect as
     latin-1, which garbles the UTF-8 content EPUB mandates (a smart quote
     becomes ``â\x80\x99``).  Decode explicitly instead -- a BOM wins, then a
     meta charset declaration, then UTF-8 -- and hand the parser ``str`` so no
-    byte-guessing happens downstream.
+    byte-guessing happens downstream.  Sloppy real-world EPUBs ship chapters
+    in GB18030/GBK (exported by Chinese tools) without a usable declaration;
+    rather than failing a chapter that every reader shows, fall back through
+    the legacy encodings and finally replacement characters.  Plain text
+    decoding is inert, so none of these paths can execute or load anything.
     """
     if isinstance(data, str):
         return _strip_xml_declaration(data)
@@ -124,7 +129,15 @@ def _decode_html_bytes(data):
             return _strip_xml_declaration(data.decode(encoding))
         except (LookupError, UnicodeDecodeError, ValueError):
             pass
-    return _strip_xml_declaration(data.decode("utf-8"))
+    try:
+        return _strip_xml_declaration(data.decode("utf-8"))
+    except UnicodeDecodeError:
+        for encoding in ("gb18030", "latin-1"):
+            try:
+                return _strip_xml_declaration(data.decode(encoding))
+            except UnicodeDecodeError:
+                continue
+        return _strip_xml_declaration(data.decode("utf-8", errors="replace"))
 
 
 def parse_xml_bytes(data, *, allow_recovery=True):
@@ -177,21 +190,27 @@ def parse_xhtml_bytes(data):
         pass
     try:
         return lxml_html.document_fromstring(
-            _decode_html_bytes(data), parser=_html_parser()
+            decode_html_bytes(data), parser=_html_parser()
         )
     except (etree.ParserError, etree.XMLSyntaxError) as error:
         raise EPUBParseError(f"Unparsable XHTML document: {error}") from error
 
 
 def parse_xhtml_document(path):
-    """Parse an XHTML file, falling back to the HTML parser."""
+    """Parse an XHTML file, falling back to the HTML parser.
+
+    The file is read once.  Legacy EPUB 2 chapters are not strict XML, so the
+    strict attempt fails and the same bytes feed the HTML fallback; reading
+    the file twice on that path is pure waste for such books.
+    """
+    data = Path(path).read_bytes()
     try:
-        return parse_xml_document(path, allow_recovery=False)
+        return parse_xml_bytes(data, allow_recovery=False)
     except EPUBParseError:
         pass
     try:
         return lxml_html.document_fromstring(
-            _decode_html_bytes(Path(path).read_bytes()), parser=_html_parser()
+            decode_html_bytes(data), parser=_html_parser()
         )
     except (etree.ParserError, etree.XMLSyntaxError) as error:
         raise EPUBParseError(
@@ -216,7 +235,7 @@ def parse_xhtml_fragment(data):
     try:
         return [
             lxml_html.document_fromstring(
-                _decode_html_bytes(data), parser=_html_parser()
+                decode_html_bytes(data), parser=_html_parser()
             )
         ]
     except (etree.ParserError, etree.XMLSyntaxError) as error:
@@ -280,10 +299,12 @@ def allowed_entity_name(name):
 
 
 def require_single_rootfile(root):
-    """Return the container's unique rootfile ``full-path``.
+    """Return the container's rootfile ``full-path``.
 
-    A container that declares several distinct rootfiles is ambiguous: the
-    reading order would depend on which rendition happened to be parsed first.
+    A container that declares several distinct rootfiles is technically
+    ambiguous, but real-world EPUBs occasionally repeat a rendition
+    declaration.  Mainstream readers take the first usable one, so this does
+    the same instead of rejecting the whole book.
     """
     candidates = []
     for element in iter_local(root, "rootfile"):
@@ -297,14 +318,8 @@ def require_single_rootfile(root):
         ):
             continue
         candidates.append(full_path.strip())
-    unique = {value for value in candidates}
-    if not unique:
+    if not candidates:
         raise EPUBParseError("container.xml declares no OEBPS rootfile")
-    if len(unique) > 1:
-        raise EPUBParseError(
-            "container.xml declares multiple rootfiles: "
-            + ", ".join(sorted(unique))
-        )
     full_path = candidates[0]
     if not is_safe_internal_path(full_path):
         raise EPUBParseError(
@@ -314,36 +329,43 @@ def require_single_rootfile(root):
 
 
 def validate_manifest_ids(items):
-    """Reject a manifest whose items lack a unique, non-empty id."""
+    """Validate manifest ids, returning the first occurrence of each id.
+
+    A missing id is common in sloppy real-world EPUBs and never addressable by
+    a spine ``idref``, so the item is skipped rather than failing the whole
+    book: losing one unreferenced resource declaration costs far less than
+    refusing content every mainstream reader accepts.  A duplicated id (a
+    repeated declaration, usually of the same ``href``) is likewise accepted:
+    the first occurrence wins and later ones are dropped, so a spine ``idref``
+    always binds deterministically.
+    """
     seen = set()
+    ordered = []
     for item in items:
         item_id = item.get("id")
         if not isinstance(item_id, str) or not item_id.strip():
-            raise EPUBParseError("OPF manifest item is missing its id")
+            continue
         if item_id in seen:
-            raise EPUBParseError(
-                f"OPF manifest declares a duplicate id: {item_id}"
-            )
+            continue
         seen.add(item_id)
-    return seen
+        ordered.append(item_id)
+    return ordered
 
 
 def validate_spine_references(idrefs, manifest_ids):
-    """Reject a spine that points at manifest ids the manifest never declared."""
-    missing = sorted(
-        {
-            idref
-            for idref in idrefs
-            if isinstance(idref, str) and idref.strip() and idref not in manifest_ids
-        }
-    )
-    if missing:
-        raise EPUBParseError(
-            "OPF spine references undeclared manifest ids: "
-            + ", ".join(missing)
-        )
+    """Filter a spine to the manifest ids it actually declares.
+
+    A spine ``idref`` for an undeclared manifest id cannot be bound to any
+    resource, but dropping it -- rather than rejecting the whole book -- is
+    the behavior mainstream readers use: such references are usually leftover
+    ``toc`` entries or publisher mistakes, and the remaining, resolvable
+    chapters still form a consistent reading sequence.  Skipping the dangling
+    reference never binds content to the wrong resource.
+    """
     return tuple(
-        idref for idref in idrefs if isinstance(idref, str) and idref.strip()
+        idref
+        for idref in idrefs
+        if isinstance(idref, str) and idref.strip() and idref in manifest_ids
     )
 
 
