@@ -579,6 +579,7 @@ The loopback published port in the examples keeps the container behind the host 
 | `--output-dir DIR`, `-o DIR` | Required destination for the atomic static snapshot. |
 | `--base-path PATH` | Public URL prefix; default `/`. It must begin and end with `/`. |
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
+| `--kindle` | Generate dependency-free minimal pages for legacy e-Ink Kindles and redirect Kindle WebKit browsers to them; off by default. |
 | `--log` | Compatibility alias for `--log-level info`. |
 | `--log-level debug\|info\|warning\|error` | Operational log verbosity; default `error`, which keeps routine conversion output and warnings quiet. |
 

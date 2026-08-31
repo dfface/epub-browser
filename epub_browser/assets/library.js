@@ -32,20 +32,6 @@ function deleteCookie(name) {
     document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 }
 
-// 检测是否是 Kindle 设备
-function isKindleMode() {
-    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-        return window.epubBrowserCache.kindle_mode === 'true';
-    }
-    var ua = navigator.userAgent.toLowerCase();
-    var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-    if (!window.epubBrowserCache) {
-        window.epubBrowserCache = {};
-    }
-    window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-    return isKindle;
-}
-
 function initScript() {
     var i18n = window.EpubBrowserI18n;
 
@@ -546,43 +532,36 @@ function initScript() {
     var storageKeySortableBook = 'book-grid-sortable-order';
     var storageKeySortableTag = 'tag-cloud-sortable-order';
 
-    if (isKindleMode()) {
-        document.documentElement.classList.remove("kindle-mode");
-        document.documentElement.classList.add("kindle-mode");
-    }
-
     function initSortable() {
-        if (isKindleMode() || !window.Sortable || window.__epubBrowserLibrarySortable) return;
+        if (!window.Sortable || window.__epubBrowserLibrarySortable) return;
         window.__epubBrowserLibrarySortable = true;
         var elBook = document.querySelector('.book-grid');
         var elTag = document.querySelector('.tag-cloud');
-        if (!isKindleMode()) {
-            Sortable.create(elBook, {
+        Sortable.create(elBook, {
+            delay: 300,
+            delayOnTouchOnly: true,
+            onEnd: function(evt) {
+                var itemIds = Array.from(evt.from.children).map(function(child) {
+                    return child.dataset.id;
+                });
+                localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
+            }
+        });
+        if (elTag) {
+            markTagCloudFixed(elTag);
+            Sortable.create(elTag, {
                 delay: 300,
                 delayOnTouchOnly: true,
+                filter: '.tag-cloud-item--fixed',
                 onEnd: function(evt) {
+                    pinTagCloudFixedItems(elTag);
                     var itemIds = Array.from(evt.from.children).map(function(child) {
                         return child.dataset.id;
                     });
-                    localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
+                    localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
+                    if (evt.oldIndex !== evt.newIndex) suppressTagClick();
                 }
             });
-            if (elTag) {
-                markTagCloudFixed(elTag);
-                Sortable.create(elTag, {
-                    delay: 300,
-                    delayOnTouchOnly: true,
-                    filter: '.tag-cloud-item--fixed',
-                    onEnd: function(evt) {
-                        pinTagCloudFixedItems(elTag);
-                        var itemIds = Array.from(evt.from.children).map(function(child) {
-                            return child.dataset.id;
-                        });
-                        localStorage.setItem(storageKeySortableTag, JSON.stringify(itemIds));
-                        if (evt.oldIndex !== evt.newIndex) suppressTagClick();
-                    }
-                });
-            }
         }
     }
 
@@ -614,32 +593,27 @@ function initScript() {
 
     var fontFamily = "ebook-default";
     var fontFamilyInput = null;
-    if (!isKindleMode()) {
-        if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
-            fontFamily = window.epubBrowserCache.font_family;
-        } else {
-            fontFamily = localStorage.getItem('font_family') || "ebook-default";
-            if (fontFamily) {
-                if (!window.epubBrowserCache) {
-                    window.epubBrowserCache = {};
-                }
-                window.epubBrowserCache.font_family = fontFamily;
-            }
-        }
-        if (window.epubBrowserCache && window.epubBrowserCache.font_family_input) {
-            fontFamilyInput = window.epubBrowserCache.font_family_input;
-        } else {
-            fontFamilyInput = localStorage.getItem('font_family_input');
-            if (fontFamilyInput) {
-                if (!window.epubBrowserCache) {
-                    window.epubBrowserCache = {};
-                }
-                window.epubBrowserCache.font_family_input = fontFamilyInput;
-            }
-        }
+    if (window.epubBrowserCache && window.epubBrowserCache.font_family) {
+        fontFamily = window.epubBrowserCache.font_family;
     } else {
-        fontFamily = getCookie('font_family') || "ebook-default";
-        fontFamilyInput = getCookie('font_family_input');
+        fontFamily = localStorage.getItem('font_family') || "ebook-default";
+        if (fontFamily) {
+            if (!window.epubBrowserCache) {
+                window.epubBrowserCache = {};
+            }
+            window.epubBrowserCache.font_family = fontFamily;
+        }
+    }
+    if (window.epubBrowserCache && window.epubBrowserCache.font_family_input) {
+        fontFamilyInput = window.epubBrowserCache.font_family_input;
+    } else {
+        fontFamilyInput = localStorage.getItem('font_family_input');
+        if (fontFamilyInput) {
+            if (!window.epubBrowserCache) {
+                window.epubBrowserCache = {};
+            }
+            window.epubBrowserCache.font_family_input = fontFamilyInput;
+        }
     }
     updateFontFamily(fontFamily, fontFamilyInput);
 
@@ -876,13 +850,11 @@ function initScript() {
         });
     }
 
-    if (!isKindleMode()) {
-        pwaSupport();
-        deferLibraryFeature('bookshelfBtn', 'bookshelf', function() {
-            if (window.initBookShelf) window.initBookShelf();
-        }, 'bookshelf.loading');
-        deferLibraryFeature('annotationsBtn', 'annotations', null, 'annotations.loading');
-    }
+    pwaSupport();
+    deferLibraryFeature('bookshelfBtn', 'bookshelf', function() {
+        if (window.initBookShelf) window.initBookShelf();
+    }, 'bookshelf.loading');
+    deferLibraryFeature('annotationsBtn', 'annotations', null, 'annotations.loading');
 
     function hideLoading() {
         var overlay = document.getElementById('loadingOverlay');

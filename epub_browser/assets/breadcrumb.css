@@ -436,10 +436,6 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     transform: translateY(-2px);
 }
 
-.kindle-mode #bookshelfBtn {
-    display: none;
-}
-
 .reading-controls #scrollToTopBtn .control-name {
     position: absolute;
     width: 1px;

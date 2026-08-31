@@ -12,7 +12,7 @@ from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
 from epub_browser.pdf_processor import PDFMetadata, PDFPageMetadata
 from epub_browser.processor import EPUBProcessor, server_book_public_path_allowed
-from epub_browser.site import publish_library_shell
+from epub_browser.site import LibraryBook, publish_library_shell, render_kindle_library_page
 from epub_browser.urls import SiteURLs
 
 
@@ -127,6 +127,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             )
             epub_html = epub.create_chapter_template('<p>Text</p>', '', 0, 'One')
 
+            # Server renders the minimal reader at request time: no legacy
+            # Kindle redirect scripts are embedded in the server templates.
+            self.assertNotIn('kindle_chapter', epub_html)
+            self.assertNotIn('location.replace', epub_html)
+
             shared_markers = (
                 'class="chapter-top-bar app-header"',
                 'id="bookHomeFloating"',
@@ -234,6 +239,145 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 'pdf-annotation-tab', 'pdf-annotation-toolbar',
             ):
                 self.assertNotIn(duplicate_ui, pdf_html)
+
+    def test_kindle_minimal_templates_are_self_contained_es5_and_cookie_driven(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory)
+            processor.book_title = 'Kindle Book'
+            processor.lang = 'en'
+            processor.chapters = [
+                {'title': 'One'}, {'title': 'Two'}, {'title': 'Three'},
+            ]
+            toc = processor._build_toc_data()
+            self.assertEqual([item['title'] for item in toc], ['One', 'Two', 'Three'])
+
+            index_html = processor.create_kindle_index_page(toc)
+            self.assertIn('href="kindle_chapter_0.html"', index_html)
+            self.assertIn('href="kindle_chapter_2.html"', index_html)
+            self.assertIn('id="kResume"', index_html)
+            self.assertIn('getCookie(', index_html)
+            self.assertIn('Continue reading', index_html)
+
+            middle = processor.create_kindle_chapter_page('<p>Text</p>', '', 1, 'Two')
+            self.assertIn('class="prev"', middle)
+            self.assertIn('class="next"', middle)
+            self.assertIn('href="kindle_chapter_0.html"', middle)
+            self.assertIn('href="kindle_chapter_2.html"', middle)
+            self.assertIn("chapter_1.html", middle)
+
+            first = processor.create_kindle_chapter_page('<p>One</p>', '', 0, 'One')
+            last = processor.create_kindle_chapter_page('<p>Three</p>', '', 2, 'Three')
+            self.assertNotIn('class="prev"', first)
+            self.assertNotIn('class="next"', last)
+            self.assertIn('class="next"', first)
+            self.assertIn('class="prev"', last)
+
+            for page in (index_html, middle):
+                self.assertNotIn('/assets/', page)
+                self.assertIn('<style>', page)
+                self.assertIn('<script>', page)
+                # ES5 only and no browser APIs the legacy Kindle WebKit lacks.
+                for banned in (
+                    "=>", "const ", "let ", "Promise", "classList",
+                    "localStorage", "fetch(", "addEventListener",
+                ):
+                    self.assertNotIn(banned, page)
+
+    def test_kindle_minimal_library_page_is_self_contained_and_es5(self):
+        with tempfile.TemporaryDirectory() as directory:
+            books = (
+                LibraryBook(
+                    book_id='alpha',
+                    title='Alpha Book',
+                    authors=('One Author',),
+                    tags=(),
+                    cover=None,
+                ),
+                LibraryBook(
+                    book_id='beta',
+                    title='Beta Book',
+                    authors=(),
+                    tags=(),
+                    cover=None,
+                ),
+            )
+            page = render_kindle_library_page(books, SiteURLs())
+            self.assertIn('href="/book/alpha/kindle.html"', page)
+            self.assertIn('href="/book/beta/kindle.html"', page)
+            self.assertIn('Alpha Book', page)
+            self.assertIn('One Author', page)
+            self.assertIn('kTheme', page)
+            self.assertNotIn('/assets/', page)
+            for banned in (
+                "=>", "const ", "let ", "Promise", "classList", "localStorage",
+            ):
+                self.assertNotIn(banned, page)
+
+    def test_ssg_chapter_template_embeds_kindle_entry_script(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            epub = EPUBProcessor(
+                'book.epub', directory, asset_manifest=assets,
+                book_id='epub-book', deployment_mode='ssg',
+                kindle_support=True,
+            )
+            epub.book_title = 'An EPUB'
+            epub.chapters = [{'title': 'One'}, {'title': 'Two'}]
+            chapter_html = epub.create_chapter_template('<p>Text</p>', '', 1, 'Two')
+            self.assertIn(
+                "location.replace('kindle_chapter_1.html')", chapter_html
+            )
+            self.assertIn("ua.indexOf('silk') !== -1", chapter_html)
+            self.assertIn('full=1', chapter_html)
+
+    def test_ssg_chapter_template_omits_kindle_entry_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            epub = EPUBProcessor('book.epub', directory, deployment_mode='ssg')
+            epub.book_title = 'An EPUB'
+            epub.chapters = [{'title': 'One'}, {'title': 'Two'}]
+            chapter_html = epub.create_chapter_template('<p>Text</p>', '', 1, 'Two')
+            self.assertNotIn('kindle_chapter', chapter_html)
+            self.assertNotIn('location.replace', chapter_html)
+
+    def test_ssg_library_shell_kindle_support_is_opt_in(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            books = (LibraryBook('alpha', 'Alpha', ('A',), (), None),)
+            publish_library_shell(
+                Path(directory), books, assets, SiteURLs(), kindle=True
+            )
+            self.assertTrue((Path(directory) / 'kindle-library.html').exists())
+            library_html = Path(directory, 'index.html').read_text(encoding='utf-8')
+            self.assertIn(
+                "location.replace('kindle-library.html')", library_html
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            books = (LibraryBook('alpha', 'Alpha', ('A',), (), None),)
+            publish_library_shell(
+                Path(directory), books, assets, SiteURLs()
+            )
+            self.assertFalse((Path(directory) / 'kindle-library.html').exists())
+            library_html = Path(directory, 'index.html').read_text(encoding='utf-8')
+            self.assertNotIn('kindle-library.html', library_html)
+
+    def test_server_library_shell_writes_no_kindle_entry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            publish_library_shell(
+                Path(directory), (), assets, SiteURLs(), deployment_mode='server'
+            )
+            self.assertFalse((Path(directory) / 'kindle-library.html').exists())
+            library_html = Path(directory, 'index.html').read_text(encoding='utf-8')
+            self.assertNotIn('kindle-library.html', library_html)
 
     def test_server_includes_real_account_controls_but_ssg_includes_none(self):
         server_html = self._server_html()
@@ -2383,13 +2527,13 @@ assert.deepEqual(
         self.assertRegex(html, r'data-i18n-aria-label=(?:["\'])?book\.clearReadingProgress')
         self.assertRegex(html, r'data-i18n=(?:["\'])?book\.clear')
         self.assertIn("updateContinueReadingButton(book_hash);", script)
-        self.assertIn("setClearReadingProgressAvailability(!!resumeChapter && !isKindleMode());", script)
+        self.assertIn("setClearReadingProgressAvailability(!!resumeChapter);", script)
         self.assertIn("clearButton.hidden = !available;", script)
         self.assertIn("clearMenuToggle.setAttribute('aria-expanded'", script)
         self.assertIn("window.EpubDialog.confirm({", script)
         self.assertIn("message: bookT('book.clearReadingProgressConfirm')", script)
         self.assertIn("'DELETE',", script)
-        self.assertIn("true,\n                    true", script)
+        self.assertIn("true,\n                true", script)
         self.assertIn("if (!result || result.error)", script)
         self.assertIn("book.clearReadingProgressFailed", script)
         clear_handler = script.index("window.EpubDialog.confirm({")

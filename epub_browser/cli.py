@@ -24,6 +24,7 @@ class SSGConfig:
     log: bool = False
     log_level: str = "error"
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
+    kindle: bool = False
 
     def __post_init__(self) -> None:
         if self.log and self.log_level == "error":
@@ -110,6 +111,14 @@ def _new_parser() -> argparse.ArgumentParser:
     ssg.add_argument("--base-path", default="/", type=_parse_base_path)
     _add_logging_options(ssg)
     _add_book_id_storage(ssg)
+    ssg.add_argument(
+        "--kindle",
+        action="store_true",
+        help=(
+            "Generate dependency-free minimal pages for legacy e-Ink Kindles "
+            "and redirect Kindle WebKit browsers to them (SSG only)"
+        ),
+    )
 
     server = modes.add_parser("server", help="Run the stateful reading server")
     server.add_argument("sources", nargs="+", metavar="SOURCE")
@@ -175,6 +184,7 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
                 log=_uses_log_alias(values),
                 log_level=_log_level(values),
                 book_id_storage=values.book_id_storage,
+                kindle=values.kindle,
             )
         try:
             auth = _server_auth_options(values)

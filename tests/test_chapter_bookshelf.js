@@ -7,7 +7,7 @@ test('chapter shelf support calls the bookshelf initializer exported by its asse
   let initialized = 0;
   const timeouts = [];
   const window = {
-    epubBrowserCache: { kindle_mode: 'false' },
+    epubBrowserCache: {},
     initBookShelf() { initialized += 1; },
     addEventListener() {},
     location: { pathname: '/book/book-id/chapter_0.html', hash: '', search: '' },

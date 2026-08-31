@@ -533,6 +533,7 @@ docker run -d \
 | `--output-dir DIR`, `-o DIR` | 必填；原子静态快照的目标目录。 |
 | `--base-path PATH` | 公开 URL 前缀，默认 `/`；必须以 `/` 开头和结尾。 |
 | `--book-id-storage sidecar\|embedded` | 本次命令中所有源文件的稳定身份载体，默认 `sidecar`。 |
+| `--kindle` | 为旧式 e-Ink Kindle 生成无依赖极简页面，并将 Kindle WebKit 浏览器重定向到这些页面；默认关闭。 |
 | `--log` | `--log-level info` 的兼容别名。 |
 | `--log-level debug\|info\|warning\|error` | 运行日志详细程度；默认 `error`，日常转换输出和警告保持安静。 |
 

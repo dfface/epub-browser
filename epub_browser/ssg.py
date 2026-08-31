@@ -107,7 +107,9 @@ class SSGPublisher:
                 excluded_prefixes=SERVER_ONLY_ASSET_PREFIXES,
             ).publish()
             books = self._convert_all(prepared, staging, assets)
-            publish_library_shell(staging, books, assets, self.urls)
+            publish_library_shell(
+                staging, books, assets, self.urls, kindle=self.config.kindle
+            )
             self._validate_snapshot(staging, books, assets)
             identity_state = self._capture_pdf_identity_state(prepared)
             try:
@@ -318,6 +320,7 @@ class SSGPublisher:
             book_id=prepared.book_id,
             urls=self.urls,
             reporter=self.reporter,
+            kindle_support=self.config.kindle,
         )
         try:
             converted: ConvertedBook = processor.convert()

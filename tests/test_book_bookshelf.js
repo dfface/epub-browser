@@ -17,7 +17,7 @@ function loadBookClient() {
   const text = { textContent: '' };
   const window = {
     EpubBrowserMode: 'server',
-    epubBrowserCache: { kindle_mode: 'false' },
+    epubBrowserCache: {},
     EpubBrowserI18n: { t(key) { return key; } },
     EpubBrowserNotification: {
       show(message, level) { notifications.push({ message, level }); },
@@ -97,7 +97,7 @@ test('Server reader defers its shelf button until the Server store has loaded', 
   const remoteShelf = { items: ['book-id'], groups: {}, order: ['book-id'] };
   const window = {
     EpubBrowserMode: 'server',
-    epubBrowserCache: { kindle_mode: 'false' },
+    epubBrowserCache: {},
     EpubBrowserI18n: { t(key) { return key; } },
     EpubBrowserNotification: { show() {} },
     EpubBrowserBookFeatures: {

@@ -20,7 +20,14 @@ from .server_chrome import (
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
 from .source_format import EPUB_FORMAT
-from .processor import metadata_text
+# The Kindle minimal reader CSS/JS live in processor.py as the single source
+# of truth shared by the book-level kindle.html pages and the minimal library
+# page below; both surfaces must stay dependency-free and ES5.
+from .processor import (
+    _KINDLE_READER_CSS,
+    _KINDLE_READER_JS,
+    metadata_text,
+)
 
 
 @dataclass(frozen=True)
@@ -33,11 +40,75 @@ class LibraryBook:
     source_format: str = EPUB_FORMAT
 
 
+def render_kindle_library_page(
+    books: Sequence[LibraryBook],
+    urls: SiteURLs,
+) -> str:
+    """Render the dependency-free Kindle minimal library page.
+
+    One plain row per book linking straight into that book's ``kindle.html``
+    minimal reader, reusing the exact inline CSS/JS of the EPUBProcessor
+    Kindle pages so legacy Kindle WebKit browsers get one consistent, ES5,
+    no-/assets/ surface.  SSG writes this page next to ``index.html``; Server
+    mode renders it at request time from the authenticated catalogue.
+    """
+    rows = []
+    for book in sorted(books, key=lambda book: book.book_id):
+        href = urls.public(f"/book/{book.book_id}/kindle.html")
+        title = html.escape(metadata_text(book.title), quote=False)
+        authors = " & ".join(
+            html.escape(metadata_text(author), quote=False)
+            for author in book.authors
+        )
+        if authors:
+            rows.append(
+                f'<li><a href="{href}"><span class="k-lib-title">{title}</span>'
+                f'<span class="k-lib-authors">{authors}</span></a></li>'
+            )
+        else:
+            rows.append(f'<li><a href="{href}">{title}</a></li>')
+    list_html = "\n".join(rows) if rows else '<li class="k-lib-empty">No books</li>'
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Library</title>
+<style>
+{_KINDLE_READER_CSS}
+.k-lib-title{{display:block;font-weight:bold}}
+.k-lib-authors{{display:block;color:#666;font-size:14px;font-weight:normal}}
+body.dark .k-lib-authors{{color:#9a9a9a}}
+.k-lib-empty{{padding:8px 0;color:#666}}
+</style>
+</head>
+<body class="light">
+<header class="k-header"><a href="index.html?full=1">Library</a></header>
+<div class="k-toc">
+    <ul>
+{list_html}
+    </ul>
+</div>
+<p class="k-footer"><a href="index.html?full=1">Open full library</a></p>
+<div class="k-bar">
+    <button type="button" onclick="kTheme()" accesskey="t">Theme</button>
+    <button type="button" onclick="kFont(-1)">A-</button>
+    <button type="button" onclick="kFont(1)">A+</button>
+</div>
+<script>
+{_KINDLE_READER_JS}
+</script>
+</body>
+</html>
+"""
+
+
 def render_library_shell(
     books: Sequence[LibraryBook],
     assets: PublishedAssets,
     urls: SiteURLs,
     deployment_mode: str,
+    kindle: bool = False,
 ) -> str:
     """Render the shared library application shell for one deployment mode.
 
@@ -83,6 +154,20 @@ def render_library_shell(
             <button type="button" class="app-nav-link" id="pwa-install-btn" style="display: none;">
                 <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="library.install">Install</span>
             </button>""" if deployment_mode == "ssg" else ""
+    # Legacy Kindle WebKit entry (SSG, opt-in via --kindle): steer real
+    # e-Ink Kindles to the dependency-free minimal library instead of the
+    # full SPA; Kindle Fire (Silk) and ?full=1 keep the full UI. Runs
+    # before the SPA loads.
+    kindle_entry_script = """
+<script>
+(function () {
+  var ua = navigator.userAgent.toLowerCase();
+  if (ua.indexOf('kindle') === -1) return;
+  if (ua.indexOf('silk') !== -1) return;
+  if (location.search.indexOf('full=1') !== -1) return;
+  location.replace('kindle-library.html');
+})();
+</script>""" if (deployment_mode == "ssg" and kindle) else ""
     server_account_control = ""
     server_account_panel = ""
     server_account_stylesheet = ""
@@ -175,39 +260,8 @@ def render_library_shell(
 {server_account_stylesheet}
 {server_progress_stylesheet}
 <script>
-// 立即应用主题，避免闪现 —— Kindle 兼容版
-function isKindleDevice() {
-  // 优先从 window 缓存读取
-  if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-    return window.epubBrowserCache.kindle_mode === "true";
-  }
-  // 检测设备
-  var ua = navigator.userAgent.toLowerCase();
-  var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
-
-  if (!window.epubBrowserCache) {
-    window.epubBrowserCache = {};
-  }
-  window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
-  return isKindle;
-}
-
-// 通用 Cookie 方法（只定义一次）
-function getCookie(key) {
-  var cookies = document.cookie.split("; ");
-  for (var i = 0; i < cookies.length; i++) {
-    var parts = cookies[i].split("=");
-    var cookieKey = parts[0];
-    var cookieValue = parts.slice(1).join("=");
-    if (cookieKey === key) {
-      return decodeURIComponent(cookieValue);
-    }
-  }
-  return null;
-}
-
+// 立即应用主题，避免闪现
 var theme = "light";
-var isKindle = false;
 
 try {
   // 优先从 window 缓存读取
@@ -218,7 +272,7 @@ try {
     storedTheme = localStorage.getItem("theme");
     if (storedTheme) {
       if (!window.epubBrowserCache) {
-    window.epubBrowserCache = {};
+        window.epubBrowserCache = {};
       }
       window.epubBrowserCache.theme = storedTheme;
     }
@@ -226,25 +280,16 @@ try {
 
   if (storedTheme) {
     theme = storedTheme;
-  } else if (isKindleDevice()) {
-    isKindle = true;
-    theme = getCookie("theme") || "light";
   }
 } catch (e) {
-  // 捕获异常，兼容 Kindle
-  if (isKindleDevice()) {
-    isKindle = true;
-    theme = getCookie("theme") || "light";
-  }
+  // localStorage 不可用时保持默认主题
 }
 
 // 使用 html 元素添加类名
 var htmlElement = document.documentElement;
 htmlElement.classList.add(theme + "-mode");
-if (isKindle) {
-  htmlElement.classList.add("kindle-mode");
-}
 </script>
+{kindle_entry_script}
 </head>
 <body>
 """
@@ -422,6 +467,7 @@ if (isKindle) {
     </script>
     </body>
 </html>"""
+    library_html = library_html.replace("{kindle_entry_script}", kindle_entry_script)
     library_html = library_html.replace("{server_progress_stylesheet}", server_progress_stylesheet)
     library_html = library_html.replace("{server_progress_panel}", server_progress_panel)
     library_html = library_html.replace("{server_progress_script}", server_progress_script)
@@ -474,6 +520,7 @@ def publish_library_shell(
     assets: PublishedAssets,
     urls: SiteURLs,
     deployment_mode: str = "ssg",
+    kindle: bool = False,
 ) -> None:
     if deployment_mode not in {"ssg", "server"}:
         raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
@@ -491,8 +538,13 @@ def publish_library_shell(
         }
         for book in ordered_books
     ]
-    html = render_library_shell(ordered_books, assets, urls, deployment_mode)
+    html = render_library_shell(ordered_books, assets, urls, deployment_mode, kindle)
     _atomic_write_text(root / "index.html", html)
+    if deployment_mode == "ssg" and kindle:
+        _atomic_write_text(
+            root / "kindle-library.html",
+            render_kindle_library_page(ordered_books, urls),
+        )
     _atomic_write_text(
         root / "book-metadata.json",
         json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),

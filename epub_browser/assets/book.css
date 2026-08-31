@@ -707,33 +707,6 @@ body {
     font-size: 0.5rem;
 }
 
-.kindle-mode .eb-header, .kindle-mode .toc-container, 
-.kindle-mode .content-container, .kindle-mode .navigation,
-.kindle-mode .theme-toggle, .kindle-mode .control-btn {
-    box-shadow: none;
-    border-radius: inherit;
-}
-
-.kindle-mode .book-info-card, .kindle-mode .eb-footer{
-    display: none;
-}
-
-.kindle-mode .chapter-list {
-    max-height: none;
-}
-
-.kindle-mode .breadcrumb, .kindle-mode .toc-container {
-    margin: 0;
-}
-
-.kindle-mode .container {
-    padding: 0;
-}
-
-.kindle-mode .theme-toggle {
-    border: 1px solid;
-}
-
 @media (max-width: 768px) {
     body {
         padding: 0;

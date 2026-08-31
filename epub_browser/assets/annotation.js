@@ -361,23 +361,8 @@
             }
         },
         
-        // Detect if Kindle device
-        isKindleMode: function() {
-            if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-                return window.epubBrowserCache.kindle_mode === 'true';
-            }
-            var ua = navigator.userAgent.toLowerCase();
-            var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-            if (!window.epubBrowserCache) window.epubBrowserCache = {};
-            window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-            return isKindle;
-        },
-        
         // Get storage
         getStorage: function(key) {
-            if (this.isKindleMode()) {
-                return this.getCookie(key);
-            }
             try {
                 return localStorage.getItem(key);
             } catch (e) {
@@ -387,31 +372,9 @@
         
         // Set storage
         setStorage: function(key, value) {
-            if (this.isKindleMode()) {
-                this.setCookie(key, value);
-            } else {
-                try {
-                    localStorage.setItem(key, value);
-                } catch (e) {}
-            }
-        },
-        
-        // Cookie operations
-        getCookie: function(key) {
-            var cookies = document.cookie.split('; ');
-            for (var i = 0; i < cookies.length; i++) {
-                var parts = cookies[i].split('=');
-                if (parts[0] === key) {
-                    return decodeURIComponent(parts.slice(1).join('='));
-                }
-            }
-            return null;
-        },
-        
-        setCookie: function(key, value) {
-            var date = new Date();
-            date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
-            document.cookie = key + '=' + value + '; expires=' + date.toUTCString() + '; path=/;';
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {}
         },
         
         // Add alpha to hex color

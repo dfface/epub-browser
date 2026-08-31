@@ -78,6 +78,263 @@ SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
 })
 _GENERATED_READER_PAGE = re.compile(r"^(?:index|chapter_[0-9]+)\.html$")
 
+# Kindle minimal reader: a deliberately dependency-free surface for legacy
+# Kindle WebKit browsers. All CSS/JS is inlined into the page, preferences and
+# reading progress use cookies (no localStorage), and the script stays ES5
+# (no let/const, arrow functions, Promise, or template literals). No CSS
+# variables, box shadows, or rounded corners. Keep this minimal on purpose:
+# it is a fallback, not a second full-featured reader.
+_KINDLE_READER_CSS = """\
+body{margin:0;padding:0;background:#fff;color:#111;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
+body.sepia{background:#f3e9d2;color:#3c2f1a}
+body.dark{background:#161616;color:#c9c9c9}
+.k-header{padding:10px 14px;border-bottom:1px solid #999;line-height:1.4}
+body.sepia .k-header,body.dark .k-header{border-color:#666}
+.k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
+.k-chapter{display:block;margin-top:2px;color:#666;font-size:14px;font-weight:normal}
+body.dark .k-chapter{color:#9a9a9a}
+.k-content{padding:18px 16px 36px;max-width:640px;margin:0 auto;word-wrap:break-word}
+.k-content img{max-width:100%;height:auto}
+.k-content a{color:#0b57d0}
+body.dark .k-content a{color:#8ab4f8}
+.k-nav{overflow:hidden;border-top:1px solid #999;padding:12px 14px;max-width:640px;margin:0 auto}
+body.sepia .k-nav,body.dark .k-nav{border-color:#666}
+.k-nav a{color:inherit;text-decoration:none;padding:6px 0}
+.k-nav .prev{float:left}
+.k-nav .next{float:right}
+.k-bar{border-top:1px solid #999;padding:12px 14px;text-align:center}
+body.sepia .k-bar,body.dark .k-bar{border-color:#666}
+.k-bar button{background:none;border:1px solid #666;color:inherit;padding:6px 14px;margin:0 4px;font-size:14px;font-family:inherit}
+.k-meta{padding:0 16px;color:#666;font-size:14px}
+body.dark .k-meta{color:#9a9a9a}
+.k-resume{display:block;margin:14px 16px;padding:10px;border:1px solid #666;text-align:center;text-decoration:none;color:inherit;font-size:15px}
+.k-toc{padding:4px 16px 30px;max-width:640px;margin:0 auto}
+.k-toc ul{list-style:none;margin:0;padding:0}
+.k-toc li{padding:5px 0;line-height:1.45}
+.k-toc li.lvl-1{padding-left:16px}
+.k-toc li.lvl-2{padding-left:32px}
+.k-toc li.lvl-3{padding-left:48px}
+.k-toc a{color:inherit;text-decoration:none;display:block}
+.k-toc .sec{color:#666;font-size:14px}
+body.dark .k-toc .sec{color:#9a9a9a}
+.k-footer{padding:0 16px 24px;color:#666;font-size:13px}
+body.dark .k-footer{color:#9a9a9a}
+"""
+
+_KINDLE_READER_JS = """\
+function getCookie(key) {
+  var cookies = document.cookie.split('; ');
+  for (var i = 0; i < cookies.length; i++) {
+    var parts = cookies[i].split('=');
+    if (parts[0] === key) {
+      return decodeURIComponent(parts.slice(1).join('='));
+    }
+  }
+  return null;
+}
+function setCookie(key, value, days) {
+  var expires = '';
+  if (days) {
+    var date = new Date();
+    date.setTime(date.getTime() + days * 86400000);
+    expires = '; expires=' + date.toUTCString();
+  }
+  document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/';
+}
+var K_THEMES = ['light', 'sepia', 'dark'];
+var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24];
+function applyTheme(theme) {
+  document.body.className = theme;
+}
+function applyFont(size) {
+  document.body.style.fontSize = K_FONT_SIZES[size - 1] + 'px';
+}
+function kTheme() {
+  var current = getCookie('kindle_theme') || 'light';
+  var index = K_THEMES.indexOf(current);
+  if (index < 0) { index = 0; }
+  var next = K_THEMES[(index + 1) % K_THEMES.length];
+  setCookie('kindle_theme', next, 365);
+  applyTheme(next);
+}
+function kFont(delta) {
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  size = Math.max(1, Math.min(7, size + delta));
+  setCookie('kindle_font_size', String(size), 365);
+  applyFont(size);
+}
+(function () {
+  applyTheme(getCookie('kindle_theme') || 'light');
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  applyFont(size);
+})();
+"""
+
+
+# Kindle minimal-page UI strings, resolved server-side against the book's
+# language so legacy e-Ink Kindles never have to load i18n.js.  Keys mirror
+# the on-page [data-i18n] attributes; "previous"/"next" keep the arrows that
+# the template renders inline.
+_KINDLE_READER_I18N = {
+    "en": {
+        "continueReading": "Continue reading",
+        "openFullReader": "Open full reader",
+        "previous": "\u2039 Prev",
+        "next": "Next \u203a",
+        "theme": "Theme",
+    },
+    "zh": {
+        "continueReading": "继续阅读",
+        "openFullReader": "打开完整阅读器",
+        "previous": "\u2039 上一章",
+        "next": "下一章 \u203a",
+        "theme": "主题",
+    },
+    "zh-CN": {
+        "continueReading": "继续阅读",
+        "openFullReader": "打开完整阅读器",
+        "previous": "\u2039 上一章",
+        "next": "下一章 \u203a",
+        "theme": "主题",
+    },
+    "zh-TW": {
+        "continueReading": "繼續閱讀",
+        "openFullReader": "開啟完整閱讀器",
+        "previous": "\u2039 上一章",
+        "next": "下一章 \u203a",
+        "theme": "主題",
+    },
+    "ja": {
+        "continueReading": "続きを読む",
+        "openFullReader": "フルリーダーを開く",
+        "previous": "\u2039 前へ",
+        "next": "次へ \u203a",
+        "theme": "テーマ",
+    },
+    "ko": {
+        "continueReading": "계속 읽기",
+        "openFullReader": "전체 리더 열기",
+        "previous": "\u2039 이전",
+        "next": "다음 \u203a",
+        "theme": "테마",
+    },
+    "es": {
+        "continueReading": "Continuar leyendo",
+        "openFullReader": "Abrir el lector completo",
+        "previous": "\u2039 Anterior",
+        "next": "Siguiente \u203a",
+        "theme": "Tema",
+    },
+    "de": {
+        "continueReading": "Weiterlesen",
+        "openFullReader": "Vollständigen Reader öffnen",
+        "previous": "\u2039 Zurück",
+        "next": "Weiter \u203a",
+        "theme": "Design",
+    },
+    "fr": {
+        "continueReading": "Reprendre la lecture",
+        "openFullReader": "Ouvrir le lecteur complet",
+        "previous": "\u2039 Précédent",
+        "next": "Suivant \u203a",
+        "theme": "Thème",
+    },
+    "ru": {
+        "continueReading": "Продолжить чтение",
+        "openFullReader": "Открыть полный читатель",
+        "previous": "\u2039 Назад",
+        "next": "Далее \u203a",
+        "theme": "Тема",
+    },
+    "it": {
+        "continueReading": "Continua a leggere",
+        "openFullReader": "Apri il lettore completo",
+        "previous": "\u2039 Precedente",
+        "next": "Successivo \u203a",
+        "theme": "Tema",
+    },
+    "pt-BR": {
+        "continueReading": "Continuar lendo",
+        "openFullReader": "Abrir o leitor completo",
+        "previous": "\u2039 Anterior",
+        "next": "Próximo \u203a",
+        "theme": "Tema",
+    },
+    "ar": {
+        "continueReading": "متابعة القراءة",
+        "openFullReader": "فتح القارئ الكامل",
+        "previous": "\u2039 السابق",
+        "next": "التالي \u203a",
+        "theme": "السمة",
+    },
+    "id": {
+        "continueReading": "Lanjutkan membaca",
+        "openFullReader": "Buka pembaca lengkap",
+        "previous": "\u2039 Sebelumnya",
+        "next": "Berikutnya \u203a",
+        "theme": "Tema",
+    },
+    "hi": {
+        "continueReading": "पढ़ना जारी रखें",
+        "openFullReader": "पूर्ण रीडर खोलें",
+        "previous": "\u2039 पिछला",
+        "next": "अगला \u203a",
+        "theme": "थीम",
+    },
+    "vi": {
+        "continueReading": "Đọc tiếp",
+        "openFullReader": "Mở trình đọc đầy đủ",
+        "previous": "\u2039 Trước",
+        "next": "Tiếp \u203a",
+        "theme": "Chủ đề",
+    },
+    "th": {
+        "continueReading": "อ่านต่อ",
+        "openFullReader": "เปิดโปรแกรมอ่านแบบเต็ม",
+        "previous": "\u2039 ก่อนหน้า",
+        "next": "ถัดไป \u203a",
+        "theme": "ธีม",
+    },
+    "ms": {
+        "continueReading": "Teruskan membaca",
+        "openFullReader": "Buka pembaca penuh",
+        "previous": "\u2039 Sebelum",
+        "next": "Seterusnya \u203a",
+        "theme": "Tema",
+    },
+}
+
+_KINDLE_READER_I18N_SCRIPT = """\
+(function () {
+  var messages = %(messages)s;
+  var elements = document.querySelectorAll('[data-i18n]');
+  for (var i = 0; i < elements.length; i++) {
+    var key = elements[i].getAttribute('data-i18n');
+    if (messages[key]) elements[i].textContent = messages[key];
+  }
+})();
+"""
+
+
+def _kindle_i18n_messages(language):
+    """Resolve the Kindle minimal-page strings for a book language."""
+    dictionary = _KINDLE_READER_I18N.get(language or "")
+    if dictionary is None:
+        dictionary = _KINDLE_READER_I18N.get((language or "").split("-")[0])
+    if dictionary is None:
+        dictionary = _KINDLE_READER_I18N["en"]
+    return dictionary
+
+
+def _kindle_i18n_script(language):
+    """Inline ES5 script applying the localized Kindle page strings."""
+    messages = _kindle_i18n_messages(language)
+    return _KINDLE_READER_I18N_SCRIPT % {
+        "messages": json.dumps(messages, ensure_ascii=True)
+    }
+
 
 def server_book_public_path_allowed(relative_path):
     """Return whether a Server book path is generated or a passive resource."""
@@ -629,6 +886,7 @@ class EPUBProcessor:
         processor.urls = urls or SiteURLs()
         processor.reporter = Reporter(False)
         processor.deployment_mode = deployment_mode
+        processor.kindle_support = False
         processor.source_format = PDF_FORMAT
         processor._caller_supplied_book_id = True
         processor.book_hash = str(book_id)
@@ -703,6 +961,7 @@ class EPUBProcessor:
         processor.urls = urls or SiteURLs()
         processor.reporter = reporter or Reporter(False)
         processor.deployment_mode = "server"
+        processor.kindle_support = False
         processor.source_format = EPUB_FORMAT
         processor._caller_supplied_book_id = True
         processor.book_hash = str(book_id)
@@ -732,6 +991,7 @@ class EPUBProcessor:
         urls=None,
         reporter=None,
         deployment_mode="ssg",
+        kindle_support=False,
     ):
         self.epub_path = os.fspath(epub_path)
         self.output_dir = output_dir
@@ -740,6 +1000,7 @@ class EPUBProcessor:
         if deployment_mode not in {"ssg", "server"}:
             raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
         self.deployment_mode = deployment_mode
+        self.kindle_support = bool(kindle_support)
         self.source_format = EPUB_FORMAT
         self._caller_supplied_book_id = book_id is not None
         self.book_hash = book_id or base64.urlsafe_b64encode(
@@ -1527,6 +1788,11 @@ class EPUBProcessor:
         
         # 创建章节页面
         self.create_chapter_pages(write=self.deployment_mode != "server")
+
+        # SSG 在开启 --kindle 时额外写出独立的 Kindle 极简阅读页面；
+        # Server 模式在请求时由 server_pages 用同一模板动态渲染，不写入转换产物。
+        if self.deployment_mode != "server" and self.kindle_support:
+            self.create_kindle_pages()
         
         # 复制资源文件（CSS、图片、字体等）并删除 extracted 文件夹
         self.copy_resources()
@@ -1559,6 +1825,13 @@ class EPUBProcessor:
         safe_book_title = metadata_text(self.book_title)
         book_title_text = html.escape(safe_book_title, quote=False)
         book_title_attribute = html.escape(safe_book_title, quote=True)
+        # The minimal reader is opt-in (--kindle); PDF books never have a
+        # kindle.html page, so neither case embeds an entry script.
+        kindle_entry_script = (
+            ""
+            if (is_pdf_book or not self.kindle_support)
+            else self._kindle_entry_script("kindle.html")
+        )
         book_id_attribute = html.escape(str(self.book_hash), quote=True)
         book_id_url = urllib.parse.quote(str(self.book_hash), safe='')
         if self.authors:
@@ -1734,39 +2007,8 @@ class EPUBProcessor:
 """
         index_html += """
     <script>
-    // 立即应用主题，避免闪现 —— Kindle 兼容版
-    function isKindleDevice() {
-    // 优先从 window 缓存读取
-    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-        return window.epubBrowserCache.kindle_mode === "true";
-    }
-    // 检测设备
-    var ua = navigator.userAgent.toLowerCase();
-    var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
-    
-    if (!window.epubBrowserCache) {
-        window.epubBrowserCache = {};
-    }
-    window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
-    return isKindle;
-    }
-
-    // 通用 Cookie 方法（只定义一次）
-    function getCookie(key) {
-    var cookies = document.cookie.split("; ");
-    for (var i = 0; i < cookies.length; i++) {
-        var parts = cookies[i].split("=");
-        var cookieKey = parts[0];
-        var cookieValue = parts.slice(1).join("=");
-        if (cookieKey === key) {
-        return decodeURIComponent(cookieValue);
-        }
-    }
-    return null;
-    }
-
+    // 立即应用主题，避免闪现
     var theme = "light";
-    var isKindle = false;
 
     try {
     // 优先从 window 缓存读取
@@ -1785,25 +2027,16 @@ class EPUBProcessor:
 
     if (storedTheme) {
         theme = storedTheme;
-    } else if (isKindleDevice()) {
-        isKindle = true;
-        theme = getCookie("theme") || "light";
     }
     } catch (e) {
-    // 捕获异常，兼容 Kindle
-    if (isKindleDevice()) {
-        isKindle = true;
-        theme = getCookie("theme") || "light";
-    }
+    // localStorage 不可用时保持默认主题
     }
 
     // 使用 html 元素添加类名
     var htmlElement = document.documentElement;
     htmlElement.classList.add(theme + "-mode");
-    if (isKindle) {
-    htmlElement.classList.add("kindle-mode");
-    }
     </script>
+{kindle_entry_script}
 </head>
 <body>
 """
@@ -2060,6 +2293,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         index_html = rewrite_root_urls(index_html, self.urls)
         # 不再压缩 HTML：模板本身紧凑，实测 minify_html 对这类输出无收益
         # （CSS/JS 因 kindle 兼容不能压），且章节页曾因压缩丢失标签而禁用
+        index_html = index_html.replace("{kindle_entry_script}", kindle_entry_script)
         if write:
             with open(os.path.join(self.web_dir, 'index.html'), 'w', encoding='utf-8') as f:
                 f.write(index_html)
@@ -2280,6 +2514,208 @@ document.addEventListener('DOMContentLoaded', function() {{
                     futures.append(future)
             for future in futures:
                 future.result()
+
+    def _kindle_entry_script(self, target_url):
+        """Legacy Kindle WebKit entry script (SSG only).
+
+        Real e-Ink Kindles (UA contains ``kindle`` but not Silk) are sent to
+        the dependency-free minimal page; Kindle Fire (Silk) and ``?full=1``
+        keep the full reader, which must never be a redirect loop.  Server
+        renders the minimal pages at request time, so nothing is emitted
+        there.  PDF books have no minimal pages and must not use this.  The
+        minimal pages themselves are opt-in via ``kindle_support``.
+        """
+        if not self.kindle_support or self.deployment_mode == "server":
+            return ""
+        return f"""
+<script>
+(function () {{
+  var ua = navigator.userAgent.toLowerCase();
+  if (ua.indexOf('kindle') === -1) return;
+  if (ua.indexOf('silk') !== -1) return;
+  if (location.search.indexOf('full=1') !== -1) return;
+  location.replace('{target_url}');
+}})();
+</script>"""
+
+    def create_kindle_pages(self):
+        """生成 Kindle 极简阅读页面（SSG 输出）。
+
+        仅针对 EPUB：PDF 阅读页依赖 PDF.js，旧 Kindle 浏览器无法运行，
+        因此 PDF 书籍不生成 Kindle 页面。页面刻意自包含：内联 CSS/JS、
+        Cookie 存储、ES5 语法，不依赖 /assets/ 下的任何资源。
+        Server 模式在请求时用同一组模板动态渲染，不写入这里。
+        """
+        if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT:
+            return
+        toc_data = self._build_toc_data()
+        with open(os.path.join(self.web_dir, 'kindle.html'), 'w', encoding='utf-8') as f:
+            f.write(self.create_kindle_index_page(toc_data))
+        for i, chapter in enumerate(self.chapters):
+            chapter_path = self._internal_file(chapter['path'])
+            body_content = ""
+            style_links = ""
+            try:
+                with open(chapter_path, 'rb') as f:
+                    content = decode_html_bytes(f.read())
+                body_content, style_links = self.process_html_content(
+                    content, chapter['path']
+                )
+            except ValueError:
+                raise
+            except Exception as e:
+                # One broken chapter must not sink the whole book: render an
+                # empty placeholder so the Kindle sequence stays complete.
+                self.reporter.detail(
+                    f"Failed to process chapter {chapter['path']} for the "
+                    f"Kindle page; rendering an empty placeholder: {e}"
+                )
+            chapter_html = self.create_kindle_chapter_page(
+                body_content, style_links, i, chapter['title']
+            )
+            with open(
+                os.path.join(self.web_dir, f'kindle_chapter_{i}.html'),
+                'w',
+                encoding='utf-8',
+            ) as f:
+                f.write(chapter_html)
+
+    def create_kindle_index_page(self, toc_data=None):
+        """Kindle 极简目录页模板。"""
+        book_language = html.escape(self.lang or 'en', quote=True)
+        safe_book_title = metadata_text(self.book_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        book_hash_js = json.dumps(str(self.book_hash))
+        authors_html = ""
+        if self.authors:
+            authors_text = " & ".join(
+                html.escape(metadata_text(author), quote=False)
+                for author in self.authors
+            )
+            authors_html = f'<p class="k-meta">{authors_text}</p>'
+        if toc_data is None:
+            toc_data = self._build_toc_data()
+        toc_items = []
+        for item in toc_data:
+            if item.get('kind') == 'chapter':
+                level = int(item.get('level') or 0)
+                if level > 3:
+                    level = 3
+                chapter_file = f"kindle_chapter_{item.get('chapter_index')}.html"
+                title = html.escape(
+                    metadata_text(item.get('title', '')), quote=False
+                )
+                toc_items.append(f'<li class="lvl-{level}"><a href="{chapter_file}">{title}</a></li>')
+            else:
+                title = html.escape(
+                    metadata_text(item.get('title', '')), quote=False
+                )
+                toc_items.append(f'<li class="sec">{title}</li>')
+        toc_html = "\n".join(toc_items)
+        resume_script = f"""
+(function () {{
+  var progress = getCookie({book_hash_js});
+  var resume = document.getElementById('kResume');
+  if (resume && progress) {{
+    var match = progress.match(/^chapter_(\\d+)\\.html$/);
+    if (match) {{
+      resume.href = 'kindle_chapter_' + match[1] + '.html';
+      resume.style.display = 'block';
+    }}
+  }}
+}})();
+"""
+        return f"""<!DOCTYPE html>
+<html lang="{book_language}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{book_title_text}</title>
+<style>
+{_KINDLE_READER_CSS}
+</style>
+</head>
+<body class="light">
+<header class="k-header">
+    <a href="index.html?full=1">{book_title_text}</a>
+</header>
+{authors_html}
+<a id="kResume" class="k-resume" href="kindle_chapter_0.html" style="display:none" accesskey="c" data-i18n="continueReading">Continue reading</a>
+<div class="k-toc">
+    <ul>
+{toc_html}
+    </ul>
+</div>
+<p class="k-footer"><a href="index.html?full=1" data-i18n="openFullReader">Open full reader</a></p>
+<script>
+{_kindle_i18n_script(self.lang)}
+{_KINDLE_READER_JS}
+{resume_script}</script>
+</body>
+</html>
+"""
+
+    def create_kindle_chapter_page(
+        self, body_content, style_links, chapter_index, chapter_title
+    ):
+        """Kindle 极简章节阅读页模板。"""
+        book_language = html.escape(self.lang or 'en', quote=True)
+        safe_book_title = metadata_text(self.book_title)
+        safe_chapter_title = metadata_text(chapter_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        chapter_title_text = html.escape(safe_chapter_title, quote=False)
+        book_hash_js = json.dumps(str(self.book_hash))
+        prev_link = ""
+        next_link = ""
+        if chapter_index > 0:
+            prev_link = (
+                f'<a class="prev" href="kindle_chapter_{chapter_index - 1}.html" '
+                'accesskey="p" data-i18n="previous">\u2039 Prev</a>'
+            )
+        if chapter_index < len(self.chapters) - 1:
+            next_link = (
+                f'<a class="next" href="kindle_chapter_{chapter_index + 1}.html" '
+                'accesskey="n" data-i18n="next">Next \u203a</a>'
+            )
+        progress_script = (
+            f"setCookie({book_hash_js}, 'chapter_{chapter_index}.html', 365);\n"
+        )
+        return f"""<!DOCTYPE html>
+<html lang="{book_language}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no">
+<title>{chapter_title_text} - {book_title_text}</title>
+<style>
+{_KINDLE_READER_CSS}
+</style>
+{style_links}
+</head>
+<body class="light">
+<header class="k-header">
+    <a href="kindle.html">{book_title_text}</a>
+    <span class="k-chapter">{chapter_title_text}</span>
+</header>
+<div class="k-content">
+{body_content}
+</div>
+<nav class="k-nav">
+    {prev_link}
+    {next_link}
+</nav>
+<div class="k-bar">
+    <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
+    <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
+    <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+</div>
+<script>
+{_kindle_i18n_script(self.lang)}
+{_KINDLE_READER_JS}
+{progress_script}</script>
+</body>
+</html>
+"""
 
     def _write_server_content_cache(self):
         """Persist only immutable EPUB-derived data for Server mode.
@@ -2661,6 +3097,13 @@ document.addEventListener('DOMContentLoaded', function() {{
         page_width_control_attribute = ""
         page_width_slider_attributes = 'min="1" max="4" value="3" step="1"'
         page_width_value_control = ""
+        # The minimal reader is opt-in (--kindle); PDF pages never have a
+        # kindle_chapter_N.html page, so neither case embeds an entry script.
+        kindle_entry_script = (
+            ""
+            if (pdf_page is not None or not self.kindle_support)
+            else self._kindle_entry_script(f"kindle_chapter_{chapter_index}.html")
+        )
         page_width_scale = '''
                             <span data-i18n="settings.pageWidthNarrow">Narrow</span>
                             <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
@@ -2920,39 +3363,8 @@ document.addEventListener('DOMContentLoaded', function() {{
 """
         chapter_html += """
     <script>
-    // 立即应用主题，避免闪现 —— Kindle 兼容版
-    function isKindleDevice() {
-    // 优先从 window 缓存读取
-    if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-        return window.epubBrowserCache.kindle_mode === "true";
-    }
-    // 检测设备
-    var ua = navigator.userAgent.toLowerCase();
-    var isKindle = ua.indexOf("kindle") !== -1 || ua.indexOf("silk") !== -1;
-    
-    if (!window.epubBrowserCache) {
-        window.epubBrowserCache = {};
-    }
-    window.epubBrowserCache.kindle_mode = isKindle ? "true" : "false";
-    return isKindle;
-    }
-
-    // 通用 Cookie 方法（只定义一次）
-    function getCookie(key) {
-    var cookies = document.cookie.split("; ");
-    for (var i = 0; i < cookies.length; i++) {
-        var parts = cookies[i].split("=");
-        var cookieKey = parts[0];
-        var cookieValue = parts.slice(1).join("=");
-        if (cookieKey === key) {
-        return decodeURIComponent(cookieValue);
-        }
-    }
-    return null;
-    }
-
+    // 立即应用主题，避免闪现
     var theme = "light";
-    var isKindle = false;
 
     try {
     // 优先从 window 缓存读取
@@ -2971,25 +3383,16 @@ document.addEventListener('DOMContentLoaded', function() {{
 
     if (storedTheme) {
         theme = storedTheme;
-    } else if (isKindleDevice()) {
-        isKindle = true;
-        theme = getCookie("theme") || "light";
     }
     } catch (e) {
-    // 捕获异常，兼容 Kindle
-    if (isKindleDevice()) {
-        isKindle = true;
-        theme = getCookie("theme") || "light";
-    }
+    // localStorage 不可用时保持默认主题
     }
 
     // 使用 html 元素添加类名
     var htmlElement = document.documentElement;
     htmlElement.classList.add(theme + "-mode");
-    if (isKindle) {
-    htmlElement.classList.add("kindle-mode");
-    }
     </script>
+{kindle_entry_script}
 </head>
 """
         chapter_html +=f"""
@@ -3448,6 +3851,9 @@ document.addEventListener('DOMContentLoaded', function() {{
         chapter_html = rewrite_asset_urls(chapter_html, self.asset_manifest)
         chapter_html = self._inject_deployment_mode(chapter_html)
         chapter_html = rewrite_root_urls(chapter_html, self.urls)
+        # The Kindle entry script sits in the plain-string head block of the
+        # template, so it needs a placeholder substitution.
+        chapter_html = chapter_html.replace("{kindle_entry_script}", kindle_entry_script)
         # kindle 支持，不能压缩 css 和 js
         # 部分 xhtml 书籍压缩之后会丢失标签，说明压缩算法可能存在问题
         # chapter_html = minify_html.minify(chapter_html, minify_css=False, minify_js=False)

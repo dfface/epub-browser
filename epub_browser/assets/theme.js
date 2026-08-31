@@ -11,62 +11,34 @@ function initTheme() {
         { id: 'lavender', nameKey: 'theme.lavender', icon: 'fa-spa' }
     ];
 
-    // 检测是否是 Kindle 设备
-    function isKindleDevice() {
-        // 优先从 window 缓存读取
-        if (window.epubBrowserCache && window.epubBrowserCache.kindle_mode !== undefined) {
-            return window.epubBrowserCache.kindle_mode === 'true';
-        }
-        // 检测设备
-        var ua = navigator.userAgent.toLowerCase();
-        // 使用字符串包含检测，更兼容旧浏览器
-        var isKindle = ua.indexOf('kindle') !== -1 || ua.indexOf('silk') !== -1;
-        // 缓存结果到 window
-        if (!window.epubBrowserCache) {
-            window.epubBrowserCache = {};
-        }
-        window.epubBrowserCache.kindle_mode = isKindle ? 'true' : 'false';
-        return isKindle;
-    }
-
     // 检查本地存储中的主题设置
     function getCurrentTheme() {
-        var isKindle = isKindleDevice();
-        if (!isKindle) {
-            // 优先从 window 读取
-            if (window.epubBrowserCache && window.epubBrowserCache.theme) {
-                return window.epubBrowserCache.theme;
-            }
-            try {
-                var theme = localStorage.getItem('theme');
-                if (theme) {
-                    // 缓存到 window
-                    if (!window.epubBrowserCache) {
-                        window.epubBrowserCache = {};
-                    }
-                    window.epubBrowserCache.theme = theme;
-                    return theme;
+        // 优先从 window 读取
+        if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+            return window.epubBrowserCache.theme;
+        }
+        try {
+            var theme = localStorage.getItem('theme');
+            if (theme) {
+                // 缓存到 window
+                if (!window.epubBrowserCache) {
+                    window.epubBrowserCache = {};
                 }
-                return 'light';
-            } catch (e) {
-                return 'light';
+                window.epubBrowserCache.theme = theme;
+                return theme;
             }
-        } else {
-            return getCookie('theme') || 'light';
+            return 'light';
+        } catch (e) {
+            return 'light';
         }
     }
 
     // 保存主题设置
     function saveTheme(theme) {
-        var isKindle = isKindleDevice();
-        if (!isKindle) {
-            try {
-                localStorage.setItem('theme', theme);
-            } catch (e) {
-                // 忽略错误
-            }
-        } else {
-            setCookie('theme', theme);
+        try {
+            localStorage.setItem('theme', theme);
+        } catch (e) {
+            // 忽略错误
         }
         // 缓存到 window
         if (!window.epubBrowserCache) {
@@ -182,8 +154,6 @@ function initTheme() {
         themeToggle.setAttribute('aria-haspopup', 'menu');
         themeToggle.setAttribute('aria-expanded', 'false');
 
-        var isKindle = isKindleDevice();
-
         // 应用初始主题
         var currentTheme = getCurrentTheme();
         applyTheme(currentTheme);
@@ -204,31 +174,24 @@ function initTheme() {
         function handleThemeToggle(e) {
             e.stopPropagation();
             
-            if (isKindle) {
-                // Kindle 模式下保持原有切换行为
-                var currentTheme = getCurrentTheme();
-                var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                applyTheme(newTheme);
+            // 显示主题选择菜单
+            if (!themeMenu) {
+                themeMenu = createThemeMenu();
+                document.body.appendChild(themeMenu);
+            }
+
+            currentToggleBtn = themeToggle;
+
+            if (themeMenu.style.display === 'none') {
+                updateThemeMenuPosition(themeMenu, themeToggle);
+                var activeTheme = getCurrentTheme();
+                renderThemeMenu(themeMenu, activeTheme, themeToggle);
+                themeMenu.style.display = 'block';
+                themeToggle.setAttribute('aria-expanded', 'true');
+                themeMenuFocusIndex = focusThemeChoice(themeMenu, themeIndex(activeTheme));
             } else {
-                // 非 Kindle 模式下显示主题选择菜单
-                if (!themeMenu) {
-                    themeMenu = createThemeMenu();
-                    document.body.appendChild(themeMenu);
-                }
-                
-                currentToggleBtn = themeToggle;
-                
-                if (themeMenu.style.display === 'none') {
-                    updateThemeMenuPosition(themeMenu, themeToggle);
-                    var activeTheme = getCurrentTheme();
-                    renderThemeMenu(themeMenu, activeTheme, themeToggle);
-                    themeMenu.style.display = 'block';
-                    themeToggle.setAttribute('aria-expanded', 'true');
-                    themeMenuFocusIndex = focusThemeChoice(themeMenu, themeIndex(activeTheme));
-                } else {
-                    themeMenu.style.display = 'none';
-                    themeToggle.setAttribute('aria-expanded', 'false');
-                }
+                themeMenu.style.display = 'none';
+                themeToggle.setAttribute('aria-expanded', 'false');
             }
         }
 
@@ -272,29 +235,6 @@ function initTheme() {
                 updateThemeMenuPosition(themeMenu, currentToggleBtn);
             }
         });
-    }
-
-    // 工具函数：获取 Cookie
-    function getCookie(key) {
-        var cookies = document.cookie.split('; ');
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = cookies[i];
-            var parts = cookie.split('=');
-            var cookieKey = parts[0];
-            var cookieValue = parts.slice(1).join('=');
-            if (cookieKey === key) {
-                return decodeURIComponent(cookieValue);
-            }
-        }
-        return null;
-    }
-
-    // 工具函数：设置 Cookie
-    function setCookie(key, value) {
-        var date = new Date();
-        date.setTime(date.getTime() + 3650 * 24 * 60 * 60 * 1000);
-        var expires = "expires=" + date.toUTCString();
-        document.cookie = key + "=" + value + "; " + expires + "; path=/;";
     }
 
     // 初始化

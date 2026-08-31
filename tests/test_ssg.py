@@ -649,6 +649,116 @@ class SSGPublicationTests(unittest.TestCase):
                 ).is_file()
             )
 
+    def test_kindle_minimal_reader_pages_are_generated_for_epub(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:kindle")
+            SSGPublisher(
+                SSGConfig((source,), output, kindle=True),
+                show_progress=False,
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book = output / "book" / metadata[0]["hash"]
+
+            index = (book / "kindle.html").read_text(encoding="utf-8")
+            self.assertIn("SSG Book", index)
+            self.assertIn('href="kindle_chapter_0.html"', index)
+            self.assertIn('id="kResume"', index)
+            self.assertIn("Continue reading", index)
+
+            chapter = (book / "kindle_chapter_0.html").read_text(encoding="utf-8")
+            self.assertIn("<h1>One</h1>", chapter)
+            self.assertIn("Text", chapter)
+            self.assertIn('href="kindle.html"', chapter)
+            # First (and only) chapter has neither a prev nor a next link.
+            self.assertNotIn('class="prev"', chapter)
+            self.assertNotIn('class="next"', chapter)
+            # Self-contained: no /assets/ references in the reader page.
+            self.assertNotIn("/assets/", chapter)
+            # ES5 only and no localStorage: these tokens must never appear.
+            for banned in (
+                "=>", "const ", "let ", "Promise", "classList", "localStorage",
+            ):
+                self.assertNotIn(banned, chapter)
+
+            # Library level: the minimal library page and the legacy-Kindle
+            # redirect from the full library shell.
+            minimal_library = (output / "kindle-library.html").read_text(encoding="utf-8")
+            self.assertIn("Library", minimal_library)
+            self.assertIn(
+                f'href="/book/{book.name}/kindle.html"', minimal_library
+            )
+            self.assertNotIn("/assets/", minimal_library)
+            library_index = (output / "index.html").read_text(encoding="utf-8")
+            self.assertIn("location.replace('kindle-library.html')", library_index)
+            self.assertIn("kindle-library.html", library_index)
+
+            # Book home and chapter pages carry the legacy-Kindle redirect to
+            # their minimal siblings, and the minimal pages escape the loop.
+            book_index = (book / "index.html").read_text(encoding="utf-8")
+            self.assertIn("location.replace('kindle.html')", book_index)
+            full_chapter = (book / "chapter_0.html").read_text(encoding="utf-8")
+            self.assertIn(
+                "location.replace('kindle_chapter_0.html')", full_chapter
+            )
+            self.assertIn('href="index.html?full=1"', index)
+            self.assertIn("Open full reader", index)
+
+    def test_kindle_minimal_reader_pages_are_not_generated_for_pdf(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=2)
+            SSGPublisher(
+                SSGConfig((source,), output),
+                show_progress=False,
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book = output / "book" / metadata[0]["hash"]
+            self.assertFalse((book / "kindle.html").exists())
+            self.assertEqual(list(book.glob("kindle_chapter_*.html")), [])
+            # PDF pages must not redirect anywhere: there is no minimal page.
+            book_index = (book / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn("location.replace('kindle.html')", book_index)
+            chapter = (book / "chapter_0.html").read_text(encoding="utf-8")
+            self.assertNotIn("kindle_chapter", chapter)
+
+    def test_kindle_pages_are_opt_in(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.epub"
+            output = root / "dist"
+            self._write_minimal_epub(source, identifier="urn:test:no-kindle")
+            SSGPublisher(
+                SSGConfig((source,), output),
+                show_progress=False,
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            book = output / "book" / metadata[0]["hash"]
+
+            # Without --kindle no minimal pages exist and nothing redirects.
+            self.assertFalse((output / "kindle-library.html").exists())
+            self.assertFalse((book / "kindle.html").exists())
+            self.assertEqual(list(book.glob("kindle_chapter_*.html")), [])
+            library_index = (output / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn("kindle-library.html", library_index)
+            book_index = (book / "index.html").read_text(encoding="utf-8")
+            self.assertNotIn("location.replace('kindle.html')", book_index)
+            chapter = (book / "chapter_0.html").read_text(encoding="utf-8")
+            self.assertNotIn("kindle_chapter", chapter)
+
     def test_operational_filesystem_failure_returns_stable_status(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

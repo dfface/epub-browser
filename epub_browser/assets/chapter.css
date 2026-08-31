@@ -1813,41 +1813,6 @@ body.pagination-mode {
     width: 100%;
 }
 
-.kindle-mode .eb-header, .kindle-mode .toc-container, 
-.kindle-mode .eb-content-container,
-.kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .pagination-controls {
-    box-shadow: none;
-    border-radius: inherit;
-}
-
-.kindle-mode .pagination-controls {
-    border: 1px solid;
-}
-
-.kindle-mode .eb-footer {
-    display: none;
-}
-
-.kindle-mode .breadcrumb {
-    margin: 0;
-}
-
-.kindle-mode .pagination-page {
-    transition: none;
-}
-
-.kindle-mode .toc-container {
-    margin: 0;
-}
-
-.kindle-mode .theme-toggle {
-    border: 1px solid;
-}
-
-.kindle-mode .eb-content-container {
-    margin-bottom: 0;
-}
-
 /* 暗黑模式全局修复 */
 .dark-mode #eb-content * {
     color: var(--text) !important;

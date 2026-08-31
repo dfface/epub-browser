@@ -111,6 +111,13 @@ assert config.output_dir.name == 'dist'
             ["ssg", "books", "--output-dir", "dist", "--base-path", "/reader/"]
         )
 
+    def test_ssg_kindle_support_is_opt_in_flag(self):
+        config = parse_cli(["ssg", "books", "--output-dir", "dist", "--kindle"])
+        self.assertTrue(config.kindle)
+
+        config = parse_cli(["ssg", "books", "--output-dir", "dist"])
+        self.assertFalse(config.kindle)
+
     def test_ssg_normalizes_and_validates_base_path_at_the_cli_boundary(self):
         config = parse_cli(
             ["ssg", "books", "--output-dir", "dist", "--base-path", "reader"]

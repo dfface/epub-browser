@@ -840,24 +840,6 @@ body {
     }
 }
 
-.kindle-mode .eb-header, .kindle-mode .tag-cloud-item, .kindle-mode .book-cover, .kindle-mode .book-card, .kindle-mode .theme-toggle, .kindle-mode .control-btn, .kindle-mode .search-box {
-    box-shadow: none;
-    border-radius: inherit;
-    border-color: transparent;
-}
-
-.kindle-mode .container {
-    padding: 0;
-}
-
-.kindle-mode .eb-header {
-    margin-bottom: 0;
-}
-
-.kindle-mode .theme-toggle {
-    border: 1px solid;
-}
-
 @media (max-width: 480px) {
     .book-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
