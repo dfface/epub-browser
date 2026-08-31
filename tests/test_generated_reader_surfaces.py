@@ -2781,15 +2781,18 @@ assert.deepEqual(
 
         ordered_controls = (
             'id="mobileTocBtn"',
-            'id="mobilePageJumpBtn"',
+            'id="mobileBookHomeBtn"',
             'data-i18n-aria-label="reader.previous"',
             '<i class="fas fa-home">',
             'data-i18n-aria-label="reader.next"',
-            'id="mobileBookHomeBtn"',
+            'id="mobilePageJumpBtn"',
             'id="mobileSettingsBtn"',
         )
         positions = [mobile_controls.index(control) for control in ordered_controls]
         self.assertEqual(positions, sorted(positions))
+        # The home button must stay centered between the prev/next actions.
+        home = positions[3]
+        self.assertTrue(positions[2] < home < positions[4])
 
     def test_chapter_script_uses_an_immutable_content_addressed_url(self):
         self.assertRegex(self._chapter_html(), r'/assets/immutable/chapter\.[0-9a-f]{12}\.js')

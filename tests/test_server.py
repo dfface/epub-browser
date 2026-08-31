@@ -1,5 +1,6 @@
 import asyncio
 import base64
+from datetime import date
 import hashlib
 import json
 import logging
@@ -5143,7 +5144,7 @@ class ReadingInsightsAPITests(unittest.TestCase):
 
         self.assertEqual(alice_page.status_code, 200)
         self.assertIn('data-book-review-initial', alice_page.text)
-        self.assertIn('&lt;Private first-paint review>', alice_page.text)
+        self.assertIn('&lt;Private first-paint review&gt;', alice_page.text)
         self.assertIn('data-book-review-display', alice_page.text)
         self.assertNotIn('data-book-review-display data-book-id="book" hidden', alice_page.text)
         self.assertEqual(bob_page.status_code, 200)
@@ -5424,9 +5425,12 @@ class ReadingInsightsAPITests(unittest.TestCase):
             self.client.post("/api/reading-sessions/book/heartbeat", json=payload).status_code,
             200,
         )
-        insights = self.client.get(
-            "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
-        )
+        # The week window is the calendar week containing the anchor date.
+        # Anchor on today so the heartbeat (which uses the real clock) always
+        # falls inside the window regardless of the day the suite runs.
+        anchor = date.today().isoformat()
+        insights_url = f"/api/reading-insights?period=week&anchor={anchor}&timezone=UTC"
+        insights = self.client.get(insights_url)
         self.assertEqual(insights.status_code, 200)
         self.assertEqual(insights.json()["insights"]["period"], "week")
         self.assertEqual(len(insights.json()["insights"]["activity"]["days"]), 365)
@@ -5438,12 +5442,12 @@ class ReadingInsightsAPITests(unittest.TestCase):
         ))
         self.assertEqual(self.bob_client.get("/api/book-reviews/book").json(), {"review": None})
         self.assertEqual(self.bob_client.get(
-            "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
+            insights_url
         ).json()["insights"]["sessions"], [])
         self.assertTrue(all(
             day["book_count"] == 0
             for day in self.bob_client.get(
-                "/api/reading-insights?period=week&anchor=2026-08-26&timezone=UTC"
+                insights_url
             ).json()["insights"]["activity"]["days"]
         ))
         anonymous = TestClient(self.app)
