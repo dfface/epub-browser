@@ -372,16 +372,24 @@ _INLINE_SCRIPT = re.compile(
 )
 
 
-def reader_content_security_policy(markup):
+def reader_content_security_policy(markup, inline_scripts=False):
     if isinstance(markup, bytes):
         markup = markup.decode('utf-8', errors='replace')
-    hashes = []
-    for script in _INLINE_SCRIPT.findall(str(markup or '')):
-        digest = base64.b64encode(
-            hashlib.sha256(script.encode('utf-8')).digest()
-        ).decode('ascii')
-        hashes.append("'sha256-{}'".format(digest))
-    script_sources = " ".join(["'self'"] + sorted(set(hashes)))
+    if inline_scripts:
+        # Legacy e-ink Kindles ship a WebKit that does not understand CSP hash
+        # sources ('sha256-...'); it then rejects every inline <script>, killing
+        # the Kindle minimal UI's i18n, theme and font controls. These pages are
+        # a closed, already-sanitized read surface, so allowing inline scripts
+        # is safe.
+        script_sources = "'self' 'unsafe-inline'"
+    else:
+        hashes = []
+        for script in _INLINE_SCRIPT.findall(str(markup or '')):
+            digest = base64.b64encode(
+                hashlib.sha256(script.encode('utf-8')).digest()
+            ).decode('ascii')
+            hashes.append("'sha256-{}'".format(digest))
+        script_sources = " ".join(["'self'"] + sorted(set(hashes)))
     return (
         "default-src 'self'; "
         "script-src {}; "
@@ -771,7 +779,9 @@ def create_app(
         heartbeat_attempts[key] = attempts
         return False
 
-    def apply_reader_security_headers(target_response, file_path=None, markup=None):
+    def apply_reader_security_headers(
+        target_response, file_path=None, markup=None, inline_scripts=False
+    ):
         if markup is None:
             try:
                 markup = Path(file_path).read_text(encoding='utf-8')
@@ -779,7 +789,7 @@ def create_app(
                 return target_response
         target_response.headers[
             'Content-Security-Policy'
-        ] = reader_content_security_policy(markup)
+        ] = reader_content_security_policy(markup, inline_scripts=inline_scripts)
         target_response.headers['X-Content-Type-Options'] = 'nosniff'
         return target_response
 
@@ -3777,7 +3787,9 @@ window.location.assign(payload.redirect||'/');
             kindle_library_books(principal), SiteURLs(), shelf=shelf
         )
         target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
-        return apply_reader_security_headers(target, markup=markup)
+        return apply_reader_security_headers(
+            target, markup=markup, inline_scripts=True
+        )
 
     async def openapi_schema(request):
         return response(openapi_document(), cache_control='public, max-age=300')
@@ -4030,6 +4042,7 @@ window.location.assign(payload.redirect||'/');
                             return apply_reader_security_headers(
                                 dynamic_response,
                                 markup=markup,
+                                inline_scripts=True,
                             )
                         kindle_chapter_match = re.fullmatch(
                             r'kindle_chapter_([0-9]+)\.html',
@@ -4047,6 +4060,7 @@ window.location.assign(payload.redirect||'/');
                             return apply_reader_security_headers(
                                 dynamic_response,
                                 markup=markup,
+                                inline_scripts=True,
                             )
                     if book_relative_path == 'toc.json':
                         return Response(

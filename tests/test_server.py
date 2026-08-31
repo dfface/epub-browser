@@ -5661,6 +5661,28 @@ class ServerKindleTests(unittest.TestCase):
         self.assertNotIn("=>", chapter.text)
         self.assertNotIn("addEventListener", chapter.text)
 
+    def test_kindle_surfaces_allow_inline_scripts_for_legacy_devices(self):
+        # Legacy e-ink Kindles ship a WebKit that does not understand CSP hash
+        # sources ("'sha256-...'"), so the minimal Kindle surfaces must allow
+        # inline scripts (i18n, theme + font controls) instead of relying on
+        # hashes, which the device would otherwise block entirely.
+        for path in (
+            "/kindle-library.html",
+            "/book/book/kindle.html",
+            "/book/book/kindle_chapter_0.html",
+        ):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                policy = response.headers["content-security-policy"]
+                script_directive = next(
+                    directive
+                    for directive in policy.split(";")
+                    if directive.strip().startswith("script-src")
+                )
+                self.assertIn("'unsafe-inline'", script_directive)
+                self.assertNotIn("'sha256-", script_directive)
+
     def test_kindle_chapters_read_and_write_progress(self):
         chapter = self.client.get("/book/book/kindle_chapter_0.html")
         self.assertEqual(chapter.status_code, 200)

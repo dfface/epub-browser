@@ -31,6 +31,7 @@ inside the existing reading experience.
   - [Choose SSG or Server](#choose-ssg-or-server)
   - [Live demos](#live-demos)
   - [AI-native reading](#ai-native-reading-server-only)
+  - [Kindle minimal mode](#kindle-minimal-mode)
 - [Get started](#get-started)
   - [Choose an installation](#choose-an-installation)
   - [Quick start](#quick-start)
@@ -83,6 +84,9 @@ inside the existing reading experience.
 - **17 interface languages:** English, 简体中文, 繁體中文, 日本語, 한국어,
   Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية,
   Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
+- **Kindle minimal mode:** A dependency-free, e-ink-friendly reading surface
+  (`--kindle` for both SSG and Server) with theme and font controls, a 17-language
+  UI, table-of-contents navigation, and per-account reading progress on the Server.
 
 ![A chapter guide embedded beside the original EPUB text, with a private Ask AI drawer.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/ai-native-reading.png)
 
@@ -148,6 +152,46 @@ intentionally hides AI reading and Ask AI.
 See the [AI-native reading guide](docs/ai-native-reading.md) for the complete
 interaction model and the [local rich-text renderer notes](docs/third-party-ai-renderers.md)
 for the rendering and network-safety boundary.
+
+### Kindle minimal mode
+
+Legacy e-Ink Kindles (and any constrained browser) get a dependency-free minimal
+reading surface. Enable it with `--kindle`:
+
+- SSG: `epub-browser ssg --kindle -o output/ SOURCE...`
+- Server: `epub-browser server --kindle --server-dir data SOURCE...`
+
+Each EPUB book (PDF books are excluded) gains three extra pages:
+
+- the minimal shelf `/kindle-library.html`
+- the book page `/book/<id>/kindle.html`
+- the chapter page `/book/<id>/kindle_chapter_N.html`
+
+These pages are tuned for e-Ink: minimal markup, CSS-only theming, ES5-compatible
+scripts, no Service Worker, and no framework. You can read without any JavaScript;
+theme switching (Light / Sepia / Dark), font sizing (A- / A+), and the 17-language
+UI are lightweight inline scripts layered on top of the plain HTML.
+
+Every page offers theme and font controls (in the header, and again in the chapter
+footer), table-of-contents navigation, previous/next chapter, and a "Continue
+reading" link that resumes from saved progress.
+
+Reading progress differs by mode:
+
+- **SSG:** progress is stored in the current browser's cookies — local, no account.
+- **Server:** progress and reading heartbeats are synchronized per signed-in account
+  in SQLite. The Kindle surfaces are read/report-only: they record the current
+  chapter and report heartbeats, render a read-only shelf, and never expose insights
+  or content management.
+
+Access control is enforced on every Kindle surface. A restricted-visibility book
+returns 403 to unauthorized users on the minimal shelf (omitted), the book and
+chapter pages, and the progress API.
+
+Supported browsers (UA containing `Kindle/`, `Arora/`, etc.) are redirected from the
+full reader to the minimal pages automatically; the URLs above also work directly.
+This makes the minimal mode a graceful fallback for low-power or JavaScript-limited
+devices.
 
 ## Get started
 

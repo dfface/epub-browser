@@ -22,6 +22,9 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.9](releases/v2.9.9.md) — Server-mode Kindle surfaces now allow
+  inline scripts so theme, font size, and i18n work on legacy e-ink Kindles
+  (the strict sha256 CSP was blocking them).
 - [v2.9.8](releases/v2.9.8.md) — Kindle minimal-reader theme/font fixes,
   read-only bookshelf groups on the minimal shelf, real reading-time
   heartbeat reporting, Kindle session-device labels, and restricted-book

@@ -29,6 +29,7 @@ EPUB Browser 现在同时接受 `.epub` 和 `.pdf`。两种格式共用 Library�
   - [选择 SSG 或 Server](#选择-ssg-或-server)
   - [演示站点](#演示站点)
   - [AI 原生阅读](#ai-原生阅读仅-server-模式)
+  - [Kindle 极简模式](#kindle-极简模式)
 - [开始使用](#开始使用)
   - [选择安装方式](#选择安装方式)
   - [快速开始](#快速开始)
@@ -72,6 +73,9 @@ EPUB Browser 现在同时接受 `.epub` 和 `.pdf`。两种格式共用 Library�
   阅读过程不依赖 CDN。
 - **17 种界面语言**：英语、简体中文、繁体中文、日语、韩语、西班牙语、德语、法语、
   俄语、意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语。
+- **Kindle 极简模式**：为老款 e-ink Kindle 等受限设备准备的零依赖极简阅读面
+  （SSG 与 Server 均通过 `--kindle` 开启），提供主题与字号控制、17 种语言界面、
+  目录导航，Server 模式下阅读进度按账户同步。
 
 ![贴着 EPUB 原文生成的章节导读，以及保留章节上下文的私密 Ask AI 对话。](assets/ai-native-reading.png)
 
@@ -131,6 +135,41 @@ Node.js 只供维护者运行浏览器侧测试，不属于读者侧的生产运
 
 完整交互见 [AI 原生阅读专题](../ai-native-reading.md)，富文本渲染与网络安全边界见
 [本地 AI 富文本渲染器说明](../third-party-ai-renderers.md)。
+
+### Kindle 极简模式
+
+老款 e-ink Kindle（以及任何受限浏览器）都能用一套零依赖的极简阅读面。通过
+`--kindle` 开启：
+
+- SSG：`epub-browser ssg --kindle -o output/ SOURCE...`
+- Server：`epub-browser server --kindle --server-dir data SOURCE...`
+
+每本 EPUB（不含 PDF）会额外生成/提供三个页面：
+
+- 极简书架 `/kindle-library.html`
+- 书籍页 `/book/<id>/kindle.html`
+- 章节页 `/book/<id>/kindle_chapter_N.html`
+
+这些页面为 e-ink 调优：极简标签、纯 CSS 主题、兼容 ES5 的旧 WebKit 脚本、
+不依赖 Service Worker、没有前端框架。即使完全不运行 JavaScript 也能阅读；
+主题切换（浅色 / 米黄 / 深色）、字号调节（A- / A+）与 17 种语言界面，是在
+纯 HTML 之上叠加的轻量内联脚本。
+
+每个页面都提供主题与字号控制（页头以及章节页底部各一组）、目录导航、上一章/
+下一章，以及从已保存进度恢复的"继续阅读"链接。
+
+阅读进度按模式不同：
+
+- **SSG**：进度保存在当前浏览器 Cookie 中——本地、无需账户。
+- **Server**：进度与阅读心跳按已登录账户同步到 SQLite。Kindle 各面仅可读/上报：
+  记录当前章节与阅读心跳、渲染只读书架，绝不暴露阅读洞察或内容管理。
+
+访问控制贯穿所有 Kindle 面。受限可见性书籍对未授权用户在所有极简面上返回
+403——书架不列出该书，书籍页与章节页、进度 API 一律拒绝。
+
+受支持的浏览器（UA 含 `Kindle/`、`Arora/` 等旧 WebKit）从完整阅读器自动重定向
+到极简页；也可直接访问上面的 URL。这让极简模式成为低性能或限制 JavaScript 设备
+的优雅降级方案。
 
 ## 开始使用
 
