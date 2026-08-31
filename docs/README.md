@@ -22,8 +22,9 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
-- [v2.9.7](releases/v2.9.7.md) — Server-mode Kindle minimal surfaces with
-  read-write reading progress and a no-JavaScript login fallback.
+- [v2.9.7](releases/v2.9.7.md) — Kindle minimal mode for SSG and Server
+  (`--kindle`) with read-write reading progress and a no-JavaScript login
+  fallback.
 - [v2.9.6](releases/v2.9.6.md) — tag drag sorting, unified tag-bar
   styling, and more tolerant EPUB parsing.
 - [v2.9.5](releases/v2.9.5.md) — gzip-compressed server responses,
