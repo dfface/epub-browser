@@ -15,9 +15,11 @@ patch a few bytes of the OPF without re-serialising the document, and must keep
 that dedicated locator.
 """
 
+import codecs
+import re
 import urllib.parse
 from html.entities import html5
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from lxml import etree, html as lxml_html
 
@@ -77,6 +79,54 @@ def _html_parser():
     return lxml_html.HTMLParser(recover=True, no_network=True, huge_tree=False)
 
 
+def _strip_xml_declaration(text):
+    """Drop a leading ``<?xml ...?>`` so the HTML fallback accepts ``str``.
+
+    lxml's ``fromstring`` refuses ``str`` input that carries an encoding
+    declaration -- the encoding has already been decoded, so the declaration
+    is meaningless -- and raises ``ValueError`` before the HTML parser runs.
+    """
+    if text.startswith("<?xml"):
+        end = text.find("?>")
+        if end != -1:
+            text = text[end + 2:].lstrip()
+    return text
+
+
+def _decode_html_bytes(data):
+    """Decode bytes into str for the HTML fallback parser.
+
+    lxml's HTML parser decodes input whose encoding it cannot detect as
+    latin-1, which garbles the UTF-8 content EPUB mandates (a smart quote
+    becomes ``â\x80\x99``).  Decode explicitly instead -- a BOM wins, then a
+    meta charset declaration, then UTF-8 -- and hand the parser ``str`` so no
+    byte-guessing happens downstream.
+    """
+    if isinstance(data, str):
+        return _strip_xml_declaration(data)
+    for bom, encoding, width in (
+        (codecs.BOM_UTF32_LE, "utf-32-le", 4),
+        (codecs.BOM_UTF32_BE, "utf-32-be", 4),
+        (codecs.BOM_UTF16_LE, "utf-16-le", 2),
+        (codecs.BOM_UTF16_BE, "utf-16-be", 2),
+        (codecs.BOM_UTF8, "utf-8", 3),
+    ):
+        if data.startswith(bom):
+            return _strip_xml_declaration(data[width:].decode(encoding))
+    match = re.search(
+        br'charset\s*=\s*["\']?([A-Za-z0-9._-]+)',
+        data[:4096],
+        re.IGNORECASE,
+    )
+    if match:
+        encoding = match.group(1).decode("ascii", "ignore")
+        try:
+            return _strip_xml_declaration(data.decode(encoding))
+        except (LookupError, UnicodeDecodeError, ValueError):
+            pass
+    return _strip_xml_declaration(data.decode("utf-8"))
+
+
 def parse_xml_bytes(data, *, allow_recovery=True):
     """Parse XML bytes strictly, falling back to recovery on failure."""
     if isinstance(data, str):
@@ -126,7 +176,9 @@ def parse_xhtml_bytes(data):
     except EPUBParseError:
         pass
     try:
-        return lxml_html.document_fromstring(data, parser=_html_parser())
+        return lxml_html.document_fromstring(
+            _decode_html_bytes(data), parser=_html_parser()
+        )
     except (etree.ParserError, etree.XMLSyntaxError) as error:
         raise EPUBParseError(f"Unparsable XHTML document: {error}") from error
 
@@ -138,7 +190,9 @@ def parse_xhtml_document(path):
     except EPUBParseError:
         pass
     try:
-        return lxml_html.parse(str(path), parser=_html_parser()).getroot()
+        return lxml_html.document_fromstring(
+            _decode_html_bytes(Path(path).read_bytes()), parser=_html_parser()
+        )
     except (etree.ParserError, etree.XMLSyntaxError) as error:
         raise EPUBParseError(
             f"Unparsable XHTML document {path}: {error}"
@@ -160,7 +214,11 @@ def parse_xhtml_fragment(data):
     except EPUBParseError:
         pass
     try:
-        return [lxml_html.document_fromstring(data, parser=_html_parser())]
+        return [
+            lxml_html.document_fromstring(
+                _decode_html_bytes(data), parser=_html_parser()
+            )
+        ]
     except (etree.ParserError, etree.XMLSyntaxError) as error:
         raise EPUBParseError(f"Unparsable XHTML fragment: {error}") from error
 

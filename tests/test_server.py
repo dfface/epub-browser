@@ -1387,7 +1387,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertEqual(favicon.content, b'published favicon')
         self.assertEqual(
             favicon.headers['cache-control'],
-            'public, max-age=31536000, immutable',
+            'private, max-age=31536000, immutable',
         )
 
     def test_public_login_supports_traditional_chinese_korean_and_japanese(self):
@@ -4360,17 +4360,85 @@ class ServerCacheTests(unittest.TestCase):
 
         return asyncio.run(collect())
 
-    def test_authenticated_immutable_assets_revalidate_in_a_private_cache(self):
+    def test_authenticated_immutable_assets_keep_their_long_lived_cache_policy(self):
+        # Authentication must not downgrade content-addressed assets to
+        # revalidate-on-every-load; they stay cacheable for a year.
         response = self.client.get("/assets/immutable/app.0123456789ab.js")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["cache-control"], "private, no-cache")
-        self.assertNotIn("public", response.headers["cache-control"])
+        self.assertEqual(
+            response.headers["cache-control"],
+            "private, max-age=31536000, immutable",
+        )
         self.assertIn("etag", response.headers)
 
-        cached = self.client.get("/assets/immutable/app.0123456789ab.js", headers={"If-None-Match": response.headers["etag"]})
+        cached = self.client.get(
+            "/assets/immutable/app.0123456789ab.js",
+            headers={"If-None-Match": response.headers["etag"]},
+        )
         self.assertEqual(cached.status_code, 304)
-        self.assertEqual(cached.headers["cache-control"], "private, no-cache")
+        self.assertEqual(
+            cached.headers["cache-control"],
+            "private, max-age=31536000, immutable",
+        )
+
+    def test_gzip_compresses_html_when_the_client_accepts_it(self):
+        payload = "<!DOCTYPE html><html><body>" + "x" * 2000 + "</body></html>"
+        (Path(self.directory.name) / "index.html").write_text(
+            payload,
+            encoding="utf-8",
+        )
+        response = self.client.get("/", headers={"Accept-Encoding": "gzip"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-encoding"], "gzip")
+        self.assertIn(
+            "accept-encoding",
+            response.headers.get("vary", "").lower(),
+        )
+        # TestClient auto-decodes gzip bodies; the payload must still match.
+        self.assertEqual(response.content, payload.encode("utf-8"))
+
+    def test_gzip_compresses_large_immutable_text_assets(self):
+        large = Path(
+            self.directory.name,
+            "assets",
+            "immutable",
+            "large.0123456789ab.js",
+        )
+        payload = "// " + "x" * 2000
+        large.write_text(payload, encoding="utf-8")
+
+        response = self.client.get(
+            "/assets/immutable/large.0123456789ab.js",
+            headers={"Accept-Encoding": "gzip"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-encoding"], "gzip")
+        self.assertEqual(response.content, payload.encode("utf-8"))
+
+    def test_gzip_skips_small_and_binary_responses(self):
+        icon = Path(
+            self.directory.name,
+            "assets",
+            "immutable",
+            "icon.0123456789ab.png",
+        )
+        icon.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 200)
+
+        small = self.client.get(
+            "/assets/immutable/app.0123456789ab.js",
+            headers={"Accept-Encoding": "gzip"},
+        )
+        self.assertNotIn("content-encoding", small.headers)
+
+        binary = self.client.get(
+            "/assets/immutable/icon.0123456789ab.png",
+            headers={"Accept-Encoding": "gzip"},
+        )
+        self.assertNotIn("content-encoding", binary.headers)
+        self.assertEqual(binary.content, b"\x89PNG\r\n\x1a\n" + b"\x00" * 200)
 
     def test_mutable_assets_and_worker_revalidate(self):
         cover = self.client.get("/assets/cover.webp")

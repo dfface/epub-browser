@@ -14,6 +14,7 @@ from epub_browser.epub_parsing import (
     EPUBParseError,
     allowed_entity_name,
     is_safe_internal_path,
+    parse_xhtml_bytes,
     parse_xhtml_fragment,
     parse_xml_bytes,
     require_single_rootfile,
@@ -153,6 +154,28 @@ class ParseXhtmlFragmentTests(unittest.TestCase):
     def test_legacy_html_with_unclosed_void_tags_parses(self):
         nodes = parse_xhtml_fragment('<link rel="stylesheet"><p>Hi</p>')
         self.assertEqual(len(nodes), 1)
+
+    def test_utf8_punctuation_survives_the_html_fallback(self):
+        # The HTML fallback must not decode UTF-8 bytes as latin-1: a smart
+        # quote used to come back as the mojibake ``â\x80\x99``.
+        nodes = parse_xhtml_fragment("Don\u2019t ban \u2014 ok")
+        body = nodes[0].find("body")
+        self.assertIn("\u2019", body.text_content())
+        self.assertNotIn("\u00e2", body.text_content())
+
+    def test_html_fallback_bytes_default_to_utf8(self):
+        nodes = parse_xhtml_bytes("Brazil\u2019s economy".encode("utf-8"))
+        self.assertEqual(nodes.text_content(), "Brazil\u2019s economy")
+
+    def test_html_fallback_bytes_honor_meta_charset(self):
+        # A non-UTF-8 document declaration must still win over the UTF-8
+        # fallback; 0xE9 is ``é`` in windows-1252.
+        data = (
+            b'<html><head><meta charset="windows-1252"></head>'
+            b"<body><p>\xe9</p></body></html>"
+        )
+        root = parse_xhtml_bytes(data)
+        self.assertEqual(root.text_content(), "\u00e9")
 
 
 if __name__ == "__main__":

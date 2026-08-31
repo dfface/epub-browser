@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import (
     FileResponse,
     HTMLResponse,
@@ -556,7 +557,7 @@ def cache_control_for_path(path):
     """Cache immutable app assets and stable EPUB resources without caching pages."""
     normalized = os.path.normpath(path).replace(os.sep, '/')
     if '/assets/immutable/' in normalized:
-        return 'public, max-age=31536000, immutable'
+        return 'private, max-age=31536000, immutable'
     if '/book/' in normalized and '/resources/' in normalized:
         return 'public, max-age=2592000'
     return 'no-cache'
@@ -4865,6 +4866,11 @@ window.location.assign(payload.redirect||'/');
         if path.startswith('/auth/oidc/'):
             authorized.headers['Cache-Control'] = 'no-store'
             return authorized
+        if path.startswith('/assets/immutable/'):
+            # Content-addressed assets are immutable; authentication must not
+            # downgrade the long-lived cache policy set by the static file
+            # adapter, or browsers would revalidate every asset on each load.
+            return authorized
         # Lookup text is sensitive reading data.  Its handlers deliberately
         # request no-store; preserve that stronger policy instead of replacing
         # it with the authenticated page default.
@@ -4872,6 +4878,11 @@ window.location.assign(payload.redirect||'/');
             authorized.headers['Cache-Control'] = 'private, no-cache'
         return authorized
 
+    app.add_middleware(
+        GZipMiddleware,
+        minimum_size=500,
+        compresslevel=6,
+    )
     app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 
     return app
