@@ -557,6 +557,7 @@ docker run -d \
 | `--admin-password-file FILE` | 首选初始密钥文件；后备为 `EPUB_BROWSER_ADMIN_PASSWORD_FILE`，未设置文件时再使用 `EPUB_BROWSER_ADMIN_PASSWORD`。 |
 | `--trusted-proxy-cidr CIDR` | 可重复指定的直接代理网络信任边界，用于安全解析 `X-Forwarded-For` 中的客户端 IP。 |
 | `--cookie-secure` | 只通过浏览器侧 HTTPS 发送会话 Cookie。 |
+| `--kindle` | 为旧式 e-Ink Kindle 提供无依赖极简页面，并将 Kindle WebKit 浏览器重定向到这些页面；默认关闭。 |
 
 #### 旧版 v1 语法
 

@@ -603,6 +603,7 @@ Exactly one of `--server-dir` and `--ephemeral` is required.
 | `--admin-password-file FILE` | Preferred initial secret file; fallback `EPUB_BROWSER_ADMIN_PASSWORD_FILE`, then `EPUB_BROWSER_ADMIN_PASSWORD` when no file is set. |
 | `--trusted-proxy-cidr CIDR` | Repeatable direct-proxy network trust boundary for safe `X-Forwarded-For` client-IP parsing. |
 | `--cookie-secure` | Send the session cookie only over browser-facing HTTPS. |
+| `--kindle` | Serve dependency-free minimal pages for legacy e-Ink Kindles and redirect Kindle WebKit browsers to them; off by default. |
 
 #### Legacy v1 syntax
 
