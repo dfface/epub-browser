@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#244548">
+    <meta name="description" content="在中央政治局常委扩大会议上的讲话 - 毛泽东选集 - EPUB Browser">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
+    <title>在中央政治局常委扩大会议上的讲话 - 毛泽东选集</title>
+    
+    <script src="/assets/immutable/i18n.2a5c1f7052f1.js"></script>
+    <script>window.EpubBrowserBasePath="/";window.EpubBrowserMode="ssg"</script><script>window.EpubBrowserI18n.init();</script>
+    
+    
+    <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
+    <link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css"/>
+    <link id="code-light" rel="stylesheet" href="/assets/immutable/vendor/highlight/github.min.3a9a5def8b9c.css">
+    <link id="code-dark" rel="stylesheet" disabled href="/assets/immutable/vendor/highlight/github-dark.min.9f208d022102.css">
+    <link rel="stylesheet" href="/assets/immutable/vendor/fontawesome/css/all.min.59cdcd0cf392.css">
+    <link rel="stylesheet" href="/assets/immutable/theme.0fee49e270c4.css">
+    <link rel="stylesheet" href="/assets/immutable/notification.3af6bb473911.css">
+    <link rel="stylesheet" href="/assets/immutable/dialog.11578e5f1426.css">
+    <link rel="stylesheet" href="/assets/immutable/chapter.5b661db85010.css">
+    
+    <link rel="stylesheet" href="/assets/immutable/breadcrumb.10ebdb945eb6.css">
+    <link rel="stylesheet" href="/assets/immutable/loading.4191d9fecbbb.css">
+    <link rel="stylesheet" href="/assets/immutable/annotation.5ff12abe2407.css">
+    <link rel="stylesheet" href="/assets/immutable/annotation-hub.bed06f149212.css">
+    
+    <link rel="stylesheet" href="/assets/immutable/vendor/glightbox/glightbox.min.6d3f62d4d179.css">
+    <link rel="icon" type="image/png" href="/assets/immutable/favicon.dd042ee39766.png">
+    <link rel="apple-touch-icon" href="/assets/immutable/icon-192.15435b416555.png">
+    <link rel="stylesheet" href="/assets/immutable/bookshelf.9fd53d54c1ae.css">
+
+    <script>
+    // 立即应用主题，避免闪现
+    var theme = "light";
+
+    try {
+    // 优先从 window 缓存读取
+    var storedTheme = null;
+    if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+        storedTheme = window.epubBrowserCache.theme;
+    } else {
+        storedTheme = localStorage.getItem("theme");
+        if (storedTheme) {
+        if (!window.epubBrowserCache) {
+            window.epubBrowserCache = {};
+        }
+        window.epubBrowserCache.theme = storedTheme;
+        }
+    }
+
+    if (storedTheme) {
+        theme = storedTheme;
+    }
+    } catch (e) {
+    // localStorage 不可用时保持默认主题
+    }
+
+    // 使用 html 元素添加类名
+    var htmlElement = document.documentElement;
+    htmlElement.classList.add(theme + "-mode");
+    </script>
+
+<script>
+(function () {
+  var ua = navigator.userAgent.toLowerCase();
+  if (ua.indexOf('kindle') === -1) return;
+  if (ua.indexOf('silk') !== -1) return;
+  if (location.search.indexOf('full=1') !== -1) return;
+  location.replace('kindle_chapter_333.html');
+})();
+</script>
+</head>
+
+<body>
+
+    <a class="skip-link" href="#eb-content" data-i18n="reader.skipToContent">Skip to reading content</a>
+
+    <div class="reading-progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="reader.bookChapters">Chapters</h3>
+            <div class="toc-header-actions">
+                <button class="toc-current-chapter" id="bookHomeLocateCurrent" type="button" aria-label="Locate current chapter" data-i18n-aria-label="reader.locateCurrentChapter">
+                    <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                </button>
+                <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
+                    <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
+                </a>
+                <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close book home" data-i18n-aria-label="reader.closeBookHome">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+    </nav>
+
+    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
+            <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <ul class="toc-list" id="tocList">
+            <!-- 动态生成的目录将放在这里 -->
+        </ul>
+    </nav>
+    
+
+    <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
+
+    <header class="chapter-top-bar app-header">
+        <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
+            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/immutable/logo-mark-color.ef9a3679a944.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            <div class="app-nav-links">
+                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+                <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="6QrgU-nfQSm_M6lmKAuBRg" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+                
+                
+            </div>
+            <div class="app-nav-actions">
+                <div class="library-language app-nav-locale">
+    <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" id="localeCurrentLabel" data-i18n="locale.name.en">English</span></button>
+    <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="en" data-i18n="locale.name.en">English</option><option value="zh-CN" data-i18n="locale.name.zh-CN">简体中文</option><option value="zh-TW" data-i18n="locale.name.zh-TW">繁體中文</option><option value="ko" data-i18n="locale.name.ko">한국어</option><option value="ja" data-i18n="locale.name.ja">日本語</option><option value="es" data-i18n="locale.name.es">Español</option><option value="de" data-i18n="locale.name.de">Deutsch</option><option value="fr" data-i18n="locale.name.fr">Français</option><option value="ru" data-i18n="locale.name.ru">Русский</option><option value="it" data-i18n="locale.name.it">Italiano</option><option value="pt-BR" data-i18n="locale.name.pt-BR">Português (Brasil)</option><option value="ar" data-i18n="locale.name.ar">العربية</option><option value="id" data-i18n="locale.name.id">Bahasa Indonesia</option><option value="hi" data-i18n="locale.name.hi">हिन्दी</option><option value="vi" data-i18n="locale.name.vi">Tiếng Việt</option><option value="th" data-i18n="locale.name.th">ไทย</option><option value="ms" data-i18n="locale.name.ms">Bahasa Melayu</option></select>
+</div>
+                <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
+                
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
+            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
+            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
+            <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
+            <div class="pagination-toolbar-controls" id="paginationInfo" role="group" aria-label="Page navigation" data-i18n-aria-label="reader.navigation">
+                <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_332.html" id="readerPreviousChapter" class="control-btn prev-chapter" aria-label="Previous chapter" data-i18n-aria-label="reader.previous" aria-disabled="false"><i class="fas fa-arrow-left" aria-hidden="true"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></a>
+                <button class="control-btn" id="prevPage" type="button" aria-label="Previous page" data-i18n-aria-label="reader.previousPage" data-pagination-toolbar-control hidden><i class="fas fa-chevron-left" aria-hidden="true"></i><span class="control-name" data-i18n="reader.previousPage">Previous page</span></button>
+                <button class="control-btn" id="reloadPages" type="button" aria-label="Reload pages" data-i18n-aria-label="reader.reloadPages" data-pagination-toolbar-control hidden><i class="fas fa-rotate-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.reloadPages">Reload pages</span></button>
+                <button class="control-btn" id="nextPage" type="button" aria-label="Next page" data-i18n-aria-label="reader.nextPage" data-pagination-toolbar-control hidden><i class="fas fa-chevron-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.nextPage">Next page</span></button>
+                <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_334.html" id="readerNextChapter" class="control-btn next-chapter" aria-label="Next chapter" data-i18n-aria-label="reader.next" aria-disabled="false"><i class="fas fa-arrow-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></a>
+                <span class="pagination-page-status" id="currentPage" aria-live="polite">1</span>
+                <span class="pagination-page-status" id="totalPages" aria-label="Total pages" data-i18n-aria-label="reader.totalPages">1</span>
+                <button class="control-btn" id="pageJumpToggle" type="button" aria-label="Jump" data-i18n-aria-label="reader.jump" aria-controls="paginationPageJumpPopover" aria-expanded="false" data-pagination-toolbar-control hidden><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i><span class="control-name" data-i18n="reader.jump">Jump</span></button>
+                <section class="pagination-page-jump-popover" id="paginationPageJumpPopover" role="dialog" aria-modal="false" aria-labelledby="paginationPageJumpTitle" aria-describedby="paginationPageJumpRange" aria-hidden="true" hidden>
+                    <strong class="pagination-page-jump-title" id="paginationPageJumpTitle" data-i18n="reader.jump">Jump</strong>
+                    <p class="pagination-page-jump-range" id="paginationPageJumpRange"></p>
+                    <label class="pagination-page-jump-label" for="pageJumpInput" data-i18n="reader.currentPage">Current page</label>
+                    <div class="pagination-page-jump-form">
+                        <input type="number" id="pageJumpInput" min="1" max="1" value="1" inputmode="numeric" aria-label="Current page" data-i18n-aria-label="reader.currentPage">
+                        <button class="pagination-jump-submit" id="goToPage" type="button" aria-label="Jump" data-i18n-aria-label="reader.jump"><i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i></button>
+                    </div>
+                </section>
+            </div>
+            
+            
+            
+        </div>
+        <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
+            <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
+                <div class="loading-spinner"></div>
+            </div>
+            <article class="eb-content" id="eb-content" lang="zh-CN" dir="auto" data-eb-styles data-chapter-index="333" data-chapter-title="在中央政治局常委扩大会议上的讲话" data-book-hash="6QrgU-nfQSm_M6lmKAuBRg" data-total-chapters="416">
+            
+  <div class="div">
+    <h3 class="h3"><span class="c3">在中央政治局<br/>常委扩大会议上的讲话</span><a class="zy" href="#id0a" id="id0">*</a></h3>
+
+    <p class="a0"><span class="f2">（一九六六年三月二十日）</span></p>
+
+    <p class="a5"><span class="f3">（一）关于不参加苏共二十三大</span></p>
+
+    <p class="a">苏联二十三大我们不参加了。苏联是在内外交困的情况下开这个会。我们靠自力更生，不靠它，不拖泥带水。要人家不动摇，首先要自己不动摇。我们不去参加，左派腰板硬了，中间派向我们靠近了。二十三大不去参加，无非是兵临城下，不打，就是笔墨官司。不参加可以写一封信。我们讲过叛徒、工贼。苏联反华好嘛，一反我们，我们就有文章可作。叛徒、工贼总是要反华的。我们旗帜要鲜明，不要拖泥带水。卡斯特罗无非是豺狼当道<a class="zy" href="#id1a" id="id1">〔1〕</a>。</p>
+
+    <p class="a">（有人问：这次我们没参加，将来修正主义开会，我们还发不发贺电？）</p>
+
+    <p class="a">发还发，发是向苏联人民发。</p>
+
+    <p class="a5"><span class="f3">（二）学术问题，教育界问题</span></p>
+
+    <p class="a">过去我们蒙在鼓里，许多事情都不知道，事实上是资产阶级、小资产阶级在那里掌握着。过去我们对民族资产阶级和资产阶级知识分子的政策是区别于买办资产阶级的，改变了过去苏区的政策。这个政策是灵的，正确的。应该把他们区别开，如果把他们等同起来是不对的。现在大、中、小学大部分都是被资产阶级、小资产阶级、地主、富农出身的知识分子垄断了。解放后，我们把他们都包下来，当时包下来是对的。现在要搞革命。要保几个人，如郭老、范老<a class="zy" href="#id2a" id="id2">〔2〕</a>，其他的人不要保了。发动年轻人向他们挑战，要指名道姓。他们先挑起斗争。我们在报上斗争。</p>
+
+    <p class="a">现在每一个中等以上的城市都有一个文、史、哲、法、经研究部门。研究史的，史有各种史，学术门门都有史。有历史、通史、哲学、文学、自然科学都有史，没有一门没有史。自然科学史我们还没有动。今后每隔五年、十年的功夫批评一下，讲讲道理，培养接班人。不然都掌握在他们手里。范老是帝王派，对帝王派将相很感兴趣，反对青年研究历史，反对一九五八年研究历史的方法<a class="zy" href="#id3a" id="id3">〔3〕</a>。批判时，不要放空炮，要研究史料。这是一场严重的阶级斗争，不然将要出修正主义。出修正主义的就是这一批人，如吴晗、翦伯赞<a class="zy" href="#id4a" id="id4">〔4〕</a>都是反对马克思列宁主义的。他们俩都是共产党员，共产党员却反对共产党。现在全国二十八个省市中，有十五个省市开展了这场斗争，还有十三个没有动。</p>
+
+    <p class="a">对知识分子包下来，有好处也有坏处。包下来了，拿定息，当教授、校长，这批人实际上是一批国民党。还有你那个北京刊物《前线》<a class="zy" href="#id5a" id="id5">〔5〕</a>，是吴晗、翦伯赞的前线。廖沫沙<a class="zy" href="#id6a" id="id6">〔6〕</a>是为《李慧娘》捧过场的，提倡过“有鬼无害论”。阶级斗争展开的面很广，包括报纸、刊物、文艺、电影、戏剧。阶级斗争很尖锐，很广泛，请各大区注意一下，报纸、文艺各方面都要管。</p>
+
+    <p class="a">尹达这篇文章<a class="zy" href="#id7a" id="id7">〔7〕</a>发表出来了，写得好，各报都应当转载。尹达是历史所长，他是赵毅敏<a class="zy" href="#id8a" id="id8">〔8〕</a>的弟弟。他的文章是一九六四年写出来的，压了一年半才发表。对青年人的文章，好的坏的都不要压。对吴晗、翦伯赞，不要剥夺他的吃饭权，有什么关系。不要怕触犯了罗尔纲<a class="zy" href="#id9a" id="id9">〔9〕</a>、翦伯赞等人。</p>
+
+    <p class="a">中专、技校、半工半读，统统到乡下去。</p>
+
+    <p class="a">文学系要写诗、写小说，不要写文学史。你不从写作搞起怎么能行？写等于学作文，学作文就是以听、写为主。至于写史，到工作时再说。不要只读死东西，不搞应用。我们解放军的军长、师长，对宋朝、明朝、尧舜不知道，同样打胜仗。读《孙子兵法》，没有一个人照他那样打仗的。</p>
+
+    <p class="a">两种办法：一种是开展批评，一种是半工半读，搞四清。不要压青年人，让他冒出来。戚本禹<a class="zy" href="#id10a" id="id10">〔10〕</a>批判罗尔纲，戚是中央办公厅信访办公室的一个工作人员，罗是教授。好的坏的都不要压。赫鲁晓夫我们为他出全集呢！</p>
+
+    <p class="a">（林彪：我们搞物质建设，他们搞资产阶级的精神建设。）</p>
+
+    <p class="a">把新生力量，如学生、助教、讲师、一部分教授，都解放出来。剩下一部分死不转变的老教授孤立起来。改了就好，不改也不要紧。还是尹达讲得对。尹达讲，年纪小的、学问少的打倒那些老的、学问多的。</p>
+
+    <p class="a">（朱德：打倒那些权威。陈伯达：打倒资产阶级权威，培养新生力量，树立无产阶级权威，培养接班人。）</p>
+
+    <p class="a">现在的权威是谁？是姚文元<a class="zy" href="#id11a" id="id11">〔11〕</a>、戚本禹、尹达。谁融化谁，现在还没有解决。</p>
+
+    <p class="a">（陈伯达：接班人要自然形成。斯大林搞了个马林科夫，不行，没等你死，他就夭折了。）</p>
+
+    <p class="a">就是不要这些人接班，要年纪小的，学问少的，立场稳的，有政治经验的、坚定的人来接班。</p>
+
+    <p class="a5"><span class="f3">（三）工业体制问题</span></p>
+
+    <p class="a">有些问题，你们想不通。你们能管得了那么多？在南京，我和江渭清<a class="zy" href="#id12a" id="id12">〔12〕</a>谈了，打起仗来，中央一不出兵，二不出将；三有点粮也不多，送不去；四又没有衣服；五有点枪炮也不多。各大区、各个省都自己搞去。要人自为战，各省自己搞。海军、空军、地方搞不了，中央统一搞。打起仗来还是靠地方，你们靠中央，靠不住的。地方搞游击队，还是靠斗争武器。</p>
+
+    <p class="a">华东工业有两种管法。江苏的办法好，是省不管工业，南京、苏州就搞起来了，苏州十万工人，八亿产值。济南是另一种，大的归省，小的归市，扯不清。</p>
+
+    <p class="a">（刘少奇：如何试行普遍劳动制？普遍参加劳动，参加义务劳动，现在脱产人员太多，职工八十万、家属也是八十万。）</p>
+
+    <p class="a">现在要做普遍宣传，打破老一套，逐步实行。</p>
+
+    <p class="a">我们这个国家是二十八个“国家”组成的，有“大国”也有“小国”，如西藏、青海就是“小国”，人不多。</p>
+
+    <p class="a">（周恩来：要搞机械化。）</p>
+
+    <p class="a">先由中央局，省、地、市等你们回去鸣放。四、五、六、七四个月，省、地、市等都要鸣放。大鸣大放要联系到“备战、备荒、为人民”，不然他们不敢放。</p>
+
+    <p class="a">（周恩来：怕说他们是分散主义。）</p>
+
+    <p class="a">地方要抓积累，现在是一切归国库。上海就有积累，一有资金，二有原料，三有设备。不能什么东西都集中到中央，不能竭泽而渔。苏联就是吃竭泽而渔的亏。</p>
+
+    <p class="a">（彭真：上海用机器支援农村，由非法变合法。）</p>
+
+    <p class="a">是非法要承认合法，历史上都是由非法变合法的。孙中山一开始是非法的，以后变合法；共产党也是由非法变合法的。袁世凯是合法变非法的。合法是反动的，非法是革命的。现在反动派就是不让人家有积极性，限制人家革命。中央还是“虚君共和”<a class="zy" href="#id13a" id="id13">〔13〕</a>好。英国女皇、日本天皇都是“虚君共和”。中央还是“虚君共和”好，只管大政方针。就是大政方针也是从地方鸣放出来，中央开个加工厂，把它制造出来。省、市、地、县、放出来，中央才能造出来。这样就好，中央只管虚，不管实，或是少管实。中央收上来的厂收多了。凡是收的都叫他们出中央，到地方上去，连人带马都出去。</p>
+
+    <p class="a">（彭真：办托拉斯<a class="zy" href="#id14a" id="id14">〔14〕</a>，把党的工作也收归托拉斯，这实际上就是工业党。）</p>
+
+    <p class="a">四清都归你们，中央只管二十三条<a class="zy" href="#id15a" id="id15">〔15〕</a>。</p>
+
+    <p class="a">……</p>
+
+    <p class="a">什么军区政治部，你们有什么经验？军队还是靠地方军，以后才变成正规军的。我没有什么经验，过去三个月总结，半年总结，还不都是根据下面报告？搞兵工厂都是靠地方搞出来的。中央只生产精神。比如解放战争时期，中央什么也没有，没有一个人、一粒粮、一颗子弹，只有来源于你们的实践经验，根据你们打胜仗打败仗的经验，出点精神。现在是南粮北调，北煤南调<a class="zy" href="#id16a" id="id16">〔16〕</a>，这样不行。</p>
+
+    <p class="a">（周恩来：国防工业也要归地方。总的是下放，不是上调。中央只管尖端。）</p>
+
+    <p class="a">飞机厂也没有搬家，打起仗来，要枪，也送不出去。一个省要有个小钢铁厂。一个省有几千万人，有十万吨钢还不行，一个省要搞那么几十个。</p>
+
+    <p class="a">（余秋里：要三老带三新：老厂带新厂，老基地带新基地，老产品带新产品。）</p>
+
+    <p class="a">（林彪：老带新，这是中国的道路。）</p>
+
+    <p class="a">这好象抗战时期带游击队一样。要搞社会主义，不要搞个人主义。</p>
+
+    <p class="a">（彭真：小钢厂有四千个，给中央统光了。）</p>
+
+    <p class="a">你分人家的干什么？统统归他们。</p>
+
+    <p class="a">（彭真：明年搞个办法。）</p>
+
+    <p class="a">等明年干什么？你们回去就开个会，凡是要人家的，就叫他去当副厂长。</p>
+
+    <p class="a">（周恩来：现在搞农业机械化，还是借东风的。八机部搞托拉斯，收上来了不少厂子。）</p>
+
+    <p class="a">那就叫八机部的陈正人<a class="zy" href="#id17a" id="id17">〔17〕</a>去当厂长嘛！</p>
+
+    <p class="a">有的对农民实在挖得苦，江西一担粮收税三回，我看应该打扁担。一文一武开个会，对苛捐杂税准许打。</p>
+
+    <p class="a">中央计划要和地方结合起来。中央不能管死，省也不能统死。</p>
+
+    <p class="a">（刘少奇：把计划拨出一点归地方。）</p>
+
+    <p class="a">你用战争吓唬他。原子弹一响，个人主义就不搞了。打起仗来，《人民日报》还发得出么？要注意分权，不要竭泽而渔。现在是上面无人管，下面无权管。</p>
+
+    <p class="a">（陶铸：中央也无权呀！）</p>
+
+    <p class="a">现在我们允许闹独立性。你对官僚主义就闹嘛！要象戚本禹等人那样闹独立性，对错误的东西闹独立性，你宣传部长不要压嘛！学生要造反，要允许造反。文化革命要搞群众运动，让学生鸣放。我赞成挖他们的墙角，包括挖部长的墙角。有一个化学教授的讲稿，给学生读了几个月还不懂，大学生问他，他也不知道。学生就是要挖他的墙角。吴晗、翦伯赞就是靠史吃饭的。学生读过的明史，吴晗没有读过呢！俞平伯<a class="zy" href="#id18a" id="id18">〔18〕</a>一点学问也没有。</p>
+
+    <p class="a">（林彪：还是要学毛主席著作。）</p>
+
+    <p class="a">不要学翦伯赞的那些东西，也不要学我那些。要学就要突破，不要受限制；不要光解释，只记录；不要受束缚。列宁就不受马克思的束缚。</p>
+
+    <p class="a">（林彪：列宁也是超。我们现在要提倡学毛主席著作，是撒毛泽东思想的种子。）</p>
+
+    <p class="a">那这样说也可以，但不要迷信，不要受束缚，要有新解释、新观点，要有新的创造。就是要教授给学生打倒。</p>
+
+    <p class="a">（林彪：这些人只想专政。）</p>
+
+    <p class="a">吉林的一个文教书记，有篇文章对形象思维批判，写得好。《光明日报》批判《官场现形记》、《二十年目睹之怪现状》，批判得好，把大是大非讲清楚了，《官场现形记》是改良主义。总之，所谓“谴责小说”是反动的，反孙中山的，保皇的，使地主专政。他们是要修正一下，改良一下，是没落的。</p>
+
+    <p class="a">把农业机械化的文件发到各省去议，在这里就不讲了。</p>
+
+    <p class="a">　　</p>
+
+    <p class="a"><span class="f3">　注　　释　</span></p>
+
+    <p class="zs"><a class="hl" href="#id0" id="id0a">　*　</a>这是毛泽东同志在杭州召开的中央政治局常委扩大会议上的讲话。</p>
+
+    <p class="zs"><a class="hl" href="#id1" id="id1a">〔1〕</a>菲德尔·卡斯特罗，古巴领导人，一九二六年八月十三日出生于古巴东方省比兰镇。他一九五〇年毕业于哈瓦那大学，获法学博士学位。一九五三年七月二十六日，卡斯特罗领导发动反对巴蒂斯塔独裁政权的武装起义，失败后被捕，在法庭上发表了举世闻名的辩护词《历史将宣判我无罪》。一九五五年，他流亡美国、墨西哥，在墨期间筹划“七·二六运动”。卡斯特罗一九五六年回到古巴，在马埃斯特拉山区创建起义军和根据地。一九五九年一月，他率领起义军推翻巴蒂斯塔独裁政权，成立革命政府，出任政府总理（后改称部长会议主席）和武装部队总司令。卡斯特罗一九六二年起担任古巴社会主义革命统一党第一书记。一九六五年该党改名为古巴共产党后，担任中央委员会第一书记。</p>
+
+    <p class="zs1">“豺狼当道”典出《后汉书·张纲传》，东汉末年，外戚诸梁姻族满朝，大将军梁冀专权。朝廷派遣张纲等八人分道巡按各州郡，纠察收审贪官污吏。张纲衔命出洛阳，叹道：“豺狼当道，安问狐狸？”遂将车轮埋于都亭，起草弹劾梁冀的奏章。意即：祸国大盗正在那儿当道呢！何必去抓小偷啊！</p>
+
+    <p class="zs1">中苏论战时，古巴保持中立，其实，卡斯特罗在内心对赫鲁晓夫的和平共处路线不满，对苏联国内的经济改革看不惯，认为是革命的蜕化，在这些问题上他和毛泽东倒是完全一致。古巴的另一个领导人格瓦拉甚至公开说中国的人民公社为古巴和第三世界树立了榜样。但古巴经济严重依赖于苏联（古巴这个当时仅七百万人口的小国最多时从苏联获得的收益相当于每年人均四百美元），不得不最终站到了苏联一边，卡斯特罗一九六五年三月发表演讲点名批评中共是“修正主义者”，两党关系中断，两国间也恶感日盛。</p>
+
+    <p class="zs1">毛泽东起初主张“豺狼当道，安问狐狸”，认为苏联才是危险的“豺狼”，而像古巴不过是“狐狸”，应该“分化瓦解、多多争取”，此后便认为古巴也变成了“豺狼”，后公开予以批判。</p>
+
+    <p class="zs1">二〇〇七年，卡斯特罗在其口述新书《我的生活》中说到：“我真希望跟毛泽东结识，但因为中苏当时矛盾和分歧而变得不可能。在世界最伟大的政治战略家中，在古往今来所有的军事领袖中，你一定不能漏掉毛泽东。”</p>
+
+    <p class="zs"><a class="hl" href="#id2" id="id2a">〔2〕</a>郭沫若，时任中国科学院院长，文学、史学界权威。范文澜，著名历史学家，时任中国史学会副会长，中国科学院哲学社会科学部委员，中国科学院近代史研究所所长，主编《中国通史简编》，并长期从事该书的修订工作。两人同为国学名家。</p>
+
+    <p class="zs"><a class="hl" href="#id3" id="id3a">〔3〕</a>一九五八年，史学届爆发了以“厚今薄古”为口号的“史学革命”，唯物史观和阶级斗争学说成为历史研究的指导理论，经过知识分子思想改造运动，传统的旧史学被整个地翻了案，几千年来被剥削阶级颠倒了的历史终于被再颠倒过来了。劳动人民成为创造历史的主人，农民起义成为历史发展的动力，帝王将相统治阶级则被扫进了历史的垃圾堆。如过去被旧史咒骂的发匪拳乱，在新史中是伟大的太平天国农民革命和义和团反帝爱国运动；旧史中被尊为“完人”的曾国藩之流，则被还了反革命刽子手的真面目。范文澜为二保论者（即保“王朝体系”，保“帝王将相”）。范老在一篇未刊稿中指出：所谓“二保论”，一是按中国历史上朝代作为顺序编写历史；二是中国历史各朝代的统治者，政权代表的皇帝、大臣、名将等，在历史过程中的作用。有人主张打破王朝体系，我不赞成，因为王朝体系打不破，也没有法子打破。”但范文澜也支持“厚今薄古”，曾于一九五八年四月二十八日在《人民日报》发表文章《历史研究必须厚今薄古》。</p>
+
+    <p class="zs"><a class="hl" href="#id4" id="id4a">〔4〕</a>吴晗是明史专家，时任北京市副市长，曾编写新编历史剧《海瑞罢官》，鼓吹“老百姓应指望清官”。翦伯赞，历史学家，时任北大副校长，反对姚文元对吴晗的《海瑞罢官》的批判。</p>
+
+    <p class="zs"><a class="hl" href="#id5" id="id5a">〔5〕</a>《前线》，北京市委刊物。此处的“你”指彭真，时任北京市委书记。</p>
+
+    <p class="zs"><a class="hl" href="#id6" id="id6a">〔6〕</a>廖沫沙：时任北京市委统战部部长，曾在一九六一年八月三十一日在《北京晚报》发表文章《有鬼无害论》。</p>
+
+    <p class="zs"><a class="hl" href="#id7" id="id7a">〔7〕</a>尹达：原名刘火翟，著名历史学家、考古学家，时任考古研究所所长。人民日报在一九六六年三月二日转载《红旗》一九六六年第三期他的文章《必须把史学革命进行到底》，作者自注文章作于一九六四年八月。文章说：</p>
+
+    <p class="zs1">“史学长期掌握在剥削阶级手里。……长期积累下来的历史资料，经过剥削阶级史学家的加工、整理、选择、淘汰、删节和阐释，就必然注入其阶级偏见，字里行间无不充满强烈的阶级性。”</p>
+
+    <p class="zs1">“以马克思主义的唯物史观为指导，重新研究和改写全部历史，这是一个十分艰巨的任务。”</p>
+
+    <p class="zs1">“批判封建的、资产阶级的史学思想，进行史学革命，是一件关系重大的事情。史学革命是社会主义革命的一个组成部分，是在千百万人民群众中彻底清除封建的、资产阶级的思想影响的问题。封建的、资产阶级的史学思想是资本主义复辟的一种潜在力量，只有彻底进行史学革命，才能把它清除。”</p>
+
+    <p class="zs"><a class="hl" href="#id8" id="id8a">〔8〕</a>赵毅敏：原名刘焜，一九六一年苏共二十二大之后，中苏关系更加恶化。一九六二年意大利共产党召开党代会，为了配合苏共压制中国共产党，只邀请一位代表与会。赵毅敏受命作为中共代表参加意大利共产党的代表大会。会上，对于一些人煽起的反华合唱，赵毅敏孤身一人，据理抗争，捍卫了中国共产党的尊严和荣誉。毛泽东写下的“独有英雄驱虎豹，更无豪杰怕熊罴”诗句，其中的“独”有指他的意思。</p>
+
+    <p class="zs"><a class="hl" href="#id9" id="id9a">〔9〕</a>罗尔纲：著名历史学家，太平天国史研究专家，曾在一九六四年八月三日《人民日报》发表《忠王李秀成投降实为苦肉缓兵之计》，认为太平天国忠王李秀成是假投降曾国藩。李秀成被清军俘获后，五、六天时间内写了三万多字的“自述”，后人命名《忠王李秀成自述》，其中多称颂曾国藩、曾国荃兄弟，希望他们收降部众，“不计是王是将，不计何处之人，求停刀勿杀，赦其死罪，给票给资，放其他行”，屈节求生，向曾国藩表示愿意招降太平军余部，所写笔供中有“收复军部，而酬高厚”之语，被俘十七天后，曾国藩还是把他杀了。</p>
+
+    <p class="zs"><a class="hl" href="#id10" id="id10a">〔10〕</a>戚本禹在一九六五年十二月《红旗》杂志发表《为革命而研究历史》，批判了翦伯赞“超阶级”的“历史主义”观点，文章说：</p>
+
+    <p class="zs1">“没有超阶级的历史研究。以往一切统治阶级，都是根据他们自己阶级的利贫来解释历史的。他们的阶级利益同人民群众的利益是那样地不调和，同社会发展的要求是那样地不一致，因此，他们不可能认识历史的真象，而且要歪曲历史真象。趴在历史故纸堆上，踏着前代历史学家的脚印，亦步亦趋地去进行历史研究，势必要变成前代历史学家的俘虏，替他们去宣扬那些陈旧的、与时代精神相背离的观点。</p>
+
+    <p class="zs1">为革命而研究历史，就要站在无产阶级的立场上，用无产阶级的观点和方法去研究历史。有没有这样的立场、观点和方法，对我们的历史研究来说，是最重要的问题。”</p>
+
+    <p class="zs1">戚本禹在一九六三年《历史研究》第四期发表了戚本禹《评李秀成自述——并与罗尔纲、梁岵庐、吕集义等先生的商榷》一文，文章根据李秀成自述，提出，李秀成“形容自己是‘骑在虎背，不得下骑’”，“做了元帅以后的李秀成并没有保持他艰苦朴素的作风”。“忠王府是个未完的工程，几千个工人长期建筑了三年多，到苏州陷落时仍未竣工”，“李鸿章见了忠王府也不禁叹道：‘琼楼玉宇，曲栏洞房，真如神仙窟宅’”，“同一时代，同一种历史条件，却存在着两种截然不同的人物。一种人宁死不屈，慷慨赴义，另一种人投降变节，屈膝媚敌”，断定李秀成是真投降，“认贼作父”，《人民日报》在一九六四年七月二十四日做了摘要转载，毛泽东看了戚的文章后，专门调读了《忠王李秀成自述》影印本，写下批语：“白纸黑字，铁证如山；晚节不忠，不足为训。”</p>
+
+    <p class="zs"><a class="hl" href="#id11" id="id11a">〔11〕</a>姚文元：时任上海《解放日报》的编委，一九六五年十一月十日在上海《文汇报》发表《评新编历史剧〈海瑞罢官〉》，文章说，吴晗身为明史专家却不惜歪曲历史史实编造出一个完美形象的假海瑞，剧中的“退田”和“平冤狱”都不是史实，历史上的“退田”是为了缓和阶级矛盾保护了一些中小地主和富农，而剧中却说成是保护贫雇农，历史上退休内阁首辅徐阶的儿子徐瑛只被判处充军，也不是海瑞判的，而剧中却说海瑞“下了决心，把徐瑛处死”，身为共产党员不去提倡阶级斗争，却去鼓吹“清官救民”的封建论调，把剧中的贫雇农说成是只会恳求“大老爷与我等作主”，向海瑞叩头高呼“大老爷为民作主，江南贫民今后有好日子过了！”，很明显，吴晗是用自己的资产阶级观点改造了这个人物：</p>
+
+    <p class="zs1">“海瑞不过是地主阶级中一位较有远见的人物，他忠于封建制度，是封建皇朝的“忠臣”。他看到了当时农民阶级同地主阶级尖锐矛盾的某些现象，看到了当时本阶级内部某些腐化现象不利于皇朝统治，为了巩固封建统治、削弱农民反抗、缓和尖锐的阶级矛盾，为了维护封建皇朝的根本利益，他敢于向危害封建皇朝利益的某些集团或者某些措施进行尖锐的斗争。在若干事情上，他同中小地主和富农利益一致，抑制豪强地主，目的还是为了巩固整个地主阶级对农民的专政，维护皇朝的利益。这是海瑞的阶级本质，是海瑞全部行动的出发点和归宿。”</p>
+
+    <p class="zs1">“如果在新编的历史剧中，能够真正贯彻历史唯物主义的原则，用阶级观点，对这类史料进行科学分析，去伪存真，按照海瑞的本来面貌去塑造这个人物，使观众看到他的阶级本质是什么，用历史唯物论的观点去认识历史人物的阶级面貌，也不是一件没有意义的事。从破除许多歌颂海瑞的旧小说、旧戏的所散布的坏影响来说，是有积极意义的。可是吴晗同志却不但违背历史真实，原封不动地全部袭用了地主阶级歌颂海瑞的立场观点和材料；而且变本加厉，把他塑造成一个贫苦农民的“救星”、一个为农民利益而斗争的胜利者，要他作为今天人民的榜样，这就完全离开了正确的方向。”</p>
+
+    <p class="zs1">“现在回到文章开头提出的问题上来：《海瑞罢官》这张“大字报”的“现实意义”究竟是什么？对我们社会主义时代的中国人民究竟起什么作用？要回答这个问题，就要研究一下作品产生的背景。大家知道，一九六一年，正是我国因为连续三年自然灾害而遇到暂时的经济困难的时候，在帝国主义、各国反动派和现代修正主义一再发动反华高潮的情况下，牛鬼蛇神们刮过一阵“单干风”、“翻案风”。他们鼓吹什么“单干”的“优越性”，要求恢复个体经济，要求“退田”，就是要拆掉人民公社的台，恢复地主富农的罪恶统治。那些在旧社会中为劳动人民制造了无数冤狱的帝国主义者和地富反坏右，他们失掉了制造冤狱的权利，他们觉得被打倒是“冤枉”的，大肆叫嚣什么“平冤狱”，他们希望有那么一个代表他们利益的人物出来，同无产阶级专政对抗，为他们抱不平，为他们“翻案”，使他们再上台执政。“退田”、“平冤狱”就是当时资产阶级反对无产阶级专政和社会主义革命的斗争焦点。”</p>
+
+    <p class="zs1">“阶级斗争是客观存在，它必然要在意识形态领域里用这种或者那种形式反映出来，在这位或者那位作家的笔下反映出来，而不管这位作家是自觉的还是不自觉的，这是不以人们意志为转移的客观规律。《海瑞罢官》就是这种阶级斗争的一种形式的反映。如果吴晗同志不同意这种分析，那么请他明确回答：在一九六一年，人民从歪曲历史真实的《海瑞罢官》中到底能“学习”到一些什么东西呢？”</p>
+
+    <p class="zs1">《评新编历史剧〈海瑞罢官〉》曾经过毛泽东同志的亲笔润色，使其分析更深刻，更尖锐。</p>
+
+    <p class="zs"><a class="hl" href="#id12" id="id12a">〔12〕</a>江渭清：时任江苏省委第一书记。</p>
+
+    <p class="zs"><a class="hl" href="#id13" id="id13a">〔13〕</a>“虚君共和”，毛泽东认为中央高度集权不利于社会主义事业,并提出了“虚君共和”的构想.这一构想在文化大革命中的彻底贯彻,建构了中国计划体制中的中央高度集权,形成地方政府成为经济活动主体的体制,从而使中国的计划经济体制有别于苏联模式。</p>
+
+    <p class="zs"><a class="hl" href="#id14" id="id14a">〔14〕</a>托拉斯：二十世纪六十年代初期,主持一线工作的刘少奇建议试办托拉斯（垄断企业），一九六四年二月二十六日，煤炭工业部向中央提出在徐州成立华东煤炭工业公司，试办托拉斯，四月三十日得到中共中央批准，我国试办的第一个托拉斯企业正式成立。一九六四年六月，国家经委在反复调查研究的基础上，草拟了《关于试办工业、交通托拉斯的意见报告（草稿）》，获得批准，一九六四年和一九六五年共全国试办了十六个全国性和区域性托拉斯，但试办过程中遇到一些问题，主要有三大方面：全国或跨地区的托拉斯与地方的矛盾，托拉斯内部统一经营与的所属企业分级管理的矛盾，托拉斯同原有经济管理体制的矛盾。托拉斯是和毛泽东的“虚君共和”主张相对立的。</p>
+
+    <p class="zs"><a class="hl" href="#id15" id="id15a">〔15〕</a>二十三条：一九六四年底到一九六五年一月，中央政治局召集全国工作会议，在毛泽东的主持下讨论制定了《农村社会主义教育运动中目前提出的一些问题》（共“二十三条”），将“四清”的内容规定为清政治、清经济、清组织、清思想，强调这次运动的性质是解决“社会主义和资本主义的矛盾”，提出这次运动的重点是整“党内那些走资本主义道路的当权派。”</p>
+
+    <p class="zs"><a class="hl" href="#id16" id="id16a">〔16〕</a>南粮北调：北方的山西、河北、山东、河南、陕西、内蒙古、辽宁等省区及北京地区战略位置十分重要，但这些地区无一例外地都要调入粮食，江浙、两广、两湖一带南方自然条件好,粮食生产充足。国家长期实行南粮北调政策，进口的粮食也主要是接济这些地区。尽管如此，这里农民的口粮和收入仍低于全国平均水平。北方最严重的问题是灾害频发，其中尤以旱灾最为严重。从一九六八年开始，国务院全面部署华北地区打机井的工作，并以此作为扭转南粮北调的一项重大战略措施。以后几年，每年以三十多万眼机井的速度持续建设。这是在华北平原上一项宏大的农田基本建设，国家在计划中给予资金补助，并提供设备材料，受到广大农民的热烈拥护。文革中，华北大地上打了近二百万眼机电井，一亿多亩耕地提取地下水灌溉，大大改变了十年九旱的农业生产条件，加上化肥工业的发展，使粮食产量大幅度增长，扭转了中国历史上长期的南粮北调局面。</p>
+
+    <p class="zs1">北煤南调：我国煤炭资源多集中在山西、陕西及内蒙古西部，而用煤“大户”则集中在华东、华南地区。从而形成了北煤南调的格局。</p>
+
+    <p class="zs"><a class="hl" href="#id17" id="id17a">〔17〕</a>陈正人：时任第八机械工业部（原农业机械部，一九六五年一月改称第八机械工业部）部长。</p>
+
+    <p class="zs"><a class="hl" href="#id18" id="id18a">〔18〕</a>俞平伯：著名红学家，与胡适并称“新红学派”的创始人，解放前二十年代即已成名，一九二三年俞平伯出版《红楼梦辩》，考证出《红楼梦》原书只有前八十回是曹雪芹所作，后四十回是高鹗续作，但他对红楼梦的研究是资产阶级唯心论的，毛泽东对《红楼梦》不仅喜欢，而且颇有研究，也堪称是一位红学家，对于《红楼梦》，毛泽东用阶级分析的方法进行评判，俞平伯用实用主义哲学进行研究，毛泽东认为《红楼梦》描写了很精细的历史、有丰富的社会史料，俞平伯认为《红楼梦》不过是个人身世性格的反映；毛泽东认为《红楼梦》是古典现实主义小说，俞平伯认为《红楼梦》的性质与中国式的闲书相似；毛泽东认为《红楼梦》是中国古典小说中写得最好的，俞平伯认为《红楼梦》在世界文学中的位置是不高的。</p>
+  </div>
+
+            </article>
+        </div>
+
+    </div>
+
+    <div class="settings-overlay" id="settingsOverlay" data-id="settingsOverlay" aria-hidden="true"></div>
+    <div class="settings-modal" id="settingsModal" data-id="settingsModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="settingsModalTitle">
+        <div class="settings-header">
+            <h2 class="settings-header-title" id="settingsModalTitle">
+                <i class="fas fa-cog" aria-hidden="true"></i>
+                <span data-i18n="reader.settings">Settings</span>
+            </h2>
+            <button class="settings-close-btn" id="settingsCloseBtn" type="button" aria-label="Close settings" data-i18n-aria-label="reader.closeSettings">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="font">
+                <i class="fas fa-font"></i>
+                <span data-i18n="settings.appearance">Appearance</span>
+            </button>
+            <button class="settings-tab" data-tab="reading">
+                <i class="fas fa-book-reader"></i>
+                <span data-i18n="settings.reading">Reading</span>
+            </button>
+        </div>
+        <div class="settings-content">
+            <div class="settings-tab-panel active" id="font-tab">
+                <div class="settings-group">
+                    <label class="settings-label" data-i18n="settings.fontFamily">Font family</label>
+        <div class="font-family-selector">
+            <select id="fontFamilySelect">
+                <option value="ebook-default" selected data-i18n="settings.bookDefault">Book default</option>
+                <option value="system-ui, -apple-system, sans-serif" data-i18n="settings.systemDefault">System default</option>
+                <option value="custom" data-i18n="settings.customByInput">Custom by input</option>
+            </select>
+        </div>
+        <div class="custom-font-input" id="customFontInput" style="display: none;">
+            <input type="text" id="customFontFamily" placeholder="Input font name here" data-i18n-placeholder="settings.customFontPlaceholder">
+            <small data-i18n="settings.customFontTip">Tip: Font family applies globally. Ensure it’s installed in the system.</small>
+            <button class="css-btn primary" id="applyFontSettings">
+                <i class="fas fa-check"></i> <span data-i18n="settings.apply">Apply</span>
+            </button>
+        </div>
+                </div>
+                
+                <div class="settings-group">
+                    <label class="settings-label" for="fontSizeSlider" data-i18n="settings.fontSize">Font size</label>
+                    <div class="font-size-control">
+                        <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
+                        <div class="font-size-scale">
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark"></span>
+                            <span class="scale-mark major"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <div class="settings-label-row">
+                        <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
+                        
+                    </div>
+                    <div class="page-width-control">
+                        <input type="range" id="pageWidthSlider" min="1" max="4" value="3" step="1" aria-label="Page width" data-i18n-aria-label="settings.pageWidth">
+                        <div class="page-width-scale" aria-hidden="true">
+                            
+                            <span data-i18n="settings.pageWidthNarrow">Narrow</span>
+                            <span data-i18n="settings.pageWidthComfortable">Comfortable</span>
+                            <span data-i18n="settings.pageWidthWide">Wide</span>
+                            <span data-i18n="settings.pageWidthExtraWide">Extra wide</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group settings-group-custom-css">
+                    <div class="settings-section-heading">
+                        <span class="settings-section-title" data-i18n="settings.customStyles">Custom styles</span>
+                        <span class="settings-section-optional" data-i18n="settings.optional">Optional</span>
+                    </div>
+                    <p class="settings-section-description" data-i18n="settings.customStylesDescription">Use CSS to fine-tune this book’s typography and layout.</p>
+                    <div class="css-editor">
+                        <textarea id="customCssInput" placeholder="Please input your CSS code... For example: #eb-content-container{background: inherit; box-shadow:inherit;} #eb-content{margin: 50px; width: auto} #eb-content p {margin-bottom: 0.8rem; line-height: 1.7;}" data-i18n-placeholder="settings.customCssPlaceholder"></textarea>
+                        <div class="css-controls">
+                            <button class="css-btn primary" id="saveCssBtn">
+                                <i class="fas fa-save"></i> <span data-i18n="settings.save">Save</span>
+                            </button>
+                            <button class="css-btn primary" id="saveAsDefaultBtn">
+                                <i class="fas fa-star"></i> <span data-i18n="settings.saveAsDefault">Save as default</span>
+                            </button>
+                            <button class="css-btn secondary" id="resetCssBtn">
+                                <i class="fas fa-undo"></i> <span data-i18n="settings.reset">Reset</span>
+                            </button>
+                            <button class="css-btn secondary" id="loadDefaultBtn">
+                                <i class="fas fa-download"></i> <span data-i18n="settings.loadDefault">Load default</span>
+                            </button>
+                            <button class="css-btn secondary" id="previewCssBtn">
+                                <i class="fas fa-eye"></i> <span data-i18n="settings.preview">Preview</span>
+                            </button>
+                        </div>
+                        <div class="css-info">
+                            <p><i class="fas fa-info-circle"></i> <span data-i18n="settings.defaultStyleTip">Tip: The default style will be applied to all books unless a custom style is set for specific books.</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-tab-panel" id="reading-tab">
+                <div class="settings-group">
+                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
+                    </label>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="paginationModeToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.paginationMode">Use page-turning mode</span>
+                    </label>
+                    <div class="settings-option-with-tip">
+                        <label class="settings-switch">
+                            <input type="checkbox" id="clickPageToggle" disabled aria-disabled="true">
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="reader.clickToTurn">Click to turn page</span>
+                        </label>
+                        <button type="button" class="settings-info-tip" data-settings-tip data-tip="In page-turning mode, click or tap the left and right sides to turn pages. On mobile, tap the center to show or hide the reading controls. Selecting text, dragging, and long-pressing will not trigger these actions." data-i18n-data-tip="settings.clickPageHelp" aria-label="In page-turning mode, click or tap the left and right sides to turn pages. On mobile, tap the center to show or hide the reading controls. Selecting text, dragging, and long-pressing will not trigger these actions." data-i18n-aria-label="settings.clickPageHelp">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <label class="settings-switch pagination-incompatible-setting">
+                        <input type="checkbox" id="continuousScrollToggle">
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" tabindex="0" data-settings-tip data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip" aria-label="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-aria-label="settings.continuousScrollTip">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </span>
+                    </label>
+                </div>
+                <fieldset class="settings-group desktop-layout-settings">
+                    <legend class="settings-section-title" data-i18n="settings.desktopLayout">Desktop layout</legend>
+                    <div class="desktop-layout-options">
+                        <label class="settings-switch desktop-layout-option desktop-setting-only">
+                            <input type="checkbox" id="desktopChapterSidebarToggle">
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar</span>
+                        </label>
+                        <div class="desktop-layout-option settings-option-with-tip desktop-setting-only">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="autoHideDesktopChapterSidebarToggle" disabled aria-disabled="true">
+                                <span class="switch-slider"></span>
+                                <span class="switch-text" data-i18n="settings.autoHideDesktopChapterSidebar">Auto-hide chapter sidebar</span>
+                            </label>
+                            <button type="button" class="settings-info-tip" data-settings-tip data-tip="Move the pointer to the left edge, or use Tab, to show the chapter sidebar." data-i18n-data-tip="settings.autoHideDesktopChapterSidebarHelp" aria-label="Move the pointer to the left edge, or use Tab, to show the chapter sidebar." data-i18n-aria-label="settings.autoHideDesktopChapterSidebarHelp">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="desktop-layout-option settings-option-with-tip">
+                            <label class="settings-switch">
+                                <input type="checkbox" id="autoHideDesktopToolbarToggle">
+                                <span class="switch-slider"></span>
+                                <span class="switch-text" data-i18n="settings.autoHideDesktopToolbar">Auto-hide reading toolbar</span>
+                            </label>
+                            <button type="button" class="settings-info-tip" data-settings-tip data-tip="Move the pointer to the right edge, or use Tab, to show the toolbar." data-i18n-data-tip="settings.autoHideDesktopToolbarHelp" aria-label="Move the pointer to the right edge, or use Tab, to show the toolbar." data-i18n-aria-label="settings.autoHideDesktopToolbarHelp">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="settings-group keyboard-navigation-settings">
+                    <legend class="settings-section-title" data-i18n="settings.keyboardNavigation">Keyboard navigation</legend>
+                    <div class="keyboard-navigation-options">
+                        <label class="settings-switch keyboard-navigation-option">
+                            <input type="checkbox" id="arrowKeyNavigationToggle" checked>
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="settings.arrowKeyNavigation">Use Left and Right Arrow keys to navigate</span>
+                        </label>
+                        <label class="settings-switch keyboard-navigation-option">
+                            <input type="checkbox" id="spaceKeyNavigationToggle" checked>
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="settings.spaceKeyNavigation">Use Space for the next page or chapter</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <fieldset class="settings-group navigation-behavior-settings pagination-incompatible-setting" aria-describedby="navigationBehaviorHelp">
+                    <legend class="settings-section-title" data-i18n="settings.navigationBehavior">Navigation bar behavior</legend>
+                    <p class="settings-section-description" id="navigationBehaviorHelp" data-i18n="settings.navigationBehaviorHelp">Choose when the top navigation stays visible while you read.</p>
+                    <div class="navigation-behavior-options">
+                        <label class="navigation-behavior-option"><input type="radio" name="navigationBehavior" value="normal" checked><span data-i18n="settings.navigationBehavior.normal">Normal scroll</span></label>
+                        <label class="navigation-behavior-option"><input type="radio" name="navigationBehavior" value="sticky"><span data-i18n="settings.navigationBehavior.sticky">Always sticky</span></label>
+                        <label class="navigation-behavior-option"><input type="radio" name="navigationBehavior" value="auto-hide"><span data-i18n="settings.navigationBehavior.autoHide">Hide down, show up</span></label>
+                    </div>
+                </fieldset>
+            </div>
+        </div>
+    </div>
+
+    <div class="reading-controls" data-id="reading-controls">
+        <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="reader.top">
+            <i class="fas fa-arrow-up"></i>
+            <span class="control-name" data-i18n="reader.top">Top</span>
+        </button>
+    </div>
+
+    <!-- 移动端控件 -->
+    <div class="mobile-controls" data-id="mobile-controls">
+        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" title="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" data-i18n-title="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
+            <i class="fas fa-list"></i>
+            <span data-i18n="reader.thisChapterContents">This chapter</span>
+        </button>
+        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
+            <i class="fas fa-book"></i>
+            <span data-i18n="reader.bookChapters">Chapters</span>
+        </button>
+        
+        
+        
+        <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_332.html" aria-label="Previous chapter" title="Previous chapter" data-i18n-aria-label="reader.previous" data-i18n-title="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>
+        <a href="/" aria-label="Home" title="Home" data-i18n-aria-label="reader.home" data-i18n-title="reader.home">
+            <div class="control-btn" aria-label="Home" data-i18n-aria-label="reader.home">
+                <i class="fas fa-home"></i>
+                <span data-i18n="reader.home">Home</span>
+            </div>
+        </a>
+        <a href="/book/6QrgU-nfQSm_M6lmKAuBRg/chapter_334.html" aria-label="Next chapter" title="Next chapter" data-i18n-aria-label="reader.next" data-i18n-title="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>
+        <button class="control-btn" id="mobilePageJumpBtn" type="button" aria-label="Jump" title="Jump" data-i18n-aria-label="reader.jump" data-i18n-title="reader.jump">
+            <i class="fas fa-arrow-right-to-bracket" aria-hidden="true"></i>
+            <span data-i18n="reader.jump">Jump</span>
+        </button>
+        <button class="control-btn" id="mobileSettingsBtn" type="button" aria-label="Settings" title="Settings" data-i18n-aria-label="reader.settings" data-i18n-title="reader.settings" aria-controls="settingsModal" aria-expanded="false">
+            <i class="fas fa-cog"></i>
+            <span data-i18n="reader.settings">Settings</span>
+        </button>
+        <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" title="Top" data-i18n-aria-label="reader.top" data-i18n-title="reader.top">
+            <i class="fas fa-arrow-up"></i>
+            <span data-i18n="reader.top">Top</span>
+        </button>
+    </div>
+
+    <!-- 书架弹窗 -->
+    <div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
+            <div class="bookshelf-header">
+                <div class="bookshelf-header-left">
+                    <button class="bookshelf-action-btn" id="addShelfGroupBtn">
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
+                    </button>
+                    
+                    <button class="bookshelf-action-btn" id="exportShelfBtn">
+                        <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="importShelfBtn">
+                        <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+                    </button>
+                    <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+                </div>
+                <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+                <div class="bookshelf-header-right">
+                    <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="bookshelf-body" id="bookshelfBody">
+            </div>
+            <div class="bookshelf-footer" id="bookshelfFooter">
+                <span id="bookshelfStats"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分组弹窗 -->
+    <div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="bookshelf-content" tabindex="-1">
+            <div class="bookshelf-header">
+                <div class="bookshelf-header-left">
+                    <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
+                        <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                        <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
+                    </button>
+                    <button class="bookshelf-action-btn" id="renameGroupBtn">
+                        <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
+                    </button>
+                    <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
+                        <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
+                    </button>
+                </div>
+                <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
+                <div class="bookshelf-header-right">
+                    <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
+                        <i class="fas fa-home"></i>
+                    </button>
+                    <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
+                <div class="loading-spinner"></div>
+            </div>
+            <div class="bookshelf-body" id="groupBody">
+            </div>
+            <div class="bookshelf-footer" id="groupFooter">
+                <span id="groupStats"></span>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="eb-footer" data-id="eb-footer" data-version-check data-current-version="2.9.11" data-release-api="">
+    <p><span data-i18n="footer.product">EPUB Library</span> &copy; 2026 | <span data-i18n="footer.poweredBy">Powered by</span> <a href="https://github.com/dfface/epub-browser" target="_blank" rel="noopener noreferrer">epub-browser</a><!-- i18n-allow-literal: product name --> <span data-i18n="footer.poweredBySuffix">&middot;</span> <span class="eb-footer-version" aria-label="Version 2.9.11" data-i18n-aria-label="common.version" data-i18n-params='{"version":"2.9.11"}'>v2.9.11</span><span class="eb-footer-update" data-version-update hidden><span aria-hidden="true"> &middot; </span><a target="_blank" rel="noopener noreferrer"></a></span></p>
+</footer>
+
+    
+    <script src="/assets/immutable/notification.ea0bd58fa985.js" defer></script>
+    
+    <script src="/assets/immutable/locale-nav.7fe7f70a674b.js" defer></script>
+    <script src="/assets/immutable/theme.abbe7b5cddd3.js" defer></script>
+    <script src="/assets/immutable/dialog.a3f376ac6a44.js" defer></script>
+    <script src="/assets/immutable/version-check.47351de03846.js" defer></script>
+    <script src="/assets/immutable/vendor/glightbox/glightbox.min.c67c59cdf980.js" defer></script>
+    <script src="/assets/immutable/lightbox-adapter.9c8cb9207923.js" defer></script>
+    <script src="/assets/immutable/vendor/web-highlighter/web-highlighter.min.7360ce01d835.js" defer></script>
+    <script src="/assets/immutable/chapter-window.8d2c13e8f216.js" defer></script>
+    <script src="/assets/immutable/viewport-anchor.021abaa5aa16.js" defer></script>
+    <script src="/assets/immutable/continuous-buffer.27eaf6de1887.js" defer></script>
+    <script src="/assets/immutable/reading-progress.653eacfc5c3b.js" defer></script>
+    <script src="/assets/immutable/reader-layout.a54b3a6dac1a.js" defer></script>
+    
+    <script src="/assets/immutable/chapter.c1a1b1d2c300.js" defer></script>
+    <script src="/assets/immutable/annotation-position.df7b410bbafb.js" defer></script>
+    <script src="/assets/immutable/annotation.d01a4fde8a5b.js" defer></script>
+    <script src="/assets/immutable/annotation-hub.4b8e12727c14.js" defer></script>
+    <script src="/assets/immutable/vendor/sortablejs/sortable.min.6d0a831fc19b.js" defer></script>
+    
+    <script src="/assets/immutable/vendor/highlight/highlight.min.c4a399dd6f48.js" defer></script>
+    <script src="/assets/immutable/bookshelf.310bc1d75c2e.js" defer></script>
+    
+    
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.initScriptChapter) window.initScriptChapter();
+    });
+    </script>
+</body>
+</html>

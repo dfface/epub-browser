@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#244548">
+<meta name="description" content="EPUB Library - A web-based EPUB reader" data-i18n-content="library.description">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="EPUB Browser">
+<title data-i18n="library.pageTitle">EPUB Library</title>
+<script src="/assets/immutable/i18n.2a5c1f7052f1.js"></script>
+<script>window.EpubBrowserBasePath="/";window.EpubBrowserMode="ssg"</script><script>window.EpubBrowserI18n.init();</script>
+<noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
+<link rel="stylesheet" href="/assets/immutable/vendor/fontawesome/css/all.min.59cdcd0cf392.css">
+<link rel="icon" type="image/png" href="/assets/immutable/favicon.dd042ee39766.png">
+<link rel="apple-touch-icon" href="/assets/immutable/icon-192.15435b416555.png">
+<link rel="stylesheet" href="/assets/immutable/theme.0fee49e270c4.css">
+<link rel="stylesheet" href="/assets/immutable/notification.3af6bb473911.css">
+<link rel="stylesheet" href="/assets/immutable/dialog.11578e5f1426.css">
+<link rel="stylesheet" href="/assets/immutable/library.a3c0d63e86ec.css">
+<link rel="stylesheet" href="/assets/immutable/breadcrumb.10ebdb945eb6.css">
+<link rel="stylesheet" href="/assets/immutable/loading.4191d9fecbbb.css">
+<link rel="stylesheet" href="/assets/immutable/bookshelf.9fd53d54c1ae.css">
+    
+
+
+
+<script>
+// 立即应用主题，避免闪现
+var theme = "light";
+
+try {
+  // 优先从 window 缓存读取
+  var storedTheme = null;
+  if (window.epubBrowserCache && window.epubBrowserCache.theme) {
+    storedTheme = window.epubBrowserCache.theme;
+  } else {
+    storedTheme = localStorage.getItem("theme");
+    if (storedTheme) {
+      if (!window.epubBrowserCache) {
+        window.epubBrowserCache = {};
+      }
+      window.epubBrowserCache.theme = storedTheme;
+    }
+  }
+
+  if (storedTheme) {
+    theme = storedTheme;
+  }
+} catch (e) {
+  // localStorage 不可用时保持默认主题
+}
+
+// 使用 html 元素添加类名
+var htmlElement = document.documentElement;
+htmlElement.classList.add(theme + "-mode");
+</script>
+
+<script>
+(function () {
+  var ua = navigator.userAgent.toLowerCase();
+  if (ua.indexOf('kindle') === -1) return;
+  if (ua.indexOf('silk') !== -1) return;
+  if (location.search.indexOf('full=1') !== -1) return;
+  location.replace('kindle-library.html');
+})();
+</script>
+</head>
+<body>
+
+    <header class="app-header">
+    <nav class="app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
+        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/immutable/logo-mark-color.ef9a3679a944.png" width="32" height="32" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
+        <div class="app-nav-links">
+            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+            
+            
+            
+            <button type="button" class="app-nav-link" id="pwa-install-btn" style="display: none;">
+                <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="library.install">Install</span>
+            </button>
+        </div>
+        <div class="app-nav-actions">
+            <div class="library-language app-nav-locale">
+    <button type="button" class="app-nav-action app-nav-locale-toggle" id="localeToggle" aria-haspopup="menu" aria-expanded="false" aria-label="Language" data-i18n-aria-label="common.language"><i class="fas fa-globe" aria-hidden="true"></i><span class="sr-only" id="localeCurrentLabel" data-i18n="locale.name.en">English</span></button>
+    <select class="sr-only" id="localeSelect" tabindex="-1" aria-hidden="true"><option value="en" data-i18n="locale.name.en">English</option><option value="zh-CN" data-i18n="locale.name.zh-CN">简体中文</option><option value="zh-TW" data-i18n="locale.name.zh-TW">繁體中文</option><option value="ko" data-i18n="locale.name.ko">한국어</option><option value="ja" data-i18n="locale.name.ja">日本語</option><option value="es" data-i18n="locale.name.es">Español</option><option value="de" data-i18n="locale.name.de">Deutsch</option><option value="fr" data-i18n="locale.name.fr">Français</option><option value="ru" data-i18n="locale.name.ru">Русский</option><option value="it" data-i18n="locale.name.it">Italiano</option><option value="pt-BR" data-i18n="locale.name.pt-BR">Português (Brasil)</option><option value="ar" data-i18n="locale.name.ar">العربية</option><option value="id" data-i18n="locale.name.id">Bahasa Indonesia</option><option value="hi" data-i18n="locale.name.hi">हिन्दी</option><option value="vi" data-i18n="locale.name.vi">Tiếng Việt</option><option value="th" data-i18n="locale.name.th">ไทย</option><option value="ms" data-i18n="locale.name.ms">Bahasa Melayu</option></select>
+</div>
+            <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
+            
+        </div>
+    </nav>
+    </header>
+    <div class="container">
+    <section class="library-overview" aria-labelledby="libraryHeading">
+        <div>
+            <p class="library-overview-kicker" data-i18n="common.brand">EPUB Browser</p>
+            <h1 id="libraryHeading" data-i18n="library.title">Library</h1>
+        </div>
+        <div class="library-summary" aria-label="Library information" data-i18n-aria-label="library.information">
+            <span class="library-summary-item"><i class="fas fa-book" aria-hidden="true"></i><span id="libraryBookCount" data-i18n="library.bookCount" data-i18n-params='{"count": 4}'>4 book(s)</span></span>
+            <span class="library-summary-item"><i class="fas fa-tags" aria-hidden="true"></i><span id="libraryTagCount" data-i18n="library.tagCount" data-i18n-params='{"count": 10}'>10 tag(s)</span></span>
+        </div>
+    </section>
+
+
+    <div class="controls" data-id="controls">
+        <div class="search-container">
+            <input type="text" class="search-box" placeholder="Search by book title, author, or tag..." data-i18n-placeholder="library.searchPlaceholder">
+            <i class="fas fa-search search-icon"></i>
+        </div>
+        <br/>
+        <div class="tag-cloud">
+            <div class="tag-cloud-item active" data-id="All" data-i18n="library.all">All</div>
+            <div class="tag-cloud-item" data-id="NoTag" data-i18n="library.noTag">No tag</div>
+<div class="tag-cloud-item" data-id="1865">1865</div><div class="tag-cloud-item" data-id="Alice">Alice</div><div class="tag-cloud-item" data-id="Carroll">Carroll</div><div class="tag-cloud-item" data-id="Wonderland">Wonderland</div><div class="tag-cloud-item" data-id="children&#x27;s">children's</div><div class="tag-cloud-item" data-id="v.1.2">v.1.2</div><div class="tag-cloud-item" data-id="人物">人物</div><div class="tag-cloud-item" data-id="历史">历史</div><div class="tag-cloud-item" data-id="小说">小说</div><div class="tag-cloud-item" data-id="经济、管理与人生">经济、管理与人生</div>
+        </div>
+        <button type="button" class="tag-cloud-toggle" id="tagCloudToggle" hidden aria-expanded="false" data-i18n="library.showMoreTags">Show more</button>
+    </div>
+    <div class="book-grid" data-id="book-grid">
+        <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading" role="status" aria-label="Loading library" data-i18n-aria-label="library.loading">
+            <div class="loading-spinner"></div>
+        </div>
+
+    </div>
+    <div class="reading-controls" data-id="reading-controls">
+    <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="library.top">
+        <i class="fas fa-arrow-up"></i>
+        <span class="control-name" data-i18n="library.top">Top</span>
+    </button>
+    </div>
+</div>
+
+<!-- 书架弹窗 -->
+<div class="bookshelf-modal" id="bookshelfModal" role="dialog" aria-modal="true" aria-labelledby="bookshelfModalTitle">
+    <div class="bookshelf-content" tabindex="-1">
+    <div class="bookshelf-header">
+        <div class="bookshelf-header-left">
+            <button class="bookshelf-action-btn" id="addShelfGroupBtn">
+                <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+            </button>
+            <button class="bookshelf-action-btn" id="addShelfBookBtn">
+                <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
+            </button>
+
+            <button class="bookshelf-action-btn" id="exportShelfBtn">
+                <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
+            </button>
+            <button class="bookshelf-action-btn" id="importShelfBtn">
+                <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
+            </button>
+            <input type="file" id="importShelfFile" accept=".json" style="display: none;">
+        </div>
+        <h2 class="bookshelf-title" id="bookshelfModalTitle"><i class="fas fa-home" aria-hidden="true"></i> <span data-i18n="bookshelf.title">Bookshelf</span></h2>
+        <div class="bookshelf-header-right">
+            <button class="bookshelf-close-btn" id="bookshelfCloseBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="bookshelf-loading" id="bookshelfLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
+        <div class="loading-spinner"></div>
+    </div>
+    <div class="bookshelf-body" id="bookshelfBody">
+    </div>
+    <div class="bookshelf-footer" id="bookshelfFooter">
+        <span id="bookshelfStats"></span>
+    </div>
+    </div>
+</div>
+
+<!-- 分组弹窗 -->
+<div class="bookshelf-modal" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+    <div class="bookshelf-content" tabindex="-1">
+    <div class="bookshelf-header">
+        <div class="bookshelf-header-left">
+            <button class="bookshelf-action-btn" id="addGroupSubGroupBtn">
+                <i class="fas fa-folder-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addGroup">Add Group</span>
+            </button>
+            <button class="bookshelf-action-btn" id="addGroupBookBtn">
+                <i class="fas fa-plus" aria-hidden="true"></i> <span data-i18n="bookshelf.addBook">Add Book</span>
+            </button>
+            <button class="bookshelf-action-btn" id="renameGroupBtn">
+                <i class="fas fa-edit" aria-hidden="true"></i> <span data-i18n="bookshelf.rename">Rename</span>
+            </button>
+            <button class="bookshelf-action-btn bookshelf-delete-btn" id="deleteGroupBtn">
+                <i class="fas fa-trash" aria-hidden="true"></i> <span data-i18n="bookshelf.deleteGroup">Delete Group</span>
+            </button>
+        </div>
+        <h2 class="bookshelf-title" id="groupModalTitle" data-i18n="bookshelf.group">Group</h2>
+        <div class="bookshelf-header-right">
+            <button class="bookshelf-close-btn" id="groupCloseBtn" aria-label="Back to bookshelf" data-i18n-aria-label="bookshelf.home">
+                <i class="fas fa-home"></i>
+            </button>
+            <button class="bookshelf-close-btn" id="groupCloseAllBtn" aria-label="Close" data-i18n-aria-label="bookshelf.close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <div class="bookshelf-loading" id="groupLoading" role="status" aria-label="Loading bookshelf" data-i18n-aria-label="bookshelf.loading">
+        <div class="loading-spinner"></div>
+    </div>
+    <div class="bookshelf-body" id="groupBody">
+    </div>
+    <div class="bookshelf-footer" id="groupFooter">
+        <span id="groupStats"></span>
+    </div>
+    </div>
+</div>
+
+<footer class="eb-footer" data-id="eb-footer" data-version-check data-current-version="2.9.11" data-release-api="">
+    <p><span data-i18n="footer.product">EPUB Library</span> &copy; 2026 | <span data-i18n="footer.poweredBy">Powered by</span> <a href="https://github.com/dfface/epub-browser" target="_blank" rel="noopener noreferrer">epub-browser</a><!-- i18n-allow-literal: product name --> <span data-i18n="footer.poweredBySuffix">&middot;</span> <span class="eb-footer-version" aria-label="Version 2.9.11" data-i18n-aria-label="common.version" data-i18n-params='{"version":"2.9.11"}'>v2.9.11</span><span class="eb-footer-update" data-version-update hidden><span aria-hidden="true"> &middot; </span><a target="_blank" rel="noopener noreferrer"></a></span></p>
+</footer>
+
+    <script src="/assets/immutable/cache-boundary.41fc48a34cbe.js" defer></script>
+    <script src="/assets/immutable/notification.ea0bd58fa985.js" defer></script>
+
+    <script src="/assets/immutable/theme.abbe7b5cddd3.js" defer></script>
+    <script src="/assets/immutable/dialog.a3f376ac6a44.js" defer></script>
+    <script src="/assets/immutable/version-check.47351de03846.js" defer></script>
+    <script>window.EpubBrowserLibraryFeatureAssets={"pinyin":"/assets/immutable/vendor/pinyin-pro/pinyin-pro.min.2517533c0eb3.js","sortable":"/assets/immutable/vendor/sortablejs/sortable.min.6d0a831fc19b.js","bookshelf":"/assets/immutable/bookshelf.310bc1d75c2e.js","annotationHubCss":"/assets/immutable/annotation-hub.bed06f149212.css","annotation":"/assets/immutable/annotation.d01a4fde8a5b.js","annotationHub":"/assets/immutable/annotation-hub.4b8e12727c14.js"};</script>
+    <script src="/assets/immutable/library-feature-loader.aa87c713ad01.js" defer></script>
+    <script src="/assets/immutable/library.e40d97aacfd3.js" defer></script>
+
+
+
+    <script src="/assets/immutable/locale-nav.7fe7f70a674b.js" defer></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        function startLibraryClients() {
+            
+            if (window.initScriptLibrary) window.initScriptLibrary();
+            
+        }
+        if (window.EpubBrowserMode === 'server') {
+            if (window.EpubBrowserCacheBoundary) {
+                window.EpubBrowserCacheBoundary.start(startLibraryClients);
+            }
+        } else {
+            startLibraryClients();
+        }
+    });
+    </script>
+    </body>
+</html>
