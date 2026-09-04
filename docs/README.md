@@ -22,6 +22,9 @@ documentation. 本页集中列出用户指南、版本说明和维护者文档�
 
 ## Releases / 版本说明
 
+- [v2.9.11](releases/v2.9.11.md) — Library "Continue reading" rail,
+  Server-only administrator General settings, and 17-language localization
+  for the new interface.
 - [v2.9.10](releases/v2.9.10.md) — Kindle minimal-reader chapter page gains
   tap-to-turn: tap the left/right third of the reading area to advance one
   viewport-aligned screen, with a `Tap to turn` toggle (on by default,
