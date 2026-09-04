@@ -130,6 +130,7 @@ SERVER_ACCOUNT_PANEL = '''
     <p class="account-admin-intro" data-i18n="admin.description">Manage users and access to restricted books.</p>
     <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
         <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
+        <button type="button" class="admin-section-tab" id="adminSectionGeneralTab" role="tab" aria-selected="false" aria-controls="adminGeneralSection" data-admin-section="general" data-i18n="admin.general">General</button>
         <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
         <button type="button" class="admin-section-tab" id="adminSectionOidcTab" role="tab" aria-selected="false" aria-controls="adminOidcSection" data-admin-section="oidc" data-i18n="admin.oidc.title">OIDC login</button>
         <button type="button" class="admin-section-tab" id="adminSectionDictionariesTab" role="tab" aria-selected="false" aria-controls="adminDictionariesSection" data-admin-section="dictionaries" data-i18n="admin.dictionaries">Dictionaries</button>
@@ -155,6 +156,27 @@ SERVER_ACCOUNT_PANEL = '''
             <p data-i18n="admin.systemLimitsDescription">Dictionary imports, AI execution, and bulk book updates have no built-in capacity, count, or concurrency limit. Actual capacity depends on this server and your AI provider.</p>
         </section>
         <p id="adminOverviewLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
+    </section>
+    <section class="account-admin-section account-card-wide admin-general-section" id="adminGeneralSection" role="tabpanel" aria-labelledby="adminSectionGeneralTab" data-admin-panel="general" hidden>
+        <h4 data-i18n="admin.general">General</h4>
+        <p class="account-section-copy" data-i18n="admin.generalDescription">Server-wide reading and display preferences.</p>
+        <form class="account-form admin-general-form" id="adminGeneralForm" novalidate>
+            <div class="admin-setting-list">
+                <div class="admin-setting-row">
+                    <div class="admin-setting-main">
+                        <label class="admin-setting-label" for="adminGeneralRecentReadingLimit">
+                            <span data-i18n="admin.general.recentReadingLimit">Books in "Continue reading"</span>
+                        </label>
+                        <input class="admin-general-input" type="number" name="recent_reading_limit" id="adminGeneralRecentReadingLimit" min="1" step="1" inputmode="numeric" required aria-describedby="adminGeneralHelp adminGeneralError">
+                    </div>
+                    <p class="admin-setting-help" id="adminGeneralHelp" data-i18n="admin.general.recentReadingLimitHelp">How many recently read books appear in the home "Continue reading" rail.</p>
+                    <p class="admin-setting-error" id="adminGeneralError" role="alert" hidden></p>
+                </div>
+            </div>
+            <div class="admin-form-actions">
+                <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminGeneralSubmit" data-i18n="admin.general.save">Save settings</button>
+            </div>
+        </form>
     </section>
     <section class="account-admin-section account-card-wide account-users-section" id="adminUsersSection" role="tabpanel" aria-labelledby="adminSectionUsersTab" data-admin-panel="users" hidden>
         <h4 id="adminUsersTitle" data-i18n="admin.users">Users</h4>

@@ -14,6 +14,7 @@
     var books = [];
     var aiSettings = null;
     var oidcSettings = null;
+    var generalSettings = null;
     var oidcSaveRequest = null;
     var aiTags = [];
     var aiTagSearchQuery = '';
@@ -966,7 +967,7 @@
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
+      return ['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books', 'general'].indexOf(section) !== -1
         ? section : '';
     }
 
@@ -974,7 +975,7 @@
 
     function setActiveAdminSection(section) {
       var activeTab = null;
-      if (['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) === -1) return;
+      if (['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books', 'general'].indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
@@ -2084,6 +2085,47 @@
           aiSettings.enabled && aiSettings.api_key_configured ? 'is-ready' : 'is-muted'
         );
       }
+    }
+
+    function renderGeneralSettings() {
+      var form = element('adminGeneralForm');
+      if (!form || !generalSettings) return;
+      var fields = form.elements;
+      fields.recent_reading_limit.value = String(generalSettings.recent_reading_limit || 10);
+      var errorEl = element('adminGeneralError');
+      if (errorEl) errorEl.hidden = true;
+    }
+
+    function saveGeneralSettings() {
+      var form = element('adminGeneralForm');
+      if (!form) return Promise.resolve(null);
+      var fields = form.elements;
+      var errorEl = element('adminGeneralError');
+      if (errorEl) errorEl.hidden = true;
+      var limit = parseInt(fields.recent_reading_limit.value, 10);
+      if (isNaN(limit) || limit < 1) {
+        if (errorEl) {
+          errorEl.textContent = t('admin.general.invalidLimit');
+          errorEl.hidden = false;
+        }
+        return Promise.resolve(null);
+      }
+      return authenticatedFetch('/api/admin/general-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recent_reading_limit: limit })
+      }).then(function(response) {
+        if (!response.ok) {
+          if (errorEl) {
+            errorEl.textContent = t('admin.general.saveFailed');
+            errorEl.hidden = false;
+          }
+          return showResponseError(response, 'admin');
+        }
+        clearAdminDirty();
+        showStatus('admin.general.saved', 'success');
+        return loadAdminData();
+      }).catch(function() { showStatus('admin.error.network', 'error'); });
     }
 
     function saveAiUserAccess(user, enabled, dailyLimit) {
@@ -3463,7 +3505,8 @@
         authenticatedFetch('/api/admin/books/index'),
         authenticatedFetch('/api/admin/ai/settings'),
         authenticatedFetch('/api/admin/ai/tags'),
-        authenticatedFetch('/api/admin/oidc/settings')
+        authenticatedFetch('/api/admin/oidc/settings'),
+        authenticatedFetch('/api/admin/general-settings')
       ];
       return Promise.all(requests).then(function(responses) {
         if (!responses[0].ok) return showResponseError(responses[0], 'admin');
@@ -3477,7 +3520,10 @@
           readJson(responses[3]),
           responses[4].ok
             ? readJson(responses[4])
-            : showResponseError(responses[4], 'admin').then(function() { return {}; })
+            : showResponseError(responses[4], 'admin').then(function() { return {}; }),
+          responses[5].ok
+            ? readJson(responses[5])
+            : showResponseError(responses[5], 'admin').then(function() { return { settings: { recent_reading_limit: 10 } }; })
         ];
         return Promise.all(payloadRequests).then(function(payloads) {
           users = payloads[0].users || [];
@@ -3488,11 +3534,13 @@
           if (oidcSettings) {
             oidcSettings.redirect_uri_suggestion = payloads[4].suggested_redirect_uri || '';
           }
+          generalSettings = payloads[5].settings || { recent_reading_limit: 10 };
           renderUsers();
           renderAiSettings();
           renderAiUserAccess();
           renderAiTags();
           renderOidcSettings();
+          renderGeneralSettings();
           renderAdminOverview();
           if (element('adminDictionaryList')) return loadDictionaries();
         });
@@ -3588,6 +3636,8 @@
       var oidcUseSuggestion = element('adminOidcUseSuggestion');
       var aiSettingsForm = element('adminAiSettingsForm');
       var aiSettingsSubmit = element('adminAiSettingsSubmit');
+      var generalForm = element('adminGeneralForm');
+      var generalSubmit = element('adminGeneralSubmit');
       var aiTagForm = element('adminAiTagForm');
       var aiTagSubmit = element('adminAiTagSubmit');
       var aiTagSearch = element('adminAiTagSearch');
@@ -3614,7 +3664,7 @@
       var bookBulkGrant = element('adminBookBulkGrant');
       var adminSectionControls = root.document && typeof root.document.querySelectorAll === 'function'
         ? Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')) : [];
-      [createUserForm, oidcForm, aiSettingsForm, aiTagForm, dictionaryForm, webhookForm].forEach(function(form) {
+      [createUserForm, oidcForm, aiSettingsForm, aiTagForm, dictionaryForm, webhookForm, generalForm].forEach(function(form) {
         if (!form) return;
         form.addEventListener('input', markAdminDirty);
         form.addEventListener('change', markAdminDirty);
@@ -3975,6 +4025,12 @@
             showStatus('admin.ai.settingsSaved', 'success');
             return loadAdminData();
           }).catch(function() { showStatus('admin.error.network', 'error'); });
+        });
+      });
+      if (generalForm) generalForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        runButtonOperation(generalSubmit, 'admin.general.saving', function() {
+          return saveGeneralSettings();
         });
       });
       if (aiTagForm) aiTagForm.addEventListener('submit', function(event) {

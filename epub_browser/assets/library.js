@@ -100,6 +100,10 @@ function initScript() {
         if (metadataQueuedRevision === revision) metadataQueuedRevision = null;
         loadBookMetadata(function(books) {
             replaceBookCards(books);
+            // The continue-reading rail joins server progress against this same
+            // catalogue, so it has to re-render whenever the catalogue changes:
+            // a conversion can rename a book, replace its cover, or remove it.
+            if (window.EpubRecentReading) window.EpubRecentReading.updateBooks(books);
             lastMetadataBooks = books;
             metadataCompletedRevision = Math.max(metadataCompletedRevision, revision);
             metadataActiveRevision = null;

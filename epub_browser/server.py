@@ -439,6 +439,12 @@ def require_admin(request) -> Principal:
     return principal
 
 
+# Bounds for the "continue reading" rail.  The rail is a short overview, so the
+# server never has to serialise a whole reading history for it.
+RECENT_READING_DEFAULT_LIMIT = 10
+RECENT_READING_MAX_LIMIT = 24
+
+
 def _safe_relative_path(value, default='/'):
     if not isinstance(value, str) or not value.startswith('/'):
         return default
@@ -2856,6 +2862,29 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
         return response({'settings': settings})
 
+    async def admin_general_settings(request):
+        require_admin(request)
+        if request.method == 'GET':
+            return response({'settings': store.get_general_settings()})
+        data = await json_object(request)
+        if data is None:
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+        if not isinstance(data, dict) or 'recent_reading_limit' not in data:
+            return response(
+                error_payload('invalid_general_settings', 'Invalid general settings'),
+                400,
+            )
+        try:
+            settings = store.set_general_settings(
+                recent_reading_limit=data['recent_reading_limit'],
+            )
+        except ValueError:
+            return response(
+                error_payload('invalid_general_settings', 'Invalid general settings'),
+                400,
+            )
+        return response({'settings': settings})
+
     async def admin_ai_user_access(request):
         require_admin(request)
         user_id = request.path_params['user_id']
@@ -4500,6 +4529,56 @@ window.location.assign(payload.redirect||'/');
         store.delete_reading_progress(principal.user_id, book_hash)
         return response({'message': 'Deleted'})
 
+    def recent_reading_limit(request):
+        default_limit = store.get_general_settings().get(
+            'recent_reading_limit', RECENT_READING_DEFAULT_LIMIT
+        )
+        raw = request.query_params.get('limit')
+        if raw is None or raw == '':
+            return default_limit
+        try:
+            requested = int(raw)
+        except (TypeError, ValueError):
+            return default_limit
+        if requested < 1:
+            return default_limit
+        return min(requested, RECENT_READING_MAX_LIMIT)
+
+    async def recent_reading(request):
+        try:
+            return await recent_reading_response(request)
+        except StarletteHTTPException:
+            # Authentication failures must keep their own status code instead
+            # of collapsing into a generic 500.
+            raise
+        except Exception:
+            return response(error_payload('server_error', 'Internal server error'), 500)
+
+    async def recent_reading_response(request):
+        """List the caller's most recently updated reading progress.
+
+        Reading progress is runtime user data, never part of the EPUB or PDF
+        content cache.  Stored rows can outlive their book: a book may have
+        been removed, soft-deleted, or restricted after the row was written.
+        Every row is therefore re-checked against the current visibility rules
+        before it leaves the server, so the caller only ever learns about
+        books it can already open.
+        """
+        principal = require_principal(request)
+        items = []
+        for row in store.list_reading_progress(principal.user_id, limit=recent_reading_limit(request)):
+            book_id = row.get('book_id')
+            if book_access_denied(principal, book_id):
+                continue
+            items.append(
+                {
+                    'book_id': book_id,
+                    'chapter_index': row.get('chapter_index'),
+                    'updated_at': row.get('updated_at'),
+                }
+            )
+        return response({'items': items}, cache_control='private, no-store')
+
     chapter_snapshot_cache: OrderedDict = OrderedDict()
     chapter_snapshot_cache_ttl_seconds = 60.0
     chapter_snapshot_cache_max_entries = 1024
@@ -4844,6 +4923,7 @@ window.location.assign(payload.redirect||'/');
             methods=['GET', 'PUT', 'DELETE'],
         ),
         Route('/api/admin/ai/settings', admin_ai_settings, methods=['GET', 'PUT']),
+        Route('/api/admin/general-settings', admin_general_settings, methods=['GET', 'PUT']),
         Route('/api/admin/ai/users/{user_id}', admin_ai_user_access, methods=['GET', 'PUT']),
         Route('/api/admin/ai/tags', admin_ai_tags, methods=['GET', 'POST']),
         Route('/api/admin/ai/tags/{tag_id}', admin_ai_tag, methods=['PUT', 'DELETE']),
@@ -4894,6 +4974,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
+        Route('/api/reading-progress', recent_reading, methods=['GET']),
         Route('/api/book-reviews/{book_id}', book_review, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/reading-sessions/{book_id}/summary', reading_session_summary, methods=['GET']),
         Route('/api/reading-sessions/{book_id}/heartbeat', reading_session_heartbeat, methods=['POST']),

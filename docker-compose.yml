@@ -19,6 +19,8 @@ services:
       - --host=0.0.0.0
       - --port=80
       - --no-browser
+      - --log-level=info
+      - --kindle
     # To record real client IPs from X-Forwarded-For, append one line for each
     # direct peer address or proxy network seen by EPUB Browser. Never trust a
     # public client network.

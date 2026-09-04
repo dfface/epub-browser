@@ -77,6 +77,20 @@ class SitePublicationTests(unittest.TestCase):
         self.assertRegex(html, r'data-progress-close[^>]*disabled')
         self.assertRegex(html, r'data-progress-close[^>]*hidden')
         self.assertIn('window.EpubLibraryProgress.start(window)', html)
+        self.assertIn('id="recentReading"', html)
+        self.assertIn('data-recent-reading-list', html)
+        self.assertIn('window.EpubRecentReading.start(window)', html)
+        self.assertRegex(html, r'/assets/immutable/recent-reading\.[0-9a-f]{12}\.css')
+        self.assertRegex(html, r'/assets/immutable/recent-reading\.[0-9a-f]{12}\.js')
+        # The rail is persistent content, so it sits above the transient
+        # library-update banner and its position never moves when the banner
+        # appears or is dismissed.
+        self.assertLess(html.index('id="libraryHeading"'), html.index('id="recentReading"'))
+        self.assertLess(html.index('id="recentReading"'), html.index('id="libraryProgress"'))
+        self.assertLess(
+            html.index('window.EpubRecentReading.start(window)'),
+            html.index('window.initScriptLibrary()'),
+        )
         self.assertIn(
             'window.EpubBrowserCacheBoundary.start(startLibraryClients)',
             html,
@@ -167,6 +181,9 @@ class SitePublicationTests(unittest.TestCase):
 
         self.assertNotIn('id="libraryProgress\"', html)
         self.assertNotIn('library-progress', html)
+        self.assertNotIn('id="recentReading\"', html)
+        self.assertNotIn('recent-reading', html)
+        self.assertNotIn('EpubRecentReading', html)
         self.assertNotIn('id="loginCard\"', html)
         self.assertNotIn('adminAiJobsStatus', html)
         self.assertNotIn('adminAiJobsPageSize', html)

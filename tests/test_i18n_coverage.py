@@ -15,6 +15,7 @@ FIRST_PARTY = [
             'api-docs.js',
             'library.js',
             'library-progress.js',
+            'recent-reading.js',
             'bookshelf.js',
             'book.js',
             'chapter.js',

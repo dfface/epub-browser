@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 21
+DB_SCHEMA_VERSION = 22
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -398,6 +398,8 @@ class StateStore:
                 self._require_foreign_key_integrity(connection)
             if version < 21:
                 self._migrate_schema_v21(connection, max(version, 20))
+            if version < 22:
+                self._migrate_schema_v22(connection, max(version, 21))
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -588,6 +590,20 @@ class StateStore:
         )
         connection.execute(
             "INSERT INTO ai_settings (singleton) VALUES (1) "
+            "ON CONFLICT(singleton) DO NOTHING"
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS general_settings (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                recent_reading_limit INTEGER NOT NULL DEFAULT 10
+                    CHECK(recent_reading_limit >= 1),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO general_settings (singleton) VALUES (1) "
             "ON CONFLICT(singleton) DO NOTHING"
         )
         added_context_window = self._add_column_if_missing(
@@ -1894,6 +1910,44 @@ class StateStore:
             )
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 21")
+
+    def _migrate_schema_v22(self, connection, source_version) -> None:
+        """Relax the upper bound on the recent reading limit."""
+        if source_version >= 22:
+            return
+        create_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'general_settings'"
+        ).fetchone()
+        if create_sql and "recent_reading_limit <= 24" not in (create_sql[0] or ""):
+            connection.execute("PRAGMA user_version = 22")
+            return
+        temporary_table = "general_settings__v22_source"
+        self._reject_migration_table(connection, temporary_table)
+        connection.execute(
+            f"ALTER TABLE general_settings RENAME TO {temporary_table}"
+        )
+        connection.execute(
+            """
+            CREATE TABLE general_settings (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                recent_reading_limit INTEGER NOT NULL DEFAULT 10
+                    CHECK(recent_reading_limit >= 1),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            f"""
+            INSERT INTO general_settings (singleton, recent_reading_limit, updated_at)
+            SELECT singleton, recent_reading_limit, updated_at
+            FROM {temporary_table}
+            """
+        )
+        self._assert_matching_row_counts(
+            connection, temporary_table, "general_settings"
+        )
+        connection.execute(f"DROP TABLE {temporary_table}")
+        connection.execute("PRAGMA user_version = 22")
 
     @staticmethod
     def _create_v16_webhook_schema(connection) -> None:
@@ -4946,6 +5000,32 @@ class StateStore:
                 ),
             )
         return self.get_ai_settings()
+
+    def get_general_settings(self) -> dict:
+        """Return the public general server configuration."""
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT recent_reading_limit FROM general_settings WHERE singleton = 1"
+            ).fetchone()
+        return {"recent_reading_limit": row["recent_reading_limit"]}
+
+    def set_general_settings(self, *, recent_reading_limit: int) -> dict:
+        try:
+            value = int(recent_reading_limit)
+        except (TypeError, ValueError):
+            raise ValueError("Recent reading limit must be an integer")
+        if value < 1:
+            raise ValueError("Recent reading limit must be at least 1")
+        with self._connection() as connection:
+            connection.execute(
+                """
+                UPDATE general_settings
+                SET recent_reading_limit = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE singleton = 1
+                """,
+                (value,),
+            )
+        return self.get_general_settings()
 
     def set_ai_user_access(
         self,
@@ -8336,17 +8416,24 @@ class StateStore:
                 (user_id, book_hash),
             )
 
-    def list_reading_progress(self, user_id: str) -> tuple:
+    def list_reading_progress(self, user_id: str, limit: Optional[int] = None) -> tuple:
+        """Return the caller's reading progress, most recently updated first.
+
+        ``limit`` is applied in SQL so a large library does not materialise
+        every row just to render a short "continue reading" rail.
+        """
+        sql = """
+            SELECT user_id, book_hash AS book_id, chapter_index, updated_at
+            FROM reading_progress WHERE user_id = ?
+            ORDER BY updated_at DESC, book_hash
+            """
+        parameters: list = [user_id]
+        if isinstance(limit, int) and not isinstance(limit, bool) and limit >= 0:
+            sql += "LIMIT ?"
+            parameters.append(limit)
         with self._connection() as connection:
             self._require_user(connection, user_id)
-            rows = connection.execute(
-                """
-                SELECT user_id, book_hash AS book_id, chapter_index, updated_at
-                FROM reading_progress WHERE user_id = ?
-                ORDER BY updated_at DESC, book_hash
-                """,
-                (user_id,),
-            ).fetchall()
+            rows = connection.execute(sql, tuple(parameters)).fetchall()
         return tuple(dict(row) for row in rows)
 
     @staticmethod

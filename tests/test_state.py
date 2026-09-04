@@ -525,6 +525,45 @@ class StateStoreTests(unittest.TestCase):
                 thread.join(1.0)
                 self.assertFalse(thread.is_alive())
 
+    def test_list_reading_progress_orders_by_recency_and_applies_the_limit(self):
+        for book_hash in ("oldest", "middle", "newest"):
+            self.store.set_reading_progress(self.owner.user_id, book_hash, 1)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute(
+                "UPDATE reading_progress SET updated_at = '2026-08-01T00:00:00Z' "
+                "WHERE book_hash = 'oldest'"
+            )
+            connection.execute(
+                "UPDATE reading_progress SET updated_at = '2026-08-02T00:00:00Z' "
+                "WHERE book_hash = 'middle'"
+            )
+            connection.execute(
+                "UPDATE reading_progress SET updated_at = '2026-08-03T00:00:00Z' "
+                "WHERE book_hash = 'newest'"
+            )
+
+        self.assertEqual(
+            [
+                row["book_id"]
+                for row in self.store.list_reading_progress(self.owner.user_id)
+            ],
+            ["newest", "middle", "oldest"],
+        )
+        self.assertEqual(
+            [
+                row["book_id"]
+                for row in self.store.list_reading_progress(self.owner.user_id, limit=2)
+            ],
+            ["newest", "middle"],
+        )
+        self.assertEqual(
+            self.store.list_reading_progress(self.owner.user_id, limit=0),
+            (),
+        )
+
+        other = self.store.create_user("reader", "hash", role="member")
+        self.assertEqual(self.store.list_reading_progress(other.user_id), ())
+
     def test_wal_reader_sees_committed_snapshot_during_write(self):
         self.store.set_reading_progress(self.owner.user_id, "book-id", 3)
         writer = self.store._connect()
@@ -3389,6 +3428,28 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(public["config_revision"], 1)
         self.assertTrue(self.store.can_use_ai(member))
         self.assertEqual(self.store.ai_daily_limit(member), 5)
+
+    def test_general_settings_default_and_validation(self):
+        self.assertEqual(
+            self.store.get_general_settings(),
+            {"recent_reading_limit": 10},
+        )
+        self.assertEqual(
+            self.store.set_general_settings(recent_reading_limit=18),
+            {"recent_reading_limit": 18},
+        )
+        self.assertEqual(
+            self.store.get_general_settings()["recent_reading_limit"], 18
+        )
+        for invalid in (0, "ten", -3):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    self.store.set_general_settings(recent_reading_limit=invalid)
+        # No upper cap: values above 24 are accepted.
+        self.assertEqual(
+            self.store.set_general_settings(recent_reading_limit=100),
+            {"recent_reading_limit": 100},
+        )
 
     def test_imported_and_administrator_tags_share_one_managed_collection(self):
         book = self.store.resolve_book(

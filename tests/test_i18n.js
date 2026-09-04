@@ -223,9 +223,9 @@ test('new locale packs have no unexpected English fallback copy', () => {
     'pdf.formatBadge',
   ]);
   const nativeIdenticalKeys = {
-    es: ['theme.sepia', 'admin.books.profile.general', 'admin.ai.profile.general', 'admin.ai.jobs.header.error', 'ai.spoilers', 'book.totalChapters', 'annotations.color', 'readingInsights.duration.minute', 'apiDocs.endpointCount'],
+    es: ['theme.sepia', 'admin.books.profile.general', 'admin.ai.profile.general', 'admin.ai.jobs.header.error', 'ai.spoilers', 'book.totalChapters', 'annotations.color', 'readingInsights.duration.minute', 'apiDocs.endpointCount', 'admin.general'],
     de: ['common.version', 'theme.sepia', 'settings.optional', 'account.role.admin', 'admin.ai.jobs.statusFilter', 'admin.ai.jobs.header.status', 'account.pats.group.administration', 'admin.webhooks.name', 'apiDocs.format'],
-    fr: ['common.version', 'reader.annotations', 'library.annotations', 'admin.menu', 'admin.title', 'admin.books.profile.fiction', 'admin.books.header.action', 'admin.books.pageButton', 'admin.ai.profile.fiction', 'admin.ai.jobs.header.action', 'admin.ai.jobs.pageButton', 'ai.spoilers', 'ai.annotation.concept', 'ai.annotation.question', 'ai.libraryConfigVersion', 'ai.libraryVersionCount', 'ai.conversation', 'book.annotations', 'annotations.tab', 'annotations.hubTitle', 'annotations.annotationCount', 'annotations.shareCount', 'annotations.shareNote', 'annotations.shareFileFallback', 'annotations.noteAction', 'readingInsights.duration.minute', 'account.pats.group.annotations', 'account.pats.group.administration', 'account.pats.expiration', 'apiDocs.format', 'apiDocs.group.annotations'],
+    fr: ['common.version', 'reader.annotations', 'library.annotations', 'admin.menu', 'admin.title', 'admin.books.profile.fiction', 'admin.books.header.action', 'admin.books.pageButton', 'admin.ai.profile.fiction', 'admin.ai.jobs.header.action', 'admin.ai.jobs.pageButton', 'ai.spoilers', 'ai.annotation.concept', 'ai.annotation.question', 'ai.libraryConfigVersion', 'ai.libraryVersionCount', 'ai.conversation', 'book.annotations', 'annotations.tab', 'annotations.hubTitle', 'annotations.annotationCount', 'annotations.shareCount', 'annotations.shareNote', 'annotations.shareFileFallback', 'annotations.noteAction', 'readingInsights.duration.minute', 'account.pats.group.annotations', 'account.pats.group.administration', 'account.pats.expiration', 'apiDocs.format', 'apiDocs.group.annotations', 'library.recentReading.page'],
     ru: [],
     it: ['reader.home', 'account.menu', 'account.password', 'book.home', 'dictionary.source', 'readingInsights.duration.minute'],
     'pt-BR': ['admin.ai.jobs.statusFilter', 'admin.ai.jobs.header.status', 'ai.spoilers', 'book.totalChapters', 'readingInsights.duration.minute', 'apiDocs.endpointCount'],
@@ -382,7 +382,7 @@ test('new locale packs translate every Library, Book, Chapter, and API Docs mess
   const intentionalInvariants = {
     es: ['reader.pageRange', 'book.totalChapters', 'apiDocs.endpointCount'],
     de: ['reader.pageRange', 'settings.optional', 'apiDocs.format'],
-    fr: ['reader.annotations', 'reader.pageRange', 'library.annotations', 'book.annotations', 'apiDocs.format', 'apiDocs.group.annotations'],
+    fr: ['reader.annotations', 'reader.pageRange', 'library.annotations', 'book.annotations', 'apiDocs.format', 'apiDocs.group.annotations', 'library.recentReading.page'],
     ru: ['reader.pageRange'],
     it: ['reader.home', 'reader.pageRange', 'book.home'],
     'pt-BR': ['reader.pageRange', 'book.totalChapters', 'apiDocs.endpointCount'],

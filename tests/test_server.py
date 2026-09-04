@@ -2202,6 +2202,38 @@ class AdminAccountTests(unittest.TestCase):
             403,
         )
 
+    def test_admin_manages_general_settings_and_member_is_denied(self):
+        initial = self.admin_client.get("/api/admin/general-settings")
+        saved = self.admin_client.put(
+            "/api/admin/general-settings",
+            json={"recent_reading_limit": 15},
+        )
+        accepted_high = self.admin_client.put(
+            "/api/admin/general-settings",
+            json={"recent_reading_limit": 100},
+        )
+        rejected_low = self.admin_client.put(
+            "/api/admin/general-settings",
+            json={"recent_reading_limit": 0},
+        )
+        rejected_missing = self.admin_client.put(
+            "/api/admin/general-settings",
+            json={},
+        )
+
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.json()["settings"]["recent_reading_limit"], 10)
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["settings"]["recent_reading_limit"], 15)
+        self.assertEqual(accepted_high.status_code, 200)
+        self.assertEqual(accepted_high.json()["settings"]["recent_reading_limit"], 100)
+        self.assertEqual(rejected_low.status_code, 400)
+        self.assertEqual(rejected_missing.status_code, 400)
+        self.assertEqual(
+            self.member_client.get("/api/admin/general-settings").status_code,
+            403,
+        )
+
     def test_admin_can_clear_a_member_ai_daily_limit(self):
         cleared = self.admin_client.put(
             "/api/admin/ai/users/" + self.member.user_id,
@@ -3762,6 +3794,78 @@ class BookAuthorizationTests(unittest.TestCase):
                     denied.json(),
                     {"code": "forbidden", "message": "Forbidden"},
                 )
+
+    def test_recent_reading_requires_authentication(self):
+        client = TestClient(self.app)
+        self.addCleanup(client.close)
+
+        denied = client.get("/api/reading-progress")
+
+        self.assertEqual(denied.status_code, 401)
+
+    def test_recent_reading_hides_books_the_caller_cannot_open(self):
+        self.store.set_reading_progress(self.member.user_id, "open-id", 3)
+        self.store.set_reading_progress(self.member.user_id, "restricted-id", 7)
+
+        response = self.member_client.get("/api/reading-progress")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "private, no-store")
+        self.assertEqual(
+            [(item["book_id"], item["chapter_index"]) for item in response.json()["items"]],
+            [("open-id", 3)],
+        )
+        self.assertTrue(response.json()["items"][0]["updated_at"])
+
+    def test_recent_reading_follows_grants_and_clamps_the_requested_limit(self):
+        self.store.grant_book_access("restricted-id", self.member.user_id)
+        self.store.set_reading_progress(self.member.user_id, "open-id", 1)
+        self.store.set_reading_progress(self.member.user_id, "restricted-id", 2)
+
+        granted = self.member_client.get("/api/reading-progress")
+        self.assertEqual(
+            {item["book_id"] for item in granted.json()["items"]},
+            {"open-id", "restricted-id"},
+        )
+        for query, expected in (
+            ("", 2),
+            ("?limit=1", 1),
+            ("?limit=999", 2),
+            ("?limit=0", 2),
+            ("?limit=not-a-number", 2),
+        ):
+            with self.subTest(query=query):
+                response = self.member_client.get("/api/reading-progress" + query)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(response.json()["items"]), expected)
+
+    def test_recent_reading_returns_an_empty_list_without_any_progress(self):
+        self.assertEqual(
+            self.member_client.get("/api/reading-progress").json(),
+            {"items": []},
+        )
+
+    def test_recent_reading_default_follows_general_settings(self):
+        self.store.grant_book_access("restricted-id", self.member.user_id)
+        self.store.set_reading_progress(self.member.user_id, "open-id", 1)
+        self.store.set_reading_progress(self.member.user_id, "restricted-id", 2)
+        self.assertEqual(
+            len(self.member_client.get("/api/reading-progress").json()["items"]), 2
+        )
+        self.admin_client.put(
+            "/api/admin/general-settings",
+            json={"recent_reading_limit": 1},
+        )
+        self.assertEqual(
+            len(self.member_client.get("/api/reading-progress").json()["items"]), 1
+        )
+        self.admin_client.put(
+            "/api/admin/general-settings",
+            json={"recent_reading_limit": 2},
+        )
+        self.assertEqual(
+            len(self.member_client.get("/api/reading-progress").json()["items"]), 2
+        )
 
     def test_grant_allows_member_catalog_and_reader_access(self):
         self.store.grant_book_access("restricted-id", self.member.user_id)

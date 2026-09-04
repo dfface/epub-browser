@@ -220,6 +220,10 @@ def render_library_shell(
     server_progress_panel = ""
     server_progress_script = ""
     server_progress_start = ""
+    recent_reading_stylesheet = ""
+    recent_reading_panel = ""
+    recent_reading_script = ""
+    recent_reading_start = ""
     bookshelf_data_actions = """
             <button class="bookshelf-action-btn" id="exportShelfBtn">
                 <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
@@ -300,6 +304,17 @@ def render_library_shell(
     </section>"""
         server_progress_script = '<script src="/assets/library-progress.js" defer></script>'
         server_progress_start = 'if (window.EpubLibraryProgress) window.EpubLibraryProgress.start(window);'
+        # The rail is Server-only: it reads per-user reading progress, which
+        # never exists in SSG output.  It starts before the catalogue request so
+        # the first metadata response can populate it without a second render.
+        recent_reading_stylesheet = '<link rel="stylesheet" href="/assets/recent-reading.css">'
+        recent_reading_panel = """
+    <section id="recentReading" class="recent-reading" hidden aria-labelledby="recentReadingTitle">
+      <h2 id="recentReadingTitle" class="recent-reading-title" data-i18n="library.recentReading.title">Continue reading</h2>
+      <ul class="recent-reading-rail" data-recent-reading-list></ul>
+    </section>"""
+        recent_reading_script = '<script src="/assets/recent-reading.js" defer></script>'
+        recent_reading_start = 'if (window.EpubRecentReading) window.EpubRecentReading.start(window);'
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET
         server_account_control = SERVER_ACCOUNT_CONTROL
         server_account_panel = SERVER_ACCOUNT_PANEL
@@ -308,6 +323,7 @@ def render_library_shell(
             if (!window.EpubBrowserAuth) return;
             window.EpubBrowserAuth.init().then(function(session) {{
                 if (!session) return;
+                {recent_reading_start}
                 if (window.initScriptLibrary) window.initScriptLibrary();
                 {server_progress_start}
             }});"""
@@ -338,6 +354,7 @@ def render_library_shell(
     {ai_reading_stylesheet}
 {server_account_stylesheet}
 {server_progress_stylesheet}
+{recent_reading_stylesheet}
 <script>
 // 立即应用主题，避免闪现
 var theme = "light";
@@ -409,6 +426,7 @@ htmlElement.classList.add(theme + "-mode");
             <span class="library-summary-item"><i class="fas fa-tags" aria-hidden="true"></i><span id="libraryTagCount" data-i18n="library.tagCount" data-i18n-params='{{"count": {len(all_tags)}}}'>{len(all_tags)} tag(s)</span></span>
         </div>
     </section>
+{recent_reading_panel}
 {server_progress_panel}
     <div class="controls" data-id="controls">
         <div class="search-container">
@@ -529,6 +547,7 @@ htmlElement.classList.add(theme + "-mode");
     <script src="/assets/library.js?v=13" defer></script>
 {ai_reading_script}
 {server_progress_script}
+{recent_reading_script}
     {SERVER_LOCALE_SCRIPT}
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -551,6 +570,10 @@ htmlElement.classList.add(theme + "-mode");
     library_html = library_html.replace("{server_progress_panel}", server_progress_panel)
     library_html = library_html.replace("{server_progress_script}", server_progress_script)
     library_html = library_html.replace("{server_progress_start}", server_progress_start)
+    library_html = library_html.replace("{recent_reading_stylesheet}", recent_reading_stylesheet)
+    library_html = library_html.replace("{recent_reading_panel}", recent_reading_panel)
+    library_html = library_html.replace("{recent_reading_script}", recent_reading_script)
+    library_html = library_html.replace("{recent_reading_start}", recent_reading_start)
     library_html = library_html.replace("{library_feature_assets}", library_feature_assets)
     library_html = library_html.replace("{bookshelf_data_actions}", bookshelf_data_actions)
     library_html = library_html.replace("{server_account_panel}", server_account_panel)

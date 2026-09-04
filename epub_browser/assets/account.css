@@ -639,6 +639,77 @@ body.auth-page {
     justify-self: start;
 }
 
+.admin-general-form {
+    max-width: 720px;
+}
+
+.admin-setting-list {
+    display: grid;
+    gap: 18px;
+}
+
+.admin-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.admin-setting-row {
+    display: grid;
+    gap: 4px;
+}
+
+.admin-setting-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.admin-setting-label {
+    flex: 1 1 0;
+    min-width: 0;
+    color: var(--account-text);
+    font-size: .9rem;
+    font-weight: 650;
+}
+
+.admin-setting-main .admin-general-input {
+    width: 5ch;
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    text-align: center;
+    flex: 0 0 auto;
+    appearance: textfield;
+}
+
+.admin-setting-main .admin-general-input::-webkit-outer-spin-button,
+.admin-setting-main .admin-general-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.admin-general-form .account-primary-action {
+    justify-self: auto;
+    flex: 0 0 auto;
+}
+
+.admin-setting-help,
+.admin-setting-error {
+    margin: 0;
+    font-size: .82rem;
+    line-height: 1.45;
+}
+
+.admin-setting-help {
+    color: var(--account-muted);
+}
+
+.admin-setting-error {
+    color: var(--account-danger);
+}
+
 .account-oidc-card {
     display: grid;
     gap: 12px;
@@ -3148,6 +3219,10 @@ body.auth-page {
     .account-form .account-primary-action,
     .account-modal .account-primary-action {
         width: 100%;
+    }
+
+    .admin-general-form .account-primary-action {
+        width: auto;
     }
 
     .account-oidc-actions,
