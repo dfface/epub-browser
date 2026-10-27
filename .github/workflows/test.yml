@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  request-gitea-upgrade:
+  request-gitea-mbp-upgrade:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version
@@ -42,8 +42,8 @@ jobs:
         env:
           GITEA_BASE_URL: ${{ vars.GITEA_BASE_URL }}
           GITEA_OWNER: devops
-          GITEA_REPO: doco-cd
-          GITEA_LABEL_ID: ${{ vars.GITEA_CONTROLLED_UPDATE_LABEL_ID }}
+          GITEA_REPO: doco-cd-macos
+          GITEA_LABEL_ID: ${{ vars.GITEA_CONTROLLED_UPDATE_MBP_LABEL_ID }}
           GITEA_ISSUE_TOKEN: ${{ secrets.GITEA_ISSUE_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
