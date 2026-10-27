@@ -1119,6 +1119,7 @@ class EPUBProcessor:
         processor._pdf_pages = tuple(metadata.pages)
         processor._pdf_encrypted = bool(metadata.encrypted)
         processor._pdf_has_extractable_text = bool(metadata.has_extractable_text)
+        processor.ai_reading_enabled = True
         return processor
 
     @classmethod
@@ -1172,6 +1173,7 @@ class EPUBProcessor:
         processor.resources_base = metadata.get("resources_base") or "resources"
         processor._server_chapter_payloads = {}
         processor.asset_manifest = asset_manifest
+        processor.ai_reading_enabled = True
         return processor
     
     def __init__(
@@ -1242,7 +1244,8 @@ class EPUBProcessor:
                     else ()
                 ),
             ).publish()
-    
+        self.ai_reading_enabled = self.deployment_mode != "ssg"
+
     def cleanup(self):
         # 诸如 extract 失败
         try:
@@ -2034,7 +2037,7 @@ class EPUBProcessor:
             authors_html = f'<p class="book-info-author" lang="{book_language}" dir="auto">{authors_text}</p>'
         else:
             authors_html = '<p class="book-info-author" data-i18n="book.unknownAuthor">Unknown author</p>'
-        ai_feature_assets = "" if is_pdf_book else self._server_ai_feature_assets()
+        ai_feature_assets = "" if (is_pdf_book or not self.ai_reading_enabled) else self._server_ai_feature_assets()
         book_feature_assets = json.dumps({
             "bookshelf": self.asset_manifest.url_for("bookshelf.js"),
             "annotationHubCss": self.asset_manifest.url_for("annotation-hub.css"),
@@ -2053,7 +2056,7 @@ class EPUBProcessor:
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
-            if self.deployment_mode == "server" and not is_pdf_book else ""
+            if self.deployment_mode == "server" and not is_pdf_book and self.ai_reading_enabled else ""
         )
         reading_insights_navigation = (
             '<button type="button" class="app-nav-link" data-reading-insights '
@@ -2063,17 +2066,17 @@ class EPUBProcessor:
         )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
-            if self.deployment_mode == "server" and not is_pdf_book else ""
+            if self.deployment_mode == "server" and not is_pdf_book and self.ai_reading_enabled else ""
         )
         ai_reading_script = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
-            if self.deployment_mode == "server" and not is_pdf_book else ""
+            if self.deployment_mode == "server" and not is_pdf_book and self.ai_reading_enabled else ""
         )
         ai_book_chat_button = (
             f'<button type="button" class="css-btn secondary" data-ai-book-chat '
             f'data-book-id="{book_id_attribute}"><i class="fas fa-comments" aria-hidden="true"></i>'
             '<span data-i18n="ai.askBook">Ask AI</span></button>'
-            if self.deployment_mode == "server" and not is_pdf_book else ""
+            if self.deployment_mode == "server" and not is_pdf_book and self.ai_reading_enabled else ""
         )
         ai_book_chat_script = ""
         book_review_assets = (
@@ -3464,7 +3467,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.chapterRead">AI reading</span></button>'
-            if self.deployment_mode == "server" and pdf_page is None
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled
             else ""
         )
         ai_followup_button = (
@@ -3473,19 +3476,19 @@ document.addEventListener('DOMContentLoaded', function() {{
             f'data-book-id="{book_id_attribute}" data-chapter-index="{chapter_index}">'
             '<i class="fas fa-comments" aria-hidden="true"></i>'
             '<span class="control-name" data-i18n="ai.askChapter">Ask AI</span></button>'
-            if self.deployment_mode == "server" and pdf_page is None
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled
             else ""
         )
         ai_feature_assets = (
             self._server_ai_feature_assets()
-            if pdf_page is None else ""
+            if pdf_page is None and self.ai_reading_enabled else ""
         )
         ai_reading_navigation = (
             f'<button type="button" class="app-nav-link" data-ai-reading-hub '
             f'data-book-id="{book_id_attribute}" aria-haspopup="dialog">'
             '<i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>'
             '<span data-i18n="ai.library">AI readings</span></button>'
-            if self.deployment_mode == "server" and pdf_page is None else ""
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled else ""
         )
         reading_insights_navigation = (
             '<button type="button" class="app-nav-link" data-reading-insights '
@@ -3495,7 +3498,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         )
         ai_reading_indicators = (
             f' data-ai-reading-indicators data-book-id="{book_id_attribute}"'
-            if self.deployment_mode == "server" and pdf_page is None else ""
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled else ""
         )
         mobile_ai_reading_button = (
             '<button class="control-btn" id="mobileAIReadingBtn" type="button" '
@@ -3505,7 +3508,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             'data-i18n-aria-label="ai.chapterRead" data-i18n-title="ai.chapterRead">'
             '<i class="fas fa-wand-magic-sparkles"></i>'
             '<span data-i18n="ai.chapterRead">AI reading</span></button>'
-            if self.deployment_mode == "server" and pdf_page is None else ""
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled else ""
         )
         mobile_ai_followup_button = (
             '<button class="control-btn" id="mobileAIChatBtn" type="button" '
@@ -3515,11 +3518,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             'data-i18n-aria-label="ai.askChapter" data-i18n-title="ai.askChapter">'
             '<i class="fas fa-comments" aria-hidden="true"></i>'
             '<span data-i18n="ai.askChapter">Ask AI</span></button>'
-            if self.deployment_mode == "server" and pdf_page is None else ""
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled else ""
         )
         ai_chapter_scripts = (
             '<script src="/assets/ai-feature-loader.js" defer></script>'
-            if self.deployment_mode == "server" and pdf_page is None else ""
+            if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled else ""
         )
         dictionary_assets = (
             '<link rel="stylesheet" href="/assets/dictionary.css">\n'

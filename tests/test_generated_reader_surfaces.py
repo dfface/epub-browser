@@ -4088,6 +4088,58 @@ assert.deepEqual(
         self.assertNotIn('ai-chat.html', book_page)
         self.assertFalse(Path(processor.web_dir, 'ai-chat.html').exists())
 
+    def test_ai_reading_entry_points_hidden_when_disabled(self):
+        # When AI reading is disabled, no AI entry point should appear anywhere in
+        # the reader chrome: desktop toolbar (AI reading / Ask AI), mobile toolbar
+        # buttons, the floating TOC "AI readings" nav, and reading indicators.
+        # Guards issue #24.
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor(
+                "book.epub", directory, deployment_mode="server"
+            )
+            processor.book_title = "A Book"
+            processor.chapters = [{"title": "One"}]
+            processor.toc = []
+            processor.ai_reading_enabled = False
+            chapter = processor.create_chapter_template("<p>Text</p>", "", 0, "One")
+        ai_markers = [
+            'data-ai-reading-hub',
+            'data-ai-learning-canvas',
+            'data-ai-followup-drawer',
+            'data-ai-reading-indicators',
+        ]
+        for marker in ai_markers:
+            self.assertNotIn(marker, chapter)
+        # Non-AI content must remain intact.
+        self.assertIn('<p>Text</p>', chapter)
+
+    def test_library_shell_hides_ai_navigation_when_disabled(self):
+        # The library home (global nav bar) is a different renderer from the
+        # per-book processor above. It must not show the AI readings entry point
+        # (or load the AI feature script) when AI reading is disabled.
+        # Guards issue #24.
+        from epub_browser.site import render_library_shell
+        from epub_browser.urls import SiteURLs
+        import types
+        assets = types.SimpleNamespace(
+            url_for=lambda name: "/assets/" + name,
+            assets={},
+        )
+        enabled = render_library_shell(
+            [], assets, SiteURLs(), deployment_mode="server", ai_reading_enabled=True
+        )
+        self.assertIn("data-ai-reading-hub", enabled)
+        self.assertIn("ai-feature-loader.js", enabled)
+        self.assertIn("data-reading-insights", enabled)
+        disabled = render_library_shell(
+            [], assets, SiteURLs(), deployment_mode="server", ai_reading_enabled=False
+        )
+        self.assertNotIn("data-ai-reading-hub", disabled)
+        self.assertNotIn("ai-feature-loader.js", disabled)
+        self.assertNotIn('data-i18n="ai.library"', disabled)
+        # Reading insights is independent of AI reading and must stay visible.
+        self.assertIn("data-reading-insights", disabled)
+
     def test_server_reader_defers_rich_renderer_assets_until_they_are_needed(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor('book.epub', directory, deployment_mode='server')

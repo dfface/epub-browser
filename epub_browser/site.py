@@ -187,6 +187,7 @@ def render_library_shell(
     urls: SiteURLs,
     deployment_mode: str,
     kindle: bool = False,
+    ai_reading_enabled: bool = True,
 ) -> str:
     """Render the shared library application shell for one deployment mode.
 
@@ -268,23 +269,26 @@ def render_library_shell(
             "readingInsightsCss": assets.url_for("reading-insights.css"),
             "readingInsights": assets.url_for("reading-insights.js"),
         }, separators=(",", ":"))
+        # Reading insights is independent of AI reading and must stay visible in
+        # server mode regardless of the AI reading toggle.
         reading_insights_navigation = '''<button type="button" class="app-nav-link" data-reading-insights aria-haspopup="dialog"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'''
-        ai_reading_navigation = '''<button type="button" class="app-nav-link" data-ai-reading-hub aria-haspopup="dialog"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="ai.library">AI readings</span></button>'''
-        ai_feature_assets = {
-            "aiReadingHubCss": assets.url_for("ai-reading-hub.css"),
-            "aiReadingHub": assets.url_for("ai-reading-hub.js"),
-            "aiRichTextCss": assets.url_for("ai-rich-text.css"),
-            "aiRichText": assets.url_for("ai-rich-text.js"),
-            "markdownIt": assets.url_for("vendor/markdown-it/markdown-it.min.js"),
-            "katexCss": assets.url_for("vendor/katex/katex.min.css"),
-            "katex": assets.url_for("vendor/katex/katex.min.js"),
-            "mermaid": assets.url_for("vendor/mermaid/mermaid.min.js"),
-        }
-        ai_reading_script = (
-            '<script>window.EpubBrowserFeatureAssets='
-            + json.dumps(ai_feature_assets, separators=(",", ":"))
-            + ';</script><script src="/assets/ai-feature-loader.js" defer></script>'
-        )
+        if ai_reading_enabled:
+            ai_reading_navigation = '''<button type="button" class="app-nav-link" data-ai-reading-hub aria-haspopup="dialog"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="ai.library">AI readings</span></button>'''
+            ai_feature_assets = {
+                "aiReadingHubCss": assets.url_for("ai-reading-hub.css"),
+                "aiReadingHub": assets.url_for("ai-reading-hub.js"),
+                "aiRichTextCss": assets.url_for("ai-rich-text.css"),
+                "aiRichText": assets.url_for("ai-rich-text.js"),
+                "markdownIt": assets.url_for("vendor/markdown-it/markdown-it.min.js"),
+                "katexCss": assets.url_for("vendor/katex/katex.min.css"),
+                "katex": assets.url_for("vendor/katex/katex.min.js"),
+                "mermaid": assets.url_for("vendor/mermaid/mermaid.min.js"),
+            }
+            ai_reading_script = (
+                '<script>window.EpubBrowserFeatureAssets='
+                + json.dumps(ai_feature_assets, separators=(",", ":"))
+                + ';</script><script src="/assets/ai-feature-loader.js" defer></script>'
+            )
         server_progress_stylesheet = '<link rel="stylesheet" href="/assets/library-progress.css">'
         server_progress_panel = """
     <section id="libraryProgress" class="library-progress" hidden aria-labelledby="libraryProgressTitle">
@@ -640,7 +644,7 @@ def publish_library_shell(
         }
         for book in ordered_books
     ]
-    html = render_library_shell(ordered_books, assets, urls, deployment_mode, kindle)
+    html = render_library_shell(ordered_books, assets, urls, deployment_mode, kindle, ai_reading_enabled=False)
     _atomic_write_text(root / "index.html", html)
     if deployment_mode == "ssg" and kindle:
         _atomic_write_text(
