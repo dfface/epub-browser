@@ -34,6 +34,7 @@ class ServerPageRenderer:
         source_format=EPUB_FORMAT,
         metadata_overrides=None,
         kindle=False,
+        ai_reading_enabled=True,
     ):
         self.public_dir = Path(public_dir)
         self.book_id = str(book_id)
@@ -41,6 +42,7 @@ class ServerPageRenderer:
         self.source_format = source_format
         self.metadata_overrides = dict(metadata_overrides or {})
         self.kindle = bool(kindle)
+        self.ai_reading_enabled = bool(ai_reading_enabled)
         if self.source_format not in {EPUB_FORMAT, PDF_FORMAT}:
             raise ServerPageError("Unsupported book format")
         self.book_dir = self.public_dir / "book" / self.book_id
@@ -133,7 +135,7 @@ class ServerPageRenderer:
         # security-sensitive reader chrome while keeping transient state out
         # of the persistent cache.
         try:
-            return EPUBProcessor.from_server_content_cache(
+            processor = EPUBProcessor.from_server_content_cache(
                 book_id=self.book_id,
                 metadata=metadata,
                 asset_manifest=PublishedAssets(self._asset_manifest()),
@@ -142,6 +144,8 @@ class ServerPageRenderer:
             )
         except ValueError as error:
             raise ServerPageError("Book content cache is invalid") from error
+        processor.ai_reading_enabled = self.ai_reading_enabled
+        return processor
 
     def _active_processor(self) -> EPUBProcessor:
         if self.source_format == PDF_FORMAT:
@@ -188,6 +192,7 @@ class ServerPageRenderer:
             )
         except (KeyError, TypeError, ValueError) as error:
             raise ServerPageError("PDF metadata cache is invalid") from error
+        processor.ai_reading_enabled = self.ai_reading_enabled
         return metadata, processor
 
     def _asset_manifest(self) -> dict[str, str]:

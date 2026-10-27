@@ -3758,6 +3758,7 @@ window.location.assign(payload.redirect||'/');
             markup = render_library_shell(
                 (), current_published_assets(), SiteURLs(),
                 deployment_mode='server', kindle=kindle,
+                ai_reading_enabled=store.get_ai_settings()["enabled"],
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
@@ -4009,12 +4010,15 @@ window.location.assign(payload.redirect||'/');
                 or kindle_page_allowed
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
+            ai_settings = store.get_ai_settings()
+            ai_reading_enabled = bool(ai_settings.get("enabled"))
             renderer = ServerPageRenderer(
                 base_directory,
                 book_id,
                 source_format=book.source_format,
                 metadata_overrides=store.managed_book_metadata(book_id),
                 kindle=kindle,
+                ai_reading_enabled=ai_reading_enabled,
             )
             # Retain a narrow compatibility path for manually-created test
             # fixtures and legacy caches that still have an accepted marker.
