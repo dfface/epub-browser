@@ -79,3 +79,159 @@ jobs:
                 \"text\": \"GitHub workflow 通知：\\n- 工作流：Upload to Docker\\n- 状态：$STATUS_TEXT\\n- 触发事件：${{ github.event_name }}\\n- 提交：${{ github.sha }}\\n- 分支：${{ github.ref }}\\n- 仓库：${{ github.repository }}\"
               }
             }"
+            
+  request-gitea-1panel-upgrade:
+    needs: [docker]
+    if: ${{ needs.docker.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            RAW="${{ github.event.release.tag_name }}"
+          else
+            # 手动触发：拉取本仓库最新的 release tag 作为版本
+            RAW="$(curl -fsSL \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
+              | jq -r '.tag_name // empty')"
+          fi
+
+          if [ -z "$RAW" ]; then
+            echo "::error::无法解析版本号（手动触发时仓库需至少有一个 release）"
+            exit 1
+          fi
+
+          CLEAN="${RAW#v}"     # 去掉 v 前缀
+          echo "version=$CLEAN" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $CLEAN"
+
+      - name: Wait for Docker image availability
+        run: sleep 10
+
+      - name: Request controlled Gitea upgrade
+        shell: bash
+        env:
+          GITEA_BASE_URL: ${{ vars.GITEA_BASE_URL }}
+          GITEA_OWNER: devops
+          GITEA_REPO: doco-cd
+          GITEA_LABEL_ID: ${{ vars.GITEA_CONTROLLED_UPDATE_LABEL_ID }}
+          GITEA_ISSUE_TOKEN: ${{ secrets.GITEA_ISSUE_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.-]+)?$ ]]
+          [[ "$GITEA_LABEL_ID" =~ ^[0-9]+$ ]]
+
+          request_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          request_body="$(
+            jq -nc \
+              --arg request_id "$request_id" \
+              --arg version "$VERSION" \
+              --arg requested_at "$requested_at" \
+              '{
+                request_id: $request_id,
+                service: "epub-browser",
+                changes: {EPUB_BROWSER_VERSION: $version},
+                requested_by: "github-actions",
+                requested_at: $requested_at
+              }'
+          )"
+
+          issue_payload="$(
+            jq -nc \
+              --arg title "controlled-update: epub-browser-$VERSION" \
+              --arg body "$request_body" \
+              --argjson label_id "$GITEA_LABEL_ID" \
+              '{title: $title, body: $body, labels: [$label_id]}'
+          )"
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$GITEA_BASE_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues" \
+            --header "Authorization: token $GITEA_ISSUE_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$issue_payload"
+
+  request-gitea-mbp-upgrade:
+    needs: [docker]
+    if: ${{ needs.docker.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            RAW="${{ github.event.release.tag_name }}"
+          else
+            # 手动触发：拉取本仓库最新的 release tag 作为版本
+            RAW="$(curl -fsSL \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
+              | jq -r '.tag_name // empty')"
+          fi
+
+          if [ -z "$RAW" ]; then
+            echo "::error::无法解析版本号（手动触发时仓库需至少有一个 release）"
+            exit 1
+          fi
+
+          CLEAN="${RAW#v}"     # 去掉 v 前缀
+          echo "version=$CLEAN" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $CLEAN"
+
+      - name: Wait for Docker image availability
+        run: sleep 10
+
+      - name: Request controlled Gitea upgrade
+        shell: bash
+        env:
+          GITEA_BASE_URL: ${{ vars.GITEA_BASE_URL }}
+          GITEA_OWNER: devops
+          GITEA_REPO: doco-cd-macos
+          GITEA_LABEL_ID: ${{ vars.GITEA_CONTROLLED_UPDATE_MBP_LABEL_ID }}
+          GITEA_ISSUE_TOKEN: ${{ secrets.GITEA_ISSUE_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}([-+][0-9A-Za-z.-]+)?$ ]]
+          [[ "$GITEA_LABEL_ID" =~ ^[0-9]+$ ]]
+
+          request_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          request_body="$(
+            jq -nc \
+              --arg request_id "$request_id" \
+              --arg version "$VERSION" \
+              --arg requested_at "$requested_at" \
+              '{
+                request_id: $request_id,
+                service: "epub-browser",
+                changes: {EPUB_BROWSER_VERSION: $version},
+                requested_by: "github-actions",
+                requested_at: $requested_at
+              }'
+          )"
+
+          issue_payload="$(
+            jq -nc \
+              --arg title "controlled-update: epub-browser-$VERSION" \
+              --arg body "$request_body" \
+              --argjson label_id "$GITEA_LABEL_ID" \
+              '{title: $title, body: $body, labels: [$label_id]}'
+          )"
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$GITEA_BASE_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/issues" \
+            --header "Authorization: token $GITEA_ISSUE_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$issue_payload"
