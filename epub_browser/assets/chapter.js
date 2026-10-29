@@ -117,42 +117,63 @@ function scopeCSS(cssText, scopeSelector) {
     }
   );
   
-  var processRules = function(css, inMediaQuery) {
-    return css.replace(
-      /((?:@media[^{]+\{[^{]*)?)([^{]+)\{([^}]+)\}/g,
-      function(match, mediaPart, selectors, rules) {
-        if (mediaPart) {
-          var selArr = selectors.split(',');
-          var processed = [];
-          for (var i = 0; i < selArr.length; i++) {
-            var s = selArr[i].trim();
-            if (s === '' || s.startsWith('@') || s.indexOf(scopeSelector) !== -1) {
-              processed.push(s);
-            } else {
-              processed.push(scopeComplexSelector(s, scopeSelector));
-            }
-          }
-          return mediaPart + processed.join(', ') + '{' + rules + '}';
-        } else {
-          var selArr2 = selectors.split(',');
-          var processed2 = [];
-          for (var i = 0; i < selArr2.length; i++) {
-            var s = selArr2[i].trim();
-            if (s === '' || s.startsWith('@') || s.indexOf(scopeSelector) !== -1) {
-              processed2.push(s);
-            } else {
-              processed2.push(scopeComplexSelector(s, scopeSelector));
-            }
-          }
-          return processed2.join(', ') + '{' + rules + '}';
-        }
+  function matchingBrace(css, openIndex) {
+    var depth = 0;
+    for (var k = openIndex; k < css.length; k++) {
+      if (css[k] === '{') { depth++; }
+      else if (css[k] === '}') {
+        depth--;
+        if (depth === 0) { return k; }
       }
-    );
-  };
+    }
+    return css.length;
+  }
+
+  function scopeSelectorList(prelude, scope) {
+    var parts = prelude.split(',');
+    var scoped = [];
+    for (var i = 0; i < parts.length; i++) {
+      scoped.push(scopeComplexSelector(parts[i].trim(), scope));
+    }
+    return scoped.join(', ');
+  }
+
+  // Brace-aware scoping: walk top-level rules and recurse into grouping at-rules
+  // (@media/@supports/@scope/@container). This correctly handles nested blocks
+  // such as "@media (prefers-color-scheme: dark) { :root { ... } }", which the
+  // previous flat regex mis-parsed and left unscoped.
+  function scopeRules(css, scope) {
+    var out = '';
+    var i = 0;
+    while (i < css.length) {
+      var at = css.indexOf('{', i);
+      if (at === -1) { out += css.slice(i); break; }
+      var prelude = css.slice(i, at);
+      var j = matchingBrace(css, at);
+      var block = css.slice(at + 1, j);
+      if (/^\s*@/.test(prelude)) {
+        var m = prelude.match(/^\s*@([\w-]+)/);
+        var name = m ? m[1].toLowerCase() : '';
+        if (name === 'media' || name === 'supports' || name === 'scope' || name === 'container') {
+          out += prelude + '{' + scopeRules(block, scope) + '}';
+        } else {
+          out += prelude + '{' + block + '}';
+        }
+      } else {
+        out += scopeSelectorList(prelude, scope) + '{' + block + '}';
+      }
+      i = j + 1;
+    }
+    return out;
+  }
   
   var scopeComplexSelector = function(selector, scope) {
     if (selector.indexOf(scope) !== -1) return selector;
-    if (selector === ':root' || selector === ':host') return scope + ':root';
+    // Book "root" selectors (:root / :host / html / body) must be scoped to the
+    // content container itself, never the document root. Otherwise the book's
+    // custom properties (e.g. --accent, --border, --code-bg) leak onto <html>
+    // and override the app's own :root variables, or fail to apply at all.
+    if (selector === ':root' || selector === ':host' || selector === 'html' || selector === 'body') return scope;
     if (selector.indexOf(':not(') !== -1 || selector.indexOf(':is(') !== -1 || selector.indexOf(':where(') !== -1) {
       return selector.replace(/(:not\(|:is\(|:where\()([^)]+)\)/g, function(m, p, inner) {
         var scopedInner = inner.split(',').map(function(s) {
@@ -171,14 +192,60 @@ function scopeCSS(cssText, scopeSelector) {
     return scope + ' ' + selector;
   };
   
-  var result = processRules(processedKeyframes);
+  var result = scopeRules(processedKeyframes, scopeSelector);
   for (var orig in keyframesMap) {
     if (keyframesMap.hasOwnProperty(orig)) {
       var reg = new RegExp('\\b' + orig + '\\b', 'g');
       result = result.replace(reg, keyframesMap[orig]);
     }
   }
+
+  // Books key their dark palette off the OS via @media (prefers-color-scheme:
+  // dark). The reader switches themes with a class on <html> (.dark-mode for
+  // dark, plus sepia/forest/ocean variants), NOT via the OS setting. So we
+  // CONVERT each such block into a .dark-mode [data-eb-styles] block and DROP
+  // the original @media wrapper. This makes the book's dark palette follow the
+  // reader's toggle instead of the OS preference, and prevents the book dark
+  // variables from applying in reader light mode just because the OS is dark.
+  result = bridgeBookDarkToAppToggle(result, scopeSelector);
+
   return result;
+}
+
+function bridgeBookDarkToAppToggle(css, scope) {
+  var scopeRe = new RegExp(scope.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+  var out = '';
+  var i = 0;
+  while (i < css.length) {
+    var at = css.indexOf('@media', i);
+    if (at === -1) { out += css.slice(i); break; }
+    out += css.slice(i, at);
+    var open = css.indexOf('{', at);
+    if (open === -1) { out += css.slice(at); break; }
+    var prelude = css.slice(at + 6, open);
+    var depth = 0;
+    var j = open;
+    for (; j < css.length; j++) {
+      if (css[j] === '{') { depth++; }
+      else if (css[j] === '}') {
+        depth--;
+        if (depth === 0) { break; }
+      }
+    }
+    var isDarkMedia = /(^|[^a-z-])prefers-color-scheme\s*:\s*dark/.test(prelude) &&
+                      !/prefers-color-scheme\s*:\s*light/.test(prelude);
+    if (isDarkMedia) {
+      // Replace the OS-driven @media block with a reader-dark-mode block so the
+      // book dark palette only applies when the reader is in dark mode.
+      var inner = css.slice(open + 1, j);
+      var bridged = inner.replace(scopeRe, '.dark-mode ' + scope);
+      out += '\n/* epub-browser: book dark palette follows reader .dark-mode toggle */\n' + bridged + '\n';
+    } else {
+      out += css.slice(at, j + 1);
+    }
+    i = j + 1;
+  }
+  return out;
 }
 
 // 移除 async，Kindle 兼容
