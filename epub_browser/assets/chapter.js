@@ -1048,7 +1048,7 @@ function initScript() {
         wrapAllElements('table', 'div', content);
         wrapAllElements('img', 'div', content);
         prepareChapterCodeBlocks(content);
-        if (typeof hljs !== 'undefined') hljs.highlightAll();
+        highlightCodeBlocks(content);
         if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
         generateToc();
         updateTocHighlight();
@@ -1735,6 +1735,22 @@ function initScript() {
         var pres = (root || document).querySelectorAll('pre');
         for (var i = 0; i < pres.length; i++) {
             var p = pres[i];
+            var codeKids = [];
+            for (var j = 0; j < p.children.length; j++) {
+                if (p.children[j].tagName === 'CODE') {
+                    codeKids.push(p.children[j]);
+                }
+            }
+            if (codeKids.length > 1) {
+                // Some publishers (e.g. O'Reilly) already tokenise a single
+                // listing into many inline <code> elements, each carrying its
+                // own syntax class and colour supplied by the book's CSS.
+                // Keep those tokens (so the original colours survive), mark
+                // the block so it is excluded from highlight.js, and let the
+                // stylesheet render the tokens inline as one continuous block
+                // instead of one block per <code>.
+                p.classList.add('eb-tokenized');
+            }
             if (p.children.length === 0) {
                 var c = document.createElement('code');
                 c.innerHTML = p.innerHTML;
@@ -1744,8 +1760,19 @@ function initScript() {
         }
     }
 
+    function highlightCodeBlocks(root) {
+        if (typeof hljs === 'undefined') return;
+        // Only highlight listings we did not receive pre-tokenised. Calling
+        // highlightElement per block keeps the publisher-tokenised blocks
+        // (marked with .eb-tokenized) out of highlight.js entirely.
+        var blocks = (root || document).querySelectorAll('pre:not(.eb-tokenized) > code');
+        for (var i = 0; i < blocks.length; i++) {
+            hljs.highlightElement(blocks[i]);
+        }
+    }
+
     prepareChapterCodeBlocks(content);
-    if (typeof hljs !== 'undefined') hljs.highlightAll();
+    highlightCodeBlocks(content);
     
     function switchCodeTheme(dark) {
         var light = document.querySelector('link[href*="github"][id*="light"]');

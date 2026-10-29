@@ -629,8 +629,25 @@ body.reader-drawer-open {
     padding: 10px;
     font-family: 'Courier New', monospace;
     font-size: 0.9rem;
-    display: flex;
+    display: block;
     white-space: pre;
+}
+
+/* Listings a publisher already split into many inline <code> tokens
+   (e.g. O'Reilly): keep every token inline so the listing stays one block,
+   and drop the per-token box so the tokens read as continuous code. The
+   tokens keep the colours supplied by the book's own stylesheet. */
+#eb-content pre.eb-tokenized code {
+    display: inline;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    white-space: inherit;
 }
 
 /* #eb-content blockquote {
@@ -1829,103 +1846,119 @@ body.pagination-mode {
 }
 
 /* 代码块 */
-.dark-mode #eb-content pre code {
-    background: var(--background) !important;
-    color: var(--text) !important;
-}
-
 .dark-mode #eb-content pre {
     background: var(--border) !important;
 }
 
-/* 代码高亮主题覆盖 */
-.dark-mode .hljs {
-    background: var(--background) !important;
+/* 暗色模式下，代码块内的高亮 token 必须以高于全局反转规则
+   (.dark-mode #eb-content * 的特异性 1,1,0) 的 !important 胜出，否则会被压平成
+   正文色。hljs 块沿用 github 暗色主题配色；出版商逐 token 拆分的块（O'Reilly 等）
+   按其 pygments 类名套用同一套暗色配色，确保深色模式下同样有区分色 */
+.dark-mode #eb-content pre code,
+.dark-mode #eb-content pre.eb-tokenized code {
+    background: transparent !important;
     color: var(--text) !important;
 }
 
-.dark-mode .hljs-comment,
-.dark-mode .hljs-quote {
-    color: var(--text-secondary) !important;
+/* 注释 / 引用 */
+.dark-mode #eb-content pre code.hljs .hljs-comment,
+.dark-mode #eb-content pre code.hljs .hljs-quote,
+.dark-mode #eb-content pre.eb-tokenized code.c,
+.dark-mode #eb-content pre.eb-tokenized code.c1,
+.dark-mode #eb-content pre.eb-tokenized code.cm,
+.dark-mode #eb-content pre.eb-tokenized code.cp,
+.dark-mode #eb-content pre.eb-tokenized code.cs {
+    color: #8b949e !important;
 }
 
-.dark-mode .hljs-keyword,
-.dark-mode .hljs-selector-tag,
-.dark-mode .hljs-literal,
-.dark-mode .hljs-section,
-.dark-mode .hljs-link {
-    color: var(--button-bg) !important;
+/* 关键字 / 选择器 / 字面量 / 节 / 链接 / 运算符 */
+.dark-mode #eb-content pre code.hljs .hljs-keyword,
+.dark-mode #eb-content pre code.hljs .hljs-selector-tag,
+.dark-mode #eb-content pre code.hljs .hljs-literal,
+.dark-mode #eb-content pre code.hljs .hljs-section,
+.dark-mode #eb-content pre code.hljs .hljs-link,
+.dark-mode #eb-content pre code.hljs .hljs-operator,
+.dark-mode #eb-content pre.eb-tokenized code.k,
+.dark-mode #eb-content pre.eb-tokenized code.kc,
+.dark-mode #eb-content pre.eb-tokenized code.kd,
+.dark-mode #eb-content pre.eb-tokenized code.kn,
+.dark-mode #eb-content pre.eb-tokenized code.kp,
+.dark-mode #eb-content pre.eb-tokenized code.kr,
+.dark-mode #eb-content pre.eb-tokenized code.kt,
+.dark-mode #eb-content pre.eb-tokenized code.ow {
+    color: #ff7b72 !important;
 }
 
-.dark-mode .hljs-string,
-.dark-mode .hljs-title,
-.dark-mode .hljs-name,
-.dark-mode .hljs-type,
-.dark-mode .hljs-attribute,
-.dark-mode .hljs-symbol,
-.dark-mode .hljs-bullet,
-.dark-mode .hljs-built_in,
-.dark-mode .hljs-addition,
-.dark-mode .hljs-variable,
-.dark-mode .hljs-template-tag,
-.dark-mode .hljs-template-variable {
-    color: var(--text) !important;
+/* 字符串 / 标题 / 名称 / 类型 / 属性 / 符号 / 内置 / 变量等 */
+.dark-mode #eb-content pre code.hljs .hljs-string,
+.dark-mode #eb-content pre code.hljs .hljs-title,
+.dark-mode #eb-content pre code.hljs .hljs-name,
+.dark-mode #eb-content pre code.hljs .hljs-attribute,
+.dark-mode #eb-content pre code.hljs .hljs-symbol,
+.dark-mode #eb-content pre code.hljs .hljs-bullet,
+.dark-mode #eb-content pre code.hljs .hljs-addition,
+.dark-mode #eb-content pre code.hljs .hljs-variable,
+.dark-mode #eb-content pre code.hljs .hljs-template-tag,
+.dark-mode #eb-content pre code.hljs .hljs-template-variable,
+.dark-mode #eb-content pre.eb-tokenized code.s,
+.dark-mode #eb-content pre.eb-tokenized code.s1,
+.dark-mode #eb-content pre.eb-tokenized code.s2,
+.dark-mode #eb-content pre.eb-tokenized code.sb,
+.dark-mode #eb-content pre.eb-tokenized code.sc,
+.dark-mode #eb-content pre.eb-tokenized code.sd,
+.dark-mode #eb-content pre.eb-tokenized code.se,
+.dark-mode #eb-content pre.eb-tokenized code.sh,
+.dark-mode #eb-content pre.eb-tokenized code.si,
+.dark-mode #eb-content pre.eb-tokenized code.sr,
+.dark-mode #eb-content pre.eb-tokenized code.sx,
+.dark-mode #eb-content pre.eb-tokenized code.ss {
+    color: #a5d6ff !important;
 }
 
-.dark-mode .hljs-number,
-.dark-mode .hljs-regexp,
-.dark-mode .hljs-literal {
-    color: var(--notification-success) !important;
+/* 数字 / 正则 */
+.dark-mode #eb-content pre code.hljs .hljs-number,
+.dark-mode #eb-content pre code.hljs .hljs-regexp,
+.dark-mode #eb-content pre code.hljs .hljs-meta,
+.dark-mode #eb-content pre.eb-tokenized code.m,
+.dark-mode #eb-content pre.eb-tokenized code.mi,
+.dark-mode #eb-content pre.eb-tokenized code.mf,
+.dark-mode #eb-content pre.eb-tokenized code.mh,
+.dark-mode #eb-content pre.eb-tokenized code.mo,
+.dark-mode #eb-content pre.eb-tokenized code.il,
+.dark-mode #eb-content pre.eb-tokenized code.mn,
+.dark-mode #eb-content pre.eb-tokenized code.mx {
+    color: #79c0ff !important;
 }
 
-.dark-mode .hljs-deletion,
-.dark-mode .hljs-meta {
-    color: #ff6b6b !important;
+/* 函数名 / 删除（强调） */
+.dark-mode #eb-content pre code.hljs .hljs-title.function_,
+.dark-mode #eb-content pre code.hljs .hljs-deletion,
+.dark-mode #eb-content pre.eb-tokenized code.nf {
+    color: #d2a8ff !important;
 }
 
-/* 日间模式代码高亮覆盖 */
+/* 内置名 / 类型（github 暗色用橙色，与字符串蓝区分） */
+.dark-mode #eb-content pre code.hljs .hljs-built_in,
+.dark-mode #eb-content pre code.hljs .hljs-type {
+    color: #ffa657 !important;
+}
+
+/* 类名（pygments: nc） */
+.dark-mode #eb-content pre.eb-tokenized code.nc {
+    color: #ffa657 !important;
+}
+
+/* 日间模式代码高亮：直接沿用 github 浅色主题的原始 token 配色（字符串、
+   关键字、数字等各有区分色），只把代码块背景设为透明，使其与阅读区背景
+   融合，不再把大量 token 压平成正文色（否则 Python 这类以标识符/字符串为主的
+   代码在浅色模式下看起来像是“没有高亮”） */
 :not(.dark-mode) .hljs {
-    background: var(--background) !important;
-    color: var(--text) !important;
+    background: transparent !important;
 }
 
 :not(.dark-mode) .hljs-comment,
 :not(.dark-mode) .hljs-quote {
     color: var(--text-secondary) !important;
-}
-
-:not(.dark-mode) .hljs-keyword,
-:not(.dark-mode) .hljs-selector-tag,
-:not(.dark-mode) .hljs-literal,
-:not(.dark-mode) .hljs-section,
-:not(.dark-mode) .hljs-link {
-    color: var(--button-bg) !important;
-}
-
-:not(.dark-mode) .hljs-string,
-:not(.dark-mode) .hljs-title,
-:not(.dark-mode) .hljs-name,
-:not(.dark-mode) .hljs-type,
-:not(.dark-mode) .hljs-attribute,
-:not(.dark-mode) .hljs-symbol,
-:not(.dark-mode) .hljs-bullet,
-:not(.dark-mode) .hljs-built_in,
-:not(.dark-mode) .hljs-addition,
-:not(.dark-mode) .hljs-variable,
-:not(.dark-mode) .hljs-template-tag,
-:not(.dark-mode) .hljs-template-variable {
-    color: var(--text) !important;
-}
-
-:not(.dark-mode) .hljs-number,
-:not(.dark-mode) .hljs-regexp,
-:not(.dark-mode) .hljs-literal {
-    color: var(--notification-success) !important;
-}
-
-:not(.dark-mode) .hljs-deletion,
-:not(.dark-mode) .hljs-meta {
-    color: #ff6b6b !important;
 }
 
 /* 表格 */
