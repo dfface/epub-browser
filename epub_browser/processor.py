@@ -68,7 +68,10 @@ SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 # Server reader chrome and assets are deliberately outside this revision.
 # v10: chapters are parsed and sanitized through the unified lxml pipeline, so
 # stored chapter HTML differs from earlier revisions and must be regenerated.
-SERVER_OUTPUT_REVISION = "server-content-v10"
+# v11: book CSS font/length fixed units (px/pt) in font-size-relevant
+# properties are converted to `em` so the reader font-size control affects every
+# EPUB; stored chapter CSS therefore differs and must be regenerated.
+SERVER_OUTPUT_REVISION = "server-content-v11"
 
 SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "aac", "avif", "bmp", "css", "eot", "flac", "gif", "ico", "jpe", "jfif", "jpeg",
@@ -892,8 +895,113 @@ def _split_css_declarations(content):
     return parts
 
 
+# Font/sizing properties written with fixed (px, pt) or root/percentage
+# relative (rem, %) units ignore or only partially honor the reader's font-size
+# control: `px`/`pt` are absolute, `rem` is relative to the document root which
+# the reader never changes (so it behaves like a fixed size), and `%` is
+# normalized for consistency. We convert all of them to `em` (relative to the
+# parent / content container) so they scale with that control. Only
+# text-sizing/spacing properties are touched; layout-critical properties
+# (borders, margins, widths, images, ...) are left alone. `em` is kept as-is;
+# `calc()`/`var()`/`clamp()` values and exotic units (ex, ch, vw, ...) are
+# preserved.
+_FIXED_UNIT_EM_PROPERTIES = frozenset({
+    "font-size",
+    "letter-spacing",
+    "word-spacing",
+    "line-height",
+})
+
+# The reader applies its font-size control as `font-size: <n>rem` on the content
+# container. `em` is relative to that container, so converted values scale with
+# the control; `rem` is relative to the document root (which the reader never
+# changes) so it would NOT scale -- that is exactly why `rem` is rewritten to
+# `em` here. This also avoids double scaling because the reader never changes the
+# root font-size.
+_ROOT_FONT_SIZE_PX = 16.0
+_PT_PER_PX = 4.0 / 3.0  # 1pt = 1/72in, 1px = 1/96in -> 1pt = 4/3 px
+
+# Matches fixed (px, pt) and root/percentage relative (rem, %) lengths. These are
+# all normalized to `em` for font/sizing properties; `em` itself and other values
+# are left to the broader passthrough below.
+_FONT_TO_EM_RE = re.compile(
+    r"^\s*(-?\d*\.?\d+)(px|pt|rem|%)\s*(!\s*important)?\s*$",
+    re.IGNORECASE,
+)
+_CSS_DECL_NAME_RE = re.compile(r"^\s*([\w-]+)\s*:")
+
+
+def _length_to_px(value):
+    # Absolute length in px, used to resolve a block's own font-size so a px/pt
+    # line-height can be converted relative to it. Percentages are relative and
+    # cannot be expressed as an absolute px without parent context, so they are
+    # skipped (they are still normalized to `em` by the converter below). `rem`
+    # maps cleanly to px (1rem == 16px) and is kept.
+    match = _FONT_TO_EM_RE.match(value)
+    if not match:
+        return None
+    unit = match.group(2).lower()
+    if unit == "%":
+        return None
+    number = float(match.group(1))
+    if unit == "pt":
+        number *= _PT_PER_PX
+    elif unit == "rem":
+        number *= _ROOT_FONT_SIZE_PX
+    return number
+
+
+def _format_em(value_px, reference_px):
+    em = value_px / reference_px
+    if em == 0:
+        return "0"
+    return format(em, ".4f").rstrip("0").rstrip(".") + "em"
+
+
+def _normalize_font_unit_to_em(name, value, font_size_px_ref):
+    """Normalize a font/sizing length to `em`.
+
+    `px`/`pt` are absolute, `rem` is root-relative, and `%` is relative to the
+    parent; all three are rewritten to `em` (relative to the content container)
+    so they honor the reader font-size control instead of staying pinned. `em`
+    and any value not matched here (calc/var/ex/ch/vw/...) pass through.
+    """
+    if name not in _FIXED_UNIT_EM_PROPERTIES:
+        return None
+    match = _FONT_TO_EM_RE.match(value)
+    if not match:
+        return None
+    number = float(match.group(1))
+    unit = match.group(2).lower()
+    important = match.group(3)
+    if unit == "%":
+        em_value = _format_em(number / 100.0, 1.0)
+    elif unit == "rem":
+        # 1rem == 16px; divide by the same 16 so 1rem -> 1em. `em` then scales
+        # with the reader control while `rem` (root-relative) would not.
+        em_value = _format_em(number * _ROOT_FONT_SIZE_PX, _ROOT_FONT_SIZE_PX)
+    else:  # px / pt
+        px = number * (_PT_PER_PX if unit == "pt" else 1.0)
+        reference = font_size_px_ref if (
+            name == "line-height" and font_size_px_ref
+        ) else _ROOT_FONT_SIZE_PX
+        em_value = _format_em(px, reference)
+    if important:
+        em_value = em_value + " " + important.strip()
+    return "{}: {}".format(name, em_value)
+
+
+def _declaration_name_value(declaration):
+    name_match = _CSS_DECL_NAME_RE.match(declaration)
+    if not name_match:
+        return "", ""
+    name = name_match.group(1).casefold()
+    value = declaration.split(":", 1)[1].strip()
+    return name, value
+
+
 def sanitize_css_declarations(content):
-    declarations = []
+    parsed = []
     for raw_declaration in _split_css_declarations(str(content or "")):
         declaration = raw_declaration.strip()
         if not declaration or ":" not in declaration:
@@ -901,8 +1009,22 @@ def sanitize_css_declarations(content):
         decoded = _decode_css_escapes(declaration)
         if _RISKY_CSS.search(decoded) or not _css_urls_are_safe(declaration):
             continue
-        declarations.append(declaration)
-    return "; ".join(declarations)
+        parsed.append(declaration)
+    # Resolve the block's own font-size (px) so a px/pt line-height can be
+    # converted relative to it; otherwise line-height falls back to the root.
+    font_size_px_ref = None
+    for declaration in parsed:
+        name, value = _declaration_name_value(declaration)
+        if name == "font-size":
+            font_size_px_ref = _length_to_px(value)
+            if font_size_px_ref is not None:
+                break
+    converted = []
+    for declaration in parsed:
+        name, value = _declaration_name_value(declaration)
+        replacement = _normalize_font_unit_to_em(name, value, font_size_px_ref)
+        converted.append(replacement if replacement else declaration)
+    return "; ".join(converted)
 
 
 def _css_at_rule_name(prelude):
@@ -1004,11 +1126,29 @@ def _sanitize_css_stylesheet(content):
     return "\n".join(output)
 
 
+_INLINE_STYLE_ATTR_RE = re.compile(r'style="([^"]*)"', re.IGNORECASE)
+
+
+def _convert_inline_styles(html):
+    """Convert fixed font/length units inside inline `style` attributes.
+
+    The SSG build does not run the full HTML sanitizer, so inline-styled text
+    would otherwise ignore the reader font-size control. We only rewrite the
+    font/length declarations (via sanitize_css_declarations); everything else is
+    passed through untouched.
+    """
+    def _replace(match):
+        converted = sanitize_css_declarations(match.group(1))
+        return 'style="{}"'.format(converted) if converted else match.group(0)
+    return _INLINE_STYLE_ATTR_RE.sub(_replace, html)
+
+
 def sanitize_css_text(content):
+    # Always run the full sanitizer so fixed font/length units (px/pt) in
+    # stylesheet CSS are converted to `em` (see sanitize_css_declarations),
+    # not just inline styles. Comments are stripped first; the sanitizer drops
+    # risky declarations and re-emits the rest, which is the intended cleaning.
     candidate = _CSS_COMMENT.sub("", str(content or ""))
-    if not _RISKY_CSS.search(_decode_css_escapes(candidate)) \
-            and _css_urls_are_safe(candidate):
-        return candidate
     return _sanitize_css_stylesheet(candidate)
 
 
@@ -3002,6 +3142,11 @@ document.addEventListener('DOMContentLoaded', function() {{
             # HTML documents. Only generated chapter_N.html links survive.
             body_content = self.fix_html_file_links(body_content, chapter_path)
             body_content = sanitize_html_fragment(body_content)
+        else:
+            # The SSG build does not run the full HTML sanitizer; convert fixed
+            # font/length units inside inline `style` attributes so the reader
+            # font-size control still affects inline-styled text (issue #35).
+            body_content = _convert_inline_styles(body_content)
         
         # 修复body中的图片链接
         body_content = self.fix_image_links(body_content, chapter_path)
@@ -3064,12 +3209,16 @@ document.addEventListener('DOMContentLoaded', function() {{
                             link.replace(f'href="{href}"', f'href="{web_href}"')
                         )
                 styles = re.findall(
-                    r'<style[^>]*>.*?</style>',
+                    r'<style[^>]*>(.*?)</style>',
                     head_content,
-                    re.DOTALL,
+                    re.DOTALL | re.IGNORECASE,
                 )
                 for style in styles:
-                    style_links.append(add_class_to_style(style, "eb"))
+                    safe_style = sanitize_css_text(style)
+                    if safe_style:
+                        style_links.append(
+                            '<style class="eb">{}</style>'.format(safe_style)
+                        )
             return '\n        '.join(style_links)
 
         style_links = []

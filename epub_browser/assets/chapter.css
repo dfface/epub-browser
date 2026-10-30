@@ -537,36 +537,6 @@ body.reader-drawer-open {
     color: var(--reader-action, var(--button-bg)) !important;
 }
 
-/* #eb-content h2, #eb-content h3, #eb-content h4 {
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    color: var(--text-color);
-    transition: var(--transition);
-}
-
-#eb-content h2 {
-    font-size: 1.5rem;
-    border-bottom: 2px solid var(--primary);
-    padding-bottom: 0.5rem;
-}
-
-#eb-content h3 {
-    font-size: 1.3rem;
-    border-left: 4px solid var(--primary);
-    padding-left: 1rem;
-}
-
-#eb-content h4 {
-    font-size: 1.1rem;
-    border-left: 2px solid var(--primary);
-    padding-left: 1rem;
-}
-
-#eb-content p {
-    margin-bottom: 0.8rem;
-    line-height: 1.7;
-} */
-
 #eb-content .img-wrapper {
     overflow: scroll;
     display: initial;
@@ -616,7 +586,9 @@ body.reader-drawer-open {
     padding: 10px 10px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
+    /* Relative to `pre` (which is already 0.692em of the container) so the code
+       block does not get double-scaled; equals 0.9rem at the default size. */
+    font-size: 1em;
     height: auto;
     width: 100%;
 }
@@ -628,7 +600,9 @@ body.reader-drawer-open {
     margin: 0px;
     padding: 10px;
     font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
+    /* `em` so code scales with the reader font-size control; 0.692em == 0.9rem
+       at the default 1.3rem content container. */
+    font-size: 0.692em;
     display: block;
     white-space: pre;
 }
@@ -649,30 +623,6 @@ body.reader-drawer-open {
     font-size: inherit;
     white-space: inherit;
 }
-
-/* #eb-content blockquote {
-    color: inherit;
-    position: relative;
-    overflow: hidden;
-}
-
-#eb-content ul, #eb-content ol {
-    padding: 0;
-}
-
-#eb-content ul li, #eb-content ol li {
-    border-radius: inherit;
-    box-shadow: none;
-    transition: all 0.3s ease;
-}
-
-#eb-content ul li:before {
-    margin-right: 0.5rem;
-}
-
-#eb-content ol li:before {
-    margin-right: 0.5rem;
-} */
 
 .eb-footer {
     text-align: center;
