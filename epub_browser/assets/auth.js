@@ -10,6 +10,7 @@
     var sessionRequest = null;
     var redirecting = false;
     var initialized = false;
+    var localeSyncBound = false;
     var users = [];
     var books = [];
     var aiSettings = null;
@@ -1270,12 +1271,24 @@
     function renderIdentity() {
       var identity = element('accountIdentity');
       var menuValue = element('accountMenuValue');
-      if (!sessionState || !sessionState.user) return;
+      if (!sessionState || !sessionState.user) {
+        // Not authenticated: fall back to the translated "Account" label.
+        if (menuValue && !menuValue.getAttribute('data-i18n')) {
+          menuValue.setAttribute('data-i18n', 'account.menu');
+        }
+        if (identity) identity.textContent = '';
+        return;
+      }
       if (identity) identity.textContent = t('account.signedInAs', {
         username: sessionState.user.username,
         role: roleLabel(sessionState.user.role)
       });
-      if (menuValue) menuValue.textContent = sessionState.user.username;
+      if (menuValue) {
+        // The menu value carries the username (not a translatable string), so
+        // stop translateDocument from overwriting it on locale changes.
+        menuValue.textContent = sessionState.user.username;
+        menuValue.removeAttribute('data-i18n');
+      }
       var adminPanel = element('adminPanel');
       var adminMenu = element('adminMenu');
       if (adminPanel) adminPanel.hidden = sessionState.user.role !== 'admin';
@@ -4443,21 +4456,26 @@
       if (root.document && typeof root.document.addEventListener === 'function') {
         root.document.addEventListener('visibilitychange', handleAiJobsVisibilityChange);
       }
-      if (i18n() && i18n().onLocaleChange) {
-        i18n().onLocaleChange(function() {
-          renderIdentity();
-          renderSessions([]);
-          renderUsers();
-          renderAiSettings();
-          renderOidcSettings();
-          renderAccountOidc();
-          renderAiUserAccess();
-          renderAiTags();
-          renderAdminBooks();
-          renderAdminAiJobs();
-          loadSessions();
-        });
-      }
+      bindLocaleSync();
+    }
+
+    function bindLocaleSync() {
+      if (localeSyncBound) return;
+      if (!i18n() || !i18n().onLocaleChange) return;
+      localeSyncBound = true;
+      i18n().onLocaleChange(function() {
+        renderIdentity();
+        renderSessions([]);
+        renderUsers();
+        renderAiSettings();
+        renderOidcSettings();
+        renderAccountOidc();
+        renderAiUserAccess();
+        renderAiTags();
+        renderAdminBooks();
+        renderAdminAiJobs();
+        loadSessions();
+      });
     }
 
     function init() {
@@ -4475,6 +4493,8 @@
         return null;
       });
     }
+
+    bindLocaleSync();
 
     return {
       fetch: authenticatedFetch,

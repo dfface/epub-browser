@@ -2595,10 +2595,11 @@ class EPUBProcessor:
                 );
             }
         });
-}
-if (window.EpubBrowserCacheBoundary) {
-    window.EpubBrowserCacheBoundary.start(startBookClients);
-}"""
+    }
+    startBookClients();
+    if (window.EpubBrowserCacheBoundary) {
+        window.EpubBrowserCacheBoundary.start(function() {});
+    }"""
             if self.deployment_mode == "server"
             else "if (window.initScriptBook) window.initScriptBook();"
         )
@@ -4190,8 +4191,9 @@ document.addEventListener('DOMContentLoaded', function() {{
             if (window.EpubReadingSessions) window.EpubReadingSessions.start();
         });
     }
+    startChapterClients();
     if (window.EpubBrowserCacheBoundary) {
-        window.EpubBrowserCacheBoundary.start(startChapterClients);
+        window.EpubBrowserCacheBoundary.start(function() {});
     }"""
             if self.deployment_mode == "server"
             else "if (window.initScriptChapter) window.initScriptChapter();"
