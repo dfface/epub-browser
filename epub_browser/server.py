@@ -95,7 +95,7 @@ from .server_library import (
 )
 from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
-from .source_format import EPUB_FORMAT, PDF_FORMAT
+from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
 from .site import LibraryBook, render_kindle_library_page, render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
@@ -407,6 +407,44 @@ def error_payload(code, message):
     return {'code': code, 'message': message}
 
 
+def _safe_source_filename(raw):
+    """Reduce a client-supplied filename to a safe, non-hidden base name.
+
+    Strips any directory components (path separators) and characters that are
+    unsafe across common filesystems, but preserves Unicode letters and digits
+    so international names (e.g. Chinese or accented) survive intact.  Hidden
+    or empty names are refused so uploads can only land in the managed sources
+    directory under their bare name.
+    """
+    if not raw:
+        return ""
+    name = raw.split("/")[-1].split("\\")[-1]
+    # Keep Unicode word characters plus "." and "-" so international names are
+    # retained; replace everything else (separators, control characters, the
+    # reserved Windows characters, etc.) with an underscore.
+    name = re.sub(r"[^\w.-]", "_", name)
+    name = re.sub(r"_+", "_", name)
+    if not re.search(r"[^\W_]", name) or name.startswith(".") or name in (".", ".."):
+        return ""
+    if len(name) > 255:
+        stem, dot, suffix = name.rpartition(".")
+        if dot:
+            name = stem[:250] + dot + suffix
+        else:
+            name = name[:255]
+    return name
+
+
+def _is_valid_book_magic(head, filename):
+    """Best-effort content sniff for EPUB (ZIP) and PDF uploads."""
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".pdf":
+        return head[:4] == b"%PDF"
+    if suffix == ".epub":
+        return head[:4] in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
+    return False
+
+
 def route_is_public_unauthenticated(path):
     return (
         path in PUBLIC_UNAUTHENTICATED_ENDPOINTS
@@ -706,6 +744,7 @@ def create_app(
     log_errors: bool = False,
     server_directory=None,
     kindle: bool = False,
+    library_manager=None,
 ):
     """Create the ASGI module used by Uvicorn to serve an EPUB library."""
     base_directory = os.path.abspath(public_dir)
@@ -720,6 +759,11 @@ def create_app(
     # server directory, not inside the published cache tree.  Migrate any
     # databases earlier builds wrote under ``cache/public/data``.
     data_directory = Path(server_directory) if server_directory else Path(base_directory)
+    if library_manager is not None:
+        upload_sources_dir = Path(library_manager.managed_sources_dir)
+    else:
+        upload_sources_dir = data_directory / "data" / "sources"
+        upload_sources_dir.mkdir(parents=True, exist_ok=True)
     migrate_legacy_dictionary_directory(base_directory, data_directory)
     ai_reading = AIReadingService(store, base_directory)
     webhook_service = WebhookService(store)
@@ -2539,6 +2583,47 @@ window.location.assign(payload.redirect||'/');
         return response(
             {'books': [admin_book_data(book) for book in store.active_books()]}
         )
+
+    async def admin_books_upload(request):
+        require_admin(request)
+        if not runtime_status.is_ready():
+            return response(error_payload("not_ready", "Server is not ready"), 503)
+        raw_name = unquote(request.headers.get("x-epub-browser-source-filename", ""))
+        filename = _safe_source_filename(raw_name)
+        if not filename:
+            return response(
+                error_payload("invalid_source_filename", "Invalid source filename"), 400
+            )
+        if not is_supported_source(Path(filename)):
+            return response(
+                error_payload("unsupported_source", "Only EPUB and PDF files are supported"), 400
+            )
+        target = upload_sources_dir / filename
+        if target.exists():
+            return response(
+                error_payload("book_source_exists", "A book source with this name already exists"), 409
+            )
+        temp = upload_sources_dir / (".upload-" + secrets.token_urlsafe(24))
+        try:
+            with temp.open("xb") as output:
+                async for chunk in request.stream():
+                    output.write(chunk)
+            with temp.open("rb") as probe:
+                head = probe.read(5)
+            if not _is_valid_book_magic(head, filename):
+                return response(
+                    error_payload("unsupported_source", "The uploaded file is not a valid EPUB or PDF"), 400
+                )
+            os.replace(temp, target)
+        except OSError:
+            return response(
+                error_payload("source_upload_failed", "Failed to store the uploaded file"), 400
+            )
+        finally:
+            temp.unlink(missing_ok=True)
+        if library_manager is not None:
+            library_manager.queue_path(target)
+        return response({"filename": filename}, 201)
 
     async def admin_book_index(request):
         require_admin(request)
@@ -4919,6 +5004,7 @@ window.location.assign(payload.redirect||'/');
         ),
         Route('/api/admin/users/{username}', admin_user, methods=['PUT', 'DELETE']),
         Route('/api/admin/books', admin_books, methods=['GET']),
+        Route('/api/admin/books/upload', admin_books_upload, methods=['POST']),
         Route('/api/admin/books/index', admin_book_index, methods=['GET']),
         Route('/api/admin/books/bulk', admin_bulk_books, methods=['POST']),
         Route(

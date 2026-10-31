@@ -271,7 +271,11 @@
         oidc_identity_conflict: true,
         oidc_identity_not_found: true,
         last_login_method: true,
-        network: true
+        network: true,
+        invalid_source_filename: true,
+        unsupported_source: true,
+        book_source_exists: true,
+        source_upload_failed: true
       } : {
         authentication_required: true,
         csrf_required: true,
@@ -4126,6 +4130,274 @@
       if (bookRefresh) bookRefresh.addEventListener('click', function() {
         loadAdminBookIndex();
       });
+      var bookUploadForm = element('adminBookUploadForm');
+      var bookUploadFile = element('adminBookUploadFile');
+      var bookUploadButton = element('adminBookUploadButton');
+      var bookUploadLabel = element('adminBookUploadLabel');
+      var bookUploadMessage = element('adminBookUploadMessage');
+      var bookUploadFileList = element('adminBookUploadFileList');
+      var bookUploadClear = element('adminBookUploadClear');
+      var bookDropzone = element('adminBookDropzone');
+      if (bookUploadForm) {
+        var bookUploadBusy = false;
+        var bookUploadEntries = [];
+        var formatBookFileSize = function(bytes) {
+          if (typeof bytes !== 'number' || bytes < 0) return '';
+          if (bytes < 1024) return bytes + ' B';
+          var kb = bytes / 1024;
+          if (kb < 1024) return (kb < 10 ? kb.toFixed(1) : String(Math.round(kb))) + ' KB';
+          var mb = kb / 1024;
+          return (mb < 10 ? mb.toFixed(1) : String(Math.round(mb))) + ' MB';
+        };
+        var bookFileKey = function(file) {
+          return [file.name, file.size, file.lastModified || 0].join('|');
+        };
+        var isSupportedExtension = function(name) {
+          var suffix = (name.split('.').pop() || '').toLowerCase();
+          return suffix === 'epub' || suffix === 'pdf';
+        };
+        var clearBookUploadMessage = function() {
+          if (!bookUploadMessage) return;
+          bookUploadMessage.hidden = true;
+          bookUploadMessage.textContent = '';
+          bookUploadMessage.className = 'auth-alert admin-book-upload-message';
+        };
+        var setBookUploadMessage = function(kind, keyName, params) {
+          if (!bookUploadMessage) return;
+          bookUploadMessage.hidden = false;
+          bookUploadMessage.className = 'auth-alert admin-book-upload-message' +
+            (kind === 'success' ? ' success' : '');
+          bookUploadMessage.textContent = params ? t(keyName, params) : t(keyName);
+        };
+        var updateFileItemStatus = function(entry, statusEl) {
+          statusEl = statusEl || entry.statusEl;
+          if (!statusEl) return;
+          statusEl.className = 'admin-book-file-status';
+          statusEl.innerHTML = '';
+          if (entry.status === 'uploading') {
+            statusEl.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>';
+          } else if (entry.status === 'done') {
+            statusEl.innerHTML = '<i class="fas fa-circle-check" aria-hidden="true"></i>';
+          } else if (entry.status === 'error') {
+            statusEl.innerHTML = '<i class="fas fa-circle-exclamation" aria-hidden="true"></i>';
+            statusEl.title = entry.message || '';
+          }
+        };
+        var renderFileItem = function(entry) {
+          var li = document.createElement('li');
+          li.className = 'admin-book-file-item is-' + entry.status;
+          var icon = document.createElement('i');
+          icon.className = 'fas fa-file-lines admin-book-file-icon';
+          icon.setAttribute('aria-hidden', 'true');
+          var name = document.createElement('span');
+          name.className = 'admin-book-file-name';
+          name.textContent = entry.file.name;
+          var size = document.createElement('span');
+          size.className = 'admin-book-file-size';
+          size.textContent = formatBookFileSize(entry.file.size);
+          var status = document.createElement('span');
+          status.className = 'admin-book-file-status';
+          status.setAttribute('aria-hidden', 'true');
+          var remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'admin-book-file-remove';
+          remove.setAttribute('aria-label', t('admin.books.fileRemove', {filename: entry.file.name}));
+          remove.innerHTML = '<i class="fas fa-xmark" aria-hidden="true"></i>';
+          remove.addEventListener('click', function() {
+            if (bookUploadBusy) return;
+            removeFileEntry(entry);
+          });
+          li.appendChild(icon);
+          li.appendChild(name);
+          li.appendChild(size);
+          li.appendChild(status);
+          li.appendChild(remove);
+          entry.li = li;
+          entry.statusEl = status;
+          updateFileItemStatus(entry, status);
+          if (bookUploadFileList) bookUploadFileList.appendChild(li);
+        };
+        var refreshBookUploadControl = function() {
+          var retryable = 0;
+          var pendingOnly = 0;
+          var retryOnly = 0;
+          bookUploadEntries.forEach(function(entry) {
+            if (entry.status === 'pending') {
+              retryable += 1;
+              pendingOnly += 1;
+            } else if (entry.status === 'error' && entry.retryable) {
+              retryable += 1;
+              retryOnly += 1;
+            }
+          });
+          if (bookUploadButton) {
+            bookUploadButton.disabled = bookUploadBusy || retryable === 0;
+            bookUploadButton.setAttribute('aria-busy', bookUploadBusy ? 'true' : 'false');
+          }
+          if (bookUploadLabel) {
+            if (bookUploadBusy) {
+              bookUploadLabel.textContent = t('admin.books.uploading');
+            } else if (retryable === 0) {
+              bookUploadLabel.textContent = t('admin.books.uploadButton');
+            } else if (retryOnly > 0 && pendingOnly === 0) {
+              bookUploadLabel.textContent = t('admin.books.uploadRetry', {count: retryable});
+            } else {
+              bookUploadLabel.textContent = t('admin.books.uploadMany', {count: retryable});
+            }
+          }
+          if (bookUploadClear) {
+            bookUploadClear.hidden = bookUploadBusy || bookUploadEntries.length === 0;
+          }
+          if (bookUploadFile) bookUploadFile.disabled = bookUploadBusy;
+          if (bookUploadFileList) {
+            var removes = bookUploadFileList.querySelectorAll('.admin-book-file-remove');
+            for (var i = 0; i < removes.length; i++) removes[i].disabled = bookUploadBusy;
+          }
+        };
+        var removeFileEntry = function(entry) {
+          var index = bookUploadEntries.indexOf(entry);
+          if (index !== -1) bookUploadEntries.splice(index, 1);
+          if (entry.li && entry.li.parentNode) entry.li.parentNode.removeChild(entry.li);
+          refreshBookUploadControl();
+        };
+        var addFiles = function(fileLike) {
+          var incoming = fileLike ? Array.prototype.slice.call(fileLike) : [];
+          if (!incoming.length) return;
+          clearBookUploadMessage();
+          var seen = {};
+          bookUploadEntries.forEach(function(entry) {
+            seen[bookFileKey(entry.file)] = true;
+          });
+          incoming.forEach(function(file) {
+            var key = bookFileKey(file);
+            if (seen[key]) return;
+            seen[key] = true;
+            var entry = {file: file, status: 'pending', retryable: true, message: ''};
+            if (!isSupportedExtension(file.name)) {
+              entry.status = 'error';
+              entry.retryable = false;
+              entry.message = t('admin.error.unsupported_source');
+            }
+            bookUploadEntries.push(entry);
+            renderFileItem(entry);
+          });
+          refreshBookUploadControl();
+        };
+        var uploadOneEntry = function(entry) {
+          entry.status = 'uploading';
+          entry.li.className = 'admin-book-file-item is-uploading';
+          updateFileItemStatus(entry);
+          return entry.file.arrayBuffer().then(function(contents) {
+            return authenticatedFetch('/api/admin/books/upload', {
+              method: 'POST',
+              headers: {
+                'Content-Type': entry.file.type || 'application/octet-stream',
+                'X-EPUB-Browser-Source-Filename': encodeURIComponent(entry.file.name)
+              }, body: contents
+            });
+          }).then(function(response) {
+            if (!response.ok) {
+              return readJson(response).then(function(payload) {
+                entry.status = 'error';
+                entry.retryable = !(payload && payload.code === 'book_source_exists');
+                entry.message = t(messageKey('admin', payload && payload.code));
+                entry.li.className = 'admin-book-file-item is-error';
+                updateFileItemStatus(entry);
+                throw new Error('book_upload_failed');
+              });
+            }
+            entry.status = 'done';
+            entry.li.className = 'admin-book-file-item is-done';
+            updateFileItemStatus(entry);
+            return null;
+          }, function() {
+            if (entry.status !== 'done') {
+              entry.status = 'error';
+              entry.retryable = true;
+              entry.message = t('admin.error.source_upload_failed');
+              entry.li.className = 'admin-book-file-item is-error';
+              updateFileItemStatus(entry);
+            }
+          });
+        };
+        var runPool = function(items, limit, worker) {
+          var index = 0;
+          var runners = [];
+          var step = function() {
+            if (index >= items.length) return Promise.resolve();
+            var current = items[index++];
+            return Promise.resolve(worker(current)).then(step);
+          };
+          var count = Math.min(limit, items.length);
+          for (var i = 0; i < count; i++) runners.push(step());
+          return Promise.all(runners);
+        };
+        if (bookUploadFile) {
+          bookUploadFile.addEventListener('change', function() {
+            if (bookUploadBusy) return;
+            addFiles(bookUploadFile.files);
+            bookUploadFile.value = '';
+          });
+        }
+        if (bookDropzone && bookUploadFile) {
+          ['dragenter', 'dragover'].forEach(function(type) {
+            bookDropzone.addEventListener(type, function(event) {
+              event.preventDefault();
+              bookDropzone.classList.add('is-dragover');
+            });
+          });
+          ['dragleave', 'dragend'].forEach(function(type) {
+            bookDropzone.addEventListener(type, function() {
+              bookDropzone.classList.remove('is-dragover');
+            });
+          });
+          bookDropzone.addEventListener('drop', function(event) {
+            event.preventDefault();
+            bookDropzone.classList.remove('is-dragover');
+            if (bookUploadBusy) return;
+            var dropped = event.dataTransfer && event.dataTransfer.files;
+            if (dropped && dropped.length) addFiles(dropped);
+          });
+        }
+        if (bookUploadClear) {
+          bookUploadClear.addEventListener('click', function() {
+            if (bookUploadBusy) return;
+            bookUploadEntries.slice().forEach(removeFileEntry);
+            clearBookUploadMessage();
+          });
+        }
+        refreshBookUploadControl();
+        bookUploadForm.addEventListener('submit', function(event) {
+          event.preventDefault();
+          if (bookUploadBusy) return;
+          var pending = bookUploadEntries.filter(function(entry) {
+            return entry.status === 'pending' || (entry.status === 'error' && entry.retryable);
+          });
+          if (!pending.length) return;
+          bookUploadBusy = true;
+          refreshBookUploadControl();
+          var success = 0;
+          var failed = 0;
+          runPool(pending, 3, function(entry) {
+            return uploadOneEntry(entry).then(function() {
+              if (entry.status === 'done') success += 1;
+              else failed += 1;
+            });
+          }).then(function() {
+            bookUploadBusy = false;
+            bookUploadEntries.slice().forEach(function(entry) {
+              if (entry.status === 'done') removeFileEntry(entry);
+            });
+            setBookUploadMessage(
+              failed === 0 ? 'success' : 'error',
+              'admin.books.uploadBatchResult',
+              {success: success, failed: failed}
+            );
+            if (success > 0) loadAdminBookIndex();
+            refreshBookUploadControl();
+          });
+        });
+      }
       if (bookSelectPage) bookSelectPage.addEventListener('change', function() {
         var matching = filteredAdminBooks();
         var start = (adminBooksState.page - 1) * adminBooksState.pageSize;

@@ -391,9 +391,12 @@ def run_server(
                 migration_result.state_path
             )
 
+        data_sources = server_dir / "data" / "sources"
+        data_sources.mkdir(parents=True, exist_ok=True)
+        effective_sources = (*config.sources, data_sources)
         manager = library_factory(
             server_dir=server_dir,
-            sources=config.sources,
+            sources=effective_sources,
             state_store=state_store,
             migration_manager=migration_manager,
             reporter=active_reporter,
@@ -454,7 +457,7 @@ def run_server(
                     return
                 try:
                     watcher = watcher_factory(
-                        config.sources,
+                        effective_sources,
                         manager,
                         reporter=active_reporter,
                     )
@@ -481,6 +484,7 @@ def run_server(
             log_errors=True,
             server_directory=server_dir,
             kindle=config.kindle,
+            library_manager=manager,
         )
         uvicorn_config = uvicorn.Config(
             app,

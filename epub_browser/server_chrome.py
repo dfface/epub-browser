@@ -321,6 +321,31 @@ SERVER_ACCOUNT_PANEL = '''
     <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
         <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
         <p class="account-section-copy" data-i18n="admin.booksDescription">Manage book metadata, visibility, member access, tags, AI reading classification, and AI results.</p>
+        <section class="admin-book-upload" id="adminBookUploadSurface" aria-labelledby="adminBookUploadTitle">
+            <div class="admin-book-upload-head">
+                <span class="admin-book-upload-icon" aria-hidden="true"><i class="fas fa-file-arrow-up"></i></span>
+                <div class="admin-book-upload-heading">
+                    <h5 id="adminBookUploadTitle" data-i18n="admin.books.uploadTitle">Upload book</h5>
+                    <p class="account-section-copy" id="adminBookUploadDescription" data-i18n="admin.books.uploadDescription">Upload an EPUB or PDF file to add it to the library. The file is stored on the server and converted automatically.</p>
+                </div>
+            </div>
+            <form id="adminBookUploadForm" class="admin-book-upload-form">
+                <label class="admin-book-dropzone" id="adminBookDropzone" for="adminBookUploadFile">
+                    <i class="fas fa-cloud-arrow-up admin-book-dropzone-icon" aria-hidden="true"></i>
+                    <span class="admin-book-dropzone-title" data-i18n="admin.books.uploadChoose">Click to choose files</span>
+                    <span class="admin-book-dropzone-hint" data-i18n="admin.books.uploadDropHint">or drag and drop them here · EPUB or PDF</span>
+                    <input id="adminBookUploadFile" name="source" type="file" accept=".epub,.pdf" multiple class="admin-book-file-input" aria-describedby="adminBookUploadDescription" aria-required="true">
+                </label>
+                <ul class="admin-book-file-list" id="adminBookUploadFileList" aria-live="polite"></ul>
+                <div class="admin-book-upload-actions">
+                    <p class="auth-alert admin-book-upload-message" id="adminBookUploadMessage" role="status" aria-live="polite" hidden></p>
+                    <button type="button" class="bookshelf-action-btn account-inline-action admin-book-upload-clear" id="adminBookUploadClear" hidden data-i18n="admin.books.uploadClear">Clear</button>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminBookUploadButton" disabled>
+                        <i class="fas fa-upload" aria-hidden="true"></i><span id="adminBookUploadLabel" data-i18n="admin.books.uploadButton">Upload</span>
+                    </button>
+                </div>
+            </form>
+        </section>
         <div id="adminBookTableSurface" class="admin-books-workspace" hidden>
             <div class="account-form admin-books-controls" role="search" aria-labelledby="adminBooksTitle">
                 <label class="admin-book-search-control" for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>

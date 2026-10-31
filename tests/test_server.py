@@ -1620,6 +1620,88 @@ class AdminAccountTests(unittest.TestCase):
         self.admin_client = self._login("admin", "admin-secret")
         self.member_client = self._login("member", "member-secret")
 
+    def test_admin_can_upload_epub_and_pdf_to_sources(self):
+        sources = Path(self.directory.name) / "data" / "sources"
+        epub_response = self.admin_client.post(
+            "/api/admin/books/upload",
+            data=b"PK\x03\x04" + b"\x00" * 20,
+            headers={
+                "Content-Type": "application/epub+zip",
+                "X-EPUB-Browser-Source-Filename": "uploaded.epub",
+            },
+        )
+        self.assertEqual(epub_response.status_code, 201)
+        self.assertTrue((sources / "uploaded.epub").is_file())
+
+        pdf_response = self.admin_client.post(
+            "/api/admin/books/upload",
+            data=b"%PDF-1.4" + b"\x00" * 20,
+            headers={
+                "Content-Type": "application/pdf",
+                "X-EPUB-Browser-Source-Filename": "uploaded.pdf",
+            },
+        )
+        self.assertEqual(pdf_response.status_code, 201)
+        self.assertTrue((sources / "uploaded.pdf").is_file())
+
+    def test_admin_upload_rejects_unsupported_types_and_unsafe_names(self):
+        sources = Path(self.directory.name) / "data" / "sources"
+        unsupported = self.admin_client.post(
+            "/api/admin/books/upload",
+            data=b"hello",
+            headers={
+                "Content-Type": "text/plain",
+                "X-EPUB-Browser-Source-Filename": "notes.txt",
+            },
+        )
+        self.assertEqual(unsupported.status_code, 400)
+        self.assertFalse((sources / "notes.txt").exists())
+
+        traversal = self.admin_client.post(
+            "/api/admin/books/upload",
+            data=b"PK\x03\x04" + b"\x00" * 20,
+            headers={
+                "Content-Type": "application/epub+zip",
+                "X-EPUB-Browser-Source-Filename": "../../evil.epub",
+            },
+        )
+        self.assertEqual(traversal.status_code, 201)
+        self.assertFalse((sources / ".." / "evil.epub").exists())
+        self.assertTrue((sources / "evil.epub").is_file())
+
+        bad_magic = self.admin_client.post(
+            "/api/admin/books/upload",
+            data=b"not a pdf at all",
+            headers={
+                "Content-Type": "application/pdf",
+                "X-EPUB-Browser-Source-Filename": "fake.pdf",
+            },
+        )
+        self.assertEqual(bad_magic.status_code, 400)
+        self.assertFalse((sources / "fake.pdf").exists())
+
+        duplicate = self.admin_client.post(
+            "/api/admin/books/upload",
+            data=b"PK\x03\x04" + b"\x00" * 20,
+            headers={
+                "Content-Type": "application/epub+zip",
+                "X-EPUB-Browser-Source-Filename": "evil.epub",
+            },
+        )
+        self.assertEqual(duplicate.status_code, 409)
+
+    def test_member_cannot_upload_books(self):
+        blocked = self.member_client.post(
+            "/api/admin/books/upload",
+            data=b"PK\x03\x04",
+            headers={
+                "Content-Type": "application/epub+zip",
+                "X-EPUB-Browser-Source-Filename": "blocked.epub",
+            },
+        )
+        self.assertEqual(blocked.status_code, 403)
+        self.assertFalse((Path(self.directory.name) / "data" / "sources" / "blocked.epub").exists())
+
     def _login(self, username, password, **client_options):
         client = TestClient(
             self.app,
