@@ -1,0 +1,21 @@
+.app-dialog-modal { position: fixed; z-index: 10100; inset: 0; display: grid; place-items: center; padding: 20px; color: var(--text); font-family: var(--font-family, system-ui, -apple-system, sans-serif); }
+.app-dialog-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .56); }
+.app-dialog { position: relative; width: min(100%, 440px); padding: 24px; border-radius: var(--border-radius-lg); background: var(--card-bg); box-shadow: var(--shadow-md); }
+.app-dialog-header h2 { margin: 0; font-size: 1.2rem; line-height: 1.35; }
+.app-dialog-message { margin: 12px 0 0; color: var(--text-secondary); line-height: 1.55; white-space: pre-line; }
+.app-dialog-details { display: grid; max-height: min(240px, 35vh); gap: 8px; margin: 14px 0 0; padding: 12px 12px 12px 32px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font-size: .9rem; line-height: 1.45; }
+.app-dialog-label { display: block; margin: 20px 0 8px; color: var(--text); font-size: .9rem; font-weight: 600; }
+.app-dialog-input { width: 100%; min-height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; outline: 0; background: var(--background); color: var(--text); font: inherit; }
+.app-dialog-input:focus { border-color: var(--button-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--button-bg) 24%, transparent); }
+.app-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.app-dialog-button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.app-dialog-button:hover { background: var(--hover); }
+.app-dialog-confirm { background: var(--button-bg); color: var(--button-text); }
+.app-dialog-confirm:hover { background: var(--button-hover); }
+.app-dialog-destructive { background: var(--notification-error); color: #fff; }
+.app-dialog-destructive:hover { background: color-mix(in srgb, var(--notification-error) 86%, #000); }
+.app-dialog-button:disabled { opacity: .48; cursor: not-allowed; }
+.app-dialog-destructive:disabled:hover { background: var(--notification-error); }
+.app-dialog-button:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
+@media (max-width: 600px) { .app-dialog-modal { padding: 14px; align-items: end; }.app-dialog { width: 100%; padding: 20px; }.app-dialog-footer { flex-direction: column-reverse; }.app-dialog-button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .app-dialog-button { transition: none; } }
