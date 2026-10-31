@@ -29,7 +29,7 @@ SERVER_ACCOUNT_CONTROL = '''<button type="button" class="library-meta-action app
         <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>
     </button>
     <button type="button" class="library-meta-action app-nav-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Account" data-i18n-aria-label="account.menu">
-        <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue" data-i18n="account.menu">Account</span>
+        <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue">Account</span>
     </button>'''
 SERVER_ACCOUNT_PANEL = '''
 <div class="bookshelf-modal account-modal" id="accountPanel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="accountTitle">

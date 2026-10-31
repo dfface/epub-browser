@@ -559,9 +559,12 @@ htmlElement.classList.add(theme + "-mode");
         function startLibraryClients() {
             {server_client_start}
         }
-        startLibraryClients();
-        if (window.EpubBrowserMode === 'server' && window.EpubBrowserCacheBoundary) {
-            window.EpubBrowserCacheBoundary.start(function() {});
+        if (window.EpubBrowserMode === 'server') {
+            if (window.EpubBrowserCacheBoundary) {
+                window.EpubBrowserCacheBoundary.start(startLibraryClients);
+            }
+        } else {
+            startLibraryClients();
         }
     });
     </script>

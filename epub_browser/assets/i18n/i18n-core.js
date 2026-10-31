@@ -177,6 +177,11 @@
       function afterLoad() {
         function finish() {
           translateDocument();
+          // Notify locale-change listeners once the initial dictionaries are
+          // ready, just like setLocale does. Listeners that render content via
+          // t() (rather than data-i18n attributes) otherwise run before the
+          // dictionary is loaded and never get a second chance to re-render.
+          notifyListeners();
           reveal();
         }
         if (root.document && root.document.readyState === 'loading') {

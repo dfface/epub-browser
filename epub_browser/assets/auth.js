@@ -1272,10 +1272,10 @@
       var identity = element('accountIdentity');
       var menuValue = element('accountMenuValue');
       if (!sessionState || !sessionState.user) {
-        // Not authenticated: fall back to the translated "Account" label.
-        if (menuValue && !menuValue.getAttribute('data-i18n')) {
-          menuValue.setAttribute('data-i18n', 'account.menu');
-        }
+        // Not authenticated: show the translated "Account" label. The menu
+        // value is JS-controlled (no data-i18n) so translateDocument can never
+        // clobber the signed-in username on locale switches.
+        if (menuValue) menuValue.textContent = t('account.menu');
         if (identity) identity.textContent = '';
         return;
       }
@@ -1285,9 +1285,9 @@
       });
       if (menuValue) {
         // The menu value carries the username (not a translatable string), so
-        // stop translateDocument from overwriting it on locale changes.
+        // it must be set exclusively by renderIdentity, never by
+        // translateDocument.
         menuValue.textContent = sessionState.user.username;
-        menuValue.removeAttribute('data-i18n');
       }
       var adminPanel = element('adminPanel');
       var adminMenu = element('adminMenu');
