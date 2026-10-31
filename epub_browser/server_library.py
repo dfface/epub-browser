@@ -167,6 +167,11 @@ class ServerLibraryManager:
             Path(source).expanduser().absolute() for source in sources
         )
         self.sources = tuple(path.resolve() for path in self._source_inputs)
+        # Uploaded source files live in a server-managed directory that is
+        # intentionally nested under the server directory; it is exempt from the
+        # source-boundary guard below and discovered/monitored like any source.
+        self.managed_sources_dir = self.server_dir / "data" / "sources"
+        self.managed_sources_dir.mkdir(parents=True, exist_ok=True)
         self.state_store = state_store
         self.migration_manager = migration_manager
         self.reporter = reporter or Reporter(False)
@@ -199,6 +204,8 @@ class ServerLibraryManager:
 
     def _validate_source_boundaries(self) -> None:
         for source in self.sources:
+            if source == self.managed_sources_dir:
+                continue
             managed_inside_source = self.server_dir == source or self.server_dir.is_relative_to(source)
             source_inside_managed = source == self.server_dir or source.is_relative_to(self.server_dir)
             if managed_inside_source or source_inside_managed:
